@@ -962,46 +962,81 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                   className="overflow-auto bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700 sm:rounded-r-lg rounded-b-lg sm:rounded-tl-none max-h-60 shadow-lg"
                   style={{ width: `${dropdownWidth}px` }}
                 >
-                  {suggestions.map((suggestionItem, index) => (
-                    <div
-                      key={`${suggestionItem.kind}-${suggestionItem.label}-${index}`}
-                      className={twMerge([
-                        "px-3 py-2 cursor-pointer text-sm flex items-center gap-2",
-                        "hover:bg-gray-100 dark:hover:bg-gray-700",
-                        "text-gray-950 dark:text-white",
-                        highlightedIndex === index && "bg-gray-100 dark:bg-gray-700",
-                      ])}
-                      onClick={() => handleSuggestionClick(suggestionItem)}
-                      onMouseEnter={() => {
-                        setHighlightedIndex(index);
-                        setHighlightedSuggestion(suggestionItem);
-                        if (exampleObj) {
-                          const cursorPosition = inputRef.current?.selectionStart || 0;
-                          const context = getExpressionContext(inputValue, cursorPosition);
-                          const value = computeHighlightedValue(suggestionItem, context);
-                          setHighlightedValue(value);
-                        }
-                      }}
-                    >
-                      <span>{suggestionItem.label}</span>
-                      {suggestionItem.kind === "function" && (
-                        <span className="text-gray-500">{formatFunctionSignature(suggestionItem)}</span>
-                      )}
-                      {suggestionItem.label === "$" && (
-                        <span className="px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded">
-                          event data
+                  {(() => {
+                    const nodeDataSuggestions = suggestions.filter(
+                      (s) => s.label === "$" || s.nodeName || (s.kind !== "function" && s.kind !== "keyword"),
+                    );
+                    const functionSuggestions = suggestions.filter((s) => s.kind === "function");
+
+                    const renderSuggestionItem = (suggestionItem: Suggestion, index: number) => (
+                      <div
+                        key={`${suggestionItem.kind}-${suggestionItem.label}-${index}`}
+                        className={twMerge([
+                          "px-3 py-2 cursor-pointer text-sm flex items-center gap-2",
+                          "hover:bg-gray-100 dark:hover:bg-gray-700",
+                          "text-gray-950 dark:text-white",
+                          highlightedIndex === index && "bg-gray-100 dark:bg-gray-700",
+                        ])}
+                        onClick={() => handleSuggestionClick(suggestionItem)}
+                        onMouseEnter={() => {
+                          setHighlightedIndex(index);
+                          setHighlightedSuggestion(suggestionItem);
+                          if (exampleObj) {
+                            const cursorPosition = inputRef.current?.selectionStart || 0;
+                            const context = getExpressionContext(inputValue, cursorPosition);
+                            const value = computeHighlightedValue(suggestionItem, context);
+                            setHighlightedValue(value);
+                          }
+                        }}
+                      >
+                        <span>{suggestionItem.label}</span>
+                        {suggestionItem.kind === "function" && (
+                          <span className="text-gray-500">{formatFunctionSignature(suggestionItem)}</span>
+                        )}
+                        {suggestionItem.label === "$" && (
+                          <span className="px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded">
+                            event data
+                          </span>
+                        )}
+                        {suggestionItem.kind !== "function" && suggestionItem.labelDetail && (
+                          <span className="px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded">
+                            node
+                          </span>
+                        )}
+                        <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 rounded">
+                          {suggestionItem.detail ?? suggestionItem.kind}
                         </span>
-                      )}
-                      {suggestionItem.kind !== "function" && suggestionItem.labelDetail && (
-                        <span className="px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded">
-                          node
-                        </span>
-                      )}
-                      <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 rounded">
-                        {suggestionItem.detail ?? suggestionItem.kind}
-                      </span>
-                    </div>
-                  ))}
+                      </div>
+                    );
+
+                    // Calculate the starting index for functions (after node data suggestions)
+                    const functionStartIndex = nodeDataSuggestions.length;
+
+                    return (
+                      <>
+                        {nodeDataSuggestions.length > 0 && (
+                          <>
+                            <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0">
+                              Connected nodes data
+                            </div>
+                            {nodeDataSuggestions.map((suggestionItem, idx) =>
+                              renderSuggestionItem(suggestionItem, idx),
+                            )}
+                          </>
+                        )}
+                        {functionSuggestions.length > 0 && (
+                          <>
+                            <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0">
+                              Expr functions
+                            </div>
+                            {functionSuggestions.map((suggestionItem, idx) =>
+                              renderSuggestionItem(suggestionItem, functionStartIndex + idx),
+                            )}
+                          </>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>,
