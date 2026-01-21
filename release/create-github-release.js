@@ -29,7 +29,7 @@ async function main() {
   const repoRoot = path.resolve(__dirname, "..");
   const buildRoot = path.join(repoRoot, `build/superplane-single-host-tarball-${version}`);
   const artifactPath = path.join(buildRoot, "superplane-single-host.tar.gz");
-  const assetName = `superplane-single-host-${version}.tar.gz`;
+  const assetName = "superplane-single-host.tar.gz";
 
   if (!fs.existsSync(artifactPath)) {
     console.error(
