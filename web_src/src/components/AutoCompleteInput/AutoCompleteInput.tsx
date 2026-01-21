@@ -950,7 +950,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const shouldShowValuePreview = showValuePreview && highlightedIndex >= 0;
 
     return (
-      <div ref={containerRef} className={"relative w-full" + (quickTip ? " mb-3" : "")}>
+      <div ref={containerRef} className={"relative w-full" + (quickTip ? " mb-6" : "")}>
         {/* Hidden mirror element for measuring cursor position */}
         <span
           ref={mirrorRef}
@@ -1036,8 +1036,23 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             {...rest}
           />
           {quickTip && (
-            <span className="pointer-events-none absolute -bottom-4 right-1 text-[10px] font-medium text-gray-400 bg-gray-100 rounded-b-md px-2">
-              {quickTip}
+            <span className="absolute -bottom-5 right-0 flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+              <span>
+                Use{" "}
+                <code className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-gray-700 dark:text-gray-300">
+                  {"{{"}
+                </code>{" "}
+                to write{" "}
+                <a
+                  href="https://expr-lang.org/docs/language-definition"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  expr
+                </a>{" "}
+                expressions
+              </span>
             </span>
           )}
         </span>
