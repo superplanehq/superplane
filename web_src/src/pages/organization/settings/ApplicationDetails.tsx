@@ -1,5 +1,5 @@
 import { ArrowLeft, ExternalLink, Loader2, Trash2 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useState, useEffect, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import {
@@ -26,6 +26,7 @@ interface ApplicationDetailsProps {
 
 export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { installationId } = useParams<{ installationId: string }>();
   const [configValues, setConfigValues] = useState<Record<string, unknown>>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -181,6 +182,8 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
     );
   }
 
+  const defaultTab = location.state?.tab === "configuration" ? "configuration" : "overview";
+
   return (
     <div className="pt-6">
       <div className="flex items-center gap-4 mb-6">
@@ -200,7 +203,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
         </div>
       </div>
 
-      <Tabs defaultValue="overview" className="w-full">
+      <Tabs defaultValue={defaultTab} className="w-full">
         <TabsList className="mb-6">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="configuration">Configuration</TabsTrigger>
