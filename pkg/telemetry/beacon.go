@@ -51,7 +51,7 @@ func isBeaconEnabled() bool {
 func sendBeacon() {
 	client := &http.Client{Timeout: 5 * time.Second}
 
-	url := "https://analytics.superplane.com/beacon"
+	url := defaultBeaconURL
 	installationID := os.Getenv("SUPERPLANE_INSTALLATION_ID")
 	installationType := os.Getenv("SUPERPLANE_INSTALLATION_TYPE")
 
