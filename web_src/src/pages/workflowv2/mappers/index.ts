@@ -37,6 +37,11 @@ import {
   triggerRenderers as slackTriggerRenderers,
   eventStateRegistry as slackEventStateRegistry,
 } from "./slack";
+import {
+  componentMappers as smtpComponentMappers,
+  triggerRenderers as smtpTriggerRenderers,
+  eventStateRegistry as smtpEventStateRegistry,
+} from "./smtp";
 import { timeGateMapper } from "./timegate";
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { waitCustomFieldRenderer, waitMapper } from "./wait";
