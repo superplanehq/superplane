@@ -22,6 +22,108 @@ export function generateNodeId(blockName: string, nodeName: string): string {
   return `${sanitizedBlock}-${sanitizedName}-${randomChars}`;
 }
 
+export function normalizeNodeNameBase(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "node";
+  }
+
+  const tokens = trimmed.split(/[^a-zA-Z0-9]+/).filter(Boolean);
+  if (tokens.length === 0) {
+    return "node";
+  }
+
+  const normalized = tokens
+    .map((token, index) => {
+      if (!token) {
+        return "";
+      }
+      if (index === 0) {
+        return token;
+      }
+      return token.charAt(0).toUpperCase() + token.slice(1);
+    })
+    .join("");
+
+  if (!normalized) {
+    return "node";
+  }
+
+  if (/^[a-zA-Z_]/.test(normalized)) {
+    return normalized;
+  }
+
+  return `node${normalized}`;
+}
+
+export function getDefaultNodeName(baseName: string, nodes: ComponentsNode[]): string {
+  const existingNames = collectNodeNames(nodes);
+  const normalizedBase = normalizeNodeNameBase(baseName);
+  return buildOrdinalNodeName(normalizedBase, existingNames);
+}
+
+export function getNextNodeName(baseName: string, nodes: ComponentsNode[]): string {
+  const existingNames = collectNodeNames(nodes);
+  const trimmed = baseName.trim();
+  const base = stripTrailingNumber(trimmed) || trimmed || "node";
+  return buildOrdinalNodeName(base, existingNames);
+}
+
+export function isNodeNameUnique(name: string, nodes: ComponentsNode[], excludeId?: string): boolean {
+  const trimmed = name.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  return !nodes.some((node) => {
+    if (!node.name) {
+      return false;
+    }
+    if (excludeId && node.id === excludeId) {
+      return false;
+    }
+    return node.name.trim() === trimmed;
+  });
+}
+
+function collectNodeNames(nodes: ComponentsNode[]): Set<string> {
+  const names = new Set<string>();
+  nodes.forEach((node) => {
+    if (!node.name) {
+      return;
+    }
+    const trimmed = node.name.trim();
+    if (trimmed) {
+      names.add(trimmed);
+    }
+  });
+  return names;
+}
+
+function buildOrdinalNodeName(baseName: string, existingNames: Set<string>): string {
+  const base = baseName.trim() || "node";
+  let index = 1;
+  let candidate = `${base}${index}`;
+  while (existingNames.has(candidate)) {
+    index += 1;
+    candidate = `${base}${index}`;
+  }
+  return candidate;
+}
+
+function stripTrailingNumber(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+  const match = trimmed.match(/^(.*?)(\d+)$/);
+  if (!match) {
+    return trimmed;
+  }
+  const base = match[1].trimEnd();
+  return base || trimmed;
+}
+
 export function mapTriggerEventsToSidebarEvents(
   events: WorkflowsWorkflowEvent[],
   node: ComponentsNode,

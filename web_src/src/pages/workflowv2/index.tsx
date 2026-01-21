@@ -76,7 +76,10 @@ import {
   buildCanvasStatusLogEntry,
   buildTabData,
   generateNodeId,
+  getDefaultNodeName,
+  getNextNodeName,
   getNextInQueueInfo,
+  isNodeNameUnique,
   mapCanvasNodesToLogEntries,
   mapExecutionsToSidebarEvents,
   mapQueueItemsToSidebarEvents,
@@ -1090,10 +1093,26 @@ export function WorkflowPageV2() {
 
       if (Object.keys(nodeMetadata).length > 0) {
         exampleObj.__nodeNames = nodeMetadata;
+        const nodeNameCounts = Object.values(nodeMetadata).reduce<Record<string, number>>((acc, metadata) => {
+          if (!metadata.name) {
+            return acc;
+          }
+          acc[metadata.name] = (acc[metadata.name] || 0) + 1;
+          return acc;
+        }, {});
         Object.entries(nodeMetadata).forEach(([nodeId, metadata]) => {
           const value = exampleObj[nodeId];
           if (value && typeof value === "object" && !Array.isArray(value)) {
-            (value as Record<string, unknown>).__nodeName = metadata.name;
+            const record = value as Record<string, unknown>;
+            if (typeof record.__nodeName !== "string") {
+              record.__nodeName = metadata.name;
+            }
+            if (typeof record.__nodeId !== "string") {
+              record.__nodeId = nodeId;
+            }
+          }
+          if (metadata.name && nodeNameCounts[metadata.name] === 1 && exampleObj[metadata.name] === undefined) {
+            exampleObj[metadata.name] = value;
           }
         });
       }
@@ -1260,6 +1279,16 @@ export function WorkflowPageV2() {
       // Save snapshot before making changes
       saveWorkflowSnapshot(workflow);
 
+      const trimmedNodeName = updatedNodeName.trim();
+      if (!trimmedNodeName) {
+        showErrorToast("Node name is required");
+        return;
+      }
+      if (!isNodeNameUnique(trimmedNodeName, workflow.spec?.nodes || [], nodeId)) {
+        showErrorToast("Node name must be unique");
+        return;
+      }
+
       // Update the node's configuration, name, and app installation ref in local cache only
       const updatedNodes = workflow?.spec?.nodes?.map((node) => {
         if (node.id === nodeId) {
@@ -1267,7 +1296,7 @@ export function WorkflowPageV2() {
           if (node.type === "TYPE_WIDGET") {
             return {
               ...node,
-              name: updatedNodeName,
+              name: trimmedNodeName,
               configuration: { ...node.configuration, ...updatedConfiguration },
             };
           }
@@ -1275,7 +1304,7 @@ export function WorkflowPageV2() {
           return {
             ...node,
             configuration: updatedConfiguration,
-            name: updatedNodeName,
+            name: trimmedNodeName,
             appInstallation: appInstallationRef,
           };
         }
@@ -1437,13 +1466,17 @@ export function WorkflowPageV2() {
       // Filter configuration to only include visible fields
       const filteredConfiguration = filterVisibleConfiguration(configuration, buildingBlock.configuration || []);
 
+      const existingNodes = workflow.spec?.nodes || [];
+      const baseName = nodeName.trim() || buildingBlock.name || "node";
+      const resolvedNodeName = getDefaultNodeName(baseName, existingNodes);
+
       // Generate a unique node ID
-      const newNodeId = generateNodeId(buildingBlock.name || "node", nodeName.trim());
+      const newNodeId = generateNodeId(buildingBlock.name || "node", resolvedNodeName);
 
       // Create the new node
       const newNode: ComponentsNode = {
         id: newNodeId,
-        name: nodeName.trim(),
+        name: resolvedNodeName,
         type:
           buildingBlock.type === "trigger"
             ? "TYPE_TRIGGER"
@@ -1613,10 +1646,14 @@ export function WorkflowPageV2() {
         data.buildingBlock.configuration || [],
       );
 
+      const existingNodes = (workflow.spec?.nodes || []).filter((node) => node.id !== data.placeholderId);
+      const baseName = data.nodeName.trim() || data.buildingBlock.name || "node";
+      const resolvedNodeName = getDefaultNodeName(baseName, existingNodes);
+
       // Update placeholder with real component data
       const updatedNode: ComponentsNode = {
         ...workflow.spec!.nodes![nodeIndex],
-        name: data.nodeName.trim(),
+        name: resolvedNodeName,
         type:
           data.buildingBlock.type === "trigger"
             ? "TYPE_TRIGGER"
@@ -2080,7 +2117,9 @@ export function WorkflowPageV2() {
         blockName = blueprintMetadata?.name || "blueprint";
       }
 
-      const newNodeId = generateNodeId(blockName, nodeToDuplicate.name || "node");
+      const existingNodes = workflow.spec?.nodes || [];
+      const duplicateName = getNextNodeName(nodeToDuplicate.name || "node", existingNodes);
+      const newNodeId = generateNodeId(blockName, duplicateName);
 
       const offsetX = 50;
       const offsetY = 50;
@@ -2088,7 +2127,7 @@ export function WorkflowPageV2() {
       const duplicateNode: ComponentsNode = {
         ...nodeToDuplicate,
         id: newNodeId,
-        name: nodeToDuplicate.name || "node",
+        name: duplicateName,
         position: {
           x: (nodeToDuplicate.position?.x || 0) + offsetX,
           y: (nodeToDuplicate.position?.y || 0) + offsetY,

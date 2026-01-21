@@ -2,6 +2,7 @@ package workflows
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
@@ -12,10 +13,13 @@ import (
 	compb "github.com/superplanehq/superplane/pkg/protos/components"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+var expressionRegex = regexp.MustCompile(`\{\{(.*?)\}\}`)
 
 func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) (*pb.Workflow, error) {
 	var createdBy *pb.UserRef
@@ -155,6 +159,31 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 		}
 	}
 
+	expressionNodeIDs := make(map[string]struct{})
+	expressionNodeIDsByName := make(map[string][]string)
+	for _, node := range workflow.Spec.Nodes {
+		if node.Type == compb.Node_TYPE_WIDGET {
+			continue
+		}
+		expressionNodeIDs[node.Id] = struct{}{}
+		if node.Name == "" {
+			continue
+		}
+		expressionNodeIDsByName[node.Name] = append(expressionNodeIDsByName[node.Name], node.Id)
+	}
+
+	for _, node := range workflow.Spec.Nodes {
+		if node.Type == compb.Node_TYPE_WIDGET {
+			continue
+		}
+		if _, ok := nodeValidationErrors[node.Id]; ok {
+			continue
+		}
+		if err := validateExpressionReferences(node, expressionNodeIDs, expressionNodeIDsByName); err != nil {
+			nodeValidationErrors[node.Id] = err.Error()
+		}
+	}
+
 	nodeTypes := make(map[string]compb.Node_Type)
 	for _, node := range workflow.Spec.Nodes {
 		nodeTypes[node.Id] = node.Type
@@ -197,6 +226,71 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 	}
 
 	return nodes, actions.ProtoToEdges(workflow.Spec.Edges), nil
+}
+
+func validateExpressionReferences(
+	node *compb.Node,
+	nodeIDs map[string]struct{},
+	nodeIDsByName map[string][]string,
+) error {
+	if node == nil || node.Configuration == nil {
+		return nil
+	}
+
+	var firstErr error
+	collectExpressionReferences(node.Configuration.AsMap(), func(expression string) {
+		if firstErr != nil {
+			return
+		}
+
+		referencedNodes, err := contexts.ParseReferencedNodes(expression)
+		if err != nil {
+			return
+		}
+
+		for _, ref := range referencedNodes {
+			if _, ok := nodeIDs[ref]; ok {
+				continue
+			}
+
+			nodeIDsForName, ok := nodeIDsByName[ref]
+			if !ok {
+				firstErr = fmt.Errorf("expression references unknown node %s", ref)
+				return
+			}
+			if len(nodeIDsForName) != 1 {
+				firstErr = fmt.Errorf("expression references non-unique node name %s", ref)
+				return
+			}
+		}
+	})
+
+	return firstErr
+}
+
+func collectExpressionReferences(value any, visit func(string)) {
+	switch typed := value.(type) {
+	case map[string]any:
+		for _, entry := range typed {
+			collectExpressionReferences(entry, visit)
+		}
+	case []any:
+		for _, entry := range typed {
+			collectExpressionReferences(entry, visit)
+		}
+	case string:
+		matches := expressionRegex.FindAllStringSubmatch(typed, -1)
+		for _, match := range matches {
+			if len(match) < 2 {
+				continue
+			}
+			expression := strings.TrimSpace(match[1])
+			if expression == "" {
+				continue
+			}
+			visit(expression)
+		}
+	}
 }
 
 func validateNodeRef(registry *registry.Registry, organizationID string, node *compb.Node) error {

@@ -235,7 +235,7 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 }
 
 func (b *NodeConfigurationBuilder) BuildMessageChainForExpression(expression string) (map[string]any, error) {
-	referencedNodes, err := parseReferencedNodes(expression)
+	referencedNodes, err := ParseReferencedNodes(expression)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +244,7 @@ func (b *NodeConfigurationBuilder) BuildMessageChainForExpression(expression str
 }
 
 func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, error) {
-	referencedNodes, err := parseReferencedNodes(expression)
+	referencedNodes, err := ParseReferencedNodes(expression)
 	if err != nil {
 		return "", err
 	}
@@ -351,8 +351,13 @@ func (b *NodeConfigurationBuilder) resolveNodeRefs(nodeRefs []string) (map[strin
 	}
 
 	nodeIDs := make(map[string]struct{}, len(nodes))
+	nodeIDsByName := make(map[string][]string, len(nodes))
 	for _, node := range nodes {
 		nodeIDs[node.NodeID] = struct{}{}
+		if node.Name == "" {
+			continue
+		}
+		nodeIDsByName[node.Name] = append(nodeIDsByName[node.Name], node.NodeID)
 	}
 
 	refToNodeID := make(map[string]string, len(nodeRefs))
@@ -362,7 +367,14 @@ func (b *NodeConfigurationBuilder) resolveNodeRefs(nodeRefs []string) (map[strin
 			continue
 		}
 
-		return nil, fmt.Errorf("node %s not found in execution chain", nodeRef)
+		nodeIDsForName, ok := nodeIDsByName[nodeRef]
+		if !ok {
+			return nil, fmt.Errorf("node %s not found in execution chain", nodeRef)
+		}
+		if len(nodeIDsForName) != 1 {
+			return nil, fmt.Errorf("node name %s is not unique", nodeRef)
+		}
+		refToNodeID[nodeRef] = nodeIDsForName[0]
 	}
 
 	return refToNodeID, nil
@@ -524,7 +536,8 @@ func (b *NodeConfigurationBuilder) listExecutionsInChain() ([]models.WorkflowNod
 	return executions, nil
 }
 
-func parseReferencedNodes(expression string) ([]string, error) {
+// ParseReferencedNodes returns the root node references used in an expression.
+func ParseReferencedNodes(expression string) ([]string, error) {
 	tree, err := parser.Parse(expression)
 	if err != nil {
 		return nil, err

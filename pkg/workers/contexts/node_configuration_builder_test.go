@@ -75,6 +75,99 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root(t *testing.T) {
 	assert.Equal(t, "42", result["count"])
 }
 
+func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root_ByName(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{
+			{
+				NodeID: triggerNode,
+				Name:   "triggerNode",
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: componentNode,
+				Name:   "componentNode",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	rootEventData := map[string]any{
+		"user":    "john",
+		"action":  "login",
+		"success": true,
+		"count":   42,
+	}
+	rootEvent := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, triggerNode, "default", nil, rootEventData)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{triggerNode: rootEventData})
+
+	configuration := map[string]any{
+		"user":    "{{ $.triggerNode.user }}",
+		"action":  "{{ $.triggerNode.action }}",
+		"success": "{{ $.triggerNode.success }}",
+		"count":   "{{ $.triggerNode.count }}",
+	}
+
+	result, err := builder.Build(configuration)
+	require.NoError(t, err)
+	assert.Equal(t, "john", result["user"])
+	assert.Equal(t, "login", result["action"])
+	assert.Equal(t, "true", result["success"])
+	assert.Equal(t, "42", result["count"])
+}
+
+func Test_NodeConfigurationBuilder_WorkflowLevelNode_DuplicateNames(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{
+			{
+				NodeID: "node-1",
+				Name:   "dup",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+			{
+				NodeID: "node-2",
+				Name:   "dup",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+		WithInput(map[string]any{"node-1": map[string]any{"value": "ok"}})
+
+	configuration := map[string]any{
+		"value": "{{ $.dup.value }}",
+	}
+
+	_, err := builder.Build(configuration)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "node name dup is not unique")
+}
+
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root_NoRootEvent(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
