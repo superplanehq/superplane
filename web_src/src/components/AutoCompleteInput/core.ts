@@ -35,6 +35,14 @@ export interface Suggestion {
   nodeId?: string;
   /** For node suggestions: the human-readable node name */
   nodeName?: string;
+  /** For function/node suggestions: short description */
+  description?: string;
+  /** For function suggestions: example usage of the function */
+  example?: string;
+  /** For node suggestions: component/trigger type label */
+  componentType?: string;
+  /** For $ selector: number of available nodes */
+  nodeCount?: number;
 }
 
 export interface GetSuggestionsOptions {
@@ -44,96 +52,456 @@ export interface GetSuggestionsOptions {
   allowInStrings?: boolean;
 }
 
-type ExprFunction = { name: string; snippet?: string };
+type ExprFunction = {
+  name: string;
+  snippet?: string;
+  description: string;
+  example: string;
+};
 
 /** Built-in functions (from expr-lang docs categories). */
 export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
   // String
-  { name: "trim", snippet: "trim(${1:str}${2:, ${3:chars}})" },
-  { name: "trimPrefix", snippet: "trimPrefix(${1:str}, ${2:prefix})" },
-  { name: "trimSuffix", snippet: "trimSuffix(${1:str}, ${2:suffix})" },
-  { name: "upper", snippet: "upper(${1:str})" },
-  { name: "lower", snippet: "lower(${1:str})" },
-  { name: "split", snippet: "split(${1:str}, ${2:delimiter}${3:, ${4:n}})" },
-  { name: "splitAfter", snippet: "splitAfter(${1:str}, ${2:delimiter}${3:, ${4:n}})" },
-  { name: "replace", snippet: "replace(${1:str}, ${2:old}, ${3:new})" },
-  { name: "repeat", snippet: "repeat(${1:str}, ${2:n})" },
-  { name: "indexOf", snippet: "indexOf(${1:str}, ${2:substring})" },
-  { name: "lastIndexOf", snippet: "lastIndexOf(${1:str}, ${2:substring})" },
-  { name: "hasPrefix", snippet: "hasPrefix(${1:str}, ${2:prefix})" },
-  { name: "hasSuffix", snippet: "hasSuffix(${1:str}, ${2:suffix})" },
+  {
+    name: "trim",
+    snippet: "trim(${1:str}${2:, ${3:chars}})",
+    description: "Removes whitespace from both ends of a string.",
+    example: 'trim("  Hello  ") == "Hello"',
+  },
+  {
+    name: "trimPrefix",
+    snippet: "trimPrefix(${1:str}, ${2:prefix})",
+    description: "Removes the specified prefix from a string.",
+    example: 'trimPrefix("HelloWorld", "Hello") == "World"',
+  },
+  {
+    name: "trimSuffix",
+    snippet: "trimSuffix(${1:str}, ${2:suffix})",
+    description: "Removes the specified suffix from a string.",
+    example: 'trimSuffix("HelloWorld", "World") == "Hello"',
+  },
+  {
+    name: "upper",
+    snippet: "upper(${1:str})",
+    description: "Converts all characters to uppercase.",
+    example: 'upper("hello") == "HELLO"',
+  },
+  {
+    name: "lower",
+    snippet: "lower(${1:str})",
+    description: "Converts all characters to lowercase.",
+    example: 'lower("HELLO") == "hello"',
+  },
+  {
+    name: "split",
+    snippet: "split(${1:str}, ${2:delimiter}${3:, ${4:n}})",
+    description: "Splits a string by delimiter into an array.",
+    example: 'split("a,b,c", ",") == ["a", "b", "c"]',
+  },
+  {
+    name: "splitAfter",
+    snippet: "splitAfter(${1:str}, ${2:delimiter}${3:, ${4:n}})",
+    description: "Splits a string after each delimiter.",
+    example: 'splitAfter("a,b,c", ",") == ["a,", "b,", "c"]',
+  },
+  {
+    name: "replace",
+    snippet: "replace(${1:str}, ${2:old}, ${3:new})",
+    description: "Replaces all occurrences of old with new.",
+    example: 'replace("hello", "l", "L") == "heLLo"',
+  },
+  {
+    name: "repeat",
+    snippet: "repeat(${1:str}, ${2:n})",
+    description: "Repeats a string n times.",
+    example: 'repeat("Hi", 3) == "HiHiHi"',
+  },
+  {
+    name: "indexOf",
+    snippet: "indexOf(${1:str}, ${2:substring})",
+    description: "Returns index of first occurrence, or -1.",
+    example: 'indexOf("apple pie", "pie") == 6',
+  },
+  {
+    name: "lastIndexOf",
+    snippet: "lastIndexOf(${1:str}, ${2:substring})",
+    description: "Returns index of last occurrence, or -1.",
+    example: 'lastIndexOf("apple apple", "apple") == 6',
+  },
+  {
+    name: "hasPrefix",
+    snippet: "hasPrefix(${1:str}, ${2:prefix})",
+    description: "Returns true if string starts with prefix.",
+    example: 'hasPrefix("HelloWorld", "Hello") == true',
+  },
+  {
+    name: "hasSuffix",
+    snippet: "hasSuffix(${1:str}, ${2:suffix})",
+    description: "Returns true if string ends with suffix.",
+    example: 'hasSuffix("HelloWorld", "World") == true',
+  },
 
   // Date
-  { name: "now", snippet: "now()" },
-  { name: "duration", snippet: "duration(${1:str})" },
-  { name: "date", snippet: "date(${1:str}${2:, ${3:format}}${4:, ${5:timezone}})" },
-  { name: "timezone", snippet: "timezone(${1:str})" },
+  {
+    name: "now",
+    snippet: "now()",
+    description: "Returns the current date and time.",
+    example: "now().Year() == 2024",
+  },
+  {
+    name: "duration",
+    snippet: "duration(${1:str})",
+    description: "Parses a duration string (ns, us, ms, s, m, h).",
+    example: 'duration("1h").Seconds() == 3600',
+  },
+  {
+    name: "date",
+    snippet: "date(${1:str}${2:, ${3:format}}${4:, ${5:timezone}})",
+    description: "Parses a date string with optional format.",
+    example: 'date("2023-08-14").Year() == 2023',
+  },
+  {
+    name: "timezone",
+    snippet: "timezone(${1:str})",
+    description: "Returns a timezone by name.",
+    example: 'timezone("Europe/Zurich")',
+  },
 
   // Number
-  { name: "max", snippet: "max(${1:n1}, ${2:n2})" },
-  { name: "min", snippet: "min(${1:n1}, ${2:n2})" },
-  { name: "abs", snippet: "abs(${1:n})" },
-  { name: "ceil", snippet: "ceil(${1:n})" },
-  { name: "floor", snippet: "floor(${1:n})" },
-  { name: "round", snippet: "round(${1:n})" },
+  {
+    name: "max",
+    snippet: "max(${1:n1}, ${2:n2})",
+    description: "Returns the larger of two numbers.",
+    example: "max(5, 7) == 7",
+  },
+  {
+    name: "min",
+    snippet: "min(${1:n1}, ${2:n2})",
+    description: "Returns the smaller of two numbers.",
+    example: "min(5, 7) == 5",
+  },
+  {
+    name: "abs",
+    snippet: "abs(${1:n})",
+    description: "Returns the absolute value.",
+    example: "abs(-5) == 5",
+  },
+  {
+    name: "ceil",
+    snippet: "ceil(${1:n})",
+    description: "Rounds up to the nearest integer.",
+    example: "ceil(1.5) == 2.0",
+  },
+  {
+    name: "floor",
+    snippet: "floor(${1:n})",
+    description: "Rounds down to the nearest integer.",
+    example: "floor(1.5) == 1.0",
+  },
+  {
+    name: "round",
+    snippet: "round(${1:n})",
+    description: "Rounds to the nearest integer.",
+    example: "round(1.5) == 2.0",
+  },
 
   // Array
-  { name: "all", snippet: "all(${1:array}, ${2:predicate})" },
-  { name: "any", snippet: "any(${1:array}, ${2:predicate})" },
-  { name: "one", snippet: "one(${1:array}, ${2:predicate})" },
-  { name: "none", snippet: "none(${1:array}, ${2:predicate})" },
-  { name: "map", snippet: "map(${1:array}, ${2:predicate})" },
-  { name: "filter", snippet: "filter(${1:array}, ${2:predicate})" },
-  { name: "find", snippet: "find(${1:array}, ${2:predicate})" },
-  { name: "findIndex", snippet: "findIndex(${1:array}, ${2:predicate})" },
-  { name: "findLast", snippet: "findLast(${1:array}, ${2:predicate})" },
-  { name: "findLastIndex", snippet: "findLastIndex(${1:array}, ${2:predicate})" },
-  { name: "groupBy", snippet: "groupBy(${1:array}, ${2:predicate})" },
-  { name: "count", snippet: "count(${1:array}${2:, ${3:predicate}})" },
-  { name: "concat", snippet: "concat(${1:array1}, ${2:array2}${3:, ${4:...}})" },
-  { name: "flatten", snippet: "flatten(${1:array})" },
-  { name: "uniq", snippet: "uniq(${1:array})" },
-  { name: "join", snippet: "join(${1:array}${2:, ${3:delimiter}})" },
-  { name: "reduce", snippet: "reduce(${1:array}, ${2:predicate}${3:, ${4:initialValue}})" },
-  { name: "sum", snippet: "sum(${1:array}${2:, ${3:predicate}})" },
-  { name: "mean", snippet: "mean(${1:array})" },
-  { name: "median", snippet: "median(${1:array})" },
-  { name: "first", snippet: "first(${1:array})" },
-  { name: "last", snippet: "last(${1:array})" },
-  { name: "take", snippet: "take(${1:array}, ${2:n})" },
-  { name: "reverse", snippet: "reverse(${1:array})" },
-  { name: "sort", snippet: "sort(${1:array}${2:, ${3:order}})" },
-  { name: "sortBy", snippet: "sortBy(${1:array}${2:, ${3:predicate}}${4:, ${5:order}})" },
+  {
+    name: "all",
+    snippet: "all(${1:array}, ${2:predicate})",
+    description: "Returns true if all elements satisfy the predicate.",
+    example: "all([1, 2, 3], # > 0) == true",
+  },
+  {
+    name: "any",
+    snippet: "any(${1:array}, ${2:predicate})",
+    description: "Returns true if any element satisfies the predicate.",
+    example: "any([1, 2, 3], # > 2) == true",
+  },
+  {
+    name: "one",
+    snippet: "one(${1:array}, ${2:predicate})",
+    description: "Returns true if exactly one element satisfies.",
+    example: "one([1, 2, 3], # == 2) == true",
+  },
+  {
+    name: "none",
+    snippet: "none(${1:array}, ${2:predicate})",
+    description: "Returns true if no elements satisfy the predicate.",
+    example: "none([1, 2, 3], # > 5) == true",
+  },
+  {
+    name: "map",
+    snippet: "map(${1:array}, ${2:predicate})",
+    description: "Transforms each element using the predicate.",
+    example: "map([1, 2, 3], # * 2) == [2, 4, 6]",
+  },
+  {
+    name: "filter",
+    snippet: "filter(${1:array}, ${2:predicate})",
+    description: "Returns elements that satisfy the predicate.",
+    example: "filter([1, 2, 3], # > 1) == [2, 3]",
+  },
+  {
+    name: "find",
+    snippet: "find(${1:array}, ${2:predicate})",
+    description: "Returns first element that satisfies predicate.",
+    example: "find([1, 2, 3], # > 1) == 2",
+  },
+  {
+    name: "findIndex",
+    snippet: "findIndex(${1:array}, ${2:predicate})",
+    description: "Returns index of first matching element.",
+    example: "findIndex([1, 2, 3], # > 1) == 1",
+  },
+  {
+    name: "findLast",
+    snippet: "findLast(${1:array}, ${2:predicate})",
+    description: "Returns last element that satisfies predicate.",
+    example: "findLast([1, 2, 3], # > 1) == 3",
+  },
+  {
+    name: "findLastIndex",
+    snippet: "findLastIndex(${1:array}, ${2:predicate})",
+    description: "Returns index of last matching element.",
+    example: "findLastIndex([1, 2, 3], # > 1) == 2",
+  },
+  {
+    name: "groupBy",
+    snippet: "groupBy(${1:array}, ${2:predicate})",
+    description: "Groups elements by predicate result.",
+    example: "groupBy(users, .Age)",
+  },
+  {
+    name: "count",
+    snippet: "count(${1:array}${2:, ${3:predicate}})",
+    description: "Counts elements satisfying the predicate.",
+    example: "count([1, 2, 3], # > 1) == 2",
+  },
+  {
+    name: "concat",
+    snippet: "concat(${1:array1}, ${2:array2}${3:, ${4:...}})",
+    description: "Concatenates two or more arrays.",
+    example: "concat([1, 2], [3, 4]) == [1, 2, 3, 4]",
+  },
+  {
+    name: "flatten",
+    snippet: "flatten(${1:array})",
+    description: "Flattens nested arrays into one level.",
+    example: "flatten([[1, 2], [3]]) == [1, 2, 3]",
+  },
+  {
+    name: "uniq",
+    snippet: "uniq(${1:array})",
+    description: "Removes duplicate elements.",
+    example: "uniq([1, 2, 2, 3]) == [1, 2, 3]",
+  },
+  {
+    name: "join",
+    snippet: "join(${1:array}${2:, ${3:delimiter}})",
+    description: "Joins array elements into a string.",
+    example: 'join(["a", "b"], ",") == "a,b"',
+  },
+  {
+    name: "reduce",
+    snippet: "reduce(${1:array}, ${2:predicate}${3:, ${4:initialValue}})",
+    description: "Reduces array to single value using accumulator.",
+    example: "reduce([1, 2, 3], #acc + #, 0) == 6",
+  },
+  {
+    name: "sum",
+    snippet: "sum(${1:array}${2:, ${3:predicate}})",
+    description: "Returns sum of all numbers in array.",
+    example: "sum([1, 2, 3]) == 6",
+  },
+  {
+    name: "mean",
+    snippet: "mean(${1:array})",
+    description: "Returns average of all numbers.",
+    example: "mean([1, 2, 3]) == 2.0",
+  },
+  {
+    name: "median",
+    snippet: "median(${1:array})",
+    description: "Returns median of all numbers.",
+    example: "median([1, 2, 3]) == 2.0",
+  },
+  {
+    name: "first",
+    snippet: "first(${1:array})",
+    description: "Returns first element, or nil if empty.",
+    example: "first([1, 2, 3]) == 1",
+  },
+  {
+    name: "last",
+    snippet: "last(${1:array})",
+    description: "Returns last element, or nil if empty.",
+    example: "last([1, 2, 3]) == 3",
+  },
+  {
+    name: "take",
+    snippet: "take(${1:array}, ${2:n})",
+    description: "Returns first n elements.",
+    example: "take([1, 2, 3, 4], 2) == [1, 2]",
+  },
+  {
+    name: "reverse",
+    snippet: "reverse(${1:array})",
+    description: "Returns array in reverse order.",
+    example: "reverse([1, 2, 3]) == [3, 2, 1]",
+  },
+  {
+    name: "sort",
+    snippet: "sort(${1:array}${2:, ${3:order}})",
+    description: "Sorts array in ascending or descending order.",
+    example: "sort([3, 1, 2]) == [1, 2, 3]",
+  },
+  {
+    name: "sortBy",
+    snippet: "sortBy(${1:array}${2:, ${3:predicate}}${4:, ${5:order}})",
+    description: "Sorts array by predicate result.",
+    example: 'sortBy(users, .Age, "desc")',
+  },
 
   // Map
-  { name: "keys", snippet: "keys(${1:map})" },
-  { name: "values", snippet: "values(${1:map})" },
+  {
+    name: "keys",
+    snippet: "keys(${1:map})",
+    description: "Returns array of map keys.",
+    example: 'keys({a: 1, b: 2}) == ["a", "b"]',
+  },
+  {
+    name: "values",
+    snippet: "values(${1:map})",
+    description: "Returns array of map values.",
+    example: "values({a: 1, b: 2}) == [1, 2]",
+  },
 
   // Type conversion
-  { name: "type", snippet: "type(${1:v})" },
-  { name: "int", snippet: "int(${1:v})" },
-  { name: "float", snippet: "float(${1:v})" },
-  { name: "string", snippet: "string(${1:v})" },
-  { name: "toJSON", snippet: "toJSON(${1:v})" },
-  { name: "fromJSON", snippet: "fromJSON(${1:v})" },
-  { name: "toBase64", snippet: "toBase64(${1:v})" },
-  { name: "fromBase64", snippet: "fromBase64(${1:v})" },
-  { name: "toPairs", snippet: "toPairs(${1:map})" },
-  { name: "fromPairs", snippet: "fromPairs(${1:array})" },
+  {
+    name: "type",
+    snippet: "type(${1:v})",
+    description: "Returns the type name of a value.",
+    example: 'type(42) == "int"',
+  },
+  {
+    name: "int",
+    snippet: "int(${1:v})",
+    description: "Converts value to integer.",
+    example: 'int("123") == 123',
+  },
+  {
+    name: "float",
+    snippet: "float(${1:v})",
+    description: "Converts value to float.",
+    example: 'float("1.5") == 1.5',
+  },
+  {
+    name: "string",
+    snippet: "string(${1:v})",
+    description: "Converts value to string.",
+    example: 'string(123) == "123"',
+  },
+  {
+    name: "toJSON",
+    snippet: "toJSON(${1:v})",
+    description: "Converts value to JSON string.",
+    example: "toJSON({a: 1}) == '{\"a\":1}'",
+  },
+  {
+    name: "fromJSON",
+    snippet: "fromJSON(${1:v})",
+    description: "Parses JSON string to value.",
+    example: "fromJSON('{\"a\":1}') == {a: 1}",
+  },
+  {
+    name: "toBase64",
+    snippet: "toBase64(${1:v})",
+    description: "Encodes string to Base64.",
+    example: 'toBase64("Hello") == "SGVsbG8="',
+  },
+  {
+    name: "fromBase64",
+    snippet: "fromBase64(${1:v})",
+    description: "Decodes Base64 to string.",
+    example: 'fromBase64("SGVsbG8=") == "Hello"',
+  },
+  {
+    name: "toPairs",
+    snippet: "toPairs(${1:map})",
+    description: "Converts map to key-value pairs array.",
+    example: 'toPairs({a: 1}) == [["a", 1]]',
+  },
+  {
+    name: "fromPairs",
+    snippet: "fromPairs(${1:array})",
+    description: "Converts key-value pairs to map.",
+    example: 'fromPairs([["a", 1]]) == {a: 1}',
+  },
 
   // Misc
-  { name: "len", snippet: "len(${1:v})" },
-  { name: "get", snippet: "get(${1:v}, ${2:index})" },
+  {
+    name: "len",
+    snippet: "len(${1:v})",
+    description: "Returns length of array, map, or string.",
+    example: 'len("hello") == 5',
+  },
+  {
+    name: "get",
+    snippet: "get(${1:v}, ${2:index})",
+    description: "Gets element by index/key, or nil if missing.",
+    example: "get([1, 2, 3], 1) == 2",
+  },
 
   // Bitwise
-  { name: "bitand", snippet: "bitand(${1:a}, ${2:b})" },
-  { name: "bitor", snippet: "bitor(${1:a}, ${2:b})" },
-  { name: "bitxor", snippet: "bitxor(${1:a}, ${2:b})" },
-  { name: "bitnand", snippet: "bitnand(${1:a}, ${2:b})" },
-  { name: "bitnot", snippet: "bitnot(${1:a})" },
-  { name: "bitshl", snippet: "bitshl(${1:a}, ${2:b})" },
-  { name: "bitshr", snippet: "bitshr(${1:a}, ${2:b})" },
-  { name: "bitushr", snippet: "bitushr(${1:a}, ${2:b})" },
+  {
+    name: "bitand",
+    snippet: "bitand(${1:a}, ${2:b})",
+    description: "Bitwise AND operation.",
+    example: "bitand(0b1010, 0b1100) == 0b1000",
+  },
+  {
+    name: "bitor",
+    snippet: "bitor(${1:a}, ${2:b})",
+    description: "Bitwise OR operation.",
+    example: "bitor(0b1010, 0b1100) == 0b1110",
+  },
+  {
+    name: "bitxor",
+    snippet: "bitxor(${1:a}, ${2:b})",
+    description: "Bitwise XOR operation.",
+    example: "bitxor(0b1010, 0b1100) == 0b0110",
+  },
+  {
+    name: "bitnand",
+    snippet: "bitnand(${1:a}, ${2:b})",
+    description: "Bitwise AND NOT operation.",
+    example: "bitnand(0b1010, 0b1100) == 0b0010",
+  },
+  {
+    name: "bitnot",
+    snippet: "bitnot(${1:a})",
+    description: "Bitwise NOT operation.",
+    example: "bitnot(0b1010) == -0b1011",
+  },
+  {
+    name: "bitshl",
+    snippet: "bitshl(${1:a}, ${2:b})",
+    description: "Left shift operation.",
+    example: "bitshl(0b101, 2) == 0b10100",
+  },
+  {
+    name: "bitshr",
+    snippet: "bitshr(${1:a}, ${2:b})",
+    description: "Right shift operation.",
+    example: "bitshr(0b101, 1) == 0b10",
+  },
+  {
+    name: "bitushr",
+    snippet: "bitushr(${1:a}, ${2:b})",
+    description: "Unsigned right shift operation.",
+    example: "bitushr(-5, 2) == 4611686018427387902",
+  },
 ] as const;
 
 export function getSuggestions<TGlobals extends Record<string, unknown>>(
@@ -151,15 +519,17 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
     return keys.slice(0, limit).map((k) => {
       const v = (globals as Record<string, unknown>)[k];
       const tailDot = isExpandableValue(v) ? "." : "";
-      const nodeName = getNodeName(globals, k, v);
+      const metadata = getNodeMetadata(globals, k, v);
       return {
         label: `["${k}"]`,
         kind: "variable",
         insertText: `$[${quoteKey(k, envTrigger.quote)}]${tailDot}`,
         detail: getValueTypeLabel(v),
-        labelDetail: formatNodeNameLabel(nodeName),
-        nodeId: nodeName ? k : undefined,
-        nodeName: nodeName,
+        labelDetail: formatNodeNameLabel(metadata.nodeName),
+        nodeId: metadata.nodeName ? k : undefined,
+        nodeName: metadata.nodeName,
+        componentType: metadata.componentType,
+        description: metadata.description,
       };
     });
   }
@@ -175,15 +545,17 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
       .slice(0, limit)
       .map((k) => {
         const v = (globals as Record<string, unknown>)[k];
-        const nodeName = getNodeName(globals, k, v);
+        const metadata = getNodeMetadata(globals, k, v);
         return {
           label: `["${k}"]`,
           kind: "variable",
           insertText: quoteKey(k, bracketCtx.quote), // only the key token
           detail: getValueTypeLabel(v),
-          labelDetail: formatNodeNameLabel(nodeName),
-          nodeId: nodeName ? k : undefined,
-          nodeName: nodeName,
+          labelDetail: formatNodeNameLabel(metadata.nodeName),
+          nodeId: metadata.nodeName ? k : undefined,
+          nodeName: metadata.nodeName,
+          componentType: metadata.componentType,
+          description: metadata.description,
         };
       });
   }
@@ -239,11 +611,14 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
 
   if (includeGlobals) {
     if (!prefix || "$".startsWith(prefix)) {
+      const nodeCount = listGlobalKeys(globals).length;
       out.push({
         label: "$",
         kind: "variable",
         insertText: "$",
         detail: getValueTypeLabel(globals),
+        description: "Root selector for accessing payload data from all connected components.",
+        nodeCount,
       });
     }
   }
@@ -256,6 +631,8 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
           kind: "function",
           insertText: fn.snippet ?? `${fn.name}($0)`,
           detail: "function",
+          description: fn.description,
+          example: fn.example,
         });
       }
     }
@@ -289,23 +666,45 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function getNodeName(globals: Record<string, unknown>, key: string, value: unknown): string | undefined {
+type NodeMetadata = {
+  nodeName?: string;
+  componentType?: string;
+  description?: string;
+};
+
+function getNodeMetadata(globals: Record<string, unknown>, key: string, value: unknown): NodeMetadata {
+  const metadata: NodeMetadata = {};
+
+  // Try to get nodeName from the value itself
   if (isRecord(value)) {
     const nodeName = value.__nodeName;
-    if (typeof nodeName === "string" && nodeName.trim()) return nodeName;
-  }
-
-  const nodeNames = isRecord(globals) ? (globals as Record<string, unknown>).__nodeNames : undefined;
-  if (isRecord(nodeNames)) {
-    const entry = nodeNames[key];
-    if (typeof entry === "string" && entry.trim()) return entry;
-    if (isRecord(entry)) {
-      const name = entry.nodeName ?? entry.name ?? entry.label;
-      if (typeof name === "string" && name.trim()) return name;
+    if (typeof nodeName === "string" && nodeName.trim()) {
+      metadata.nodeName = nodeName;
     }
   }
 
-  return undefined;
+  // Get full metadata from __nodeNames
+  const nodeNames = isRecord(globals) ? (globals as Record<string, unknown>).__nodeNames : undefined;
+  if (isRecord(nodeNames)) {
+    const entry = nodeNames[key];
+    if (typeof entry === "string" && entry.trim()) {
+      metadata.nodeName = metadata.nodeName || entry;
+    } else if (isRecord(entry)) {
+      // New format: { name, componentType, description }
+      const name = entry.name ?? entry.nodeName ?? entry.label;
+      if (typeof name === "string" && name.trim()) {
+        metadata.nodeName = metadata.nodeName || name;
+      }
+      if (typeof entry.componentType === "string" && entry.componentType.trim()) {
+        metadata.componentType = entry.componentType;
+      }
+      if (typeof entry.description === "string" && entry.description.trim()) {
+        metadata.description = entry.description;
+      }
+    }
+  }
+
+  return metadata;
 }
 
 function formatNodeNameLabel(nodeName?: string): string | undefined {

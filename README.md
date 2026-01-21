@@ -41,6 +41,7 @@ A few concrete things teams build with SuperPlane:
 Run the latest demo container:
 
 ```
+docker pull ghcr.io/superplanehq/superplane-demo:stable
 docker run --rm -p 3000:3000 -v spdata:/app/data -ti ghcr.io/superplanehq/superplane-demo:stable
 ```
 

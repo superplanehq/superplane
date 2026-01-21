@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from "react";
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { twMerge } from "tailwind-merge";
 import { getSuggestions, Suggestion } from "./core";
+import { Eye, EyeOff } from "lucide-react";
+import { evaluateExpr, formatExprResult } from "@/lib/exprEvaluator";
 
 export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<"textarea">, "onChange" | "size"> {
   exampleObj: Record<string, unknown> | null;
@@ -49,13 +51,34 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       top: number;
       left: number;
     }>({ top: 0, left: 0 });
+    const [previewMode, setPreviewMode] = useState(false);
     const dropdownWidth = 350;
     const previousWordLength = useRef<number>(0);
     const previousInputValue = useRef<string>(value);
 
+    // Check if input contains any expressions
+    const hasExpressions = useMemo(() => /\{\{.*?\}\}/.test(inputValue), [inputValue]);
+
+    // Check if all expressions are valid
+    const allExpressionsValid = useMemo(() => {
+      if (!exampleObj) return true;
+      const regex = /\{\{(.*?)\}\}/g;
+      let match;
+      while ((match = regex.exec(inputValue)) !== null) {
+        try {
+          evaluateExpr(match[1].trim(), exampleObj);
+        } catch {
+          return false;
+        }
+      }
+      return true;
+    }, [inputValue, exampleObj]);
+
     const containerRef = useRef<HTMLDivElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
+    const suggestionsListRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+    const backdropRef = useRef<HTMLDivElement>(null);
     const mirrorRef = useRef<HTMLSpanElement>(null);
     useImperativeHandle(forwardedRef, () => inputRef.current as HTMLTextAreaElement);
 
@@ -65,6 +88,274 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       if (!textarea) return;
       textarea.style.height = "auto";
       textarea.style.height = `${textarea.scrollHeight}px`;
+    }, []);
+
+    // Tokenize expression content for syntax highlighting
+    const tokenizeExpression = (expr: string): React.ReactNode[] => {
+      const tokens: React.ReactNode[] = [];
+      let i = 0;
+      let key = 0;
+
+      while (i < expr.length) {
+        // Skip whitespace
+        if (/\s/.test(expr[i])) {
+          let ws = "";
+          while (i < expr.length && /\s/.test(expr[i])) {
+            ws += expr[i++];
+          }
+          tokens.push(<span key={key++}>{ws}</span>);
+          continue;
+        }
+
+        // $ selector (root)
+        if (expr[i] === "$") {
+          tokens.push(
+            <span key={key++} className="text-violet-600 dark:text-violet-400 font-semibold">
+              $
+            </span>,
+          );
+          i++;
+          continue;
+        }
+
+        // Property access with dot notation
+        if (expr[i] === ".") {
+          tokens.push(
+            <span key={key++} className="text-gray-500">
+              .
+            </span>,
+          );
+          i++;
+          // Capture the property name
+          let prop = "";
+          while (i < expr.length && /[a-zA-Z0-9_]/.test(expr[i])) {
+            prop += expr[i++];
+          }
+          if (prop) {
+            tokens.push(
+              <span key={key++} className="text-sky-600 dark:text-sky-400">
+                {prop}
+              </span>,
+            );
+          }
+          continue;
+        }
+
+        // Strings (single or double quoted)
+        if (expr[i] === '"' || expr[i] === "'") {
+          const quote = expr[i];
+          let str = quote;
+          i++;
+          while (i < expr.length && expr[i] !== quote) {
+            if (expr[i] === "\\" && i + 1 < expr.length) {
+              str += expr[i++];
+            }
+            str += expr[i++];
+          }
+          if (i < expr.length) str += expr[i++]; // closing quote
+          tokens.push(
+            <span key={key++} className="text-amber-600 dark:text-amber-400">
+              {str}
+            </span>,
+          );
+          continue;
+        }
+
+        // Numbers
+        if (/[0-9]/.test(expr[i])) {
+          let num = "";
+          while (i < expr.length && /[0-9.]/.test(expr[i])) {
+            num += expr[i++];
+          }
+          tokens.push(
+            <span key={key++} className="text-orange-600 dark:text-orange-400">
+              {num}
+            </span>,
+          );
+          continue;
+        }
+
+        // Identifiers (could be functions, keywords, or node names)
+        if (/[a-zA-Z_]/.test(expr[i])) {
+          let ident = "";
+          while (i < expr.length && /[a-zA-Z0-9_]/.test(expr[i])) {
+            ident += expr[i++];
+          }
+          // Check if it's a function call (followed by parenthesis)
+          const isFunction = i < expr.length && expr[i] === "(";
+          // Check if it's a keyword
+          const keywords = [
+            "true",
+            "false",
+            "nil",
+            "null",
+            "in",
+            "not",
+            "and",
+            "or",
+            "matches",
+            "contains",
+            "startsWith",
+            "endsWith",
+          ];
+          const isKeyword = keywords.includes(ident);
+
+          if (isFunction) {
+            tokens.push(
+              <span key={key++} className="text-emerald-600 dark:text-emerald-400">
+                {ident}
+              </span>,
+            );
+          } else if (isKeyword) {
+            tokens.push(
+              <span key={key++} className="text-pink-600 dark:text-pink-400 font-medium">
+                {ident}
+              </span>,
+            );
+          } else {
+            // Regular identifier (likely a node name or variable)
+            tokens.push(
+              <span key={key++} className="text-sky-600 dark:text-sky-400">
+                {ident}
+              </span>,
+            );
+          }
+          continue;
+        }
+
+        // Operators and punctuation
+        const operators = [
+          "==",
+          "!=",
+          ">=",
+          "<=",
+          "&&",
+          "||",
+          "??",
+          "?:",
+          "->",
+          "..",
+          ">",
+          "<",
+          "+",
+          "-",
+          "*",
+          "/",
+          "%",
+          "!",
+          "?",
+          ":",
+          "[",
+          "]",
+          "(",
+          ")",
+          ",",
+          "|",
+        ];
+        let foundOp = false;
+        for (const op of operators) {
+          if (expr.slice(i, i + op.length) === op) {
+            tokens.push(
+              <span key={key++} className="text-gray-500 dark:text-gray-400">
+                {op}
+              </span>,
+            );
+            i += op.length;
+            foundOp = true;
+            break;
+          }
+        }
+        if (foundOp) continue;
+
+        // Fallback: single character
+        tokens.push(<span key={key++}>{expr[i++]}</span>);
+      }
+
+      return tokens;
+    };
+
+    // Evaluate an expression against the exampleObj using the expr evaluator
+    const evaluateExpression = useCallback(
+      (expr: string): { value: string; error?: string } => {
+        if (!exampleObj) return { value: "?", error: "No context available" };
+        try {
+          const result = evaluateExpr(expr.trim(), exampleObj);
+          return { value: formatExprResult(result) };
+        } catch (e) {
+          const errorMsg = e instanceof Error ? e.message : "Evaluation failed";
+          return { value: "error", error: errorMsg };
+        }
+      },
+      [exampleObj],
+    );
+
+    // Render content with highlighted expressions
+    const renderHighlightedContent = (text: string) => {
+      const parts: React.ReactNode[] = [];
+      const regex = /(\{\{)(.*?)(\}\})/g;
+      let lastIndex = 0;
+      let match;
+      let key = 0;
+
+      while ((match = regex.exec(text)) !== null) {
+        // Add text before the match
+        if (match.index > lastIndex) {
+          parts.push(<span key={key++}>{text.slice(lastIndex, match.index)}</span>);
+        }
+        // Add the highlighted expression with syntax coloring
+        if (previewMode) {
+          // In preview mode, show evaluated value or error
+          const result = evaluateExpression(match[2]);
+          if (result.error) {
+            // Error state - show in red with error message
+            parts.push(
+              <span key={key++} className="bg-red-100 dark:bg-red-900/50 rounded-sm">
+                <span className="text-gray-400 dark:text-gray-500">{match[1]}</span>
+                <span className="text-red-600 dark:text-red-400 font-medium">{` error (${result.error}) `}</span>
+                <span className="text-gray-400 dark:text-gray-500">{match[3]}</span>
+              </span>,
+            );
+          } else {
+            // Success state - show in green
+            parts.push(
+              <span key={key++} className="bg-emerald-100 dark:bg-emerald-900/50 rounded-sm">
+                <span className="text-gray-400 dark:text-gray-500">{match[1]}</span>
+                <span className="text-emerald-700 dark:text-emerald-300 font-medium">{` ${result.value} `}</span>
+                <span className="text-gray-400 dark:text-gray-500">{match[3]}</span>
+              </span>,
+            );
+          }
+        } else {
+          parts.push(
+            <span key={key++} className="bg-gray-100 dark:bg-gray-800 rounded-sm">
+              <span className="text-gray-400 dark:text-gray-500">{match[1]}</span>
+              {tokenizeExpression(match[2])}
+              <span className="text-gray-400 dark:text-gray-500">{match[3]}</span>
+            </span>,
+          );
+        }
+        lastIndex = regex.lastIndex;
+      }
+
+      // Add remaining text
+      if (lastIndex < text.length) {
+        parts.push(<span key={key++}>{text.slice(lastIndex)}</span>);
+      }
+
+      // Handle empty text - add a zero-width space to maintain height
+      if (parts.length === 0) {
+        parts.push(<span key={0}>{"\u200B"}</span>);
+      }
+
+      return parts;
+    };
+
+    // Sync scroll between textarea and backdrop
+    const handleScroll = useCallback(() => {
+      if (inputRef.current && backdropRef.current) {
+        backdropRef.current.scrollTop = inputRef.current.scrollTop;
+        backdropRef.current.scrollLeft = inputRef.current.scrollLeft;
+      }
     }, []);
 
     const getWordAtCursor = (text: string, position: number) => {
@@ -638,6 +929,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       onChange?.(newValue);
       setHighlightedIndex(-1);
       requestAnimationFrame(() => {
+        inputRef.current?.focus();
         const cursorTarget = context.startOffset + range.start + insertText.length;
         inputRef.current?.setSelectionRange(cursorTarget, cursorTarget);
       });
@@ -684,6 +976,12 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           }
           // Allow default behavior (newline) when no suggestion is highlighted
           break;
+        case "Tab":
+          if (highlightedIndex >= 0) {
+            e.preventDefault();
+            handleSuggestionClick(suggestions[highlightedIndex]);
+          }
+          break;
         case "Escape":
           setIsOpen(false);
           setHighlightedIndex(-1);
@@ -695,8 +993,10 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
 
     // Scroll highlighted item into view
     useEffect(() => {
-      if (highlightedIndex >= 0 && suggestionsRef.current) {
-        const highlightedElement = suggestionsRef.current.children[highlightedIndex] as HTMLElement;
+      if (highlightedIndex >= 0 && suggestionsListRef.current) {
+        const highlightedElement = suggestionsListRef.current.querySelector(
+          `[data-suggestion-index="${highlightedIndex}"]`,
+        ) as HTMLElement;
         if (highlightedElement) {
           highlightedElement.scrollIntoView({
             block: "nearest",
@@ -710,7 +1010,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const shouldShowValuePreview = showValuePreview && highlightedIndex >= 0;
 
     return (
-      <div ref={containerRef} className={"relative w-full" + (quickTip ? " mb-3" : "")}>
+      <div ref={containerRef} className={"relative w-full" + (quickTip || hasExpressions ? " mb-6" : "")}>
         {/* Hidden mirror element for measuring cursor position */}
         <span
           ref={mirrorRef}
@@ -724,7 +1024,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             left: 0,
           }}
         />
-        {/* Input Field */}
+        {/* Input Field with Syntax Highlighting */}
         <span
           data-slot="control"
           className={twMerge([
@@ -734,6 +1034,24 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             className,
           ])}
         >
+          {/* Backdrop for syntax highlighting */}
+          <div
+            ref={backdropRef}
+            aria-hidden="true"
+            className={twMerge([
+              "font-sm pointer-events-none absolute inset-0 whitespace-pre-wrap break-words overflow-hidden",
+              "rounded-md border border-transparent px-3 py-2 text-base",
+              "text-gray-950 dark:text-white",
+              // Size variants (must match textarea)
+              inputSize === "xs" && "min-h-7 px-2 text-xs",
+              inputSize === "sm" && "min-h-8 px-2 text-sm",
+              inputSize === "md" && "min-h-8 px-3 text-base md:text-sm",
+              inputSize === "lg" && "min-h-11 px-4 text-lg",
+            ])}
+          >
+            {renderHighlightedContent(inputValue)}
+          </div>
+          {/* Textarea with transparent text */}
           <textarea
             ref={inputRef}
             rows={1}
@@ -744,6 +1062,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             onKeyDownCapture={handleCursorChange}
             onClick={handleCursorChange}
             onSelect={handleCursorChange}
+            onScroll={handleScroll}
             onFocus={() => {
               setIsFocused(true);
               if (suggestions.length > 0) {
@@ -759,13 +1078,15 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
               }, 150);
             }}
             placeholder={placeholder}
-            disabled={disabled}
+            disabled={disabled || previewMode}
             className={twMerge([
-              "font-sm bg-white border-gray-300 shadow-xs placeholder:text-gray-500 selection:bg-primary selection:text-primary-foreground",
+              "font-sm bg-transparent border-gray-300 shadow-xs placeholder:text-gray-500 selection:bg-primary/30",
               "relative block w-full min-w-0 appearance-none rounded-md border px-3 py-2 text-base outline-none resize-none overflow-hidden",
               "focus-visible:border-gray-500 focus-visible:ring-ring/50",
               "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
               "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+              // Make text transparent but keep caret visible
+              "text-transparent caret-gray-950 dark:caret-white",
               // Size variants (min-height instead of fixed height)
               inputSize === "xs" && "min-h-7 px-2 text-xs",
               inputSize === "sm" && "min-h-8 px-2 text-sm",
@@ -774,10 +1095,51 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             ])}
             {...rest}
           />
-          {quickTip && (
-            <span className="pointer-events-none absolute -bottom-[21px] right-1 text-[11px] text-gray-500 bg-gray-100 rounded-b-md px-1.5 py-0.5">
-              {quickTip}
-            </span>
+          {/* Bottom bar with preview toggle and quickTip */}
+          {(hasExpressions || quickTip) && (
+            <div className="absolute -bottom-5 left-0 right-0 flex items-center justify-between">
+              {/* Preview toggle - left side */}
+              {hasExpressions ? (
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode(!previewMode)}
+                  className={twMerge([
+                    "flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors",
+                    previewMode
+                      ? allExpressionsValid
+                        ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
+                        : "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
+                      : allExpressionsValid
+                        ? "text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
+                        : "text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30",
+                  ])}
+                >
+                  {previewMode ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                  <span>Preview</span>
+                </button>
+              ) : (
+                <span />
+              )}
+              {/* QuickTip - right side */}
+              {quickTip && (
+                <span className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+                  Use{" "}
+                  <code className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-gray-700 dark:text-gray-300">
+                    {"{{"}
+                  </code>{" "}
+                  to write{" "}
+                  <a
+                    href="https://expr-lang.org/docs/language-definition"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    expr
+                  </a>{" "}
+                  expressions
+                </span>
+              )}
+            </div>
           )}
         </span>
 
@@ -799,45 +1161,159 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                     className="border border-gray-200 dark:border-gray-700 sm:border-r-0 sm:border-t p-3 bg-gray-100 dark:bg-gray-700 sm:rounded-l-lg rounded-t-lg sm:rounded-br-none h-fit self-start shadow-lg"
                     style={{ width: `${valuePreviewWidth}px` }}
                   >
-                    {highlightedSuggestion?.nodeName ? (
+                    {/* $ selector */}
+                    {highlightedSuggestion?.label === "$" ? (
                       <>
-                        <div className="mb-2">
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Node Name</div>
-                          <div className="text-sm text-gray-800 dark:text-white font-medium">
-                            {highlightedSuggestion.nodeName}
-                          </div>
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">$ (Event Data)</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                          Root selector for accessing payload data from all connected components.
                         </div>
-                        <div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Node ID</div>
-                          <div className="text-sm text-gray-800 dark:text-white font-mono break-all">
-                            {highlightedSuggestion.nodeId}
+                        <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2 text-sky-400">
+                          {highlightedSuggestion.nodeCount ?? 0} node
+                          {highlightedSuggestion.nodeCount !== 1 ? "s" : ""} available
+                        </div>
+                      </>
+                    ) : /* Node suggestions */
+                    highlightedSuggestion?.nodeName ? (
+                      <>
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">
+                          {highlightedSuggestion.componentType || "Component"}
+                        </div>
+                        {highlightedSuggestion.description && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                            {highlightedSuggestion.description}
+                          </div>
+                        )}
+                        <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2 space-y-1">
+                          <div className="flex justify-between">
+                            <span className="text-gray-500">Name</span>
+                            <span className="text-sky-400 truncate ml-2 max-w-[120px]">
+                              {highlightedSuggestion.nodeName}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-500">ID</span>
+                            <span className="text-gray-400 truncate ml-2 max-w-[120px]">
+                              {highlightedSuggestion.nodeId}
+                            </span>
                           </div>
                         </div>
                       </>
-                    ) : highlightedSuggestion?.kind === "function" ? (
+                    ) : /* Function suggestions */
+                    highlightedSuggestion?.kind === "function" ? (
                       <>
-                        <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Function</div>
-                        <div className="text-sm text-gray-800 dark:text-white font-mono">
-                          {highlightedSuggestion.label}
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">
+                          {highlightedSuggestion.label}()
+                        </div>
+                        {highlightedSuggestion.description && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                            {highlightedSuggestion.description}
+                          </div>
+                        )}
+                        {highlightedSuggestion.example && (
+                          <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2 text-emerald-400 break-all">
+                            {highlightedSuggestion.example}
+                          </div>
+                        )}
+                      </>
+                    ) : /* Object values */
+                    highlightedValue !== null &&
+                      typeof highlightedValue === "object" &&
+                      !Array.isArray(highlightedValue) ? (
+                      <>
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Object</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                          {
+                            Object.keys(highlightedValue as Record<string, unknown>).filter((k) => !k.startsWith("__"))
+                              .length
+                          }{" "}
+                          properties
+                        </div>
+                        <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2 space-y-0.5">
+                          {Object.keys(highlightedValue as Record<string, unknown>)
+                            .filter((k) => !k.startsWith("__"))
+                            .slice(0, 5)
+                            .map((key) => (
+                              <div key={key} className="truncate">
+                                <span className="text-gray-400">.</span>
+                                <span className="text-sky-400">{key}</span>
+                              </div>
+                            ))}
+                          {Object.keys(highlightedValue as Record<string, unknown>).filter((k) => !k.startsWith("__"))
+                            .length > 5 && (
+                            <div className="text-gray-500 mt-1">
+                              +
+                              {Object.keys(highlightedValue as Record<string, unknown>).filter(
+                                (k) => !k.startsWith("__"),
+                              ).length - 5}{" "}
+                              more...
+                            </div>
+                          )}
                         </div>
                       </>
-                    ) : highlightedValue !== undefined &&
-                      (highlightedValue === null ||
-                        (typeof highlightedValue !== "object" && !Array.isArray(highlightedValue))) ? (
+                    ) : /* Array values */
+                    Array.isArray(highlightedValue) ? (
                       <>
-                        <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Value Preview</div>
-                        <div className="text-sm text-gray-800 dark:text-white font-mono break-all">
-                          {highlightedValue === null
-                            ? "null"
-                            : typeof highlightedValue === "string"
-                              ? `"${highlightedValue}"`
-                              : String(highlightedValue)}
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Array</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                          {highlightedValue.length} item{highlightedValue.length !== 1 ? "s" : ""}
+                        </div>
+                        {highlightedValue.length > 0 && (
+                          <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2">
+                            <span className="text-gray-400">[</span>
+                            <span className="text-purple-400">{typeof highlightedValue[0]}</span>
+                            <span className="text-gray-400">, ...]</span>
+                          </div>
+                        )}
+                      </>
+                    ) : /* String values */
+                    typeof highlightedValue === "string" ? (
+                      <>
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">String</div>
+                        {highlightedValue.length > 50 && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                            {highlightedValue.length} characters
+                          </div>
+                        )}
+                        <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2 break-all">
+                          <span className="text-amber-400">"</span>
+                          <span className="text-amber-300">
+                            {highlightedValue.length > 100 ? highlightedValue.slice(0, 100) + "..." : highlightedValue}
+                          </span>
+                          <span className="text-amber-400">"</span>
+                        </div>
+                      </>
+                    ) : /* Number values */
+                    typeof highlightedValue === "number" ? (
+                      <>
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Number</div>
+                        <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2 text-orange-400">
+                          {highlightedValue}
+                        </div>
+                      </>
+                    ) : /* Boolean values */
+                    typeof highlightedValue === "boolean" ? (
+                      <>
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Boolean</div>
+                        <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2">
+                          <span className={highlightedValue ? "text-green-400" : "text-red-400"}>
+                            {String(highlightedValue)}
+                          </span>
+                        </div>
+                      </>
+                    ) : /* Null values */
+                    highlightedValue === null ? (
+                      <>
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Null</div>
+                        <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2 text-gray-500 italic">
+                          null
                         </div>
                       </>
                     ) : (
+                      /* Fallback: show type */
                       <>
-                        <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Type</div>
-                        <div className="text-sm text-gray-800 dark:text-white font-mono">
+                        <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Type</div>
+                        <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2 text-gray-300">
                           {highlightedSuggestion?.detail ?? highlightedSuggestion?.kind ?? "unknown"}
                         </div>
                       </>
@@ -845,49 +1321,94 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                   </div>
                 )}
                 <div
+                  ref={suggestionsListRef}
                   className="overflow-auto bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700 sm:rounded-r-lg rounded-b-lg sm:rounded-tl-none max-h-60 shadow-lg"
                   style={{ width: `${dropdownWidth}px` }}
                 >
-                  {suggestions.map((suggestionItem, index) => (
-                    <div
-                      key={`${suggestionItem.kind}-${suggestionItem.label}-${index}`}
-                      className={twMerge([
-                        "px-3 py-2 cursor-pointer text-sm flex items-center gap-2",
-                        "hover:bg-gray-100 dark:hover:bg-gray-700",
-                        "text-gray-800 dark:text-white",
-                        highlightedIndex === index && "bg-gray-100 dark:bg-gray-700",
-                      ])}
-                      onClick={() => handleSuggestionClick(suggestionItem)}
-                      onMouseEnter={() => {
-                        setHighlightedIndex(index);
-                        setHighlightedSuggestion(suggestionItem);
-                        if (exampleObj) {
-                          const cursorPosition = inputRef.current?.selectionStart || 0;
-                          const context = getExpressionContext(inputValue, cursorPosition);
-                          const value = computeHighlightedValue(suggestionItem, context);
-                          setHighlightedValue(value);
-                        }
-                      }}
-                    >
-                      <span>{suggestionItem.label}</span>
-                      {suggestionItem.kind === "function" && (
-                        <span className="text-gray-500">{formatFunctionSignature(suggestionItem)}</span>
-                      )}
-                      {suggestionItem.label === "$" && (
-                        <span className="px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded">
-                          event data
+                  {(() => {
+                    const nodeDataSuggestions = suggestions.filter(
+                      (s) => s.label === "$" || s.nodeName || (s.kind !== "function" && s.kind !== "keyword"),
+                    );
+                    const functionSuggestions = suggestions.filter((s) => s.kind === "function");
+
+                    const renderSuggestionItem = (suggestionItem: Suggestion, index: number) => (
+                      <div
+                        key={`${suggestionItem.kind}-${suggestionItem.label}-${index}`}
+                        data-suggestion-index={index}
+                        className={twMerge([
+                          "px-3 py-2 cursor-pointer text-sm flex items-center gap-2",
+                          "hover:bg-gray-100 dark:hover:bg-gray-700",
+                          "text-gray-950 dark:text-white",
+                          highlightedIndex === index && "bg-gray-100 dark:bg-gray-700",
+                        ])}
+                        onMouseDown={(e) => {
+                          e.preventDefault(); // Prevent blur on the input
+                          handleSuggestionClick(suggestionItem);
+                        }}
+                        onMouseEnter={() => {
+                          setHighlightedIndex(index);
+                          setHighlightedSuggestion(suggestionItem);
+                          if (exampleObj) {
+                            const cursorPosition = inputRef.current?.selectionStart || 0;
+                            const context = getExpressionContext(inputValue, cursorPosition);
+                            const value = computeHighlightedValue(suggestionItem, context);
+                            setHighlightedValue(value);
+                          }
+                        }}
+                      >
+                        <span className="truncate min-w-0">{suggestionItem.label}</span>
+                        {suggestionItem.kind === "function" && (
+                          <span className="text-gray-500 truncate min-w-0">
+                            {formatFunctionSignature(suggestionItem)}
+                          </span>
+                        )}
+                        {suggestionItem.label === "$" && (
+                          <span className="flex-shrink-0 px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded">
+                            event data
+                          </span>
+                        )}
+                        {suggestionItem.kind !== "function" && suggestionItem.labelDetail && (
+                          <span className="flex-shrink-0 px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded">
+                            node
+                          </span>
+                        )}
+                        <span className="flex-shrink-0 px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 rounded">
+                          {suggestionItem.detail ?? suggestionItem.kind}
                         </span>
-                      )}
-                      {suggestionItem.kind !== "function" && suggestionItem.labelDetail && (
-                        <span className="px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded">
-                          node
+                        <span className="ml-auto flex-shrink-0 text-[10px] text-gray-400 dark:text-gray-500 border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5">
+                          Tab
                         </span>
-                      )}
-                      <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 rounded">
-                        {suggestionItem.detail ?? suggestionItem.kind}
-                      </span>
-                    </div>
-                  ))}
+                      </div>
+                    );
+
+                    // Calculate the starting index for functions (after node data suggestions)
+                    const functionStartIndex = nodeDataSuggestions.length;
+
+                    return (
+                      <>
+                        {nodeDataSuggestions.length > 0 && (
+                          <>
+                            <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0">
+                              Connected nodes data
+                            </div>
+                            {nodeDataSuggestions.map((suggestionItem, idx) =>
+                              renderSuggestionItem(suggestionItem, idx),
+                            )}
+                          </>
+                        )}
+                        {functionSuggestions.length > 0 && (
+                          <>
+                            <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0">
+                              Expr functions
+                            </div>
+                            {functionSuggestions.map((suggestionItem, idx) =>
+                              renderSuggestionItem(suggestionItem, functionStartIndex + idx),
+                            )}
+                          </>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>,
