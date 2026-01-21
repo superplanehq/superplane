@@ -2004,15 +2004,15 @@ function CanvasContent({
             </ZoomSlider>
             <Panel
               position="bottom-left"
-              className="bg-white text-gray-800 outline-1 outline-slate-950/25 flex gap-0.5 rounded-md p-0.5"
-              style={{ marginLeft: 288 }}
+              className="bg-white text-gray-800 outline-1 outline-slate-950/25 flex items-center gap-1 rounded-md p-0.5 h-8"
+              style={{ marginLeft: 300 }}
             >
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 text-xs font-medium"
+                    className="h-8 items-center text-xs font-medium"
                     onClick={() => handleLogButtonClick("all")}
                   >
                     <ScrollText className="h-3 w-3" />
@@ -2025,7 +2025,7 @@ function CanvasContent({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 text-xs font-medium"
+                    className="h-8 items-center text-xs font-medium"
                     onClick={() => handleLogButtonClick("error")}
                   >
                     <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"} />
@@ -2041,14 +2041,14 @@ function CanvasContent({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 text-xs font-medium"
+                    className="h-8 items-center text-xs font-medium"
                     onClick={() => handleLogButtonClick("warning")}
                   >
                     <TriangleAlert
-                      className={logCounts.warning > 0 ? "h-3 w-3 text-amber-600" : "h-3 w-3 text-gray-800"}
+                      className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800"}
                     />
                     <span
-                      className={logCounts.warning > 0 ? "tabular-nums text-amber-600" : "tabular-nums text-gray-800"}
+                      className={logCounts.warning > 0 ? "tabular-nums text-orange-500" : "tabular-nums text-gray-800"}
                     >
                       {logCounts.warning}
                     </span>

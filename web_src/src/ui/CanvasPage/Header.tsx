@@ -196,8 +196,8 @@ export function Header({
                   setExportAction("");
                 }}
               >
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Export YAML" />
+                <SelectTrigger className="w-20">
+                  <SelectValue placeholder="YAML" />
                 </SelectTrigger>
                 <SelectContent align="end">
                   <SelectItem value="copy">

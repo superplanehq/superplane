@@ -413,7 +413,7 @@ export const ConfigurationFieldRenderer = ({
                 validationErrors &&
                 isRequired &&
                 (value === undefined || value === null || value === ""))) && (
-              <span className="text-red-500 text-xs ml-2">Required</span>
+              <span className="text-red-500 text-xs ml-2 leading-0">Required</span>
             )}
         </Label>
       </div>
