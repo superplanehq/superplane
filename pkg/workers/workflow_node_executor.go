@@ -277,6 +277,8 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		WorkflowID:     execution.WorkflowID.String(),
 		OrganizationID: workflow.OrganizationID.String(),
 		NodeID:         execution.NodeID,
+		RootEventID:    execution.RootEventID,
+		EventID:        execution.EventID,
 		SourceNodeID:   inputEvent.NodeID,
 		BaseURL:        w.baseURL,
 		Configuration:  execution.Configuration.Data(),

@@ -122,6 +122,8 @@ type ExecutionContext struct {
 	WorkflowID      string
 	OrganizationID  string
 	NodeID          string
+	RootEventID     uuid.UUID
+	EventID         uuid.UUID
 	SourceNodeID    string
 	BaseURL         string
 	Data            any

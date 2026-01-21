@@ -2830,7 +2830,8 @@ function prepareData(
   nodes: CanvasNode[];
   edges: CanvasEdge[];
 } {
-  const edges = workflow?.spec?.edges?.map(prepareEdge) || [];
+  const edges =
+    workflow?.spec?.edges?.map((edge) => prepareEdge(edge, workflow?.spec?.nodes || [])) || [];
   const orderedNodes = (workflow?.spec?.nodes || []).slice().sort((a, b) => {
     const aIsLoop = isLoopNode(a);
     const bIsLoop = isLoopNode(b);
@@ -3293,14 +3294,22 @@ function prepareMergeNode(
   };
 }
 
-function prepareEdge(edge: ComponentsEdge): CanvasEdge {
+function prepareEdge(edge: ComponentsEdge, nodes: ComponentsNode[]): CanvasEdge {
   const id = `${edge.sourceId!}-targets->${edge.targetId!}-using->${edge.channel!}`;
+  let targetHandle: string | null = null;
+  const targetNode = nodes.find((node) => node.id === edge.targetId);
+  if (targetNode && isLoopNode(targetNode)) {
+    const sourceNode = nodes.find((node) => node.id === edge.sourceId);
+    const sourceParentId = sourceNode ? getParentNodeId(sourceNode) : null;
+    targetHandle = sourceParentId === targetNode.id ? "loop-output" : "loop-input";
+  }
 
   return {
     id: id,
     source: edge.sourceId!,
     target: edge.targetId!,
     sourceHandle: edge.channel!,
+    targetHandle,
   };
 }
 

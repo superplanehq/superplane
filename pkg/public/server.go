@@ -780,6 +780,8 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 				ID:             execution.ID,
 				WorkflowID:     execution.WorkflowID.String(),
 				NodeID:         execution.NodeID,
+				RootEventID:    execution.RootEventID,
+				EventID:        execution.EventID,
 				BaseURL:        s.BaseURL,
 				Configuration:  execution.Configuration.Data(),
 				HTTP:           contexts.NewHTTPContext(s.registry.GetHTTPClient()),

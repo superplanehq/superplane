@@ -107,6 +107,8 @@ const HANDLE_STYLE = {
   border: "3px solid #C9D5E1",
   background: "transparent",
 };
+const LOOP_ANCHOR_TOP = 52;
+const LOOP_ANCHOR_PADDING = 8;
 
 function LeftHandle({ data, nodeId }: BlockProps) {
   if (data.type === "trigger" || data.type === "annotation") return null;
@@ -130,6 +132,48 @@ function LeftHandle({ data, nodeId }: BlockProps) {
   const hoveredEdge = (data as any)._hoveredEdge;
   const connectingFrom = (data as any)._connectingFrom;
   const allEdges = (data as any)._allEdges || [];
+
+  if (data.type === "loop" && !isCollapsed) {
+    const isAlreadyConnected = connectingFrom
+      ? allEdges.some((edge: any) => edge.source === connectingFrom.nodeId && edge.target === nodeId)
+      : false;
+    const isHighlighted =
+      (hoveredEdge && hoveredEdge.target === nodeId) ||
+      (connectingFrom &&
+        connectingFrom.nodeId !== nodeId &&
+        connectingFrom.handleType === "source" &&
+        !isAlreadyConnected);
+
+    return (
+      <div
+        className="absolute"
+        style={{
+          left: LOOP_ANCHOR_PADDING,
+          top: LOOP_ANCHOR_TOP,
+          transform: "translateY(-50%)",
+        }}
+      >
+        <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1">
+          <Handle
+            type="target"
+            position={Position.Left}
+            id="loop-input"
+            style={{
+              ...HANDLE_STYLE,
+              position: "relative",
+              pointerEvents: "auto",
+              transform: "none",
+              left: "auto",
+              right: "auto",
+              top: "auto",
+            }}
+            className={isHighlighted ? "highlighted" : undefined}
+          />
+          <span className="text-xs font-medium whitespace-nowrap text-slate-500">Loop input</span>
+        </div>
+      </div>
+    );
+  }
 
   // Check if already connected to the source being dragged
   const isAlreadyConnected = connectingFrom
@@ -190,11 +234,82 @@ function RightHandle({ data, nodeId }: BlockProps) {
   })();
 
   const channels = data.outputChannels || ["default"];
+  const isLoopNode = data.type === "loop";
 
   // Get hovered edge info and connecting state
   const hoveredEdge = (data as any)._hoveredEdge;
   const connectingFrom = (data as any)._connectingFrom;
   const allEdges = (data as any)._allEdges || [];
+
+  if (isLoopNode && channels.length === 1 && !isCollapsed) {
+    const channel = channels[0] || "default";
+    const isAlreadyConnected = connectingFrom
+      ? allEdges.some(
+          (edge: any) =>
+            edge.source === nodeId && edge.sourceHandle === channel && edge.target === connectingFrom.nodeId,
+        )
+      : false;
+
+    const isSourceHighlighted =
+      (hoveredEdge && hoveredEdge.source === nodeId && hoveredEdge.sourceHandle === channel) ||
+      (connectingFrom && connectingFrom.nodeId === nodeId && connectingFrom.handleId === channel) ||
+      (connectingFrom &&
+        connectingFrom.nodeId !== nodeId &&
+        connectingFrom.handleType === "target" &&
+        !isAlreadyConnected);
+
+    const isTargetHighlighted =
+      (hoveredEdge && hoveredEdge.target === nodeId) ||
+      (connectingFrom &&
+        connectingFrom.nodeId !== nodeId &&
+        connectingFrom.handleType === "source" &&
+        !isAlreadyConnected);
+
+    return (
+      <div
+        className="absolute"
+        style={{
+          right: LOOP_ANCHOR_PADDING,
+          top: LOOP_ANCHOR_TOP,
+          transform: "translateY(-50%)",
+        }}
+      >
+        <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1">
+          <Handle
+            type="target"
+            position={Position.Left}
+            id="loop-output"
+            style={{
+              ...HANDLE_STYLE,
+              position: "relative",
+              pointerEvents: "auto",
+              transform: "none",
+              left: "auto",
+              right: "auto",
+              top: "auto",
+            }}
+            className={isTargetHighlighted ? "highlighted" : undefined}
+          />
+          <span className="text-xs font-medium whitespace-nowrap text-slate-500">Loop output</span>
+          <Handle
+            type="source"
+            position={Position.Right}
+            id={channel}
+            style={{
+              ...HANDLE_STYLE,
+              position: "relative",
+              pointerEvents: "auto",
+              transform: "none",
+              left: "auto",
+              right: "auto",
+              top: "auto",
+            }}
+            className={isSourceHighlighted ? "highlighted" : undefined}
+          />
+        </div>
+      </div>
+    );
+  }
 
   // Single channel: render one handle that respects collapsed state
   if (channels.length === 1) {

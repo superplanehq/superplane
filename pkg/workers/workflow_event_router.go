@@ -3,6 +3,7 @@ package workers
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"golang.org/x/sync/semaphore"
@@ -14,6 +15,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/telemetry"
+)
+
+const (
+	loopComponentName        = "loop"
+	loopIterationPayloadType = "loop.iteration"
+	loopOutputPayloadType    = "loop.output"
 )
 
 type WorkflowEventRouter struct {
@@ -118,8 +125,10 @@ func (w *WorkflowEventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event
 		return nil, nil, err
 	}
 
+	nodeMeta := buildNodeMeta(workflow)
+
 	if event.ExecutionID == nil {
-		queueItems, err := w.processRootEvent(tx, workflow, event)
+		queueItems, err := w.processRootEvent(tx, workflow, event, nodeMeta)
 		return queueItems, nil, err
 	}
 
@@ -132,16 +141,16 @@ func (w *WorkflowEventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event
 		return w.processChildExecutionEvent(tx, logger, workflow, execution, event)
 	}
 
-	queueItems, err := w.processExecutionEvent(tx, logger, workflow, execution, event)
+	queueItems, err := w.processExecutionEvent(tx, logger, workflow, execution, event, nodeMeta)
 	return queueItems, execution, err
 }
 
-func (w *WorkflowEventRouter) processRootEvent(tx *gorm.DB, workflow *models.Workflow, event *models.WorkflowEvent) ([]models.WorkflowNodeQueueItem, error) {
+func (w *WorkflowEventRouter) processRootEvent(tx *gorm.DB, workflow *models.Workflow, event *models.WorkflowEvent, nodeMeta map[string]nodeMeta) ([]models.WorkflowNodeQueueItem, error) {
 	now := time.Now()
 
 	w.logger.Infof("Processing root event %s", event.ID)
 
-	edges := workflow.FindEdges(event.NodeID, event.Channel)
+	edges := filterEdges(workflow.FindEdges(event.NodeID, event.Channel), nodeMeta)
 	var queueItems []models.WorkflowNodeQueueItem
 	for _, edge := range edges {
 		targetNode, err := models.FindWorkflowNode(tx, workflow.ID, edge.TargetID)
@@ -176,14 +185,95 @@ func (w *WorkflowEventRouter) processRootEvent(tx *gorm.DB, workflow *models.Wor
 	return queueItems, nil
 }
 
-func (w *WorkflowEventRouter) processExecutionEvent(tx *gorm.DB, logger *log.Entry, workflow *models.Workflow, execution *models.WorkflowNodeExecution, event *models.WorkflowEvent) ([]models.WorkflowNodeQueueItem, error) {
+func (w *WorkflowEventRouter) processExecutionEvent(tx *gorm.DB, logger *log.Entry, workflow *models.Workflow, execution *models.WorkflowNodeExecution, event *models.WorkflowEvent, nodeMeta map[string]nodeMeta) ([]models.WorkflowNodeQueueItem, error) {
 	now := time.Now()
 
 	logger = logging.WithExecution(logger, execution, nil)
 	w.logger.Infof("Processing event")
 
+	if meta, ok := nodeMeta[execution.NodeID]; ok && meta.IsLoop {
+		switch eventPayloadType(event) {
+		case loopIterationPayloadType:
+			return w.processLoopIterationEvent(tx, workflow, execution, event, nodeMeta)
+		case loopOutputPayloadType:
+			return w.processLoopOutputEvent(tx, workflow, execution, event, nodeMeta)
+		}
+	}
+
 	var createdQueueItems []models.WorkflowNodeQueueItem
-	edges := workflow.FindEdges(execution.NodeID, event.Channel)
+	edges := filterEdges(workflow.FindEdges(execution.NodeID, event.Channel), nodeMeta)
+	for _, edge := range edges {
+		targetNode, err := models.FindWorkflowNode(tx, workflow.ID, edge.TargetID)
+		if err != nil {
+			return nil, err
+		}
+
+		if targetNode.State == models.WorkflowNodeStateError {
+			continue
+		}
+
+		queueItem := models.WorkflowNodeQueueItem{
+			WorkflowID:  workflow.ID,
+			NodeID:      targetNode.NodeID,
+			RootEventID: execution.RootEventID,
+			EventID:     event.ID,
+			CreatedAt:   &now,
+		}
+
+		if err := tx.Create(&queueItem).Error; err != nil {
+			return nil, err
+		}
+
+		createdQueueItems = append(createdQueueItems, queueItem)
+	}
+
+	return createdQueueItems, event.RoutedInTransaction(tx)
+}
+
+func (w *WorkflowEventRouter) processLoopIterationEvent(tx *gorm.DB, workflow *models.Workflow, execution *models.WorkflowNodeExecution, event *models.WorkflowEvent, nodeMeta map[string]nodeMeta) ([]models.WorkflowNodeQueueItem, error) {
+	now := time.Now()
+	loopID := execution.NodeID
+
+	entryNodes := loopEntryNodes(workflow, loopID, nodeMeta, event.Channel)
+	if len(entryNodes) == 0 {
+		return nil, event.RoutedInTransaction(tx)
+	}
+
+	var createdQueueItems []models.WorkflowNodeQueueItem
+	for _, nodeID := range entryNodes {
+		targetNode, err := models.FindWorkflowNode(tx, workflow.ID, nodeID)
+		if err != nil {
+			return nil, err
+		}
+
+		if targetNode.State == models.WorkflowNodeStateError {
+			continue
+		}
+
+		queueItem := models.WorkflowNodeQueueItem{
+			WorkflowID:  workflow.ID,
+			NodeID:      targetNode.NodeID,
+			RootEventID: execution.RootEventID,
+			EventID:     event.ID,
+			CreatedAt:   &now,
+		}
+
+		if err := tx.Create(&queueItem).Error; err != nil {
+			return nil, err
+		}
+
+		createdQueueItems = append(createdQueueItems, queueItem)
+	}
+
+	return createdQueueItems, event.RoutedInTransaction(tx)
+}
+
+func (w *WorkflowEventRouter) processLoopOutputEvent(tx *gorm.DB, workflow *models.Workflow, execution *models.WorkflowNodeExecution, event *models.WorkflowEvent, nodeMeta map[string]nodeMeta) ([]models.WorkflowNodeQueueItem, error) {
+	now := time.Now()
+	loopID := execution.NodeID
+
+	edges := filterLoopOutputEdges(filterEdges(workflow.FindEdges(loopID, event.Channel), nodeMeta), nodeMeta)
+	var createdQueueItems []models.WorkflowNodeQueueItem
 	for _, edge := range edges {
 		targetNode, err := models.FindWorkflowNode(tx, workflow.ID, edge.TargetID)
 		if err != nil {
@@ -388,6 +478,157 @@ func (w *WorkflowEventRouter) completeParentExecutionIfNeeded(
 
 	logger.Infof("Parent execution completed")
 	return event.RoutedInTransaction(tx)
+}
+
+type nodeMeta struct {
+	ParentID string
+	IsLoop   bool
+}
+
+func buildNodeMeta(workflow *models.Workflow) map[string]nodeMeta {
+	meta := make(map[string]nodeMeta, len(workflow.Nodes))
+	for _, node := range workflow.Nodes {
+		parentID := ""
+		if node.Metadata != nil {
+			if raw, ok := node.Metadata["parentNodeId"]; ok {
+				if parent, ok := raw.(string); ok {
+					parentID = strings.TrimSpace(parent)
+				}
+			}
+		}
+
+		isLoop := node.Ref.Component != nil && node.Ref.Component.Name == loopComponentName
+		meta[node.ID] = nodeMeta{ParentID: parentID, IsLoop: isLoop}
+	}
+
+	return meta
+}
+
+func filterEdges(edges []models.Edge, meta map[string]nodeMeta) []models.Edge {
+	if len(edges) == 0 {
+		return edges
+	}
+
+	filtered := make([]models.Edge, 0, len(edges))
+	for _, edge := range edges {
+		if edgeAllowed(edge, meta) {
+			filtered = append(filtered, edge)
+		}
+	}
+
+	return filtered
+}
+
+func edgeAllowed(edge models.Edge, meta map[string]nodeMeta) bool {
+	source := meta[edge.SourceID]
+	target := meta[edge.TargetID]
+
+	if source.ParentID != "" {
+		if target.ParentID == source.ParentID {
+			return true
+		}
+		if edge.TargetID == source.ParentID {
+			return true
+		}
+		return false
+	}
+
+	if target.ParentID != "" {
+		return edge.SourceID == target.ParentID
+	}
+
+	return true
+}
+
+func filterLoopOutputEdges(edges []models.Edge, meta map[string]nodeMeta) []models.Edge {
+	if len(edges) == 0 {
+		return edges
+	}
+
+	filtered := make([]models.Edge, 0, len(edges))
+	for _, edge := range edges {
+		if meta[edge.TargetID].ParentID != "" {
+			continue
+		}
+		filtered = append(filtered, edge)
+	}
+
+	return filtered
+}
+
+func loopEntryNodes(workflow *models.Workflow, loopID string, meta map[string]nodeMeta, channel string) []string {
+	children := map[string]struct{}{}
+	for nodeID, info := range meta {
+		if info.ParentID == loopID {
+			children[nodeID] = struct{}{}
+		}
+	}
+
+	if len(children) == 0 {
+		return nil
+	}
+
+	explicit := map[string]struct{}{}
+	for _, edge := range workflow.Edges {
+		if edge.SourceID != loopID || edge.Channel != channel {
+			continue
+		}
+		if _, ok := children[edge.TargetID]; ok {
+			explicit[edge.TargetID] = struct{}{}
+		}
+	}
+
+	if len(explicit) > 0 {
+		return stringSetKeys(explicit)
+	}
+
+	incoming := map[string]struct{}{}
+	for _, edge := range workflow.Edges {
+		if _, ok := children[edge.SourceID]; !ok {
+			continue
+		}
+		if _, ok := children[edge.TargetID]; !ok {
+			continue
+		}
+		incoming[edge.TargetID] = struct{}{}
+	}
+
+	entries := []string{}
+	for childID := range children {
+		if _, ok := incoming[childID]; ok {
+			continue
+		}
+		entries = append(entries, childID)
+	}
+
+	return entries
+}
+
+func stringSetKeys(values map[string]struct{}) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+func eventPayloadType(event *models.WorkflowEvent) string {
+	payload, ok := event.Data.Data().(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	rawType, ok := payload["type"]
+	if !ok {
+		return ""
+	}
+
+	value, ok := rawType.(string)
+	if !ok {
+		return ""
+	}
+
+	return value
 }
 
 func (w *WorkflowEventRouter) findChildrenForNode(allChildren []models.WorkflowNodeExecution, nodeID string) []models.WorkflowNodeExecution {
