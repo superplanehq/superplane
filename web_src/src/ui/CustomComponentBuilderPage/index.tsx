@@ -365,6 +365,7 @@ function CanvasContent({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       onMove={handleMove}
+      deleteKeyCode={null}
       minZoom={0.4}
       maxZoom={1.5}
       zoomOnScroll={true}

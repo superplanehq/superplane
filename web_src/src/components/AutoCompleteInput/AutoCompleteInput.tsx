@@ -82,12 +82,18 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const mirrorRef = useRef<HTMLSpanElement>(null);
     useImperativeHandle(forwardedRef, () => inputRef.current as HTMLTextAreaElement);
 
-    // Auto-resize textarea based on content
+    // Auto-resize textarea based on content (and backdrop in preview mode)
     const adjustTextareaHeight = useCallback(() => {
       const textarea = inputRef.current;
+      const backdrop = backdropRef.current;
       if (!textarea) return;
       textarea.style.height = "auto";
-      textarea.style.height = `${textarea.scrollHeight}px`;
+      // In preview mode, backdrop content may be longer than textarea content
+      // Use the larger of the two heights
+      const textareaHeight = textarea.scrollHeight;
+      const backdropHeight = backdrop?.scrollHeight ?? 0;
+      const finalHeight = Math.max(textareaHeight, backdropHeight);
+      textarea.style.height = `${finalHeight}px`;
     }, []);
 
     // Tokenize expression content for syntax highlighting
@@ -797,10 +803,10 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       setInputValue(value);
     }, [value]);
 
-    // Adjust textarea height when value changes
+    // Adjust textarea height when value or preview mode changes
     useEffect(() => {
       adjustTextareaHeight();
-    }, [inputValue, adjustTextareaHeight]);
+    }, [inputValue, previewMode, adjustTextareaHeight]);
 
     useEffect(() => {
       previousInputValue.current = inputValue;

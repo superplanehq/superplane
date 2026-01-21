@@ -458,6 +458,52 @@ class Parser {
 // EVALUATOR
 // ============================================================================
 
+// Wrapper for Duration that provides expr-lang compatible methods
+class ExprDuration {
+  constructor(private ms: number) {}
+
+  Hours(): number {
+    return this.ms / (1000 * 60 * 60);
+  }
+  Minutes(): number {
+    return this.ms / (1000 * 60);
+  }
+  Seconds(): number {
+    return this.ms / 1000;
+  }
+  Milliseconds(): number {
+    return this.ms;
+  }
+  Microseconds(): number {
+    return this.ms * 1000;
+  }
+  Nanoseconds(): number {
+    return this.ms * 1000000;
+  }
+  Abs(): ExprDuration {
+    return new ExprDuration(Math.abs(this.ms));
+  }
+  Round(m?: ExprDuration): ExprDuration {
+    if (!m || !(m instanceof ExprDuration)) {
+      throw new Error("Round() requires a duration argument");
+    }
+    const ms = m.Milliseconds();
+    if (ms <= 0) return this;
+    return new ExprDuration(Math.round(this.ms / ms) * ms);
+  }
+  Truncate(m?: ExprDuration): ExprDuration {
+    if (!m || !(m instanceof ExprDuration)) {
+      throw new Error("Truncate() requires a duration argument");
+    }
+    const ms = m.Milliseconds();
+    if (ms <= 0) return this;
+    return new ExprDuration(Math.floor(this.ms / ms) * ms);
+  }
+  toString(): string {
+    return `${this.ms}ms`;
+  }
+}
+
 // Wrapper for Date that provides expr-lang compatible methods
 class ExprDate {
   constructor(private date: Date) {}
@@ -490,6 +536,89 @@ class ExprDate {
   }
   Unix(): number {
     return Math.floor(this.date.getTime() / 1000);
+  }
+  UnixMilli(): number {
+    return this.date.getTime();
+  }
+  UnixMicro(): number {
+    return this.date.getTime() * 1000;
+  }
+  UnixNano(): number {
+    return this.date.getTime() * 1000000;
+  }
+  Format(layout?: string): string {
+    // Simple format implementation (Go-style layout patterns)
+    // Default to ISO-like format if no layout provided
+    const fmt = layout ?? "2006-01-02 15:04:05";
+    const pad = (n: number, width: number = 2) => String(n).padStart(width, "0");
+    return fmt
+      .replace("2006", String(this.date.getFullYear()))
+      .replace("01", pad(this.date.getMonth() + 1))
+      .replace("02", pad(this.date.getDate()))
+      .replace("15", pad(this.date.getHours()))
+      .replace("04", pad(this.date.getMinutes()))
+      .replace("05", pad(this.date.getSeconds()));
+  }
+  Add(duration?: ExprDuration): ExprDate {
+    if (!duration || !(duration instanceof ExprDuration)) {
+      throw new Error('Add() requires a duration argument, e.g., Add(duration("1h"))');
+    }
+    return new ExprDate(new Date(this.date.getTime() + duration.Milliseconds()));
+  }
+  Sub(other?: ExprDate): ExprDuration {
+    if (!other || !(other instanceof ExprDate)) {
+      throw new Error("Sub() requires a time argument");
+    }
+    return new ExprDuration(this.date.getTime() - other.date.getTime());
+  }
+  Before(other?: ExprDate): boolean {
+    if (!other || !(other instanceof ExprDate)) {
+      throw new Error("Before() requires a time argument");
+    }
+    return this.date.getTime() < other.date.getTime();
+  }
+  After(other?: ExprDate): boolean {
+    if (!other || !(other instanceof ExprDate)) {
+      throw new Error("After() requires a time argument");
+    }
+    return this.date.getTime() > other.date.getTime();
+  }
+  Equal(other?: ExprDate): boolean {
+    if (!other || !(other instanceof ExprDate)) {
+      throw new Error("Equal() requires a time argument");
+    }
+    return this.date.getTime() === other.date.getTime();
+  }
+  In(): ExprDate {
+    // Timezone conversion not fully supported in JS - return as-is
+    return this;
+  }
+  UTC(): ExprDate {
+    return this; // JS dates are already in UTC internally
+  }
+  Local(): ExprDate {
+    return this;
+  }
+  IsZero(): boolean {
+    return this.date.getTime() === 0;
+  }
+  Round(duration?: ExprDuration): ExprDate {
+    if (!duration || !(duration instanceof ExprDuration)) {
+      throw new Error('Round() requires a duration argument, e.g., Round(duration("1h"))');
+    }
+    const ms = duration.Milliseconds();
+    if (ms <= 0) return this;
+    const rounded = Math.round(this.date.getTime() / ms) * ms;
+    return new ExprDate(new Date(rounded));
+  }
+  Truncate(duration?: ExprDuration): ExprDate {
+    if (!duration || !(duration instanceof ExprDuration)) {
+      throw new Error('Truncate() requires a duration argument, e.g., Truncate(duration("1h"))');
+    }
+    const ms = duration.Milliseconds();
+    if (ms <= 0) return this;
+    const truncated = Math.floor(this.date.getTime() / ms) * ms;
+    return new ExprDate(new Date(truncated));
   }
   toString(): string {
     return this.date.toISOString();
@@ -539,6 +668,31 @@ const BUILTIN_FUNCTIONS: Record<string, (...args: unknown[]) => unknown> = {
   // Date functions
   now: () => new ExprDate(new Date()),
   date: (str: unknown) => new ExprDate(new Date(String(str))),
+  duration: (str: unknown) => {
+    // Parse duration string like "1h", "30m", "1h30m", "2s", "500ms"
+    const s = String(str);
+    let ms = 0;
+    const patterns = [
+      { regex: /(\d+)h/g, mult: 60 * 60 * 1000 },
+      { regex: /(\d+)m(?!s)/g, mult: 60 * 1000 },
+      { regex: /(\d+)s(?!$)/g, mult: 1000 },
+      { regex: /(\d+)ms/g, mult: 1 },
+      { regex: /(\d+)us/g, mult: 0.001 },
+      { regex: /(\d+)ns/g, mult: 0.000001 },
+    ];
+    for (const { regex, mult } of patterns) {
+      let match;
+      while ((match = regex.exec(s)) !== null) {
+        ms += parseInt(match[1], 10) * mult;
+      }
+    }
+    // Handle plain seconds at end (e.g., "30s")
+    const plainSeconds = s.match(/(\d+)s$/);
+    if (plainSeconds) {
+      ms += parseInt(plainSeconds[1], 10) * 1000;
+    }
+    return new ExprDuration(ms);
+  },
 
   // Number functions
   max: (a: unknown, b: unknown) => Math.max(Number(a), Number(b)),
