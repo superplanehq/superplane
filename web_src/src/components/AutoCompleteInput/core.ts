@@ -65,79 +65,81 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
   {
     name: "trim",
     snippet: "trim(${1:str}${2:, ${3:chars}})",
-    description: "Removes whitespace from both ends of a string.",
+    description:
+      "Removes whitespace from both ends of a string. If the optional chars argument is given, removes those characters instead.",
     example: 'trim("  Hello  ") == "Hello"',
   },
   {
     name: "trimPrefix",
     snippet: "trimPrefix(${1:str}, ${2:prefix})",
-    description: "Removes the specified prefix from a string.",
+    description: "Removes the specified prefix from the string if it starts with that prefix.",
     example: 'trimPrefix("HelloWorld", "Hello") == "World"',
   },
   {
     name: "trimSuffix",
     snippet: "trimSuffix(${1:str}, ${2:suffix})",
-    description: "Removes the specified suffix from a string.",
+    description: "Removes the specified suffix from the string if it ends with that suffix.",
     example: 'trimSuffix("HelloWorld", "World") == "Hello"',
   },
   {
     name: "upper",
     snippet: "upper(${1:str})",
-    description: "Converts all characters to uppercase.",
+    description: "Converts all characters in the string to uppercase.",
     example: 'upper("hello") == "HELLO"',
   },
   {
     name: "lower",
     snippet: "lower(${1:str})",
-    description: "Converts all characters to lowercase.",
+    description: "Converts all characters in the string to lowercase.",
     example: 'lower("HELLO") == "hello"',
   },
   {
     name: "split",
     snippet: "split(${1:str}, ${2:delimiter}${3:, ${4:n}})",
-    description: "Splits a string by delimiter into an array.",
+    description:
+      "Splits the string at each instance of the delimiter and returns an array of substrings. Optional n limits the number of splits.",
     example: 'split("a,b,c", ",") == ["a", "b", "c"]',
   },
   {
     name: "splitAfter",
     snippet: "splitAfter(${1:str}, ${2:delimiter}${3:, ${4:n}})",
-    description: "Splits a string after each delimiter.",
+    description: "Splits the string after each instance of the delimiter. Optional n limits the number of splits.",
     example: 'splitAfter("a,b,c", ",") == ["a,", "b,", "c"]',
   },
   {
     name: "replace",
     snippet: "replace(${1:str}, ${2:old}, ${3:new})",
-    description: "Replaces all occurrences of old with new.",
-    example: 'replace("hello", "l", "L") == "heLLo"',
+    description: "Replaces all occurrences of old in string with new.",
+    example: 'replace("Hello World", "World", "Universe") == "Hello Universe"',
   },
   {
     name: "repeat",
     snippet: "repeat(${1:str}, ${2:n})",
-    description: "Repeats a string n times.",
+    description: "Repeats the string n times.",
     example: 'repeat("Hi", 3) == "HiHiHi"',
   },
   {
     name: "indexOf",
     snippet: "indexOf(${1:str}, ${2:substring})",
-    description: "Returns index of first occurrence, or -1.",
+    description: "Returns the index of the first occurrence of the substring in the string, or -1 if not found.",
     example: 'indexOf("apple pie", "pie") == 6',
   },
   {
     name: "lastIndexOf",
     snippet: "lastIndexOf(${1:str}, ${2:substring})",
-    description: "Returns index of last occurrence, or -1.",
-    example: 'lastIndexOf("apple apple", "apple") == 6',
+    description: "Returns the index of the last occurrence of the substring in the string, or -1 if not found.",
+    example: 'lastIndexOf("apple pie apple", "apple") == 10',
   },
   {
     name: "hasPrefix",
     snippet: "hasPrefix(${1:str}, ${2:prefix})",
-    description: "Returns true if string starts with prefix.",
+    description: "Returns true if string starts with the given prefix.",
     example: 'hasPrefix("HelloWorld", "Hello") == true',
   },
   {
     name: "hasSuffix",
     snippet: "hasSuffix(${1:str}, ${2:suffix})",
-    description: "Returns true if string ends with suffix.",
+    description: "Returns true if string ends with the given suffix.",
     example: 'hasSuffix("HelloWorld", "World") == true',
   },
 
@@ -145,25 +147,26 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
   {
     name: "now",
     snippet: "now()",
-    description: "Returns the current date and time.",
+    description: "Returns the current date as a time.Time value.",
     example: "now().Year() == 2024",
   },
   {
     name: "duration",
     snippet: "duration(${1:str})",
-    description: "Parses a duration string (ns, us, ms, s, m, h).",
+    description: 'Returns a time.Duration value of the given string. Valid units: "ns", "us", "ms", "s", "m", "h".',
     example: 'duration("1h").Seconds() == 3600',
   },
   {
     name: "date",
     snippet: "date(${1:str}${2:, ${3:format}}${4:, ${5:timezone}})",
-    description: "Parses a date string with optional format.",
+    description:
+      "Converts the given string into a date. Optional format specifies the date format using Go time layout. Optional timezone specifies the timezone.",
     example: 'date("2023-08-14").Year() == 2023',
   },
   {
     name: "timezone",
     snippet: "timezone(${1:str})",
-    description: "Returns a timezone by name.",
+    description: "Returns a timezone by name. Use with date.In() to convert dates to different timezones.",
     example: 'timezone("Europe/Zurich")',
   },
 
@@ -171,37 +174,37 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
   {
     name: "max",
     snippet: "max(${1:n1}, ${2:n2})",
-    description: "Returns the larger of two numbers.",
+    description: "Returns the maximum of the two numbers.",
     example: "max(5, 7) == 7",
   },
   {
     name: "min",
     snippet: "min(${1:n1}, ${2:n2})",
-    description: "Returns the smaller of two numbers.",
+    description: "Returns the minimum of the two numbers.",
     example: "min(5, 7) == 5",
   },
   {
     name: "abs",
     snippet: "abs(${1:n})",
-    description: "Returns the absolute value.",
+    description: "Returns the absolute value of a number.",
     example: "abs(-5) == 5",
   },
   {
     name: "ceil",
     snippet: "ceil(${1:n})",
-    description: "Rounds up to the nearest integer.",
+    description: "Returns the least integer value greater than or equal to x.",
     example: "ceil(1.5) == 2.0",
   },
   {
     name: "floor",
     snippet: "floor(${1:n})",
-    description: "Rounds down to the nearest integer.",
+    description: "Returns the greatest integer value less than or equal to x.",
     example: "floor(1.5) == 1.0",
   },
   {
     name: "round",
     snippet: "round(${1:n})",
-    description: "Rounds to the nearest integer.",
+    description: "Returns the nearest integer, rounding half away from zero.",
     example: "round(1.5) == 2.0",
   },
 
@@ -209,73 +212,75 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
   {
     name: "all",
     snippet: "all(${1:array}, ${2:predicate})",
-    description: "Returns true if all elements satisfy the predicate.",
+    description: "Returns true if all elements satisfy the predicate. If the array is empty, returns true.",
     example: "all([1, 2, 3], # > 0) == true",
   },
   {
     name: "any",
     snippet: "any(${1:array}, ${2:predicate})",
-    description: "Returns true if any element satisfies the predicate.",
+    description: "Returns true if any element satisfies the predicate. If the array is empty, returns false.",
     example: "any([1, 2, 3], # > 2) == true",
   },
   {
     name: "one",
     snippet: "one(${1:array}, ${2:predicate})",
-    description: "Returns true if exactly one element satisfies.",
+    description: "Returns true if exactly one element satisfies the predicate. If the array is empty, returns false.",
     example: "one([1, 2, 3], # == 2) == true",
   },
   {
     name: "none",
     snippet: "none(${1:array}, ${2:predicate})",
-    description: "Returns true if no elements satisfy the predicate.",
+    description:
+      "Returns true if all elements do not satisfy the predicate (none satisfy). If the array is empty, returns true.",
     example: "none([1, 2, 3], # > 5) == true",
   },
   {
     name: "map",
     snippet: "map(${1:array}, ${2:predicate})",
-    description: "Transforms each element using the predicate.",
+    description: "Returns a new array by applying the predicate to each element of the array.",
     example: "map([1, 2, 3], # * 2) == [2, 4, 6]",
   },
   {
     name: "filter",
     snippet: "filter(${1:array}, ${2:predicate})",
-    description: "Returns elements that satisfy the predicate.",
+    description: "Returns a new array by filtering elements of the array by the predicate.",
     example: "filter([1, 2, 3], # > 1) == [2, 3]",
   },
   {
     name: "find",
     snippet: "find(${1:array}, ${2:predicate})",
-    description: "Returns first element that satisfies predicate.",
+    description: "Finds the first element in an array that satisfies the predicate.",
     example: "find([1, 2, 3], # > 1) == 2",
   },
   {
     name: "findIndex",
     snippet: "findIndex(${1:array}, ${2:predicate})",
-    description: "Returns index of first matching element.",
+    description: "Finds the index of the first element in an array that satisfies the predicate.",
     example: "findIndex([1, 2, 3], # > 1) == 1",
   },
   {
     name: "findLast",
     snippet: "findLast(${1:array}, ${2:predicate})",
-    description: "Returns last element that satisfies predicate.",
+    description: "Finds the last element in an array that satisfies the predicate.",
     example: "findLast([1, 2, 3], # > 1) == 3",
   },
   {
     name: "findLastIndex",
     snippet: "findLastIndex(${1:array}, ${2:predicate})",
-    description: "Returns index of last matching element.",
+    description: "Finds the index of the last element in an array that satisfies the predicate.",
     example: "findLastIndex([1, 2, 3], # > 1) == 2",
   },
   {
     name: "groupBy",
     snippet: "groupBy(${1:array}, ${2:predicate})",
-    description: "Groups elements by predicate result.",
+    description: "Groups the elements of an array by the result of the predicate.",
     example: "groupBy(users, .Age)",
   },
   {
     name: "count",
     snippet: "count(${1:array}${2:, ${3:predicate}})",
-    description: "Counts elements satisfying the predicate.",
+    description:
+      "Returns the number of elements that satisfy the predicate. If no predicate, counts true elements in the array.",
     example: "count([1, 2, 3], # > 1) == 2",
   },
   {
@@ -287,79 +292,83 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
   {
     name: "flatten",
     snippet: "flatten(${1:array})",
-    description: "Flattens nested arrays into one level.",
+    description: "Flattens a given array into a one-dimensional array.",
     example: "flatten([[1, 2], [3]]) == [1, 2, 3]",
   },
   {
     name: "uniq",
     snippet: "uniq(${1:array})",
-    description: "Removes duplicate elements.",
+    description: "Removes duplicates from an array.",
     example: "uniq([1, 2, 2, 3]) == [1, 2, 3]",
   },
   {
     name: "join",
     snippet: "join(${1:array}${2:, ${3:delimiter}})",
-    description: "Joins array elements into a string.",
+    description:
+      "Joins an array of strings into a single string with the given delimiter. If no delimiter, uses empty string.",
     example: 'join(["a", "b"], ",") == "a,b"',
   },
   {
     name: "reduce",
     snippet: "reduce(${1:array}, ${2:predicate}${3:, ${4:initialValue}})",
-    description: "Reduces array to single value using accumulator.",
+    description:
+      "Applies a predicate to each element, reducing the array to a single value. Uses #acc for accumulator and # for current element.",
     example: "reduce([1, 2, 3], #acc + #, 0) == 6",
   },
   {
     name: "sum",
     snippet: "sum(${1:array}${2:, ${3:predicate}})",
-    description: "Returns sum of all numbers in array.",
+    description:
+      "Returns the sum of all numbers in the array. If predicate is given, applies it to each element before summing.",
     example: "sum([1, 2, 3]) == 6",
   },
   {
     name: "mean",
     snippet: "mean(${1:array})",
-    description: "Returns average of all numbers.",
+    description: "Returns the average of all numbers in the array.",
     example: "mean([1, 2, 3]) == 2.0",
   },
   {
     name: "median",
     snippet: "median(${1:array})",
-    description: "Returns median of all numbers.",
+    description: "Returns the median of all numbers in the array.",
     example: "median([1, 2, 3]) == 2.0",
   },
   {
     name: "first",
     snippet: "first(${1:array})",
-    description: "Returns first element, or nil if empty.",
+    description: "Returns the first element from an array. If the array is empty, returns nil.",
     example: "first([1, 2, 3]) == 1",
   },
   {
     name: "last",
     snippet: "last(${1:array})",
-    description: "Returns last element, or nil if empty.",
+    description: "Returns the last element from an array. If the array is empty, returns nil.",
     example: "last([1, 2, 3]) == 3",
   },
   {
     name: "take",
     snippet: "take(${1:array}, ${2:n})",
-    description: "Returns first n elements.",
+    description:
+      "Returns the first n elements from an array. If array has fewer than n elements, returns the whole array.",
     example: "take([1, 2, 3, 4], 2) == [1, 2]",
   },
   {
     name: "reverse",
     snippet: "reverse(${1:array})",
-    description: "Returns array in reverse order.",
+    description: "Returns a new reversed copy of the array.",
     example: "reverse([1, 2, 3]) == [3, 2, 1]",
   },
   {
     name: "sort",
     snippet: "sort(${1:array}${2:, ${3:order}})",
-    description: "Sorts array in ascending or descending order.",
+    description: 'Sorts an array in ascending order. Optional order argument: "asc" or "desc".',
     example: "sort([3, 1, 2]) == [1, 2, 3]",
   },
   {
     name: "sortBy",
     snippet: "sortBy(${1:array}${2:, ${3:predicate}}${4:, ${5:order}})",
-    description: "Sorts array by predicate result.",
+    description: 'Sorts an array by the result of the predicate. Optional order argument: "asc" or "desc".',
     example: 'sortBy(users, .Age, "desc")',
   },
 
@@ -367,13 +376,13 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
   {
     name: "keys",
     snippet: "keys(${1:map})",
-    description: "Returns array of map keys.",
+    description: "Returns an array containing the keys of the map.",
     example: 'keys({a: 1, b: 2}) == ["a", "b"]',
   },
   {
     name: "values",
     snippet: "values(${1:map})",
-    description: "Returns array of map values.",
+    description: "Returns an array containing the values of the map.",
     example: "values({a: 1, b: 2}) == [1, 2]",
   },
 
@@ -381,61 +390,62 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
   {
     name: "type",
     snippet: "type(${1:v})",
-    description: "Returns the type name of a value.",
+    description:
+      "Returns the type of the given value: nil, bool, int, uint, float, string, array, map, or the struct name.",
     example: 'type(42) == "int"',
   },
   {
     name: "int",
     snippet: "int(${1:v})",
-    description: "Converts value to integer.",
+    description: "Returns the integer value of a number or a string.",
     example: 'int("123") == 123',
   },
   {
     name: "float",
     snippet: "float(${1:v})",
-    description: "Converts value to float.",
+    description: "Returns the float value of a number or a string.",
     example: 'float("1.5") == 1.5',
   },
   {
     name: "string",
     snippet: "string(${1:v})",
-    description: "Converts value to string.",
+    description: "Converts the given value into a string representation.",
     example: 'string(123) == "123"',
   },
   {
     name: "toJSON",
     snippet: "toJSON(${1:v})",
-    description: "Converts value to JSON string.",
+    description: "Converts the given value to its JSON string representation.",
     example: "toJSON({a: 1}) == '{\"a\":1}'",
   },
   {
     name: "fromJSON",
     snippet: "fromJSON(${1:v})",
-    description: "Parses JSON string to value.",
+    description: "Parses the given JSON string and returns the corresponding value.",
     example: "fromJSON('{\"a\":1}') == {a: 1}",
   },
   {
     name: "toBase64",
     snippet: "toBase64(${1:v})",
-    description: "Encodes string to Base64.",
-    example: 'toBase64("Hello") == "SGVsbG8="',
+    description: "Encodes the string into Base64 format.",
+    example: 'toBase64("Hello World") == "SGVsbG8gV29ybGQ="',
   },
   {
     name: "fromBase64",
     snippet: "fromBase64(${1:v})",
-    description: "Decodes Base64 to string.",
-    example: 'fromBase64("SGVsbG8=") == "Hello"',
+    description: "Decodes the Base64 encoded string back to its original form.",
+    example: 'fromBase64("SGVsbG8gV29ybGQ=") == "Hello World"',
   },
   {
     name: "toPairs",
     snippet: "toPairs(${1:map})",
-    description: "Converts map to key-value pairs array.",
+    description: "Converts a map to an array of key-value pairs.",
     example: 'toPairs({a: 1}) == [["a", 1]]',
   },
   {
     name: "fromPairs",
     snippet: "fromPairs(${1:array})",
-    description: "Converts key-value pairs to map.",
+    description: "Converts an array of key-value pairs to a map.",
     example: 'fromPairs([["a", 1]]) == {a: 1}',
   },
 
@@ -443,13 +453,14 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
   {
     name: "len",
     snippet: "len(${1:v})",
-    description: "Returns length of array, map, or string.",
+    description: "Returns the length of an array, a map, or a string.",
     example: 'len("hello") == 5',
   },
   {
     name: "get",
     snippet: "get(${1:v}, ${2:index})",
-    description: "Gets element by index/key, or nil if missing.",
+    description:
+      "Retrieves the element at the specified index from an array or map. Returns nil if index is out of range or key does not exist.",
     example: "get([1, 2, 3], 1) == 2",
   },
 
@@ -457,50 +468,50 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
   {
     name: "bitand",
     snippet: "bitand(${1:a}, ${2:b})",
-    description: "Bitwise AND operation.",
+    description: "Returns the values resulting from the bitwise AND operation.",
     example: "bitand(0b1010, 0b1100) == 0b1000",
   },
   {
     name: "bitor",
     snippet: "bitor(${1:a}, ${2:b})",
-    description: "Bitwise OR operation.",
+    description: "Returns the values resulting from the bitwise OR operation.",
     example: "bitor(0b1010, 0b1100) == 0b1110",
   },
   {
     name: "bitxor",
     snippet: "bitxor(${1:a}, ${2:b})",
-    description: "Bitwise XOR operation.",
+    description: "Returns the values resulting from the bitwise XOR operation.",
     example: "bitxor(0b1010, 0b1100) == 0b0110",
   },
   {
     name: "bitnand",
     snippet: "bitnand(${1:a}, ${2:b})",
-    description: "Bitwise AND NOT operation.",
+    description: "Returns the values resulting from the bitwise AND NOT operation.",
     example: "bitnand(0b1010, 0b1100) == 0b0010",
   },
   {
     name: "bitnot",
     snippet: "bitnot(${1:a})",
-    description: "Bitwise NOT operation.",
+    description: "Returns the values resulting from the bitwise NOT operation.",
     example: "bitnot(0b1010) == -0b1011",
   },
   {
     name: "bitshl",
     snippet: "bitshl(${1:a}, ${2:b})",
-    description: "Left shift operation.",
-    example: "bitshl(0b101, 2) == 0b10100",
+    description: "Returns the values resulting from the Left Shift operation.",
+    example: "bitshl(0b101101, 2) == 0b10110100",
   },
   {
     name: "bitshr",
     snippet: "bitshr(${1:a}, ${2:b})",
-    description: "Right shift operation.",
-    example: "bitshr(0b101, 1) == 0b10",
+    description: "Returns the values resulting from the Right Shift operation.",
+    example: "bitshr(0b101101, 2) == 0b1011",
   },
   {
     name: "bitushr",
     snippet: "bitushr(${1:a}, ${2:b})",
-    description: "Unsigned right shift operation.",
-    example: "bitushr(-5, 2) == 4611686018427387902",
+    description: "Returns the values resulting from the unsigned Right Shift operation.",
+    example: "bitushr(-0b101, 2) == 4611686018427387902",
   },
 ] as const;
 
@@ -566,14 +577,30 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
   // 3) Dot completion
   const dotCtx = detectDotContext(left);
   if (dotCtx) {
-    const { baseExpr, memberPrefix, operator } = dotCtx;
+    const { baseExpr, memberPrefix, operator, isFunctionCall } = dotCtx;
+    const mp = (memberPrefix ?? "").toLowerCase();
+
+    // Handle function call method suggestions (e.g., now().Year())
+    if (isFunctionCall) {
+      const methods = getFunctionReturnMethods(baseExpr);
+      if (methods.length > 0) {
+        return methods
+          .filter((m) => m.name.toLowerCase().startsWith(mp) && mp !== m.name.toLowerCase())
+          .slice(0, limit)
+          .map((m) => ({
+            label: m.name,
+            kind: "function" as const,
+            insertText: m.snippet ?? `${m.name}()`,
+            detail: m.returnType,
+            description: m.description,
+          }));
+      }
+    }
 
     const resolvableBase = extractTailPathExpression(baseExpr);
     const target = resolveExprToValue(resolvableBase, globals);
 
     const keys = listKeys(target);
-
-    const mp = (memberPrefix ?? "").toLowerCase();
 
     return keys
       .filter((k) => k.toLowerCase().startsWith(mp) && mp !== k.toLowerCase())
@@ -643,6 +670,125 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
 }
 
 /* ------------------------- Helpers ------------------------- */
+
+type MethodInfo = {
+  name: string;
+  snippet?: string;
+  returnType: string;
+  description: string;
+};
+
+// Date/Time methods available on now(), date(), duration() return values
+const DATE_METHODS: MethodInfo[] = [
+  { name: "Year", snippet: "Year()", returnType: "int", description: "Returns the year (e.g., 2024)" },
+  { name: "Month", snippet: "Month()", returnType: "int", description: "Returns the month (1-12)" },
+  { name: "Day", snippet: "Day()", returnType: "int", description: "Returns the day of the month (1-31)" },
+  { name: "Hour", snippet: "Hour()", returnType: "int", description: "Returns the hour (0-23)" },
+  { name: "Minute", snippet: "Minute()", returnType: "int", description: "Returns the minute (0-59)" },
+  { name: "Second", snippet: "Second()", returnType: "int", description: "Returns the second (0-59)" },
+  { name: "Weekday", snippet: "Weekday()", returnType: "int", description: "Returns the day of the week (0=Sunday)" },
+  { name: "YearDay", snippet: "YearDay()", returnType: "int", description: "Returns the day of the year (1-366)" },
+  { name: "Unix", snippet: "Unix()", returnType: "int", description: "Returns Unix timestamp in seconds" },
+  {
+    name: "UnixMilli",
+    snippet: "UnixMilli()",
+    returnType: "int",
+    description: "Returns Unix timestamp in milliseconds",
+  },
+  {
+    name: "UnixMicro",
+    snippet: "UnixMicro()",
+    returnType: "int",
+    description: "Returns Unix timestamp in microseconds",
+  },
+  { name: "UnixNano", snippet: "UnixNano()", returnType: "int", description: "Returns Unix timestamp in nanoseconds" },
+  {
+    name: "Format",
+    snippet: 'Format("${1:2006-01-02}")',
+    returnType: "string",
+    description: "Formats the date using Go time layout",
+  },
+  {
+    name: "Add",
+    snippet: 'Add(duration("${1:1h}"))',
+    returnType: "time",
+    description: "Adds a duration to the time",
+  },
+  {
+    name: "Sub",
+    snippet: "Sub(${1:time})",
+    returnType: "duration",
+    description: "Returns duration between two times",
+  },
+  { name: "Before", snippet: "Before(${1:time})", returnType: "bool", description: "Reports whether time is before t" },
+  { name: "After", snippet: "After(${1:time})", returnType: "bool", description: "Reports whether time is after t" },
+  { name: "Equal", snippet: "Equal(${1:time})", returnType: "bool", description: "Reports whether times are equal" },
+  {
+    name: "In",
+    snippet: 'In(timezone("${1:UTC}"))',
+    returnType: "time",
+    description: "Returns time in the specified timezone",
+  },
+  { name: "UTC", snippet: "UTC()", returnType: "time", description: "Returns time in UTC timezone" },
+  { name: "Local", snippet: "Local()", returnType: "time", description: "Returns time in local timezone" },
+  { name: "IsZero", snippet: "IsZero()", returnType: "bool", description: "Reports whether time is zero value" },
+  {
+    name: "Round",
+    snippet: 'Round(duration("${1:1h}"))',
+    returnType: "time",
+    description: "Rounds time to nearest duration",
+  },
+  {
+    name: "Truncate",
+    snippet: 'Truncate(duration("${1:1h}"))',
+    returnType: "time",
+    description: "Truncates time to duration",
+  },
+];
+
+// Duration methods available on duration() return values
+const DURATION_METHODS: MethodInfo[] = [
+  { name: "Hours", snippet: "Hours()", returnType: "float", description: "Returns duration as hours" },
+  { name: "Minutes", snippet: "Minutes()", returnType: "float", description: "Returns duration as minutes" },
+  { name: "Seconds", snippet: "Seconds()", returnType: "float", description: "Returns duration as seconds" },
+  {
+    name: "Milliseconds",
+    snippet: "Milliseconds()",
+    returnType: "int",
+    description: "Returns duration as milliseconds",
+  },
+  {
+    name: "Microseconds",
+    snippet: "Microseconds()",
+    returnType: "int",
+    description: "Returns duration as microseconds",
+  },
+  { name: "Nanoseconds", snippet: "Nanoseconds()", returnType: "int", description: "Returns duration as nanoseconds" },
+  { name: "Abs", snippet: "Abs()", returnType: "duration", description: "Returns absolute value of duration" },
+  {
+    name: "Round",
+    snippet: 'Round(duration("${1:1s}"))',
+    returnType: "duration",
+    description: "Rounds duration to nearest multiple",
+  },
+  {
+    name: "Truncate",
+    snippet: 'Truncate(duration("${1:1s}"))',
+    returnType: "duration",
+    description: "Truncates duration to multiple",
+  },
+];
+
+// Map of function names to their return type methods
+const FUNCTION_RETURN_METHODS: Record<string, MethodInfo[]> = {
+  now: DATE_METHODS,
+  date: DATE_METHODS,
+  duration: DURATION_METHODS,
+};
+
+function getFunctionReturnMethods(funcName: string): MethodInfo[] {
+  return FUNCTION_RETURN_METHODS[funcName.toLowerCase()] ?? [];
+}
 
 type EnvKeyTrigger = { quote: "'" | '"' };
 
@@ -749,27 +895,39 @@ function getIdentifierPrefix(left: string): string {
   return m ? m[0] : "";
 }
 
-type DotContext = { baseExpr: string; memberPrefix: string; operator: "." | "?." };
+type DotContext = { baseExpr: string; memberPrefix: string; operator: "." | "?."; isFunctionCall?: boolean };
 
 function detectDotContext(left: string): DotContext | null {
   if (left.endsWith(" ")) {
     return null;
   }
 
-  const m = left.match(/(\$.+?)(\?\.|\.)\s*([$A-Za-z_][$A-Za-z0-9_]*)?$/);
-  if (!m) return null;
+  // Match expressions starting with $ (e.g., $["key"].prop)
+  const dollarMatch = left.match(/(\$.+?)(\?\.|\.)\s*([$A-Za-z_][$A-Za-z0-9_]*)?$/);
+  if (dollarMatch) {
+    let baseExpr = (dollarMatch[1] ?? "").trim();
+    const operator = (dollarMatch[2] === "?." ? "?." : ".") as "." | "?.";
+    const memberPrefix = (dollarMatch[3] ?? "").trim();
+    if (!baseExpr) return null;
 
-  let baseExpr = (m[1] ?? "").trim();
-  const operator = (m[2] === "?." ? "?." : ".") as "." | "?.";
-  const memberPrefix = (m[3] ?? "").trim();
-  if (!baseExpr) return null;
+    if (baseExpr.includes("$")) {
+      baseExpr = "$" + baseExpr.split("$").at(-1);
+    }
 
-  if (baseExpr.includes("$")) {
-    baseExpr = "$" + baseExpr.split("$").at(-1);
+    if (/^\d+(\.\d+)?$/.test(baseExpr)) return null;
+    return { baseExpr, memberPrefix, operator };
   }
 
-  if (/^\d+(\.\d+)?$/.test(baseExpr)) return null;
-  return { baseExpr, memberPrefix, operator };
+  // Match function calls (e.g., now(), date("2024-01-01"), duration("1h"))
+  const funcMatch = left.match(/([a-zA-Z_][a-zA-Z0-9_]*)\s*\([^)]*\)(\?\.|\.)\s*([$A-Za-z_][$A-Za-z0-9_]*)?$/);
+  if (funcMatch) {
+    const funcName = funcMatch[1];
+    const operator = (funcMatch[2] === "?." ? "?." : ".") as "." | "?.";
+    const memberPrefix = (funcMatch[3] ?? "").trim();
+    return { baseExpr: funcName, memberPrefix, operator, isFunctionCall: true };
+  }
+
+  return null;
 }
 
 type BracketKeyContext = { quote: "'" | '"'; partialKey: string };
