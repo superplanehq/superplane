@@ -28,11 +28,13 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root(t *testing.T) {
 		[]models.WorkflowNode{
 			{
 				NodeID: triggerNode,
+				Name:   triggerNode,
 				Type:   models.NodeTypeTrigger,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
 			},
 			{
 				NodeID: componentNode,
+				Name:   componentNode,
 				Type:   models.NodeTypeComponent,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
 			},
@@ -88,11 +90,13 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_RootFunction(t *testing.T) 
 		[]models.WorkflowNode{
 			{
 				NodeID: triggerNode,
+				Name:   triggerNode,
 				Type:   models.NodeTypeTrigger,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
 			},
 			{
 				NodeID: componentNode,
+				Name:   componentNode,
 				Type:   models.NodeTypeComponent,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
 			},
@@ -129,6 +133,131 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_RootFunction(t *testing.T) 
 	assert.Equal(t, "42", result["count"])
 }
 
+func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root_ByName(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerNode := "trigger-1"
+	triggerName := "filter"
+	componentNode := "component-1"
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{
+			{
+				NodeID: triggerNode,
+				Name:   triggerName,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: componentNode,
+				Name:   "processor",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	rootEventData := map[string]any{
+		"user":    "john",
+		"action":  "login",
+		"success": true,
+		"count":   42,
+	}
+	rootEvent := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, triggerNode, "default", nil, rootEventData)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{triggerNode: rootEventData})
+
+	configuration := map[string]any{
+		"user":    "{{ $[\"" + triggerName + "\"].user }}",
+		"action":  "{{ $[\"" + triggerName + "\"].action }}",
+		"success": "{{ $[\"" + triggerName + "\"].success }}",
+		"count":   "{{ $[\"" + triggerName + "\"].count }}",
+	}
+
+	result, err := builder.Build(configuration)
+	require.NoError(t, err)
+	assert.Equal(t, "john", result["user"])
+	assert.Equal(t, "login", result["action"])
+	assert.Equal(t, "true", result["success"])
+	assert.Equal(t, "42", result["count"])
+}
+
+func Test_NodeConfigurationBuilder_NodeNameNotUnique(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{
+			{
+				NodeID: "node-1",
+				Name:   "filter",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+			{
+				NodeID: "node-2",
+				Name:   "filter",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+		WithInput(map[string]any{})
+
+	configuration := map[string]any{
+		"field": "{{ $[\"filter\"].data }}",
+	}
+
+	_, err := builder.Build(configuration)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "node name filter is not unique")
+}
+
+func Test_NodeConfigurationBuilder_NodeIDNotAllowed(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{
+			{
+				NodeID: "node-1",
+				Name:   "filter",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+		WithInput(map[string]any{"node-1": map[string]any{"data": "value"}})
+
+	configuration := map[string]any{
+		"field": "{{ $[\"node-1\"].data }}",
+	}
+
+	_, err := builder.Build(configuration)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "node name node-1 not found in execution chain")
+}
+
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root_NoRootEvent(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -138,7 +267,7 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root_NoRootEvent(t *testing
 		r.Organization.ID,
 		r.User,
 		[]models.WorkflowNode{
-			{NodeID: "node-1", Type: models.NodeTypeComponent},
+			{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent},
 		},
 		[]models.Edge{},
 	)
@@ -171,21 +300,25 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain(t *testing.T) {
 		[]models.WorkflowNode{
 			{
 				NodeID: triggerNode,
+				Name:   triggerNode,
 				Type:   models.NodeTypeTrigger,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
 			},
 			{
 				NodeID: node1,
+				Name:   node1,
 				Type:   models.NodeTypeComponent,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
 			},
 			{
 				NodeID: node2,
+				Name:   node2,
 				Type:   models.NodeTypeComponent,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
 			},
 			{
 				NodeID: node3,
+				Name:   node3,
 				Type:   models.NodeTypeComponent,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
 			},
@@ -378,7 +511,7 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_NoPreviousExecution(t
 		r.Organization.ID,
 		r.User,
 		[]models.WorkflowNode{
-			{NodeID: "node-1", Type: models.NodeTypeComponent},
+			{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent},
 		},
 		[]models.Edge{},
 	)
@@ -406,8 +539,8 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_NodeNotInChain(t *tes
 		r.Organization.ID,
 		r.User,
 		[]models.WorkflowNode{
-			{NodeID: node1, Type: models.NodeTypeComponent},
-			{NodeID: node2, Type: models.NodeTypeComponent},
+			{NodeID: node1, Name: node1, Type: models.NodeTypeComponent},
+			{NodeID: node2, Name: node2, Type: models.NodeTypeComponent},
 		},
 		[]models.Edge{},
 	)
@@ -439,6 +572,7 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Root(t *testing.T) {
 		[]models.Node{
 			{
 				ID:   "bp-node-1",
+				Name: "bp-node-1",
 				Type: models.NodeTypeComponent,
 				Ref:  models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
 			},
@@ -463,11 +597,13 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Root(t *testing.T) {
 		[]models.WorkflowNode{
 			{
 				NodeID: triggerNode,
+				Name:   triggerNode,
 				Type:   models.NodeTypeTrigger,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
 			},
 			{
 				NodeID: blueprintNode,
+				Name:   blueprintNode,
 				Type:   models.NodeTypeBlueprint,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Blueprint: &models.BlueprintRef{ID: blueprint.ID.String()}}),
 			},
@@ -530,11 +666,13 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Chain(t *testing.T) {
 		[]models.Node{
 			{
 				ID:   "bp-node-1",
+				Name: "bp-node-1",
 				Type: models.NodeTypeComponent,
 				Ref:  models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
 			},
 			{
 				ID:   "bp-node-2",
+				Name: "bp-node-2",
 				Type: models.NodeTypeComponent,
 				Ref:  models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
 			},
@@ -561,11 +699,13 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Chain(t *testing.T) {
 		[]models.WorkflowNode{
 			{
 				NodeID: triggerNode,
+				Name:   triggerNode,
 				Type:   models.NodeTypeTrigger,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
 			},
 			{
 				NodeID: blueprintNode,
+				Name:   blueprintNode,
 				Type:   models.NodeTypeBlueprint,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Blueprint: &models.BlueprintRef{ID: blueprint.ID.String()}}),
 			},
@@ -592,10 +732,12 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Chain(t *testing.T) {
 	//
 	// Create first blueprint node child execution with outputs
 	//
+	bpNode1ID := blueprintNode + ":bp-node-1"
+	bpNode2ID := blueprintNode + ":bp-node-2"
 	bpNode1Execution := support.CreateWorkflowNodeExecution(
 		t,
 		workflow.ID,
-		"bp-node-1",
+		bpNode1ID,
 		rootEvent.ID,
 		rootEvent.ID,
 		&blueprintExecution.ID,
@@ -605,7 +747,7 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Chain(t *testing.T) {
 		"processed": true,
 		"value":     "from-first-node",
 	}
-	event1 := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, "bp-node-1", "default", &bpNode1Execution.ID, bpNode1Data)
+	event1 := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, bpNode1ID, "default", &bpNode1Execution.ID, bpNode1Data)
 
 	//
 	// Create second blueprint node child execution
@@ -613,7 +755,7 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Chain(t *testing.T) {
 	bpNode2Execution := support.CreateWorkflowNodeExecution(
 		t,
 		workflow.ID,
-		"bp-node-2",
+		bpNode2ID,
 		rootEvent.ID,
 		event1.ID,
 		&blueprintExecution.ID,
@@ -631,7 +773,7 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Chain(t *testing.T) {
 		ForBlueprintNode(blueprintWorkflowNode).
 		WithPreviousExecution(&bpNode2Execution.ID).
 		WithRootEvent(&rootEvent.ID).
-		WithInput(map[string]any{"bp-node-1": bpNode1Data})
+		WithInput(map[string]any{bpNode1ID: bpNode1Data})
 
 	configuration := map[string]any{
 		"processed": "{{ $[\"bp-node-1\"].processed }}",
@@ -655,6 +797,7 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Config(t *testing.T) {
 		[]models.Node{
 			{
 				ID:   "bp-node-1",
+				Name: "bp-node-1",
 				Type: models.NodeTypeComponent,
 				Ref:  models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
 			},
@@ -678,6 +821,7 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Config(t *testing.T) {
 		[]models.WorkflowNode{
 			{
 				NodeID: blueprintNode,
+				Name:   blueprintNode,
 				Type:   models.NodeTypeBlueprint,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Blueprint: &models.BlueprintRef{ID: blueprint.ID.String()}}),
 				Configuration: datatypes.NewJSONType(map[string]any{
@@ -736,6 +880,7 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Config_NotAvailableForWork
 		[]models.WorkflowNode{
 			{
 				NodeID: "node-1",
+				Name:   "node-1",
 				Type:   models.NodeTypeComponent,
 				Configuration: datatypes.NewJSONType(map[string]any{
 					"field": "value",
@@ -767,7 +912,7 @@ func Test_NodeConfigurationBuilder_ComplexNesting(t *testing.T) {
 		r.Organization.ID,
 		r.User,
 		[]models.WorkflowNode{
-			{NodeID: "node-1", Type: models.NodeTypeComponent},
+			{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent},
 		},
 		[]models.Edge{},
 	)
@@ -825,7 +970,7 @@ func Test_NodeConfigurationBuilder_InputVariable(t *testing.T) {
 		r.Organization.ID,
 		r.User,
 		[]models.WorkflowNode{
-			{NodeID: "node-1", Type: models.NodeTypeComponent},
+			{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent},
 		},
 		[]models.Edge{},
 	)
@@ -871,7 +1016,7 @@ func Test_NodeConfigurationBuilder_NoExpression(t *testing.T) {
 		r.Organization.ID,
 		r.User,
 		[]models.WorkflowNode{
-			{NodeID: "node-1", Type: models.NodeTypeComponent},
+			{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent},
 		},
 		[]models.Edge{},
 	)
@@ -906,7 +1051,7 @@ func Test_NodeConfigurationBuilder_DisallowExpression_ListItems(t *testing.T) {
 		r.Organization.ID,
 		r.User,
 		[]models.WorkflowNode{
-			{NodeID: "node-1", Type: models.NodeTypeComponent},
+			{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent},
 		},
 		[]models.Edge{},
 	)

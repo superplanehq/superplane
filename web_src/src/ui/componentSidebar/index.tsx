@@ -268,8 +268,18 @@ export const ComponentSidebar = ({
         break;
       }
     }
-    return Object.keys(fallback).length > 0 ? fallback : null;
-  }, [autocompleteExampleObj, latestEvents, nodeId]);
+    if (Object.keys(fallback).length === 0) {
+      return null;
+    }
+
+    const normalizedName = nodeName.trim();
+    fallback.__nodeNames = { [nodeId]: normalizedName };
+    if (normalizedName && normalizedName !== nodeId && fallback[normalizedName] === undefined) {
+      fallback[normalizedName] = fallback[nodeId];
+    }
+
+    return fallback;
+  }, [autocompleteExampleObj, latestEvents, nodeId, nodeName]);
 
   const handleCopyNodeId = useCallback(async () => {
     if (nodeId) {

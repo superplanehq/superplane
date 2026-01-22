@@ -352,12 +352,7 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 		return messageChain, nil
 	}
 
-	unresolved := unresolvedNodeRefs(referencedNodes, messageChain)
-	if len(unresolved) == 0 {
-		return messageChain, nil
-	}
-
-	refToNodeID, err := b.resolveNodeRefs(unresolved)
+	refToNodeID, err := b.resolveNodeRefs(referencedNodes)
 	if err != nil {
 		return nil, err
 	}
@@ -374,7 +369,7 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 	}
 
 	if b.previousExecutionID == nil {
-		return nil, fmt.Errorf("node %s not found in execution chain", unresolved[0])
+		return nil, fmt.Errorf("node name %s not found in execution chain", firstChainRef(chainRefs))
 	}
 
 	err = b.populateFromExecutions(messageChain, chainRefs)
@@ -383,6 +378,13 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 	}
 
 	return messageChain, nil
+}
+
+func firstChainRef(chainRefs map[string]string) string {
+	for nodeRef := range chainRefs {
+		return nodeRef
+	}
+	return ""
 }
 
 func extractInputMap(input any) map[string]any {
@@ -394,36 +396,46 @@ func extractInputMap(input any) map[string]any {
 	return inputMap
 }
 
-func unresolvedNodeRefs(referencedNodes []string, messageChain map[string]any) []string {
-	unresolved := make([]string, 0, len(referencedNodes))
-	for _, nodeRef := range referencedNodes {
-		if _, ok := messageChain[nodeRef]; !ok {
-			unresolved = append(unresolved, nodeRef)
-		}
-	}
-
-	return unresolved
-}
-
 func (b *NodeConfigurationBuilder) resolveNodeRefs(nodeRefs []string) (map[string]string, error) {
 	nodes, err := models.FindWorkflowNodesInTransaction(b.tx, b.workflowID)
 	if err != nil {
 		return nil, err
 	}
 
-	nodeIDs := make(map[string]struct{}, len(nodes))
+	nameToNodeID := make(map[string]string, len(nodes))
+	ambiguousNames := make(map[string]struct{})
 	for _, node := range nodes {
-		nodeIDs[node.NodeID] = struct{}{}
+		if node.Name == "" {
+			continue
+		}
+
+		if _, ok := ambiguousNames[node.Name]; ok {
+			continue
+		}
+
+		if existing, ok := nameToNodeID[node.Name]; ok {
+			if existing != node.NodeID {
+				delete(nameToNodeID, node.Name)
+				ambiguousNames[node.Name] = struct{}{}
+			}
+			continue
+		}
+
+		nameToNodeID[node.Name] = node.NodeID
 	}
 
 	refToNodeID := make(map[string]string, len(nodeRefs))
 	for _, nodeRef := range nodeRefs {
-		if _, ok := nodeIDs[nodeRef]; ok {
-			refToNodeID[nodeRef] = nodeRef
+		if nodeID, ok := nameToNodeID[nodeRef]; ok {
+			refToNodeID[nodeRef] = nodeID
 			continue
 		}
 
-		return nil, fmt.Errorf("node %s not found in execution chain", nodeRef)
+		if _, ok := ambiguousNames[nodeRef]; ok {
+			return nil, fmt.Errorf("node name %s is not unique", nodeRef)
+		}
+
+		return nil, fmt.Errorf("node name %s not found in execution chain", nodeRef)
 	}
 
 	return refToNodeID, nil

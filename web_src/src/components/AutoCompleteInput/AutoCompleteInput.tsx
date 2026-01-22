@@ -1292,12 +1292,15 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                               {highlightedSuggestion.nodeName}
                             </span>
                           </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-500">ID</span>
-                            <span className="text-gray-400 truncate ml-2 max-w-[120px]">
-                              {highlightedSuggestion.nodeId}
-                            </span>
-                          </div>
+                          {highlightedSuggestion.nodeId &&
+                            highlightedSuggestion.nodeId !== highlightedSuggestion.nodeName && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">ID</span>
+                                <span className="text-gray-400 truncate ml-2 max-w-[120px]">
+                                  {highlightedSuggestion.nodeId}
+                                </span>
+                              </div>
+                            )}
                         </div>
                       </>
                     ) : /* Function suggestions */

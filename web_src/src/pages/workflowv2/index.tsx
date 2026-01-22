@@ -1041,23 +1041,27 @@ export function WorkflowPageV2() {
       }
 
       const exampleObj: Record<string, unknown> = {};
-      const nodeMetadata: Record<string, { name: string; componentType: string; description?: string }> = {};
+      const nodeMetadata: Record<string, { name?: string; componentType: string; description?: string }> = {};
+      const nodeNamesById: Record<string, string> = {};
 
       chainNodeIds.forEach((chainNodeId) => {
         const chainNode = workflowNodes.find((node) => node.id === chainNodeId);
         if (!chainNode) return;
 
+        const nodeName = (chainNode.name || "").trim();
+        if (nodeName) {
+          nodeNamesById[chainNodeId] = nodeName;
+        }
+
         if (chainNode.type === "TYPE_TRIGGER") {
           const triggerMetadata = allTriggers.find((trigger) => trigger.name === chainNode.trigger?.name);
 
           // Store node metadata with trigger info
-          if (chainNode.name || triggerMetadata) {
-            nodeMetadata[chainNodeId] = {
-              name: chainNode.name || chainNodeId,
-              componentType: triggerMetadata?.label || "Trigger",
-              description: triggerMetadata?.description,
-            };
-          }
+          nodeMetadata[chainNodeId] = {
+            name: nodeName || undefined,
+            componentType: triggerMetadata?.label || "Trigger",
+            description: triggerMetadata?.description,
+          };
 
           const latestEvent = nodeEventsMap[chainNodeId]?.[0];
           if (latestEvent?.data) {
@@ -1078,13 +1082,11 @@ export function WorkflowPageV2() {
         const componentMetadata = allComponents.find((component) => component.name === chainNode.component?.name);
 
         // Store node metadata with component info
-        if (chainNode.name || componentMetadata) {
-          nodeMetadata[chainNodeId] = {
-            name: chainNode.name || chainNodeId,
-            componentType: componentMetadata?.label || "Component",
-            description: componentMetadata?.description,
-          };
-        }
+        nodeMetadata[chainNodeId] = {
+          name: nodeName || undefined,
+          componentType: componentMetadata?.label || "Component",
+          description: componentMetadata?.description,
+        };
 
         const latestExecution = nodeExecutionsMap[chainNodeId]?.find(
           (execution) => execution.state === "STATE_FINISHED" && execution.resultReason !== "RESULT_REASON_ERROR",
@@ -1165,12 +1167,45 @@ export function WorkflowPageV2() {
         exampleObj.__previousByDepth = previousByDepth;
       }
 
+      const nameToNodeId = new Map<string, string>();
+      const duplicateNames = new Set<string>();
+      for (const [nId, nodeName] of Object.entries(nodeNamesById)) {
+        if (!nodeName || nodeName === "__nodeNames") {
+          continue;
+        }
+
+        const existing = nameToNodeId.get(nodeName);
+        if (existing && existing !== nId) {
+          duplicateNames.add(nodeName);
+          continue;
+        }
+
+        nameToNodeId.set(nodeName, nId);
+      }
+
+      duplicateNames.forEach((name) => nameToNodeId.delete(name));
+
+      for (const [nodeName, nId] of nameToNodeId.entries()) {
+        if (nodeName === nId || exampleObj[nodeName] !== undefined) {
+          continue;
+        }
+
+        const value = exampleObj[nId];
+        if (value === undefined) {
+          continue;
+        }
+
+        exampleObj[nodeName] = value;
+      }
+
       if (Object.keys(nodeMetadata).length > 0) {
         exampleObj.__nodeNames = nodeMetadata;
         Object.entries(nodeMetadata).forEach(([nodeId, metadata]) => {
           const value = exampleObj[nodeId];
           if (value && typeof value === "object" && !Array.isArray(value)) {
-            (value as Record<string, unknown>).__nodeName = metadata.name;
+            if (metadata.name) {
+              (value as Record<string, unknown>).__nodeName = metadata.name;
+            }
           }
         });
       }
