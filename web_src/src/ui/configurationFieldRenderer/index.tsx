@@ -35,6 +35,7 @@ import { ValidationError } from "./types";
 import { AuthorizationDomainType } from "@/api-client";
 
 interface ConfigurationFieldRendererProps extends FieldRendererProps {
+  allowExpressions?: boolean;
   domainId?: string;
   domainType?: AuthorizationDomainType;
   appInstallationId?: string;
@@ -62,6 +63,7 @@ export const ConfigurationFieldRenderer = ({
   realtimeValidationErrors,
   enableRealtimeValidation = false,
   autocompleteExampleObj,
+  allowExpressions = false,
 }: ConfigurationFieldRendererProps) => {
   const isTogglable = field.togglable === true;
   const isEnabled = isTogglable ? value !== null && value !== undefined : true;
@@ -226,6 +228,7 @@ export const ConfigurationFieldRenderer = ({
       autocompleteExampleObj,
       appInstallationId,
       organizationId,
+      allowExpressions,
     };
 
     switch (field.type) {

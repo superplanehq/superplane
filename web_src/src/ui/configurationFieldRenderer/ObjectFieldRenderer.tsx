@@ -16,6 +16,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   appInstallationId,
   organizationId,
   autocompleteExampleObj,
+  allowExpressions = false,
 }) => {
   const [jsonError, setJsonError] = React.useState<string | null>(null);
   const [editorValue, setEditorValue] = React.useState<string>(() =>
@@ -157,6 +158,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
     <div className="border border-gray-300 dark:border-gray-700 rounded-md p-4 space-y-4">
       {schema.map((schemaField) => (
         <ConfigurationFieldRenderer
+          allowExpressions={allowExpressions}
           key={schemaField.name}
           field={schemaField}
           value={objValue[schemaField.name!]}

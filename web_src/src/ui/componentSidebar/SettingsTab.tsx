@@ -354,6 +354,7 @@ export function SettingsTab({
               const fieldName = field.name;
               return (
                 <ConfigurationFieldRenderer
+                  allowExpressions={true}
                   key={fieldName}
                   field={field}
                   value={nodeConfiguration[fieldName]}
