@@ -22,6 +22,7 @@
 {{- end }}
 {{- end }}
 
+
 {{- define "secrets.sentry.name" }}
 {{- if eq .Values.sentry.secretName "" }}
 {{- printf "%s-sentry" .Release.Name }}

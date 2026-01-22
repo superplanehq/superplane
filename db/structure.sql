@@ -242,6 +242,19 @@ CREATE TABLE public.group_metadata (
 
 
 --
+-- Name: installation_metadata; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.installation_metadata (
+    id integer NOT NULL,
+    installation_id character varying(64) NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT installation_metadata_singleton CHECK ((id = 1))
+);
+
+
+--
 -- Name: organization_invitations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -646,6 +659,14 @@ ALTER TABLE ONLY public.email_settings
 
 ALTER TABLE ONLY public.group_metadata
     ADD CONSTRAINT group_metadata_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: installation_metadata installation_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.installation_metadata
+    ADD CONSTRAINT installation_metadata_pkey PRIMARY KEY (id);
 
 
 --
@@ -1475,7 +1496,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260116164255	f
+20260121233727	f
 \.
 
 

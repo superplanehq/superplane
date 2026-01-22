@@ -275,7 +275,9 @@ func setupOtelMetrics() {
 func Start() {
 	configureLogging()
 	setupOtelMetrics()
+
 	telemetry.InitSentry()
+	telemetry.StartBeacon()
 
 	encryptionKey := os.Getenv("ENCRYPTION_KEY")
 	if encryptionKey == "" {
