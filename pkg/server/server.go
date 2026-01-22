@@ -161,7 +161,7 @@ func startInternalAPI(baseURL, webhooksBaseURL, basePath string, encryptor crypt
 	grpc.RunServer(baseURL, webhooksBaseURL, basePath, encryptor, authService, registry, lookupInternalAPIPort())
 }
 
-func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcVerifier *crypto.OIDCVerifier, authService authorization.Authorization) {
+func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, authService authorization.Authorization) {
 	log.Println("Starting Public API with integrated Web Server")
 
 	appEnv := os.Getenv("APP_ENV")
@@ -169,7 +169,7 @@ func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, regist
 	blockSignup := os.Getenv("BLOCK_SIGNUP") == "yes"
 
 	webhooksBaseURL := getWebhookBaseURL(baseURL)
-	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcVerifier, basePath, baseURL, webhooksBaseURL, appEnv, templateDir, authService, blockSignup)
+	server, err := public.NewServer(encryptor, registry, jwtSigner, basePath, baseURL, webhooksBaseURL, appEnv, templateDir, authService, blockSignup)
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)
 	}
@@ -322,13 +322,12 @@ func Start() {
 	}
 
 	jwtSigner := jwt.NewSigner(jwtSecret)
-	oidcVerifier := crypto.NewOIDCVerifier()
 	registry := registry.NewRegistry(encryptorInstance)
 
 	templates.Setup(registry)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
-		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcVerifier, authService)
+		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, authService)
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
