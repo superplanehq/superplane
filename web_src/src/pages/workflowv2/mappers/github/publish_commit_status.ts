@@ -7,6 +7,7 @@ import {
 import { ComponentBaseProps } from "@/ui/componentBase";
 import { ComponentBaseMapper, OutputPayload } from "../types";
 import { baseProps } from "./base";
+import { buildGithubExecutionSubtitle } from "./utils";
 
 interface CommitStatus {
   id?: number;
@@ -31,25 +32,34 @@ export const publishCommitStatusMapper: ComponentBaseMapper = {
   ): ComponentBaseProps {
     return baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
   },
+  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+    return buildGithubExecutionSubtitle(execution);
+  },
 
   getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, string> {
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+    const details: Record<string, string> = {};
 
-    // If no outputs (e.g., execution failed), return empty details
+    if (execution.createdAt) {
+      details["Started At"] = execution.createdAt;
+    }
+
+    if (execution.state === "STATE_FINISHED" && execution.updatedAt) {
+      details["Finished At"] = execution.updatedAt;
+    }
+
     if (!outputs || !outputs.default || outputs.default.length === 0) {
-      return {};
+      return details;
     }
 
     const status = outputs.default[0].data as CommitStatus;
 
-    const details: Record<string, string> = {
-      State: status?.state || "-",
-      Context: status?.context || "-",
-      Description: status?.description || "-",
-      "Target URL": status?.target_url || "-",
-      "Status ID": status?.id?.toString() || "-",
-      "Created At": status?.created_at || "-",
-    };
+    details["Commit Status"] = status?.state || "";
+    details["Context"] = status?.context || "";
+    details["Description"] = status?.description || "";
+    details["Target URL"] = status?.target_url || "";
+    details["Status ID"] = status?.id?.toString() || "";
+    details["Created At"] = status?.created_at || "";
 
     if (status?.creator?.login) {
       details["Created By"] = status.creator.login;

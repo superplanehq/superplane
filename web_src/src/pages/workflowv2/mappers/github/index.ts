@@ -13,9 +13,17 @@ import { publishCommitStatusMapper } from "./publish_commit_status";
 import { createReleaseMapper } from "./create_release";
 import { updateReleaseMapper } from "./update_release";
 import { deleteReleaseMapper } from "./delete_release";
+import { buildGithubActionStateRegistry } from "./utils";
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   runWorkflow: RUN_WORKFLOW_STATE_REGISTRY,
+  createIssue: buildGithubActionStateRegistry("created"),
+  getIssue: buildGithubActionStateRegistry("retrieved"),
+  updateIssue: buildGithubActionStateRegistry("updated"),
+  publishCommitStatus: buildGithubActionStateRegistry("published"),
+  createRelease: buildGithubActionStateRegistry("created"),
+  updateRelease: buildGithubActionStateRegistry("updated"),
+  deleteRelease: buildGithubActionStateRegistry("deleted"),
 };
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {

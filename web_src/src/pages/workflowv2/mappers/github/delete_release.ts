@@ -7,6 +7,7 @@ import {
 import { ComponentBaseProps } from "@/ui/componentBase";
 import { ComponentBaseMapper, OutputPayload } from "../types";
 import { baseProps } from "./base";
+import { buildGithubExecutionSubtitle } from "./utils";
 
 interface DeletedReleaseOutput {
   id?: number;
@@ -29,21 +30,30 @@ export const deleteReleaseMapper: ComponentBaseMapper = {
   ): ComponentBaseProps {
     return baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
   },
+  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+    return buildGithubExecutionSubtitle(execution);
+  },
 
   getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, string> {
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+    const details: Record<string, string> = {};
 
-    // If no outputs (e.g., execution failed), return empty details
+    if (execution.createdAt) {
+      details["Started At"] = execution.createdAt;
+    }
+
+    if (execution.state === "STATE_FINISHED" && execution.updatedAt) {
+      details["Finished At"] = execution.updatedAt;
+    }
+
     if (!outputs || !outputs.default || outputs.default.length === 0) {
-      return {};
+      return details;
     }
 
     const deletedRelease = outputs.default[0].data as DeletedReleaseOutput;
 
-    const details: Record<string, string> = {
-      "Release ID": deletedRelease?.id?.toString() || "-",
-      "Tag Name": deletedRelease?.tag_name || "-",
-    };
+    details["Release ID"] = deletedRelease?.id?.toString() || "";
+    details["Tag Name"] = deletedRelease?.tag_name || "";
 
     if (deletedRelease?.name) {
       details["Release Name"] = deletedRelease.name;

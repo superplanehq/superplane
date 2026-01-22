@@ -17,6 +17,7 @@ import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
 import { getTriggerRenderer } from "..";
 import githubIcon from "@/assets/icons/integrations/github.svg";
+import { buildGithubExecutionSubtitle } from "./utils";
 
 interface ExecutionMetadata {
   workflowRun?: {
@@ -121,18 +122,36 @@ export const runWorkflowMapper: ComponentBaseMapper = {
       eventStateMap: RUN_WORKFLOW_STATE_MAP,
     };
   },
+  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+    return buildGithubExecutionSubtitle(execution);
+  },
 
   getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, string> {
     const metadata = execution.metadata as ExecutionMetadata;
-    const details: Record<string, string> = {
-      URL: metadata.workflowRun?.url || "-",
-      "Run ID": metadata.workflowRun?.id?.toString() || "-",
-      Status: metadata.workflowRun?.status || "-",
-      Conclusion: metadata.workflowRun?.conclusion || "-",
-    };
+    const details: Record<string, string> = {};
 
-    if (execution.state == "STATE_FINISHED") {
-      details["Finished At"] = execution.updatedAt || "-";
+    if (execution.createdAt) {
+      details["Started At"] = execution.createdAt;
+    }
+
+    if (execution.state == "STATE_FINISHED" && execution.updatedAt) {
+      details["Finished At"] = execution.updatedAt;
+    }
+
+    if (metadata.workflowRun?.url) {
+      details["Workflow URL"] = metadata.workflowRun.url;
+    }
+
+    if (metadata.workflowRun?.id) {
+      details["Run ID"] = metadata.workflowRun.id.toString();
+    }
+
+    if (metadata.workflowRun?.status) {
+      details["Run Status"] = metadata.workflowRun.status;
+    }
+
+    if (metadata.workflowRun?.conclusion) {
+      details["Conclusion"] = metadata.workflowRun.conclusion;
     }
 
     return details;

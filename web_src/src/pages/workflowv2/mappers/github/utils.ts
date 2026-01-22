@@ -1,4 +1,9 @@
 import { MetadataItem } from "@/ui/metadataList";
+import { formatTimeAgo } from "@/utils/date";
+import { WorkflowsWorkflowNodeExecution } from "@/api-client";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { EventStateRegistry } from "../types";
+import { defaultStateFunction } from "../stateRegistry";
 
 export type PredicateType = "equals" | "notEquals" | "matches";
 
@@ -41,4 +46,32 @@ export function createGithubMetadataItems(
   }
 
   return metadataItems;
+}
+
+export function buildGithubSubtitle(content: string | undefined, createdAt?: string): string {
+  const trimmed = (content || "").trim();
+  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
+
+  if (trimmed && timeAgo) {
+    return `${trimmed} · ${timeAgo}`;
+  }
+  return trimmed || timeAgo;
+}
+
+export function buildGithubExecutionSubtitle(execution: WorkflowsWorkflowNodeExecution, content?: string): string {
+  const timestamp = execution.updatedAt || execution.createdAt;
+  return buildGithubSubtitle(content || "", timestamp);
+}
+
+export function buildGithubActionStateRegistry(successState: string): EventStateRegistry {
+  return {
+    stateMap: {
+      ...DEFAULT_EVENT_STATE_MAP,
+      [successState]: DEFAULT_EVENT_STATE_MAP.success,
+    },
+    getState: (execution) => {
+      const state = defaultStateFunction(execution);
+      return state === "success" ? successState : state;
+    },
+  };
 }

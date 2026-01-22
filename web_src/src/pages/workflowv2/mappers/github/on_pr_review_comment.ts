@@ -4,6 +4,7 @@ import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
 import { BaseNodeMetadata, Comment, PullRequest } from "./types";
+import { buildGithubSubtitle } from "./utils";
 
 interface OnPullRequestReviewCommentConfiguration {
   contentFilter?: string;
@@ -28,7 +29,7 @@ export const onPullRequestReviewCommentTriggerRenderer: TriggerRenderer = {
 
     return {
       title: title,
-      subtitle: eventData?.action || "",
+      subtitle: buildGithubSubtitle(eventData?.action || "", event.createdAt),
     };
   },
 
@@ -91,7 +92,7 @@ export const onPullRequestReviewCommentTriggerRenderer: TriggerRenderer = {
 
       props.lastEventData = {
         title: title,
-        subtitle: eventData?.action || "",
+        subtitle: buildGithubSubtitle(eventData?.action || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id,

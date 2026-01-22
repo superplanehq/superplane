@@ -11,6 +11,7 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import { MetadataItem } from "@/ui/metadataList";
 import { OutputPayload, ComponentBaseMapper } from "../types";
 import { Issue } from "./types";
+import { buildGithubExecutionSubtitle } from "./utils";
 
 export const baseIssueMapper: ComponentBaseMapper = {
   props(
@@ -22,17 +23,28 @@ export const baseIssueMapper: ComponentBaseMapper = {
   ): ComponentBaseProps {
     return baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
   },
+  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+    return buildGithubExecutionSubtitle(execution);
+  },
 
   getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, string> {
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+    const details: Record<string, string> = {};
 
-    // If no outputs (e.g., execution failed), return empty details
+    if (execution.createdAt) {
+      details["Started At"] = execution.createdAt;
+    }
+
+    if (execution.state === "STATE_FINISHED" && execution.updatedAt) {
+      details["Finished At"] = execution.updatedAt;
+    }
+
     if (!outputs || !outputs.default || outputs.default.length === 0) {
-      return {};
+      return details;
     }
 
     const issue = outputs.default[0].data as Issue;
-    return getDetailsForIssue(issue);
+    return { ...details, ...getDetailsForIssue(issue) };
   },
 };
 
@@ -111,6 +123,7 @@ function baseEventSections(
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
       eventState: getState(componentName)(execution),
+      eventSubtitle: buildGithubExecutionSubtitle(execution),
       eventId: execution.rootEvent?.id,
     },
   ];
