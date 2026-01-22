@@ -8,11 +8,6 @@ import (
 )
 
 func (p *PagerDuty) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.ApplicationResource, error) {
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create client: %w", err)
-	}
-
 	switch resourceType {
 	case "service":
 		metadata := Metadata{}
@@ -31,6 +26,11 @@ func (p *PagerDuty) ListResources(resourceType string, ctx core.ListResourcesCon
 		return resources, nil
 
 	case "priority":
+		client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
 		priorities, err := client.ListPriorities()
 		if err != nil {
 			return nil, fmt.Errorf("failed to list priorities: %w", err)
@@ -47,6 +47,11 @@ func (p *PagerDuty) ListResources(resourceType string, ctx core.ListResourcesCon
 		return resources, nil
 
 	case "user":
+		client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
 		users, err := client.ListUsers()
 		if err != nil {
 			return nil, fmt.Errorf("failed to list users: %w", err)
@@ -63,6 +68,11 @@ func (p *PagerDuty) ListResources(resourceType string, ctx core.ListResourcesCon
 		return resources, nil
 
 	case "escalation_policy":
+		client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
 		policies, err := client.ListEscalationPolicies()
 		if err != nil {
 			return nil, fmt.Errorf("failed to list escalation policies: %w", err)
