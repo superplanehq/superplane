@@ -26,8 +26,6 @@ export const updateIncidentMapper: ComponentBaseMapper = {
 
     return {
       iconSrc: pdIcon,
-      iconBackground: "bg-green-500",
-      headerColor: getBackgroundColorClass(componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(componentDefinition.color),
       collapsed: node.isCollapsed,
       title: node.name!,
