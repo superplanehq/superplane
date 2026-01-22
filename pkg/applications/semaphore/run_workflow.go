@@ -352,9 +352,9 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	}
 
 	if metadata.Pipeline.Result == PipelineResultPassed {
-		err = executionCtx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{payload})
+		err = executionCtx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{ensureWorkflowURL(payload, metadata.Workflow)})
 	} else {
-		err = executionCtx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{payload})
+		err = executionCtx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{ensureWorkflowURL(payload, metadata.Workflow)})
 	}
 
 	if err != nil {
@@ -445,10 +445,18 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 	}
 
 	if pipeline.Result == PipelineResultPassed {
-		return ctx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{pipeline})
+		return ctx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{ensureWorkflowURL(map[string]any{
+			"data": map[string]any{
+				"pipeline": pipeline,
+			},
+		}, metadata.Workflow)})
 	}
 
-	return ctx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{pipeline})
+	return ctx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{ensureWorkflowURL(map[string]any{
+		"data": map[string]any{
+			"pipeline": pipeline,
+		},
+	}, metadata.Workflow)})
 }
 
 func (r *RunWorkflow) finish(ctx core.ActionContext) error {
@@ -491,4 +499,30 @@ func (r *RunWorkflow) buildParameters(ctx core.ExecutionContext, params []Parame
 	parameters["SUPERPLANE_CANVAS_ID"] = ctx.WorkflowID
 
 	return parameters
+}
+
+func ensureWorkflowURL(payload map[string]any, workflow *WorkflowMetadata) map[string]any {
+	if workflow == nil || workflow.URL == "" {
+		return payload
+	}
+
+	if dataMap, ok := payload["data"].(map[string]any); ok {
+		workflowMap, ok := dataMap["workflow"].(map[string]any)
+		if !ok {
+			workflowMap = map[string]any{}
+		}
+		workflowMap["url"] = workflow.URL
+		dataMap["workflow"] = workflowMap
+		payload["data"] = dataMap
+		return payload
+	}
+
+	workflowMap, ok := payload["workflow"].(map[string]any)
+	if !ok {
+		workflowMap = map[string]any{}
+	}
+	workflowMap["url"] = workflow.URL
+	payload["workflow"] = workflowMap
+
+	return payload
 }
