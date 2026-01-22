@@ -6,6 +6,3 @@ metadata:
 data:
   BASE_URL: https://{{ $domain }}
   WEBHOOKS_BASE_URL: https://{{ $domain }}
-  SUPERPLANE_BEACON_ENABLED: {{ ternary "yes" "no" .Values.installation.beaconEnabled | quote }}
-  SUPERPLANE_BEACON_URL: {{ .Values.installation.beaconURL | quote }}
-  SUPERPLANE_INSTALLATION_TYPE: {{ .Values.installation.type | quote }}
