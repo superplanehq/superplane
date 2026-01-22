@@ -39,10 +39,6 @@ function buildExecutionTabData(
 
     currentData = {
       ...flattened,
-      "Execution ID": execution.id,
-      "Execution State": execution.state?.replace("STATE_", "").toLowerCase(),
-      "Execution Result": execution.result?.replace("RESULT_", "").toLowerCase(),
-      "Execution Started": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
     };
   }
 

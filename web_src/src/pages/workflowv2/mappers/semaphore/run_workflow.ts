@@ -4,7 +4,7 @@ import {
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
-import { ComponentBaseMapper, EventStateRegistry, StateFunction } from "../types";
+import { ComponentBaseMapper, EventStateRegistry, OutputPayload, StateFunction } from "../types";
 import {
   ComponentBaseProps,
   ComponentBaseSpec,
@@ -17,6 +17,7 @@ import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
 import { getTriggerRenderer } from "..";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+import { formatTimeAgo } from "@/utils/date";
 
 interface ExecutionMetadata {
   workflow?: {
@@ -123,6 +124,68 @@ export const runWorkflowMapper: ComponentBaseMapper = {
       eventStateMap: RUN_WORKFLOW_STATE_MAP,
     };
   },
+  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+    const timestamp = execution.updatedAt || execution.createdAt;
+    return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
+  },
+  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, any> {
+    const details: Record<string, any> = {};
+    const outputs = execution.outputs as
+      | { passed?: OutputPayload[]; failed?: OutputPayload[]; default?: OutputPayload[] }
+      | undefined;
+    const payload =
+      (outputs?.passed?.[0]?.data as Record<string, any> | undefined) ||
+      (outputs?.failed?.[0]?.data as Record<string, any> | undefined) ||
+      (outputs?.default?.[0]?.data as Record<string, any> | undefined);
+    const payloadData =
+      payload && typeof payload === "object" && payload.data && typeof payload.data === "object"
+        ? payload.data
+        : payload;
+    const metadataFallback =
+      (!payloadData || typeof payloadData !== "object") && execution.metadata
+        ? (execution.metadata as Record<string, any>)
+        : undefined;
+
+    const sourceData =
+      payloadData && typeof payloadData === "object"
+        ? payloadData
+        : metadataFallback && typeof metadataFallback === "object"
+          ? metadataFallback
+          : undefined;
+
+    if (!sourceData || typeof sourceData !== "object") {
+      return details;
+    }
+
+    const pipeline = sourceData.pipeline as Record<string, any> | undefined;
+    const repository = sourceData.repository as Record<string, any> | undefined;
+    const project = sourceData.project as Record<string, any> | undefined;
+    const organization = sourceData.organization as Record<string, any> | undefined;
+    const revision = sourceData.revision as Record<string, any> | undefined;
+    const blocks = sourceData.blocks as Array<Record<string, any>> | undefined;
+    const workflow = sourceData.workflow as Record<string, any> | undefined;
+
+    const addDetail = (key: string, value?: string) => {
+      if (value) {
+        details[key] = value;
+      }
+    };
+
+    addDetail("Done At", formatDate(pipeline?.done_at));
+    addDetail("Workflow URL", (execution.metadata as Record<string, any> | undefined)?.workflow?.url || workflow?.url);
+    addDetail("Repository URL", repository?.url);
+    addDetail("Project", project?.name);
+    addDetail("Organization", organization?.name);
+    addDetail("Branch", revision?.branch?.name || revision?.reference);
+    addDetail("Commit", formatCommit(revision));
+    addDetail("Pipeline File", formatPipelineFile(pipeline));
+    const blockDetails = buildBlocksDetails(blocks);
+    if (blockDetails) {
+      details["Blocks"] = blockDetails;
+    }
+
+    return details;
+  },
 };
 
 function runWorkflowMetadataList(node: ComponentsNode): MetadataItem[] {
@@ -206,11 +269,17 @@ function runWorkflowEventSections(
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
     const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
     const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+    const executionState = runWorkflowStateFunction(execution);
+    const subtitleTimestamp =
+      executionState === "running" ? execution.createdAt : execution.updatedAt || execution.createdAt;
+    const eventSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : undefined;
+
     sections.push({
-      showAutomaticTime: true,
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventState: runWorkflowStateFunction(execution),
+      eventSubtitle,
+      eventState: executionState,
+      eventId: execution.rootEvent?.id,
     });
   }
 
@@ -227,10 +296,58 @@ function runWorkflowEventSections(
       sections.push({
         receivedAt: queueItem.createdAt ? new Date(queueItem.createdAt) : undefined,
         eventTitle: title,
+        eventSubtitle: queueItem.createdAt ? formatTimeAgo(new Date(queueItem.createdAt)) : undefined,
         eventState: "next-in-queue" as const,
+        eventId: queueItem.rootEvent?.id,
       });
     }
   }
 
   return sections;
+}
+
+function formatDate(value?: string): string | undefined {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toLocaleString();
+}
+
+function formatCommit(revision?: Record<string, any>): string | undefined {
+  if (!revision) return undefined;
+  const sha = revision.commit_sha as string | undefined;
+  const message = revision.commit_message as string | undefined;
+  const shortSha = sha ? sha.slice(0, 7) : undefined;
+  if (shortSha && message) return `${shortSha} · ${message}`;
+  return shortSha || message;
+}
+
+function formatPipelineFile(pipeline?: Record<string, any>): string | undefined {
+  if (!pipeline) return undefined;
+  const workingDirectory = pipeline.working_directory as string | undefined;
+  const yamlFileName = pipeline.yaml_file_name as string | undefined;
+  if (workingDirectory && yamlFileName) return `${workingDirectory}/${yamlFileName}`.replace("//", "/");
+  return yamlFileName || workingDirectory;
+}
+
+function buildBlocksDetails(blocks?: Array<Record<string, any>>): Record<string, any> | undefined {
+  if (!blocks || blocks.length === 0) return undefined;
+
+  return {
+    __type: "semaphoreBlocks",
+    blocks: blocks.map((block) => {
+      const jobs = (block?.jobs as Array<Record<string, any>> | undefined) || [];
+      return {
+        name: block?.name as string | undefined,
+        result: block?.result as string | undefined,
+        resultReason: block?.result_reason as string | undefined,
+        state: block?.state as string | undefined,
+        jobs: jobs.map((job) => ({
+          name: job?.name as string | undefined,
+          result: job?.result as string | undefined,
+          status: job?.status as string | undefined,
+        })),
+      };
+    }),
+  };
 }

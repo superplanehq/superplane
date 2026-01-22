@@ -3,6 +3,7 @@ import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+import { formatTimeAgo } from "@/utils/date";
 
 interface OnPipelineDoneMetadata {
   project?: {
@@ -18,6 +19,10 @@ interface OnPipelineDoneEventData {
   };
   repository?: {
     slug: string;
+    url: string;
+  };
+  revision?: {
+    commit_sha: string;
   };
   pipeline?: {
     name: string;
@@ -33,22 +38,31 @@ interface OnPipelineDoneEventData {
 export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
     const eventData = event.data?.data as OnPipelineDoneEventData;
+    const result = eventData?.pipeline?.result || "";
+    const timeAgo = event.createdAt ? formatTimeAgo(new Date(event.createdAt)) : "";
+    const subtitle = result && timeAgo ? `${result} · ${timeAgo}` : result || timeAgo;
 
     return {
       title: eventData?.pipeline?.name || "",
-      subtitle: eventData?.pipeline?.result || "",
+      subtitle,
     };
   },
 
   getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
     const eventData = lastEvent.data?.data as OnPipelineDoneEventData;
+    const doneAt = eventData?.pipeline?.done_at ? new Date(eventData.pipeline.done_at).toLocaleString() : "";
+    const repositoryUrl = eventData?.repository?.url || "";
+    const commitSha = eventData?.revision?.commit_sha || "";
+    const commitUrl = repositoryUrl && commitSha ? `${repositoryUrl}/commit/${commitSha}` : "";
 
     return {
+      "Done At": doneAt,
+      Result: eventData?.pipeline?.result || "",
       Project: eventData?.project?.name || "",
       Repository: eventData?.repository?.slug || "",
+      "Repository URL": repositoryUrl,
+      "Commit URL": commitUrl,
       Pipeline: eventData?.pipeline?.name || "",
-      Result: eventData?.pipeline?.result || "",
-      "Done At": eventData?.pipeline?.done_at || "",
     };
   },
 
@@ -73,9 +87,13 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data?.data as OnPipelineDoneEventData;
+      const result = eventData.pipeline?.result || "";
+      const timeAgo = lastEvent.createdAt ? formatTimeAgo(new Date(lastEvent.createdAt)) : "";
+      const subtitle = result && timeAgo ? `${result} · ${timeAgo}` : result || timeAgo;
+
       props.lastEventData = {
         title: eventData.pipeline?.name || "",
-        subtitle: eventData.pipeline?.result || "",
+        subtitle,
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id,
