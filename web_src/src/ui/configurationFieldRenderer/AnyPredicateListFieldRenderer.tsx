@@ -4,15 +4,25 @@ import { Button } from "../button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FieldRendererProps } from "./types";
+import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
 
 interface Predicate {
   type: string;
   value: string;
 }
 
-export const AnyPredicateListFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
+export const AnyPredicateListFieldRenderer: React.FC<FieldRendererProps> = ({
+  field,
+  value,
+  onChange,
+  autocompleteExampleObj,
+  allowExpressions = false,
+}) => {
   const predicates: Predicate[] = Array.isArray(value) ? value : [];
   const operators = field.typeOptions?.anyPredicateList?.operators ?? [];
+
+  const useExpressionInput = !field.disallowExpression && allowExpressions;
+  const placeholder = field.placeholder || "Value";
 
   const addPredicate = () => {
     const newPredicate: Predicate = {
@@ -50,13 +60,29 @@ export const AnyPredicateListFieldRenderer: React.FC<FieldRendererProps> = ({ fi
                 ))}
               </SelectContent>
             </Select>
-            <Input
-              type="text"
-              value={predicate.value ?? ""}
-              onChange={(e) => updatePredicate(index, "value", e.target.value)}
-              placeholder="Value"
-              className=""
-            />
+            {useExpressionInput ? (
+              <AutoCompleteInput
+                exampleObj={autocompleteExampleObj ?? null}
+                value={predicate.value ?? ""}
+                onChange={(nextValue) => updatePredicate(index, "value", nextValue)}
+                placeholder={placeholder}
+                startWord="{{"
+                prefix="{{ "
+                suffix=" }}"
+                inputSize="md"
+                showValuePreview
+                quickTip="Tip: type `{{` to start an expression."
+                className=""
+              />
+            ) : (
+              <Input
+                type="text"
+                value={predicate.value ?? ""}
+                onChange={(e) => updatePredicate(index, "value", e.target.value)}
+                placeholder={placeholder}
+                className=""
+              />
+            )}
           </div>
           <Button variant="ghost" size="icon" onClick={() => removePredicate(index)} className="mt-1">
             <Trash2 className="h-4 w-4 text-red-500" />
