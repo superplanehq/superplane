@@ -255,4 +255,7 @@ image.push:
 
 tag.create.patch:
 	./release/create_tag.sh patch
+
+tag.create.minor:
+	./release/create_tag.sh minor
 		
