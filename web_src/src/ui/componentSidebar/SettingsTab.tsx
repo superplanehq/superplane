@@ -70,7 +70,7 @@ export function SettingsTab({
       return autocompleteExampleObj;
     }
 
-    const nodeNameLabel = nodeLabel || nodeName;
+    const nodeNameLabel = nodeName.trim();
     if (!nodeNameLabel) {
       return autocompleteExampleObj;
     }

@@ -1185,23 +1185,36 @@ export function WorkflowPageV2() {
 
       duplicateNames.forEach((name) => nameToNodeId.delete(name));
 
-      for (const [nodeName, nId] of nameToNodeId.entries()) {
-        if (nodeName === nId || exampleObj[nodeName] !== undefined) {
+      const namedExampleObj: Record<string, unknown> = {};
+      for (const [nodeName, nodeId] of nameToNodeId.entries()) {
+        if (nodeName === nodeId || namedExampleObj[nodeName] !== undefined) {
           continue;
         }
 
-        const value = exampleObj[nId];
+        const value = exampleObj[nodeId];
         if (value === undefined) {
           continue;
         }
 
-        exampleObj[nodeName] = value;
+        namedExampleObj[nodeName] = value;
+      }
+
+      if (Object.keys(namedExampleObj).length === 0) {
+        return null;
+      }
+
+      if (exampleObj.__root) {
+        namedExampleObj.__root = exampleObj.__root;
+      }
+
+      if (exampleObj.__previousByDepth) {
+        namedExampleObj.__previousByDepth = exampleObj.__previousByDepth;
       }
 
       if (Object.keys(nodeMetadata).length > 0) {
-        exampleObj.__nodeNames = nodeMetadata;
-        Object.entries(nodeMetadata).forEach(([nodeId, metadata]) => {
-          const value = exampleObj[nodeId];
+        namedExampleObj.__nodeNames = nodeMetadata;
+        Object.entries(nodeMetadata).forEach(([, metadata]) => {
+          const value = namedExampleObj[metadata.name ?? ""];
           if (value && typeof value === "object" && !Array.isArray(value)) {
             if (metadata.name) {
               (value as Record<string, unknown>).__nodeName = metadata.name;
@@ -1210,7 +1223,7 @@ export function WorkflowPageV2() {
         });
       }
 
-      return exampleObj;
+      return namedExampleObj;
     },
     [workflow, nodeExecutionsMap, nodeEventsMap, allComponents, allTriggers],
   );

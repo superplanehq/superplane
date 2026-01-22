@@ -250,33 +250,35 @@ export const ComponentSidebar = ({
     }
 
     const fallback: Record<string, unknown> = {};
+    let fallbackValue: Record<string, unknown> | undefined;
     for (const event of latestEvents) {
       if (event.kind === "execution" && event.originalExecution?.input) {
-        fallback[nodeId] = event.originalExecution.input as Record<string, unknown>;
+        fallbackValue = event.originalExecution.input as Record<string, unknown>;
         break;
       }
       if (event.kind === "trigger" && event.originalEvent?.data) {
-        fallback[nodeId] = event.originalEvent.data as Record<string, unknown>;
+        fallbackValue = event.originalEvent.data as Record<string, unknown>;
         break;
       }
       if (event.originalExecution?.input) {
-        fallback[nodeId] = event.originalExecution.input as Record<string, unknown>;
+        fallbackValue = event.originalExecution.input as Record<string, unknown>;
         break;
       }
       if (event.originalEvent?.data) {
-        fallback[nodeId] = event.originalEvent.data as Record<string, unknown>;
+        fallbackValue = event.originalEvent.data as Record<string, unknown>;
         break;
       }
     }
-    if (Object.keys(fallback).length === 0) {
+    if (!fallbackValue) {
       return null;
     }
 
     const normalizedName = nodeName.trim();
     fallback.__nodeNames = { [nodeId]: normalizedName };
-    if (normalizedName && normalizedName !== nodeId && fallback[normalizedName] === undefined) {
-      fallback[normalizedName] = fallback[nodeId];
+    if (!normalizedName) {
+      return null;
     }
+    fallback[normalizedName] = fallbackValue;
 
     return fallback;
   }, [autocompleteExampleObj, latestEvents, nodeId, nodeName]);
