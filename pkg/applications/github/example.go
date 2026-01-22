@@ -151,7 +151,7 @@ func (t *OnPullRequest) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnPullRequestOnce, exampleDataOnPullRequestBytes, &exampleDataOnPullRequest)
 }
 
-func (t *OnPullRequestReviewComment) ExampleData() map[string]any {
+func (t *OnPRComment) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(
 		&exampleDataOnPullRequestReviewCommentOnce,
 		exampleDataOnPullRequestReviewCommentBytes,
