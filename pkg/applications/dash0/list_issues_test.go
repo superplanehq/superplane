@@ -76,7 +76,7 @@ func Test__ListIssues__Setup(t *testing.T) {
 func Test__ListIssues__Execute(t *testing.T) {
 	component := ListIssues{}
 
-	t.Run("successful query returns issues", func(t *testing.T) {
+	t.Run("degraded issues emit to degraded channel", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -130,6 +130,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 		assert.True(t, execCtx.Finished)
 		assert.True(t, execCtx.Passed)
 		assert.Equal(t, "dash0.issues.list", execCtx.Type)
+		assert.Equal(t, ChannelNameDegraded, execCtx.Channel)
 		require.Len(t, execCtx.Payloads, 1)
 
 		// Verify the request was made with the correct query
@@ -143,6 +144,159 @@ func Test__ListIssues__Execute(t *testing.T) {
 		bodyStr := string(body)
 		assert.Contains(t, bodyStr, "query=%7Botel_metric_name%3D%22dash0.issue.status%22%7D+%3E%3D+1")
 		assert.Contains(t, bodyStr, "dataset=default")
+	})
+
+	t.Run("no issues emits to clear channel", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"status": "success",
+							"data": {
+								"resultType": "vector",
+								"result": []
+							}
+						}
+					`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.AppInstallationContext{
+			Configuration: map[string]any{
+				"apiToken": "token123",
+				"baseURL":  "https://api.us-west-2.aws.dash0.com",
+			},
+		}
+
+		nodeMetadataCtx := &contexts.MetadataContext{}
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.Execute(core.ExecutionContext{
+			Configuration:   map[string]any{},
+			HTTP:            httpContext,
+			AppInstallation: appCtx,
+			ExecutionState:  execCtx,
+			NodeMetadata:    nodeMetadataCtx,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, execCtx.Finished)
+		assert.True(t, execCtx.Passed)
+		assert.Equal(t, ChannelNameClear, execCtx.Channel)
+	})
+
+	t.Run("critical issues emit to critical channel", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"status": "success",
+							"data": {
+								"resultType": "vector",
+								"result": [
+									{
+										"metric": {
+											"otel_metric_name": "dash0.issue.status",
+											"issue_id": "issue-1"
+										},
+										"value": [1234567890, "2"]
+									}
+								]
+							}
+						}
+					`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.AppInstallationContext{
+			Configuration: map[string]any{
+				"apiToken": "token123",
+				"baseURL":  "https://api.us-west-2.aws.dash0.com",
+			},
+		}
+
+		nodeMetadataCtx := &contexts.MetadataContext{}
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.Execute(core.ExecutionContext{
+			Configuration:   map[string]any{},
+			HTTP:            httpContext,
+			AppInstallation: appCtx,
+			ExecutionState:  execCtx,
+			NodeMetadata:    nodeMetadataCtx,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, execCtx.Finished)
+		assert.True(t, execCtx.Passed)
+		assert.Equal(t, ChannelNameCritical, execCtx.Channel)
+	})
+
+	t.Run("mixed issues emit to critical channel (highest severity)", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"status": "success",
+							"data": {
+								"resultType": "vector",
+								"result": [
+									{
+										"metric": {
+											"otel_metric_name": "dash0.issue.status",
+											"issue_id": "issue-1"
+										},
+										"value": [1234567890, "1"]
+									},
+									{
+										"metric": {
+											"otel_metric_name": "dash0.issue.status",
+											"issue_id": "issue-2"
+										},
+										"value": [1234567890, "2"]
+									},
+									{
+										"metric": {
+											"otel_metric_name": "dash0.issue.status",
+											"issue_id": "issue-3"
+										},
+										"value": [1234567890, "1"]
+									}
+								]
+							}
+						}
+					`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.AppInstallationContext{
+			Configuration: map[string]any{
+				"apiToken": "token123",
+				"baseURL":  "https://api.us-west-2.aws.dash0.com",
+			},
+		}
+
+		nodeMetadataCtx := &contexts.MetadataContext{}
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.Execute(core.ExecutionContext{
+			Configuration:   map[string]any{},
+			HTTP:            httpContext,
+			AppInstallation: appCtx,
+			ExecutionState:  execCtx,
+			NodeMetadata:    nodeMetadataCtx,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, execCtx.Finished)
+		assert.True(t, execCtx.Passed)
+		assert.Equal(t, ChannelNameCritical, execCtx.Channel)
 	})
 
 	t.Run("query execution failure -> error", func(t *testing.T) {

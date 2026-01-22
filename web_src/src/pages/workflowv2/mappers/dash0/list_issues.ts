@@ -19,6 +19,63 @@ import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import { ListIssuesConfiguration, PrometheusResponse } from "./types";
 import { formatTimeAgo } from "@/utils/date";
 
+// Output channel names matching the backend constants
+const CHANNEL_CLEAR = "clear";
+const CHANNEL_DEGRADED = "degraded";
+const CHANNEL_CRITICAL = "critical";
+
+// Type for outputs with new channel structure
+type ListIssuesOutputs = {
+  default?: OutputPayload[];
+  clear?: OutputPayload[];
+  degraded?: OutputPayload[];
+  critical?: OutputPayload[];
+};
+
+/**
+ * Extracts the first payload from execution outputs, checking all possible channels.
+ * Supports both the new channel-based outputs (clear/degraded/critical) and
+ * the legacy default channel for backwards compatibility.
+ */
+function getFirstPayload(execution: WorkflowsWorkflowNodeExecution): OutputPayload | null {
+  const outputs = execution.outputs as ListIssuesOutputs | undefined;
+  if (!outputs) return null;
+
+  // Check new channel-based outputs first (in severity order)
+  for (const channel of [CHANNEL_CRITICAL, CHANNEL_DEGRADED, CHANNEL_CLEAR]) {
+    const channelOutputs = outputs[channel as keyof ListIssuesOutputs];
+    if (channelOutputs && channelOutputs.length > 0) {
+      return channelOutputs[0];
+    }
+  }
+
+  // Fallback to default channel for backwards compatibility
+  if (outputs.default && outputs.default.length > 0) {
+    return outputs.default[0];
+  }
+
+  return null;
+}
+
+/**
+ * Determines which output channel has data, indicating the issue state.
+ * Returns the channel name or null if no output found.
+ */
+function getActiveChannel(execution: WorkflowsWorkflowNodeExecution): string | null {
+  const outputs = execution.outputs as ListIssuesOutputs | undefined;
+  if (!outputs) return null;
+
+  // Check new channel-based outputs
+  if (outputs.critical && outputs.critical.length > 0) return CHANNEL_CRITICAL;
+  if (outputs.degraded && outputs.degraded.length > 0) return CHANNEL_DEGRADED;
+  if (outputs.clear && outputs.clear.length > 0) return CHANNEL_CLEAR;
+
+  // Fallback to default channel
+  if (outputs.default && outputs.default.length > 0) return "default";
+
+  return null;
+}
+
 export const listIssuesMapper: ComponentBaseMapper = {
   props(
     nodes: ComponentsNode[],
@@ -84,14 +141,7 @@ export const listIssuesMapper: ComponentBaseMapper = {
       details["Checked at"] = new Date(execution.createdAt).toLocaleString();
     }
 
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
-
-    if (!outputs || !outputs.default || outputs.default.length === 0) {
-      details["Issues"] = [];
-      return details;
-    }
-
-    const payload = outputs.default[0];
+    const payload = getFirstPayload(execution);
     if (!payload || !payload.data) {
       details["Issues"] = [];
       return details;
@@ -208,57 +258,71 @@ export const listIssuesStateFunction: StateFunction = (execution: WorkflowsWorkf
 
   // Only analyze issue status for finished, successful executions
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+    // First, try to determine state from the active output channel
+    // This is the preferred method as the backend now routes to the appropriate channel
+    const activeChannel = getActiveChannel(execution);
 
-    if (!outputs || !outputs.default || outputs.default.length === 0) {
-      return "clear";
-    }
-
-    // Extract the Prometheus response from the first output payload
-    const payload = outputs.default[0];
-    if (!payload || !payload.data) {
-      return "clear";
-    }
-
-    const responseData = payload.data as PrometheusResponse | undefined;
-    if (!responseData || !responseData.data || !responseData.data.result) {
-      return "clear";
-    }
-
-    const results = responseData.data.result;
-
-    // No issues found
-    if (results.length === 0) {
-      return "clear";
-    }
-
-    // Analyze issue statuses
-    let hasCritical = false;
-    let hasDegraded = false;
-
-    for (const result of results) {
-      // For instant queries, check the value field: [timestamp, "status"]
-      if (result.value && Array.isArray(result.value) && result.value.length >= 2) {
-        const status = String(result.value[1]);
-        if (status === "2") {
-          hasCritical = true;
-        } else if (status === "1") {
-          hasDegraded = true;
-        }
-      }
-    }
-
-    // Return critical if there's at least one critical issue
-    if (hasCritical) {
+    if (activeChannel === CHANNEL_CRITICAL) {
       return "critical";
     }
-
-    // Return degraded if there are only degraded issues
-    if (hasDegraded) {
+    if (activeChannel === CHANNEL_DEGRADED) {
       return "degraded";
     }
+    if (activeChannel === CHANNEL_CLEAR) {
+      return "clear";
+    }
 
-    // Default to clear if we can't determine status
+    // Fallback for legacy executions using 'default' channel:
+    // Analyze the data to determine state
+    if (activeChannel === "default") {
+      const payload = getFirstPayload(execution);
+      if (!payload || !payload.data) {
+        return "clear";
+      }
+
+      const responseData = payload.data as PrometheusResponse | undefined;
+      if (!responseData || !responseData.data || !responseData.data.result) {
+        return "clear";
+      }
+
+      const results = responseData.data.result;
+
+      // No issues found
+      if (results.length === 0) {
+        return "clear";
+      }
+
+      // Analyze issue statuses
+      let hasCritical = false;
+      let hasDegraded = false;
+
+      for (const result of results) {
+        // For instant queries, check the value field: [timestamp, "status"]
+        if (result.value && Array.isArray(result.value) && result.value.length >= 2) {
+          const status = String(result.value[1]);
+          if (status === "2") {
+            hasCritical = true;
+          } else if (status === "1") {
+            hasDegraded = true;
+          }
+        }
+      }
+
+      // Return critical if there's at least one critical issue
+      if (hasCritical) {
+        return "critical";
+      }
+
+      // Return degraded if there are only degraded issues
+      if (hasDegraded) {
+        return "degraded";
+      }
+
+      // Default to clear if we can't determine status
+      return "clear";
+    }
+
+    // No output found - default to clear
     return "clear";
   }
 
@@ -271,13 +335,7 @@ export const LIST_ISSUES_STATE_REGISTRY: EventStateRegistry = {
 };
 
 function getIssueCounts(execution: WorkflowsWorkflowNodeExecution): { critical: number; degraded: number } {
-  const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
-
-  if (!outputs || !outputs.default || outputs.default.length === 0) {
-    return { critical: 0, degraded: 0 };
-  }
-
-  const payload = outputs.default[0];
+  const payload = getFirstPayload(execution);
   if (!payload || !payload.data) {
     return { critical: 0, degraded: 0 };
   }
