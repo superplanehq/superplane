@@ -13,8 +13,8 @@ import (
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__OnPullRequestReviewComment__HandleWebhook(t *testing.T) {
-	trigger := &OnPullRequestReviewComment{}
+func Test__OnPRComment__HandleWebhook(t *testing.T) {
+	trigger := &OnPRComment{}
 	eventType := "pull_request_review_comment"
 
 	t.Run("no X-Hub-Signature-256 -> 403", func(t *testing.T) {
@@ -176,11 +176,184 @@ func Test__OnPullRequestReviewComment__HandleWebhook(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, eventContext.Count(), 0)
 	})
+
+	t.Run("issue_comment event with pull_request -> event IS emitted", func(t *testing.T) {
+		// PR conversation comments come as issue_comment events with a pull_request field
+		body := []byte(`{"action":"created","issue":{"pull_request":{"url":"https://api.github.com/repos/test/test/pulls/1"}},"comment":{"body":"comment on PR conversation"}}`)
+
+		secret := "test-secret"
+		h := hmac.New(sha256.New, []byte(secret))
+		h.Write(body)
+		signature := fmt.Sprintf("%x", h.Sum(nil))
+
+		headers := http.Header{}
+		headers.Set("X-Hub-Signature-256", "sha256="+signature)
+		headers.Set("X-GitHub-Event", "issue_comment")
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"repository": "test",
+			},
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, eventContext.Count())
+	})
+
+	t.Run("issue_comment event without pull_request -> event is NOT emitted", func(t *testing.T) {
+		// Regular issue comments should not trigger this handler
+		body := []byte(`{"action":"created","issue":{"id":123},"comment":{"body":"comment on issue"}}`)
+
+		secret := "test-secret"
+		h := hmac.New(sha256.New, []byte(secret))
+		h.Write(body)
+		signature := fmt.Sprintf("%x", h.Sum(nil))
+
+		headers := http.Header{}
+		headers.Set("X-Hub-Signature-256", "sha256="+signature)
+		headers.Set("X-GitHub-Event", "issue_comment")
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"repository": "test",
+			},
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, eventContext.Count())
+	})
+
+	t.Run("issue_comment event with content filter matches -> event IS emitted", func(t *testing.T) {
+		body := []byte(`{"action":"created","issue":{"pull_request":{"url":"https://api.github.com/repos/test/test/pulls/1"}},"comment":{"body":"/solve this PR"}}`)
+
+		secret := "test-secret"
+		h := hmac.New(sha256.New, []byte(secret))
+		h.Write(body)
+		signature := fmt.Sprintf("%x", h.Sum(nil))
+
+		headers := http.Header{}
+		headers.Set("X-Hub-Signature-256", "sha256="+signature)
+		headers.Set("X-GitHub-Event", "issue_comment")
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"repository":    "test",
+				"contentFilter": "/solve",
+			},
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, eventContext.Count())
+	})
+
+	t.Run("pull_request_review submitted -> event IS emitted", func(t *testing.T) {
+		// Review submission comments (when clicking "Submit review")
+		body := []byte(`{"action":"submitted","review":{"body":"LGTM!","state":"approved"},"pull_request":{"number":1}}`)
+
+		secret := "test-secret"
+		h := hmac.New(sha256.New, []byte(secret))
+		h.Write(body)
+		signature := fmt.Sprintf("%x", h.Sum(nil))
+
+		headers := http.Header{}
+		headers.Set("X-Hub-Signature-256", "sha256="+signature)
+		headers.Set("X-GitHub-Event", "pull_request_review")
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"repository": "test",
+			},
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, eventContext.Count())
+	})
+
+	t.Run("pull_request_review dismissed -> event is NOT emitted", func(t *testing.T) {
+		body := []byte(`{"action":"dismissed","review":{"body":"dismissed review"},"pull_request":{"number":1}}`)
+
+		secret := "test-secret"
+		h := hmac.New(sha256.New, []byte(secret))
+		h.Write(body)
+		signature := fmt.Sprintf("%x", h.Sum(nil))
+
+		headers := http.Header{}
+		headers.Set("X-Hub-Signature-256", "sha256="+signature)
+		headers.Set("X-GitHub-Event", "pull_request_review")
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"repository": "test",
+			},
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, eventContext.Count())
+	})
+
+	t.Run("pull_request_review with content filter matches -> event IS emitted", func(t *testing.T) {
+		body := []byte(`{"action":"submitted","review":{"body":"/deploy to staging","state":"approved"},"pull_request":{"number":1}}`)
+
+		secret := "test-secret"
+		h := hmac.New(sha256.New, []byte(secret))
+		h.Write(body)
+		signature := fmt.Sprintf("%x", h.Sum(nil))
+
+		headers := http.Header{}
+		headers.Set("X-Hub-Signature-256", "sha256="+signature)
+		headers.Set("X-GitHub-Event", "pull_request_review")
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"repository":    "test",
+				"contentFilter": "/deploy",
+			},
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, eventContext.Count())
+	})
 }
 
-func Test__OnPullRequestReviewComment__Setup(t *testing.T) {
+func Test__OnPRComment__Setup(t *testing.T) {
 	helloRepo := Repository{ID: 123456, Name: "hello", URL: "https://github.com/testhq/hello"}
-	trigger := OnPullRequestReviewComment{}
+	trigger := OnPRComment{}
 
 	t.Run("repository is required", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
@@ -208,7 +381,7 @@ func Test__OnPullRequestReviewComment__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "repository world is not accessible to app installation")
 	})
 
-	t.Run("metadata is set and webhook is requested", func(t *testing.T) {
+	t.Run("metadata is set and webhook is requested with all event types", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{
 			Metadata: Metadata{
 				Repositories: []Repository{helloRepo},
@@ -225,8 +398,9 @@ func Test__OnPullRequestReviewComment__Setup(t *testing.T) {
 		require.Equal(t, nodeMetadataCtx.Get(), NodeMetadata{Repository: &helloRepo})
 		require.Len(t, appCtx.WebhookRequests, 1)
 
+		// Single webhook listening to all PR comment event types
 		webhookRequest := appCtx.WebhookRequests[0].(WebhookConfiguration)
-		assert.Equal(t, webhookRequest.EventType, "pull_request_review_comment")
-		assert.Equal(t, webhookRequest.Repository, "hello")
+		assert.Equal(t, "hello", webhookRequest.Repository)
+		assert.ElementsMatch(t, []string{"pull_request_review_comment", "issue_comment", "pull_request_review"}, webhookRequest.EventTypes)
 	})
 }
