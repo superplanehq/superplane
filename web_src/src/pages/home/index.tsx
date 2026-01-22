@@ -683,7 +683,13 @@ function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActio
             <Trash2 size={16} />
             {deleteWorkflowMutation.isPending ? "Deleting..." : "Delete"}
           </Button>
-          <Button variant="outline" onClick={closeDialog}>
+          <Button
+            variant="outline"
+            onClick={(event) => {
+              event.stopPropagation();
+              closeDialog();
+            }}
+          >
             Cancel
           </Button>
         </DialogActions>

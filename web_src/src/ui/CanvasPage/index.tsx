@@ -1953,6 +1953,7 @@ function CanvasContent({
             onDrop={handleDrop}
             onMove={handleMove}
             onInit={handleInit}
+            deleteKeyCode={null}
             onPaneClick={handlePaneClick}
             onEdgeMouseEnter={handleEdgeMouseEnter}
             onEdgeMouseLeave={handleEdgeMouseLeave}

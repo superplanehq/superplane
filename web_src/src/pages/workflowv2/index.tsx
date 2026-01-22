@@ -70,6 +70,7 @@ import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { useAccount } from "@/contexts/AccountContext";
+import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
 import {
   buildRunEntryFromEvent,
   buildRunItemFromExecution,
@@ -284,6 +285,32 @@ export function WorkflowPageV2() {
 
     return { nodeExecutionsMap: executionsMap, nodeQueueItemsMap: queueItemsMap, nodeEventsMap: eventsMap };
   }, [storeVersion]);
+
+  const approvalGroupNames = useMemo(() => {
+    if (!organizationId) return [];
+
+    const groupNames = new Set<string>();
+    Object.values(nodeExecutionsMap).forEach((executions) => {
+      executions.forEach((execution) => {
+        const metadata = execution.metadata as { records?: Array<{ type?: string; group?: string }> } | undefined;
+        const records = metadata?.records;
+        if (!Array.isArray(records)) return;
+
+        records.forEach((record) => {
+          if (record.type === "group" && record.group) {
+            groupNames.add(record.group);
+          }
+        });
+      });
+    });
+
+    return Array.from(groupNames);
+  }, [organizationId, nodeExecutionsMap]);
+
+  const groupUsersUpdatedAt = useApprovalGroupUsersPrefetch({
+    organizationId,
+    groupNames: approvalGroupNames,
+  }).updatedAt;
 
   // Execution chain data utilities for lazy loading
   const { loadExecutionChain } = useExecutionChainData(workflowId!, queryClient, workflow);
@@ -584,6 +611,7 @@ export function WorkflowPageV2() {
     nodeEventsMap,
     nodeExecutionsMap,
     nodeQueueItemsMap,
+    groupUsersUpdatedAt,
     workflowId,
     queryClient,
     workflowLoading,

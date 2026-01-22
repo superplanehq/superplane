@@ -168,7 +168,11 @@ export function Applications({ organizationId }: ApplicationsProps) {
                       </span>
                       <Button
                         variant="outline"
-                        onClick={() => navigate(`/${organizationId}/settings/applications/${app.metadata?.id}`)}
+                        onClick={() =>
+                          navigate(`/${organizationId}/settings/applications/${app.metadata?.id}`, {
+                            state: { tab: "configuration" },
+                          })
+                        }
                         className="text-sm py-1.5 self-start"
                       >
                         Configure...

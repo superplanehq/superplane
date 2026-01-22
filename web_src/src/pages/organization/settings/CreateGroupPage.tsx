@@ -2,19 +2,12 @@ import { Heading } from "@/components/Heading/heading";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import {
-  Dropdown,
-  DropdownButton,
-  DropdownDescription,
-  DropdownItem,
-  DropdownLabel,
-  DropdownMenu,
-} from "../../../components/Dropdown/dropdown";
 import { Icon } from "../../../components/Icon";
 import { Input } from "../../../components/Input/input";
 import { useCreateGroup, useOrganizationRoles } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { isRBACEnabled } from "@/lib/env";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export function CreateGroupPage() {
   const navigate = useNavigate();
@@ -140,23 +133,25 @@ export function CreateGroupPage() {
                       </div>
                     </div>
                   ) : (
-                    <Dropdown>
-                      <DropdownButton className="flex items-center gap-2 text-sm justify-between">
-                        {sortedRoles.find((r) => r.metadata?.name === selectedRole)?.spec?.displayName || "Select Role"}
-                        <Icon name="chevron-down" />
-                      </DropdownButton>
-                      <DropdownMenu>
-                        {sortedRoles.map((role) => (
-                          <DropdownItem
-                            key={role.metadata?.name}
-                            onClick={() => setSelectedRole(role.metadata?.name || "")}
-                          >
-                            <DropdownLabel>{role.spec?.displayName}</DropdownLabel>
-                            <DropdownDescription>{role.spec?.description || ""}</DropdownDescription>
-                          </DropdownItem>
-                        ))}
-                      </DropdownMenu>
-                    </Dropdown>
+                    <>
+                      <Select value={selectedRole} onValueChange={setSelectedRole}>
+                        <SelectTrigger className="w-auto min-w-56">
+                          <SelectValue placeholder="Select Role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sortedRoles.map((role) => (
+                            <SelectItem key={role.metadata?.name} value={role.metadata?.name || ""}>
+                              {role.spec?.displayName || role.metadata?.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {selectedRole && (
+                        <p className="mt-2 max-w-lg text-xs text-gray-500 dark:text-gray-400">
+                          {sortedRoles.find((role) => role.metadata?.name === selectedRole)?.spec?.description || ""}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               )}
