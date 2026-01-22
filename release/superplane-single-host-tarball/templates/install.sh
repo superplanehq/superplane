@@ -52,6 +52,24 @@ else
 fi
 
 echo ""
+default_oidc_keys_path="/app/data/oidc-keys"
+read -rp "4) Path to OIDC keys directory [${default_oidc_keys_path}]: " OIDC_KEYS_PATH_INPUT
+OIDC_KEYS_PATH="${OIDC_KEYS_PATH_INPUT:-$default_oidc_keys_path}"
+
+mkdir -p "${OIDC_KEYS_PATH}"
+
+if [[ -z "$(find "${OIDC_KEYS_PATH}" -type f 2>/dev/null | head -n 1)" ]]; then
+  if ! command -v openssl >/dev/null 2>&1; then
+    echo "openssl is required to generate OIDC keys."
+    exit 1
+  fi
+
+  oidc_key_file="${OIDC_KEYS_PATH}/$(date -u +%s).pem"
+  openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out "${oidc_key_file}"
+  chmod 600 "${oidc_key_file}"
+fi
+
+echo ""
 echo "Writing ${ENV_FILE}..."
 
 cat > "${ENV_FILE}" <<EOF
@@ -82,6 +100,7 @@ TEMPLATE_DIR=/app/templates
 
 ENCRYPTION_KEY=${ENCRYPTION_KEY}
 JWT_SECRET=${JWT_SECRET}
+OIDC_KEYS_PATH=${OIDC_KEYS_PATH}
 SESSION_SECRET=${SESSION_SECRET}
 NO_ENCRYPTION=no
 
