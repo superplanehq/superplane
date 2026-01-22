@@ -10,6 +10,7 @@ import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import { MetadataItem } from "@/ui/metadataList";
 import smtpIcon from "@/assets/icons/integrations/smtp.svg";
+import { formatTimeAgo } from "@/utils/date";
 
 interface SendEmailConfiguration {
   to?: string;
@@ -54,11 +55,16 @@ export const sendEmailMapper: ComponentBaseMapper = {
     const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
 
     return {
-      To: stringOrDash(result?.to),
-      Subject: stringOrDash(result?.subject),
-      "Sent At": stringOrDash(result?.sentAt),
+      "Sent At": formatDate(result?.sentAt) || "-",
       "From Email": stringOrDash(result?.fromEmail),
+      To: stringOrDash(result?.to),
+      Cc: stringOrDash(result?.cc),
+      Subject: stringOrDash(result?.subject),
     };
+  },
+  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+    if (!execution.createdAt) return "";
+    return formatTimeAgo(new Date(execution.createdAt));
   },
 };
 
@@ -123,4 +129,11 @@ function stringOrDash(value?: unknown): string {
   }
 
   return String(value);
+}
+
+function formatDate(value?: unknown): string | undefined {
+  if (!value) return undefined;
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toLocaleString();
 }

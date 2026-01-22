@@ -63,7 +63,7 @@ export function buildGithubExecutionSubtitle(execution: WorkflowsWorkflowNodeExe
   return buildGithubSubtitle(content || "", timestamp);
 }
 
-export function buildGithubActionStateRegistry(successState: string): EventStateRegistry {
+export function buildActionStateRegistry(successState: string): EventStateRegistry {
   return {
     stateMap: {
       ...DEFAULT_EVENT_STATE_MAP,
