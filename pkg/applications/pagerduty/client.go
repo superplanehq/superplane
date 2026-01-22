@@ -121,7 +121,7 @@ type IncidentBody struct {
 	Details string `json:"details"`
 }
 
-func (c *Client) CreateIncident(title, service, urgency, description string) (any, error) {
+func (c *Client) CreateIncident(title, service, urgency, description, fromEmail string) (any, error) {
 	request := CreateIncidentRequest{
 		Incident: IncidentPayload{
 			Type:    "incident",
@@ -147,9 +147,38 @@ func (c *Client) CreateIncident(title, service, urgency, description string) (an
 	}
 
 	url := fmt.Sprintf("%s/incidents", c.BaseURL)
-	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error building request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/vnd.pagerduty+json;version=2")
+
+	if fromEmail != "" {
+		req.Header.Set("From", fromEmail)
+	}
+
+	if c.AuthType == AuthTypeAppOAuth {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.Token))
+	} else {
+		req.Header.Set("Authorization", fmt.Sprintf("Token token=%s", c.Token))
+	}
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error executing request: %v", err)
+	}
+	defer res.Body.Close()
+
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading body: %v", err)
+	}
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
 	}
 
 	var response map[string]any
@@ -260,7 +289,6 @@ func (c *Client) UpdateIncident(
 
 	url := fmt.Sprintf("%s/incidents/%s", c.BaseURL, incidentID)
 
-	// Create request with From header
 	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("error building request: %v", err)
@@ -268,7 +296,10 @@ func (c *Client) UpdateIncident(
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/vnd.pagerduty+json;version=2")
-	req.Header.Set("From", fromEmail)
+
+	if fromEmail != "" {
+		req.Header.Set("From", fromEmail)
+	}
 
 	if c.AuthType == AuthTypeAppOAuth {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.Token))
@@ -329,7 +360,10 @@ func (c *Client) AddIncidentNote(incidentID string, fromEmail string, content st
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/vnd.pagerduty+json;version=2")
-	req.Header.Set("From", fromEmail)
+
+	if fromEmail != "" {
+		req.Header.Set("From", fromEmail)
+	}
 
 	if c.AuthType == AuthTypeAppOAuth {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.Token))

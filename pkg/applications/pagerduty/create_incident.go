@@ -18,6 +18,7 @@ type CreateIncidentSpec struct {
 	Description string `json:"description"`
 	Urgency     string `json:"urgency"`
 	Service     string `json:"service"`
+	FromEmail   string `json:"fromEmail"`
 }
 
 func (c *CreateIncident) Name() string {
@@ -88,6 +89,14 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "fromEmail",
+			Label:       "From Email",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "Email address of a valid PagerDuty user. Required for App OAuth and account-level API tokens, optional for user-level API tokens.",
+			Placeholder: "user@example.com",
+		},
 	}
 }
 
@@ -135,7 +144,7 @@ func (c *CreateIncident) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	incident, err := client.CreateIncident(spec.Title, spec.Service, spec.Urgency, spec.Description)
+	incident, err := client.CreateIncident(spec.Title, spec.Service, spec.Urgency, spec.Description, spec.FromEmail)
 	if err != nil {
 		return fmt.Errorf("failed to create incident: %v", err)
 	}

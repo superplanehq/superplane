@@ -63,8 +63,8 @@ func (c *UpdateIncident) Configuration() []configuration.Field {
 			Name:        "fromEmail",
 			Label:       "From Email",
 			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "Email address of a valid PagerDuty user (required by API)",
+			Required:    false,
+			Description: "Email address of a valid PagerDuty user. Required for App OAuth and account-level API tokens, optional for user-level API tokens.",
 			Placeholder: "user@example.com",
 		},
 		{
@@ -155,10 +155,6 @@ func (c *UpdateIncident) Setup(ctx core.SetupContext) error {
 
 	if spec.IncidentID == "" {
 		return errors.New("incidentId is required")
-	}
-
-	if spec.FromEmail == "" {
-		return errors.New("fromEmail is required")
 	}
 
 	// Validate that at least one field to update is provided
