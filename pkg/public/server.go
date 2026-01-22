@@ -66,7 +66,7 @@ type Server struct {
 	encryptor             crypto.Encryptor
 	registry              *registry.Registry
 	jwt                   *jwt.Signer
-	oidcSigner            *oidc.Signer
+	oidcProvider          oidc.Provider
 	oidcVerifier          *crypto.OIDCVerifier
 	authService           authorization.Authorization
 	timeoutHandlerTimeout time.Duration
@@ -89,7 +89,7 @@ func NewServer(
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
 	jwtSigner *jwt.Signer,
-	oidcSigner *oidc.Signer,
+	oidcProvider oidc.Provider,
 	oidcVerifier *crypto.OIDCVerifier,
 	basePath string,
 	baseURL string,
@@ -117,7 +117,7 @@ func NewServer(
 		timeoutHandlerTimeout: 15 * time.Second,
 		encryptor:             encryptor,
 		jwt:                   jwtSigner,
-		oidcSigner:            oidcSigner,
+		oidcProvider:          oidcProvider,
 		oidcVerifier:          oidcVerifier,
 		registry:              registry,
 		authService:           authorizationService,
@@ -462,7 +462,7 @@ func (s *Server) handleOIDCConfiguration(w http.ResponseWriter, _ *http.Request)
 
 func (s *Server) handleOIDCJWKS(w http.ResponseWriter, _ *http.Request) {
 	response := jwksResponse{
-		Keys: s.oidcSigner.PublicJWKs(),
+		Keys: s.oidcProvider.PublicJWKs(),
 	}
 	respondJSON(w, response)
 }

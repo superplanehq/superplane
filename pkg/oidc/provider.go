@@ -17,20 +17,11 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-type Signer struct {
+type RSAProvider struct {
 	privateKey  *rsa.PrivateKey
 	publicKeys  map[string]*rsa.PublicKey
 	publicJWKs  []PublicJWK
 	activeKeyID string
-}
-
-type PublicJWK struct {
-	Kty string `json:"kty"`
-	Use string `json:"use"`
-	Alg string `json:"alg"`
-	Kid string `json:"kid"`
-	N   string `json:"n"`
-	E   string `json:"e"`
 }
 
 type keyEntry struct {
@@ -38,7 +29,7 @@ type keyEntry struct {
 	key  *rsa.PrivateKey
 }
 
-func NewSignerFromKeyDir(keysPath string) (*Signer, error) {
+func NewProviderFromKeyDir(keysPath string) (Provider, error) {
 	entries, err := os.ReadDir(keysPath)
 	if err != nil {
 		return nil, err
@@ -73,11 +64,11 @@ func NewSignerFromKeyDir(keysPath string) (*Signer, error) {
 	return newSignerFromKeys(activeKey, keys)
 }
 
-func (s *Signer) PublicJWKs() []PublicJWK {
+func (s *RSAProvider) PublicJWKs() []PublicJWK {
 	return s.publicJWKs
 }
 
-func (s *Signer) Generate(subject string, duration time.Duration) (string, error) {
+func (s *RSAProvider) Sign(subject string, duration time.Duration) (string, error) {
 	now := time.Now()
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
 		"iat": now.Unix(),
@@ -95,7 +86,7 @@ func (s *Signer) Generate(subject string, duration time.Duration) (string, error
 	return tokenString, nil
 }
 
-func newSignerFromKeys(activeKey *rsa.PrivateKey, keys []keyEntry) (*Signer, error) {
+func newSignerFromKeys(activeKey *rsa.PrivateKey, keys []keyEntry) (Provider, error) {
 	publicKeys := make(map[string]*rsa.PublicKey, len(keys))
 	publicJWKs := make([]PublicJWK, 0, len(keys))
 
@@ -120,7 +111,7 @@ func newSignerFromKeys(activeKey *rsa.PrivateKey, keys []keyEntry) (*Signer, err
 		return nil, errors.New("active OIDC key is not registered")
 	}
 
-	return &Signer{
+	return &RSAProvider{
 		privateKey:  activeKey,
 		publicKeys:  publicKeys,
 		publicJWKs:  publicJWKs,
