@@ -20,7 +20,7 @@ export const onBranchCreatedTriggerRenderer: TriggerRenderer = {
 
     return {
       title: eventData?.ref ? `Branch: ${eventData.ref}` : "Branch Created",
-      subtitle: buildGithubSubtitle(eventData?.repository?.full_name || "", event.createdAt),
+      subtitle: buildGithubSubtitle(eventData?.ref || "", event.createdAt),
     };
   },
 

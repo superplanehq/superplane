@@ -38,41 +38,27 @@ export const deleteReleaseMapper: ComponentBaseMapper = {
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
     const details: Record<string, string> = {};
 
-    if (execution.createdAt) {
-      details["Started At"] = execution.createdAt;
-    }
+    if (outputs && outputs.default && outputs.default.length > 0) {
+      const deletedRelease = outputs.default[0].data as DeletedReleaseOutput;
+      Object.assign(details, {
+        "Deleted At": deletedRelease?.deleted_at ? new Date(deletedRelease.deleted_at).toLocaleString() : "-",
+        "Tag Deleted": deletedRelease?.tag_deleted ? "Yes" : "No",
+      });
 
-    if (execution.state === "STATE_FINISHED" && execution.updatedAt) {
-      details["Finished At"] = execution.updatedAt;
-    }
+      details["Release ID"] = deletedRelease?.id?.toString() || "";
+      details["Tag Name"] = deletedRelease?.tag_name || "";
 
-    if (!outputs || !outputs.default || outputs.default.length === 0) {
-      return details;
-    }
+      if (deletedRelease?.name) {
+        details["Release Name"] = deletedRelease.name;
+      }
 
-    const deletedRelease = outputs.default[0].data as DeletedReleaseOutput;
+      if (deletedRelease?.draft) {
+        details["Was Draft"] = "Yes";
+      }
 
-    details["Release ID"] = deletedRelease?.id?.toString() || "";
-    details["Tag Name"] = deletedRelease?.tag_name || "";
-
-    if (deletedRelease?.name) {
-      details["Release Name"] = deletedRelease.name;
-    }
-
-    if (deletedRelease?.deleted_at) {
-      details["Deleted At"] = deletedRelease.deleted_at;
-    }
-
-    if (deletedRelease?.tag_deleted !== undefined) {
-      details["Tag Deleted"] = deletedRelease.tag_deleted ? "Yes" : "No";
-    }
-
-    if (deletedRelease?.draft) {
-      details["Was Draft"] = "Yes";
-    }
-
-    if (deletedRelease?.prerelease) {
-      details["Was Prerelease"] = "Yes";
+      if (deletedRelease?.prerelease) {
+        details["Was Prerelease"] = "Yes";
+      }
     }
 
     return details;

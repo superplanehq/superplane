@@ -40,7 +40,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 export const triggerRenderers: Record<string, TriggerRenderer> = {
   onPush: onPushTriggerRenderer,
   onPullRequest: onPullRequestTriggerRenderer,
-  onPullRequestReviewComment: onPullRequestReviewCommentTriggerRenderer,
+  onPRComment: onPullRequestReviewCommentTriggerRenderer,
   onIssue: onIssueTriggerRenderer,
   onIssueComment: onIssueCommentTriggerRenderer,
   onRelease: onReleaseTriggerRenderer,

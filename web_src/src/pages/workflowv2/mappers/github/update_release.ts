@@ -41,42 +41,28 @@ export const updateReleaseMapper: ComponentBaseMapper = {
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
     const details: Record<string, string> = {};
 
-    if (execution.createdAt) {
-      details["Started At"] = execution.createdAt;
-    }
+    if (outputs && outputs.default && outputs.default.length > 0) {
+      const release = outputs.default[0].data as ReleaseOutput;
+      Object.assign(details, {
+        "Published At": release?.published_at ? new Date(release.published_at).toLocaleString() : "-",
+        "Updated By": release?.author?.login || "-",
+      });
 
-    if (execution.state === "STATE_FINISHED" && execution.updatedAt) {
-      details["Finished At"] = execution.updatedAt;
-    }
+      details["Release URL"] = release?.html_url || "";
+      details["Release ID"] = release?.id?.toString() || "";
+      details["Tag Name"] = release?.tag_name || "";
 
-    if (!outputs || !outputs.default || outputs.default.length === 0) {
-      return details;
-    }
+      if (release?.name) {
+        details["Name"] = release.name;
+      }
 
-    const release = outputs.default[0].data as ReleaseOutput;
+      if (release?.draft !== undefined) {
+        details["Draft"] = release.draft ? "Yes" : "No";
+      }
 
-    details["Release URL"] = release?.html_url || "";
-    details["Release ID"] = release?.id?.toString() || "";
-    details["Tag Name"] = release?.tag_name || "";
-
-    if (release?.name) {
-      details["Name"] = release.name;
-    }
-
-    if (release?.draft !== undefined) {
-      details["Draft"] = release.draft ? "Yes" : "No";
-    }
-
-    if (release?.prerelease !== undefined) {
-      details["Prerelease"] = release.prerelease ? "Yes" : "No";
-    }
-
-    if (release?.published_at) {
-      details["Published At"] = release.published_at;
-    }
-
-    if (release?.author?.login) {
-      details["Updated By"] = release.author.login;
+      if (release?.prerelease !== undefined) {
+        details["Prerelease"] = release.prerelease ? "Yes" : "No";
+      }
     }
 
     return details;

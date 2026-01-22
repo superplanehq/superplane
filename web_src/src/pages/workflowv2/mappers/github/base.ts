@@ -31,20 +31,12 @@ export const baseIssueMapper: ComponentBaseMapper = {
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
     const details: Record<string, string> = {};
 
-    if (execution.createdAt) {
-      details["Started At"] = execution.createdAt;
-    }
-
-    if (execution.state === "STATE_FINISHED" && execution.updatedAt) {
-      details["Finished At"] = execution.updatedAt;
-    }
-
     if (!outputs || !outputs.default || outputs.default.length === 0) {
       return details;
     }
 
     const issue = outputs.default[0].data as Issue;
-    return { ...details, ...getDetailsForIssue(issue) };
+    return { ...getDetailsForIssue(issue), ...details };
   },
 };
 
@@ -72,19 +64,22 @@ export function baseProps(
 }
 
 export function getDetailsForIssue(issue: Issue): Record<string, string> {
-  const details: Record<string, string> = {
-    Number: issue?.number.toString(),
-    ID: issue?.id.toString(),
-    State: issue?.state,
-    URL: issue?.html_url,
-    Title: issue?.title || "-",
-    Author: issue?.user?.html_url || "-",
-    "Created At": issue?.created_at,
-  };
+  const details: Record<string, string> = {};
+  Object.assign(details, {
+    "Created At": issue?.created_at ? new Date(issue.created_at).toLocaleString() : "-",
+    "Created By": issue?.user?.login || "-",
+  });
+
+  details["Number"] = issue?.number.toString();
+  details["ID"] = issue?.id.toString();
+  details["State"] = issue?.state;
+  details["URL"] = issue?.html_url;
+  details["Title"] = issue?.title || "-";
+  details["Author"] = issue?.user?.html_url || "-";
 
   if (issue.closed_by) {
     details["Closed By"] = issue?.closed_by.html_url;
-    details["Closed At"] = issue?.closed_at!;
+    details["Closed At"] = issue?.closed_at ? new Date(issue.closed_at).toLocaleString() : "";
   }
 
   if (issue.labels) {

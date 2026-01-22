@@ -130,14 +130,6 @@ export const runWorkflowMapper: ComponentBaseMapper = {
     const metadata = execution.metadata as ExecutionMetadata;
     const details: Record<string, string> = {};
 
-    if (execution.createdAt) {
-      details["Started At"] = execution.createdAt;
-    }
-
-    if (execution.state == "STATE_FINISHED" && execution.updatedAt) {
-      details["Finished At"] = execution.updatedAt;
-    }
-
     if (metadata.workflowRun?.url) {
       details["Workflow URL"] = metadata.workflowRun.url;
     }

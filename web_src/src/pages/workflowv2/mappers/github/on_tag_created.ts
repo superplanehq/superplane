@@ -20,7 +20,7 @@ export const onTagCreatedTriggerRenderer: TriggerRenderer = {
 
     return {
       title: eventData?.ref ? `Tag: ${eventData.ref}` : "Tag Created",
-      subtitle: buildGithubSubtitle(eventData?.repository?.full_name || "", event.createdAt),
+      subtitle: buildGithubSubtitle(eventData?.ref || "", event.createdAt),
     };
   },
 
@@ -50,7 +50,7 @@ export const onTagCreatedTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data?.data as GitRef;
       props.lastEventData = {
         title: eventData?.ref ? `Tag: ${eventData.ref}` : "Tag Created",
-        subtitle: buildGithubSubtitle(eventData?.repository?.full_name || "", lastEvent.createdAt),
+        subtitle: buildGithubSubtitle(eventData?.ref || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id,

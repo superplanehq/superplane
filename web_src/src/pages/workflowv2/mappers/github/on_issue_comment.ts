@@ -25,7 +25,7 @@ export const onIssueCommentTriggerRenderer: TriggerRenderer = {
 
     return {
       title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
-      subtitle: buildGithubSubtitle(`Comment by ${eventData?.comment?.user?.login || "unknown"}`, event.createdAt),
+      subtitle: buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, event.createdAt),
     };
   },
 
@@ -36,7 +36,7 @@ export const onIssueCommentTriggerRenderer: TriggerRenderer = {
       Issue: `#${eventData?.issue?.number}`,
       "Issue Title": eventData?.issue?.title || "",
       "Comment Action": eventData?.action || "",
-      "Comment By": eventData?.comment?.user?.login || "",
+      By: eventData?.comment?.user?.login || "",
       "Comment Body": eventData?.comment?.body?.substring(0, 100) || "",
     };
   },
@@ -73,10 +73,7 @@ export const onIssueCommentTriggerRenderer: TriggerRenderer = {
 
       props.lastEventData = {
         title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
-        subtitle: buildGithubSubtitle(
-          `Comment by ${eventData?.comment?.user?.login || "unknown"}`,
-          lastEvent.createdAt,
-        ),
+        subtitle: buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id,

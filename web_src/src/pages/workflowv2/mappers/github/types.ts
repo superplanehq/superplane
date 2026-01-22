@@ -12,6 +12,12 @@ export interface Issue {
   html_url: string;
   state: string;
   created_at: string;
+  pull_request?: {
+    diff_url: string;
+    html_url: string;
+    patch_url: string;
+    url: string;
+  };
   title?: string;
   user?: {
     id: number;

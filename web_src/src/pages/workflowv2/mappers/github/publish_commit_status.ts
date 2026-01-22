@@ -38,31 +38,24 @@ export const publishCommitStatusMapper: ComponentBaseMapper = {
 
   getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, string> {
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
-    const details: Record<string, string> = {};
+    let details: Record<string, string> = {};
 
-    if (execution.createdAt) {
-      details["Started At"] = execution.createdAt;
-    }
+    if (outputs && outputs.default && outputs.default.length > 0) {
+      const status = outputs.default[0].data as CommitStatus;
+      Object.assign(details, {
+        "Created At": status.created_at ? new Date(status.created_at).toLocaleString() : "-",
+        "Created By": status.creator?.login || "-",
+      });
 
-    if (execution.state === "STATE_FINISHED" && execution.updatedAt) {
-      details["Finished At"] = execution.updatedAt;
-    }
+      if (status.updated_at) {
+        details["Updated At"] = new Date(status.updated_at).toLocaleString();
+      }
 
-    if (!outputs || !outputs.default || outputs.default.length === 0) {
-      return details;
-    }
-
-    const status = outputs.default[0].data as CommitStatus;
-
-    details["Commit Status"] = status?.state || "";
-    details["Context"] = status?.context || "";
-    details["Description"] = status?.description || "";
-    details["Target URL"] = status?.target_url || "";
-    details["Status ID"] = status?.id?.toString() || "";
-    details["Created At"] = status?.created_at || "";
-
-    if (status?.creator?.login) {
-      details["Created By"] = status.creator.login;
+      details["Commit Status"] = status?.state || "";
+      details["Context"] = status?.context || "";
+      details["Description"] = status?.description || "";
+      details["Target URL"] = status?.target_url || "";
+      details["Status ID"] = status?.id?.toString() || "";
     }
 
     return details;
