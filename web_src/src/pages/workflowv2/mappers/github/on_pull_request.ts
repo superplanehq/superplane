@@ -4,6 +4,7 @@ import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
 import { BaseNodeMetadata, PullRequest } from "./types";
+import { buildGithubSubtitle } from "./utils";
 
 interface OnPullRequestConfiguration {
   actions: string[];
@@ -24,7 +25,7 @@ export const onPullRequestTriggerRenderer: TriggerRenderer = {
 
     return {
       title: `#${eventData?.number} - ${eventData?.pull_request?.title}`,
-      subtitle: eventData?.action || "",
+      subtitle: buildGithubSubtitle(eventData?.action || "", event.createdAt),
     };
   },
 
@@ -71,7 +72,7 @@ export const onPullRequestTriggerRenderer: TriggerRenderer = {
 
       props.lastEventData = {
         title: `#${eventData?.number} - ${eventData?.pull_request?.title}`,
-        subtitle: eventData?.action || "",
+        subtitle: buildGithubSubtitle(eventData?.action || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id,

@@ -4,6 +4,7 @@ import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
 import { BaseNodeMetadata, Issue, Comment } from "./types";
+import { buildGithubSubtitle } from "./utils";
 
 interface OnIssueCommentConfiguration {
   contentFilter?: string;
@@ -24,7 +25,7 @@ export const onIssueCommentTriggerRenderer: TriggerRenderer = {
 
     return {
       title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
-      subtitle: `Comment by ${eventData?.comment?.user?.login || "unknown"}`,
+      subtitle: buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, event.createdAt),
     };
   },
 
@@ -35,7 +36,7 @@ export const onIssueCommentTriggerRenderer: TriggerRenderer = {
       Issue: `#${eventData?.issue?.number}`,
       "Issue Title": eventData?.issue?.title || "",
       "Comment Action": eventData?.action || "",
-      "Comment By": eventData?.comment?.user?.login || "",
+      By: eventData?.comment?.user?.login || "",
       "Comment Body": eventData?.comment?.body?.substring(0, 100) || "",
     };
   },
@@ -72,7 +73,7 @@ export const onIssueCommentTriggerRenderer: TriggerRenderer = {
 
       props.lastEventData = {
         title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
-        subtitle: `Comment by ${eventData?.comment?.user?.login || "unknown"}`,
+        subtitle: buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id,

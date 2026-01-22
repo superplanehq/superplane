@@ -3,7 +3,8 @@ import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
-import { BaseNodeMetadata, Comment, PullRequest } from "./types";
+import { BaseNodeMetadata, Comment, Issue } from "./types";
+import { buildGithubSubtitle } from "./utils";
 
 interface OnPullRequestReviewCommentConfiguration {
   contentFilter?: string;
@@ -12,7 +13,7 @@ interface OnPullRequestReviewCommentConfiguration {
 interface OnPullRequestReviewCommentEventData {
   action?: string;
   comment?: Comment;
-  pull_request?: PullRequest;
+  issue?: Issue;
 }
 
 /**
@@ -21,14 +22,13 @@ interface OnPullRequestReviewCommentEventData {
 export const onPullRequestReviewCommentTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
     const eventData = event.data?.data as OnPullRequestReviewCommentEventData;
-
-    const prNumber = eventData?.pull_request?.number || "";
+    const prNumber = eventData?.issue?.number || "";
     const fileName = eventData?.comment?.path || "";
     const title = fileName ? `#${prNumber} - Comment on ${fileName}` : `#${prNumber} - Review Comment`;
 
     return {
       title: title,
-      subtitle: eventData?.action || "",
+      subtitle: buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, event.createdAt),
     };
   },
 
@@ -36,13 +36,12 @@ export const onPullRequestReviewCommentTriggerRenderer: TriggerRenderer = {
     const eventData = lastEvent.data?.data as OnPullRequestReviewCommentEventData;
 
     const rootValues: Record<string, string> = {
-      Action: eventData?.action || "",
-      "PR Number": eventData?.pull_request?.number?.toString() || "",
-      "PR Title": eventData?.pull_request?.title || "",
-      "PR URL": eventData?.pull_request?._links?.html?.href || "",
+      Author: eventData?.comment?.user?.login || "",
       "Comment Body": eventData?.comment?.body || "",
       "Comment URL": eventData?.comment?.html_url || "",
-      Author: eventData?.comment?.user?.login || "",
+      "PR Number": eventData?.issue?.number?.toString() || "",
+      "PR Title": eventData?.issue?.title || "",
+      "PR URL": eventData?.issue?.pull_request?.url || "",
     };
 
     if (eventData?.comment?.path) {
@@ -85,13 +84,13 @@ export const onPullRequestReviewCommentTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data?.data as OnPullRequestReviewCommentEventData;
-      const prNumber = eventData?.pull_request?.number || "";
+      const prNumber = eventData?.issue?.number || "";
       const fileName = eventData?.comment?.path || "";
       const title = fileName ? `#${prNumber} - Comment on ${fileName}` : `#${prNumber} - Review Comment`;
 
       props.lastEventData = {
         title: title,
-        subtitle: eventData?.action || "",
+        subtitle: buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id,
