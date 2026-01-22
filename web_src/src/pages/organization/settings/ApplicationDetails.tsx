@@ -18,6 +18,7 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
+import smtpIcon from "@/assets/icons/integrations/smtp.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 interface ApplicationDetailsProps {
@@ -43,6 +44,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
     pagerduty: pagerDutyIcon,
     semaphore: SemaphoreLogo,
     slack: slackIcon,
+    smtp: smtpIcon,
   };
 
   const renderAppIcon = (slug: string | undefined, appName: string | undefined, className: string) => {

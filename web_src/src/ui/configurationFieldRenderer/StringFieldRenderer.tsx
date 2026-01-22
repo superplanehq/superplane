@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
 import { FieldRendererProps } from "./types";
@@ -10,8 +10,18 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
   onChange,
   autocompleteExampleObj,
 }) => {
-  const currentValue = (value as string) ?? (field.defaultValue as string) ?? "";
+  const hasInitialized = useRef(false);
   const shouldPreserveEmpty = field.togglable === true;
+
+  // Set initial value only on first mount if no value is present but there's a default
+  useEffect(() => {
+    if (!hasInitialized.current && (value === undefined || value === null) && field.defaultValue !== undefined) {
+      hasInitialized.current = true;
+      onChange(String(field.defaultValue));
+    }
+  }, [value, field.defaultValue, onChange]);
+
+  const currentValue = (value as string) ?? "";
 
   if (field.disallowExpression) {
     return (

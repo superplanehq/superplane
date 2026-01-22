@@ -73,6 +73,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   pagerduty: pagerdutyComponentMappers,
   dash0: dash0ComponentMappers,
   slack: slackComponentMappers,
+  smtp: smtpComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -81,6 +82,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   pagerduty: pagerdutyTriggerRenderers,
   dash0: dash0TriggerRenderers,
   slack: slackTriggerRenderers,
+  smtp: smtpTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -89,6 +91,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   pagerduty: pagerdutyEventStateRegistry,
   dash0: dash0EventStateRegistry,
   slack: slackEventStateRegistry,
+  smtp: smtpEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
