@@ -1,6 +1,6 @@
 import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { formatRelativeTime } from "@/utils/timezone";
+import { formatTimeAgo } from "@/utils/date";
 import { TriggerRenderer } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
@@ -42,10 +42,11 @@ export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
     const eventData = event.data?.data as OnIncidentStatusUpdateEventData;
     const incident = eventData?.incident;
     const statusUpdate = eventData?.status_update;
+    const subtitle = buildSubtitle(statusUpdate?.message?.substring(0, 50) || "", event.createdAt);
 
     return {
       title: incident?.summary || incident?.id || "Status Update",
-      subtitle: `${statusUpdate?.message?.substring(0, 50) || ""} - ${formatRelativeTime(event.createdAt!)}`,
+      subtitle,
     };
   },
 
@@ -67,6 +68,9 @@ export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
     }
     if (statusUpdate?.message) {
       values["Status Update Message"] = statusUpdate.message;
+    }
+    if (lastEvent.createdAt) {
+      values["Updated At"] = new Date(lastEvent.createdAt).toLocaleString();
     }
     if (eventData?.agent?.summary) {
       values["Agent"] = eventData.agent.summary;
@@ -97,10 +101,11 @@ export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data?.data as OnIncidentStatusUpdateEventData;
       const incident = eventData?.incident;
       const statusUpdate = eventData?.status_update;
+      const subtitle = buildSubtitle(statusUpdate?.message?.substring(0, 50) || "", lastEvent.createdAt);
 
       props.lastEventData = {
         title: incident?.summary || incident?.id || "Status Update",
-        subtitle: `${statusUpdate?.message?.substring(0, 50) || ""} - ${formatRelativeTime(lastEvent.createdAt!)}`,
+        subtitle,
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id,
@@ -110,3 +115,12 @@ export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+function buildSubtitle(content: string, createdAt?: string): string {
+  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
+  if (content && timeAgo) {
+    return `${content} · ${timeAgo}`;
+  }
+
+  return content || timeAgo;
+}

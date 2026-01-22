@@ -351,6 +351,15 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
 	}
 
+	if metadata.Workflow != nil && metadata.Workflow.URL != "" {
+		workflowData, ok := payload["workflow"].(map[string]any)
+		if !ok {
+			workflowData = map[string]any{}
+			payload["workflow"] = workflowData
+		}
+		workflowData["url"] = metadata.Workflow.URL
+	}
+
 	if metadata.Pipeline.Result == PipelineResultPassed {
 		err = executionCtx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{payload})
 	} else {
@@ -444,11 +453,20 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 		return err
 	}
 
-	if pipeline.Result == PipelineResultPassed {
-		return ctx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{pipeline})
+	payload := map[string]any{
+		"pipeline": pipeline,
+	}
+	if metadata.Workflow != nil && metadata.Workflow.URL != "" {
+		payload["workflow"] = map[string]any{
+			"url": metadata.Workflow.URL,
+		}
 	}
 
-	return ctx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{pipeline})
+	if pipeline.Result == PipelineResultPassed {
+		return ctx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{payload})
+	}
+
+	return ctx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{payload})
 }
 
 func (r *RunWorkflow) finish(ctx core.ActionContext) error {

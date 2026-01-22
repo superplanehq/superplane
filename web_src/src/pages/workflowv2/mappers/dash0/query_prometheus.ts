@@ -10,6 +10,7 @@ import { ComponentBaseMapper, OutputPayload } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import { QueryPrometheusConfiguration } from "./types";
+import { formatTimeAgo } from "@/utils/date";
 
 export const queryPrometheusMapper: ComponentBaseMapper = {
   props(
@@ -41,7 +42,8 @@ export const queryPrometheusMapper: ComponentBaseMapper = {
       return { Response: "No data returned" };
     }
 
-    const responseData = outputs.default[0]?.data as Record<string, any> | undefined;
+    const payload = outputs.default[0];
+    const responseData = payload?.data as Record<string, any> | undefined;
 
     if (!responseData) {
       return { Response: "No data returned" };
@@ -49,6 +51,9 @@ export const queryPrometheusMapper: ComponentBaseMapper = {
 
     // Format the Prometheus response data for display
     const details: Record<string, string> = {};
+    if (payload?.timestamp) {
+      details["Checked At"] = new Date(payload.timestamp).toLocaleString();
+    }
     try {
       const formatted = JSON.stringify(responseData, null, 2);
       details["Response Data"] = formatted;
@@ -57,6 +62,10 @@ export const queryPrometheusMapper: ComponentBaseMapper = {
     }
 
     return details;
+  },
+  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+    if (!execution.createdAt) return "";
+    return formatTimeAgo(new Date(execution.createdAt));
   },
 };
 
