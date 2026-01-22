@@ -1103,7 +1103,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           />
           {/* Bottom bar with preview toggle and quickTip */}
           {(hasExpressions || quickTip) && (
-            <div className="absolute -bottom-5 left-0 right-0 flex items-center justify-between">
+            <div className="absolute -bottom-6 left-0 right-0 flex items-center justify-between">
               {/* Preview toggle - left side */}
               {hasExpressions ? (
                 <button

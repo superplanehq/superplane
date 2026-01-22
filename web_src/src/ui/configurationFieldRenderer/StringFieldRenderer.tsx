@@ -9,6 +9,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
   value,
   onChange,
   autocompleteExampleObj,
+  allowExpressions = false,
 }) => {
   const hasInitialized = useRef(false);
   const shouldPreserveEmpty = field.togglable === true;
@@ -23,7 +24,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
 
   const currentValue = (value as string) ?? "";
 
-  if (field.disallowExpression) {
+  if (field.disallowExpression || !allowExpressions) {
     return (
       <Input
         type={field.sensitive ? "password" : "text"}

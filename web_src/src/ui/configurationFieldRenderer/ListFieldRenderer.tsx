@@ -23,6 +23,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   validationErrors,
   fieldPath = field.name || "",
   autocompleteExampleObj,
+  allowExpressions = false,
 }) => {
   const items = Array.isArray(value) ? value : [];
   const listOptions = field.typeOptions?.list;
@@ -114,6 +115,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
 
                   return (
                     <ConfigurationFieldRenderer
+                      allowExpressions={allowExpressions}
                       key={schemaField.name}
                       field={schemaField}
                       value={itemValues[schemaField.name!]}

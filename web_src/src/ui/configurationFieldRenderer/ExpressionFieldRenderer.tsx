@@ -9,10 +9,11 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
   value,
   onChange,
   autocompleteExampleObj,
+  allowExpressions = false,
 }) => {
   const currentValue = (value as string) ?? (field.defaultValue as string) ?? "";
 
-  if (field.disallowExpression) {
+  if (field.disallowExpression || !allowExpressions) {
     return (
       <Input
         type={field.sensitive ? "password" : "text"}
