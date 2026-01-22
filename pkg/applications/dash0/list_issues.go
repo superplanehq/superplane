@@ -10,6 +10,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+// Output channel names for ListIssues component
+const (
+	ChannelNameClear    = "clear"
+	ChannelNameDegraded = "degraded"
+	ChannelNameCritical = "critical"
+)
+
 type ListIssues struct{}
 
 type ListIssuesSpec struct {
@@ -41,7 +48,11 @@ func (l *ListIssues) Color() string {
 }
 
 func (l *ListIssues) OutputChannels(configuration any) []core.OutputChannel {
-	return []core.OutputChannel{core.DefaultOutputChannel}
+	return []core.OutputChannel{
+		{Name: ChannelNameClear, Label: "Clear", Description: "No active issues detected"},
+		{Name: ChannelNameDegraded, Label: "Degraded", Description: "One or more degraded issues detected"},
+		{Name: ChannelNameCritical, Label: "Critical", Description: "One or more critical issues detected"},
+	}
 }
 
 func (l *ListIssues) Configuration() []configuration.Field {
@@ -128,11 +139,57 @@ func (l *ListIssues) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
+	// Determine the output channel based on issue severity
+	channel := l.determineOutputChannel(data)
+
 	return ctx.ExecutionState.Emit(
-		core.DefaultOutputChannel.Name,
+		channel,
 		"dash0.issues.list",
 		[]any{data},
 	)
+}
+
+// determineOutputChannel analyzes the Prometheus response to determine which
+// output channel to emit to based on the highest severity issue found.
+// Status value "2" = critical, "1" = degraded, no issues = clear
+func (l *ListIssues) determineOutputChannel(data map[string]any) string {
+	resultValue, _, ok := extractPrometheusResults(data)
+	if !ok || len(resultValue) == 0 {
+		return ChannelNameClear
+	}
+
+	hasCritical := false
+	hasDegraded := false
+
+	for _, resultItem := range resultValue {
+		resultMap, ok := resultItem.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		// Extract the value field: [timestamp, "status"]
+		value, ok := resultMap["value"].([]any)
+		if !ok || len(value) < 2 {
+			continue
+		}
+
+		// Get the status value (second element)
+		status := fmt.Sprintf("%v", value[1])
+		if status == "2" {
+			hasCritical = true
+		} else if status == "1" {
+			hasDegraded = true
+		}
+	}
+
+	// Return the highest severity channel
+	if hasCritical {
+		return ChannelNameCritical
+	}
+	if hasDegraded {
+		return ChannelNameDegraded
+	}
+	return ChannelNameClear
 }
 
 // buildCheckRuleLookupSets creates lookup sets for check rule names and IDs
