@@ -30,7 +30,7 @@ func Test__HealthCheckEndpoint(t *testing.T) {
 	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
 	signer := jwt.NewSigner("test")
 	oidcProvider := support.NewOIDCProvider()
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, crypto.NewOIDCVerifier(), "", "", "", "test", "/app/templates", authService, false)
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, "", "", "", "test", "/app/templates", authService, false)
 	require.NoError(t, err)
 
 	response := execRequest(server, requestParams{
@@ -50,7 +50,7 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 	signer := jwt.NewSigner("test")
 	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
 	oidcProvider := support.NewOIDCProvider()
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, crypto.NewOIDCVerifier(), "", "", "", "test", "/app/templates", authService, false)
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, "", "", "", "test", "/app/templates", authService, false)
 	require.NoError(t, err)
 
 	server.RegisterOpenAPIHandler()
@@ -120,7 +120,7 @@ func Test__GRPCGatewayRegistration(t *testing.T) {
 	signer := jwt.NewSigner("test")
 	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
 	oidcProvider := support.NewOIDCProvider()
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, crypto.NewOIDCVerifier(), "", "", "", "test", "/app/templates", authService, false)
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, "", "", "", "test", "/app/templates", authService, false)
 	require.NoError(t, err)
 
 	err = server.RegisterGRPCGateway("localhost:50051")
@@ -253,7 +253,7 @@ func Test__CreateOrganization(t *testing.T) {
 		encryptor := &crypto.NoOpEncryptor{}
 		r := registry.NewRegistry(encryptor)
 		oidcProvider := support.NewOIDCProvider()
-		server, err := NewServer(encryptor, r, signer, oidcProvider, crypto.NewOIDCVerifier(), "", "localhost", "", "test", "/app/templates", mockedAuthService, false)
+		server, err := NewServer(encryptor, r, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", mockedAuthService, false)
 		require.NoError(t, err)
 
 		//
@@ -303,7 +303,7 @@ func Test__CreateOrganization(t *testing.T) {
 		encryptor := &crypto.NoOpEncryptor{}
 		r := registry.NewRegistry(encryptor)
 		oidcProvider := support.NewOIDCProvider()
-		server, err := NewServer(encryptor, r, signer, oidcProvider, crypto.NewOIDCVerifier(), "", "localhost", "", "test", "/app/templates", authService, false)
+		server, err := NewServer(encryptor, r, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", authService, false)
 		require.NoError(t, err)
 
 		//
@@ -357,7 +357,7 @@ func Test__CreateOrganization(t *testing.T) {
 		encryptor := &crypto.NoOpEncryptor{}
 		r := registry.NewRegistry(encryptor)
 		oidcProvider := support.NewOIDCProvider()
-		server, err := NewServer(encryptor, r, signer, oidcProvider, crypto.NewOIDCVerifier(), "", "localhost", "", "test", "/app/templates", authService, false)
+		server, err := NewServer(encryptor, r, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", authService, false)
 		require.NoError(t, err)
 
 		body, err := json.Marshal(OrganizationCreationRequest{Name: "Duplicate Organization"})

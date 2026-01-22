@@ -67,7 +67,6 @@ type Server struct {
 	registry              *registry.Registry
 	jwt                   *jwt.Signer
 	oidcProvider          oidc.Provider
-	oidcVerifier          *crypto.OIDCVerifier
 	authService           authorization.Authorization
 	timeoutHandlerTimeout time.Duration
 	upgrader              *websocket.Upgrader
@@ -90,7 +89,6 @@ func NewServer(
 	registry *registry.Registry,
 	jwtSigner *jwt.Signer,
 	oidcProvider oidc.Provider,
-	oidcVerifier *crypto.OIDCVerifier,
 	basePath string,
 	baseURL string,
 	webhooksBaseURL string,
@@ -118,7 +116,6 @@ func NewServer(
 		encryptor:             encryptor,
 		jwt:                   jwtSigner,
 		oidcProvider:          oidcProvider,
-		oidcVerifier:          oidcVerifier,
 		registry:              registry,
 		authService:           authorizationService,
 		upgrader: &websocket.Upgrader{
