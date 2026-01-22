@@ -10,7 +10,6 @@ import (
 	"github.com/markbates/goth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -25,7 +24,7 @@ func setupTestServer(r *support.ResourceRegistry, t *testing.T) (*Server, *model
 	os.Setenv("BASE_URL", "http://localhost:8000")
 
 	signer := jwt.NewSigner("test-client-secret")
-	server, err := NewServer(r.Encryptor, r.Registry, signer, crypto.NewOIDCVerifier(), "", "", "", "test", "/app/templates", r.AuthService, false)
+	server, err := NewServer(r.Encryptor, r.Registry, signer, "", "", "", "test", "/app/templates", r.AuthService, false)
 	require.NoError(t, err)
 
 	token, err := signer.Generate(r.Account.ID.String(), time.Hour)
@@ -151,7 +150,7 @@ func TestServer_AuthIntegration(t *testing.T) {
 	t.Run("should block signup when configured", func(t *testing.T) {
 
 		signer := jwt.NewSigner("test-client-secret")
-		blockedServer, err := NewServer(r.Encryptor, r.Registry, signer, crypto.NewOIDCVerifier(), "", "localhost", "", "test", "/app/templates", r.AuthService, true)
+		blockedServer, err := NewServer(r.Encryptor, r.Registry, signer, "", "localhost", "", "test", "/app/templates", r.AuthService, true)
 		require.NoError(t, err)
 
 		handler := blockedServer.authHandler
