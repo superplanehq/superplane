@@ -302,21 +302,26 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusForbidden, fmt.Errorf("invalid signature")
 	}
 
-	type Hook struct {
-		Pipeline struct {
-			ID     string `json:"id"`
-			State  string `json:"state"`
-			Result string `json:"result"`
-		} `json:"pipeline"`
-	}
-
-	hook := Hook{}
-	err = json.Unmarshal(ctx.Body, &hook)
+	var payload map[string]any
+	err = json.Unmarshal(ctx.Body, &payload)
 	if err != nil {
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	executionCtx, err := ctx.FindExecutionByKV("pipeline", hook.Pipeline.ID)
+	pipelineData, ok := payload["pipeline"].(map[string]any)
+	if !ok {
+		return http.StatusBadRequest, fmt.Errorf("pipeline data missing from webhook payload")
+	}
+
+	pipelineID, _ := pipelineData["id"].(string)
+	if pipelineID == "" {
+		return http.StatusBadRequest, fmt.Errorf("pipeline id missing from webhook payload")
+	}
+
+	pipelineState, _ := pipelineData["state"].(string)
+	pipelineResult, _ := pipelineData["result"].(string)
+
+	executionCtx, err := ctx.FindExecutionByKV("pipeline", pipelineID)
 
 	//
 	// We will receive hooks for pipelines that weren't started by SuperPlane,
@@ -339,17 +344,17 @@ func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusOK, nil
 	}
 
-	metadata.Pipeline.State = hook.Pipeline.State
-	metadata.Pipeline.Result = hook.Pipeline.Result
+	metadata.Pipeline.State = pipelineState
+	metadata.Pipeline.Result = pipelineResult
 	err = executionCtx.Metadata.Set(metadata)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
 	}
 
 	if metadata.Pipeline.Result == PipelineResultPassed {
-		err = executionCtx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{metadata})
+		err = executionCtx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{payload})
 	} else {
-		err = executionCtx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{metadata})
+		err = executionCtx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{payload})
 	}
 
 	if err != nil {
@@ -440,10 +445,10 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 	}
 
 	if pipeline.Result == PipelineResultPassed {
-		return ctx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{metadata})
+		return ctx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{pipeline})
 	}
 
-	return ctx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{metadata})
+	return ctx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{pipeline})
 }
 
 func (r *RunWorkflow) finish(ctx core.ActionContext) error {
