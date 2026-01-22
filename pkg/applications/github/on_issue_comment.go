@@ -126,6 +126,15 @@ func (i *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 		return http.StatusOK, nil
 	}
 
+	// Skip PR comments - they should be handled by OnPRComment
+	// GitHub sends issue_comment events for PR conversation comments,
+	// but includes a pull_request field in the issue object to identify them
+	if issue, ok := data["issue"].(map[string]any); ok {
+		if _, hasPR := issue["pull_request"]; hasPR {
+			return http.StatusOK, nil
+		}
+	}
+
 	// Apply content filter if configured
 	if config.ContentFilter != "" {
 		comment, ok := data["comment"].(map[string]any)

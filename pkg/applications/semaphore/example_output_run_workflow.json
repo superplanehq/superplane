@@ -1,18 +1,74 @@
 {
   "data": {
-    "workflow": {
-      "id": "wf_123",
-      "url": "https://semaphore.example.com/workflows/wf_123"
+    "blocks": [
+      {
+        "jobs": [
+          {
+            "id": "00000-00000-00000-00000-00000",
+            "index": 0,
+            "name": "Job #1",
+            "result": "passed",
+            "status": "finished"
+          }
+        ],
+        "name": "Block #1",
+        "result": "passed",
+        "result_reason": "test",
+        "state": "done"
+      }
+    ],
+    "organization": {
+      "id": "00000000-0000-0000-0000-000000000000",
+      "name": "test"
     },
     "pipeline": {
-      "id": "ppl_456",
+      "created_at": "2026-01-22T15:32:47Z",
+      "done_at": "2026-01-22T15:32:55Z",
+      "error_description": "",
+      "id": "00000000-0000-0000-0000-000000000000",
+      "name": "Initial Pipeline",
+      "pending_at": "2026-01-22T15:32:48Z",
+      "queuing_at": "2026-01-22T15:32:48Z",
+      "result": "passed",
+      "result_reason": "test",
+      "running_at": "2026-01-22T15:32:48Z",
       "state": "done",
-      "result": "passed"
+      "stopping_at": "1970-01-01T00:00:00Z",
+      "working_directory": ".semaphore",
+      "yaml_file_name": "semaphore.yml"
     },
-    "extra": {
-      "triggeredBy": "SuperPlane"
+    "project": {
+      "id": "00000000-0000-0000-0000-000000000000",
+      "name": "test"
+    },
+    "repository": {
+      "slug": "test/test",
+      "url": "https://github.com/test/test"
+    },  
+    "revision": {
+      "branch": {
+        "commit_range": "0000000000000000000000000000000000000000^...0000000000000000000000000000000000000000",
+        "name": "test"
+      },
+      "commit_message": "test",
+      "commit_sha": "0000000000000000000000000000000000000000",
+      "pull_request": null,
+      "reference": "refs/heads/test",
+      "reference_type": "branch",
+      "sender": {
+        "avatar_url": "https://example.com/avatar.png",
+        "email": "test@test.com",
+        "login": "test"
+      },
+      "tag": null
+    },
+    "version": "1.0.0",
+    "workflow": {
+      "created_at": "2026-01-22T15:32:47Z",
+      "id": "00000000-0000-0000-0000-000000000000",
+      "initial_pipeline_id": "00000000-0000-0000-0000-000000000000"
     }
   },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "timestamp": "2026-01-22T15:32:56.061430218Z",
   "type": "semaphore.workflow.finished"
 }
