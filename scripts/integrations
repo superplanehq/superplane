@@ -1,23 +1,237 @@
 #!/bin/bash
 
-# Count the number of integrations in SuperPlane
-# Integrations are stored as directories in pkg/applications/
+# Report how many components and triggers were added per ISO week, based on git history.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-INTEGRATIONS_DIR="$REPO_ROOT/pkg/applications"
+export REPO_ROOT
 
-# Get list of integrations (directories only, excluding . and ..)
-integrations=$(find "$INTEGRATIONS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r dir; do basename "$dir"; done | sort)
-
-if [ -z "$integrations" ]; then
-  echo "No integrations found."
-  echo ""
-  echo "Total integrations: 0"
-else
-  count=$(echo "$integrations" | grep -c '^')
-  echo "Integrations:"
-  echo "$integrations" | sed 's/^/  - /'
-  echo ""
-  echo "Total integrations: $count"
+# Basic checks for required tools.
+if ! command -v git >/dev/null 2>&1; then
+  echo "git is required but not found."
+  exit 1
 fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "python3 is required but not found."
+  exit 1
+fi
+
+python3 - <<'PY'
+import datetime
+import os
+import re
+import subprocess
+from collections import Counter, defaultdict
+
+repo_root = os.environ["REPO_ROOT"]
+components_dir = os.path.join(repo_root, "pkg", "components")
+triggers_dir = os.path.join(repo_root, "pkg", "triggers")
+applications_dir = os.path.join(repo_root, "pkg", "applications")
+
+
+def git_first_add_date(path):
+    rel_path = os.path.relpath(path, repo_root)
+    cmd = [
+        "git",
+        "-C",
+        repo_root,
+        "log",
+        "--diff-filter=A",
+        "--format=%ad",
+        "--date=short",
+        "--reverse",
+        "--",
+        rel_path,
+    ]
+    try:
+        out = subprocess.check_output(cmd, text=True).strip().splitlines()
+    except subprocess.CalledProcessError:
+        return None
+    return out[0] if out else None
+
+
+def extract_brace_block(text, start_idx):
+    depth = 1
+    i = start_idx
+    while i < len(text):
+        ch = text[i]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start_idx:i], i
+        i += 1
+    return None, None
+
+
+def extract_component_trigger_types(source, method_name, return_iface):
+    types = []
+    pattern = re.compile(
+        r"func\s*\([^)]*\)\s*"
+        + re.escape(method_name)
+        + r"\s*\(\s*\)\s*\[\]\s*core\."
+        + re.escape(return_iface)
+        + r"\s*{"
+    )
+    for match in pattern.finditer(source):
+        body, _ = extract_brace_block(source, match.end())
+        if body is None:
+            continue
+        return_pattern = re.compile(
+            r"return\s*\[\]\s*core\."
+            + re.escape(return_iface)
+            + r"\s*{"
+        )
+        for return_match in return_pattern.finditer(body):
+            literal, _ = extract_brace_block(body, return_match.end())
+            if literal is None:
+                continue
+            for type_match in re.finditer(r"&?\s*([A-Za-z_][A-Za-z0-9_]*)\s*{", literal):
+                types.append(type_match.group(1))
+    return types
+
+
+def find_type_file(type_name, files):
+    pattern = re.compile(r"type\s+" + re.escape(type_name) + r"\s+struct\b")
+    for path, content in files:
+        if pattern.search(content):
+            return path, content
+    return None
+
+
+def extract_const_strings(content):
+    consts = {}
+    for match in re.finditer(r'^\s*const\s+(\w+)\s*=\s*"([^"]+)"', content, re.MULTILINE):
+        consts[match.group(1)] = match.group(2)
+    for match in re.finditer(r"^\s*const\s*\((.*?)^\s*\)", content, re.DOTALL | re.MULTILINE):
+        block = match.group(1)
+        for line in block.splitlines():
+            line_match = re.search(r'^\s*(\w+)\s*=\s*"([^"]+)"', line)
+            if line_match:
+                consts[line_match.group(1)] = line_match.group(2)
+    return consts
+
+
+def find_name_literal(type_name, files):
+    consts = {}
+    for _, content in files:
+        consts.update(extract_const_strings(content))
+
+    name_pattern = re.compile(
+        r"func\s*\([^)]*\*?\s*"
+        + re.escape(type_name)
+        + r"\s*\)\s*Name\(\)\s*string\s*{"
+    )
+    for _, content in files:
+        match = name_pattern.search(content)
+        if not match:
+            continue
+        body, _ = extract_brace_block(content, match.end())
+        if body is None:
+            continue
+        literal = re.search(r'return\s+"([^"]+)"', body)
+        if literal:
+            return literal.group(1)
+        ident = re.search(r"return\s+([A-Za-z_][A-Za-z0-9_]*)", body)
+        if ident:
+            return consts.get(ident.group(1))
+    return None
+
+
+items = set()
+
+# Core components and triggers are one per directory.
+if os.path.isdir(components_dir):
+    for name in sorted(os.listdir(components_dir)):
+        path = os.path.join(components_dir, name)
+        if not os.path.isdir(path):
+            continue
+        go_files = []
+        for filename in os.listdir(path):
+            if not filename.endswith(".go") or filename.endswith("_test.go"):
+                continue
+            file_path = os.path.join(path, filename)
+            with open(file_path, "r", encoding="utf-8") as handle:
+                go_files.append((file_path, handle.read()))
+        display_name = None
+        for _, content in go_files:
+            match = re.search(r"func\s*\([^)]*\)\s*Name\(\)\s*string\s*{", content)
+            if match:
+                type_match = re.search(r"func\s*\([^)]*\*?\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)\s*Name\(\)", content)
+                if type_match:
+                    display_name = find_name_literal(type_match.group(1), go_files)
+                    if display_name:
+                        break
+        items.add(("component", display_name or name, path))
+
+if os.path.isdir(triggers_dir):
+    for name in sorted(os.listdir(triggers_dir)):
+        path = os.path.join(triggers_dir, name)
+        if not os.path.isdir(path):
+            continue
+        go_files = []
+        for filename in os.listdir(path):
+            if not filename.endswith(".go") or filename.endswith("_test.go"):
+                continue
+            file_path = os.path.join(path, filename)
+            with open(file_path, "r", encoding="utf-8") as handle:
+                go_files.append((file_path, handle.read()))
+        display_name = None
+        for _, content in go_files:
+            match = re.search(r"func\s*\([^)]*\)\s*Name\(\)\s*string\s*{", content)
+            if match:
+                type_match = re.search(r"func\s*\([^)]*\*?\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)\s*Name\(\)", content)
+                if type_match:
+                    display_name = find_name_literal(type_match.group(1), go_files)
+                    if display_name:
+                        break
+        items.add(("trigger", display_name or name, path))
+
+# App components and triggers are listed on the application.
+if os.path.isdir(applications_dir):
+    for app_name in sorted(os.listdir(applications_dir)):
+        app_dir = os.path.join(applications_dir, app_name)
+        if not os.path.isdir(app_dir):
+            continue
+
+        go_files = []
+        for filename in os.listdir(app_dir):
+            if not filename.endswith(".go") or filename.endswith("_test.go"):
+                continue
+            path = os.path.join(app_dir, filename)
+            with open(path, "r", encoding="utf-8") as handle:
+                go_files.append((path, handle.read()))
+
+        for path, content in go_files:
+            for type_name in extract_component_trigger_types(content, "Components", "Component"):
+                type_result = find_type_file(type_name, go_files)
+                type_path = type_result[0] if type_result else app_dir
+                name_literal = find_name_literal(type_name, go_files)
+                items.add(("component", name_literal or f"{app_name}.{type_name}", type_path))
+            for type_name in extract_component_trigger_types(content, "Triggers", "Trigger"):
+                type_result = find_type_file(type_name, go_files)
+                type_path = type_result[0] if type_result else app_dir
+                name_literal = find_name_literal(type_name, go_files)
+                items.add(("trigger", name_literal or f"{app_name}.{type_name}", type_path))
+
+week_counts = Counter()
+week_names = defaultdict(set)
+for _, name, path in sorted(items):
+    date_str = git_first_add_date(path)
+    if not date_str:
+        continue
+    day = datetime.date.fromisoformat(date_str)
+    year, week, _ = day.isocalendar()
+    key = f"{year}-W{week:02d}"
+    week_counts[key] += 1
+    week_names[key].add(name)
+
+print("Components and Triggers added per week:")
+print("")
+for key in sorted(week_counts):
+    print(f" {key}: {week_counts[key]}")
+    for name in sorted(week_names[key]):
+        print(f"    - {name}")
+PY
