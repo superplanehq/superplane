@@ -17,6 +17,7 @@ import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
 import { getTriggerRenderer } from "..";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+import { formatTimeAgo } from "@/utils/date";
 
 interface ExecutionMetadata {
   workflow?: {
@@ -123,6 +124,10 @@ export const runWorkflowMapper: ComponentBaseMapper = {
       eventStateMap: RUN_WORKFLOW_STATE_MAP,
     };
   },
+  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+    const timestamp = execution.updatedAt || execution.createdAt;
+    return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
+  },
 };
 
 function runWorkflowMetadataList(node: ComponentsNode): MetadataItem[] {
@@ -206,11 +211,16 @@ function runWorkflowEventSections(
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
     const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
     const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+    const executionState = runWorkflowStateFunction(execution);
+    const subtitleTimestamp = executionState === "running" ? execution.createdAt : execution.updatedAt || execution.createdAt;
+    const eventSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : undefined;
+
     sections.push({
-      showAutomaticTime: true,
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventState: runWorkflowStateFunction(execution),
+      eventSubtitle,
+      eventState: executionState,
+      eventId: execution.rootEvent?.id,
     });
   }
 
@@ -227,7 +237,9 @@ function runWorkflowEventSections(
       sections.push({
         receivedAt: queueItem.createdAt ? new Date(queueItem.createdAt) : undefined,
         eventTitle: title,
+        eventSubtitle: queueItem.createdAt ? formatTimeAgo(new Date(queueItem.createdAt)) : undefined,
         eventState: "next-in-queue" as const,
+        eventId: queueItem.rootEvent?.id,
       });
     }
   }
