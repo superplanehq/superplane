@@ -82,6 +82,25 @@ type IssueListEntry = {
   checkDescription?: string;
 };
 
+type SemaphoreJobEntry = {
+  name?: string;
+  result?: string;
+  status?: string;
+};
+
+type SemaphoreBlockEntry = {
+  name?: string;
+  result?: string;
+  resultReason?: string;
+  state?: string;
+  jobs?: SemaphoreJobEntry[];
+};
+
+type SemaphoreBlocksValue = {
+  __type: "semaphoreBlocks";
+  blocks: SemaphoreBlockEntry[];
+};
+
 interface ChainItemProps {
   item: ChainItemData;
   index: number;
@@ -192,6 +211,10 @@ export const ChainItem: React.FC<ChainItemProps> = ({
         "checkName" in entry &&
         typeof (entry as IssueListEntry).checkName === "string",
     );
+  };
+  const isSemaphoreBlocks = (value: unknown): value is SemaphoreBlocksValue => {
+    if (!value || typeof value !== "object") return false;
+    return "__type" in value && (value as SemaphoreBlocksValue).__type === "semaphoreBlocks";
   };
   const getApprovalStatusColor = (status: string) => {
     const normalized = status.toLowerCase();
@@ -467,6 +490,61 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                 )}
                               </div>
                             ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (isSemaphoreBlocks(value)) {
+                    return (
+                      <div key={key} className="flex items-start gap-1 px-2 rounded-md w-full min-w-0 font-medium">
+                        <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
+                          {key}:
+                        </span>
+                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
+                          <div className="flex flex-col gap-3">
+                            {value.blocks.map((block, blockIndex) => {
+                              const blockTitle = block.name || `Block ${blockIndex + 1}`;
+                              const blockStatusParts = [block.result, block.state, block.resultReason].filter(Boolean);
+                              return (
+                                <div key={`${blockTitle}-${blockIndex}`} className="flex flex-col gap-1">
+                                  <div className="text-[13px] text-gray-800 font-medium truncate" title={blockTitle}>
+                                    {blockTitle}
+                                    {blockStatusParts.length > 0 && (
+                                      <span className="text-[12px] text-gray-600 font-normal">
+                                        {" "}
+                                        · {blockStatusParts.join(" · ")}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {(block.jobs || []).length > 0 && (
+                                    <div className="flex flex-col gap-1 pl-2">
+                                      {block.jobs!.map((job, jobIndex) => {
+                                        const jobTitle = job.name || `Job ${jobIndex + 1}`;
+                                        const jobStatusParts = [job.result, job.status].filter(Boolean);
+                                        return (
+                                          <div
+                                            key={`${jobTitle}-${jobIndex}`}
+                                            className="text-[12px] text-gray-600 truncate"
+                                            title={
+                                              jobStatusParts.length > 0
+                                                ? `${jobTitle} · ${jobStatusParts.join(" · ")}`
+                                                : jobTitle
+                                            }
+                                          >
+                                            {jobTitle}
+                                            {jobStatusParts.length > 0 && (
+                                              <span className="text-gray-500"> · {jobStatusParts.join(" · ")}</span>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>

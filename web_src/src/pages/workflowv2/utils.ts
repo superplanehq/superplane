@@ -940,9 +940,6 @@ export function buildTabData(
 
     tabData.current = {
       ...eventValues,
-      "Event ID": triggerEvent.id,
-      "Node ID": triggerEvent.nodeId,
-      "Created At": triggerEvent.createdAt ? new Date(triggerEvent.createdAt).toLocaleString() : undefined,
     };
 
     // Payload tab: raw event data
@@ -971,14 +968,11 @@ export function buildTabData(
       const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
       const rootEventValues = rootTriggerRenderer.getRootEventValues(queueItem.rootEvent);
 
-      tabData.root = {
-        ...rootEventValues,
-        "Event ID": queueItem.rootEvent.id,
-        "Node ID": queueItem.rootEvent.nodeId,
+      tabData.root = Object.assign({}, rootEventValues, {
         "Created At": queueItem.rootEvent.createdAt
           ? new Date(queueItem.rootEvent.createdAt).toLocaleString()
           : undefined,
-      };
+      });
     }
 
     tabData.current = {
@@ -1008,10 +1002,6 @@ export function buildTabData(
 
   const currentData = {
     ...flattened,
-    "Execution ID": execution.id,
-    "Execution State": execution.state?.replace("STATE_", "").toLowerCase(),
-    "Execution Result": execution.result?.replace("RESULT_", "").toLowerCase(),
-    "Execution Started": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
   };
 
   // Filter out undefined and empty values
