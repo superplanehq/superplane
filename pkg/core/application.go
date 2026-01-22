@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/oidc"
 )
 
 type Application interface {
@@ -156,6 +157,7 @@ type SyncContext struct {
 	InstallationID  string
 	HTTP            HTTPContext
 	AppInstallation AppInstallationContext
+	OIDCSigner      *oidc.Signer
 }
 
 /*

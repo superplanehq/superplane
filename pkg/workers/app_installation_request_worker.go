@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
@@ -21,14 +22,16 @@ type AppInstallationRequestWorker struct {
 	semaphore       *semaphore.Weighted
 	registry        *registry.Registry
 	encryptor       crypto.Encryptor
+	oidcSigner      *oidc.Signer
 	baseURL         string
 	webhooksBaseURL string
 }
 
-func NewAppInstallationRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, webhooksBaseURL string) *AppInstallationRequestWorker {
+func NewAppInstallationRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry, oidcSigner *oidc.Signer, baseURL string, webhooksBaseURL string) *AppInstallationRequestWorker {
 	return &AppInstallationRequestWorker{
 		encryptor:       encryptor,
 		registry:        registry,
+		oidcSigner:      oidcSigner,
 		baseURL:         baseURL,
 		webhooksBaseURL: webhooksBaseURL,
 		semaphore:       semaphore.NewWeighted(25),
@@ -108,6 +111,7 @@ func (w *AppInstallationRequestWorker) syncAppInstallation(tx *gorm.DB, request 
 		WebhooksBaseURL: w.webhooksBaseURL,
 		OrganizationID:  installation.OrganizationID.String(),
 		InstallationID:  installation.ID.String(),
+		OIDCSigner:      w.oidcSigner,
 	})
 
 	if syncErr != nil {

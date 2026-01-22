@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/oidc"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -18,7 +19,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func InstallApplication(ctx context.Context, registry *registry.Registry, baseURL string, webhooksBaseURL string, orgID string, appName, installationName string, appConfig *structpb.Struct) (*pb.InstallApplicationResponse, error) {
+func InstallApplication(ctx context.Context, registry *registry.Registry, oidcSigner *oidc.Signer, baseURL string, webhooksBaseURL string, orgID string, appName, installationName string, appConfig *structpb.Struct) (*pb.InstallApplicationResponse, error) {
 	app, err := registry.GetApplication(appName)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "application %s not found", appName)
@@ -67,6 +68,7 @@ func InstallApplication(ctx context.Context, registry *registry.Registry, baseUR
 		WebhooksBaseURL: webhooksBaseURL,
 		OrganizationID:  orgID,
 		InstallationID:  appInstallation.ID.String(),
+		OIDCSigner:      oidcSigner,
 	})
 
 	err = database.Conn().Save(appInstallation).Error

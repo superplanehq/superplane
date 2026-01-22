@@ -5,6 +5,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/organizations"
+	"github.com/superplanehq/superplane/pkg/oidc"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
@@ -16,6 +17,7 @@ import (
 type OrganizationService struct {
 	authorizationService authorization.Authorization
 	registry             *registry.Registry
+	oidcSigner           *oidc.Signer
 	baseURL              string
 	webhooksBaseURL      string
 }
@@ -23,11 +25,13 @@ type OrganizationService struct {
 func NewOrganizationService(
 	authorizationService authorization.Authorization,
 	registry *registry.Registry,
+	oidcSigner *oidc.Signer,
 	baseURL string,
 	webhooksBaseURL string,
 ) *OrganizationService {
 	return &OrganizationService{
 		registry:             registry,
+		oidcSigner:           oidcSigner,
 		baseURL:              baseURL,
 		webhooksBaseURL:      webhooksBaseURL,
 		authorizationService: authorizationService,
@@ -113,6 +117,7 @@ func (s *OrganizationService) InstallApplication(ctx context.Context, req *pb.In
 	return organizations.InstallApplication(
 		ctx,
 		s.registry,
+		s.oidcSigner,
 		s.baseURL,
 		s.webhooksBaseURL,
 		orgID,
@@ -127,6 +132,7 @@ func (s *OrganizationService) UpdateApplication(ctx context.Context, req *pb.Upd
 	return organizations.UpdateApplication(
 		ctx,
 		s.registry,
+		s.oidcSigner,
 		s.baseURL,
 		s.webhooksBaseURL,
 		orgID,

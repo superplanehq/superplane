@@ -95,6 +95,37 @@ func (s *Signer) Generate(subject string, duration time.Duration) (string, error
 	return tokenString, nil
 }
 
+func (s *Signer) GenerateWithClaims(subject string, duration time.Duration, issuer string, audience string, additionalClaims map[string]any) (string, error) {
+	now := time.Now()
+	claims := jwt.MapClaims{
+		"iat": now.Unix(),
+		"nbf": now.Unix(),
+		"exp": now.Add(duration).Unix(),
+		"sub": subject,
+	}
+
+	if issuer != "" {
+		claims["iss"] = issuer
+	}
+
+	if audience != "" {
+		claims["aud"] = audience
+	}
+
+	for key, value := range additionalClaims {
+		claims[key] = value
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = s.activeKeyID
+	tokenString, err := token.SignedString(s.privateKey)
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
+}
+
 func newSignerFromKeys(activeKey *rsa.PrivateKey, keys []keyEntry) (*Signer, error) {
 	publicKeys := make(map[string]*rsa.PublicKey, len(keys))
 	publicJWKs := make([]PublicJWK, 0, len(keys))

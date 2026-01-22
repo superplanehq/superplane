@@ -3,6 +3,7 @@ module github.com/superplanehq/superplane
 go 1.25
 
 require (
+	github.com/aws/aws-sdk-go-v2 v1.41.1
 	github.com/bradleyfalzon/ghinstallation/v2 v2.17.0
 	github.com/casbin/casbin/v2 v2.134.0
 	github.com/casbin/gorm-adapter/v3 v3.37.0
@@ -44,6 +45,7 @@ require (
 )
 
 require (
+	github.com/aws/smithy-go v1.24.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
