@@ -63,7 +63,8 @@ func AcceptInviteLink(ctx context.Context, authService authorization.Authorizati
 		}
 	}
 
-	err = authService.AssignRole(user.ID.String(), models.RoleOrgViewer, org.ID.String(), models.DomainTypeOrganization)
+	// TODO: this should be a role org Member when RBAC is fully implemented
+	err = authService.AssignRole(user.ID.String(), models.RoleOrgOwner, org.ID.String(), models.DomainTypeOrganization)
 	if err != nil {
 		tx.Rollback()
 		return nil, status.Error(codes.Internal, "failed to accept invite")
