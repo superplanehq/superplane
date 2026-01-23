@@ -44,18 +44,24 @@ const coreOutputPath = "docs/integrations/Core.mdx"
 var camelBoundary = regexp.MustCompile(`([a-z0-9])([A-Z])`)
 
 type docEntry struct {
-	Title         string `yaml:"title"`
-	Subtitle      string `yaml:"subtitle"`
-	Description   string `yaml:"description"`
-	ExampleOutput string `yaml:"exampleOutput"`
+	Title           string           `yaml:"title"`
+	Subtitle        string           `yaml:"subtitle"`
+	Description     string           `yaml:"description"`
+	ExampleOutput   string           `yaml:"exampleOutput"`
+	ExampleUseCases []exampleUseCase `yaml:"exampleUseCases"`
 }
 
 type docIndex struct {
-	Title         string     `yaml:"title"`
-	Overview      string     `yaml:"overview"`
-	ExampleCanvas string     `yaml:"exampleCanvas"`
-	Components    []docEntry `yaml:"components"`
-	Triggers      []docEntry `yaml:"triggers"`
+	Title      string     `yaml:"title"`
+	Overview   string     `yaml:"overview"`
+	Components []docEntry `yaml:"components"`
+	Triggers   []docEntry `yaml:"triggers"`
+}
+
+type exampleUseCase struct {
+	Title       string `yaml:"title"`
+	Description string `yaml:"description"`
+	Canvas      string `yaml:"canvas"`
 }
 
 func main() {
@@ -79,19 +85,9 @@ func writeCoreDocsFromIndex(indexPath string, outputPath string) error {
 		return err
 	}
 
-	screenshotPath := ""
-	if strings.TrimSpace(index.ExampleCanvas) != "" {
-		path, err := generateCanvasScreenshot(index.ExampleCanvas)
-		if err != nil {
-			return err
-		}
-		screenshotPath = path
-	}
-
 	var buf bytes.Buffer
 	writeCoreFrontMatter(&buf, strings.TrimSpace(index.Title))
 	writeOverviewSection(&buf, index.Overview)
-	writeExampleCanvasSection(&buf, outputPath, screenshotPath)
 	writeCardGridTriggers(&buf, index.Triggers)
 	writeCardGridComponents(&buf, index.Components)
 	if err := writeTriggerSection(&buf, index.Triggers); err != nil {
@@ -142,6 +138,9 @@ func writeTriggerSection(buf *bytes.Buffer, triggers []docEntry) error {
 		buf.WriteString(fmt.Sprintf("<a id=\"%s\"></a>\n\n", slugify(trigger.Title)))
 		buf.WriteString(fmt.Sprintf("## %s\n\n", trigger.Title))
 		writeParagraph(buf, trigger.Description)
+		if err := writeExampleUseCasesSection(buf, trigger.ExampleUseCases); err != nil {
+			return err
+		}
 		if err := writeExampleSection("Example Data", trigger.ExampleOutput, buf); err != nil {
 			return err
 		}
@@ -212,20 +211,6 @@ func writeOverviewSection(buf *bytes.Buffer, description string) {
 	buf.WriteString("\n\n")
 }
 
-func writeExampleCanvasSection(buf *bytes.Buffer, outputPath string, screenshotPath string) {
-	trimmed := strings.TrimSpace(screenshotPath)
-	if trimmed == "" {
-		return
-	}
-	relative, err := filepath.Rel(filepath.Dir(outputPath), trimmed)
-	if err != nil {
-		relative = trimmed
-	}
-	relative = filepath.ToSlash(relative)
-	buf.WriteString("## Example Canvas\n\n")
-	buf.WriteString(fmt.Sprintf("![Example canvas](%s)\n\n", relative))
-}
-
 func writeExampleSection(title string, examplePath string, buf *bytes.Buffer) error {
 	trimmed := strings.TrimSpace(examplePath)
 	if trimmed == "" {
@@ -244,6 +229,62 @@ func writeExampleSection(title string, examplePath string, buf *bytes.Buffer) er
 	buf.WriteString("```json\n")
 	buf.WriteString(trimmedRaw)
 	buf.WriteString("\n```\n\n")
+	return nil
+}
+
+func writeExampleUseCasesSection(buf *bytes.Buffer, useCases []exampleUseCase) error {
+	if len(useCases) == 0 {
+		return nil
+	}
+
+	buf.WriteString("### Use Cases\n\n")
+	for _, useCase := range useCases {
+		title := strings.TrimSpace(useCase.Title)
+		if title == "" {
+			title = "Use Case"
+		}
+		buf.WriteString(fmt.Sprintf("#### %s\n\n", title))
+		writeParagraph(buf, useCase.Description)
+
+		canvasPath := strings.TrimSpace(useCase.Canvas)
+		if canvasPath == "" {
+			continue
+		}
+
+		screenshotPath, err := generateCanvasScreenshot(canvasPath)
+		if err != nil {
+			return err
+		}
+
+		relative := filepath.ToSlash(strings.TrimPrefix(screenshotPath, "docs/integrations/"))
+		if !strings.HasPrefix(relative, ".") {
+			relative = "./" + relative
+		}
+
+		writeTabsImport(buf)
+		buf.WriteString("<Tabs>\n")
+		buf.WriteString("  <TabItem label=\"UI\">\n\n")
+		buf.WriteString(fmt.Sprintf("![%s](%s)\n\n", escapeQuotes(title), relative))
+		buf.WriteString("  </TabItem>\n")
+		buf.WriteString("  <TabItem label=\"YAML\">\n\n")
+		buf.WriteString("```yaml\n")
+		if err := writeFileContent(buf, canvasPath); err != nil {
+			return err
+		}
+		buf.WriteString("\n```\n\n")
+		buf.WriteString("  </TabItem>\n")
+		buf.WriteString("</Tabs>\n\n")
+	}
+
+	return nil
+}
+
+func writeFileContent(buf *bytes.Buffer, path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	buf.Write(bytes.TrimRight(data, "\n"))
 	return nil
 }
 
@@ -269,6 +310,14 @@ func writeCardGridImport(buf *bytes.Buffer) {
 		return
 	}
 	buf.WriteString("import { CardGrid, LinkCard } from \"@astrojs/starlight/components\";\n\n")
+}
+
+func writeTabsImport(buf *bytes.Buffer) {
+	content := buf.String()
+	if strings.Contains(content, "Tabs") {
+		return
+	}
+	buf.WriteString("import { Tabs, TabItem } from \"@astrojs/starlight/components\";\n\n")
 }
 
 type screenshotEnv struct {

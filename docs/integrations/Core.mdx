@@ -7,10 +7,6 @@ type: "core"
 
 Core components and triggers for building with SuperPlane.
 
-## Example Canvas
-
-![Example canvas](Core/webhook_external_system_integration.png)
-
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Triggers
@@ -53,6 +49,74 @@ on-demand actions, or operator-initiated runs.
 
 Start a run by sending an HTTP request to a unique webhook URL. This
 trigger lets external systems or services initiate a run in SuperPlane.
+
+### Use Cases
+
+#### External system webhook to HTTP request
+
+Accept inbound webhooks from external systems and forward the payload
+to an HTTP endpoint for processing.
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+<Tabs>
+  <TabItem label="UI">
+
+![External system webhook to HTTP request](./Core/webhook_external_system_integration.png)
+
+  </TabItem>
+  <TabItem label="YAML">
+
+```yaml
+metadata:
+  name: "Webhook external system integration"
+  description: "Trigger a canvas from an external system using a webhook, then forward the payload."
+  isTemplate: false
+spec:
+  nodes:
+    - id: "webhook-trigger"
+      name: "Webhook"
+      type: "TYPE_TRIGGER"
+      configuration:
+        authentication: "none"
+      metadata:
+        url: "https://hooks.superplane.example/webhook"
+        authentication: "none"
+      position:
+        x: -40
+        "y": 320
+      component: null
+      blueprint: null
+      trigger:
+        name: "webhook"
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+    - id: "noop-confirmation"
+      name: "Received Webhook Payload"
+      type: "TYPE_COMPONENT"
+      configuration: {}
+      metadata: null
+      position:
+        x: 420
+        "y": 320
+      component:
+        name: "noop"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+  edges:
+    - sourceId: "webhook-trigger"
+      targetId: "noop-confirmation"
+      channel: "default"
+```
+
+  </TabItem>
+</Tabs>
 
 ### Example Data
 

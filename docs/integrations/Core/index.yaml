@@ -3,8 +3,6 @@ title: Core
 overview:
   Core components and triggers for building with SuperPlane.
 
-exampleCanvas: docs/integrations/Core/webhook_external_system_integration.yaml
-
 triggers:
   - title: Manual Run
     subtitle: Trigger a run manually, by clicking a button in the UI.
@@ -18,6 +16,12 @@ triggers:
     description: |
       Start a run by sending an HTTP request to a unique webhook URL. This
       trigger lets external systems or services initiate a run in SuperPlane.
+    exampleUseCases:
+      - title: External system webhook to HTTP request
+        description: |
+          Accept inbound webhooks from external systems and forward the payload
+          to an HTTP endpoint for processing.
+        canvas: docs/integrations/Core/webhook_external_system_integration.yaml
     exampleOutput: pkg/triggers/webhook/example_data.json
     useCases:
       - title: External System Integration
