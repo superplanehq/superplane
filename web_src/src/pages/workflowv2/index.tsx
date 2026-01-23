@@ -1060,7 +1060,7 @@ export function WorkflowPageV2() {
           }
 
           const latestEvent = nodeEventsMap[chainNodeId]?.[0];
-          if (latestEvent?.data && Object.keys(latestEvent.data).length > 0) {
+          if (latestEvent?.data) {
             exampleObj[chainNodeId] = { ...(latestEvent.data || {}) } as Record<string, unknown>;
           }
           if (exampleObj[chainNodeId]) {
@@ -1112,7 +1112,7 @@ export function WorkflowPageV2() {
         }
       });
 
-      if (Object.keys(exampleObj).length === 0) {
+      if (!exampleObj) {
         return null;
       }
 
