@@ -2,12 +2,35 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
+	"github.com/ghodss/yaml"
+	"github.com/google/uuid"
+	pw "github.com/playwright-community/playwright-go"
+	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/workflows"
+	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
+	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/server"
+	"google.golang.org/protobuf/encoding/protojson"
 	"gopkg.in/yaml.v3"
+
+	// Register integrations used by doc templates.
+	_ "github.com/superplanehq/superplane/pkg/components/http"
+	_ "github.com/superplanehq/superplane/pkg/triggers/webhook"
 )
 
 const docsRoot = "docs/integrations"
@@ -24,10 +47,11 @@ type docEntry struct {
 }
 
 type docIndex struct {
-	Title      string     `yaml:"title"`
-	Overview   string     `yaml:"overview"`
-	Components []docEntry `yaml:"components"`
-	Triggers   []docEntry `yaml:"triggers"`
+	Title         string     `yaml:"title"`
+	Overview      string     `yaml:"overview"`
+	ExampleCanvas string     `yaml:"exampleCanvas"`
+	Components    []docEntry `yaml:"components"`
+	Triggers      []docEntry `yaml:"triggers"`
 }
 
 func main() {
@@ -51,13 +75,27 @@ func writeCoreDocsFromIndex(indexPath string, outputPath string) error {
 		return err
 	}
 
+	screenshotPath := ""
+	if strings.TrimSpace(index.ExampleCanvas) != "" {
+		path, err := generateCanvasScreenshot(index.ExampleCanvas)
+		if err != nil {
+			return err
+		}
+		screenshotPath = path
+	}
+
 	var buf bytes.Buffer
 	writeCoreFrontMatter(&buf, strings.TrimSpace(index.Title))
 	writeOverviewSection(&buf, index.Overview)
+	writeExampleCanvasSection(&buf, outputPath, screenshotPath)
 	writeCardGridTriggers(&buf, index.Triggers)
 	writeCardGridComponents(&buf, index.Components)
-	writeTriggerSection(&buf, index.Triggers)
-	writeComponentSection(&buf, index.Components)
+	if err := writeTriggerSection(&buf, index.Triggers); err != nil {
+		return err
+	}
+	if err := writeComponentSection(&buf, index.Components); err != nil {
+		return err
+	}
 
 	return writeFile(outputPath, buf.Bytes())
 }
@@ -170,6 +208,20 @@ func writeOverviewSection(buf *bytes.Buffer, description string) {
 	buf.WriteString("\n\n")
 }
 
+func writeExampleCanvasSection(buf *bytes.Buffer, outputPath string, screenshotPath string) {
+	trimmed := strings.TrimSpace(screenshotPath)
+	if trimmed == "" {
+		return
+	}
+	relative, err := filepath.Rel(filepath.Dir(outputPath), trimmed)
+	if err != nil {
+		relative = trimmed
+	}
+	relative = filepath.ToSlash(relative)
+	buf.WriteString("## Example Canvas\n\n")
+	buf.WriteString(fmt.Sprintf("![Example canvas](%s)\n\n", relative))
+}
+
 func writeExampleSection(title string, examplePath string, buf *bytes.Buffer) error {
 	trimmed := strings.TrimSpace(examplePath)
 	if trimmed == "" {
@@ -213,6 +265,294 @@ func writeCardGridImport(buf *bytes.Buffer) {
 		return
 	}
 	buf.WriteString("import { CardGrid, LinkCard } from \"@astrojs/starlight/components\";\n\n")
+}
+
+type screenshotEnv struct {
+	runner  *pw.Playwright
+	browser pw.Browser
+	context pw.BrowserContext
+	page    pw.Page
+	viteCmd *exec.Cmd
+	baseURL string
+}
+
+func generateCanvasScreenshot(templatePath string) (string, error) {
+	workflow, err := readTemplateWorkflow(templatePath)
+	if err != nil {
+		return "", err
+	}
+	waitText := firstNodeName(workflow)
+
+	env := &screenshotEnv{}
+	if err := env.start(); err != nil {
+		return "", err
+	}
+	defer env.shutdown()
+
+	orgID, userID, err := seedUserAndOrganization()
+	if err != nil {
+		return "", err
+	}
+
+	reg := registry.NewRegistry(crypto.NewNoOpEncryptor())
+	ctx := authentication.SetUserIdInMetadata(context.Background(), userID.String())
+	resp, err := workflows.CreateWorkflow(ctx, reg, orgID.String(), workflow)
+	if err != nil {
+		return "", err
+	}
+
+	workflowID, err := uuid.Parse(resp.Workflow.Metadata.Id)
+	if err != nil {
+		return "", err
+	}
+
+	if err := env.openWorkflow(orgID, workflowID, waitText); err != nil {
+		return "", err
+	}
+
+	screenshotPath := strings.TrimSuffix(templatePath, filepath.Ext(templatePath)) + ".png"
+	if err := os.MkdirAll(filepath.Dir(screenshotPath), 0o755); err != nil {
+		return "", err
+	}
+
+	if _, err := env.page.Screenshot(pw.PageScreenshotOptions{
+		Path:     pw.String(screenshotPath),
+		FullPage: pw.Bool(true),
+		Type:     pw.ScreenshotTypePng,
+	}); err != nil {
+		return "", err
+	}
+
+	return screenshotPath, nil
+}
+
+func (e *screenshotEnv) start() error {
+	setScreenshotEnv()
+
+	if err := e.startVite(); err != nil {
+		return err
+	}
+	e.startAppServer()
+	if err := e.startPlaywright(); err != nil {
+		return err
+	}
+	return e.launchBrowser()
+}
+
+func (e *screenshotEnv) shutdown() {
+	if e.page != nil {
+		_, _ = e.page.Close()
+	}
+	if e.context != nil {
+		_ = e.context.Close()
+	}
+	if e.browser != nil {
+		_ = e.browser.Close()
+	}
+	if e.runner != nil {
+		_ = e.runner.Stop()
+	}
+	if e.viteCmd != nil && e.viteCmd.Process != nil {
+		_ = e.viteCmd.Process.Kill()
+	}
+}
+
+func (e *screenshotEnv) startPlaywright() error {
+	runner, err := pw.Run()
+	if err != nil {
+		return err
+	}
+	e.runner = runner
+	return nil
+}
+
+func (e *screenshotEnv) launchBrowser() error {
+	browser, err := e.runner.Chromium.Launch()
+	if err != nil {
+		return err
+	}
+	context, err := browser.NewContext(pw.BrowserNewContextOptions{
+		Viewport: &pw.Size{
+			Width:  1920,
+			Height: 1080,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	page, err := context.NewPage()
+	if err != nil {
+		return err
+	}
+	e.browser = browser
+	e.context = context
+	e.page = page
+	e.baseURL = os.Getenv("BASE_URL")
+	return nil
+}
+
+func (e *screenshotEnv) startAppServer() {
+	go server.Start()
+	baseURL := os.Getenv("BASE_URL")
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		resp, err := http.Get(baseURL + "/api/v1/canvases/is-alive")
+		if err == nil {
+			_ = resp.Body.Close()
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	time.Sleep(600 * time.Millisecond)
+}
+
+func (e *screenshotEnv) startVite() error {
+	cmd := exec.Command("npm", "run", "dev", "--", "--host", "127.0.0.1", "--port", "5173")
+	cmd.Dir = "web_src"
+	cmd.Env = append(os.Environ(), "BROWSER=none", "API_PORT=8001")
+	cmd.Stdout = io.Discard
+	cmd.Stderr = io.Discard
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	e.viteCmd = cmd
+
+	deadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(deadline) {
+		resp, err := http.Get("http://127.0.0.1:5173/")
+		if err == nil {
+			_ = resp.Body.Close()
+			return nil
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	return fmt.Errorf("vite failed to start")
+}
+
+func (e *screenshotEnv) openWorkflow(orgID uuid.UUID, workflowID uuid.UUID, waitText string) error {
+	if _, err := e.page.Goto(
+		fmt.Sprintf("%s/%s/workflows/%s", e.baseURL, orgID.String(), workflowID.String()),
+		pw.PageGotoOptions{WaitUntil: pw.WaitUntilStateDomcontentloaded},
+	); err != nil {
+		return err
+	}
+
+	trimmed := strings.TrimSpace(waitText)
+	if trimmed != "" {
+		if err := e.page.Locator("text=" + trimmed).WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(10000)}); err != nil {
+			return err
+		}
+	}
+	time.Sleep(800 * time.Millisecond)
+	return nil
+}
+
+func readTemplateWorkflow(templatePath string) (*pb.Workflow, error) {
+	data, err := os.ReadFile(templatePath)
+	if err != nil {
+		return nil, err
+	}
+
+	jsonData, err := yaml.YAMLToJSON(data)
+	if err != nil {
+		return nil, err
+	}
+
+	var workflow pb.Workflow
+	if err := protojson.Unmarshal(jsonData, &workflow); err != nil {
+		return nil, err
+	}
+
+	return &workflow, nil
+}
+
+func firstNodeName(workflow *pb.Workflow) string {
+	if workflow == nil || workflow.Spec == nil {
+		return ""
+	}
+	if len(workflow.Spec.Nodes) == 0 {
+		return ""
+	}
+	return workflow.Spec.Nodes[0].Name
+}
+
+func seedUserAndOrganization() (uuid.UUID, uuid.UUID, error) {
+	email := "docs@screenshot.superplane.local"
+	name := "Docs Screenshot"
+	account, err := models.FindAccountByEmail(email)
+	if err != nil {
+		account, err = models.CreateAccount(name, email)
+		if err != nil {
+			return uuid.Nil, uuid.Nil, err
+		}
+	}
+
+	orgName := "docs-screenshot-org"
+	organization, err := models.FindOrganizationByName(orgName)
+	if err != nil {
+		organization, err = models.CreateOrganization(orgName, "")
+		if err != nil {
+			return uuid.Nil, uuid.Nil, err
+		}
+	}
+
+	user, err := models.FindMaybeDeletedUserByEmail(organization.ID.String(), email)
+	if err != nil {
+		user, err = models.CreateUser(organization.ID, account.ID, email, name)
+		if err != nil {
+			return uuid.Nil, uuid.Nil, err
+		}
+	} else if user.DeletedAt.Valid {
+		if err := user.Restore(); err != nil {
+			return uuid.Nil, uuid.Nil, err
+		}
+	}
+
+	if svc, err := authorization.NewAuthService(); err == nil {
+		tx := database.Conn().Begin()
+		if err := svc.SetupOrganization(tx, organization.ID.String(), user.ID.String()); err != nil {
+			tx.Rollback()
+			return uuid.Nil, uuid.Nil, err
+		}
+		if err := tx.Commit().Error; err != nil {
+			return uuid.Nil, uuid.Nil, err
+		}
+	}
+
+	return organization.ID, user.ID, nil
+}
+
+func setScreenshotEnv() {
+	os.Setenv("DB_NAME", "superplane_test")
+	os.Setenv("START_PUBLIC_API", "yes")
+	os.Setenv("START_INTERNAL_API", "yes")
+	os.Setenv("INTERNAL_API_PORT", "50052")
+	os.Setenv("PUBLIC_API_BASE_PATH", "/api/v1")
+	os.Setenv("START_WEB_SERVER", "yes")
+	os.Setenv("WEB_BASE_PATH", "")
+	os.Setenv("START_GRPC_GATEWAY", "yes")
+	os.Setenv("GRPC_SERVER_ADDR", "127.0.0.1:50052")
+	os.Setenv("START_EVENT_DISTRIBUTER", "yes")
+	os.Setenv("START_CONSUMERS", "yes")
+	os.Setenv("START_WORKFLOW_EVENT_ROUTER", "yes")
+	os.Setenv("START_WORKFLOW_NODE_EXECUTOR", "yes")
+	os.Setenv("START_BLUEPRINT_NODE_EXECUTOR", "yes")
+	os.Setenv("START_WORKFLOW_NODE_QUEUE_WORKER", "yes")
+	os.Setenv("START_NODE_REQUEST_WORKER", "yes")
+	os.Setenv("START_WEBHOOK_PROVISIONER", "yes")
+	os.Setenv("START_WEBHOOK_CLEANUP_WORKER", "yes")
+	os.Setenv("NO_ENCRYPTION", "yes")
+	os.Setenv("ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef")
+	os.Setenv("JWT_SECRET", "docs-jwt-secret")
+	os.Setenv("OIDC_KEYS_PATH", "test/fixtures/oidc-keys")
+	os.Setenv("PUBLIC_API_PORT", "8001")
+	os.Setenv("BASE_URL", "http://127.0.0.1:8001")
+	os.Setenv("WEBHOOKS_BASE_URL", "https://superplane.sxmoon.com")
+	os.Setenv("APP_ENV", "development")
+	os.Setenv("OWNER_SETUP_ENABLED", "yes")
+	os.Setenv("ENABLE_PASSWORD_LOGIN", "yes")
 }
 
 func escapeQuotes(value string) string {

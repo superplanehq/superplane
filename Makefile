@@ -202,7 +202,11 @@ gen:
 	$(MAKE) format.js
 
 gen.integrations.docs:
-	go run scripts/generate_integrations_docs.go
+	$(MAKE) setup.playwright
+	$(MAKE) db.create DB_NAME=superplane_test
+	$(MAKE) db.migrate DB_NAME=superplane_test
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -lc "cd web_src && if [ ! -d node_modules ]; then npm ci; fi"
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -lc "go run scripts/generate_integrations_docs.go"
 
 gen.integrations.local.update: gen.integrations.docs
 	rm -rf ../docs/src/content/docs/integrations

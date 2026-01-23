@@ -3,6 +3,8 @@ title: Core
 overview:
   Core components and triggers for building with SuperPlane.
 
+exampleCanvas: docs/integrations/Core/webhook_external_system_integration.yaml
+
 triggers:
   - title: Manual Run
     subtitle: Trigger a run manually, by clicking a button in the UI.
