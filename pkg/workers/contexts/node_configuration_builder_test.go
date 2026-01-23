@@ -75,6 +75,60 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root(t *testing.T) {
 	assert.Equal(t, "42", result["count"])
 }
 
+func Test_NodeConfigurationBuilder_WorkflowLevelNode_RootFunction(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	rootEventData := map[string]any{
+		"user":    "john",
+		"action":  "login",
+		"success": true,
+		"count":   42,
+	}
+	rootEvent := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, triggerNode, "default", nil, rootEventData)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{triggerNode: rootEventData})
+
+	configuration := map[string]any{
+		"user":    "{{ root().user }}",
+		"action":  "{{ root().action }}",
+		"success": "{{ root().success }}",
+		"count":   "{{ root().count }}",
+	}
+
+	result, err := builder.Build(configuration)
+	require.NoError(t, err)
+	assert.Equal(t, "john", result["user"])
+	assert.Equal(t, "login", result["action"])
+	assert.Equal(t, "true", result["success"])
+	assert.Equal(t, "42", result["count"])
+}
+
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root_NoRootEvent(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -199,6 +253,120 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "first", result["from_node1"])
 	assert.Equal(t, "2", result["from_node2"])
+}
+
+func Test_NodeConfigurationBuilder_WorkflowLevelNode_Previous(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerNode := "trigger-1"
+	node1 := "node-1"
+	node2 := "node-2"
+	node3 := "node-3"
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: node1,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+			{
+				NodeID: node2,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+			{
+				NodeID: node3,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: node1, TargetID: node2, Channel: "default"},
+			{SourceID: node2, TargetID: node3, Channel: "default"},
+		},
+	)
+
+	rootEvent := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, triggerNode, "default", nil, map[string]any{"root": "data"})
+
+	execution1 := support.CreateWorkflowNodeExecution(
+		t,
+		workflow.ID,
+		node1,
+		rootEvent.ID,
+		rootEvent.ID,
+		nil,
+	)
+	node1Data := map[string]any{
+		"step":   1,
+		"result": "first",
+	}
+	event1 := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, node1, "default", &execution1.ID, node1Data)
+
+	execution2 := support.CreateNextNodeExecution(
+		t,
+		workflow.ID,
+		node2,
+		rootEvent.ID,
+		event1.ID,
+		&execution1.ID,
+	)
+	node2Data := map[string]any{
+		"step":   2,
+		"result": "second",
+	}
+	support.EmitWorkflowEventForNodeWithData(t, workflow.ID, node2, "default", &execution2.ID, node2Data)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+		WithPreviousExecution(&execution2.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{node2: node2Data})
+
+	configuration := map[string]any{
+		"immediate": "{{ previous().result }}",
+		"upstream":  "{{ previous(2).result }}",
+		"root":      "{{ previous(3).root }}",
+	}
+
+	result, err := builder.Build(configuration)
+	require.NoError(t, err)
+	assert.Equal(t, "second", result["immediate"])
+	assert.Equal(t, "first", result["upstream"])
+	assert.Equal(t, "data", result["root"])
+}
+
+func Test_NodeConfigurationBuilder_WorkflowLevelNode_Previous_MultipleInputs(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{
+			{NodeID: "node-1", Type: models.NodeTypeComponent},
+			{NodeID: "node-2", Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{},
+	)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+		WithInput(map[string]any{
+			"node-1": map[string]any{"value": "one"},
+			"node-2": map[string]any{"value": "two"},
+		})
+
+	_, err := builder.Build(map[string]any{"field": "{{ previous().value }}"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "previous() is not available when multiple inputs are present")
 }
 
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_NoPreviousExecution(t *testing.T) {

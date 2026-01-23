@@ -3,6 +3,9 @@ package contexts
 import (
 	"fmt"
 	"regexp"
+	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/expr-lang/expr"
@@ -15,6 +18,7 @@ import (
 )
 
 var expressionRegex = regexp.MustCompile(`\{\{(.*?)\}\}`)
+var previousDepthRegex = regexp.MustCompile(`\bprevious\s*\(([^)]*)\)`)
 
 type NodeConfigurationBuilder struct {
 	tx                  *gorm.DB
@@ -243,6 +247,41 @@ func (b *NodeConfigurationBuilder) BuildMessageChainForExpression(expression str
 	return b.buildMessageChain(referencedNodes)
 }
 
+func (b *NodeConfigurationBuilder) BuildExpressionEnv(expression string) (map[string]any, error) {
+	messageChain, err := b.BuildMessageChainForExpression(expression)
+	if err != nil {
+		return nil, err
+	}
+
+	env := map[string]any{"$": messageChain}
+
+	if strings.Contains(expression, "root(") {
+		rootPayload, err := b.resolveRootPayload()
+		if err != nil {
+			return nil, err
+		}
+		env["__root"] = rootPayload
+	}
+
+	depths, err := parsePreviousDepths(expression)
+	if err != nil {
+		return nil, err
+	}
+	if len(depths) > 0 {
+		previousByDepth := make(map[string]any, len(depths))
+		for _, depth := range depths {
+			payload, err := b.resolvePreviousPayload(depth)
+			if err != nil {
+				return nil, err
+			}
+			previousByDepth[strconv.Itoa(depth)] = payload
+		}
+		env["__previousByDepth"] = previousByDepth
+	}
+
+	return env, nil
+}
+
 func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, error) {
 	referencedNodes, err := parseReferencedNodes(expression)
 	if err != nil {
@@ -265,6 +304,28 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 		expr.AsAny(),
 		expr.WithContext("ctx"),
 		expr.Timezone(time.UTC.String()),
+		expr.Function("root", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("root() takes no arguments")
+			}
+
+			return b.resolveRootPayload()
+		}),
+		expr.Function("previous", func(params ...any) (any, error) {
+			depth := 1
+			if len(params) > 1 {
+				return nil, fmt.Errorf("previous() accepts zero or one argument")
+			}
+			if len(params) == 1 {
+				parsedDepth, err := parseDepth(params[0])
+				if err != nil {
+					return nil, err
+				}
+				depth = parsedDepth
+			}
+
+			return b.resolvePreviousPayload(depth)
+		}),
 	}
 
 	vm, err := expr.Compile(expression, exprOptions...)
@@ -381,6 +442,18 @@ func (b *NodeConfigurationBuilder) fetchRootEvent() (*models.WorkflowEvent, erro
 	return rootEvent, nil
 }
 
+func (b *NodeConfigurationBuilder) resolveRootPayload() (any, error) {
+	rootEvent, err := b.fetchRootEvent()
+	if err != nil {
+		return nil, err
+	}
+	if rootEvent == nil {
+		return nil, fmt.Errorf("no root event found")
+	}
+
+	return rootEvent.Data.Data(), nil
+}
+
 func populateFromInputOrRoot(messageChain map[string]any, inputMap map[string]any, rootEvent *models.WorkflowEvent, refToNodeID map[string]string) map[string]string {
 	chainRefs := make(map[string]string, len(refToNodeID))
 	for nodeRef, nodeID := range refToNodeID {
@@ -463,6 +536,177 @@ func latestEventByExecution(events []models.WorkflowEvent, executionIDs []uuid.U
 	}
 
 	return latestByExecution
+}
+
+func parsePreviousDepths(expression string) ([]int, error) {
+	matches := previousDepthRegex.FindAllStringSubmatch(expression, -1)
+	if len(matches) == 0 {
+		return nil, nil
+	}
+
+	seen := map[int]struct{}{}
+	for _, match := range matches {
+		raw := strings.TrimSpace(match[1])
+		if raw == "" {
+			seen[1] = struct{}{}
+			continue
+		}
+
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			return nil, fmt.Errorf("depth must be an integer")
+		}
+		if parsed < 1 {
+			return nil, fmt.Errorf("depth must be >= 1")
+		}
+		seen[parsed] = struct{}{}
+	}
+
+	depths := make([]int, 0, len(seen))
+	for depth := range seen {
+		depths = append(depths, depth)
+	}
+	sort.Ints(depths)
+	return depths, nil
+}
+
+func parseDepth(param any) (int, error) {
+	switch value := param.(type) {
+	case int:
+		if value < 1 {
+			return 0, fmt.Errorf("depth must be >= 1")
+		}
+		return value, nil
+	case int64:
+		if value < 1 {
+			return 0, fmt.Errorf("depth must be >= 1")
+		}
+		return int(value), nil
+	case float64:
+		parsed := int(value)
+		if value != float64(parsed) {
+			return 0, fmt.Errorf("depth must be an integer")
+		}
+		if parsed < 1 {
+			return 0, fmt.Errorf("depth must be >= 1")
+		}
+		return parsed, nil
+	default:
+		return 0, fmt.Errorf("depth must be an integer")
+	}
+}
+
+func (b *NodeConfigurationBuilder) resolvePreviousPayload(depth int) (any, error) {
+	if depth < 1 {
+		return nil, fmt.Errorf("depth must be >= 1")
+	}
+
+	inputPayload, hasInput, err := b.singleInputPayload()
+	if err != nil {
+		return nil, err
+	}
+	step := 0
+	if hasInput {
+		step++
+		if step >= depth && inputPayload != nil {
+			return inputPayload, nil
+		}
+	}
+
+	step, payload, err := b.resolveFromExecutions(depth, step, hasInput)
+	if err != nil {
+		return nil, err
+	}
+	if payload != nil {
+		return payload, nil
+	}
+
+	return b.resolveFromRoot(depth, step)
+}
+
+func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, hasInput bool) (int, any, error) {
+	if b.previousExecutionID == nil {
+		return step, nil, nil
+	}
+
+	executionsInChain, err := b.listExecutionsInChain()
+	if err != nil {
+		return step, nil, err
+	}
+	if len(executionsInChain) == 0 {
+		return step, nil, nil
+	}
+
+	startIndex := 0
+	if hasInput {
+		startIndex = 1
+	}
+
+	executionIDs := make([]uuid.UUID, 0, len(executionsInChain))
+	for _, execution := range executionsInChain {
+		executionIDs = append(executionIDs, execution.ID)
+	}
+
+	events, err := models.ListWorkflowEventsForExecutionsInTransaction(b.tx, executionIDs)
+	if err != nil {
+		return step, nil, err
+	}
+
+	latestByExecution := latestEventByExecution(events, executionIDs)
+	for _, execution := range executionsInChain[startIndex:] {
+		step++
+		if step < depth {
+			continue
+		}
+
+		event, exists := latestByExecution[execution.ID]
+		if !exists {
+			continue
+		}
+
+		if payload := event.Data.Data(); payload != nil {
+			return step, payload, nil
+		}
+	}
+
+	return step, nil, nil
+}
+
+func (b *NodeConfigurationBuilder) resolveFromRoot(depth int, step int) (any, error) {
+	rootEvent, err := b.fetchRootEvent()
+	if err != nil {
+		return nil, err
+	}
+	if rootEvent == nil {
+		return nil, nil
+	}
+
+	step++
+	if step < depth {
+		return nil, nil
+	}
+
+	if payload := rootEvent.Data.Data(); payload != nil {
+		return payload, nil
+	}
+
+	return nil, nil
+}
+
+func (b *NodeConfigurationBuilder) singleInputPayload() (any, bool, error) {
+	inputMap := extractInputMap(b.input)
+	if len(inputMap) == 0 {
+		return nil, false, nil
+	}
+	if len(inputMap) > 1 {
+		return nil, false, fmt.Errorf("previous() is not available when multiple inputs are present")
+	}
+
+	for _, value := range inputMap {
+		return value, true, nil
+	}
+
+	return nil, false, nil
 }
 
 func (b *NodeConfigurationBuilder) listExecutionsInChain() ([]models.WorkflowNodeExecution, error) {

@@ -470,6 +470,9 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
 
     const getSuggestionInsertText = (suggestion: ReturnType<typeof getSuggestions>[number]) => {
       if (suggestion.kind === "function") {
+        if (suggestion.label === "root" || suggestion.label === "previous") {
+          return suggestion.insertText ?? `${suggestion.label}().`;
+        }
         return `${suggestion.label}()`;
       }
       return suggestion.insertText ?? suggestion.label;
@@ -538,101 +541,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       return { start: left.length, end: left.length };
     };
 
-    const extractTailPathExpression = (expr: string) => {
-      const s = expr.trim();
-      let bracketDepth = 0;
-      let inSingle = false;
-      let inDouble = false;
-
-      const isEscaped = (idx: number) => {
-        let backslashes = 0;
-        for (let j = idx - 1; j >= 0 && s[j] === "\\"; j--) {
-          backslashes++;
-        }
-        return backslashes % 2 === 1;
-      };
-
-      const isStopChar = (ch: string) =>
-        ch === "(" ||
-        ch === ")" ||
-        ch === "," ||
-        ch === ";" ||
-        ch === ":" ||
-        ch === "?" ||
-        ch === "+" ||
-        ch === "-" ||
-        ch === "*" ||
-        ch === "/" ||
-        ch === "%" ||
-        ch === "|" ||
-        ch === "&" ||
-        ch === "!" ||
-        ch === "=" ||
-        ch === "<" ||
-        ch === ">" ||
-        ch === "\n" ||
-        ch === "\r" ||
-        ch === "\t" ||
-        ch === " ";
-
-      let start = -1;
-      for (let i = 0; i < s.length; i++) {
-        const ch = s[i];
-
-        if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
-        else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
-
-        if (inSingle || inDouble) continue;
-
-        if (ch === "[") {
-          bracketDepth++;
-          continue;
-        }
-        if (ch === "]") {
-          bracketDepth = Math.max(0, bracketDepth - 1);
-          continue;
-        }
-
-        if (bracketDepth === 0 && ch === "$") {
-          start = i;
-        }
-      }
-
-      if (start === -1) return "";
-
-      bracketDepth = 0;
-      inSingle = false;
-      inDouble = false;
-      let end = s.length;
-
-      for (let i = start; i < s.length; i++) {
-        const ch = s[i];
-
-        if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
-        else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
-
-        if (inSingle || inDouble) continue;
-
-        if (ch === "[") {
-          bracketDepth++;
-          continue;
-        }
-        if (ch === "]") {
-          bracketDepth = Math.max(0, bracketDepth - 1);
-          continue;
-        }
-
-        if (bracketDepth === 0 && i > start && isStopChar(ch)) {
-          end = i;
-          break;
-        }
-      }
-
-      return s.slice(start, end).trim();
-    };
-
     const resolveExpressionValue = (expression: string, globals: Record<string, unknown>) => {
-      const tailExpr = extractTailPathExpression(expression);
+      const tailExpr = extractTailExpressionWithParens(expression);
       if (!tailExpr) return undefined;
 
       const stripWhitespaceOutsideStrings = (input: string) => {
@@ -663,6 +573,11 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       };
 
       let expr = stripWhitespaceOutsideStrings(tailExpr);
+      const normalized = normalizeSpecialFunctionExpr(expr);
+      if (normalized === null) {
+        return undefined;
+      }
+      expr = normalized;
       if (expr.startsWith("$[")) {
         expr = "$" + expr.slice(1);
       }
@@ -753,6 +668,101 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       return cur;
     };
 
+    const extractTailExpressionWithParens = (expr: string) => {
+      const s = expr.trim();
+      let i = s.length - 1;
+      let bracketDepth = 0;
+      let parenDepth = 0;
+      let inSingle = false;
+      let inDouble = false;
+
+      const isEscaped = (idx: number): boolean => {
+        let bs = 0;
+        for (let j = idx - 1; j >= 0 && s[j] === "\\"; j--) bs++;
+        return bs % 2 === 1;
+      };
+
+      const isStopChar = (ch: string): boolean =>
+        ch === "(" ||
+        ch === ")" ||
+        ch === "," ||
+        ch === ";" ||
+        ch === ":" ||
+        ch === "?" ||
+        ch === "+" ||
+        ch === "-" ||
+        ch === "*" ||
+        ch === "/" ||
+        ch === "%" ||
+        ch === "|" ||
+        ch === "&" ||
+        ch === "!" ||
+        ch === "=" ||
+        ch === "<" ||
+        ch === ">" ||
+        ch === "\n" ||
+        ch === "\r" ||
+        ch === "\t" ||
+        ch === " ";
+
+      for (; i >= 0; i--) {
+        const ch = s[i];
+
+        if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
+        else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
+
+        if (inSingle || inDouble) continue;
+
+        if (ch === "]") {
+          bracketDepth++;
+          continue;
+        }
+        if (ch === "[") {
+          bracketDepth = Math.max(0, bracketDepth - 1);
+          continue;
+        }
+        if (ch === ")") {
+          parenDepth++;
+          continue;
+        }
+        if (ch === "(") {
+          if (parenDepth == 0) {
+            return s.slice(i + 1).trim();
+          }
+          parenDepth = Math.max(0, parenDepth - 1);
+          continue;
+        }
+
+        if (bracketDepth > 0 || parenDepth > 0) continue;
+
+        if (isStopChar(ch)) {
+          return s.slice(i + 1).trim();
+        }
+      }
+
+      return s;
+    };
+
+    const normalizeSpecialFunctionExpr = (expr: string): string | null => {
+      const rootMatch = expr.match(/^root\(\)/);
+      if (rootMatch) {
+        return `__root${expr.slice(rootMatch[0].length)}`;
+      }
+
+      const previousMatch = expr.match(/^previous\(([^)]*)\)/);
+      if (previousMatch) {
+        const raw = (previousMatch[1] ?? "").trim();
+        const depth = raw === "" ? 1 : Number(raw);
+        if (!Number.isInteger(depth) || depth < 1) {
+          return null;
+        }
+
+        return `__previousByDepth["${depth}"]${expr.slice(previousMatch[0].length)}`;
+      }
+
+      return expr;
+    };
+
     const computeHighlightedValue = React.useCallback(
       (suggestion: ReturnType<typeof getSuggestions>[number], context: ReturnType<typeof getExpressionContext>) => {
         if (!exampleObj || !context) return undefined;
@@ -761,9 +771,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         const insertText = getSuggestionInsertText(suggestion);
         const left = context.expressionText.slice(0, context.expressionCursor);
         const range = getReplacementRange(left, insertText);
-        const nextExpression =
-          context.expressionText.slice(0, range.start) + insertText + context.expressionText.slice(range.end);
-        const value = resolveExpressionValue(nextExpression, exampleObj);
+        const nextExpressionLeft = context.expressionText.slice(0, range.start) + insertText;
+        const value = resolveExpressionValue(nextExpressionLeft, exampleObj);
         if (typeof value === "function") return undefined;
         return value;
       },
