@@ -17,6 +17,10 @@ triggers:
       Start a run by sending an HTTP request to a unique webhook URL. This
       trigger lets external systems or services initiate a run in SuperPlane.
     exampleOutput: pkg/triggers/webhook/example_data.json
+    useCases:
+      - title: External System Integration
+        description: Kick off a run by sending an HTTP request (webhook) from an external system.
+        yamlPath: webhook_external_system_integration.yaml
 
   - title: Schedule
     subtitle: Automatically trigger runs on a recurring schedule.

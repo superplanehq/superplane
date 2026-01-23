@@ -1,0 +1,47 @@
+metadata:
+  name: "Webhook external system integration"
+  description: "Trigger a canvas from an external system using a webhook, then forward the payload."
+  isTemplate: false
+spec:
+  nodes:
+    - id: "webhook-trigger"
+      name: "Incoming webhook"
+      type: "TYPE_TRIGGER"
+      configuration: {}
+      metadata: null
+      position:
+        x: -40
+        "y": 320
+      component: null
+      blueprint: null
+      trigger:
+        name: "webhook"
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+    - id: "forward-request"
+      name: "Forward payload"
+      type: "TYPE_COMPONENT"
+      configuration:
+        method: "POST"
+        url: "https://rbaskets.in/b0a1w9p"
+        json:
+          eventId: "${{ event.id }}"
+          eventType: "${{ event.type }}"
+      metadata: null
+      position:
+        x: 420
+        "y": 320
+      component:
+        name: "http"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+  edges:
+    - sourceId: "webhook-trigger"
+      targetId: "forward-request"
+      channel: "default"
