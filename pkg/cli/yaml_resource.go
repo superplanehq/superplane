@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ghodss/yaml"
+	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 // returns tuple (apiVersion, kind, error)
@@ -28,4 +29,98 @@ func ParseYamlResourceHeaders(raw []byte) (string, string, error) {
 	}
 
 	return apiVersion, kind, nil
+}
+
+const (
+	canvasAPIVersion = "v1"
+	canvasKind       = "Canvas"
+)
+
+type CanvasResource struct {
+	APIVersion string                                `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string                                `json:"kind" yaml:"kind"`
+	Metadata   CanvasMetadata                        `json:"metadata" yaml:"metadata"`
+	Spec       *openapi_client.WorkflowsWorkflowSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+}
+
+type CanvasMetadata struct {
+	ID          string `json:"id,omitempty" yaml:"id,omitempty"`
+	Name        string `json:"name,omitempty" yaml:"name,omitempty"`
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+}
+
+func ParseCanvasResource(raw []byte) (*CanvasResource, error) {
+	var resource CanvasResource
+	if err := yaml.Unmarshal(raw, &resource); err != nil {
+		return nil, fmt.Errorf("failed to parse canvas resource: %w", err)
+	}
+
+	if resource.Kind != canvasKind {
+		return nil, fmt.Errorf("unsupported resource kind %q", resource.Kind)
+	}
+
+	if resource.APIVersion == "" {
+		return nil, fmt.Errorf("canvas apiVersion is required")
+	}
+
+	if resource.Metadata.Name == "" {
+		return nil, fmt.Errorf("canvas metadata.name is required")
+	}
+
+	return &resource, nil
+}
+
+func WorkflowFromCanvasResource(resource CanvasResource) openapi_client.WorkflowsWorkflow {
+	workflow := openapi_client.WorkflowsWorkflow{}
+	metadata := openapi_client.WorkflowsWorkflowMetadata{}
+	metadata.SetName(resource.Metadata.Name)
+	if resource.Metadata.Description != "" {
+		metadata.SetDescription(resource.Metadata.Description)
+	}
+	if resource.Metadata.ID != "" {
+		metadata.SetId(resource.Metadata.ID)
+	}
+
+	workflow.SetMetadata(metadata)
+	if resource.Spec != nil {
+		workflow.SetSpec(*resource.Spec)
+	} else {
+		workflow.SetSpec(*EmptyWorkflowSpec())
+	}
+
+	return workflow
+}
+
+func CanvasResourceFromWorkflow(workflow openapi_client.WorkflowsWorkflow) CanvasResource {
+	resource := CanvasResource{
+		APIVersion: canvasAPIVersion,
+		Kind:       canvasKind,
+		Metadata:   CanvasMetadata{},
+		Spec:       EmptyWorkflowSpec(),
+	}
+
+	if workflow.Metadata != nil {
+		if workflow.Metadata.Id != nil {
+			resource.Metadata.ID = *workflow.Metadata.Id
+		}
+		if workflow.Metadata.Name != nil {
+			resource.Metadata.Name = *workflow.Metadata.Name
+		}
+		if workflow.Metadata.Description != nil {
+			resource.Metadata.Description = *workflow.Metadata.Description
+		}
+	}
+
+	if workflow.Spec != nil {
+		resource.Spec = workflow.Spec
+	}
+
+	return resource
+}
+
+func EmptyWorkflowSpec() *openapi_client.WorkflowsWorkflowSpec {
+	return &openapi_client.WorkflowsWorkflowSpec{
+		Nodes: []openapi_client.ComponentsNode{},
+		Edges: []openapi_client.ComponentsEdge{},
+	}
 }
