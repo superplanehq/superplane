@@ -158,7 +158,10 @@ export const ifMapper: ComponentBaseMapper = {
 
       // Substitute values in the expression
       if (inputData) {
-        const substitutedExpression = substituteExpressionValues(expression, inputData);
+        const substitutedExpression = substituteExpressionValues(expression, inputData, {
+          root: execution.rootEvent?.data,
+          previousByDepth: { "1": inputData },
+        });
         const parsedEvaluation = parseExpression(substitutedExpression);
 
         // Determine if the if condition evaluated to true (has outputs on "true" channel)

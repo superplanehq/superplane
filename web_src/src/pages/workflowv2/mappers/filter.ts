@@ -152,7 +152,10 @@ export const filterMapper: ComponentBaseMapper = {
 
       // Substitute values in the expression
       if (inputData) {
-        const substitutedExpression = substituteExpressionValues(expression, inputData);
+        const substitutedExpression = substituteExpressionValues(expression, inputData, {
+          root: execution.rootEvent?.data,
+          previousByDepth: { "1": inputData },
+        });
         const parsedEvaluation = parseExpression(substitutedExpression);
 
         // Determine if the filter passed (has outputs) or failed (no outputs)
