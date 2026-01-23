@@ -167,7 +167,7 @@ func (s *invitationSteps) assertInviteLinkDisabled() {
 
 func (s *invitationSteps) assertViewerInviteLinkMessage() {
 	s.session.AssertText("Invite link to add members")
-	s.session.AssertText("Reach out to an organization owner or admin to invite new members.")
+	s.session.AssertText("Only people with owner and admin roles can see this.")
 
 	copyLinkVisible, err := s.session.Page().Locator("text=Copy link").IsVisible()
 	require.NoError(s.t, err)
