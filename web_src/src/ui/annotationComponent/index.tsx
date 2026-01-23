@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { NodeResizer, type ResizeParams } from "@xyflow/react";
+import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import { SelectionWrapper } from "../selectionWrapper";
 import { setActiveNoteId } from "./noteFocus";
@@ -80,24 +81,24 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
   // Local state for dimensions - updated in real-time during resize
   const [dimensions, setDimensions] = useState({ width: propWidth, height: propHeight });
 
+  // Edit mode state - when true, show textarea; when false, show rendered markdown
+  const [isEditing, setIsEditing] = useState(false);
+
   // Sync dimensions when props change (e.g., after save or on initial load)
   useEffect(() => {
     setDimensions({ width: propWidth, height: propHeight });
   }, [propWidth, propHeight]);
 
+  // Keep noteDrafts in sync with annotationText
   useEffect(() => {
     if (!noteId) return;
-    const textarea = textareaRef.current;
-    if (!textarea) return;
     const nextValue = noteDrafts.get(noteId) ?? annotationText ?? "";
-    if (textarea.value !== nextValue) {
-      textarea.value = nextValue;
-    }
     noteDrafts.set(noteId, nextValue);
   }, [annotationText, noteId]);
 
+  // Sync textarea value when entering edit mode or when annotationText changes
   useLayoutEffect(() => {
-    if (!noteId) return;
+    if (!noteId || !isEditing) return;
     const textarea = textareaRef.current;
     if (!textarea) return;
     if (!noteDrafts.has(noteId)) {
@@ -107,7 +108,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
     if (textarea.value !== draft) {
       textarea.value = draft;
     }
-  }, [noteId, annotationText]);
+  }, [noteId, annotationText, isEditing]);
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -160,6 +161,34 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
     },
     [onAnnotationUpdate],
   );
+
+  // Enter edit mode on double-click
+  const handleDoubleClick = useCallback(() => {
+    setIsEditing(true);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, []);
+
+  // Exit edit mode
+  const exitEditMode = useCallback(() => {
+    setIsEditing(false);
+    if (noteId) {
+      setActiveNoteId(null);
+    }
+  }, [noteId]);
+
+  // Handle keyboard events in edit mode
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Escape") {
+        exitEditMode();
+        textareaRef.current?.blur();
+      }
+    },
+    [exitEditMode],
+  );
+
+  // Shared text styling for both modes
+  const textStyles = "text-sm leading-normal text-gray-800";
 
   return (
     <SelectionWrapper selected={selected}>
@@ -232,46 +261,88 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
           </>
         )}
 
-        <div className="flex-1 overflow-hidden px-3 pb-3">
-          <textarea
-            ref={textareaRef}
-            data-note-id={noteId || undefined}
-            defaultValue={noteId ? (noteDrafts.get(noteId) ?? annotationText) : annotationText}
-            onInput={(event) => {
-              const value = (event.target as HTMLTextAreaElement).value;
-              if (noteId) {
-                noteDrafts.set(noteId, value);
-                setActiveNoteId(noteId);
-              }
-              if (onAnnotationUpdate) {
-                onAnnotationUpdate({ text: value });
-              }
-            }}
-            onBlur={() => {
-              handleTextCommit();
-              const activeElement = document.activeElement as Node | null;
-              const shouldRestore =
-                !lastPointerDownOutsideRef.current && (!activeElement || activeElement === document.body);
-              if (shouldRestore) {
-                requestAnimationFrame(() => textareaRef.current?.focus());
-              } else if (noteId) {
-                setActiveNoteId(null);
-              }
-            }}
-            onFocus={() => {
-              if (noteId) {
-                setActiveNoteId(noteId);
-              }
-              lastPointerDownOutsideRef.current = false;
-            }}
-            className={cn(
-              "nodrag h-full w-full resize-none bg-transparent text-sm leading-normal outline-none",
-              "text-gray-800",
-              "placeholder:text-black/50",
-            )}
-            placeholder="Start typing..."
-            aria-label={`${title} note`}
-          />
+        <div className="flex-1 overflow-hidden px-3 pb-3 relative">
+          {isEditing ? (
+            <>
+              <textarea
+                ref={textareaRef}
+                data-note-id={noteId || undefined}
+                defaultValue={noteId ? (noteDrafts.get(noteId) ?? annotationText) : annotationText}
+                onInput={(event) => {
+                  const value = (event.target as HTMLTextAreaElement).value;
+                  if (noteId) {
+                    noteDrafts.set(noteId, value);
+                    setActiveNoteId(noteId);
+                  }
+                  if (onAnnotationUpdate) {
+                    onAnnotationUpdate({ text: value });
+                  }
+                }}
+                onBlur={() => {
+                  handleTextCommit();
+                  // Only exit edit mode if the blur was caused by clicking outside the container
+                  // This prevents exiting edit mode when component re-renders during auto-save
+                  if (lastPointerDownOutsideRef.current) {
+                    exitEditMode();
+                  } else {
+                    // Restore focus if blur wasn't from clicking outside
+                    requestAnimationFrame(() => textareaRef.current?.focus());
+                  }
+                }}
+                onFocus={() => {
+                  if (noteId) {
+                    setActiveNoteId(noteId);
+                  }
+                  lastPointerDownOutsideRef.current = false;
+                }}
+                onKeyDown={handleKeyDown}
+                className={cn(
+                  "nodrag h-full w-full resize-none bg-transparent outline-none",
+                  textStyles,
+                  "placeholder:text-black/50",
+                )}
+                placeholder="Start typing..."
+                aria-label={`${title} note`}
+              />
+              <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/5 text-[10px] text-black/40 pointer-events-none select-none">
+                Markdown supported
+              </span>
+            </>
+          ) : (
+            <div
+              className={cn("nodrag h-full w-full overflow-auto cursor-text text-left", textStyles)}
+              onDoubleClick={handleDoubleClick}
+            >
+              {annotationText ? (
+                <ReactMarkdown
+                  components={{
+                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                    ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
+                    ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
+                    li: ({ children }) => <li className="mb-1">{children}</li>,
+                    h1: ({ children }) => <h1 className="text-base font-bold mb-2">{children}</h1>,
+                    h2: ({ children }) => <h2 className="text-sm font-bold mb-2">{children}</h2>,
+                    h3: ({ children }) => <h3 className="text-sm font-semibold mb-1">{children}</h3>,
+                    code: ({ children }) => <code className="bg-black/10 px-1 rounded text-xs">{children}</code>,
+                    pre: ({ children }) => (
+                      <pre className="bg-black/10 p-2 rounded text-xs overflow-auto mb-2">{children}</pre>
+                    ),
+                    a: ({ children, href }) => (
+                      <a href={href} className="underline text-blue-600">
+                        {children}
+                      </a>
+                    ),
+                    strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                    em: ({ children }) => <em className="italic">{children}</em>,
+                  }}
+                >
+                  {annotationText}
+                </ReactMarkdown>
+              ) : (
+                <span className="text-black/50">Double click to add and edit notes...</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </SelectionWrapper>
