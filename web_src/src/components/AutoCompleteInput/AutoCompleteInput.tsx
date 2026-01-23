@@ -1468,7 +1468,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                             {formatFunctionSignature(suggestionItem)}
                           </span>
                         )}
-                        {suggestionItem.label === "$" && (
+                        {["$", "root", "previous"].includes(suggestionItem.label) && (
                           <span className="flex-shrink-0 px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded">
                             event data
                           </span>
