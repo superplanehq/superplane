@@ -13,26 +13,18 @@ Generate text responses with OpenAI models
 
 - [Text Prompt](#text-prompt)
 
-## Components
-
-### Text Prompt
+## Text Prompt
 
 Generate a text response using OpenAI
 
-## Output Channels
-
-| Name | Label | Description |
-| --- | --- | --- |
-| default | Default | - |
-
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
 | model | Model | app-installation-resource | yes | - |
 | input | Prompt | text | yes | - |
 
-## Example Output
+### Example Output
 
 ```json
 {

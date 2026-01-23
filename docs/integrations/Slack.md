@@ -22,26 +22,18 @@ After installation, follow the setup prompt to create the Slack app and add thos
 
 - [On App Mention](#on-app-mention)
 
-## Components
-
-### Send Text Message
+## Send Text Message
 
 Send a text message to a Slack channel
 
-## Output Channels
-
-| Name | Label | Description |
-| --- | --- | --- |
-| default | Default | - |
-
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
 | channel | Channel | app-installation-resource | yes | - |
 | text | Text | text | yes | - |
 
-## Example Output
+### Example Output
 
 ```json
 {
@@ -56,20 +48,18 @@ Send a text message to a Slack channel
 }
 ```
 
-## Triggers
-
-### On App Mention
+## On App Mention
 
 Listen to messages mentioning the Slack App
 
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
 | channel | Channel | app-installation-resource | no | - |
 | customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
 
-## Example Data
+### Example Data
 
 ```json
 {

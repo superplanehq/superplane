@@ -99,13 +99,11 @@ func writeComponentSection(buf *bytes.Buffer, components []core.Component) {
 		return
 	}
 
-	buf.WriteString("## Components\n\n")
 	for _, component := range components {
-		buf.WriteString(fmt.Sprintf("### %s\n\n", component.Label()))
+		buf.WriteString(fmt.Sprintf("## %s\n\n", component.Label()))
 		writeParagraph(buf, component.Description())
-		writeOutputChannels(buf, component.OutputChannels(nil))
-		writeConfiguration(buf, component.Configuration())
-		writeExample("Example Output", component.ExampleOutput(), buf)
+		writeConfigurationSection(buf, component.Configuration())
+		writeExampleSection("Example Output", component.ExampleOutput(), buf)
 	}
 }
 
@@ -114,13 +112,12 @@ func writeTriggerSection(buf *bytes.Buffer, triggers []core.Trigger) {
 		return
 	}
 
-	buf.WriteString("## Triggers\n\n")
 	for _, trigger := range triggers {
-		buf.WriteString(fmt.Sprintf("### %s\n\n", trigger.Label()))
+		buf.WriteString(fmt.Sprintf("## %s\n\n", trigger.Label()))
 		writeParagraph(buf, trigger.Description())
 		config := actions.AppendGlobalTriggerFields(trigger.Configuration())
-		writeConfiguration(buf, config)
-		writeExample("Example Data", trigger.ExampleData(), buf)
+		writeConfigurationSection(buf, config)
+		writeExampleSection("Example Data", trigger.ExampleData(), buf)
 	}
 }
 
@@ -169,12 +166,12 @@ func writeOutputChannels(buf *bytes.Buffer, channels []core.OutputChannel) {
 	buf.WriteString("\n")
 }
 
-func writeConfiguration(buf *bytes.Buffer, fields []configuration.Field) {
+func writeConfigurationSection(buf *bytes.Buffer, fields []configuration.Field) {
 	if len(fields) == 0 {
 		return
 	}
 
-	buf.WriteString("## Configuration\n\n")
+	buf.WriteString("### Configuration\n\n")
 	buf.WriteString("| Name | Label | Type | Required | Description |\n")
 	buf.WriteString("| --- | --- | --- | --- | --- |\n")
 	for _, field := range fields {
@@ -193,7 +190,7 @@ func writeConfiguration(buf *bytes.Buffer, fields []configuration.Field) {
 	buf.WriteString("\n")
 }
 
-func writeExample(title string, data map[string]any, buf *bytes.Buffer) {
+func writeExampleSection(title string, data map[string]any, buf *bytes.Buffer) {
 	if len(data) == 0 {
 		return
 	}
@@ -201,7 +198,7 @@ func writeExample(title string, data map[string]any, buf *bytes.Buffer) {
 	if err != nil {
 		return
 	}
-	buf.WriteString(fmt.Sprintf("## %s\n\n", title))
+	buf.WriteString(fmt.Sprintf("### %s\n\n", title))
 	buf.WriteString("```json\n")
 	buf.Write(raw)
 	buf.WriteString("\n```\n\n")

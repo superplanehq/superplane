@@ -17,20 +17,11 @@ Run and react to your Semaphore workflows
 
 - [On Pipeline Done](#on-pipeline-done)
 
-## Components
-
-### Run Workflow
+## Run Workflow
 
 Run Semaphore workflow
 
-## Output Channels
-
-| Name | Label | Description |
-| --- | --- | --- |
-| passed | Passed | - |
-| failed | Failed | - |
-
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -40,7 +31,7 @@ Run Semaphore workflow
 | commitSha | Commit SHA | string | no | - |
 | parameters | Parameters | list | no | - |
 
-## Example Output
+### Example Output
 
 ```json
 {
@@ -63,20 +54,18 @@ Run Semaphore workflow
 }
 ```
 
-## Triggers
-
-### On Pipeline Done
+## On Pipeline Done
 
 Listen to Semaphore pipeline done events
 
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
 | project | Project | app-installation-resource | yes | - |
 | customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
 
-## Example Data
+### Example Data
 
 ```json
 {

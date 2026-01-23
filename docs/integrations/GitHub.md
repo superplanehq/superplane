@@ -31,19 +31,11 @@ Manage and react to changes in your GitHub repositories
 - [On Release](#on-release)
 - [On Tag Created](#on-tag-created)
 
-## Components
-
-### Create Issue
+## Create Issue
 
 Create a new issue in a GitHub repository
 
-## Output Channels
-
-| Name | Label | Description |
-| --- | --- | --- |
-| default | Default | - |
-
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -53,7 +45,7 @@ Create a new issue in a GitHub repository
 | assignees | Assignees | list | no | - |
 | labels | Labels | list | no | - |
 
-## Example Output
+### Example Output
 
 ```json
 {
@@ -72,17 +64,11 @@ Create a new issue in a GitHub repository
 }
 ```
 
-### Create Release
+## Create Release
 
 Create a new release in a GitHub repository
 
-## Output Channels
-
-| Name | Label | Description |
-| --- | --- | --- |
-| default | Default | - |
-
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -95,7 +81,7 @@ Create a new release in a GitHub repository
 | generateReleaseNotes | Generate release notes | boolean | no | Automatically generate release notes from commits since the last release |
 | body | Additional notes | text | no | Optional text to append after auto-generated release notes. If auto-generation is off, this becomes the entire release description. |
 
-## Example Output
+### Example Output
 
 ```json
 {
@@ -112,17 +98,11 @@ Create a new release in a GitHub repository
 }
 ```
 
-### Delete Release
+## Delete Release
 
 Delete a release from a GitHub repository
 
-## Output Channels
-
-| Name | Label | Description |
-| --- | --- | --- |
-| default | Default | - |
-
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -131,7 +111,7 @@ Delete a release from a GitHub repository
 | tagName | Tag Name | string | no | Git tag identifying the release to delete. Supports template variables from previous steps. |
 | deleteTag | Also delete Git tag | boolean | no | When enabled, also deletes the associated Git tag from the repository |
 
-## Example Output
+### Example Output
 
 ```json
 {
@@ -150,24 +130,18 @@ Delete a release from a GitHub repository
 }
 ```
 
-### Get Issue
+## Get Issue
 
 Get a GitHub issue by number
 
-## Output Channels
-
-| Name | Label | Description |
-| --- | --- | --- |
-| default | Default | - |
-
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
 | repository | Repository | app-installation-resource | yes | - |
 | issueNumber | Issue Number | string | yes | - |
 
-## Example Output
+### Example Output
 
 ```json
 {
@@ -187,17 +161,11 @@ Get a GitHub issue by number
 }
 ```
 
-### Publish Commit Status
+## Publish Commit Status
 
 Publish a status check to a GitHub commit
 
-## Output Channels
-
-| Name | Label | Description |
-| --- | --- | --- |
-| default | Default | - |
-
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -208,7 +176,7 @@ Publish a status check to a GitHub commit
 | description | Description | text | no | Short description of the status (max ~140 characters) |
 | targetUrl | Target URL | string | no | e.g. Link to build logs, test results, ... |
 
-## Example Output
+### Example Output
 
 ```json
 {
@@ -225,18 +193,11 @@ Publish a status check to a GitHub commit
 }
 ```
 
-### Run Workflow
+## Run Workflow
 
 Run GitHub Actions workflow
 
-## Output Channels
-
-| Name | Label | Description |
-| --- | --- | --- |
-| passed | Passed | - |
-| failed | Failed | - |
-
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -245,7 +206,7 @@ Run GitHub Actions workflow
 | ref | Branch or tag | git-ref | yes | - |
 | inputs | Inputs | list | no | - |
 
-## Example Output
+### Example Output
 
 ```json
 {
@@ -262,17 +223,11 @@ Run GitHub Actions workflow
 }
 ```
 
-### Update Issue
+## Update Issue
 
 Update a GitHub issue
 
-## Output Channels
-
-| Name | Label | Description |
-| --- | --- | --- |
-| default | Default | - |
-
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -284,7 +239,7 @@ Update a GitHub issue
 | assignees | Assignees | list | no | - |
 | labels | Labels | list | no | - |
 
-## Example Output
+### Example Output
 
 ```json
 {
@@ -301,17 +256,11 @@ Update a GitHub issue
 }
 ```
 
-### Update Release
+## Update Release
 
 Update an existing release in a GitHub repository
 
-## Output Channels
-
-| Name | Label | Description |
-| --- | --- | --- |
-| default | Default | - |
-
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -324,7 +273,7 @@ Update an existing release in a GitHub repository
 | draft | Draft | boolean | no | Mark release as draft or publish it |
 | prerelease | Prerelease | boolean | no | Mark as prerelease or stable release |
 
-## Example Output
+### Example Output
 
 ```json
 {
@@ -342,13 +291,11 @@ Update an existing release in a GitHub repository
 }
 ```
 
-## Triggers
-
-### On Branch Created
+## On Branch Created
 
 Listen to GitHub branch creation events
 
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -356,7 +303,7 @@ Listen to GitHub branch creation events
 | branches | Branches | any-predicate-list | yes | - |
 | customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
 
-## Example Data
+### Example Data
 
 ```json
 {
@@ -382,11 +329,11 @@ Listen to GitHub branch creation events
 }
 ```
 
-### On Issue
+## On Issue
 
 Listen to issue events
 
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -394,7 +341,7 @@ Listen to issue events
 | actions | Actions | multi-select | yes | - |
 | customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
 
-## Example Data
+### Example Data
 
 ```json
 {
@@ -426,11 +373,11 @@ Listen to issue events
 }
 ```
 
-### On Issue Comment
+## On Issue Comment
 
 Listen to issue comment events
 
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -438,7 +385,7 @@ Listen to issue comment events
 | contentFilter | Content Filter | string | no | Optional regex pattern to filter comments by content |
 | customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
 
-## Example Data
+### Example Data
 
 ```json
 {
@@ -470,11 +417,11 @@ Listen to issue comment events
 }
 ```
 
-### On Pull Request
+## On Pull Request
 
 Listen to pull request events
 
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -482,7 +429,7 @@ Listen to pull request events
 | actions | Actions | multi-select | yes | - |
 | customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
 
-## Example Data
+### Example Data
 
 ```json
 {
@@ -515,11 +462,11 @@ Listen to pull request events
 }
 ```
 
-### On PR Review Comment
+## On PR Review Comment
 
 Listen to pull request review comment events
 
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -527,7 +474,7 @@ Listen to pull request review comment events
 | contentFilter | Content Filter | string | no | Optional regex pattern to filter comments by content |
 | customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
 
-## Example Data
+### Example Data
 
 ```json
 {
@@ -559,11 +506,11 @@ Listen to pull request review comment events
 }
 ```
 
-### On Push
+## On Push
 
 Listen to GitHub push events
 
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -571,7 +518,7 @@ Listen to GitHub push events
 | refs | Refs | any-predicate-list | yes | - |
 | customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
 
-## Example Data
+### Example Data
 
 ```json
 {
@@ -798,11 +745,11 @@ Listen to GitHub push events
 }
 ```
 
-### On Release
+## On Release
 
 Listen to release events
 
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -810,7 +757,7 @@ Listen to release events
 | actions | Actions | multi-select | yes | - |
 | customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
 
-## Example Data
+### Example Data
 
 ```json
 {
@@ -838,11 +785,11 @@ Listen to release events
 }
 ```
 
-### On Tag Created
+## On Tag Created
 
 Listen to GitHub tag creation events
 
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -850,7 +797,7 @@ Listen to GitHub tag creation events
 | tags | Tags | any-predicate-list | yes | - |
 | customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
 
-## Example Data
+### Example Data
 
 ```json
 {

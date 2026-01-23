@@ -19,19 +19,11 @@ Manage and react to incidents in PagerDuty
 - [On Incident](#on-incident)
 - [On Incident Status Update](#on-incident-status-update)
 
-## Components
-
-### Create Incident
+## Create Incident
 
 Create a new incident in PagerDuty
 
-## Output Channels
-
-| Name | Label | Description |
-| --- | --- | --- |
-| default | Default | - |
-
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -41,7 +33,7 @@ Create a new incident in PagerDuty
 | service | Service | app-installation-resource | yes | The PagerDuty service to create the incident for |
 | fromEmail | From Email | string | no | Email address of a valid PagerDuty user. Required for App OAuth and account-level API tokens, optional for user-level API tokens. |
 
-## Example Output
+### Example Output
 
 ```json
 {
@@ -127,17 +119,11 @@ Create a new incident in PagerDuty
 }
 ```
 
-### Update Incident
+## Update Incident
 
 Update an existing incident in PagerDuty
 
-## Output Channels
-
-| Name | Label | Description |
-| --- | --- | --- |
-| default | Default | - |
-
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -151,7 +137,7 @@ Update an existing incident in PagerDuty
 | assignees | Assignees | list | no | Update incident assignees (user IDs) |
 | note | Note | text | no | Add a note/comment to the incident |
 
-## Example Output
+### Example Output
 
 ```json
 {
@@ -237,13 +223,11 @@ Update an existing incident in PagerDuty
 }
 ```
 
-## Triggers
-
-### On Incident
+## On Incident
 
 Listen to incident events
 
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -252,7 +236,7 @@ Listen to incident events
 | urgencies | Urgencies | multi-select | no | Filter incidents by urgency |
 | customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
 
-## Example Data
+### Example Data
 
 ```json
 {
@@ -327,18 +311,18 @@ Listen to incident events
 }
 ```
 
-### On Incident Status Update
+## On Incident Status Update
 
 Listen to incident status update events
 
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
 | service | Service | app-installation-resource | yes | The PagerDuty service to monitor for incident status updates |
 | customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
 
-## Example Data
+### Example Data
 
 ```json
 {

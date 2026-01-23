@@ -13,19 +13,11 @@ Send emails via any SMTP server
 
 - [Send Email](#send-email)
 
-## Components
-
-### Send Email
+## Send Email
 
 Send an email via SMTP
 
-## Output Channels
-
-| Name | Label | Description |
-| --- | --- | --- |
-| default | Default | - |
-
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -39,7 +31,7 @@ Send an email via SMTP
 | fromEmail | From Email (Override) | string | no | Override the default sender email address |
 | replyTo | Reply-To | string | no | Reply-to email address |
 
-## Example Output
+### Example Output
 
 ```json
 {

@@ -14,27 +14,17 @@ Connect to Dash0 to query data using Prometheus API
 - [List Issues](#list-issues)
 - [Query Prometheus](#query-prometheus)
 
-## Components
-
-### List Issues
+## List Issues
 
 Query Dash0 to get a list of all current issues using the metric dash0.issue.status
 
-## Output Channels
-
-| Name | Label | Description |
-| --- | --- | --- |
-| clear | Clear | No active issues detected |
-| degraded | Degraded | One or more degraded issues detected |
-| critical | Critical | One or more critical issues detected |
-
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
 | checkRules | Check Rules | app-installation-resource | no | Select one or more check rules to filter issues |
 
-## Example Output
+### Example Output
 
 ```json
 {
@@ -70,17 +60,11 @@ Query Dash0 to get a list of all current issues using the metric dash0.issue.sta
 }
 ```
 
-### Query Prometheus
+## Query Prometheus
 
 Execute a PromQL query against Dash0 Prometheus API and return the response data
 
-## Output Channels
-
-| Name | Label | Description |
-| --- | --- | --- |
-| default | Default | - |
-
-## Configuration
+### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
@@ -91,7 +75,7 @@ Execute a PromQL query against Dash0 Prometheus API and return the response data
 | end | End Time | string | no | End time for range queries (e.g., 'now', '2024-01-01T01:00:00Z') |
 | step | Step | string | no | Query resolution step width for range queries (e.g., '15s', '1m', '5m') |
 
-## Example Output
+### Example Output
 
 ```json
 {
