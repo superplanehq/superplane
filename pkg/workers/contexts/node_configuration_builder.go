@@ -265,6 +265,36 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 		expr.AsAny(),
 		expr.WithContext("ctx"),
 		expr.Timezone(time.UTC.String()),
+		expr.Function("root", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("root() takes no arguments")
+			}
+
+			rootEvent, err := b.fetchRootEvent()
+			if err != nil {
+				return nil, err
+			}
+			if rootEvent == nil {
+				return nil, fmt.Errorf("no root event found")
+			}
+
+			return rootEvent.Data.Data(), nil
+		}),
+		expr.Function("previous", func(params ...any) (any, error) {
+			depth := 1
+			if len(params) > 1 {
+				return nil, fmt.Errorf("previous() accepts zero or one argument")
+			}
+			if len(params) == 1 {
+				parsedDepth, err := parseDepth(params[0])
+				if err != nil {
+					return nil, err
+				}
+				depth = parsedDepth
+			}
+
+			return b.resolvePreviousPayload(depth)
+		}),
 	}
 
 	vm, err := expr.Compile(expression, exprOptions...)
@@ -463,6 +493,145 @@ func latestEventByExecution(events []models.WorkflowEvent, executionIDs []uuid.U
 	}
 
 	return latestByExecution
+}
+
+func parseDepth(param any) (int, error) {
+	switch value := param.(type) {
+	case int:
+		if value < 1 {
+			return 0, fmt.Errorf("depth must be >= 1")
+		}
+		return value, nil
+	case int64:
+		if value < 1 {
+			return 0, fmt.Errorf("depth must be >= 1")
+		}
+		return int(value), nil
+	case float64:
+		parsed := int(value)
+		if value != float64(parsed) {
+			return 0, fmt.Errorf("depth must be an integer")
+		}
+		if parsed < 1 {
+			return 0, fmt.Errorf("depth must be >= 1")
+		}
+		return parsed, nil
+	default:
+		return 0, fmt.Errorf("depth must be an integer")
+	}
+}
+
+func (b *NodeConfigurationBuilder) resolvePreviousPayload(depth int) (any, error) {
+	if depth < 1 {
+		return nil, fmt.Errorf("depth must be >= 1")
+	}
+
+	inputPayload, hasInput, err := b.singleInputPayload()
+	if err != nil {
+		return nil, err
+	}
+	step := 0
+	if hasInput {
+		step++
+		if step >= depth && inputPayload != nil {
+			return inputPayload, nil
+		}
+	}
+
+	step, payload, err := b.resolveFromExecutions(depth, step, hasInput)
+	if err != nil {
+		return nil, err
+	}
+	if payload != nil {
+		return payload, nil
+	}
+
+	return b.resolveFromRoot(depth, step)
+}
+
+func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, hasInput bool) (int, any, error) {
+	if b.previousExecutionID == nil {
+		return step, nil, nil
+	}
+
+	executionsInChain, err := b.listExecutionsInChain()
+	if err != nil {
+		return step, nil, err
+	}
+	if len(executionsInChain) == 0 {
+		return step, nil, nil
+	}
+
+	startIndex := 0
+	if hasInput {
+		startIndex = 1
+	}
+
+	executionIDs := make([]uuid.UUID, 0, len(executionsInChain))
+	for _, execution := range executionsInChain {
+		executionIDs = append(executionIDs, execution.ID)
+	}
+
+	events, err := models.ListWorkflowEventsForExecutionsInTransaction(b.tx, executionIDs)
+	if err != nil {
+		return step, nil, err
+	}
+
+	latestByExecution := latestEventByExecution(events, executionIDs)
+	for _, execution := range executionsInChain[startIndex:] {
+		step++
+		if step < depth {
+			continue
+		}
+
+		event, exists := latestByExecution[execution.ID]
+		if !exists {
+			continue
+		}
+
+		if payload := event.Data.Data(); payload != nil {
+			return step, payload, nil
+		}
+	}
+
+	return step, nil, nil
+}
+
+func (b *NodeConfigurationBuilder) resolveFromRoot(depth int, step int) (any, error) {
+	rootEvent, err := b.fetchRootEvent()
+	if err != nil {
+		return nil, err
+	}
+	if rootEvent == nil {
+		return nil, nil
+	}
+
+	step++
+	if step < depth {
+		return nil, nil
+	}
+
+	if payload := rootEvent.Data.Data(); payload != nil {
+		return payload, nil
+	}
+
+	return nil, nil
+}
+
+func (b *NodeConfigurationBuilder) singleInputPayload() (any, bool, error) {
+	inputMap := extractInputMap(b.input)
+	if len(inputMap) == 0 {
+		return nil, false, nil
+	}
+	if len(inputMap) > 1 {
+		return nil, false, fmt.Errorf("previous() is not available when multiple inputs are present")
+	}
+
+	for _, value := range inputMap {
+		return value, true, nil
+	}
+
+	return nil, false, nil
 }
 
 func (b *NodeConfigurationBuilder) listExecutionsInChain() ([]models.WorkflowNodeExecution, error) {
