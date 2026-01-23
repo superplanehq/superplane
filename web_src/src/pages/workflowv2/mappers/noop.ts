@@ -4,9 +4,10 @@ import {
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
-import { ComponentBaseMapper } from "./types";
+import { ComponentBaseMapper, OutputPayload } from "./types";
 import { ComponentBaseProps, EventSection, EventState } from "@/ui/componentBase";
 import { getTriggerRenderer, getStateMap } from ".";
+import { formatTimeAgo } from "@/utils/date";
 
 export const noopMapper: ComponentBaseMapper = {
   props(
@@ -28,6 +29,25 @@ export const noopMapper: ComponentBaseMapper = {
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
+  },
+  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+    const timestamp = execution.updatedAt || execution.createdAt;
+    return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
+  },
+  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, string> {
+    const details: Record<string, string> = {};
+    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+    const payload = outputs?.default?.[0];
+
+    if (payload?.type) {
+      details["Event Type"] = payload.type;
+    }
+
+    if (payload?.timestamp) {
+      details["Emitted At"] = new Date(payload.timestamp).toLocaleString();
+    }
+
+    return details;
   },
 };
 
