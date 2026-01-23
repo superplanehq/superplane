@@ -61,6 +61,19 @@ type ExprFunction = {
 
 /** Built-in functions (from expr-lang docs categories). */
 export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
+  {
+    name: "root",
+    snippet: "root().",
+    description: "Returns the root payload that started the run.",
+    example: "root().github.ref",
+  },
+  {
+    name: "previous",
+    snippet: "previous().",
+    description:
+      "Returns the payload from the immediate predecessor that emitted this event. Provide depth to walk upstream.",
+    example: "previous(2).data.image.version",
+  },
   // String
   {
     name: "trim",
@@ -597,7 +610,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
       }
     }
 
-    const resolvableBase = extractTailPathExpression(baseExpr);
+    const resolvableBase = isFunctionCall ? baseExpr : extractTailPathExpression(baseExpr);
     const target = resolveExprToValue(resolvableBase, globals);
 
     const keys = listKeys(target);
@@ -800,7 +813,7 @@ function detectEnvKeyTrigger(left: string): EnvKeyTrigger | null {
 
 function listGlobalKeys(globals: Record<string, unknown>): string[] {
   const keys = Object.keys(globals ?? {});
-  return keys.filter((key) => key !== "__nodeNames");
+  return keys.filter((key) => !key.startsWith("__"));
 }
 
 function isExpandableValue(v: unknown): boolean {
@@ -902,8 +915,12 @@ function detectDotContext(left: string): DotContext | null {
     return null;
   }
 
+  const tail = extractTailExpressionWithParens(left);
+  const expr = tail.trim();
+  if (!expr) return null;
+
   // Match expressions starting with $ (e.g., $["key"].prop)
-  const dollarMatch = left.match(/(\$.+?)(\?\.|\.)\s*([$A-Za-z_][$A-Za-z0-9_]*)?$/);
+  const dollarMatch = expr.match(/(\$.+?)(\?\.|\.)\s*([$A-Za-z_][$A-Za-z0-9_]*)?$/);
   if (dollarMatch) {
     let baseExpr = (dollarMatch[1] ?? "").trim();
     const operator = (dollarMatch[2] === "?." ? "?." : ".") as "." | "?.";
@@ -919,12 +936,19 @@ function detectDotContext(left: string): DotContext | null {
   }
 
   // Match function calls (e.g., now(), date("2024-01-01"), duration("1h"))
-  const funcMatch = left.match(/([a-zA-Z_][a-zA-Z0-9_]*)\s*\([^)]*\)(\?\.|\.)\s*([$A-Za-z_][$A-Za-z0-9_]*)?$/);
+  const funcMatch = expr.match(/((?:[a-zA-Z_][a-zA-Z0-9_]*)\s*\([^)]*\))(\?\.|\.)\s*([$A-Za-z_][$A-Za-z0-9_]*)?$/);
   if (funcMatch) {
-    const funcName = funcMatch[1];
+    let funcName = extractTailExpressionWithParens(funcMatch[1]);
+    funcName = extractSpecialFunctionCall(funcName);
     const operator = (funcMatch[2] === "?." ? "?." : ".") as "." | "?.";
     const memberPrefix = (funcMatch[3] ?? "").trim();
+    if (!funcName) return null;
     return { baseExpr: funcName, memberPrefix, operator, isFunctionCall: true };
+  }
+
+  const tailCtx = findTailDotContext(expr);
+  if (tailCtx) {
+    return tailCtx;
   }
 
   return null;
@@ -941,7 +965,8 @@ function detectBracketKeyContext(left: string): BracketKeyContext | null {
   return { quote, partialKey };
 }
 
-function extractTailPathExpression(expr: string): string {
+function extractTailPathExpression(expr: string | undefined | null): string {
+  if (!expr) return "";
   const s = expr.trim();
   let i = s.length - 1;
 
@@ -1003,7 +1028,167 @@ function extractTailPathExpression(expr: string): string {
   return s;
 }
 
+function findTailDotContext(input: string): DotContext | null {
+  const s = input.trim();
+  let i = s.length - 1;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  let inSingle = false;
+  let inDouble = false;
+
+  const isEscaped = (idx: number): boolean => {
+    let bs = 0;
+    for (let j = idx - 1; j >= 0 && s[j] === "\\"; j--) bs++;
+    return bs % 2 === 1;
+  };
+
+  for (; i >= 0; i--) {
+    const ch = s[i];
+
+    if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
+    else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
+
+    if (inSingle || inDouble) continue;
+
+    if (ch === "]") {
+      bracketDepth++;
+      continue;
+    }
+    if (ch === "[") {
+      bracketDepth = Math.max(0, bracketDepth - 1);
+      continue;
+    }
+    if (ch === ")") {
+      parenDepth++;
+      continue;
+    }
+    if (ch === "(") {
+      if (parenDepth == 0) {
+        return null;
+      }
+      parenDepth = Math.max(0, parenDepth - 1);
+      continue;
+    }
+
+    if (bracketDepth > 0 || parenDepth > 0) continue;
+
+    if (ch === "." && i > 0 && /\d/.test(s[i - 1]) && i + 1 < s.length && /\d/.test(s[i + 1])) {
+      continue;
+    }
+
+    if (ch === "." || (ch === "?" && s[i + 1] === ".")) {
+      const operator = ch === "?" ? "?." : ".";
+      const opStart = ch === "?" ? i : i;
+      let baseExpr = s.slice(0, opStart).trim();
+      baseExpr = extractTailExpressionWithParens(baseExpr);
+      baseExpr = extractSpecialFunctionCall(baseExpr);
+      const memberPrefix = s.slice(opStart + operator.length).trim();
+      if (!baseExpr) return null;
+      if (/^\d+(\.\d+)?$/.test(baseExpr)) return null;
+      const isFunctionCall = baseExpr.includes("(");
+      return { baseExpr, memberPrefix, operator: operator as "." | "?.", isFunctionCall };
+    }
+  }
+
+  return null;
+}
+
 type Token = { t: "dot" } | { t: "ident"; v: string } | { t: "key"; v: string };
+
+function extractTailExpressionWithParens(expr: string): string {
+  const s = expr.trim();
+  let i = s.length - 1;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  let inSingle = false;
+  let inDouble = false;
+
+  const isEscaped = (idx: number): boolean => {
+    let bs = 0;
+    for (let j = idx - 1; j >= 0 && s[j] === "\\"; j--) bs++;
+    return bs % 2 === 1;
+  };
+
+  const isStopChar = (ch: string): boolean =>
+    ch === "(" ||
+    ch === ")" ||
+    ch === "," ||
+    ch === ";" ||
+    ch === ":" ||
+    ch === "?" ||
+    ch === "+" ||
+    ch === "-" ||
+    ch === "*" ||
+    ch === "/" ||
+    ch === "%" ||
+    ch === "|" ||
+    ch === "&" ||
+    ch === "!" ||
+    ch === "=" ||
+    ch === "<" ||
+    ch === ">" ||
+    ch === "\n" ||
+    ch === "\r" ||
+    ch === "\t" ||
+    ch === " ";
+
+  for (; i >= 0; i--) {
+    const ch = s[i];
+
+    if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
+    else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
+
+    if (inSingle || inDouble) continue;
+
+    if (ch === "]") {
+      bracketDepth++;
+      continue;
+    }
+    if (ch === "[") {
+      bracketDepth = Math.max(0, bracketDepth - 1);
+      continue;
+    }
+    if (ch === ")") {
+      parenDepth++;
+      continue;
+    }
+    if (ch === "(") {
+      if (parenDepth === 0) {
+        return s.slice(i + 1).trim();
+      }
+      parenDepth = Math.max(0, parenDepth - 1);
+      continue;
+    }
+
+    if (bracketDepth > 0 || parenDepth > 0) continue;
+
+    if (isStopChar(ch)) {
+      return s.slice(i + 1).trim();
+    }
+  }
+
+  return s;
+}
+
+function extractSpecialFunctionCall(expr: string): string {
+  const matches = [...expr.matchAll(/(root\(\)|previous\([^)]*\))/g)];
+  if (matches.length === 0) {
+    return expr;
+  }
+
+  const lastMatch = matches[matches.length - 1];
+  const matchValue = lastMatch?.[0];
+  if (!matchValue || lastMatch?.index === undefined) {
+    return expr;
+  }
+
+  const afterMatch = expr.slice(lastMatch.index + matchValue.length).trimStart();
+  if (afterMatch.startsWith(".") || afterMatch.startsWith("?.")) {
+    return expr;
+  }
+
+  return matchValue;
+}
 
 function resolveExprToValue<TGlobals extends Record<string, unknown>>(baseExpr: string, globals: TGlobals): unknown {
   const stripWhitespaceOutsideStrings = (input: string) => {
@@ -1031,6 +1216,12 @@ function resolveExprToValue<TGlobals extends Record<string, unknown>>(baseExpr: 
   };
 
   let expr = stripWhitespaceOutsideStrings(baseExpr.trim());
+  expr = extractTailExpressionWithParens(expr);
+  const normalized = normalizeSpecialFunctionExpr(expr);
+  if (normalized === null) {
+    return undefined;
+  }
+  expr = normalized;
 
   const tokens: Token[] = [];
   let i = 0;
@@ -1107,6 +1298,26 @@ function resolveExprToValue<TGlobals extends Record<string, unknown>>(baseExpr: 
   }
 
   return cur;
+}
+
+function normalizeSpecialFunctionExpr(expr: string): string | null {
+  const rootMatch = expr.match(/^root\(\)/);
+  if (rootMatch) {
+    return `__root${expr.slice(rootMatch[0].length)}`;
+  }
+
+  const previousMatch = expr.match(/^previous\(([^)]*)\)/);
+  if (previousMatch) {
+    const raw = (previousMatch[1] ?? "").trim();
+    const depth = raw === "" ? 1 : Number(raw);
+    if (!Number.isInteger(depth) || depth < 1) {
+      return null;
+    }
+
+    return `__previousByDepth["${depth}"]${expr.slice(previousMatch[0].length)}`;
+  }
+
+  return expr;
 }
 
 function listKeys(value: unknown): string[] {
