@@ -1116,6 +1116,55 @@ export function WorkflowPageV2() {
         return null;
       }
 
+      const getIncomingNodes = (targetId: string): string[] => {
+        return workflowEdges
+          .filter((edge) => edge.targetId === targetId && edge.sourceId)
+          .map((edge) => edge.sourceId as string);
+      };
+
+      const previousByDepth: Record<string, unknown> = {};
+      let frontier = [nodeId];
+      const visited = new Set<string>([nodeId]);
+      let depth = 0;
+
+      while (frontier.length > 0) {
+        const next: string[] = [];
+        frontier.forEach((current) => {
+          getIncomingNodes(current).forEach((sourceId) => {
+            if (visited.has(sourceId)) return;
+            visited.add(sourceId);
+            next.push(sourceId);
+          });
+        });
+
+        if (next.length === 0) {
+          break;
+        }
+
+        depth += 1;
+        const firstAtDepth = next[0];
+        if (firstAtDepth && exampleObj[firstAtDepth]) {
+          previousByDepth[String(depth)] = exampleObj[firstAtDepth];
+        }
+
+        frontier = next;
+      }
+
+      const rootNodeId = workflowNodes.find((node) => {
+        if (!chainNodeIds.has(node.id)) return false;
+        return !workflowEdges.some(
+          (edge) => edge.targetId === node.id && edge.sourceId && chainNodeIds.has(edge.sourceId as string),
+        );
+      })?.id;
+
+      if (rootNodeId && exampleObj[rootNodeId]) {
+        exampleObj.__root = exampleObj[rootNodeId];
+      }
+
+      if (Object.keys(previousByDepth).length > 0) {
+        exampleObj.__previousByDepth = previousByDepth;
+      }
+
       if (Object.keys(nodeMetadata).length > 0) {
         exampleObj.__nodeNames = nodeMetadata;
         Object.entries(nodeMetadata).forEach(([nodeId, metadata]) => {
