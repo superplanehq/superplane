@@ -69,7 +69,7 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
         <div
           className={`uppercase text-[11px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-white ${LastEventStateColor}`}
         >
-          <span>{currentState}</span>
+          <span>{stateStyle.label || currentState}</span>
         </div>
         {section.eventSubtitle && (
           <span
@@ -134,6 +134,7 @@ export interface EventStateStyle {
   textColor: string;
   backgroundColor: string;
   badgeColor: string;
+  label?: string; // Optional display label, defaults to state name if not provided
 }
 
 export type EventStateMap = Record<EventState, EventStateStyle>;

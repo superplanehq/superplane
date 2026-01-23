@@ -36,3 +36,12 @@ export interface ResourceRef {
 export interface IncidentAssignment {
   assignee: ResourceRef;
 }
+
+export interface ListIncidentsConfiguration {
+  services?: string[];
+}
+
+export interface ListIncidentsResponse {
+  incidents: Incident[];
+  total: number;
+}
