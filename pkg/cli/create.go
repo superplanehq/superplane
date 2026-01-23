@@ -54,10 +54,8 @@ var createCanvasCmd = &cobra.Command{
 		resource := CanvasResource{
 			APIVersion: canvasAPIVersion,
 			Kind:       canvasKind,
-			Metadata: CanvasMetadata{
-				Name: name,
-			},
-			Spec: EmptyWorkflowSpec(),
+			Metadata:   &openapi_client.WorkflowsWorkflowMetadata{Name: &name},
+			Spec:       EmptyWorkflowSpec(),
 		}
 
 		workflow := WorkflowFromCanvasResource(resource)

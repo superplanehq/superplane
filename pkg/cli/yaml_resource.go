@@ -37,16 +37,10 @@ const (
 )
 
 type CanvasResource struct {
-	APIVersion string                                `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string                                `json:"kind" yaml:"kind"`
-	Metadata   CanvasMetadata                        `json:"metadata" yaml:"metadata"`
-	Spec       *openapi_client.WorkflowsWorkflowSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
-}
-
-type CanvasMetadata struct {
-	ID          string `json:"id,omitempty" yaml:"id,omitempty"`
-	Name        string `json:"name,omitempty" yaml:"name,omitempty"`
-	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+	APIVersion string                                    `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string                                    `json:"kind" yaml:"kind"`
+	Metadata   *openapi_client.WorkflowsWorkflowMetadata `json:"metadata" yaml:"metadata"`
+	Spec       *openapi_client.WorkflowsWorkflowSpec     `json:"spec,omitempty" yaml:"spec,omitempty"`
 }
 
 func ParseCanvasResource(raw []byte) (*CanvasResource, error) {
@@ -63,7 +57,7 @@ func ParseCanvasResource(raw []byte) (*CanvasResource, error) {
 		return nil, fmt.Errorf("canvas apiVersion is required")
 	}
 
-	if resource.Metadata.Name == "" {
+	if resource.Metadata.Name == nil {
 		return nil, fmt.Errorf("canvas metadata.name is required")
 	}
 
@@ -73,12 +67,12 @@ func ParseCanvasResource(raw []byte) (*CanvasResource, error) {
 func WorkflowFromCanvasResource(resource CanvasResource) openapi_client.WorkflowsWorkflow {
 	workflow := openapi_client.WorkflowsWorkflow{}
 	metadata := openapi_client.WorkflowsWorkflowMetadata{}
-	metadata.SetName(resource.Metadata.Name)
-	if resource.Metadata.Description != "" {
-		metadata.SetDescription(resource.Metadata.Description)
+	metadata.SetName(*resource.Metadata.Name)
+	if resource.Metadata.Description != nil {
+		metadata.SetDescription(*resource.Metadata.Description)
 	}
-	if resource.Metadata.ID != "" {
-		metadata.SetId(resource.Metadata.ID)
+	if resource.Metadata.Id != nil {
+		metadata.SetId(*resource.Metadata.Id)
 	}
 
 	workflow.SetMetadata(metadata)
@@ -92,30 +86,12 @@ func WorkflowFromCanvasResource(resource CanvasResource) openapi_client.Workflow
 }
 
 func CanvasResourceFromWorkflow(workflow openapi_client.WorkflowsWorkflow) CanvasResource {
-	resource := CanvasResource{
+	return CanvasResource{
 		APIVersion: canvasAPIVersion,
 		Kind:       canvasKind,
-		Metadata:   CanvasMetadata{},
-		Spec:       EmptyWorkflowSpec(),
+		Metadata:   workflow.Metadata,
+		Spec:       workflow.Spec,
 	}
-
-	if workflow.Metadata != nil {
-		if workflow.Metadata.Id != nil {
-			resource.Metadata.ID = *workflow.Metadata.Id
-		}
-		if workflow.Metadata.Name != nil {
-			resource.Metadata.Name = *workflow.Metadata.Name
-		}
-		if workflow.Metadata.Description != nil {
-			resource.Metadata.Description = *workflow.Metadata.Description
-		}
-	}
-
-	if workflow.Spec != nil {
-		resource.Spec = workflow.Spec
-	}
-
-	return resource
 }
 
 func EmptyWorkflowSpec() *openapi_client.WorkflowsWorkflowSpec {

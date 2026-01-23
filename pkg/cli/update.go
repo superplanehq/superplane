@@ -34,9 +34,9 @@ var updateCmd = &cobra.Command{
 			client := DefaultClient()
 			ctx := context.Background()
 
-			workflowID := resource.Metadata.ID
+			workflowID := *resource.Metadata.Id
 			if workflowID == "" {
-				workflowID, err = findWorkflowIDByName(ctx, client, resource.Metadata.Name)
+				workflowID, err = findWorkflowIDByName(ctx, client, *resource.Metadata.Name)
 				Check(err)
 			}
 
