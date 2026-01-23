@@ -19,6 +19,7 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   noExampleObjectText?: string;
   showValuePreview?: boolean;
   quickTip?: string;
+  expressionMode?: "wrapped" | "raw";
 }
 
 export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInputProps>(
@@ -37,6 +38,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       noExampleObjectText = "No suggestions found",
       showValuePreview = false,
       quickTip,
+      expressionMode = "wrapped",
       ...rest
     } = props;
     const [inputValue, setInputValue] = useState(value);
@@ -56,12 +58,28 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const previousWordLength = useRef<number>(0);
     const previousInputValue = useRef<string>(value);
 
+    const isRawExpression = expressionMode === "raw";
+
     // Check if input contains any expressions
-    const hasExpressions = useMemo(() => /\{\{.*?\}\}/.test(inputValue), [inputValue]);
+    const hasExpressions = useMemo(() => {
+      if (isRawExpression) {
+        return inputValue.trim().length > 0;
+      }
+      return /\{\{.*?\}\}/.test(inputValue);
+    }, [inputValue, isRawExpression]);
 
     // Check if all expressions are valid
     const allExpressionsValid = useMemo(() => {
       if (!exampleObj) return true;
+      if (isRawExpression) {
+        if (inputValue.trim().length === 0) return true;
+        try {
+          evaluateExpr(inputValue.trim(), exampleObj);
+          return true;
+        } catch {
+          return false;
+        }
+      }
       const regex = /\{\{(.*?)\}\}/g;
       let match;
       while ((match = regex.exec(inputValue)) !== null) {
@@ -72,7 +90,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         }
       }
       return true;
-    }, [inputValue, exampleObj]);
+    }, [inputValue, exampleObj, isRawExpression]);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -297,6 +315,28 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
 
     // Render content with highlighted expressions
     const renderHighlightedContent = (text: string) => {
+      if (isRawExpression) {
+        if (!text) {
+          return [<span key={0}>{"\u200B"}</span>];
+        }
+        if (previewMode) {
+          const result = evaluateExpression(text);
+          if (result.error) {
+            return [
+              <span key={0} className="bg-red-100 dark:bg-red-900/50 rounded-sm">
+                <span className="text-red-600 dark:text-red-400 font-medium">{` error (${result.error}) `}</span>
+              </span>,
+            ];
+          }
+          return [
+            <span key={0} className="bg-emerald-100 dark:bg-emerald-900/50 rounded-sm">
+              <span className="text-emerald-700 dark:text-emerald-300 font-medium">{` ${result.value} `}</span>
+            </span>,
+          ];
+        }
+        return tokenizeExpression(text);
+      }
+
       const parts: React.ReactNode[] = [];
       const regex = /(\{\{)(.*?)(\}\})/g;
       let lastIndex = 0;
@@ -381,7 +421,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     };
 
     const isAllowedToSuggest = (text: string, position: number) => {
-      if (!props.startWord || !props.suffix) {
+      if (isRawExpression || !props.startWord || !props.suffix) {
         return true;
       }
 
@@ -399,7 +439,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     };
 
     const getExpressionContext = (text: string, cursor: number) => {
-      if (!startWord || !suffix) {
+      if (isRawExpression || !startWord || !suffix) {
         return {
           expressionText: text,
           expressionCursor: cursor,
@@ -731,6 +771,22 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     );
 
     const valuePreviewWidth = 200;
+
+    const renderQuickTip = (tip: string) => {
+      const parts = tip.split(/`([^`]+)`/g);
+      return parts.map((part, index) =>
+        index % 2 === 1 ? (
+          <code
+            key={`code-${index}`}
+            className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-gray-700 dark:text-gray-300"
+          >
+            {part}
+          </code>
+        ) : (
+          <span key={`text-${index}`}>{part}</span>
+        ),
+      );
+    };
 
     const measureCursorPixelPosition = useCallback(() => {
       if (!inputRef.current || !mirrorRef.current) return;
@@ -1127,22 +1183,30 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                 <span />
               )}
               {/* QuickTip - right side */}
-              {quickTip && (
+              {(quickTip || hasExpressions) && (
                 <span className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
-                  Use{" "}
-                  <code className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-gray-700 dark:text-gray-300">
-                    {"{{"}
-                  </code>{" "}
-                  to write{" "}
-                  <a
-                    href="https://expr-lang.org/docs/language-definition"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    expr
-                  </a>{" "}
-                  expressions
+                  {quickTip
+                    ? renderQuickTip(quickTip)
+                    : [
+                        "Use ",
+                        <code
+                          key="default-tip"
+                          className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-gray-700 dark:text-gray-300"
+                        >
+                          {"{{"}
+                        </code>,
+                        " to write ",
+                        <a
+                          key="expr-link"
+                          href="https://expr-lang.org/docs/language-definition"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          expr
+                        </a>,
+                        " expressions",
+                      ]}
                 </span>
               )}
             </div>

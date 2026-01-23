@@ -242,7 +242,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   runDisabledTooltip: _runDisabledTooltip,
   onEdit: _onEdit,
   onConfigure: _onConfigure,
-  onDuplicate: _onDuplicate,
+  onDuplicate,
   onDeactivate: _onDeactivate,
   onToggleView,
   onDelete,
@@ -258,6 +258,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
 }) => {
   const hasError = error && error.trim() !== "";
   const RunIcon = React.useMemo(() => resolveIcon("play"), []);
+  const DuplicateIcon = React.useMemo(() => resolveIcon("copy"), []);
   const DeleteIcon = React.useMemo(() => resolveIcon("trash-2"), []);
   const ToggleViewIcon = React.useMemo(
     () => resolveIcon(isCompactView ? "chevrons-up-down" : "chevrons-down-up"),
@@ -292,6 +293,20 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
             >
               <RunIcon className="h-4 w-4" />
               <span>Run</span>
+            </button>
+          )}
+          {onDuplicate && (
+            <button
+              type="button"
+              data-testid="node-action-duplicate"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onDuplicate();
+              }}
+              className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+            >
+              <DuplicateIcon className="h-4 w-4" />
             </button>
           )}
           {onToggleView && (

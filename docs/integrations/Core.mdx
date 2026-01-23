@@ -1,0 +1,371 @@
+---
+title: "Core"
+sidebar:
+  label: "Core"
+type: "core"
+---
+
+## Overview
+
+Built-in SuperPlane components.
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Components
+
+<CardGrid>
+  <LinkCard title="Approval" href="#approval" description="Collect approvals on events" />
+  <LinkCard title="Filter" href="#filter" description="Filter events based on their content" />
+  <LinkCard title="HTTP Request" href="#http-request" description="Make HTTP requests" />
+  <LinkCard title="If" href="#if" description="Route events based on expression" />
+  <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
+  <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
+  <LinkCard title="Time Gate" href="#time-gate" description="Route events based on time conditions - include or exclude specific time windows" />
+  <LinkCard title="Wait" href="#wait" description="Wait for a certain amount of time" />
+</CardGrid>
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="Schedule" href="#schedule" description="Start a new execution chain on a schedule" />
+  <LinkCard title="Manual Run" href="#manual-run" description="Start a new execution chain manually" />
+  <LinkCard title="Webhook" href="#webhook" description="Start a new execution chain when a webhook is called" />
+</CardGrid>
+
+<a id="approval"></a>
+
+## Approval
+
+Collect approvals on events
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| items | Approvers | list | yes | List of users, groups, or roles who must approve before the workflow continues |
+
+### Example Output
+
+```json
+{
+  "data": {
+    "records": [
+      {
+        "approval": {
+          "approvedAt": "2024-01-01T12:00:00Z",
+          "comment": "Looks good"
+        },
+        "index": 0,
+        "state": "approved",
+        "type": "user",
+        "user": {
+          "email": "alex@example.com",
+          "id": "user_123",
+          "name": "Alex Doe"
+        }
+      }
+    ],
+    "result": "approved"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "approval.finished"
+}
+```
+
+<a id="filter"></a>
+
+## Filter
+
+Filter events based on their content
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| expression | Filter Expression | expression | yes | Boolean expression to filter data |
+
+### Example Output
+
+```json
+{
+  "data": {},
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "filter.executed"
+}
+```
+
+<a id="http-request"></a>
+
+## HTTP Request
+
+Make HTTP requests
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| method | Method | select | yes | - |
+| url | URL | string | yes | - |
+| queryParams | Query Params | list | no | Query parameters to append to the URL |
+| headers | Headers | list | no | Custom headers to send with this request |
+| contentType | Body | select | no | Body content type for POST, PUT, and PATCH requests |
+| json | JSON Payload | object | no | The JSON object to send as the request body |
+| formData | Form Data | list | no | Key-value pairs to send as form data |
+| text | Text Payload | text | no | Plain text to send as the request body |
+| xml | XML Payload | xml | no | XML content to send as the request body |
+| successCodes | Overwrite success definition | string | no | Comma-separated list of success status codes (e.g., 200, 201, 2xx). Leave empty for default 2xx behavior |
+| timeoutStrategy | Set Timeout and Retries | select | no | Configure timeout and retry behavior for failed requests |
+| timeoutSeconds | Timeout (seconds) | number | no | Timeout in seconds for each request attempt |
+| retries | Retries | number | no | Number of retry attempts. Wait longer after each failed attempt (timeout capped to 120s) |
+
+### Example Output
+
+```json
+{
+  "data": {
+    "body": {
+      "message": "ok"
+    },
+    "error": "Error to read request body: EOF",
+    "headers": {
+      "Content-Type": [
+        "application/json"
+      ]
+    },
+    "status": 200
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "http.request.finished"
+}
+```
+
+<a id="if"></a>
+
+## If
+
+Route events based on expression
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| expression | - | expression | yes | Boolean expression to evaluate |
+
+### Example Output
+
+```json
+{
+  "data": {},
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "if.executed"
+}
+```
+
+<a id="merge"></a>
+
+## Merge
+
+Merge multiple upstream inputs and forward
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| executionTimeout | Execution Timeout | object | no | - |
+| stopIfExpression | Stop if | expression | no | When true, stop waiting and finish immediately. |
+
+### Example Output
+
+```json
+{
+  "data": {
+    "eventIDs": [
+      "event_1",
+      "event_2"
+    ],
+    "groupKey": "merge-group-123",
+    "sources": [
+      "node_a",
+      "node_b"
+    ],
+    "stopEarly": false
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "merge.finished"
+}
+```
+
+<a id="no-operation"></a>
+
+## No Operation
+
+Just pass events through without any additional processing
+
+### Example Output
+
+```json
+{
+  "data": {},
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "noop.finished"
+}
+```
+
+<a id="time-gate"></a>
+
+## Time Gate
+
+Route events based on time conditions - include or exclude specific time windows
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| mode | Mode | select | yes | - |
+| days | Days of Week | multi-select | no | - |
+| startDayInYear | Start Day (MM/DD) | day-in-year | no | Start day in MM/DD format (e.g., 12/25 for Christmas) |
+| startTime | Start Time (HH:MM) | time | yes | Start time in HH:MM format (24-hour), e.g., 09:30 |
+| endDayInYear | End Day (MM/DD) | day-in-year | no | End day in MM/DD format (e.g., 01/01 for New Year) |
+| endTime | End Time (HH:MM) | time | yes | End time in HH:MM format (24-hour), e.g., 17:30 |
+| timezone | Timezone | select | yes | Timezone offset for time-based calculations (default: UTC) |
+
+### Example Output
+
+```json
+{
+  "data": {},
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "timegate.finished"
+}
+```
+
+<a id="wait"></a>
+
+## Wait
+
+Wait for a certain amount of time
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| mode | Wait Mode | select | yes | - |
+| waitFor | Wait for... | string | no | Component will wait for a fixed amount of time before emitting the event forward.
+
+Supports expressions and expects integer.
+
+Example expressions:
+&#123;&#123;$.wait_time&#125;&#125;
+&#123;&#123;$.wait_time + 5&#125;&#125;
+&#123;&#123;$.status == "urgent" ? 0 : 30&#125;&#125; |
+| unit | Unit | select | no | Time unit for the interval |
+| waitUntil | Wait until | string | no | Component will countdown until the provided date/time before emitting an event forward.
+
+Supports expressions and expects date in [ISO 8601](https://www.timestamp-converter.com/) format.
+
+Example expressions:
+&#123;&#123;$.run_time&#125;&#125;
+&#123;&#123;$.run_time.In(timezone("UTC"))&#125;&#125;
+&#123;&#123;$.run_time + duration("48h")&#125;&#125; |
+
+### Example Output
+
+```json
+{
+  "data": {
+    "actor": {
+      "display_name": "Alex Doe",
+      "email": "alex@example.com"
+    },
+    "finished_at": "2024-01-01T12:05:00Z",
+    "reason": "timeout",
+    "result": "completed",
+    "started_at": "2024-01-01T12:00:00Z"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "wait.finished"
+}
+```
+
+<a id="schedule"></a>
+
+## Schedule
+
+Start a new execution chain on a schedule
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| type | Frequency | select | yes | - |
+| timezone | Timezone | timezone | no | Timezone offset for scheduling calculations (default: your current timezone) |
+| minutesInterval | Minutes between triggers | number | no | Number of minutes between triggers (1-59) |
+| hoursInterval | Hours between triggers | number | no | Number of hours between triggers (1-23) |
+| daysInterval | Days between triggers | number | no | Number of days between triggers (1-31) |
+| weeksInterval | Weeks between triggers | number | no | Number of weeks between triggers (1-52) |
+| monthsInterval | Months between triggers | number | no | Number of months between triggers (1-24) |
+| dayOfMonth | Trigger on day of the month | number | no | Day of the month (1-31) |
+| weekDays | Trigger on days of the week | multi-select | no | Select which days of the week to trigger |
+| hour | Trigger at hour | number | no | Hour of the day (0-23) |
+| minute | Trigger at minute | number | no | Minute of the hour (0-59) |
+| cronExpression | Cron Expression | cron | no | Cron expression in 5-field (e.g., '30 14 * * MON-FRI') or 6-field (e.g., '0 30 14 * * MON-FRI') format. Valid wildcards: * , - / |
+| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
+
+### Example Data
+
+```json
+{
+  "calendar": {
+    "day": "1",
+    "hour": "09",
+    "minute": "00",
+    "month": "January",
+    "second": "00",
+    "week_day": "Monday",
+    "year": "2024"
+  },
+  "timezone": "+00:00"
+}
+```
+
+<a id="manual-run"></a>
+
+## Manual Run
+
+Start a new execution chain manually
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
+
+<a id="webhook"></a>
+
+## Webhook
+
+Start a new execution chain when a webhook is called
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| authentication | Authentication | select | yes | - |
+| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
+
+### Example Data
+
+```json
+{
+  "body": {
+    "event": "push",
+    "repository": "superplanehq/superplane"
+  },
+  "headers": {
+    "X-Event": [
+      "push"
+    ]
+  }
+}
+```
+

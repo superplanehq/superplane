@@ -7,6 +7,7 @@ import {
 import { ComponentBaseProps } from "@/ui/componentBase";
 import { ComponentBaseMapper, OutputPayload } from "../types";
 import { baseProps } from "./base";
+import { buildGithubExecutionSubtitle } from "./utils";
 
 interface DeletedReleaseOutput {
   id?: number;
@@ -29,40 +30,35 @@ export const deleteReleaseMapper: ComponentBaseMapper = {
   ): ComponentBaseProps {
     return baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
   },
+  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+    return buildGithubExecutionSubtitle(execution);
+  },
 
   getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, string> {
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+    const details: Record<string, string> = {};
 
-    // If no outputs (e.g., execution failed), return empty details
-    if (!outputs || !outputs.default || outputs.default.length === 0) {
-      return {};
-    }
+    if (outputs && outputs.default && outputs.default.length > 0) {
+      const deletedRelease = outputs.default[0].data as DeletedReleaseOutput;
+      Object.assign(details, {
+        "Deleted At": deletedRelease?.deleted_at ? new Date(deletedRelease.deleted_at).toLocaleString() : "-",
+        "Tag Deleted": deletedRelease?.tag_deleted ? "Yes" : "No",
+      });
 
-    const deletedRelease = outputs.default[0].data as DeletedReleaseOutput;
+      details["Release ID"] = deletedRelease?.id?.toString() || "";
+      details["Tag Name"] = deletedRelease?.tag_name || "";
 
-    const details: Record<string, string> = {
-      "Release ID": deletedRelease?.id?.toString() || "-",
-      "Tag Name": deletedRelease?.tag_name || "-",
-    };
+      if (deletedRelease?.name) {
+        details["Release Name"] = deletedRelease.name;
+      }
 
-    if (deletedRelease?.name) {
-      details["Release Name"] = deletedRelease.name;
-    }
+      if (deletedRelease?.draft) {
+        details["Was Draft"] = "Yes";
+      }
 
-    if (deletedRelease?.deleted_at) {
-      details["Deleted At"] = deletedRelease.deleted_at;
-    }
-
-    if (deletedRelease?.tag_deleted !== undefined) {
-      details["Tag Deleted"] = deletedRelease.tag_deleted ? "Yes" : "No";
-    }
-
-    if (deletedRelease?.draft) {
-      details["Was Draft"] = "Yes";
-    }
-
-    if (deletedRelease?.prerelease) {
-      details["Was Prerelease"] = "Yes";
+      if (deletedRelease?.prerelease) {
+        details["Was Prerelease"] = "Yes";
+      }
     }
 
     return details;

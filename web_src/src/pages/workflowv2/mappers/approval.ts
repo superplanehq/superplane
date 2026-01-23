@@ -266,7 +266,11 @@ function getComponentSubtitle(
     const approvals = (additionalData as { approvals?: ApprovalItemProps[] })?.approvals;
     const approvalsCount = approvals?.length || 0;
     const approvalsApprovedCount = approvals?.filter((approval) => approval.approved).length || 0;
-    return `${approvalsApprovedCount}/${approvalsCount} approved`;
+    const subtitle = `${approvalsApprovedCount}/${approvalsCount} approved`;
+    if (execution.createdAt) {
+      return `${subtitle} · ${formatTimeAgo(new Date(execution.createdAt))}`;
+    }
+    return subtitle;
   }
 
   // Show relative time for completed executions (use updatedAt for finished, createdAt otherwise)
@@ -275,7 +279,19 @@ function getComponentSubtitle(
 
   if (timestamp) {
     const date = new Date(timestamp);
-    return formatTimeAgo(date);
+    const metadata = execution.metadata as Record<string, unknown> | undefined;
+    const result = metadata?.result;
+    const timeAgo = formatTimeAgo(date);
+
+    if (result === "approved") {
+      return `Approved · ${timeAgo}`;
+    }
+
+    if (result === "rejected") {
+      return `Rejected · ${timeAgo}`;
+    }
+
+    return timeAgo;
   }
 
   return "";

@@ -1,6 +1,6 @@
 import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { formatRelativeTime } from "@/utils/timezone";
+import { formatTimeAgo } from "@/utils/date";
 import { TriggerRenderer } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
@@ -27,10 +27,12 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
     const eventData = event.data?.data as OnIncidentEventData;
     const incident = eventData?.incident;
+    const contentParts = [incident?.urgency, incident?.status].filter(Boolean).join(" · ");
+    const subtitle = buildSubtitle(contentParts, event.createdAt);
 
     return {
       title: `${incident?.id || ""} - ${incident?.title || ""}`,
-      subtitle: `${incident?.urgency || ""} - ${incident?.status || ""} - ${formatRelativeTime(event.createdAt!)}`,
+      subtitle,
     };
   },
 
@@ -75,10 +77,12 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
     if (lastEvent) {
       const eventData = lastEvent.data?.data as OnIncidentEventData;
       const incident = eventData?.incident;
+      const contentParts = [incident?.urgency, incident?.status].filter(Boolean).join(" · ");
+      const subtitle = buildSubtitle(contentParts, lastEvent.createdAt);
 
       props.lastEventData = {
         title: `${incident?.id || ""} - ${incident?.title || ""}`,
-        subtitle: `${incident?.urgency || ""} - ${incident?.status || ""} - ${formatRelativeTime(lastEvent.createdAt!)}`,
+        subtitle,
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id,
@@ -88,3 +92,12 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+function buildSubtitle(content: string, createdAt?: string): string {
+  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
+  if (content && timeAgo) {
+    return `${content} · ${timeAgo}`;
+  }
+
+  return content || timeAgo;
+}

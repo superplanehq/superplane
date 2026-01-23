@@ -1,7 +1,7 @@
 import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
-import { formatRelativeTime } from "@/utils/timezone";
+import { formatTimeAgo } from "@/utils/date";
 import { TriggerProps } from "@/ui/trigger";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 
@@ -32,7 +32,7 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
     const eventData = event.data?.data as AppMentionEventData | undefined;
     const title = eventData?.text?.trim() ? eventData.text : "App mention";
-    const subtitle = formatRelativeTime(event.createdAt);
+    const subtitle = buildSubtitle(eventData?.user ? `Mention by ${eventData.user}` : "Mention", event.createdAt);
 
     return {
       title,
@@ -42,12 +42,13 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (event: WorkflowsWorkflowEvent): Record<string, string> => {
     const eventData = event.data?.data as AppMentionEventData | undefined;
+    const mentionedAt = formatSlackTimestamp(eventData?.ts || eventData?.event_ts);
 
     return {
+      "Mentioned At": mentionedAt || "",
       Channel: stringOrDash(eventData?.channel),
       User: stringOrDash(eventData?.user),
       Text: stringOrDash(eventData?.text),
-      Timestamp: stringOrDash(eventData?.ts || eventData?.event_ts),
       "Thread Timestamp": stringOrDash(eventData?.thread_ts),
     };
   },
@@ -77,7 +78,7 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
     if (lastEvent) {
       const eventData = lastEvent.data?.data as AppMentionEventData | undefined;
       const title = eventData?.text?.trim() ? eventData.text : "App mention";
-      const subtitle = formatRelativeTime(lastEvent.createdAt);
+      const subtitle = buildSubtitle(eventData?.user ? `Mention by ${eventData.user}` : "Mention", lastEvent.createdAt);
 
       props.lastEventData = {
         title,
@@ -98,4 +99,32 @@ function stringOrDash(value?: unknown): string {
   }
 
   return String(value);
+}
+
+function buildSubtitle(content: string, createdAt?: string): string {
+  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
+  if (content && timeAgo) {
+    return `${content} · ${timeAgo}`;
+  }
+
+  return content || timeAgo;
+}
+
+function formatSlackTimestamp(value?: unknown): string | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  const raw = String(value);
+  const seconds = Number.parseFloat(raw);
+  if (!Number.isNaN(seconds)) {
+    return new Date(seconds * 1000).toLocaleString();
+  }
+
+  const asDate = new Date(raw);
+  if (!Number.isNaN(asDate.getTime())) {
+    return asDate.toLocaleString();
+  }
+
+  return raw;
 }

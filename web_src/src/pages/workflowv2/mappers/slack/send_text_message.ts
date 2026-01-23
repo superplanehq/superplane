@@ -10,6 +10,7 @@ import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import { MetadataItem } from "@/ui/metadataList";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
+import { formatTimeAgo } from "@/utils/date";
 
 interface SendTextMessageConfiguration {
   channel?: string;
@@ -54,11 +55,15 @@ export const sendTextMessageMapper: ComponentBaseMapper = {
     const message = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
 
     return {
+      "Sent At": formatSlackTimestamp(message?.ts || message?.event_ts) || "-",
       Channel: stringOrDash(message?.channel),
       User: stringOrDash(message?.user),
-      Timestamp: stringOrDash(message?.ts || message?.event_ts),
       Text: stringOrDash(message?.text),
     };
+  },
+  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+    if (!execution.createdAt) return "";
+    return formatTimeAgo(new Date(execution.createdAt));
   },
 };
 
@@ -117,4 +122,23 @@ function stringOrDash(value?: unknown): string {
   }
 
   return String(value);
+}
+
+function formatSlackTimestamp(value?: unknown): string | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  const raw = String(value);
+  const seconds = Number.parseFloat(raw);
+  if (!Number.isNaN(seconds)) {
+    return new Date(seconds * 1000).toLocaleString();
+  }
+
+  const asDate = new Date(raw);
+  if (!Number.isNaN(asDate.getTime())) {
+    return asDate.toLocaleString();
+  }
+
+  return raw;
 }

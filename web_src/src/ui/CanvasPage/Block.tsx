@@ -1,3 +1,4 @@
+import React from "react";
 import { Composite, type CompositeProps } from "@/ui/composite";
 import { SwitchComponent, type SwitchComponentProps } from "@/ui/switchComponent";
 import { Trigger, type TriggerProps } from "@/ui/trigger";
@@ -54,7 +55,10 @@ interface BlockProps extends ComponentActionsProps {
   data: BlockData;
   nodeId?: string;
   selected?: boolean;
-  onAnnotationUpdate?: (nodeId: string, updates: { text?: string; color?: string }) => void;
+  onAnnotationUpdate?: (
+    nodeId: string,
+    updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
+  ) => void;
 
   onExpand?: (nodeId: string, nodeData: BlockData) => void;
   onClick?: () => void;
@@ -193,91 +197,130 @@ function RightHandle({ data, nodeId }: BlockProps) {
     );
   }
 
-  const baseTop = 48;
-  const spacing = 40; // Space between handles
+  // Helper function to check if a channel handle should be highlighted
+  const getChannelHighlight = (channel: string) => {
+    const isAlreadyConnected = connectingFrom
+      ? allEdges.some(
+          (edge: any) =>
+            edge.source === nodeId && edge.sourceHandle === channel && edge.target === connectingFrom.nodeId,
+        )
+      : false;
+
+    return (
+      (hoveredEdge && hoveredEdge.source === nodeId && hoveredEdge.sourceHandle === channel) ||
+      (connectingFrom && connectingFrom.nodeId === nodeId && connectingFrom.handleId === channel) ||
+      (connectingFrom &&
+        connectingFrom.nodeId !== nodeId &&
+        connectingFrom.handleType === "target" &&
+        !isAlreadyConnected)
+    );
+  };
+
+  // Multiple channels: tree layout with trunk, branches, labels, and handles
+  // Visual: [node]──┬── label ─○
+  //                 ├── label ─○
+  //                 └── label ─○
+
+  // Layout constants
+  const channelSpacing = 24;
+  const handleSize = 12;
+  const edgeColor = "#C9D5E1";
+
+  // Horizontal positions (left to right)
+  const trunkLength = 16;
+  const branchEndX = trunkLength + 24; // Where diagonal branches end
+  const labelStartX = branchEndX + 4; // Label position with padding
+  const lineEndX = branchEndX + 62; // Where horizontal line ends (reserves space for labels)
+  const handleGap = 4;
+  const handleLeftX = lineEndX + handleGap; // Handle's left edge position
+
+  // SVG dimensions
+  const totalHeight = (channels.length - 1) * channelSpacing;
+  const svgHeight = totalHeight + 40;
+  const svgCenterY = svgHeight / 2;
+
+  // Pre-calculate channel positions
+  const channelPositions = channels.map((channel, index) => ({
+    channel,
+    offsetY: (index - (channels.length - 1) / 2) * channelSpacing,
+    isHighlighted: getChannelHighlight(channel),
+  }));
 
   return (
-    <>
-      {channels.map((channel, index) => {
-        // Check if already connected to the target being dragged
-        const isAlreadyConnected = connectingFrom
-          ? allEdges.some(
-              (edge: any) =>
-                edge.source === nodeId && edge.sourceHandle === channel && edge.target === connectingFrom.nodeId,
-            )
-          : false;
+    <div
+      className="absolute"
+      style={{
+        left: "100%",
+        top: 0,
+        bottom: 0,
+        pointerEvents: "none",
+      }}
+    >
+      {/* SVG for trunk and branch lines */}
+      <svg
+        width={lineEndX}
+        height={svgHeight}
+        style={{
+          position: "absolute",
+          left: 0,
+          top: `calc(50% - ${svgCenterY}px)`,
+          overflow: "visible",
+        }}
+      >
+        {/* Trunk line from node */}
+        <line x1={0} y1={svgCenterY} x2={trunkLength} y2={svgCenterY} stroke={edgeColor} strokeWidth={3} />
 
-        const isHighlighted =
-          (hoveredEdge && hoveredEdge.source === nodeId && hoveredEdge.sourceHandle === channel) ||
-          (connectingFrom && connectingFrom.nodeId === nodeId && connectingFrom.handleId === channel) ||
-          (connectingFrom &&
-            connectingFrom.nodeId !== nodeId &&
-            connectingFrom.handleType === "target" &&
-            !isAlreadyConnected);
+        {/* Branch lines for each channel */}
+        {channelPositions.map(({ channel, offsetY }) => {
+          const y = svgCenterY + offsetY;
+          return (
+            <g key={channel}>
+              {/* Diagonal from trunk to channel Y */}
+              <line x1={trunkLength} y1={svgCenterY} x2={branchEndX} y2={y} stroke={edgeColor} strokeWidth={3} />
+              {/* Horizontal line through label area to before handle */}
+              <line x1={branchEndX} y1={y} x2={lineEndX} y2={y} stroke={edgeColor} strokeWidth={3} />
+            </g>
+          );
+        })}
+      </svg>
 
-        return (
-          <div
-            key={channel}
-            className="absolute"
+      {/* Labels and handles for each channel */}
+      {channelPositions.map(({ channel, offsetY, isHighlighted }) => (
+        <React.Fragment key={channel}>
+          {/* Label with background to cover the line */}
+          <span
+            className="text-xs font-medium whitespace-nowrap absolute"
             style={{
-              left: "100%",
-              top: baseTop + index * spacing,
+              left: labelStartX,
+              top: `calc(50% + ${offsetY}px)`,
               transform: "translateY(-50%)",
+              color: "#8B9AAC",
+              lineHeight: `${handleSize}px`,
+              background: "#F8FAFC",
               paddingLeft: 4,
+              paddingRight: 4,
             }}
           >
-            <div className="relative flex items-center">
-              {/* Small line from node */}
-              <div
-                style={{
-                  width: 20,
-                  height: 3,
-                  backgroundColor: "#C9D5E1",
-                  pointerEvents: "none",
-                  marginRight: 4,
-                }}
-              />
-              {/* Label text */}
-              <span
-                className="text-xs font-medium whitespace-nowrap"
-                style={{
-                  color: "#8B9AAC",
-                  pointerEvents: "none",
-                  paddingLeft: 2,
-                  paddingRight: 2,
-                }}
-              >
-                {channel}
-              </span>
-              {/* Small line to handle */}
-              <div
-                style={{
-                  width: 16,
-                  height: 3,
-                  backgroundColor: "#C9D5E1",
-                  pointerEvents: "none",
-                  marginLeft: 4,
-                }}
-              />
-              {/* Handle (connection point) */}
-              <Handle
-                type="source"
-                position={Position.Right}
-                id={channel}
-                style={{
-                  ...HANDLE_STYLE,
-                  position: "relative",
-                  pointerEvents: "auto",
-                  marginLeft: -6,
-                  top: 5,
-                }}
-                className={isHighlighted ? "highlighted" : undefined}
-              />
-            </div>
-          </div>
-        );
-      })}
-    </>
+            {channel}
+          </span>
+
+          {/* Handle */}
+          <Handle
+            type="source"
+            position={Position.Right}
+            id={channel}
+            style={{
+              ...HANDLE_STYLE,
+              left: handleLeftX,
+              top: `calc(50% + ${offsetY}px)`,
+              transform: "translateY(-50%)",
+              pointerEvents: "auto",
+            }}
+            className={isHighlighted ? "highlighted" : undefined}
+          />
+        </React.Fragment>
+      ))}
+    </div>
   );
 }
 
@@ -398,7 +441,14 @@ function BlockContent({
     case "merge":
       return <MergeComponent {...(data.merge as MergeComponentProps)} selected={selected} {...actionProps} />;
     case "annotation": {
-      const handleAnnotationUpdate = (updates: { text?: string; color?: string }) => {
+      const handleAnnotationUpdate = (updates: {
+        text?: string;
+        color?: string;
+        width?: number;
+        height?: number;
+        x?: number;
+        y?: number;
+      }) => {
         if (nodeId && onAnnotationUpdate) {
           onAnnotationUpdate(nodeId, updates);
         }

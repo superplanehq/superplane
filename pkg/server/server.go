@@ -164,7 +164,7 @@ func startInternalAPI(baseURL, webhooksBaseURL, basePath string, encryptor crypt
 	grpc.RunServer(baseURL, webhooksBaseURL, basePath, encryptor, authService, registry, oidcSigner, lookupInternalAPIPort())
 }
 
-func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcSigner *oidc.Signer, oidcVerifier *crypto.OIDCVerifier, authService authorization.Authorization) {
+func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcProvider oidc.Provider, authService authorization.Authorization) {
 	log.Println("Starting Public API with integrated Web Server")
 
 	appEnv := os.Getenv("APP_ENV")
@@ -172,7 +172,7 @@ func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, regist
 	blockSignup := os.Getenv("BLOCK_SIGNUP") == "yes"
 
 	webhooksBaseURL := getWebhookBaseURL(baseURL)
-	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcSigner, oidcVerifier, basePath, baseURL, webhooksBaseURL, appEnv, templateDir, authService, blockSignup)
+	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcProvider, basePath, baseURL, webhooksBaseURL, appEnv, templateDir, authService, blockSignup)
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)
 	}
@@ -330,18 +330,17 @@ func Start() {
 	}
 
 	jwtSigner := jwt.NewSigner(jwtSecret)
-	oidcSigner, err := oidc.NewSignerFromKeyDir(oidcKeysPath)
+	oidcProvider, err := oidc.NewProviderFromKeyDir(oidcKeysPath)
 	if err != nil {
 		panic(fmt.Sprintf("failed to load OIDC keys: %v", err))
 	}
 
-	oidcVerifier := crypto.NewOIDCVerifier()
 	registry := registry.NewRegistry(encryptorInstance)
 
 	templates.Setup(registry)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
-		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcSigner, oidcVerifier, authService)
+		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcProvider, authService)
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {

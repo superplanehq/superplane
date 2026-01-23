@@ -4,6 +4,7 @@ import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
 import { BaseNodeMetadata, Release } from "./types";
+import { buildGithubSubtitle } from "./utils";
 
 interface OnReleaseConfiguration {
   actions: string[];
@@ -25,7 +26,7 @@ export const onReleaseTriggerRenderer: TriggerRenderer = {
 
     return {
       title: `${releaseName} (${assetCount} asset${assetCount !== 1 ? "s" : ""})`,
-      subtitle: eventData?.action || "",
+      subtitle: buildGithubSubtitle(eventData?.action || "", event.createdAt),
     };
   },
 
@@ -80,7 +81,7 @@ export const onReleaseTriggerRenderer: TriggerRenderer = {
 
       props.lastEventData = {
         title: `${releaseName} (${assetCount} asset${assetCount !== 1 ? "s" : ""})`,
-        subtitle: eventData?.action || "",
+        subtitle: buildGithubSubtitle(eventData?.action || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id,
