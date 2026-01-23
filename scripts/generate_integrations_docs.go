@@ -29,6 +29,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/server"
 	"google.golang.org/protobuf/encoding/protojson"
 	yamlv3 "gopkg.in/yaml.v3"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	// Register integrations used by doc templates.
@@ -313,6 +314,10 @@ func generateCanvasScreenshot(templatePath string) (string, error) {
 		return "", err
 	}
 
+	if err := seedWebhookMetadata(workflowID); err != nil {
+		return "", err
+	}
+
 	if err := env.addAuthCookie(accountID); err != nil {
 		return "", err
 	}
@@ -467,7 +472,8 @@ func (e *screenshotEnv) openWorkflow(orgID uuid.UUID, workflowID uuid.UUID, wait
 
 	trimmed := strings.TrimSpace(waitText)
 	if trimmed != "" {
-		if err := e.page.Locator("text=" + trimmed).WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(10000)}); err != nil {
+		selector := nodeHeaderSelector(trimmed)
+		if err := e.page.Locator(selector).WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(10000)}); err != nil {
 			return err
 		}
 	}
@@ -597,6 +603,11 @@ func firstNodeName(workflow *pb.Workflow) string {
 	return workflow.Spec.Nodes[0].Name
 }
 
+func nodeHeaderSelector(nodeName string) string {
+	safe := slugify(nodeName)
+	return fmt.Sprintf("[data-testid=\"node-%s-header\"]", safe)
+}
+
 func seedUserAndOrganization() (uuid.UUID, uuid.UUID, uuid.UUID, error) {
 	email := "docs@screenshot.superplane.local"
 	name := "Docs Screenshot"
@@ -661,6 +672,18 @@ func ensureWorkflowNameAvailable(orgID uuid.UUID, workflow *pb.Workflow) error {
 	}
 
 	return existing.SoftDelete()
+}
+
+func seedWebhookMetadata(workflowID uuid.UUID) error {
+	webhookMetadata := map[string]any{
+		"url":            "https://hooks.superplane.example/webhook",
+		"authentication": "none",
+	}
+
+	return database.Conn().
+		Model(&models.WorkflowNode{}).
+		Where("workflow_id = ? AND node_id = ?", workflowID, "webhook-trigger").
+		Update("metadata", datatypes.NewJSONType(webhookMetadata)).Error
 }
 
 func setScreenshotEnv() {

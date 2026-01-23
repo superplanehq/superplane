@@ -5,10 +5,13 @@ metadata:
 spec:
   nodes:
     - id: "webhook-trigger"
-      name: "Incoming webhook"
+      name: "Webhook"
       type: "TYPE_TRIGGER"
-      configuration: {}
-      metadata: null
+      configuration:
+        authentication: "none"
+      metadata:
+        url: "https://hooks.superplane.example/webhook"
+        authentication: "none"
       position:
         x: -40
         "y": 320
@@ -20,21 +23,16 @@ spec:
       isCollapsed: false
       appInstallation: null
       errorMessage: ""
-    - id: "forward-request"
-      name: "Forward payload"
+    - id: "noop-confirmation"
+      name: "Received Webhook Payload"
       type: "TYPE_COMPONENT"
-      configuration:
-        method: "POST"
-        url: "https://rbaskets.in/b0a1w9p"
-        json:
-          eventId: "${{ event.id }}"
-          eventType: "${{ event.type }}"
+      configuration: {}
       metadata: null
       position:
         x: 420
         "y": 320
       component:
-        name: "http"
+        name: "noop"
       blueprint: null
       trigger: null
       widget: null
@@ -43,5 +41,5 @@ spec:
       errorMessage: ""
   edges:
     - sourceId: "webhook-trigger"
-      targetId: "forward-request"
+      targetId: "noop-confirmation"
       channel: "default"
