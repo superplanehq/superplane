@@ -8,6 +8,7 @@ import { ComponentBaseMapper, OutputPayload } from "../types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
+import { formatTimeAgo } from "@/utils/date";
 import { MetadataItem } from "@/ui/metadataList";
 
 interface SendTextMessageConfiguration {
@@ -64,6 +65,11 @@ export const sendTextMessageMapper: ComponentBaseMapper = {
       Content: stringOrDash(message?.content),
       Timestamp: stringOrDash(message?.timestamp),
     };
+  },
+
+  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+    if (!execution.createdAt) return "";
+    return formatTimeAgo(new Date(execution.createdAt));
   },
 };
 
