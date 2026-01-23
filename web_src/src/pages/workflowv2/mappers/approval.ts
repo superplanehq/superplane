@@ -488,15 +488,33 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
       });
     }
 
+    const approvalRecords = (executionMetadata?.records as ApprovalRecord[] | undefined) || [];
+    const hasApprovedAnyRecord = hasCurrentUserApprovedAnyRecord(approvalRecords, currentUserId, currentUserEmail);
+    const pendingUserRecordIndex = getPendingUserApprovalIndex(approvalRecords, currentUserId, currentUserEmail);
+    const interactiveApprovalIndex =
+      hasApprovedAnyRecord || execution?.state !== "STATE_STARTED"
+        ? undefined
+        : getInteractiveApprovalIndex(approvalRecords, {
+            currentUserId,
+            currentUserEmail,
+            currentUserRoles,
+            organizationId,
+            queryClient,
+          });
+
     // Map backend records to approval items
     const labelMaps = { rolesByName, groupsByName };
-    const approvals = ((executionMetadata?.records as ApprovalRecord[] | undefined) || []).map(
+    const approvals = approvalRecords.map(
       (record: ApprovalRecord) => {
         const isPending = record.state === "pending";
         const isExecutionActive = execution?.state === "STATE_STARTED";
+        const approveIndex =
+          record.type === "anyone" && pendingUserRecordIndex !== undefined ? pendingUserRecordIndex : record.index;
         const canAct =
+          !hasApprovedAnyRecord &&
           isPending &&
           isExecutionActive &&
+          record.index === interactiveApprovalIndex &&
           canCurrentUserActOnApproval(record, {
             currentUserId,
             currentUserEmail,
@@ -555,7 +573,7 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
                   },
                   body: {
                     parameters: {
-                      index: record.index,
+                      index: approveIndex,
                       comment: artifacts?.comment,
                     },
                   },
@@ -650,4 +668,86 @@ function canCurrentUserActOnApproval(
     default:
       return false;
   }
+}
+
+function hasCurrentUserApprovedAnyRecord(
+  records: ApprovalRecord[],
+  currentUserId?: string,
+  currentUserEmail?: string,
+): boolean {
+  if (!currentUserId && !currentUserEmail) return false;
+
+  return records.some(
+    (record) =>
+      record.state === "approved" &&
+      ((currentUserId && record.user?.id === currentUserId) ||
+        (currentUserEmail && record.user?.email === currentUserEmail)),
+  );
+}
+
+function getPendingUserApprovalIndex(
+  records: ApprovalRecord[],
+  currentUserId?: string,
+  currentUserEmail?: string,
+): number | undefined {
+  if (!currentUserId && !currentUserEmail) return undefined;
+
+  const match = records.find(
+    (record) =>
+      record.type === "user" &&
+      record.state === "pending" &&
+      ((currentUserId && record.user?.id === currentUserId) ||
+        (currentUserEmail && record.user?.email === currentUserEmail)),
+  );
+
+  return match?.index;
+}
+
+function getInteractiveApprovalIndex(
+  records: ApprovalRecord[],
+  {
+    currentUserId,
+    currentUserEmail,
+    currentUserRoles,
+    organizationId,
+    queryClient,
+  }: {
+    currentUserId?: string;
+    currentUserEmail?: string;
+    currentUserRoles: string[];
+    organizationId?: string;
+    queryClient: QueryClient;
+  },
+): number | undefined {
+  const pendingUserIndex = getPendingUserApprovalIndex(records, currentUserId, currentUserEmail);
+  if (pendingUserIndex !== undefined) {
+    const pendingUserRecord = records.find((record) => record.index === pendingUserIndex);
+    if (
+      pendingUserRecord &&
+      pendingUserRecord.state === "pending" &&
+      canCurrentUserActOnApproval(pendingUserRecord, {
+        currentUserId,
+        currentUserEmail,
+        currentUserRoles,
+        organizationId,
+        queryClient,
+      })
+    ) {
+      return pendingUserIndex;
+    }
+  }
+
+  const fallback = records.find(
+    (record) =>
+      record.state === "pending" &&
+      canCurrentUserActOnApproval(record, {
+        currentUserId,
+        currentUserEmail,
+        currentUserRoles,
+        organizationId,
+        queryClient,
+      }),
+  );
+
+  return fallback?.index;
 }
