@@ -16,6 +16,30 @@ import { getTriggerRenderer } from ".";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
 
+// Output channel names matching backend
+const CHANNEL_SUCCESS = "success";
+const CHANNEL_TIMEOUT = "timeout";
+const CHANNEL_FAIL = "fail";
+
+/**
+ * Output payload type
+ */
+interface OutputPayload {
+  type: string;
+  timestamp: string;
+  data: any;
+}
+
+/**
+ * Type for merge outputs with channel structure
+ */
+type MergeOutputs = {
+  success?: OutputPayload[];
+  timeout?: OutputPayload[];
+  fail?: OutputPayload[];
+  default?: OutputPayload[]; // For backwards compatibility
+};
+
 /**
  * Metadata structure for merge execution (from backend)
  */
@@ -31,6 +55,22 @@ interface MergeExecutionMetadata {
  */
 interface MergeAdditionalData {
   incomingSourcesCount?: number;
+}
+
+/**
+ * Determines which output channel has data, indicating the merge outcome.
+ * Returns the channel name or null if no output found.
+ */
+function getActiveChannel(execution: WorkflowsWorkflowNodeExecution): string | null {
+  const outputs = execution.outputs as MergeOutputs | undefined;
+  if (!outputs) return null;
+
+  if (outputs.success && outputs.success.length > 0) return CHANNEL_SUCCESS;
+  if (outputs.timeout && outputs.timeout.length > 0) return CHANNEL_TIMEOUT;
+  if (outputs.fail && outputs.fail.length > 0) return CHANNEL_FAIL;
+  if (outputs.default && outputs.default.length > 0) return "default";
+
+  return null;
 }
 
 export const MERGE_STATE_MAP: EventStateMap = {
@@ -83,19 +123,24 @@ export const mergeStateFunction: StateFunction = (execution: WorkflowsWorkflowNo
     return "waiting";
   }
 
-  // Check for timeout - timeout results in RESULT_FAILED with "timed out" message
-  if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED") {
-    if (execution.resultMessage?.toLowerCase().includes("timed out")) {
-      return "timeout";
-    }
+  // For finished executions, determine state from active output channel
+  if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
+    const activeChannel = getActiveChannel(execution);
 
-    // Failed state - stopIfExpression triggered or other error
-    return "failed";
+    if (activeChannel === CHANNEL_SUCCESS) return "success";
+    if (activeChannel === CHANNEL_TIMEOUT) return "timeout";
+    if (activeChannel === CHANNEL_FAIL) return "failed";
+
+    // Backwards compatibility for legacy executions using default channel
+    if (activeChannel === "default") return "success";
+
+    // No output found - default to success for finished/passed
+    return "success";
   }
 
-  // Success state - merge completed normally
-  if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
-    return "success";
+  // Handle error states (actual failures, not routed to fail channel)
+  if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED") {
+    return "failed";
   }
 
   return "neutral";

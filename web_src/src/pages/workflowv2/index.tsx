@@ -3199,6 +3199,7 @@ function prepareMergeNode(
       type: "merge",
       label: displayLabel,
       state: "pending" as const,
+      outputChannels: componentDef?.outputChannels?.map((channel) => channel.name!) || ["default"],
       merge: {
         title: displayLabel,
         lastEvent: lastEvent,

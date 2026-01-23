@@ -16,8 +16,15 @@ import (
 )
 
 // Merge is a component that passes its input downstream on
-// the default channel. The queue/worker layer is responsible
-// for aggregating inputs from multiple parents.
+// different channels based on execution outcome. The queue/worker
+// layer is responsible for aggregating inputs from multiple parents.
+
+// Output channel names for Merge component
+const (
+	ChannelNameSuccess = "success"
+	ChannelNameTimeout = "timeout"
+	ChannelNameFail    = "fail"
+)
 
 func init() {
 	registry.RegisterComponent("merge", &Merge{})
@@ -32,7 +39,11 @@ func (m *Merge) Icon() string        { return "arrow-right-from-line" }
 func (m *Merge) Color() string       { return "gray" }
 
 func (m *Merge) OutputChannels(configuration any) []core.OutputChannel {
-	return []core.OutputChannel{core.DefaultOutputChannel}
+	return []core.OutputChannel{
+		{Name: ChannelNameSuccess, Label: "Success", Description: "All inputs received successfully"},
+		{Name: ChannelNameTimeout, Label: "Timeout", Description: "Timed out waiting for inputs"},
+		{Name: ChannelNameFail, Label: "Fail", Description: "Stopped early by condition"},
+	}
 }
 
 type Spec struct {
@@ -83,16 +94,17 @@ func (m *Merge) Configuration() []configuration.Field {
 							Label:    "Timeout",
 							Type:     configuration.FieldTypeNumber,
 							Required: true,
+							Default:  2,
 						},
 						{
 							Name:     "unit",
 							Label:    "Unit",
 							Type:     configuration.FieldTypeSelect,
 							Required: true,
+							Default:  "minutes",
 							TypeOptions: &configuration.TypeOptions{
 								Select: &configuration.SelectTypeOptions{
 									Options: []configuration.FieldOption{
-										{Label: "Seconds", Value: "seconds"},
 										{Label: "Minutes", Value: "minutes"},
 										{Label: "Hours", Value: "hours"},
 									},
@@ -150,6 +162,15 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 		return nil, fmt.Errorf("error finding or creating execution: %v", err)
 	}
 
+	// If the execution is already finished (e.g., timed out or stopped early),
+	// dequeue the item but don't process it further
+	if executionCtx.ExecutionState.IsFinished() {
+		if err := ctx.DequeueItem(); err != nil {
+			return nil, fmt.Errorf("error dequeuing item: %v", err)
+		}
+		return nil, nil
+	}
+
 	if err := ctx.DequeueItem(); err != nil {
 		return nil, fmt.Errorf("error dequeuing item: %v", err)
 	}
@@ -177,9 +198,12 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 	}
 
 	//
-	// Evaluate stop expression if enabled and provided
+	// Evaluate stop expression if provided.
+	// The EnableStopIf toggle controls visibility in the UI - when disabled,
+	// the field is hidden and won't have a value. For backward compatibility,
+	// configs created before the toggle will still work if they have an expression.
 	//
-	if spec.EnableStopIf && spec.StopIfExpression != "" {
+	if spec.StopIfExpression != "" {
 		env, err := expressionEnv(ctx, spec.StopIfExpression)
 		if err != nil {
 			return nil, err
@@ -197,7 +221,7 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 
 		//
 		// If stopExpression is truthy,
-		// we mark metadata and fail immediately
+		// we mark metadata and emit to fail channel
 		//
 		if b, ok := out.(bool); ok && b {
 			md.StopEarly = true
@@ -206,13 +230,17 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 				return nil, err
 			}
 
-			return &executionCtx.ID, executionCtx.ExecutionState.Fail(models.WorkflowNodeExecutionResultReasonError, "Stopped by stopIfExpression")
+			return &executionCtx.ID, executionCtx.ExecutionState.Emit(
+				ChannelNameFail,
+				"merge.stopped",
+				[]any{md},
+			)
 		}
 	}
 
 	if len(md.Sources) >= incoming {
 		return &executionCtx.ID, executionCtx.ExecutionState.Emit(
-			core.DefaultOutputChannel.Name,
+			ChannelNameSuccess,
 			"merge.finished",
 			[]any{md},
 		)
@@ -418,7 +446,22 @@ func (m *Merge) HandleTimeout(ctx core.ActionContext) error {
 		return nil
 	}
 
-	return ctx.ExecutionState.Fail(models.WorkflowNodeExecutionResultReasonError, "Execution timed out waiting for other inputs")
+	// Get current metadata to include in the timeout output
+	md := &ExecutionMetadata{}
+	if err := mapstructure.Decode(ctx.Metadata.Get(), md); err != nil {
+		// If we can't decode metadata, emit with empty object
+		return ctx.ExecutionState.Emit(
+			ChannelNameTimeout,
+			"merge.timeout",
+			[]any{map[string]any{}},
+		)
+	}
+
+	return ctx.ExecutionState.Emit(
+		ChannelNameTimeout,
+		"merge.timeout",
+		[]any{md},
+	)
 }
 
 func (m *Merge) Execute(ctx core.ExecutionContext) error {
@@ -428,12 +471,14 @@ func (m *Merge) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	// Only schedule timeout if enabled
-	if spec.EnableTimeout {
-		interval := durationFrom(spec.ExecutionTimeout.Value, spec.ExecutionTimeout.Unit)
-		if interval > 0 {
-			return ctx.Requests.ScheduleActionCall("timeoutReached", map[string]any{}, interval)
-		}
+	// Schedule timeout if executionTimeout has valid values.
+	// The EnableTimeout toggle controls visibility in the UI - when disabled,
+	// the timeout fields are hidden and won't have values.
+	// For backward compatibility, configs created before the toggle was added
+	// will still work because they have timeout values configured.
+	interval := durationFrom(spec.ExecutionTimeout.Value, spec.ExecutionTimeout.Unit)
+	if interval > 0 {
+		return ctx.Requests.ScheduleActionCall("timeoutReached", map[string]any{}, interval)
 	}
 
 	return nil
