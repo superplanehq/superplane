@@ -36,10 +36,16 @@ func (m *Merge) OutputChannels(configuration any) []core.OutputChannel {
 }
 
 type Spec struct {
+	// EnableTimeout toggles the execution timeout feature
+	EnableTimeout bool `json:"enableTimeout" mapstructure:"enableTimeout"`
+
 	ExecutionTimeout struct {
 		Value int    `json:"value"`
 		Unit  string `json:"unit"`
 	} `json:"executionTimeout"`
+
+	// EnableStopIf toggles the conditional stop feature
+	EnableStopIf bool `json:"enableStopIf" mapstructure:"enableStopIf"`
 
 	// Optional expression to short-circuit waiting for all inputs.
 	// The expression is evaluated against the incoming event input using
@@ -51,10 +57,24 @@ type Spec struct {
 func (m *Merge) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:        "enableTimeout",
+			Label:       "Enable Timeout",
+			Type:        configuration.FieldTypeBool,
+			Description: "Cancel merge after a specified time if not all inputs are received.",
+			Required:    false,
+			Default:     false,
+		},
+		{
 			Name:     "executionTimeout",
 			Label:    "Execution Timeout",
 			Type:     configuration.FieldTypeObject,
 			Required: false,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "enableTimeout",
+					Values: []string{"true"},
+				},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				Object: &configuration.ObjectTypeOptions{
 					Schema: []configuration.Field{
@@ -84,12 +104,26 @@ func (m *Merge) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "enableStopIf",
+			Label:       "Enable Conditional Stop",
+			Type:        configuration.FieldTypeBool,
+			Description: "Stop waiting early when a condition is met.",
+			Required:    false,
+			Default:     false,
+		},
+		{
 			Name:        "stopIfExpression",
 			Label:       "Stop if",
 			Type:        configuration.FieldTypeExpression,
 			Description: "When true, stop waiting and finish immediately.",
 			Placeholder: "e.g. $.result == 'fail'",
 			Required:    false,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "enableStopIf",
+					Values: []string{"true"},
+				},
+			},
 		},
 	}
 }
@@ -143,9 +177,9 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 	}
 
 	//
-	// Evaluate stop expression if provided
+	// Evaluate stop expression if enabled and provided
 	//
-	if spec.StopIfExpression != "" {
+	if spec.EnableStopIf && spec.StopIfExpression != "" {
 		env, err := expressionEnv(ctx, spec.StopIfExpression)
 		if err != nil {
 			return nil, err
@@ -394,9 +428,12 @@ func (m *Merge) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	interval := durationFrom(spec.ExecutionTimeout.Value, spec.ExecutionTimeout.Unit)
-	if interval > 0 {
-		return ctx.Requests.ScheduleActionCall("timeoutReached", map[string]any{}, interval)
+	// Only schedule timeout if enabled
+	if spec.EnableTimeout {
+		interval := durationFrom(spec.ExecutionTimeout.Value, spec.ExecutionTimeout.Unit)
+		if interval > 0 {
+			return ctx.Requests.ScheduleActionCall("timeoutReached", map[string]any{}, interval)
+		}
 	}
 
 	return nil

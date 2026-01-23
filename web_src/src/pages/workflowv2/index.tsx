@@ -2784,6 +2784,7 @@ function prepareData(
   edges: CanvasEdge[];
 } {
   const edges = workflow?.spec?.edges?.map(prepareEdge) || [];
+  const workflowEdges = workflow?.spec?.edges || [];
   const nodes =
     workflow?.spec?.nodes
       ?.map((node) => {
@@ -2800,6 +2801,7 @@ function prepareData(
           queryClient,
           organizationId,
           currentUser,
+          workflowEdges,
         );
       })
       .map((node) => ({
@@ -2940,18 +2942,6 @@ function getRunItemState(execution: WorkflowsWorkflowNodeExecution): LastRunStat
   return "failed";
 }
 
-function executionToEventSectionState(execution: WorkflowsWorkflowNodeExecution): EventState {
-  if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
-    return "running";
-  }
-
-  if (execution.state == "STATE_FINISHED" && execution.result == "RESULT_PASSED") {
-    return "success";
-  }
-
-  return "failed";
-}
-
 function prepareNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
@@ -2965,6 +2955,7 @@ function prepareNode(
   queryClient: any,
   organizationId: string,
   currentUser?: { id?: string; email?: string },
+  edges?: ComponentsEdge[],
 ): CanvasNode {
   switch (node.type) {
     case "TYPE_TRIGGER":
@@ -3000,6 +2991,7 @@ function prepareNode(
         queryClient,
         organizationId,
         currentUser,
+        edges,
       );
   }
 }
@@ -3038,6 +3030,7 @@ function prepareComponentNode(
   queryClient: QueryClient,
   organizationId?: string,
   currentUser?: { id?: string; email?: string },
+  edges?: ComponentsEdge[],
 ): CanvasNode {
   // Detect placeholder nodes (no component reference, name is "New Component")
   const isPlaceholder = !node.component?.name && node.name === "New Component";
@@ -3075,7 +3068,7 @@ function prepareComponentNode(
   const componentName = componentNameParts[0];
 
   if (componentName == "merge") {
-    return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
+    return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap, edges);
   }
 
   return prepareComponentBaseNode(
@@ -3163,10 +3156,20 @@ function prepareMergeNode(
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
   nodeQueueItemsMap?: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
+  edges?: ComponentsEdge[],
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
-  const metadata = components.find((c) => c.name === "noop");
+  const componentDef = components.find((c) => c.name === "merge");
+
+  // Calculate incoming sources count from edges
+  const incomingSourcesCount = edges?.filter((edge) => edge.targetId === node.id).length || 0;
+  const additionalData = { incomingSourcesCount };
+
+  // Use the merge state function and mapper for consistent state handling
+  const mergeStateResolver = getState("merge");
+  const mergeStateMap = getStateMap("merge");
+  const mergeMapper = getComponentBaseMapper("merge");
 
   let lastEvent;
   if (execution) {
@@ -3175,15 +3178,19 @@ function prepareMergeNode(
 
     const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
 
+    // Get subtitle from the merge mapper with incoming sources count
+    const eventSubtitle = mergeMapper.subtitle(node, execution, additionalData);
+
     lastEvent = {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventState: executionToEventSectionState(execution),
+      eventSubtitle: eventSubtitle,
+      eventState: mergeStateResolver(execution),
       eventId: execution.rootEvent?.id,
     };
   }
 
-  const displayLabel = node.name || metadata?.label!;
+  const displayLabel = node.name || componentDef?.label || "Merge";
 
   return {
     id: node.id!,
@@ -3198,6 +3205,7 @@ function prepareMergeNode(
         nextInQueue: getNextInQueueInfo(nodeQueueItemsMap, node.id!, nodes),
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
+        eventStateMap: mergeStateMap,
       },
     },
   };
