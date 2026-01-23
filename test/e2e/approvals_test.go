@@ -37,6 +37,16 @@ func TestApprovals(t *testing.T) {
 		steps.approveFirstPendingRequirement()
 		steps.assertApprovalExecutionFinishedAndOutputNodeProcessed()
 	})
+
+	t.Run("preventing duplicate approvals across approver types", func(t *testing.T) {
+		steps := &ApprovalSteps{t: t}
+		steps.start()
+		steps.givenCanvasWithManualTriggerAnyoneAndUserApprovalAndNoop()
+		steps.runManualTrigger()
+		steps.approveAnyoneRequirement()
+		steps.waitForApprovalMetadata("Approval", 1, 1, "user")
+		steps.assertNoApproveButtons()
+	})
 }
 
 type ApprovalSteps struct {
@@ -100,6 +110,53 @@ func (s *ApprovalSteps) givenCanvasWithManualTriggerApprovalAndNoop() {
 	s.saveCanvas()
 }
 
+func (s *ApprovalSteps) givenCanvasWithManualTriggerAnyoneAndUserApprovalAndNoop() {
+	s.canvas = shared.NewCanvasSteps("Approval Canvas", s.t, s.session)
+	s.canvas.Create()
+	s.canvas.Visit()
+
+	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
+	s.addApprovalWithAnyAndSpecificUser("Approval", models.Position{X: 1000, Y: 200})
+	s.canvas.AddNoop("Output", models.Position{X: 1600, Y: 200})
+
+	s.canvas.Connect("Start", "Approval")
+	s.canvas.Connect("Approval", "Output")
+
+	s.saveCanvas()
+}
+
+func (s *ApprovalSteps) addApprovalWithAnyAndSpecificUser(nodeName string, pos models.Position) {
+	s.canvas.OpenBuildingBlocksSidebar()
+
+	source := q.TestID("building-block-approval")
+	target := q.TestID("rf__wrapper")
+
+	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.session.Sleep(300)
+
+	s.session.FillIn(q.TestID("node-name-input"), nodeName)
+	s.session.Click(q.Locator(`button:has-text("Add Approver")`))
+	s.session.Sleep(200)
+
+	typeSelects := s.session.Page().Locator(`[data-testid="field-type-select"]`)
+	s.session.Click(q.Locator(`[data-testid="field-type-select"]`))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("Any user")`))
+
+	if err := typeSelects.Nth(1).Click(); err != nil {
+		s.t.Fatalf("clicking second approver type select: %v", err)
+	}
+	s.session.Click(q.Locator(`div[role="option"]:has-text("Specific user")`))
+
+	userSelect := s.session.Page().Locator(`button:has-text("Select user")`).First()
+	if err := userSelect.Click(); err != nil {
+		s.t.Fatalf("opening user select: %v", err)
+	}
+	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
+
+	s.session.Click(q.TestID("save-node-button"))
+	s.session.Sleep(500)
+}
+
 func (s *ApprovalSteps) runManualTrigger() {
 	s.canvas.RunManualTrigger("Start")
 	s.canvas.WaitForExecution("Approval", models.WorkflowNodeExecutionStateStarted, 5*time.Second)
@@ -109,6 +166,77 @@ func (s *ApprovalSteps) approveFirstPendingRequirement() {
 	s.session.Click(q.Locator(`button:has-text("Approve")`))
 	s.session.FillIn(q.Locator(`input:has-placeholder("Enter comment")`), "Do it")
 	s.session.Click(q.Locator(`button:has-text("Confirm Approval")`))
+}
+
+func (s *ApprovalSteps) approveAnyoneRequirement() {
+	s.session.AssertVisible(q.Locator(`button:has-text("Approve")`))
+
+	item := s.session.Page().Locator(`[data-slot="item"]:has([data-slot="item-title"]:has-text("Any user"))`)
+	approveButton := item.Locator(`button:has-text("Approve")`).First()
+	count, err := approveButton.Count()
+	if err != nil {
+		s.t.Fatalf("counting approve buttons for any user: %v", err)
+	}
+	if count == 0 {
+		approveButton = s.session.Page().Locator(`button:has-text("Approve")`).First()
+	}
+	if err := approveButton.Click(); err != nil {
+		s.t.Fatalf("clicking approve button: %v", err)
+	}
+	s.session.FillIn(q.Locator(`input:has-placeholder("Enter comment")`), "Do it")
+	s.session.Click(q.Locator(`button:has-text("Confirm Approval")`))
+}
+
+func (s *ApprovalSteps) waitForApprovalMetadata(nodeName string, approvedCount int, pendingCount int, approvedType string) {
+	found := false
+	start := time.Now()
+
+	for time.Since(start) < 5*time.Second {
+		executions := s.canvas.GetExecutionsForNode(nodeName)
+		if len(executions) == 0 {
+			s.session.Sleep(500)
+			continue
+		}
+
+		metadata := executions[0].Metadata.Data()
+		rawRecords, ok := metadata["records"].([]any)
+		require.True(s.t, ok, "expected approval records metadata")
+
+		approved := 0
+		pending := 0
+		approvedTypeMatch := false
+		for _, rawRecord := range rawRecords {
+			record, ok := rawRecord.(map[string]any)
+			require.True(s.t, ok, "expected approval record metadata")
+			state, _ := record["state"].(string)
+			recordType, _ := record["type"].(string)
+			switch state {
+			case "approved":
+				approved++
+				if recordType == approvedType {
+					approvedTypeMatch = true
+				}
+			case "pending":
+				pending++
+			}
+		}
+
+		if approved == approvedCount && pending == pendingCount && approvedTypeMatch {
+			found = true
+			break
+		}
+
+		s.session.Sleep(500)
+	}
+
+	require.True(s.t, found, "timed out waiting for approval metadata to update")
+}
+
+func (s *ApprovalSteps) assertNoApproveButtons() {
+	approveButtons := s.session.Page().Locator(`button:has-text("Approve")`)
+	count, err := approveButtons.Count()
+	require.NoError(s.t, err)
+	require.Equal(s.t, 0, count, "expected no approve buttons for current user")
 }
 
 func (s *ApprovalSteps) assertApprovalExecutionFinishedAndOutputNodeProcessed() {

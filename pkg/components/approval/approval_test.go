@@ -107,6 +107,48 @@ func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
 	assert.Equal(t, ChannelRejected, stateCtx.Channel)
 }
 
+func TestApproval_HandleAction_RejectImmediatelyFinishes(t *testing.T) {
+	approval := &Approval{}
+
+	user1 := &core.User{ID: "test-user-1"}
+	user2 := &core.User{ID: "test-user-2"}
+	metadata := &Metadata{
+		Result: StatePending,
+		Records: []Record{
+			{Index: 0, State: StatePending, Type: ItemTypeUser, User: user1},
+			{Index: 1, State: StatePending, Type: ItemTypeUser, User: user2},
+		},
+	}
+
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{
+		Metadata: metadata,
+	}
+	authCtx := &contexts.AuthContext{
+		User: user1,
+	}
+
+	ctx := core.ActionContext{
+		Name: "reject",
+		Parameters: map[string]any{
+			"index":  float64(0),
+			"reason": "Nope",
+		},
+		Metadata:       metadataCtx,
+		ExecutionState: stateCtx,
+		Auth:           authCtx,
+	}
+
+	err := approval.HandleAction(ctx)
+
+	assert.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.True(t, stateCtx.Finished)
+	assert.Equal(t, ChannelRejected, stateCtx.Channel)
+	stored := metadataCtx.Metadata.(*Metadata)
+	assert.Equal(t, StateRejected, stored.Result)
+}
+
 // TODO: Add tests for role and group approval when RBAC is enabled
 func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
 	approval := &Approval{}
@@ -144,6 +186,125 @@ func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, stateCtx.Passed)
 	assert.False(t, stateCtx.Finished)
+}
+
+func TestApproval_HandleAction_ApproveOnceAcrossAllRequirements(t *testing.T) {
+	approval := &Approval{}
+
+	user := &core.User{ID: "test-user"}
+	metadata := &Metadata{
+		Result: StatePending,
+		Records: []Record{
+			{Index: 0, State: StatePending, Type: ItemTypeAnyone},
+			{Index: 1, State: StatePending, Type: ItemTypeUser, User: user},
+		},
+	}
+
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{
+		Metadata: metadata,
+	}
+	authCtx := &contexts.AuthContext{
+		User: user,
+	}
+
+	ctx := core.ActionContext{
+		Name: "approve",
+		Parameters: map[string]any{
+			"index": float64(0),
+		},
+		Metadata:       metadataCtx,
+		ExecutionState: stateCtx,
+		Auth:           authCtx,
+	}
+
+	err := approval.HandleAction(ctx)
+	require.NoError(t, err)
+
+	stored := metadataCtx.Metadata.(*Metadata)
+	assert.Equal(t, StateApproved, stored.Records[1].State)
+	assert.Equal(t, StatePending, stored.Records[0].State)
+
+	ctx.Parameters["index"] = float64(0)
+	err = approval.HandleAction(ctx)
+	assert.Error(t, err)
+}
+
+func TestApproval_HandleAction_ApproveAnyoneMarksSpecificUser(t *testing.T) {
+	approval := &Approval{}
+
+	user := &core.User{ID: "test-user"}
+	metadata := &Metadata{
+		Result: StatePending,
+		Records: []Record{
+			{Index: 0, State: StatePending, Type: ItemTypeAnyone},
+			{Index: 1, State: StatePending, Type: ItemTypeUser, User: user},
+		},
+	}
+
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{
+		Metadata: metadata,
+	}
+	authCtx := &contexts.AuthContext{
+		User: user,
+	}
+
+	ctx := core.ActionContext{
+		Name: "approve",
+		Parameters: map[string]any{
+			"index": float64(0),
+		},
+		Metadata:       metadataCtx,
+		ExecutionState: stateCtx,
+		Auth:           authCtx,
+	}
+
+	err := approval.HandleAction(ctx)
+	require.NoError(t, err)
+
+	stored := metadataCtx.Metadata.(*Metadata)
+	assert.Equal(t, StateApproved, stored.Records[1].State)
+	assert.Equal(t, user.ID, stored.Records[1].User.ID)
+	assert.Equal(t, StatePending, stored.Records[0].State)
+}
+
+func TestApproval_HandleAction_ApproveFallsBackToPendingRequirement(t *testing.T) {
+	approval := &Approval{}
+
+	user := &core.User{ID: "test-user"}
+	metadata := &Metadata{
+		Result: StatePending,
+		Records: []Record{
+			{Index: 0, State: StateApproved, Type: ItemTypeAnyone, User: &core.User{ID: "other-user"}},
+			{Index: 1, State: StatePending, Type: ItemTypeAnyone},
+		},
+	}
+
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{
+		Metadata: metadata,
+	}
+	authCtx := &contexts.AuthContext{
+		User: user,
+	}
+
+	ctx := core.ActionContext{
+		Name: "approve",
+		Parameters: map[string]any{
+			"index": float64(0),
+		},
+		Metadata:       metadataCtx,
+		ExecutionState: stateCtx,
+		Auth:           authCtx,
+	}
+
+	err := approval.HandleAction(ctx)
+	require.NoError(t, err)
+
+	stored := metadataCtx.Metadata.(*Metadata)
+	assert.Equal(t, StateApproved, stored.Records[1].State)
+	assert.Equal(t, user.ID, stored.Records[1].User.ID)
 }
 
 func TestMetadata_UpdateResult(t *testing.T) {

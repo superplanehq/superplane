@@ -79,7 +79,13 @@ if [ -z "$(find "${OIDC_KEYS_PATH}" -type f 2>/dev/null | head -n 1)" ]; then
     exit 1
   fi
   oidc_key_file="${OIDC_KEYS_PATH}/$(date -u +%s).pem"
-  openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out "${oidc_key_file}"
+  openssl_err_file="$(mktemp)"
+  if ! openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out "${oidc_key_file}" 2>"${openssl_err_file}"; then
+    cat "${openssl_err_file}"
+    rm -f "${openssl_err_file}"
+    exit 1
+  fi
+  rm -f "${openssl_err_file}"
   chmod 600 "${oidc_key_file}"
 fi
 
