@@ -2,7 +2,6 @@ package discord
 
 import (
 	"fmt"
-	"regexp"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -13,19 +12,15 @@ func init() {
 	registry.RegisterApplication("discord", &Discord{})
 }
 
-// webhookURLPattern matches Discord webhook URLs
-// Format: https://discord.com/api/webhooks/{webhook.id}/{webhook.token}
-// or: https://discordapp.com/api/webhooks/{webhook.id}/{webhook.token}
-var webhookURLPattern = regexp.MustCompile(`^https://(discord\.com|discordapp\.com)/api/webhooks/\d+/[\w-]+$`)
-
 type Discord struct{}
 
 type Configuration struct {
-	WebhookURL string `json:"webhookUrl" mapstructure:"webhookUrl"`
+	BotToken string `json:"botToken" mapstructure:"botToken"`
 }
 
 type Metadata struct {
-	WebhookID string `json:"webhookId" mapstructure:"webhookId"`
+	BotID    string `json:"botId" mapstructure:"botId"`
+	Username string `json:"username" mapstructure:"username"`
 }
 
 func (d *Discord) Name() string {
@@ -47,22 +42,26 @@ func (d *Discord) Description() string {
 func (d *Discord) InstallationInstructions() string {
 	return `To set up Discord integration:
 
-1. Open your Discord server settings
-2. Go to **Integrations** → **Webhooks**
-3. Click **New Webhook**
-4. Select the channel where messages should be sent
-5. Copy the **Webhook URL** and paste it below`
+1. Go to the **Discord Developer Portal** (https://discord.com/developers/applications)
+2. Click **New Application** and give it a name
+3. Go to the **Bot** section and click **Add Bot**
+4. Under **Token**, click **Reset Token** then **Copy** to copy the bot token
+5. Go to **OAuth2** → **URL Generator**:
+   - Under **Scopes**, select **bot**
+   - Under **Bot Permissions**, select: **View Channels**, **Send Messages**
+6. Copy the generated URL and open it to invite the bot to your server
+7. Paste the **Bot Token** below`
 }
 
 func (d *Discord) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "webhookUrl",
-			Label:       "Webhook URL",
+			Name:        "botToken",
+			Label:       "Bot Token",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Sensitive:   false,
-			Description: "Discord webhook URL (https://discord.com/api/webhooks/{id}/{token})",
+			Sensitive:   true,
+			Description: "Discord bot token from the Developer Portal",
 		},
 	}
 }
@@ -78,48 +77,39 @@ func (d *Discord) Triggers() []core.Trigger {
 }
 
 func (d *Discord) Sync(ctx core.SyncContext) error {
-	// Get the decrypted webhook URL using GetConfig (sensitive fields are encrypted)
-	webhookURLBytes, err := ctx.AppInstallation.GetConfig("webhookUrl")
+	// Get the decrypted bot token using GetConfig (sensitive fields are encrypted)
+	botTokenBytes, err := ctx.AppInstallation.GetConfig("botToken")
 	if err != nil {
-		return fmt.Errorf("webhookUrl is required")
+		return fmt.Errorf("botToken is required")
 	}
 
-	webhookURL := string(webhookURLBytes)
-	if webhookURL == "" {
-		return fmt.Errorf("webhookUrl is required")
+	botToken := string(botTokenBytes)
+	if botToken == "" {
+		return fmt.Errorf("botToken is required")
 	}
 
-	if !webhookURLPattern.MatchString(webhookURL) {
-		return fmt.Errorf("invalid webhook URL format. Expected: https://discord.com/api/webhooks/{id}/{token}")
-	}
-
-	// Parse webhook ID from URL for metadata
-	webhookID, err := parseWebhookID(webhookURL)
-	if err != nil {
-		return fmt.Errorf("failed to parse webhook URL: %v", err)
-	}
-
-	// Verify the webhook is valid by making a GET request
+	// Verify the bot token is valid by getting the current user
 	client, err := NewClient(ctx.AppInstallation)
 	if err != nil {
 		return err
 	}
 
-	webhookInfo, err := client.GetWebhook()
+	botUser, err := client.GetCurrentUser()
 	if err != nil {
-		return fmt.Errorf("failed to verify webhook: %v", err)
+		return fmt.Errorf("failed to verify bot token: %v", err)
 	}
 
 	ctx.AppInstallation.SetMetadata(Metadata{
-		WebhookID: webhookID,
+		BotID:    botUser.ID,
+		Username: botUser.Username,
 	})
 
-	ctx.AppInstallation.SetState("ready", fmt.Sprintf("Connected to channel: %s", webhookInfo.ChannelID))
+	ctx.AppInstallation.SetState("ready", fmt.Sprintf("Connected as: %s", botUser.Username))
 	return nil
 }
 
 func (d *Discord) HandleRequest(ctx core.HTTPRequestContext) {
-	// no-op: Discord webhook-based integration doesn't receive incoming requests
+	// no-op: Discord bot integration doesn't receive incoming HTTP requests
 }
 
 func (d *Discord) CompareWebhookConfig(a, b any) (bool, error) {
@@ -127,8 +117,62 @@ func (d *Discord) CompareWebhookConfig(a, b any) (bool, error) {
 }
 
 func (d *Discord) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.ApplicationResource, error) {
-	// No resources for webhook-based integration
-	return []core.ApplicationResource{}, nil
+	if resourceType != "channel" {
+		return []core.ApplicationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.AppInstallation)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Errorf("Discord: failed to create client: %v", err)
+		}
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	guilds, err := client.GetCurrentUserGuilds()
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Errorf("Discord: failed to get guilds: %v", err)
+		}
+		return nil, fmt.Errorf("failed to get guilds: %w", err)
+	}
+
+	if ctx.Logger != nil {
+		ctx.Logger.Infof("Discord: found %d guilds", len(guilds))
+	}
+
+	var resources []core.ApplicationResource
+	for _, guild := range guilds {
+		if ctx.Logger != nil {
+			ctx.Logger.Infof("Discord: fetching channels for guild %s (%s)", guild.ID, guild.Name)
+		}
+		channels, err := client.GetGuildChannels(guild.ID)
+		if err != nil {
+			if ctx.Logger != nil {
+				ctx.Logger.Warnf("Discord: failed to get channels for guild %s: %v", guild.ID, err)
+			}
+			continue // Skip guilds where we can't list channels
+		}
+
+		if ctx.Logger != nil {
+			ctx.Logger.Infof("Discord: found %d channels in guild %s", len(channels), guild.Name)
+		}
+		for _, channel := range channels {
+			// Only include text channels (type 0)
+			if channel.Type == 0 {
+				resources = append(resources, core.ApplicationResource{
+					Type: "channel",
+					ID:   channel.ID,
+					Name: fmt.Sprintf("#%s (%s)", channel.Name, guild.Name),
+				})
+			}
+		}
+	}
+
+	if ctx.Logger != nil {
+		ctx.Logger.Infof("Discord: returning %d channel resources", len(resources))
+	}
+	return resources, nil
 }
 
 func (d *Discord) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
@@ -137,14 +181,4 @@ func (d *Discord) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 
 func (d *Discord) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 	return nil
-}
-
-// parseWebhookID extracts the webhook ID from a Discord webhook URL
-func parseWebhookID(webhookURL string) (string, error) {
-	pattern := regexp.MustCompile(`/webhooks/(\d+)/`)
-	matches := pattern.FindStringSubmatch(webhookURL)
-	if len(matches) < 2 {
-		return "", fmt.Errorf("could not extract webhook ID from URL")
-	}
-	return matches[1], nil
 }

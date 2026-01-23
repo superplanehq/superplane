@@ -25,11 +25,23 @@ func Test__SendTextMessage__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "failed to decode configuration")
 	})
 
-	t.Run("no content or embed -> error", func(t *testing.T) {
+	t.Run("missing channel -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			AppInstallation: &contexts.AppInstallationContext{},
 			Metadata:        &contexts.MetadataContext{},
-			Configuration:   map[string]any{},
+			Configuration:   map[string]any{"content": "Hello"},
+		})
+
+		require.ErrorContains(t, err, "channel is required")
+	})
+
+	t.Run("no content or embed -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			AppInstallation: &contexts.AppInstallationContext{
+				Configuration: map[string]any{"botToken": "test-token"},
+			},
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"channel": "123456789"},
 		})
 
 		require.ErrorContains(t, err, "either content or embed")
@@ -37,9 +49,12 @@ func Test__SendTextMessage__Setup(t *testing.T) {
 
 	t.Run("invalid embed color -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{},
-			Metadata:        &contexts.MetadataContext{},
+			AppInstallation: &contexts.AppInstallationContext{
+				Configuration: map[string]any{"botToken": "test-token"},
+			},
+			Metadata: &contexts.MetadataContext{},
 			Configuration: map[string]any{
+				"channel":    "123456789",
 				"embedTitle": "Title",
 				"embedColor": "not-a-color",
 			},
@@ -48,28 +63,55 @@ func Test__SendTextMessage__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "invalid embed color")
 	})
 
-	t.Run("valid content -> stores metadata", func(t *testing.T) {
+	t.Run("valid content -> validates channel and stores metadata", func(t *testing.T) {
+		withDefaultTransport(t, func(req *http.Request) (*http.Response, error) {
+			assert.Contains(t, req.URL.String(), "/channels/123456789")
+			return jsonResponse(http.StatusOK, `{
+				"id": "123456789",
+				"name": "general",
+				"type": 0
+			}`), nil
+		})
+
 		metadata := &contexts.MetadataContext{}
 
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{},
-			Metadata:        metadata,
-			Configuration:   map[string]any{"content": "Hello, Discord!"},
+			AppInstallation: &contexts.AppInstallationContext{
+				Configuration: map[string]any{"botToken": "test-token"},
+			},
+			Metadata: metadata,
+			Configuration: map[string]any{
+				"channel": "123456789",
+				"content": "Hello, Discord!",
+			},
 		})
 
 		require.NoError(t, err)
 		stored, ok := metadata.Metadata.(SendTextMessageMetadata)
 		require.True(t, ok)
 		assert.False(t, stored.HasEmbed)
+		assert.Equal(t, "123456789", stored.Channel.ID)
+		assert.Equal(t, "general", stored.Channel.Name)
 	})
 
 	t.Run("valid embed -> stores metadata", func(t *testing.T) {
+		withDefaultTransport(t, func(req *http.Request) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, `{
+				"id": "123456789",
+				"name": "general",
+				"type": 0
+			}`), nil
+		})
+
 		metadata := &contexts.MetadataContext{}
 
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{},
-			Metadata:        metadata,
+			AppInstallation: &contexts.AppInstallationContext{
+				Configuration: map[string]any{"botToken": "test-token"},
+			},
+			Metadata: metadata,
 			Configuration: map[string]any{
+				"channel":          "123456789",
 				"embedTitle":       "My Embed",
 				"embedDescription": "A description",
 			},
@@ -87,13 +129,14 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 
 	t.Run("valid configuration -> sends message and emits", func(t *testing.T) {
 		withDefaultTransport(t, func(req *http.Request) (*http.Response, error) {
-			assert.Contains(t, req.URL.String(), "discord.com/api/webhooks")
+			assert.Contains(t, req.URL.String(), "/channels/123456789/messages")
 			assert.Equal(t, http.MethodPost, req.Method)
+			assert.Equal(t, "Bot test-bot-token", req.Header.Get("Authorization"))
 
 			body, err := io.ReadAll(req.Body)
 			require.NoError(t, err)
 
-			var payload ExecuteWebhookRequest
+			var payload CreateMessageRequest
 			require.NoError(t, json.Unmarshal(body, &payload))
 			assert.Equal(t, "Hello, Discord!", payload.Content)
 
@@ -101,22 +144,24 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 				"id": "1234567890",
 				"type": 0,
 				"content": "Hello, Discord!",
-				"channel_id": "111222333",
-				"author": {"id": "999888777", "username": "Webhook", "bot": true},
+				"channel_id": "123456789",
+				"author": {"id": "999888777", "username": "TestBot", "bot": true},
 				"timestamp": "2025-01-16T12:00:00.000Z"
 			}`), nil
 		})
 
-		webhookURL := "https://discord.com/api/webhooks/123456789/abc-token"
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		appCtx := &contexts.AppInstallationContext{
-			Configuration: map[string]any{"webhookUrl": webhookURL},
+			Configuration: map[string]any{"botToken": "test-bot-token"},
 		}
 
 		err := component.Execute(core.ExecutionContext{
 			AppInstallation: appCtx,
 			ExecutionState:  execState,
-			Configuration:   map[string]any{"content": "Hello, Discord!"},
+			Configuration: map[string]any{
+				"channel": "123456789",
+				"content": "Hello, Discord!",
+			},
 		})
 
 		require.NoError(t, err)
@@ -130,15 +175,76 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 		assert.Equal(t, "Hello, Discord!", data["content"])
 	})
 
-	t.Run("webhook failure -> error", func(t *testing.T) {
+	t.Run("message with embed -> sends correctly", func(t *testing.T) {
 		withDefaultTransport(t, func(req *http.Request) (*http.Response, error) {
-			return jsonResponse(http.StatusBadRequest, `{"message": "Invalid Webhook Token"}`), nil
+			body, err := io.ReadAll(req.Body)
+			require.NoError(t, err)
+
+			var payload CreateMessageRequest
+			require.NoError(t, json.Unmarshal(body, &payload))
+			assert.Equal(t, "Hello!", payload.Content)
+			require.Len(t, payload.Embeds, 1)
+			assert.Equal(t, "Test Title", payload.Embeds[0].Title)
+			assert.Equal(t, "Test Description", payload.Embeds[0].Description)
+			assert.Equal(t, 5793266, payload.Embeds[0].Color) // #5865F2
+
+			return jsonResponse(http.StatusOK, `{
+				"id": "1234567890",
+				"type": 0,
+				"content": "Hello!",
+				"channel_id": "123456789",
+				"author": {"id": "999888777", "username": "TestBot", "bot": true},
+				"timestamp": "2025-01-16T12:00:00.000Z"
+			}`), nil
 		})
 
-		webhookURL := "https://discord.com/api/webhooks/123456789/invalid-token"
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		appCtx := &contexts.AppInstallationContext{
-			Configuration: map[string]any{"webhookUrl": webhookURL},
+			Configuration: map[string]any{"botToken": "test-bot-token"},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			AppInstallation: appCtx,
+			ExecutionState:  execState,
+			Configuration: map[string]any{
+				"channel":          "123456789",
+				"content":          "Hello!",
+				"embedTitle":       "Test Title",
+				"embedDescription": "Test Description",
+				"embedColor":       "#5865F2",
+			},
+		})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("API failure -> error", func(t *testing.T) {
+		withDefaultTransport(t, func(req *http.Request) (*http.Response, error) {
+			return jsonResponse(http.StatusForbidden, `{"message": "Missing Access"}`), nil
+		})
+
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		appCtx := &contexts.AppInstallationContext{
+			Configuration: map[string]any{"botToken": "test-bot-token"},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			AppInstallation: appCtx,
+			ExecutionState:  execState,
+			Configuration: map[string]any{
+				"channel": "123456789",
+				"content": "Hello",
+			},
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to send message")
+	})
+
+	t.Run("missing channel -> error", func(t *testing.T) {
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		appCtx := &contexts.AppInstallationContext{
+			Configuration: map[string]any{"botToken": "test-bot-token"},
 		}
 
 		err := component.Execute(core.ExecutionContext{
@@ -148,6 +254,6 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 		})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to send message")
+		assert.Contains(t, err.Error(), "channel is required")
 	})
 }
