@@ -364,7 +364,7 @@ export function WorkflowPageV2() {
 
   /**
    * Debounced auto-save function for node position changes.
-   * Waits 1 second after the last position change before saving.
+   * Waits 100ms after the last position change before saving.
    * Only saves position changes, not structural modifications (deletions, additions, etc).
    * If there are unsaved structural changes, position auto-save is skipped.
    */
@@ -503,7 +503,7 @@ export function WorkflowPageV2() {
             });
           }
         }
-      }, 300),
+      }, 100),
     [
       organizationId,
       workflowId,
