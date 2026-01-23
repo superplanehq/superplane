@@ -24,6 +24,17 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/applications/semaphore"
 	_ "github.com/superplanehq/superplane/pkg/applications/slack"
 	_ "github.com/superplanehq/superplane/pkg/applications/smtp"
+	_ "github.com/superplanehq/superplane/pkg/components/approval"
+	_ "github.com/superplanehq/superplane/pkg/components/filter"
+	_ "github.com/superplanehq/superplane/pkg/components/http"
+	_ "github.com/superplanehq/superplane/pkg/components/if"
+	_ "github.com/superplanehq/superplane/pkg/components/merge"
+	_ "github.com/superplanehq/superplane/pkg/components/noop"
+	_ "github.com/superplanehq/superplane/pkg/components/timegate"
+	_ "github.com/superplanehq/superplane/pkg/components/wait"
+	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
+	_ "github.com/superplanehq/superplane/pkg/triggers/start"
+	_ "github.com/superplanehq/superplane/pkg/triggers/webhook"
 )
 
 const docsRoot = "docs/integrations"
@@ -35,6 +46,10 @@ func main() {
 	apps := reg.ListApplications()
 
 	if err := os.MkdirAll(docsRoot, 0o755); err != nil {
+		exitWithError(err)
+	}
+
+	if err := writeCoreComponentsDoc(reg.ListComponents(), reg.ListTriggers()); err != nil {
 		exitWithError(err)
 	}
 
@@ -57,6 +72,27 @@ func writeAppDocs(app core.Application) error {
 	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
 
 	return writeAppIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.mdx", appFilename(app))), app, components, triggers)
+}
+
+func writeCoreComponentsDoc(components []core.Component, triggers []core.Trigger) error {
+	if len(components) == 0 {
+		if len(triggers) == 0 {
+			return nil
+		}
+	}
+
+	sort.Slice(components, func(i, j int) bool { return components[i].Name() < components[j].Name() })
+	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
+
+	var buf bytes.Buffer
+	writeCoreFrontMatter(&buf)
+	writeOverviewSection(&buf, "Built-in SuperPlane components.")
+	writeCardGridComponents(&buf, components)
+	writeCardGridTriggers(&buf, triggers)
+	writeComponentSection(&buf, components)
+	writeTriggerSection(&buf, triggers)
+
+	return writeFile(filepath.Join(docsRoot, "Core.mdx"), buf.Bytes())
 }
 
 func writeAppIndex(
@@ -92,6 +128,15 @@ func writeAppFrontMatter(buf *bytes.Buffer, app core.Application) {
 	buf.WriteString(fmt.Sprintf("type: \"%s\"\n", escapeQuotes("application")))
 	buf.WriteString(fmt.Sprintf("name: \"%s\"\n", escapeQuotes(app.Name())))
 	buf.WriteString(fmt.Sprintf("label: \"%s\"\n", escapeQuotes(app.Label())))
+	buf.WriteString("---\n\n")
+}
+
+func writeCoreFrontMatter(buf *bytes.Buffer) {
+	buf.WriteString("---\n")
+	buf.WriteString(fmt.Sprintf("title: \"%s\"\n", escapeQuotes("Core")))
+	buf.WriteString("sidebar:\n")
+	buf.WriteString(fmt.Sprintf("  label: \"%s\"\n", escapeQuotes("Core")))
+	buf.WriteString(fmt.Sprintf("type: \"%s\"\n", escapeQuotes("core")))
 	buf.WriteString("---\n\n")
 }
 
