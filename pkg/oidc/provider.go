@@ -37,14 +37,19 @@ func NewProviderFromKeyDir(keysPath string) (Provider, error) {
 
 	var keys []keyEntry
 	for _, entry := range entries {
-		info, err := entry.Info()
-		if err != nil {
-			return nil, fmt.Errorf("stat key %s: %w", entry.Name(), err)
-		}
-		if !info.Mode().IsRegular() {
-			continue
-		}
 		keyPath := filepath.Join(keysPath, entry.Name())
+		if !entry.Type().IsRegular() {
+			if entry.Type()&os.ModeSymlink == 0 {
+				continue
+			}
+			info, err := os.Stat(keyPath)
+			if err != nil {
+				return nil, fmt.Errorf("stat key %s: %w", entry.Name(), err)
+			}
+			if !info.Mode().IsRegular() {
+				continue
+			}
+		}
 		privateKeyPEM, err := os.ReadFile(keyPath)
 		if err != nil {
 			return nil, fmt.Errorf("read key %s: %w", entry.Name(), err)
