@@ -7,12 +7,20 @@ name: "dash0"
 label: "Dash0"
 ---
 
+## Overview
+
 Connect to Dash0 to query data using Prometheus API
 
-### Components
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-- [List Issues](#list-issues)
-- [Query Prometheus](#query-prometheus)
+## Components
+
+<CardGrid>
+  <LinkCard title="List Issues" href="#list-issues" description="Query Dash0 to get a list of all current issues using the metric dash0.issue.status" />
+  <LinkCard title="Query Prometheus" href="#query-prometheus" description="Execute a PromQL query against Dash0 Prometheus API and return the response data" />
+</CardGrid>
+
+<a id="list-issues"></a>
 
 ## List Issues
 
@@ -59,6 +67,8 @@ Query Dash0 to get a list of all current issues using the metric dash0.issue.sta
   "type": "dash0.issues.list"
 }
 ```
+
+<a id="query-prometheus"></a>
 
 ## Query Prometheus
 

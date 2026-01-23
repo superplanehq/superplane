@@ -7,15 +7,25 @@ name: "semaphore"
 label: "Semaphore"
 ---
 
+## Overview
+
 Run and react to your Semaphore workflows
 
-### Components
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-- [Run Workflow](#run-workflow)
+## Components
 
-### Triggers
+<CardGrid>
+  <LinkCard title="Run Workflow" href="#run-workflow" description="Run Semaphore workflow" />
+</CardGrid>
 
-- [On Pipeline Done](#on-pipeline-done)
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Pipeline Done" href="#on-pipeline-done" description="Listen to Semaphore pipeline done events" />
+</CardGrid>
+
+<a id="run-workflow"></a>
 
 ## Run Workflow
 
@@ -54,6 +64,8 @@ Run Semaphore workflow
 }
 ```
 
+<a id="on-pipeline-done"></a>
+
 ## On Pipeline Done
 
 Listen to Semaphore pipeline done events
@@ -63,7 +75,7 @@ Listen to Semaphore pipeline done events
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
 | project | Project | app-installation-resource | yes | - |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
+| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
 
 ### Example Data
 

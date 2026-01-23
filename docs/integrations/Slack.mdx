@@ -7,20 +7,30 @@ name: "slack"
 label: "Slack"
 ---
 
+## Overview
+
 Send and react to Slack messages and interactions
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Components
+
+<CardGrid>
+  <LinkCard title="Send Text Message" href="#send-text-message" description="Send a text message to a Slack channel" />
+</CardGrid>
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On App Mention" href="#on-app-mention" description="Listen to messages mentioning the Slack App" />
+</CardGrid>
 
 ## Installation
 
 You can install the Slack app without the **Bot Token** and **Signing Secret**.
 After installation, follow the setup prompt to create the Slack app and add those values.
 
-### Components
-
-- [Send Text Message](#send-text-message)
-
-### Triggers
-
-- [On App Mention](#on-app-mention)
+<a id="send-text-message"></a>
 
 ## Send Text Message
 
@@ -48,6 +58,8 @@ Send a text message to a Slack channel
 }
 ```
 
+<a id="on-app-mention"></a>
+
 ## On App Mention
 
 Listen to messages mentioning the Slack App
@@ -57,7 +69,7 @@ Listen to messages mentioning the Slack App
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
 | channel | Channel | app-installation-resource | no | - |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
+| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
 
 ### Example Data
 

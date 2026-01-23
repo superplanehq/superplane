@@ -7,29 +7,39 @@ name: "github"
 label: "GitHub"
 ---
 
+## Overview
+
 Manage and react to changes in your GitHub repositories
 
-### Components
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-- [Create Issue](#create-issue)
-- [Create Release](#create-release)
-- [Delete Release](#delete-release)
-- [Get Issue](#get-issue)
-- [Publish Commit Status](#publish-commit-status)
-- [Run Workflow](#run-workflow)
-- [Update Issue](#update-issue)
-- [Update Release](#update-release)
+## Components
 
-### Triggers
+<CardGrid>
+  <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitHub repository" />
+  <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitHub repository" />
+  <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
+  <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
+  <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
+  <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
+  <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
+  <LinkCard title="Update Release" href="#update-release" description="Update an existing release in a GitHub repository" />
+</CardGrid>
 
-- [On Branch Created](#on-branch-created)
-- [On Issue](#on-issue)
-- [On Issue Comment](#on-issue-comment)
-- [On Pull Request](#on-pull-request)
-- [On PR Review Comment](#on-pr-review-comment)
-- [On Push](#on-push)
-- [On Release](#on-release)
-- [On Tag Created](#on-tag-created)
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Branch Created" href="#on-branch-created" description="Listen to GitHub branch creation events" />
+  <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events" />
+  <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to issue comment events" />
+  <LinkCard title="On Pull Request" href="#on-pull-request" description="Listen to pull request events" />
+  <LinkCard title="On PR Review Comment" href="#on-pr-review-comment" description="Listen to pull request review comment events" />
+  <LinkCard title="On Push" href="#on-push" description="Listen to GitHub push events" />
+  <LinkCard title="On Release" href="#on-release" description="Listen to release events" />
+  <LinkCard title="On Tag Created" href="#on-tag-created" description="Listen to GitHub tag creation events" />
+</CardGrid>
+
+<a id="create-issue"></a>
 
 ## Create Issue
 
@@ -63,6 +73,8 @@ Create a new issue in a GitHub repository
   "type": "github.issue"
 }
 ```
+
+<a id="create-release"></a>
 
 ## Create Release
 
@@ -98,6 +110,8 @@ Create a new release in a GitHub repository
 }
 ```
 
+<a id="delete-release"></a>
+
 ## Delete Release
 
 Delete a release from a GitHub repository
@@ -130,6 +144,8 @@ Delete a release from a GitHub repository
 }
 ```
 
+<a id="get-issue"></a>
+
 ## Get Issue
 
 Get a GitHub issue by number
@@ -160,6 +176,8 @@ Get a GitHub issue by number
   "type": "github.issue"
 }
 ```
+
+<a id="publish-commit-status"></a>
 
 ## Publish Commit Status
 
@@ -193,6 +211,8 @@ Publish a status check to a GitHub commit
 }
 ```
 
+<a id="run-workflow"></a>
+
 ## Run Workflow
 
 Run GitHub Actions workflow
@@ -222,6 +242,8 @@ Run GitHub Actions workflow
   "type": "github.workflow.finished"
 }
 ```
+
+<a id="update-issue"></a>
 
 ## Update Issue
 
@@ -255,6 +277,8 @@ Update a GitHub issue
   "type": "github.issue"
 }
 ```
+
+<a id="update-release"></a>
 
 ## Update Release
 
@@ -291,6 +315,8 @@ Update an existing release in a GitHub repository
 }
 ```
 
+<a id="on-branch-created"></a>
+
 ## On Branch Created
 
 Listen to GitHub branch creation events
@@ -301,7 +327,7 @@ Listen to GitHub branch creation events
 | --- | --- | --- | --- | --- |
 | repository | Repository | app-installation-resource | yes | - |
 | branches | Branches | any-predicate-list | yes | - |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
+| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
 
 ### Example Data
 
@@ -329,6 +355,8 @@ Listen to GitHub branch creation events
 }
 ```
 
+<a id="on-issue"></a>
+
 ## On Issue
 
 Listen to issue events
@@ -339,7 +367,7 @@ Listen to issue events
 | --- | --- | --- | --- | --- |
 | repository | Repository | app-installation-resource | yes | - |
 | actions | Actions | multi-select | yes | - |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
+| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
 
 ### Example Data
 
@@ -373,6 +401,8 @@ Listen to issue events
 }
 ```
 
+<a id="on-issue-comment"></a>
+
 ## On Issue Comment
 
 Listen to issue comment events
@@ -383,7 +413,7 @@ Listen to issue comment events
 | --- | --- | --- | --- | --- |
 | repository | Repository | app-installation-resource | yes | - |
 | contentFilter | Content Filter | string | no | Optional regex pattern to filter comments by content |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
+| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
 
 ### Example Data
 
@@ -417,6 +447,8 @@ Listen to issue comment events
 }
 ```
 
+<a id="on-pull-request"></a>
+
 ## On Pull Request
 
 Listen to pull request events
@@ -427,7 +459,7 @@ Listen to pull request events
 | --- | --- | --- | --- | --- |
 | repository | Repository | app-installation-resource | yes | - |
 | actions | Actions | multi-select | yes | - |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
+| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
 
 ### Example Data
 
@@ -462,6 +494,8 @@ Listen to pull request events
 }
 ```
 
+<a id="on-pr-review-comment"></a>
+
 ## On PR Review Comment
 
 Listen to pull request review comment events
@@ -472,7 +506,7 @@ Listen to pull request review comment events
 | --- | --- | --- | --- | --- |
 | repository | Repository | app-installation-resource | yes | - |
 | contentFilter | Content Filter | string | no | Optional regex pattern to filter comments by content |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
+| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
 
 ### Example Data
 
@@ -506,6 +540,8 @@ Listen to pull request review comment events
 }
 ```
 
+<a id="on-push"></a>
+
 ## On Push
 
 Listen to GitHub push events
@@ -516,7 +552,7 @@ Listen to GitHub push events
 | --- | --- | --- | --- | --- |
 | repository | Repository | app-installation-resource | yes | - |
 | refs | Refs | any-predicate-list | yes | - |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
+| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
 
 ### Example Data
 
@@ -745,6 +781,8 @@ Listen to GitHub push events
 }
 ```
 
+<a id="on-release"></a>
+
 ## On Release
 
 Listen to release events
@@ -755,7 +793,7 @@ Listen to release events
 | --- | --- | --- | --- | --- |
 | repository | Repository | app-installation-resource | yes | - |
 | actions | Actions | multi-select | yes | - |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
+| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
 
 ### Example Data
 
@@ -785,6 +823,8 @@ Listen to release events
 }
 ```
 
+<a id="on-tag-created"></a>
+
 ## On Tag Created
 
 Listen to GitHub tag creation events
@@ -795,7 +835,7 @@ Listen to GitHub tag creation events
 | --- | --- | --- | --- | --- |
 | repository | Repository | app-installation-resource | yes | - |
 | tags | Tags | any-predicate-list | yes | - |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
+| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
 
 ### Example Data
 

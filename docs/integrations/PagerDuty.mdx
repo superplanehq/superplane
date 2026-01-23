@@ -7,17 +7,27 @@ name: "pagerduty"
 label: "PagerDuty"
 ---
 
+## Overview
+
 Manage and react to incidents in PagerDuty
 
-### Components
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-- [Create Incident](#create-incident)
-- [Update Incident](#update-incident)
+## Components
 
-### Triggers
+<CardGrid>
+  <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in PagerDuty" />
+  <LinkCard title="Update Incident" href="#update-incident" description="Update an existing incident in PagerDuty" />
+</CardGrid>
 
-- [On Incident](#on-incident)
-- [On Incident Status Update](#on-incident-status-update)
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Incident" href="#on-incident" description="Listen to incident events" />
+  <LinkCard title="On Incident Status Update" href="#on-incident-status-update" description="Listen to incident status update events" />
+</CardGrid>
+
+<a id="create-incident"></a>
 
 ## Create Incident
 
@@ -118,6 +128,8 @@ Create a new incident in PagerDuty
   "type": "pagerduty.incident"
 }
 ```
+
+<a id="update-incident"></a>
 
 ## Update Incident
 
@@ -223,6 +235,8 @@ Update an existing incident in PagerDuty
 }
 ```
 
+<a id="on-incident"></a>
+
 ## On Incident
 
 Listen to incident events
@@ -234,7 +248,7 @@ Listen to incident events
 | events | Events | multi-select | yes | - |
 | service | Service | app-installation-resource | yes | The PagerDuty service to monitor for incidents |
 | urgencies | Urgencies | multi-select | no | Filter incidents by urgency |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
+| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
 
 ### Example Data
 
@@ -311,6 +325,8 @@ Listen to incident events
 }
 ```
 
+<a id="on-incident-status-update"></a>
+
 ## On Incident Status Update
 
 Listen to incident status update events
@@ -320,7 +336,7 @@ Listen to incident status update events
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
 | service | Service | app-installation-resource | yes | The PagerDuty service to monitor for incident status updates |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like {{ $.data }}. |
+| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
 
 ### Example Data
 

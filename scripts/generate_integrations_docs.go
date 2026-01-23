@@ -56,7 +56,7 @@ func writeAppDocs(app core.Application) error {
 	sort.Slice(components, func(i, j int) bool { return components[i].Name() < components[j].Name() })
 	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
 
-	return writeAppIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.md", appFilename(app))), app, components, triggers)
+	return writeAppIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.mdx", appFilename(app))), app, components, triggers)
 }
 
 func writeAppIndex(
@@ -68,7 +68,9 @@ func writeAppIndex(
 	var buf bytes.Buffer
 	writeAppFrontMatter(&buf, app)
 
-	writeParagraph(&buf, app.Description())
+	writeOverviewSection(&buf, app.Description())
+	writeCardGridComponents(&buf, components)
+	writeCardGridTriggers(&buf, triggers)
 
 	if instructions := strings.TrimSpace(app.InstallationInstructions()); instructions != "" {
 		buf.WriteString("## Installation\n\n")
@@ -76,7 +78,6 @@ func writeAppIndex(
 		buf.WriteString("\n\n")
 	}
 
-	writeOverviewSection(&buf, components, triggers)
 	writeComponentSection(&buf, components)
 	writeTriggerSection(&buf, triggers)
 
@@ -100,6 +101,7 @@ func writeComponentSection(buf *bytes.Buffer, components []core.Component) {
 	}
 
 	for _, component := range components {
+		buf.WriteString(fmt.Sprintf("<a id=\"%s\"></a>\n\n", slugify(component.Label())))
 		buf.WriteString(fmt.Sprintf("## %s\n\n", component.Label()))
 		writeParagraph(buf, component.Description())
 		writeConfigurationSection(buf, component.Configuration())
@@ -113,6 +115,7 @@ func writeTriggerSection(buf *bytes.Buffer, triggers []core.Trigger) {
 	}
 
 	for _, trigger := range triggers {
+		buf.WriteString(fmt.Sprintf("<a id=\"%s\"></a>\n\n", slugify(trigger.Label())))
 		buf.WriteString(fmt.Sprintf("## %s\n\n", trigger.Label()))
 		writeParagraph(buf, trigger.Description())
 		config := actions.AppendGlobalTriggerFields(trigger.Configuration())
@@ -121,22 +124,41 @@ func writeTriggerSection(buf *bytes.Buffer, triggers []core.Trigger) {
 	}
 }
 
-func writeOverviewSection(buf *bytes.Buffer, components []core.Component, triggers []core.Trigger) {
-	if len(components) > 0 {
-		buf.WriteString("### Components\n\n")
-		for _, component := range components {
-			buf.WriteString(fmt.Sprintf("- [%s](#%s)\n", component.Label(), slugify(component.Label())))
-		}
-		buf.WriteString("\n")
+func writeCardGridComponents(buf *bytes.Buffer, components []core.Component) {
+	if len(components) == 0 {
+		return
 	}
 
-	if len(triggers) > 0 {
-		buf.WriteString("### Triggers\n\n")
-		for _, trigger := range triggers {
-			buf.WriteString(fmt.Sprintf("- [%s](#%s)\n", trigger.Label(), slugify(trigger.Label())))
-		}
-		buf.WriteString("\n")
+	buf.WriteString("import { CardGrid, LinkCard } from \"@astrojs/starlight/components\";\n\n")
+	buf.WriteString("## Components\n\n")
+	buf.WriteString("<CardGrid>\n")
+	for _, component := range components {
+		description := strings.TrimSpace(component.Description())
+		buf.WriteString(fmt.Sprintf("  <LinkCard title=\"%s\" href=\"#%s\" description=\"%s\" />\n",
+			escapeQuotes(component.Label()),
+			slugify(component.Label()),
+			escapeQuotes(description),
+		))
 	}
+	buf.WriteString("</CardGrid>\n\n")
+}
+
+func writeCardGridTriggers(buf *bytes.Buffer, triggers []core.Trigger) {
+	if len(triggers) == 0 {
+		return
+	}
+
+	buf.WriteString("## Triggers\n\n")
+	buf.WriteString("<CardGrid>\n")
+	for _, trigger := range triggers {
+		description := strings.TrimSpace(trigger.Description())
+		buf.WriteString(fmt.Sprintf("  <LinkCard title=\"%s\" href=\"#%s\" description=\"%s\" />\n",
+			escapeQuotes(trigger.Label()),
+			slugify(trigger.Label()),
+			escapeQuotes(description),
+		))
+	}
+	buf.WriteString("</CardGrid>\n\n")
 }
 
 func writeParagraph(buf *bytes.Buffer, text string) {
@@ -144,6 +166,16 @@ func writeParagraph(buf *bytes.Buffer, text string) {
 	if trimmed == "" {
 		return
 	}
+	buf.WriteString(trimmed)
+	buf.WriteString("\n\n")
+}
+
+func writeOverviewSection(buf *bytes.Buffer, description string) {
+	trimmed := strings.TrimSpace(description)
+	if trimmed == "" {
+		return
+	}
+	buf.WriteString("## Overview\n\n")
 	buf.WriteString(trimmed)
 	buf.WriteString("\n\n")
 }
@@ -234,6 +266,8 @@ func formatTableValue(value string) string {
 		return "-"
 	}
 	escaped := strings.ReplaceAll(trimmed, "|", "\\|")
+	escaped = strings.ReplaceAll(escaped, "{", "&#123;")
+	escaped = strings.ReplaceAll(escaped, "}", "&#125;")
 	return escaped
 }
 
