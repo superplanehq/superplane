@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -14,8 +15,8 @@ import (
 type SendTextMessage struct{}
 
 type SendTextMessageConfiguration struct {
+	Channel          string `json:"channel" mapstructure:"channel"`
 	Content          string `json:"content" mapstructure:"content"`
-	Username         string `json:"username" mapstructure:"username"`
 	EmbedTitle       string `json:"embedTitle" mapstructure:"embedTitle"`
 	EmbedDescription string `json:"embedDescription" mapstructure:"embedDescription"`
 	EmbedColor       string `json:"embedColor" mapstructure:"embedColor"`
@@ -23,7 +24,13 @@ type SendTextMessageConfiguration struct {
 }
 
 type SendTextMessageMetadata struct {
-	HasEmbed bool `json:"hasEmbed" mapstructure:"hasEmbed"`
+	HasEmbed bool             `json:"hasEmbed" mapstructure:"hasEmbed"`
+	Channel  *ChannelMetadata `json:"channel" mapstructure:"channel"`
+}
+
+type ChannelMetadata struct {
+	ID   string `json:"id" mapstructure:"id"`
+	Name string `json:"name" mapstructure:"name"`
 }
 
 func (c *SendTextMessage) Name() string {
@@ -35,7 +42,7 @@ func (c *SendTextMessage) Label() string {
 }
 
 func (c *SendTextMessage) Description() string {
-	return "Send a text message to a Discord channel via webhook"
+	return "Send a text message to a Discord channel"
 }
 
 func (c *SendTextMessage) Icon() string {
@@ -53,18 +60,23 @@ func (c *SendTextMessage) OutputChannels(configuration any) []core.OutputChannel
 func (c *SendTextMessage) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:     "channel",
+			Label:    "Channel",
+			Type:     configuration.FieldTypeAppInstallationResource,
+			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "channel",
+				},
+			},
+			Description: "Discord channel to send the message to",
+		},
+		{
 			Name:        "content",
 			Label:       "Content",
 			Type:        configuration.FieldTypeText,
 			Required:    false,
 			Description: "Plain text message content (max 2000 characters)",
-		},
-		{
-			Name:        "username",
-			Label:       "Username Override",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Override the webhook's default username",
 		},
 		{
 			Name:        "embedTitle",
@@ -103,6 +115,10 @@ func (c *SendTextMessage) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	if config.Channel == "" {
+		return errors.New("channel is required")
+	}
+
 	// At least content or embed must be provided
 	hasContent := config.Content != ""
 	hasEmbed := config.EmbedTitle != "" || config.EmbedDescription != ""
@@ -123,8 +139,23 @@ func (c *SendTextMessage) Setup(ctx core.SetupContext) error {
 		}
 	}
 
+	// Get channel info to store in metadata
+	client, err := NewClient(ctx.AppInstallation)
+	if err != nil {
+		return fmt.Errorf("failed to create Discord client: %w", err)
+	}
+
+	channelInfo, err := client.GetChannel(config.Channel)
+	if err != nil {
+		return fmt.Errorf("channel validation failed: %w", err)
+	}
+
 	metadata := SendTextMessageMetadata{
 		HasEmbed: hasEmbed,
+		Channel: &ChannelMetadata{
+			ID:   channelInfo.ID,
+			Name: channelInfo.Name,
+		},
 	}
 
 	return ctx.Metadata.Set(metadata)
@@ -140,15 +171,18 @@ func (c *SendTextMessage) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	if config.Channel == "" {
+		return errors.New("channel is required")
+	}
+
 	client, err := NewClient(ctx.AppInstallation)
 	if err != nil {
 		return fmt.Errorf("failed to create Discord client: %w", err)
 	}
 
-	// Build the webhook request
-	req := ExecuteWebhookRequest{
-		Content:  config.Content,
-		Username: config.Username,
+	// Build the message request
+	req := CreateMessageRequest{
+		Content: config.Content,
 	}
 
 	// Add embed if title or description is provided
@@ -169,7 +203,7 @@ func (c *SendTextMessage) Execute(ctx core.ExecutionContext) error {
 		req.Embeds = []Embed{embed}
 	}
 
-	response, err := client.ExecuteWebhook(req)
+	response, err := client.CreateMessage(config.Channel, req)
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
 	}
