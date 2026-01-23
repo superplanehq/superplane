@@ -52,21 +52,26 @@ else
 fi
 
 echo ""
-default_oidc_keys_path="/app/data/oidc-keys"
-read -rp "4) Path to OIDC keys directory [${default_oidc_keys_path}]: " OIDC_KEYS_PATH_INPUT
-OIDC_KEYS_PATH="${OIDC_KEYS_PATH_INPUT:-$default_oidc_keys_path}"
+OIDC_KEYS_HOST_PATH="${PWD}/oidc"
+OIDC_KEYS_CONTAINER_PATH="/app/oidc-keys"
 
-mkdir -p "${OIDC_KEYS_PATH}"
+mkdir -p "${OIDC_KEYS_HOST_PATH}"
 
-if [[ -z "$(find "${OIDC_KEYS_PATH}" -type f 2>/dev/null | head -n 1)" ]]; then
+if [[ -z "$(find "${OIDC_KEYS_HOST_PATH}" -type f 2>/dev/null | head -n 1)" ]]; then
   if ! command -v openssl >/dev/null 2>&1; then
     echo "openssl is required to generate OIDC keys."
     exit 1
   fi
 
-  oidc_key_file="${OIDC_KEYS_PATH}/$(date -u +%s).pem"
-  openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out "${oidc_key_file}"
-  chmod 600 "${oidc_key_file}"
+  oidc_key_file="${OIDC_KEYS_HOST_PATH}/$(date -u +%s).pem"
+  openssl_err_file="$(mktemp)"
+  if ! openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out "${oidc_key_file}" 2>"${openssl_err_file}"; then
+    cat "${openssl_err_file}"
+    rm -f "${openssl_err_file}"
+    exit 1
+  fi
+  rm -f "${openssl_err_file}"
+  chmod 644 "${oidc_key_file}"
 fi
 
 echo ""
@@ -100,7 +105,7 @@ TEMPLATE_DIR=/app/templates
 
 ENCRYPTION_KEY=${ENCRYPTION_KEY}
 JWT_SECRET=${JWT_SECRET}
-OIDC_KEYS_PATH=${OIDC_KEYS_PATH}
+OIDC_KEYS_PATH=${OIDC_KEYS_CONTAINER_PATH}
 SESSION_SECRET=${SESSION_SECRET}
 NO_ENCRYPTION=no
 
@@ -151,6 +156,8 @@ echo "Configuration written to ${ENV_FILE}."
 echo ""
 
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]:-$0}")"
+export OIDC_KEYS_HOST_PATH
+export OIDC_KEYS_CONTAINER_PATH
 
 echo "Pulling Docker images (this may take a while)..."
 docker compose -f "${SCRIPT_DIR}/docker-compose.yml" pull --quiet
