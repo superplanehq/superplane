@@ -1,4 +1,3 @@
-import { splitBySpaces } from "@/lib/utils";
 import { ComponentBaseSpecValue } from "../ui/componentBase";
 
 const operators = new Set([
@@ -41,7 +40,7 @@ export const parseExpression = (expression: string): ComponentBaseSpecValue[] =>
   if (!expression) return [];
 
   const result: ComponentBaseSpecValue[] = [];
-  const splittedExpression = splitBySpaces(expression);
+  const splittedExpression = splitExpressionBySpaces(expression);
   let current: ComponentBaseSpecValue = {
     badges: [],
   };
@@ -67,22 +66,70 @@ export const parseExpression = (expression: string): ComponentBaseSpecValue[] =>
   return result;
 };
 
-/**
- * Safely gets a nested value from an object using a path string like "field.subfield"
- */
-function getNestedValue(data: any, path: string): any {
-  if (!data || !path) return undefined;
+const splitExpressionBySpaces = (input: string): string[] => {
+  const parts: string[] = [];
+  let current = "";
+  let inSingle = false;
+  let inDouble = false;
+  let parenDepth = 0;
+  let bracketDepth = 0;
 
-  const parts = path.split(".");
+  const isEscaped = (idx: number) => {
+    let backslashes = 0;
+    for (let i = idx - 1; i >= 0 && input[i] === "\\"; i--) {
+      backslashes++;
+    }
+    return backslashes % 2 === 1;
+  };
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+
+    if (!inDouble && ch === "'" && !isEscaped(i)) {
+      inSingle = !inSingle;
+      current += ch;
+      continue;
+    }
+    if (!inSingle && ch === '"' && !isEscaped(i)) {
+      inDouble = !inDouble;
+      current += ch;
+      continue;
+    }
+
+    if (!inSingle && !inDouble) {
+      if (ch === "(") parenDepth++;
+      if (ch === ")") parenDepth = Math.max(0, parenDepth - 1);
+      if (ch === "[") bracketDepth++;
+      if (ch === "]") bracketDepth = Math.max(0, bracketDepth - 1);
+    }
+
+    if (!inSingle && !inDouble && parenDepth === 0 && bracketDepth === 0 && /\s/.test(ch)) {
+      if (current) {
+        parts.push(current);
+        current = "";
+      }
+      continue;
+    }
+
+    current += ch;
+  }
+
+  if (current) {
+    parts.push(current);
+  }
+
+  return parts;
+};
+
+function getNestedValueByTokens(data: any, tokens: Array<string | number>): any {
+  if (!data) return undefined;
   let current = data;
-
-  for (const part of parts) {
+  for (const token of tokens) {
     if (current == null || typeof current !== "object") {
       return undefined;
     }
-    current = current[part];
+    current = (current as any)[token];
   }
-
   return current;
 }
 
@@ -131,14 +178,111 @@ export function substituteExpressionValues(expression: string, data: any): strin
     return expression || "";
   }
 
-  // Match patterns like $.field or $.field.subfield
-  // This regex matches $ followed by a dot and then one or more word characters or dots
-  const pattern = /\$\.([a-zA-Z_][a-zA-Z0-9_.]*)/g;
+  const isEscaped = (input: string, index: number) => {
+    let backslashes = 0;
+    for (let i = index - 1; i >= 0 && input[i] === "\\"; i--) {
+      backslashes++;
+    }
+    return backslashes % 2 === 1;
+  };
 
-  return expression.replace(pattern, (_match, path) => {
-    const value = getNestedValue(data, path);
-    return formatValueForExpression(value);
-  });
+  const parseExpressionReference = (input: string, startIndex: number) => {
+    if (input[startIndex] !== "$") return null;
+
+    let i = startIndex + 1;
+    const tokens: Array<string | number> = [];
+
+    while (i < input.length) {
+      const ch = input[i];
+      if (ch === ".") {
+        i++;
+        const identMatch = input.slice(i).match(/^[$A-Za-z_][$A-Za-z0-9_]*/);
+        if (!identMatch) break;
+        tokens.push(identMatch[0]);
+        i += identMatch[0].length;
+        continue;
+      }
+
+      if (ch === "[") {
+        i++;
+        while (i < input.length && /\s/.test(input[i])) i++;
+        if (i >= input.length) break;
+
+        const quote = input[i] === "'" || input[i] === '"' ? input[i] : null;
+        if (quote) {
+          i++;
+          let value = "";
+          while (i < input.length && (input[i] !== quote || isEscaped(input, i))) {
+            value += input[i];
+            i++;
+          }
+          if (input[i] !== quote) break;
+          i++;
+          while (i < input.length && /\s/.test(input[i])) i++;
+          if (input[i] !== "]") break;
+          i++;
+          tokens.push(value.replace(/\\(["'\\])/g, "$1"));
+          continue;
+        }
+
+        const numberMatch = input.slice(i).match(/^\d+/);
+        if (numberMatch) {
+          i += numberMatch[0].length;
+          while (i < input.length && /\s/.test(input[i])) i++;
+          if (input[i] !== "]") break;
+          i++;
+          tokens.push(Number(numberMatch[0]));
+          continue;
+        }
+
+        break;
+      }
+
+      break;
+    }
+
+    return { endIndex: i, tokens };
+  };
+
+  let out = "";
+  let inSingle = false;
+  let inDouble = false;
+
+  for (let i = 0; i < expression.length; i++) {
+    const ch = expression[i];
+    if (!inDouble && ch === "'" && !isEscaped(expression, i)) {
+      inSingle = !inSingle;
+      out += ch;
+      continue;
+    }
+    if (!inSingle && ch === '"' && !isEscaped(expression, i)) {
+      inDouble = !inDouble;
+      out += ch;
+      continue;
+    }
+
+    if (!inSingle && !inDouble && ch === "$" && !isEscaped(expression, i)) {
+      const parsed = parseExpressionReference(expression, i);
+      if (parsed) {
+        let value = parsed.tokens.length === 0 ? data : getNestedValueByTokens(data, parsed.tokens);
+        if (
+          value === undefined &&
+          parsed.tokens.length > 1 &&
+          typeof parsed.tokens[0] === "string" &&
+          !Object.prototype.hasOwnProperty.call(data, parsed.tokens[0])
+        ) {
+          value = getNestedValueByTokens(data, parsed.tokens.slice(1));
+        }
+        out += formatValueForExpression(value);
+        i = parsed.endIndex - 1;
+        continue;
+      }
+    }
+
+    out += ch;
+  }
+
+  return out;
 }
 
 /**
