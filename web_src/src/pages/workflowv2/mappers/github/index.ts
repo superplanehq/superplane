@@ -1,4 +1,4 @@
-import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
+import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
 import { onPushTriggerRenderer } from "./on_push";
 import { onPullRequestTriggerRenderer } from "./on_pull_request";
 import { onIssueTriggerRenderer } from "./on_issue";
@@ -9,7 +9,7 @@ import { onBranchCreatedTriggerRenderer } from "./on_branch_created";
 import { onPullRequestReviewCommentTriggerRenderer } from "./on_pr_review_comment";
 import { onWorkflowRunTriggerRenderer } from "./on_workflow_run";
 import { baseIssueMapper } from "./base";
-import { RUN_WORKFLOW_STATE_REGISTRY, runWorkflowMapper } from "./run_workflow";
+import { RUN_WORKFLOW_STATE_REGISTRY, runWorkflowMapper, runWorkflowCustomFieldRenderer } from "./run_workflow";
 import { publishCommitStatusMapper } from "./publish_commit_status";
 import { createReleaseMapper } from "./create_release";
 import { updateReleaseMapper } from "./update_release";
@@ -48,4 +48,8 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
   onTagCreated: onTagCreatedTriggerRenderer,
   onBranchCreated: onBranchCreatedTriggerRenderer,
   onWorkflowRun: onWorkflowRunTriggerRenderer,
+};
+
+export const customFieldRenderers: Record<string, CustomFieldRenderer> = {
+  runWorkflow: runWorkflowCustomFieldRenderer,
 };

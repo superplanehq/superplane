@@ -21,6 +21,7 @@ import {
   componentMappers as githubComponentMappers,
   triggerRenderers as githubTriggerRenderers,
   eventStateRegistry as githubEventStateRegistry,
+  customFieldRenderers as githubCustomFieldRenderers,
 } from "./github/index";
 import {
   componentMappers as pagerdutyComponentMappers,
@@ -113,6 +114,10 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
   webhook: webhookCustomFieldRenderer,
 };
 
+const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
+  github: githubCustomFieldRenderers,
+};
+
 /**
  * Get the appropriate renderer for a trigger type.
  * Falls back to the default renderer if no specific renderer is registered.
@@ -202,7 +207,19 @@ export function getState(componentName: string) {
  * Returns undefined if no specific renderer is registered.
  */
 export function getCustomFieldRenderer(componentName: string): CustomFieldRenderer | undefined {
-  return customFieldRenderers[componentName];
+  const parts = componentName?.split(".");
+  if (parts?.length === 1) {
+    return customFieldRenderers[componentName];
+  }
+
+  const appName = parts[0];
+  const appRenderers = appCustomFieldRenderers[appName];
+  if (!appRenderers) {
+    return undefined;
+  }
+
+  const name = parts[1];
+  return appRenderers[name];
 }
 
 /**
