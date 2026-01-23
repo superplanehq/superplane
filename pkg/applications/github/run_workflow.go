@@ -98,17 +98,18 @@ func (r *RunWorkflow) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "workflowFile",
-			Label:       "Workflow file",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Placeholder: "e.g. .github/workflows/ci.yml",
+			Name:     "workflowFile",
+			Label:    "Workflow file",
+			Type:     configuration.FieldTypeString,
+			Required: true,
+			Default:  ".github/workflows/ci.yml",
 		},
 		{
 			Name:     "ref",
 			Label:    "Branch or tag",
 			Type:     configuration.FieldTypeGitRef,
 			Required: true,
+			Default:  "main",
 		},
 		{
 			Name:  "inputs",
@@ -121,10 +122,11 @@ func (r *RunWorkflow) Configuration() []configuration.Field {
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{
 							{
-								Name:     "name",
-								Label:    "Name",
-								Type:     configuration.FieldTypeString,
-								Required: true,
+								Name:               "name",
+								Label:              "Name",
+								Type:               configuration.FieldTypeString,
+								Required:           true,
+								DisallowExpression: true,
 							},
 							{
 								Name:     "value",
