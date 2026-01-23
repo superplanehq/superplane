@@ -504,119 +504,117 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
 
     // Map backend records to approval items
     const labelMaps = { rolesByName, groupsByName };
-    const approvals = approvalRecords.map(
-      (record: ApprovalRecord) => {
-        const isPending = record.state === "pending";
-        const isExecutionActive = execution?.state === "STATE_STARTED";
-        const approveIndex =
-          record.type === "anyone" && pendingUserRecordIndex !== undefined ? pendingUserRecordIndex : record.index;
-        const canAct =
-          !hasApprovedAnyRecord &&
-          isPending &&
-          isExecutionActive &&
-          record.index === interactiveApprovalIndex &&
-          canCurrentUserActOnApproval(record, {
-            currentUserId,
-            currentUserEmail,
-            currentUserRoles,
-            organizationId,
-            queryClient,
-          });
+    const approvals = approvalRecords.map((record: ApprovalRecord) => {
+      const isPending = record.state === "pending";
+      const isExecutionActive = execution?.state === "STATE_STARTED";
+      const approveIndex =
+        record.type === "anyone" && pendingUserRecordIndex !== undefined ? pendingUserRecordIndex : record.index;
+      const canAct =
+        !hasApprovedAnyRecord &&
+        isPending &&
+        isExecutionActive &&
+        record.index === interactiveApprovalIndex &&
+        canCurrentUserActOnApproval(record, {
+          currentUserId,
+          currentUserEmail,
+          currentUserRoles,
+          organizationId,
+          queryClient,
+        });
 
-        const approvalComment = record.approval?.comment as string | undefined;
-        const hasApprovalArtifacts = record.state === "approved" && approvalComment;
+      const approvalComment = record.approval?.comment as string | undefined;
+      const hasApprovalArtifacts = record.state === "approved" && approvalComment;
 
-        const userLabel = record.user?.name || record.user?.email;
-        const title =
-          userLabel ||
-          (record.type === "user"
-            ? record.user?.name || record.user?.email
-            : record.type === "role" || record.type === "group"
-              ? getApprovalDecisionLabel(record, labelMaps)
-              : record.type === "anyone"
-                ? "Any user"
-                : "Unknown");
+      const userLabel = record.user?.name || record.user?.email;
+      const title =
+        userLabel ||
+        (record.type === "user"
+          ? record.user?.name || record.user?.email
+          : record.type === "role" || record.type === "group"
+            ? getApprovalDecisionLabel(record, labelMaps)
+            : record.type === "anyone"
+              ? "Any user"
+              : "Unknown");
 
-        return {
-          id: `${record.index}`,
-          title,
-          approved: record.state === "approved",
-          rejected: record.state === "rejected",
-          approverName: record.user?.name,
-          approverAvatar: record.user?.avatarUrl,
-          rejectionComment: record.rejection?.reason,
-          interactive: canAct,
-          requireArtifacts: canAct
-            ? [
-                {
-                  label: "comment",
-                  optional: true,
+      return {
+        id: `${record.index}`,
+        title,
+        approved: record.state === "approved",
+        rejected: record.state === "rejected",
+        approverName: record.user?.name,
+        approverAvatar: record.user?.avatarUrl,
+        rejectionComment: record.rejection?.reason,
+        interactive: canAct,
+        requireArtifacts: canAct
+          ? [
+              {
+                label: "comment",
+                optional: true,
+              },
+            ]
+          : undefined,
+        artifacts: hasApprovalArtifacts
+          ? {
+              Comment: approvalComment,
+            }
+          : undefined,
+        artifactCount: hasApprovalArtifacts ? 1 : undefined,
+        onApprove: async (artifacts?: Record<string, string>) => {
+          if (!execution?.id) return;
+
+          try {
+            await workflowsInvokeNodeExecutionAction(
+              withOrganizationHeader({
+                path: {
+                  workflowId: workflowId,
+                  executionId: execution.id,
+                  actionName: "approve",
                 },
-              ]
-            : undefined,
-          artifacts: hasApprovalArtifacts
-            ? {
-                Comment: approvalComment,
-              }
-            : undefined,
-          artifactCount: hasApprovalArtifacts ? 1 : undefined,
-          onApprove: async (artifacts?: Record<string, string>) => {
-            if (!execution?.id) return;
-
-            try {
-              await workflowsInvokeNodeExecutionAction(
-                withOrganizationHeader({
-                  path: {
-                    workflowId: workflowId,
-                    executionId: execution.id,
-                    actionName: "approve",
+                body: {
+                  parameters: {
+                    index: approveIndex,
+                    comment: artifacts?.comment,
                   },
-                  body: {
-                    parameters: {
-                      index: approveIndex,
-                      comment: artifacts?.comment,
-                    },
-                  },
-                }),
-              );
+                },
+              }),
+            );
 
-              queryClient.invalidateQueries({
-                queryKey: workflowKeys.nodeExecution(workflowId, node.id!),
-              });
-            } catch (error) {
-              console.error("Failed to approve:", error);
-            }
-          },
-          onReject: async (comment?: string) => {
-            if (!execution?.id) return;
+            queryClient.invalidateQueries({
+              queryKey: workflowKeys.nodeExecution(workflowId, node.id!),
+            });
+          } catch (error) {
+            console.error("Failed to approve:", error);
+          }
+        },
+        onReject: async (comment?: string) => {
+          if (!execution?.id) return;
 
-            try {
-              await workflowsInvokeNodeExecutionAction(
-                withOrganizationHeader({
-                  path: {
-                    workflowId: workflowId,
-                    executionId: execution.id,
-                    actionName: "reject",
+          try {
+            await workflowsInvokeNodeExecutionAction(
+              withOrganizationHeader({
+                path: {
+                  workflowId: workflowId,
+                  executionId: execution.id,
+                  actionName: "reject",
+                },
+                body: {
+                  parameters: {
+                    index: record.index,
+                    reason: comment,
                   },
-                  body: {
-                    parameters: {
-                      index: record.index,
-                      reason: comment,
-                    },
-                  },
-                }),
-              );
+                },
+              }),
+            );
 
-              queryClient.invalidateQueries({
-                queryKey: workflowKeys.nodeExecution(workflowId, node.id!),
-              });
-            } catch (error) {
-              console.error("Failed to reject:", error);
-            }
-          },
-        };
-      },
-    );
+            queryClient.invalidateQueries({
+              queryKey: workflowKeys.nodeExecution(workflowId, node.id!),
+            });
+          } catch (error) {
+            console.error("Failed to reject:", error);
+          }
+        },
+      };
+    });
 
     return {
       approvals,
