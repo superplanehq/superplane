@@ -7,9 +7,12 @@ name: "dash0"
 label: "Dash0"
 ---
 
-# Dash0
-
 Connect to Dash0 to query data using Prometheus API
+
+### Components
+
+- [List Issues](#list-issues)
+- [Query Prometheus](#query-prometheus)
 
 ## Components
 

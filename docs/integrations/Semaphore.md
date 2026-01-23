@@ -7,9 +7,15 @@ name: "semaphore"
 label: "Semaphore"
 ---
 
-# Semaphore
-
 Run and react to your Semaphore workflows
+
+### Components
+
+- [Run Workflow](#run-workflow)
+
+### Triggers
+
+- [On Pipeline Done](#on-pipeline-done)
 
 ## Components
 

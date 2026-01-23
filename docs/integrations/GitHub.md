@@ -7,9 +7,29 @@ name: "github"
 label: "GitHub"
 ---
 
-# GitHub
-
 Manage and react to changes in your GitHub repositories
+
+### Components
+
+- [Create Issue](#create-issue)
+- [Create Release](#create-release)
+- [Delete Release](#delete-release)
+- [Get Issue](#get-issue)
+- [Publish Commit Status](#publish-commit-status)
+- [Run Workflow](#run-workflow)
+- [Update Issue](#update-issue)
+- [Update Release](#update-release)
+
+### Triggers
+
+- [On Branch Created](#on-branch-created)
+- [On Issue](#on-issue)
+- [On Issue Comment](#on-issue-comment)
+- [On Pull Request](#on-pull-request)
+- [On PR Review Comment](#on-pr-review-comment)
+- [On Push](#on-push)
+- [On Release](#on-release)
+- [On Tag Created](#on-tag-created)
 
 ## Components
 

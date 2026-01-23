@@ -7,14 +7,20 @@ name: "slack"
 label: "Slack"
 ---
 
-# Slack
-
 Send and react to Slack messages and interactions
 
 ## Installation
 
 You can install the Slack app without the **Bot Token** and **Signing Secret**.
 After installation, follow the setup prompt to create the Slack app and add those values.
+
+### Components
+
+- [Send Text Message](#send-text-message)
+
+### Triggers
+
+- [On App Mention](#on-app-mention)
 
 ## Components
 

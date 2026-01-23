@@ -7,9 +7,11 @@ name: "openai"
 label: "OpenAI"
 ---
 
-# OpenAI
-
 Generate text responses with OpenAI models
+
+### Components
+
+- [Text Prompt](#text-prompt)
 
 ## Components
 

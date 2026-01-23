@@ -68,7 +68,6 @@ func writeAppIndex(
 	var buf bytes.Buffer
 	writeAppFrontMatter(&buf, app)
 
-	buf.WriteString(fmt.Sprintf("# %s\n\n", app.Label()))
 	writeParagraph(&buf, app.Description())
 
 	if instructions := strings.TrimSpace(app.InstallationInstructions()); instructions != "" {
@@ -77,6 +76,7 @@ func writeAppIndex(
 		buf.WriteString("\n\n")
 	}
 
+	writeOverviewSection(&buf, components, triggers)
 	writeComponentSection(&buf, components)
 	writeTriggerSection(&buf, triggers)
 
@@ -121,6 +121,24 @@ func writeTriggerSection(buf *bytes.Buffer, triggers []core.Trigger) {
 		config := actions.AppendGlobalTriggerFields(trigger.Configuration())
 		writeConfiguration(buf, config)
 		writeExample("Example Data", trigger.ExampleData(), buf)
+	}
+}
+
+func writeOverviewSection(buf *bytes.Buffer, components []core.Component, triggers []core.Trigger) {
+	if len(components) > 0 {
+		buf.WriteString("### Components\n\n")
+		for _, component := range components {
+			buf.WriteString(fmt.Sprintf("- [%s](#%s)\n", component.Label(), slugify(component.Label())))
+		}
+		buf.WriteString("\n")
+	}
+
+	if len(triggers) > 0 {
+		buf.WriteString("### Triggers\n\n")
+		for _, trigger := range triggers {
+			buf.WriteString(fmt.Sprintf("- [%s](#%s)\n", trigger.Label(), slugify(trigger.Label())))
+		}
+		buf.WriteString("\n")
 	}
 }
 

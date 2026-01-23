@@ -7,9 +7,11 @@ name: "smtp"
 label: "SMTP"
 ---
 
-# SMTP
-
 Send emails via any SMTP server
+
+### Components
+
+- [Send Email](#send-email)
 
 ## Components
 

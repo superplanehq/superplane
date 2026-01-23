@@ -7,9 +7,17 @@ name: "pagerduty"
 label: "PagerDuty"
 ---
 
-# PagerDuty
-
 Manage and react to incidents in PagerDuty
+
+### Components
+
+- [Create Incident](#create-incident)
+- [Update Incident](#update-incident)
+
+### Triggers
+
+- [On Incident](#on-incident)
+- [On Incident Status Update](#on-incident-status-update)
 
 ## Components
 
