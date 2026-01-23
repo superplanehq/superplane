@@ -3,6 +3,9 @@ package contexts
 import (
 	"fmt"
 	"regexp"
+	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/expr-lang/expr"
@@ -15,6 +18,7 @@ import (
 )
 
 var expressionRegex = regexp.MustCompile(`\{\{(.*?)\}\}`)
+var previousDepthRegex = regexp.MustCompile(`\bprevious\s*\(([^)]*)\)`)
 
 type NodeConfigurationBuilder struct {
 	tx                  *gorm.DB
@@ -243,6 +247,41 @@ func (b *NodeConfigurationBuilder) BuildMessageChainForExpression(expression str
 	return b.buildMessageChain(referencedNodes)
 }
 
+func (b *NodeConfigurationBuilder) BuildExpressionEnv(expression string) (map[string]any, error) {
+	messageChain, err := b.BuildMessageChainForExpression(expression)
+	if err != nil {
+		return nil, err
+	}
+
+	env := map[string]any{"$": messageChain}
+
+	if strings.Contains(expression, "root(") {
+		rootPayload, err := b.resolveRootPayload()
+		if err != nil {
+			return nil, err
+		}
+		env["__root"] = rootPayload
+	}
+
+	depths, err := parsePreviousDepths(expression)
+	if err != nil {
+		return nil, err
+	}
+	if len(depths) > 0 {
+		previousByDepth := make(map[string]any, len(depths))
+		for _, depth := range depths {
+			payload, err := b.resolvePreviousPayload(depth)
+			if err != nil {
+				return nil, err
+			}
+			previousByDepth[strconv.Itoa(depth)] = payload
+		}
+		env["__previousByDepth"] = previousByDepth
+	}
+
+	return env, nil
+}
+
 func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, error) {
 	referencedNodes, err := parseReferencedNodes(expression)
 	if err != nil {
@@ -270,15 +309,7 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 				return nil, fmt.Errorf("root() takes no arguments")
 			}
 
-			rootEvent, err := b.fetchRootEvent()
-			if err != nil {
-				return nil, err
-			}
-			if rootEvent == nil {
-				return nil, fmt.Errorf("no root event found")
-			}
-
-			return rootEvent.Data.Data(), nil
+			return b.resolveRootPayload()
 		}),
 		expr.Function("previous", func(params ...any) (any, error) {
 			depth := 1
@@ -411,6 +442,18 @@ func (b *NodeConfigurationBuilder) fetchRootEvent() (*models.WorkflowEvent, erro
 	return rootEvent, nil
 }
 
+func (b *NodeConfigurationBuilder) resolveRootPayload() (any, error) {
+	rootEvent, err := b.fetchRootEvent()
+	if err != nil {
+		return nil, err
+	}
+	if rootEvent == nil {
+		return nil, fmt.Errorf("no root event found")
+	}
+
+	return rootEvent.Data.Data(), nil
+}
+
 func populateFromInputOrRoot(messageChain map[string]any, inputMap map[string]any, rootEvent *models.WorkflowEvent, refToNodeID map[string]string) map[string]string {
 	chainRefs := make(map[string]string, len(refToNodeID))
 	for nodeRef, nodeID := range refToNodeID {
@@ -493,6 +536,38 @@ func latestEventByExecution(events []models.WorkflowEvent, executionIDs []uuid.U
 	}
 
 	return latestByExecution
+}
+
+func parsePreviousDepths(expression string) ([]int, error) {
+	matches := previousDepthRegex.FindAllStringSubmatch(expression, -1)
+	if len(matches) == 0 {
+		return nil, nil
+	}
+
+	seen := map[int]struct{}{}
+	for _, match := range matches {
+		raw := strings.TrimSpace(match[1])
+		if raw == "" {
+			seen[1] = struct{}{}
+			continue
+		}
+
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			return nil, fmt.Errorf("depth must be an integer")
+		}
+		if parsed < 1 {
+			return nil, fmt.Errorf("depth must be >= 1")
+		}
+		seen[parsed] = struct{}{}
+	}
+
+	depths := make([]int, 0, len(seen))
+	for depth := range seen {
+		depths = append(depths, depth)
+	}
+	sort.Ints(depths)
+	return depths, nil
 }
 
 func parseDepth(param any) (int, error) {

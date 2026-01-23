@@ -144,6 +144,38 @@ func TestMerge_ExpressionEnv_UsesContextEnv(t *testing.T) {
 	assert.True(t, out.(bool))
 }
 
+func TestMerge_ExpressionOptions_RootAndPrevious(t *testing.T) {
+	ctx := core.ProcessQueueContext{
+		ExpressionEnv: func(expression string) (map[string]any, error) {
+			return map[string]any{
+				"$": map[string]any{},
+				"__root": map[string]any{
+					"data": map[string]any{
+						"ref": "main",
+					},
+				},
+				"__previousByDepth": map[string]any{
+					"1": map[string]any{
+						"data": map[string]any{
+							"ok": true,
+						},
+					},
+				},
+			}, nil
+		},
+	}
+
+	env, err := expressionEnv(ctx, `root().data.ref == "main" && previous().data.ok == true`)
+	require.NoError(t, err)
+
+	vm, err := expr.Compile(`root().data.ref == "main" && previous().data.ok == true`, expressionOptions(env)...)
+	require.NoError(t, err)
+
+	out, err := expr.Run(vm, env)
+	require.NoError(t, err)
+	assert.True(t, out.(bool))
+}
+
 type MergeTestSteps struct {
 	t  *testing.T
 	Tx *gorm.DB
