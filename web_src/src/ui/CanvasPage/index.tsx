@@ -148,7 +148,10 @@ export interface CanvasPageProps {
     nodeName: string,
     appInstallationRef?: ComponentsAppInstallationRef,
   ) => void;
-  onAnnotationUpdate?: (nodeId: string, updates: { text?: string; color?: string }) => void;
+  onAnnotationUpdate?: (
+    nodeId: string,
+    updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
+  ) => void;
   getCustomField?: (nodeId: string) => ((configuration: Record<string, unknown>) => React.ReactNode) | null;
   onSave?: (nodes: CanvasNode[]) => void;
   installedApplications?: OrganizationsAppInstallation[];
@@ -1268,7 +1271,10 @@ function CanvasContent({
   onToggleView?: (nodeId: string) => void;
   onToggleCollapse?: () => void;
   onDelete?: (nodeId: string) => void;
-  onAnnotationUpdate?: (nodeId: string, updates: { text?: string; color?: string }) => void;
+  onAnnotationUpdate?: (
+    nodeId: string,
+    updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
+  ) => void;
   onBuildingBlockDrop?: (block: BuildingBlock, position?: { x: number; y: number }) => void;
   onBuildingBlocksSidebarToggle?: (open: boolean) => void;
   onConnectionDropInEmptySpace?: (
