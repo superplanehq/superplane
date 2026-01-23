@@ -3,6 +3,7 @@ package approval
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -110,7 +111,26 @@ func (m *Metadata) UpdateResult() {
 	m.Result = StateApproved
 }
 
+func (m *Metadata) hasApprovedAnyRecord(userID string) bool {
+	if userID == "" {
+		return false
+	}
+
+	return slices.ContainsFunc(m.Records, func(record Record) bool {
+		if record.State != StateApproved || record.User == nil {
+			return false
+		}
+
+		return record.User.ID == userID
+	})
+}
+
 func (m *Metadata) Approve(record *Record, index int, ctx core.ActionContext) error {
+	authenticatedUser := ctx.Auth.AuthenticatedUser()
+	if authenticatedUser != nil && m.hasApprovedAnyRecord(authenticatedUser.ID) {
+		return fmt.Errorf("user has already approved another requirement")
+	}
+
 	err := m.validateAction(record, ctx)
 	if err != nil {
 		return err
@@ -118,7 +138,7 @@ func (m *Metadata) Approve(record *Record, index int, ctx core.ActionContext) er
 
 	record.State = StateApproved
 	record.Approval = &ApprovalInfo{ApprovedAt: time.Now().Format(time.RFC3339)}
-	record.User = ctx.Auth.AuthenticatedUser()
+	record.User = authenticatedUser
 	comment, ok := ctx.Parameters["comment"].(string)
 	if ok {
 		record.Approval.Comment = comment
@@ -477,6 +497,19 @@ func (a *Approval) HandleAction(ctx core.ActionContext) error {
 		return err
 	}
 
+	if ctx.Name == "reject" {
+		metadata.Result = StateRejected
+		if err := ctx.Metadata.Set(metadata); err != nil {
+			return err
+		}
+
+		return ctx.ExecutionState.Emit(
+			ChannelRejected,
+			"approval.finished",
+			[]any{metadata},
+		)
+	}
+
 	//
 	// If we have pending records yet, just update the metadata,
 	// without finishing the execution.
@@ -518,7 +551,7 @@ func (a *Approval) handleApprove(ctx core.ActionContext) (*Metadata, error) {
 		return nil, fmt.Errorf("failed to parse metadata: %w", err)
 	}
 
-	record, err := a.findPendingRecord(metadata, ctx.Parameters)
+	record, err := a.resolveApproveRecord(metadata, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find requirement: %w", err)
 	}
@@ -532,14 +565,9 @@ func (a *Approval) handleApprove(ctx core.ActionContext) (*Metadata, error) {
 }
 
 func (a *Approval) findPendingRecord(metadata Metadata, parameters map[string]any) (*Record, error) {
-	i, ok := parameters["index"].(float64)
-	if !ok {
-		return nil, fmt.Errorf("index is required")
-	}
-
-	index := int(i)
-	if index < 0 || index >= len(metadata.Records) {
-		return nil, fmt.Errorf("invalid index: %d", index)
+	index, err := getActionIndex(parameters, len(metadata.Records))
+	if err != nil {
+		return nil, err
 	}
 
 	record := metadata.Records[index]
@@ -548,6 +576,95 @@ func (a *Approval) findPendingRecord(metadata Metadata, parameters map[string]an
 	}
 
 	return &record, nil
+}
+
+func (a *Approval) resolveApproveRecord(metadata Metadata, ctx core.ActionContext) (*Record, error) {
+	index, err := getActionIndex(ctx.Parameters, len(metadata.Records))
+	if err != nil {
+		return nil, err
+	}
+
+	requestedRecord := metadata.Records[index]
+	authenticatedUser := ctx.Auth.AuthenticatedUser()
+	if requestedRecord.Type == ItemTypeAnyone && authenticatedUser != nil {
+		userRecord := findPendingUserRecord(metadata, authenticatedUser.ID)
+		if userRecord != nil {
+			return userRecord, nil
+		}
+	}
+
+	if requestedRecord.State == StatePending {
+		if err := metadata.validateAction(&requestedRecord, ctx); err != nil {
+			return nil, err
+		}
+
+		return &requestedRecord, nil
+	}
+
+	fallback := findPendingEligibleRecord(metadata, ctx)
+	if fallback != nil {
+		return fallback, nil
+	}
+
+	return nil, fmt.Errorf("record at index %d is not pending", index)
+}
+
+func getActionIndex(parameters map[string]any, max int) (int, error) {
+	i, ok := parameters["index"].(float64)
+	if !ok {
+		return 0, fmt.Errorf("index is required")
+	}
+
+	index := int(i)
+	if index < 0 || index >= max {
+		return 0, fmt.Errorf("invalid index: %d", index)
+	}
+
+	return index, nil
+}
+
+func findPendingUserRecord(metadata Metadata, userID string) *Record {
+	for i, record := range metadata.Records {
+		if record.State != StatePending || record.Type != ItemTypeUser || record.User == nil {
+			continue
+		}
+
+		if record.User.ID == userID {
+			record.Index = i
+			return &record
+		}
+	}
+
+	return nil
+}
+
+func findPendingEligibleRecord(metadata Metadata, ctx core.ActionContext) *Record {
+	for i, record := range metadata.Records {
+		if record.State != StatePending {
+			continue
+		}
+
+		if record.Type == ItemTypeUser && record.User == nil {
+			continue
+		}
+
+		if record.Type == ItemTypeRole && record.Role == nil {
+			continue
+		}
+
+		if record.Type == ItemTypeGroup && record.Group == nil {
+			continue
+		}
+
+		if err := metadata.validateAction(&record, ctx); err != nil {
+			continue
+		}
+
+		record.Index = i
+		return &record
+	}
+
+	return nil
 }
 
 func (a *Approval) handleReject(ctx core.ActionContext) (*Metadata, error) {
