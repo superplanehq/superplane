@@ -2,204 +2,150 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 
-	"github.com/superplanehq/superplane/pkg/configuration"
-	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	"github.com/superplanehq/superplane/pkg/registry"
-
-	// Import integrations to register them via init().
-	_ "github.com/superplanehq/superplane/pkg/applications/dash0"
-	_ "github.com/superplanehq/superplane/pkg/applications/github"
-	_ "github.com/superplanehq/superplane/pkg/applications/openai"
-	_ "github.com/superplanehq/superplane/pkg/applications/pagerduty"
-	_ "github.com/superplanehq/superplane/pkg/applications/semaphore"
-	_ "github.com/superplanehq/superplane/pkg/applications/slack"
-	_ "github.com/superplanehq/superplane/pkg/applications/smtp"
-	_ "github.com/superplanehq/superplane/pkg/components/approval"
-	_ "github.com/superplanehq/superplane/pkg/components/filter"
-	_ "github.com/superplanehq/superplane/pkg/components/http"
-	_ "github.com/superplanehq/superplane/pkg/components/if"
-	_ "github.com/superplanehq/superplane/pkg/components/merge"
-	_ "github.com/superplanehq/superplane/pkg/components/noop"
-	_ "github.com/superplanehq/superplane/pkg/components/timegate"
-	_ "github.com/superplanehq/superplane/pkg/components/wait"
-	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
-	_ "github.com/superplanehq/superplane/pkg/triggers/start"
-	_ "github.com/superplanehq/superplane/pkg/triggers/webhook"
+	"gopkg.in/yaml.v3"
 )
 
 const docsRoot = "docs/integrations"
+const coreIndexPath = "docs/integrations/Core/index.yaml"
+const coreOutputPath = "docs/integrations/Core.mdx"
 
 var camelBoundary = regexp.MustCompile(`([a-z0-9])([A-Z])`)
 
-func main() {
-	reg := registry.NewRegistry(crypto.NewNoOpEncryptor())
-	apps := reg.ListApplications()
+type docEntry struct {
+	Title         string `yaml:"title"`
+	Subtitle      string `yaml:"subtitle"`
+	Description   string `yaml:"description"`
+	ExampleOutput string `yaml:"exampleOutput"`
+}
 
+type docIndex struct {
+	Title      string     `yaml:"title"`
+	Overview   string     `yaml:"overview"`
+	Components []docEntry `yaml:"components"`
+	Triggers   []docEntry `yaml:"triggers"`
+}
+
+func main() {
 	if err := os.MkdirAll(docsRoot, 0o755); err != nil {
 		exitWithError(err)
 	}
 
-	if err := writeCoreComponentsDoc(reg.ListComponents(), reg.ListTriggers()); err != nil {
+	if err := writeCoreDocsFromIndex(coreIndexPath, coreOutputPath); err != nil {
 		exitWithError(err)
-	}
-
-	for _, app := range apps {
-		if err := writeAppDocs(app); err != nil {
-			exitWithError(err)
-		}
 	}
 }
 
-func writeAppDocs(app core.Application) error {
-	if err := os.MkdirAll(docsRoot, 0o755); err != nil {
+func writeCoreDocsFromIndex(indexPath string, outputPath string) error {
+	indexData, err := os.ReadFile(indexPath)
+	if err != nil {
 		return err
 	}
 
-	components := app.Components()
-	triggers := app.Triggers()
-
-	sort.Slice(components, func(i, j int) bool { return components[i].Name() < components[j].Name() })
-	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
-
-	return writeAppIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.mdx", appFilename(app))), app, components, triggers)
-}
-
-func writeCoreComponentsDoc(components []core.Component, triggers []core.Trigger) error {
-	if len(components) == 0 {
-		if len(triggers) == 0 {
-			return nil
-		}
+	var index docIndex
+	if err := yaml.Unmarshal(indexData, &index); err != nil {
+		return err
 	}
 
-	sort.Slice(components, func(i, j int) bool { return components[i].Name() < components[j].Name() })
-	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
-
 	var buf bytes.Buffer
-	writeCoreFrontMatter(&buf)
-	writeOverviewSection(&buf, "Built-in SuperPlane components.")
-	writeCardGridComponents(&buf, components)
-	writeCardGridTriggers(&buf, triggers)
-	writeComponentSection(&buf, components)
-	writeTriggerSection(&buf, triggers)
+	writeCoreFrontMatter(&buf, strings.TrimSpace(index.Title))
+	writeOverviewSection(&buf, index.Overview)
+	writeCardGridTriggers(&buf, index.Triggers)
+	writeCardGridComponents(&buf, index.Components)
+	writeTriggerSection(&buf, index.Triggers)
+	writeComponentSection(&buf, index.Components)
 
-	return writeFile(filepath.Join(docsRoot, "Core.mdx"), buf.Bytes())
+	return writeFile(outputPath, buf.Bytes())
 }
 
-func writeAppIndex(
-	path string,
-	app core.Application,
-	components []core.Component,
-	triggers []core.Trigger,
-) error {
-	var buf bytes.Buffer
-	writeAppFrontMatter(&buf, app)
-
-	writeOverviewSection(&buf, app.Description())
-	writeCardGridComponents(&buf, components)
-	writeCardGridTriggers(&buf, triggers)
-
-	if instructions := strings.TrimSpace(app.InstallationInstructions()); instructions != "" {
-		buf.WriteString("## Installation\n\n")
-		buf.WriteString(instructions)
-		buf.WriteString("\n\n")
+func writeCoreFrontMatter(buf *bytes.Buffer, title string) {
+	if title == "" {
+		title = "Core"
 	}
-
-	writeComponentSection(&buf, components)
-	writeTriggerSection(&buf, triggers)
-
-	return writeFile(path, buf.Bytes())
-}
-
-func writeAppFrontMatter(buf *bytes.Buffer, app core.Application) {
 	buf.WriteString("---\n")
-	buf.WriteString(fmt.Sprintf("title: \"%s\"\n", escapeQuotes(app.Label())))
+	buf.WriteString(fmt.Sprintf("title: \"%s\"\n", escapeQuotes(title)))
 	buf.WriteString("sidebar:\n")
-	buf.WriteString(fmt.Sprintf("  label: \"%s\"\n", escapeQuotes(app.Label())))
-	buf.WriteString(fmt.Sprintf("type: \"%s\"\n", escapeQuotes("application")))
-	buf.WriteString(fmt.Sprintf("name: \"%s\"\n", escapeQuotes(app.Name())))
-	buf.WriteString(fmt.Sprintf("label: \"%s\"\n", escapeQuotes(app.Label())))
-	buf.WriteString("---\n\n")
-}
-
-func writeCoreFrontMatter(buf *bytes.Buffer) {
-	buf.WriteString("---\n")
-	buf.WriteString(fmt.Sprintf("title: \"%s\"\n", escapeQuotes("Core")))
-	buf.WriteString("sidebar:\n")
-	buf.WriteString(fmt.Sprintf("  label: \"%s\"\n", escapeQuotes("Core")))
+	buf.WriteString(fmt.Sprintf("  label: \"%s\"\n", escapeQuotes(title)))
 	buf.WriteString(fmt.Sprintf("type: \"%s\"\n", escapeQuotes("core")))
 	buf.WriteString("---\n\n")
 }
 
-func writeComponentSection(buf *bytes.Buffer, components []core.Component) {
+func writeComponentSection(buf *bytes.Buffer, components []docEntry) error {
 	if len(components) == 0 {
-		return
+		return nil
 	}
 
 	for _, component := range components {
-		buf.WriteString(fmt.Sprintf("<a id=\"%s\"></a>\n\n", slugify(component.Label())))
-		buf.WriteString(fmt.Sprintf("## %s\n\n", component.Label()))
-		writeParagraph(buf, component.Description())
-		writeConfigurationSection(buf, component.Configuration())
-		writeExampleSection("Example Output", component.ExampleOutput(), buf)
+		buf.WriteString(fmt.Sprintf("<a id=\"%s\"></a>\n\n", slugify(component.Title)))
+		buf.WriteString(fmt.Sprintf("## %s\n\n", component.Title))
+		writeParagraph(buf, component.Description)
+		if err := writeExampleSection("Example Output", component.ExampleOutput, buf); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
-func writeTriggerSection(buf *bytes.Buffer, triggers []core.Trigger) {
+func writeTriggerSection(buf *bytes.Buffer, triggers []docEntry) error {
 	if len(triggers) == 0 {
-		return
+		return nil
 	}
 
 	for _, trigger := range triggers {
-		buf.WriteString(fmt.Sprintf("<a id=\"%s\"></a>\n\n", slugify(trigger.Label())))
-		buf.WriteString(fmt.Sprintf("## %s\n\n", trigger.Label()))
-		writeParagraph(buf, trigger.Description())
-		config := actions.AppendGlobalTriggerFields(trigger.Configuration())
-		writeConfigurationSection(buf, config)
-		writeExampleSection("Example Data", trigger.ExampleData(), buf)
+		buf.WriteString(fmt.Sprintf("<a id=\"%s\"></a>\n\n", slugify(trigger.Title)))
+		buf.WriteString(fmt.Sprintf("## %s\n\n", trigger.Title))
+		writeParagraph(buf, trigger.Description)
+		if err := writeExampleSection("Example Data", trigger.ExampleOutput, buf); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
-func writeCardGridComponents(buf *bytes.Buffer, components []core.Component) {
+func writeCardGridComponents(buf *bytes.Buffer, components []docEntry) {
 	if len(components) == 0 {
 		return
 	}
 
-	buf.WriteString("import { CardGrid, LinkCard } from \"@astrojs/starlight/components\";\n\n")
+	writeCardGridImport(buf)
 	buf.WriteString("## Components\n\n")
 	buf.WriteString("<CardGrid>\n")
 	for _, component := range components {
-		description := strings.TrimSpace(component.Description())
+		description := strings.TrimSpace(component.Subtitle)
+		if description == "" {
+			description = strings.TrimSpace(component.Description)
+		}
 		buf.WriteString(fmt.Sprintf("  <LinkCard title=\"%s\" href=\"#%s\" description=\"%s\" />\n",
-			escapeQuotes(component.Label()),
-			slugify(component.Label()),
+			escapeQuotes(component.Title),
+			slugify(component.Title),
 			escapeQuotes(description),
 		))
 	}
 	buf.WriteString("</CardGrid>\n\n")
 }
 
-func writeCardGridTriggers(buf *bytes.Buffer, triggers []core.Trigger) {
+func writeCardGridTriggers(buf *bytes.Buffer, triggers []docEntry) {
 	if len(triggers) == 0 {
 		return
 	}
 
+	writeCardGridImport(buf)
 	buf.WriteString("## Triggers\n\n")
 	buf.WriteString("<CardGrid>\n")
 	for _, trigger := range triggers {
-		description := strings.TrimSpace(trigger.Description())
+		description := strings.TrimSpace(trigger.Subtitle)
+		if description == "" {
+			description = strings.TrimSpace(trigger.Description)
+		}
 		buf.WriteString(fmt.Sprintf("  <LinkCard title=\"%s\" href=\"#%s\" description=\"%s\" />\n",
-			escapeQuotes(trigger.Label()),
-			slugify(trigger.Label()),
+			escapeQuotes(trigger.Title),
+			slugify(trigger.Title),
 			escapeQuotes(description),
 		))
 	}
@@ -220,65 +166,29 @@ func writeOverviewSection(buf *bytes.Buffer, description string) {
 	if trimmed == "" {
 		return
 	}
-	buf.WriteString("## Overview\n\n")
 	buf.WriteString(trimmed)
 	buf.WriteString("\n\n")
 }
 
-func writeOutputChannels(buf *bytes.Buffer, channels []core.OutputChannel) {
-	if len(channels) == 0 {
-		channels = []core.OutputChannel{core.DefaultOutputChannel}
+func writeExampleSection(title string, examplePath string, buf *bytes.Buffer) error {
+	trimmed := strings.TrimSpace(examplePath)
+	if trimmed == "" {
+		return nil
 	}
 
-	buf.WriteString("## Output Channels\n\n")
-	buf.WriteString("| Name | Label | Description |\n")
-	buf.WriteString("| --- | --- | --- |\n")
-	for _, channel := range channels {
-		buf.WriteString(fmt.Sprintf("| %s | %s | %s |\n",
-			formatTableValue(channel.Name),
-			formatTableValue(channel.Label),
-			formatTableValue(channel.Description),
-		))
-	}
-	buf.WriteString("\n")
-}
-
-func writeConfigurationSection(buf *bytes.Buffer, fields []configuration.Field) {
-	if len(fields) == 0 {
-		return
-	}
-
-	buf.WriteString("### Configuration\n\n")
-	buf.WriteString("| Name | Label | Type | Required | Description |\n")
-	buf.WriteString("| --- | --- | --- | --- | --- |\n")
-	for _, field := range fields {
-		required := "no"
-		if field.Required {
-			required = "yes"
-		}
-		buf.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s |\n",
-			formatTableValue(field.Name),
-			formatTableValue(field.Label),
-			formatTableValue(field.Type),
-			required,
-			formatTableValue(field.Description),
-		))
-	}
-	buf.WriteString("\n")
-}
-
-func writeExampleSection(title string, data map[string]any, buf *bytes.Buffer) {
-	if len(data) == 0 {
-		return
-	}
-	raw, err := json.MarshalIndent(data, "", "  ")
+	raw, err := os.ReadFile(trimmed)
 	if err != nil {
-		return
+		return err
+	}
+	trimmedRaw := strings.TrimSpace(string(raw))
+	if trimmedRaw == "" {
+		return nil
 	}
 	buf.WriteString(fmt.Sprintf("### %s\n\n", title))
 	buf.WriteString("```json\n")
-	buf.Write(raw)
+	buf.WriteString(trimmedRaw)
 	buf.WriteString("\n```\n\n")
+	return nil
 }
 
 func writeFile(path string, data []byte) error {
@@ -297,23 +207,12 @@ func slugify(value string) string {
 	return strings.ToLower(withDashes)
 }
 
-func appFilename(app core.Application) string {
-	label := strings.TrimSpace(app.Label())
-	if label == "" {
-		return slugify(app.Name())
+func writeCardGridImport(buf *bytes.Buffer) {
+	content := buf.String()
+	if strings.Contains(content, "CardGrid") {
+		return
 	}
-	return label
-}
-
-func formatTableValue(value string) string {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return "-"
-	}
-	escaped := strings.ReplaceAll(trimmed, "|", "\\|")
-	escaped = strings.ReplaceAll(escaped, "{", "&#123;")
-	escaped = strings.ReplaceAll(escaped, "}", "&#125;")
-	return escaped
+	buf.WriteString("import { CardGrid, LinkCard } from \"@astrojs/starlight/components\";\n\n")
 }
 
 func escapeQuotes(value string) string {

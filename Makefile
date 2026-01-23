@@ -202,12 +202,12 @@ gen:
 	$(MAKE) format.js
 
 gen.integrations.docs:
-	rm -rf docs/integrations
 	go run scripts/generate_integrations_docs.go
 
 gen.integrations.local.update: gen.integrations.docs
 	rm -rf ../docs/src/content/docs/integrations
-	cp -R docs/integrations ../docs/src/content/docs/integrations
+	mkdir -p ../docs/src/content/docs/integrations
+	cp docs/integrations/*.mdx ../docs/src/content/docs/integrations
 
 MODULES := authorization,organizations,applications,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,workflows
 REST_API_MODULES := authorization,organizations,applications,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,workflows

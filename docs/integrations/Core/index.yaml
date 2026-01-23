@@ -9,13 +9,14 @@ triggers:
     description: |
       Manually start a run from the SuperPlane UI, useful for testing,
       on-demand actions, or operator-initiated runs.
+    exampleOutput: pkg/triggers/start/example_data.json
 
   - title: Webhook
     subtitle: Kick off a run by sending an HTTP request (webhook) from an external system.
     description: |
       Start a run by sending an HTTP request to a unique webhook URL. This
       trigger lets external systems or services initiate a run in SuperPlane.
-    exampleOutput: pkg/components/webhook/example_output.json
+    exampleOutput: pkg/triggers/webhook/example_data.json
 
   - title: Schedule
     subtitle: Automatically trigger runs on a recurring schedule.
@@ -24,7 +25,7 @@ triggers:
       This is useful for running tasks on a recurring basis (such as nightly
       builds, backups, periodic checks, or scheduled deployments) without manual
       intervention.
-    exampleOutput: pkg/components/schedule/example_output.json
+    exampleOutput: pkg/triggers/schedule/example_data.json
 
 components:
   - title: Approval
