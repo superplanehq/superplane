@@ -11,16 +11,22 @@ import { getState, getStateMap, getTriggerRenderer } from "..";
 import { MetadataItem } from "@/ui/metadataList";
 
 interface SendTextMessageConfiguration {
+  channel?: string;
   content?: string;
-  username?: string;
   embedTitle?: string;
   embedDescription?: string;
   embedColor?: string;
   embedUrl?: string;
 }
 
+interface ChannelMetadata {
+  id?: string;
+  name?: string;
+}
+
 interface SendTextMessageMetadata {
   hasEmbed?: boolean;
+  channel?: ChannelMetadata;
 }
 
 export const sendTextMessageMapper: ComponentBaseMapper = {
@@ -37,9 +43,7 @@ export const sendTextMessageMapper: ComponentBaseMapper = {
     return {
       title: node.name!,
       iconSlug: "discord",
-      iconBackground: "bg-white",
       iconColor: getColorClass(componentDefinition.color),
-      headerColor: getBackgroundColorClass(componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(componentDefinition.color),
       collapsed: node.isCollapsed,
       eventSections: lastExecution ? sendTextMessageEventSections(nodes, lastExecution, componentName) : undefined,
@@ -66,14 +70,13 @@ export const sendTextMessageMapper: ComponentBaseMapper = {
 function sendTextMessageMetadataList(node: ComponentsNode): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as SendTextMessageMetadata | undefined;
-  const configuration = node.configuration as SendTextMessageConfiguration | undefined;
+
+  if (nodeMetadata?.channel?.name) {
+    metadata.push({ icon: "hash", label: nodeMetadata.channel.name });
+  }
 
   if (nodeMetadata?.hasEmbed) {
     metadata.push({ icon: "square", label: "With Embed" });
-  }
-
-  if (configuration?.username) {
-    metadata.push({ icon: "user", label: configuration.username });
   }
 
   return metadata;
