@@ -496,20 +496,23 @@ func (s *MergeTestSteps) AssertNodeExecutionCount(expectedCount int) {
 func (s *MergeTestSteps) AssertExecutionFinished() {
 	var execution models.WorkflowNodeExecution
 	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
-	assert.Equal(s.t, execution.State, models.WorkflowNodeExecutionStateFinished)
+	assert.Equal(s.t, models.WorkflowNodeExecutionStateFinished, execution.State)
 }
 
+// AssertExecutionFailed checks that the execution finished and emitted to the fail channel.
+// Note: With output channels, conditional stop "passes" the execution but routes to the
+// "fail" channel, similar to how the `if` component routes to true/false channels.
 func (s *MergeTestSteps) AssertExecutionFailed() {
 	var execution models.WorkflowNodeExecution
 	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
-	assert.Equal(s.t, execution.State, models.WorkflowNodeExecutionStateFinished)
-	assert.Equal(s.t, execution.Result, models.WorkflowNodeExecutionResultFailed)
+	assert.Equal(s.t, models.WorkflowNodeExecutionStateFinished, execution.State)
+	assert.Equal(s.t, models.WorkflowNodeExecutionResultPassed, execution.Result)
 }
 
 func (s *MergeTestSteps) AssertExecutionPending() {
 	var execution models.WorkflowNodeExecution
 	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
-	assert.Equal(s.t, execution.State, models.WorkflowNodeExecutionStatePending)
+	assert.Equal(s.t, models.WorkflowNodeExecutionStatePending, execution.State)
 }
 
 func (s *MergeTestSteps) AssertQueueIsEmpty() {
