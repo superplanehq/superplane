@@ -121,10 +121,10 @@ export const listIncidentsMapper: ComponentBaseMapper = {
 
       const countParts: string[] = [];
       if (highCount > 0) {
-        countParts.push(`${highCount} high`);
+        countParts.push(`${highCount} high urgency`);
       }
       if (lowCount > 0) {
-        countParts.push(`${lowCount} low`);
+        countParts.push(`${lowCount} low urgency`);
       }
 
       if (countParts.length > 0) {
@@ -152,13 +152,14 @@ export const listIncidentsMapper: ComponentBaseMapper = {
       return details;
     }
 
-    // Parse incidents for display
+    // Parse incidents for display - format matches PagerDutyIncidentEntry type in ChainItem
     const incidentDetails = incidents.map((incident) => ({
-      id: incident.id,
-      title: incident.title,
-      status: incident.status,
-      urgency: incident.urgency,
+      id: incident.id || "",
+      title: incident.title || "Untitled Incident",
+      status: incident.status || "triggered",
+      urgency: incident.urgency || "low",
       service: incident.service?.summary,
+      priority: incident.priority?.summary,
       html_url: incident.html_url,
       created_at: incident.created_at,
     }));
@@ -216,14 +217,12 @@ export const LIST_INCIDENTS_STATE_MAP: EventStateMap = {
     textColor: "text-gray-800",
     backgroundColor: "bg-yellow-100",
     badgeColor: "bg-yellow-500",
-    label: "low urgency",
   },
   high: {
     icon: "circle-x",
     textColor: "text-gray-800",
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-500",
-    label: "high urgency",
   },
 };
 
@@ -299,10 +298,10 @@ function baseEventSections(
 
     const countParts: string[] = [];
     if (highCount > 0) {
-      countParts.push(`${highCount} high`);
+      countParts.push(`${highCount} high urgency`);
     }
     if (lowCount > 0) {
-      countParts.push(`${lowCount} low`);
+      countParts.push(`${lowCount} low urgency`);
     }
 
     if (countParts.length > 0) {

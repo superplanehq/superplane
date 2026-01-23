@@ -26,6 +26,7 @@ export interface Incident {
   assignments?: IncidentAssignment[];
   service?: ResourceRef;
   escalation_policy?: ResourceRef;
+  priority?: ResourceRef;
 }
 
 export interface ResourceRef {

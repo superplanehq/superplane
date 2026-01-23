@@ -101,6 +101,17 @@ type SemaphoreBlocksValue = {
   blocks: SemaphoreBlockEntry[];
 };
 
+type PagerDutyIncidentEntry = {
+  id: string;
+  title: string;
+  status: string;
+  urgency: string;
+  service?: string;
+  priority?: string;
+  html_url?: string;
+  created_at?: string;
+};
+
 interface ChainItemProps {
   item: ChainItemData;
   index: number;
@@ -222,6 +233,28 @@ export const ChainItem: React.FC<ChainItemProps> = ({
     if (!value || typeof value !== "object") return false;
     return "__type" in value && (value as SemaphoreBlocksValue).__type === "semaphoreBlocks";
   };
+  const isPagerDutyIncidentsList = (value: unknown): value is PagerDutyIncidentEntry[] => {
+    if (!Array.isArray(value)) return false;
+    if (value.length === 0) return false;
+    return value.every(
+      (entry) =>
+        entry &&
+        typeof entry === "object" &&
+        "id" in entry &&
+        "title" in entry &&
+        "status" in entry &&
+        "urgency" in entry &&
+        typeof (entry as PagerDutyIncidentEntry).id === "string" &&
+        typeof (entry as PagerDutyIncidentEntry).title === "string" &&
+        ((entry as PagerDutyIncidentEntry).status === "triggered" ||
+          (entry as PagerDutyIncidentEntry).status === "acknowledged" ||
+          (entry as PagerDutyIncidentEntry).status === "resolved"),
+    );
+  };
+  const getUrgencyDotColor = (urgency: string) => {
+    if (urgency === "high") return "bg-red-500";
+    return "bg-yellow-500";
+  };
   const getApprovalStatusColor = (status: string) => {
     const normalized = status.toLowerCase();
     if (normalized === "approved") return "bg-emerald-500";
@@ -267,7 +300,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
             <div
               className={`uppercase text-[11px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-white ${EventBadgeColor}`}
             >
-              <span>{state}</span>
+              <span>{eventStateStyle.label || state}</span>
             </div>
           </div>
         </div>
@@ -497,6 +530,82 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                               </div>
                             ))}
                           </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (isPagerDutyIncidentsList(value)) {
+                    return (
+                      <div key={key} className="flex items-start gap-1 px-2 rounded-md w-full min-w-0 font-medium">
+                        <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
+                          {key}:
+                        </span>
+                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
+                          {value.length === 0 ? (
+                            <span className="text-gray-500 italic">No incidents</span>
+                          ) : (
+                            <div className="flex flex-col gap-3">
+                              {value.map((incident, incidentIndex) => (
+                                <div key={`${incident.id}-${incidentIndex}`} className="relative pl-4">
+                                  {/* Timeline dot - colored by urgency */}
+                                  <div
+                                    className={`absolute left-0 top-1.5 h-2 w-2 rounded-full ${getUrgencyDotColor(incident.urgency)}`}
+                                  />
+                                  {/* Timeline connecting line */}
+                                  {incidentIndex < value.length - 1 && (
+                                    <div className="absolute left-[3px] top-4 bottom-[-12px] w-px bg-gray-200" />
+                                  )}
+
+                                  {/* Incident title with link */}
+                                  <div className="text-[13px] text-gray-800 font-medium">
+                                    {incident.html_url ? (
+                                      <a
+                                        href={incident.html_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="break-words"
+                                        style={{ textDecoration: "underline 1px" }}
+                                        title={incident.title}
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        {incident.title}
+                                      </a>
+                                    ) : (
+                                      <span className="break-words" title={incident.title}>
+                                        {incident.title}
+                                      </span>
+                                    )}
+                                    {incident.created_at && (
+                                      <>
+                                        {" · "}
+                                        <span className="text-[12px] font-normal text-gray-500">
+                                          {formatTimeAgo(new Date(incident.created_at))}
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+
+                                  {/* Service, status, and priority info */}
+                                  <div className="text-[12px] text-gray-600 truncate">
+                                    <span className="capitalize">{incident.status}</span>
+                                    {incident.service && (
+                                      <>
+                                        {" · "}
+                                        <span title={incident.service}>{incident.service}</span>
+                                      </>
+                                    )}
+                                    {incident.priority && (
+                                      <>
+                                        {" · "}
+                                        <span title={`Priority: ${incident.priority}`}>{incident.priority}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
