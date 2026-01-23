@@ -114,6 +114,7 @@ func (g *GitHub) Triggers() []core.Trigger {
 		&OnRelease{},
 		&OnTagCreated{},
 		&OnBranchCreated{},
+		&OnWorkflowRun{},
 	}
 }
 
