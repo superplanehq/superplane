@@ -1,0 +1,50 @@
+---
+app: "smtp"
+label: "Send Email"
+name: "smtp.sendEmail"
+type: "component"
+---
+
+# Send Email
+
+Send an email via SMTP
+
+## Output Channels
+
+| Name | Label | Description |
+| --- | --- | --- |
+| default | Default | - |
+
+## Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| to | To | string | yes | Recipient email addresses (comma-separated for multiple) |
+| cc | CC | string | no | CC recipients (comma-separated) |
+| bcc | BCC | string | no | BCC recipients (comma-separated) |
+| subject | Subject | string | yes | Email subject line |
+| body | Body | text | yes | Email body content |
+| isHTML | HTML Format | boolean | no | Enable if the body contains HTML markup |
+| fromName | From Name (Override) | string | no | Override the default sender display name |
+| fromEmail | From Email (Override) | string | no | Override the default sender email address |
+| replyTo | Reply-To | string | no | Reply-to email address |
+
+## Example Output
+
+```json
+{
+  "data": {
+    "cc": [],
+    "fromEmail": "sender@example.com",
+    "sentAt": "2025-01-21T12:00:00Z",
+    "subject": "Hello from Superplane",
+    "success": true,
+    "to": [
+      "recipient@example.com"
+    ]
+  },
+  "timestamp": "2025-01-21T12:00:00.000000000Z",
+  "type": "smtp.email.sent"
+}
+```
+
