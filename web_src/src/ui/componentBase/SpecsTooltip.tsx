@@ -17,7 +17,7 @@ export function SpecsTooltip({ children, specTitle, specValues, tooltipTitle, hi
       render={(attrs) => (
         <div
           {...attrs}
-          className="bg-white outline-1 outline-slate-300 shadow-md rounded-md max-w-[700px]"
+          className="bg-white outline-1 outline-slate-300 shadow-md rounded-md max-w-[1400px]"
           style={{ zIndex: 10000 }}
         >
           <div className="flex items-center border-b border-slate-300">
@@ -28,7 +28,7 @@ export function SpecsTooltip({ children, specTitle, specValues, tooltipTitle, hi
           {specValues.map((value, index) => (
             <div
               key={index}
-              className={`flex max-w-[700px] items-center gap-2 p-2 ${index === specValues.length - 1 ? "border-b-0" : "border-b"}`}
+              className={`flex max-w-[1400px] items-center gap-2 p-2 overflow-x-auto ${index === specValues.length - 1 ? "border-b-0" : "border-b"}`}
             >
               {value.badges.map((badge, badgeIndex) => (
                 <span

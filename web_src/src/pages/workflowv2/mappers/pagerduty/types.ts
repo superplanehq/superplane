@@ -20,6 +20,9 @@ export interface Incident {
   status?: string;
   html_url?: string;
   created_at?: string;
+  updated_at?: string;
+  resolved_at?: string;
+  last_status_change_at?: string;
   assignments?: IncidentAssignment[];
   service?: ResourceRef;
   escalation_policy?: ResourceRef;

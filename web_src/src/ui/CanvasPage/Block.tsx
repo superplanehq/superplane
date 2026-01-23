@@ -55,7 +55,10 @@ interface BlockProps extends ComponentActionsProps {
   data: BlockData;
   nodeId?: string;
   selected?: boolean;
-  onAnnotationUpdate?: (nodeId: string, updates: { text?: string; color?: string }) => void;
+  onAnnotationUpdate?: (
+    nodeId: string,
+    updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
+  ) => void;
 
   onExpand?: (nodeId: string, nodeData: BlockData) => void;
   onClick?: () => void;
@@ -438,7 +441,14 @@ function BlockContent({
     case "merge":
       return <MergeComponent {...(data.merge as MergeComponentProps)} selected={selected} {...actionProps} />;
     case "annotation": {
-      const handleAnnotationUpdate = (updates: { text?: string; color?: string }) => {
+      const handleAnnotationUpdate = (updates: {
+        text?: string;
+        color?: string;
+        width?: number;
+        height?: number;
+        x?: number;
+        y?: number;
+      }) => {
         if (nodeId && onAnnotationUpdate) {
           onAnnotationUpdate(nodeId, updates);
         }

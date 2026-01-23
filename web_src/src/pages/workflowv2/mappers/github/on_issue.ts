@@ -5,6 +5,7 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
 import { getDetailsForIssue } from "./base";
 import { BaseNodeMetadata, Issue } from "./types";
+import { buildGithubSubtitle } from "./utils";
 
 interface OnIssueConfiguration {
   actions: string[];
@@ -24,7 +25,7 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
 
     return {
       title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
-      subtitle: eventData?.action || "",
+      subtitle: buildGithubSubtitle(eventData?.action || "", event.createdAt),
     };
   },
 
@@ -66,7 +67,7 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
 
       props.lastEventData = {
         title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
-        subtitle: eventData?.action || "",
+        subtitle: buildGithubSubtitle(eventData?.action || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id,

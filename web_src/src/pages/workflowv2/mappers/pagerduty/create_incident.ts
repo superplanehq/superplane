@@ -12,6 +12,7 @@ import { MetadataItem } from "@/ui/metadataList";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
 import { BaseNodeMetadata, Incident } from "./types";
 import { getDetailsForIncident } from "./base";
+import { formatTimeAgo } from "@/utils/date";
 
 export const createIncidentMapper: ComponentBaseMapper = {
   props(
@@ -40,6 +41,10 @@ export const createIncidentMapper: ComponentBaseMapper = {
     const outputs = execution.outputs as { default: OutputPayload[] };
     const incident = outputs.default[0].data.incident as Incident;
     return getDetailsForIncident(incident);
+  },
+  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+    if (!execution.createdAt) return "";
+    return formatTimeAgo(new Date(execution.createdAt));
   },
 };
 

@@ -56,13 +56,13 @@ export interface ComponentBaseMapper {
     additionalData?: unknown,
   ): ComponentBaseProps;
 
-  subtitle?(
+  subtitle(
     node: ComponentsNode,
     execution: WorkflowsWorkflowNodeExecution,
     additionalData?: unknown,
   ): string | React.ReactNode;
 
-  getExecutionDetails?(execution: WorkflowsWorkflowNodeExecution, node: ComponentsNode): Record<string, any>;
+  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, node: ComponentsNode): Record<string, any>;
 }
 
 /**

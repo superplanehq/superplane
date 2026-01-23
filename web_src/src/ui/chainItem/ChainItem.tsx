@@ -151,7 +151,13 @@ export const ChainItem: React.FC<ChainItemProps> = ({
 
     const mapper = getComponentBaseMapper(item.workflowNode.component.name);
     // Pass a marker to indicate this is from ChainItem, so subtitle can skip issue counts
-    return mapper.subtitle?.(item.workflowNode, item.originalExecution, { skipIssueCounts: true });
+    const subtitle = mapper.subtitle?.(item.workflowNode, item.originalExecution, { skipIssueCounts: true });
+    const parts = subtitle ? subtitle.toString().split(" · ") : [];
+    if (parts.length > 1) {
+      return parts[0];
+    }
+
+    return "";
   }, [item.workflowNode, item.originalExecution]);
 
   const copyToClipboard = useCallback((text: string) => {

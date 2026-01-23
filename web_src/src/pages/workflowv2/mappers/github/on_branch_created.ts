@@ -4,7 +4,7 @@ import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
 import { BaseNodeMetadata, GitRef } from "./types";
-import { Predicate, createGithubMetadataItems } from "./utils";
+import { Predicate, buildGithubSubtitle, createGithubMetadataItems } from "./utils";
 
 interface GithubConfiguration {
   repository: string;
@@ -20,7 +20,7 @@ export const onBranchCreatedTriggerRenderer: TriggerRenderer = {
 
     return {
       title: eventData?.ref ? `Branch: ${eventData.ref}` : "Branch Created",
-      subtitle: eventData?.repository?.full_name || "",
+      subtitle: buildGithubSubtitle(eventData?.ref || "", event.createdAt),
     };
   },
 
@@ -50,7 +50,7 @@ export const onBranchCreatedTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data?.data as GitRef;
       props.lastEventData = {
         title: eventData?.ref ? `Branch: ${eventData.ref}` : "Branch Created",
-        subtitle: eventData?.repository?.full_name || "",
+        subtitle: buildGithubSubtitle(eventData?.ref || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id,

@@ -11,6 +11,7 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import { MetadataItem } from "@/ui/metadataList";
 import { OutputPayload, ComponentBaseMapper } from "../types";
 import { Issue } from "./types";
+import { buildGithubExecutionSubtitle } from "./utils";
 
 export const baseIssueMapper: ComponentBaseMapper = {
   props(
@@ -22,17 +23,20 @@ export const baseIssueMapper: ComponentBaseMapper = {
   ): ComponentBaseProps {
     return baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
   },
+  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+    return buildGithubExecutionSubtitle(execution);
+  },
 
   getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, string> {
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+    const details: Record<string, string> = {};
 
-    // If no outputs (e.g., execution failed), return empty details
     if (!outputs || !outputs.default || outputs.default.length === 0) {
-      return {};
+      return details;
     }
 
     const issue = outputs.default[0].data as Issue;
-    return getDetailsForIssue(issue);
+    return { ...getDetailsForIssue(issue), ...details };
   },
 };
 
@@ -60,19 +64,22 @@ export function baseProps(
 }
 
 export function getDetailsForIssue(issue: Issue): Record<string, string> {
-  const details: Record<string, string> = {
-    Number: issue?.number.toString(),
-    ID: issue?.id.toString(),
-    State: issue?.state,
-    URL: issue?.html_url,
-    Title: issue?.title || "-",
-    Author: issue?.user?.html_url || "-",
-    "Created At": issue?.created_at,
-  };
+  const details: Record<string, string> = {};
+  Object.assign(details, {
+    "Created At": issue?.created_at ? new Date(issue.created_at).toLocaleString() : "-",
+    "Created By": issue?.user?.login || "-",
+  });
+
+  details["Number"] = issue?.number.toString();
+  details["ID"] = issue?.id.toString();
+  details["State"] = issue?.state;
+  details["URL"] = issue?.html_url;
+  details["Title"] = issue?.title || "-";
+  details["Author"] = issue?.user?.html_url || "-";
 
   if (issue.closed_by) {
     details["Closed By"] = issue?.closed_by.html_url;
-    details["Closed At"] = issue?.closed_at!;
+    details["Closed At"] = issue?.closed_at ? new Date(issue.closed_at).toLocaleString() : "";
   }
 
   if (issue.labels) {
@@ -111,6 +118,7 @@ function baseEventSections(
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
       eventState: getState(componentName)(execution),
+      eventSubtitle: buildGithubExecutionSubtitle(execution),
       eventId: execution.rootEvent?.id,
     },
   ];

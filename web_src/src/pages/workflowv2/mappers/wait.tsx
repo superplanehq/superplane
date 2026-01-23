@@ -5,14 +5,21 @@ import {
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
-import { ComponentBaseMapper, CustomFieldRenderer } from "./types";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, OutputPayload, StateFunction } from "./types";
+import {
+  ComponentBaseProps,
+  EventSection,
+  EventState,
+  EventStateMap,
+  DEFAULT_EVENT_STATE_MAP,
+} from "@/ui/componentBase";
 import { getTriggerRenderer, getState, getStateMap } from ".";
 import { TimeLeftCountdown } from "@/ui/timeLeftCountdown";
-import { formatTimestamp } from "@/lib/utils";
+import { calcRelativeTimeFromDiff, formatTimestamp } from "@/lib/utils";
 import { MetadataItem } from "@/ui/metadataList";
 import Tippy from "@tippyjs/react/headless";
 import "tippy.js/dist/tippy.css";
+import { formatTimeAgo } from "@/utils/date";
 
 // Helper function to detect if a value contains expressions
 function hasExpressions(value: string): boolean {
@@ -73,6 +80,101 @@ export const waitMapper: ComponentBaseMapper = {
       eventStateMap: getStateMap(componentName),
     };
   },
+  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): React.ReactNode {
+    const subtitle = getWaitEventSubtitle(execution, undefined, "wait");
+    return subtitle || "";
+  },
+  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, any> {
+    const details: Record<string, any> = {};
+    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+    const payload = outputs?.default?.[0];
+    const data = payload?.data as Record<string, any> | undefined;
+    const actor = data?.actor as { email?: string; display_name?: string } | undefined;
+    const metadata = execution.metadata as { interval_duration?: number; start_time?: string } | undefined;
+
+    const startedAt = formatDateValue(data?.started_at) || formatDateValue(metadata?.start_time);
+    if (startedAt) {
+      details["Started At"] = startedAt;
+    }
+
+    const finishedAt = formatDateValue(data?.finished_at);
+    if (finishedAt) {
+      details["Finished At"] = finishedAt;
+    }
+
+    if (data?.result) {
+      details["Result"] = String(data.result);
+    }
+
+    if (data?.reason) {
+      details["Reason"] = String(data.reason);
+    }
+
+    if (actor?.display_name || actor?.email) {
+      details["Actor"] = actor.display_name || actor.email || "";
+    }
+
+    if (metadata?.interval_duration && metadata.interval_duration > 0) {
+      details["Interval Duration"] = calcRelativeTimeFromDiff(metadata.interval_duration);
+    }
+
+    return details;
+  },
+};
+
+export const WAIT_STATE_MAP: EventStateMap = {
+  ...DEFAULT_EVENT_STATE_MAP,
+  finished: {
+    icon: "circle-check",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-green-100",
+    badgeColor: "bg-emerald-500",
+  },
+  "pushed through": {
+    icon: "arrow-right",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-amber-100",
+    badgeColor: "bg-amber-500",
+  },
+};
+
+export const waitStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
+  if (!execution) return "neutral";
+
+  if (
+    execution.resultMessage &&
+    (execution.resultReason === "RESULT_REASON_ERROR" || execution.result === "RESULT_FAILED")
+  ) {
+    return "error";
+  }
+
+  if (execution.result === "RESULT_CANCELLED") {
+    return "cancelled";
+  }
+
+  if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
+    return "running";
+  }
+
+  if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
+    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+    const payload = outputs?.default?.[0];
+    const data = payload?.data as Record<string, unknown> | undefined;
+    const reason = data?.reason;
+
+    if (reason === "manual_override") {
+      return "pushed through";
+    }
+
+    return "finished";
+  }
+
+  return "failed";
+};
+
+export const WAIT_STATE_REGISTRY: EventStateRegistry = {
+  stateMap: WAIT_STATE_MAP,
+  getState: waitStateFunction,
 };
 
 function getWaitMetadataList(node: ComponentsNode): MetadataItem[] {
@@ -156,7 +258,30 @@ function getWaitEventSections(
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
 
-  let eventSubtitle: string | React.ReactNode | undefined;
+  const eventSubtitle = getWaitEventSubtitle(execution, configuration, componentName);
+
+  const eventSection: EventSection = {
+    receivedAt: new Date(execution.createdAt!),
+    eventTitle: title,
+    eventSubtitle,
+    eventState: executionState,
+    eventId: execution.rootEvent?.id,
+  };
+
+  return [eventSection];
+}
+
+function getWaitEventSubtitle(
+  execution: WorkflowsWorkflowNodeExecution,
+  configuration: Record<string, unknown> | undefined,
+  componentName: string,
+): string | React.ReactNode | undefined {
+  const executionState = getState(componentName)(execution);
+  const timeAgo = execution.updatedAt
+    ? formatTimeAgo(new Date(execution.updatedAt))
+    : execution.createdAt
+      ? formatTimeAgo(new Date(execution.createdAt))
+      : "";
 
   // Get expected duration from execution metadata (calculated interval)
   let expectedDuration: number | undefined;
@@ -173,7 +298,7 @@ function getWaitEventSections(
   }
 
   // Fallback to configuration-based calculation if metadata is not available
-  if (!expectedDuration) {
+  if (!expectedDuration && configuration) {
     if (configuration?.mode === "interval") {
       const waitFor = configuration.waitFor as string;
       const unit = configuration.unit as string;
@@ -213,26 +338,31 @@ function getWaitEventSections(
   }
 
   if (executionState === "running" && execution.createdAt && expectedDuration) {
-    eventSubtitle = <TimeLeftCountdown createdAt={new Date(execution.createdAt)} expectedDuration={expectedDuration} />;
+    return (
+      <>
+        <TimeLeftCountdown createdAt={new Date(execution.createdAt)} expectedDuration={expectedDuration} />
+        {timeAgo ? ` · ${timeAgo}` : ""}
+      </>
+    );
   }
 
-  if (executionState === "success" || executionState === "failed") {
+  if (executionState === "finished" || executionState === "failed" || executionState === "pushed through") {
     if (execution.updatedAt) {
-      eventSubtitle = `Done at: ${formatTimestamp(new Date(execution.updatedAt))} `;
-    } else {
-      eventSubtitle = "Done";
+      return `Done at: ${formatTimestamp(new Date(execution.updatedAt))} ${timeAgo ? `· ${timeAgo}` : ""}`;
     }
+    return timeAgo ? `Done · ${timeAgo}` : "Done";
   }
 
-  const eventSection: EventSection = {
-    receivedAt: new Date(execution.createdAt!),
-    eventTitle: title,
-    eventSubtitle,
-    eventState: executionState,
-    eventId: execution.rootEvent?.id,
-  };
+  return timeAgo;
+}
 
-  return [eventSection];
+function formatDateValue(value?: string): string | undefined {
+  if (!value) return undefined;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleString();
 }
 
 /**

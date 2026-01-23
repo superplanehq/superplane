@@ -4,7 +4,7 @@ import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
 import { BaseNodeMetadata, Push } from "./types";
-import { Predicate, createGithubMetadataItems } from "./utils";
+import { Predicate, buildGithubSubtitle, createGithubMetadataItems } from "./utils";
 
 interface GithubConfiguration {
   refs: Predicate[];
@@ -16,10 +16,11 @@ interface GithubConfiguration {
 export const onPushTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
     const eventData = event.data?.data as Push;
+    const shortSha = eventData?.head_commit?.id?.slice(0, 7) || "";
 
     return {
       title: eventData?.head_commit?.message || "",
-      subtitle: eventData?.head_commit?.id || "",
+      subtitle: buildGithubSubtitle(shortSha, event.createdAt),
     };
   },
 
@@ -47,9 +48,10 @@ export const onPushTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data?.data as Push;
+      const shortSha = eventData?.head_commit?.id?.slice(0, 7) || "";
       props.lastEventData = {
         title: eventData?.head_commit?.message || "",
-        subtitle: eventData?.head_commit?.id || "",
+        subtitle: buildGithubSubtitle(shortSha, lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id,
