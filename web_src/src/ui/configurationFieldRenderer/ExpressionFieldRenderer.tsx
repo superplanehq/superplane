@@ -45,9 +45,10 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
       value={currentValue}
       onChange={(nextValue) => onChange(nextValue || undefined)}
       placeholder={field.placeholder || ""}
+      expressionMode="raw"
       inputSize="md"
       showValuePreview
-      quickTip="Tip: type `$` to browse node outputs."
+      quickTip="Tip: type `$` to browse node payloads."
       className=""
       data-testid={toTestId(`expression-field-${field.name}`)}
     />
