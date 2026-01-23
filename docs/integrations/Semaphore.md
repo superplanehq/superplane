@@ -1,11 +1,65 @@
 ---
-app: "semaphore"
-label: "On Pipeline Done"
-name: "semaphore.onPipelineDone"
-type: "trigger"
+title: "Semaphore"
+sidebar:
+  label: "Semaphore"
+type: "application"
+name: "semaphore"
+label: "Semaphore"
 ---
 
-# On Pipeline Done
+# Semaphore
+
+Run and react to your Semaphore workflows
+
+## Components
+
+### Run Workflow
+
+Run Semaphore workflow
+
+## Output Channels
+
+| Name | Label | Description |
+| --- | --- | --- |
+| passed | Passed | - |
+| failed | Failed | - |
+
+## Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| project | Project | app-installation-resource | yes | - |
+| pipelineFile | Pipeline file | string | yes | - |
+| ref | Pipeline file location | git-ref | yes | - |
+| commitSha | Commit SHA | string | no | - |
+| parameters | Parameters | list | no | - |
+
+## Example Output
+
+```json
+{
+  "data": {
+    "extra": {
+      "triggeredBy": "SuperPlane"
+    },
+    "pipeline": {
+      "id": "ppl_456",
+      "result": "passed",
+      "state": "done"
+    },
+    "workflow": {
+      "id": "wf_123",
+      "url": "https://semaphore.example.com/workflows/wf_123"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "semaphore.workflow.finished"
+}
+```
+
+## Triggers
+
+### On Pipeline Done
 
 Listen to Semaphore pipeline done events
 

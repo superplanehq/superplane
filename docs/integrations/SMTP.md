@@ -1,11 +1,19 @@
 ---
-app: "smtp"
-label: "Send Email"
-name: "smtp.sendEmail"
-type: "component"
+title: "SMTP"
+sidebar:
+  label: "SMTP"
+type: "application"
+name: "smtp"
+label: "SMTP"
 ---
 
-# Send Email
+# SMTP
+
+Send emails via any SMTP server
+
+## Components
+
+### Send Email
 
 Send an email via SMTP
 

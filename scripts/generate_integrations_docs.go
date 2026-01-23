@@ -46,15 +46,7 @@ func main() {
 }
 
 func writeAppDocs(app core.Application) error {
-	appSlug := slugify(app.Name())
-	baseDir := filepath.Join(docsRoot, appSlug)
-	componentDir := filepath.Join(baseDir, "components")
-	triggerDir := filepath.Join(baseDir, "triggers")
-
-	if err := os.MkdirAll(componentDir, 0o755); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(triggerDir, 0o755); err != nil {
+	if err := os.MkdirAll(docsRoot, 0o755); err != nil {
 		return err
 	}
 
@@ -64,28 +56,17 @@ func writeAppDocs(app core.Application) error {
 	sort.Slice(components, func(i, j int) bool { return components[i].Name() < components[j].Name() })
 	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
 
-	for _, component := range components {
-		if err := writeComponentDoc(componentDir, app, component); err != nil {
-			return err
-		}
-	}
-
-	for _, trigger := range triggers {
-		if err := writeTriggerDoc(triggerDir, app, trigger); err != nil {
-			return err
-		}
-	}
-
-	return writeAppIndex(baseDir, app, components, triggers)
+	return writeAppIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.md", appFilename(app))), app, components, triggers)
 }
 
-func writeAppIndex(dir string, app core.Application, components []core.Component, triggers []core.Trigger) error {
+func writeAppIndex(
+	path string,
+	app core.Application,
+	components []core.Component,
+	triggers []core.Trigger,
+) error {
 	var buf bytes.Buffer
-	writeFrontMatter(&buf, map[string]string{
-		"type":  "application",
-		"name":  app.Name(),
-		"label": app.Label(),
-	})
+	writeAppFrontMatter(&buf, app)
 
 	buf.WriteString(fmt.Sprintf("# %s\n\n", app.Label()))
 	writeParagraph(&buf, app.Description())
@@ -96,83 +77,51 @@ func writeAppIndex(dir string, app core.Application, components []core.Component
 		buf.WriteString("\n\n")
 	}
 
-	if len(components) > 0 {
-		buf.WriteString("## Components\n\n")
-		for _, component := range components {
-			name := component.Name()
-			label := component.Label()
-			link := fmt.Sprintf("components/%s.md", slugify(componentNameOnly(name)))
-			buf.WriteString(fmt.Sprintf("- [%s](%s)\n", label, link))
-		}
-		buf.WriteString("\n")
-	}
+	writeComponentSection(&buf, components)
+	writeTriggerSection(&buf, triggers)
 
-	if len(triggers) > 0 {
-		buf.WriteString("## Triggers\n\n")
-		for _, trigger := range triggers {
-			name := trigger.Name()
-			label := trigger.Label()
-			link := fmt.Sprintf("triggers/%s.md", slugify(componentNameOnly(name)))
-			buf.WriteString(fmt.Sprintf("- [%s](%s)\n", label, link))
-		}
-		buf.WriteString("\n")
-	}
-
-	return writeFile(filepath.Join(dir, "index.md"), buf.Bytes())
+	return writeFile(path, buf.Bytes())
 }
 
-func writeComponentDoc(dir string, app core.Application, component core.Component) error {
-	var buf bytes.Buffer
-	writeFrontMatter(&buf, map[string]string{
-		"type":  "component",
-		"app":   app.Name(),
-		"name":  component.Name(),
-		"label": component.Label(),
-	})
-
-	buf.WriteString(fmt.Sprintf("# %s\n\n", component.Label()))
-	writeParagraph(&buf, component.Description())
-
-	writeOutputChannels(&buf, component.OutputChannels(nil))
-	writeConfiguration(&buf, component.Configuration())
-	writeExample("Example Output", component.ExampleOutput(), &buf)
-
-	filename := filepath.Join(dir, fmt.Sprintf("%s.md", slugify(componentNameOnly(component.Name()))))
-	return writeFile(filename, buf.Bytes())
-}
-
-func writeTriggerDoc(dir string, app core.Application, trigger core.Trigger) error {
-	var buf bytes.Buffer
-	writeFrontMatter(&buf, map[string]string{
-		"type":  "trigger",
-		"app":   app.Name(),
-		"name":  trigger.Name(),
-		"label": trigger.Label(),
-	})
-
-	buf.WriteString(fmt.Sprintf("# %s\n\n", trigger.Label()))
-	writeParagraph(&buf, trigger.Description())
-
-	config := actions.AppendGlobalTriggerFields(trigger.Configuration())
-	writeConfiguration(&buf, config)
-	writeExample("Example Data", trigger.ExampleData(), &buf)
-
-	filename := filepath.Join(dir, fmt.Sprintf("%s.md", slugify(componentNameOnly(trigger.Name()))))
-	return writeFile(filename, buf.Bytes())
-}
-
-func writeFrontMatter(buf *bytes.Buffer, fields map[string]string) {
+func writeAppFrontMatter(buf *bytes.Buffer, app core.Application) {
 	buf.WriteString("---\n")
-	keys := make([]string, 0, len(fields))
-	for key := range fields {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		value := strings.TrimSpace(fields[key])
-		buf.WriteString(fmt.Sprintf("%s: \"%s\"\n", key, escapeQuotes(value)))
-	}
+	buf.WriteString(fmt.Sprintf("title: \"%s\"\n", escapeQuotes(app.Label())))
+	buf.WriteString("sidebar:\n")
+	buf.WriteString(fmt.Sprintf("  label: \"%s\"\n", escapeQuotes(app.Label())))
+	buf.WriteString(fmt.Sprintf("type: \"%s\"\n", escapeQuotes("application")))
+	buf.WriteString(fmt.Sprintf("name: \"%s\"\n", escapeQuotes(app.Name())))
+	buf.WriteString(fmt.Sprintf("label: \"%s\"\n", escapeQuotes(app.Label())))
 	buf.WriteString("---\n\n")
+}
+
+func writeComponentSection(buf *bytes.Buffer, components []core.Component) {
+	if len(components) == 0 {
+		return
+	}
+
+	buf.WriteString("## Components\n\n")
+	for _, component := range components {
+		buf.WriteString(fmt.Sprintf("### %s\n\n", component.Label()))
+		writeParagraph(buf, component.Description())
+		writeOutputChannels(buf, component.OutputChannels(nil))
+		writeConfiguration(buf, component.Configuration())
+		writeExample("Example Output", component.ExampleOutput(), buf)
+	}
+}
+
+func writeTriggerSection(buf *bytes.Buffer, triggers []core.Trigger) {
+	if len(triggers) == 0 {
+		return
+	}
+
+	buf.WriteString("## Triggers\n\n")
+	for _, trigger := range triggers {
+		buf.WriteString(fmt.Sprintf("### %s\n\n", trigger.Label()))
+		writeParagraph(buf, trigger.Description())
+		config := actions.AppendGlobalTriggerFields(trigger.Configuration())
+		writeConfiguration(buf, config)
+		writeExample("Example Data", trigger.ExampleData(), buf)
+	}
 }
 
 func writeParagraph(buf *bytes.Buffer, text string) {
@@ -256,12 +205,12 @@ func slugify(value string) string {
 	return strings.ToLower(withDashes)
 }
 
-func componentNameOnly(value string) string {
-	parts := strings.SplitN(value, ".", 2)
-	if len(parts) == 2 {
-		return parts[1]
+func appFilename(app core.Application) string {
+	label := strings.TrimSpace(app.Label())
+	if label == "" {
+		return slugify(app.Name())
 	}
-	return value
+	return label
 }
 
 func formatTableValue(value string) string {

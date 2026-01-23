@@ -1,11 +1,19 @@
 ---
-app: "openai"
-label: "Text Prompt"
-name: "openai.text_prompt"
-type: "component"
+title: "OpenAI"
+sidebar:
+  label: "OpenAI"
+type: "application"
+name: "openai"
+label: "OpenAI"
 ---
 
-# Text Prompt
+# OpenAI
+
+Generate text responses with OpenAI models
+
+## Components
+
+### Text Prompt
 
 Generate a text response using OpenAI
 
