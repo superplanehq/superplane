@@ -169,10 +169,19 @@ func (s *ApprovalSteps) approveFirstPendingRequirement() {
 }
 
 func (s *ApprovalSteps) approveAnyoneRequirement() {
+	s.session.AssertVisible(q.Locator(`button:has-text("Approve")`))
+
 	item := s.session.Page().Locator(`[data-slot="item"]:has([data-slot="item-title"]:has-text("Any user"))`)
 	approveButton := item.Locator(`button:has-text("Approve")`).First()
+	count, err := approveButton.Count()
+	if err != nil {
+		s.t.Fatalf("counting approve buttons for any user: %v", err)
+	}
+	if count == 0 {
+		approveButton = s.session.Page().Locator(`button:has-text("Approve")`).First()
+	}
 	if err := approveButton.Click(); err != nil {
-		s.t.Fatalf("clicking approve button for any user: %v", err)
+		s.t.Fatalf("clicking approve button: %v", err)
 	}
 	s.session.FillIn(q.Locator(`input:has-placeholder("Enter comment")`), "Do it")
 	s.session.Click(q.Locator(`button:has-text("Confirm Approval")`))
