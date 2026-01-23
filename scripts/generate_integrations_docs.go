@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,12 +22,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/workflows"
+	spjwt "github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/server"
 	"google.golang.org/protobuf/encoding/protojson"
-	"gopkg.in/yaml.v3"
+	yamlv3 "gopkg.in/yaml.v3"
+	"gorm.io/gorm"
 
 	// Register integrations used by doc templates.
 	_ "github.com/superplanehq/superplane/pkg/components/http"
@@ -71,7 +74,7 @@ func writeCoreDocsFromIndex(indexPath string, outputPath string) error {
 	}
 
 	var index docIndex
-	if err := yaml.Unmarshal(indexData, &index); err != nil {
+	if err := yamlv3.Unmarshal(indexData, &index); err != nil {
 		return err
 	}
 
@@ -289,8 +292,12 @@ func generateCanvasScreenshot(templatePath string) (string, error) {
 	}
 	defer env.shutdown()
 
-	orgID, userID, err := seedUserAndOrganization()
+	orgID, userID, accountID, err := seedUserAndOrganization()
 	if err != nil {
+		return "", err
+	}
+
+	if err := ensureWorkflowNameAvailable(orgID, workflow); err != nil {
 		return "", err
 	}
 
@@ -306,7 +313,14 @@ func generateCanvasScreenshot(templatePath string) (string, error) {
 		return "", err
 	}
 
+	if err := env.addAuthCookie(accountID); err != nil {
+		return "", err
+	}
+
 	if err := env.openWorkflow(orgID, workflowID, waitText); err != nil {
+		return "", err
+	}
+	if err := env.zoomCanvas(2); err != nil {
 		return "", err
 	}
 
@@ -315,11 +329,7 @@ func generateCanvasScreenshot(templatePath string) (string, error) {
 		return "", err
 	}
 
-	if _, err := env.page.Screenshot(pw.PageScreenshotOptions{
-		Path:     pw.String(screenshotPath),
-		FullPage: pw.Bool(true),
-		Type:     pw.ScreenshotTypePng,
-	}); err != nil {
+	if err := env.captureCanvasScreenshot(screenshotPath); err != nil {
 		return "", err
 	}
 
@@ -341,7 +351,7 @@ func (e *screenshotEnv) start() error {
 
 func (e *screenshotEnv) shutdown() {
 	if e.page != nil {
-		_, _ = e.page.Close()
+		_ = e.page.Close()
 	}
 	if e.context != nil {
 		_ = e.context.Close()
@@ -389,6 +399,22 @@ func (e *screenshotEnv) launchBrowser() error {
 	e.page = page
 	e.baseURL = os.Getenv("BASE_URL")
 	return nil
+}
+
+func (e *screenshotEnv) addAuthCookie(accountID uuid.UUID) error {
+	secret := os.Getenv("JWT_SECRET")
+	signer := spjwt.NewSigner(secret)
+	token, err := signer.Generate(accountID.String(), 24*time.Hour)
+	if err != nil {
+		return err
+	}
+
+	return e.context.AddCookies([]pw.OptionalCookie{{
+		Name:     "account_token",
+		Value:    token,
+		URL:      pw.String(e.baseURL + "/"),
+		HttpOnly: pw.Bool(true),
+	}})
 }
 
 func (e *screenshotEnv) startAppServer() {
@@ -449,6 +475,99 @@ func (e *screenshotEnv) openWorkflow(orgID uuid.UUID, workflowID uuid.UUID, wait
 	return nil
 }
 
+func (e *screenshotEnv) zoomCanvas(steps int) error {
+	if steps <= 0 {
+		return nil
+	}
+	if err := e.page.Click(".react-flow"); err != nil {
+		return err
+	}
+	for i := 0; i < steps; i++ {
+		if err := e.page.Keyboard().Press("Control+="); err != nil {
+			return err
+		}
+		time.Sleep(350 * time.Millisecond)
+	}
+	return nil
+}
+
+func (e *screenshotEnv) captureCanvasScreenshot(path string) error {
+	canvas := e.page.Locator(".react-flow")
+	if err := canvas.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(10000)}); err != nil {
+		return err
+	}
+	if err := e.page.Locator(".react-flow__node").First().WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(10000)}); err != nil {
+		return err
+	}
+
+	clip, err := e.page.Evaluate(`() => {
+		const nodes = Array.from(document.querySelectorAll('.react-flow__node'));
+		if (nodes.length === 0) {
+			return null;
+		}
+		let minX = Infinity;
+		let minY = Infinity;
+		let maxX = -Infinity;
+		let maxY = -Infinity;
+		for (const node of nodes) {
+			const rect = node.getBoundingClientRect();
+			minX = Math.min(minX, rect.left);
+			minY = Math.min(minY, rect.top);
+			maxX = Math.max(maxX, rect.right);
+			maxY = Math.max(maxY, rect.bottom);
+		}
+		const padding = 80;
+		minX = Math.max(0, minX - padding);
+		minY = Math.max(0, minY - padding);
+		maxX = Math.min(window.innerWidth, maxX + padding);
+		maxY = Math.min(window.innerHeight, maxY + padding);
+		return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+	}`)
+	if err != nil {
+		return err
+	}
+	if clip == nil {
+		return fmt.Errorf("no canvas nodes found for screenshot crop")
+	}
+
+	clipMap, ok := clip.(map[string]any)
+	if !ok {
+		return fmt.Errorf("unexpected clip data")
+	}
+
+	x, ok := clipMap["x"].(float64)
+	if !ok {
+		return fmt.Errorf("invalid clip x")
+	}
+	y, ok := clipMap["y"].(float64)
+	if !ok {
+		return fmt.Errorf("invalid clip y")
+	}
+	width, ok := clipMap["width"].(float64)
+	if !ok {
+		return fmt.Errorf("invalid clip width")
+	}
+	height, ok := clipMap["height"].(float64)
+	if !ok {
+		return fmt.Errorf("invalid clip height")
+	}
+
+	if _, err := e.page.Screenshot(pw.PageScreenshotOptions{
+		Path: pw.String(path),
+		Type: pw.ScreenshotTypePng,
+		Clip: &pw.Rect{
+			X:      x,
+			Y:      y,
+			Width:  width,
+			Height: height,
+		},
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func readTemplateWorkflow(templatePath string) (*pb.Workflow, error) {
 	data, err := os.ReadFile(templatePath)
 	if err != nil {
@@ -478,14 +597,14 @@ func firstNodeName(workflow *pb.Workflow) string {
 	return workflow.Spec.Nodes[0].Name
 }
 
-func seedUserAndOrganization() (uuid.UUID, uuid.UUID, error) {
+func seedUserAndOrganization() (uuid.UUID, uuid.UUID, uuid.UUID, error) {
 	email := "docs@screenshot.superplane.local"
 	name := "Docs Screenshot"
 	account, err := models.FindAccountByEmail(email)
 	if err != nil {
 		account, err = models.CreateAccount(name, email)
 		if err != nil {
-			return uuid.Nil, uuid.Nil, err
+			return uuid.Nil, uuid.Nil, uuid.Nil, err
 		}
 	}
 
@@ -494,7 +613,7 @@ func seedUserAndOrganization() (uuid.UUID, uuid.UUID, error) {
 	if err != nil {
 		organization, err = models.CreateOrganization(orgName, "")
 		if err != nil {
-			return uuid.Nil, uuid.Nil, err
+			return uuid.Nil, uuid.Nil, uuid.Nil, err
 		}
 	}
 
@@ -502,11 +621,11 @@ func seedUserAndOrganization() (uuid.UUID, uuid.UUID, error) {
 	if err != nil {
 		user, err = models.CreateUser(organization.ID, account.ID, email, name)
 		if err != nil {
-			return uuid.Nil, uuid.Nil, err
+			return uuid.Nil, uuid.Nil, uuid.Nil, err
 		}
 	} else if user.DeletedAt.Valid {
 		if err := user.Restore(); err != nil {
-			return uuid.Nil, uuid.Nil, err
+			return uuid.Nil, uuid.Nil, uuid.Nil, err
 		}
 	}
 
@@ -514,14 +633,34 @@ func seedUserAndOrganization() (uuid.UUID, uuid.UUID, error) {
 		tx := database.Conn().Begin()
 		if err := svc.SetupOrganization(tx, organization.ID.String(), user.ID.String()); err != nil {
 			tx.Rollback()
-			return uuid.Nil, uuid.Nil, err
+			return uuid.Nil, uuid.Nil, uuid.Nil, err
 		}
 		if err := tx.Commit().Error; err != nil {
-			return uuid.Nil, uuid.Nil, err
+			return uuid.Nil, uuid.Nil, uuid.Nil, err
 		}
 	}
 
-	return organization.ID, user.ID, nil
+	return organization.ID, user.ID, account.ID, nil
+}
+
+func ensureWorkflowNameAvailable(orgID uuid.UUID, workflow *pb.Workflow) error {
+	if workflow == nil || workflow.Metadata == nil {
+		return nil
+	}
+	name := strings.TrimSpace(workflow.Metadata.Name)
+	if name == "" {
+		return nil
+	}
+
+	existing, err := models.FindWorkflowByName(name, orgID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	return existing.SoftDelete()
 }
 
 func setScreenshotEnv() {
