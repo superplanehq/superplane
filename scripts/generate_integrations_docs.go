@@ -87,6 +87,7 @@ func writeCoreDocsFromIndex(indexPath string, outputPath string) error {
 
 	var buf bytes.Buffer
 	writeCoreFrontMatter(&buf, strings.TrimSpace(index.Title))
+	writeImports(&buf, len(index.Components) > 0 || len(index.Triggers) > 0, hasExampleUseCases(index))
 	writeOverviewSection(&buf, index.Overview)
 	writeCardGridTriggers(&buf, index.Triggers)
 	writeCardGridComponents(&buf, index.Components)
@@ -121,6 +122,9 @@ func writeComponentSection(buf *bytes.Buffer, components []docEntry) error {
 		buf.WriteString(fmt.Sprintf("<a id=\"%s\"></a>\n\n", slugify(component.Title)))
 		buf.WriteString(fmt.Sprintf("## %s\n\n", component.Title))
 		writeParagraph(buf, component.Description)
+		if err := writeExampleUseCasesSection(buf, component.ExampleUseCases); err != nil {
+			return err
+		}
 		if err := writeExampleSection("Example Output", component.ExampleOutput, buf); err != nil {
 			return err
 		}
@@ -154,7 +158,6 @@ func writeCardGridComponents(buf *bytes.Buffer, components []docEntry) {
 		return
 	}
 
-	writeCardGridImport(buf)
 	buf.WriteString("## Components\n\n")
 	buf.WriteString("<CardGrid>\n")
 	for _, component := range components {
@@ -176,7 +179,6 @@ func writeCardGridTriggers(buf *bytes.Buffer, triggers []docEntry) {
 		return
 	}
 
-	writeCardGridImport(buf)
 	buf.WriteString("## Triggers\n\n")
 	buf.WriteString("<CardGrid>\n")
 	for _, trigger := range triggers {
@@ -261,7 +263,6 @@ func writeExampleUseCasesSection(buf *bytes.Buffer, useCases []exampleUseCase) e
 			relative = "./" + relative
 		}
 
-		writeTabsImport(buf)
 		buf.WriteString("<Tabs>\n")
 		buf.WriteString("  <TabItem label=\"UI\">\n\n")
 		buf.WriteString(fmt.Sprintf("![%s](%s)\n\n", escapeQuotes(title), relative))
@@ -304,20 +305,32 @@ func slugify(value string) string {
 	return strings.ToLower(withDashes)
 }
 
-func writeCardGridImport(buf *bytes.Buffer) {
-	content := buf.String()
-	if strings.Contains(content, "CardGrid") {
+func writeImports(buf *bytes.Buffer, includeCards bool, includeTabs bool) {
+	if includeCards && includeTabs {
+		buf.WriteString("import { CardGrid, LinkCard, Tabs, TabItem } from \"@astrojs/starlight/components\";\n\n")
 		return
 	}
-	buf.WriteString("import { CardGrid, LinkCard } from \"@astrojs/starlight/components\";\n\n")
+	if includeCards {
+		buf.WriteString("import { CardGrid, LinkCard } from \"@astrojs/starlight/components\";\n\n")
+		return
+	}
+	if includeTabs {
+		buf.WriteString("import { Tabs, TabItem } from \"@astrojs/starlight/components\";\n\n")
+	}
 }
 
-func writeTabsImport(buf *bytes.Buffer) {
-	content := buf.String()
-	if strings.Contains(content, "Tabs") {
-		return
+func hasExampleUseCases(index docIndex) bool {
+	for _, trigger := range index.Triggers {
+		if len(trigger.ExampleUseCases) > 0 {
+			return true
+		}
 	}
-	buf.WriteString("import { Tabs, TabItem } from \"@astrojs/starlight/components\";\n\n")
+	for _, component := range index.Components {
+		if len(component.ExampleUseCases) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 type screenshotEnv struct {
@@ -396,7 +409,9 @@ func (e *screenshotEnv) start() error {
 	if err := e.startVite(); err != nil {
 		return err
 	}
-	e.startAppServer()
+	if err := e.startAppServer(); err != nil {
+		return err
+	}
 	if err := e.startPlaywright(); err != nil {
 		return err
 	}
@@ -471,22 +486,30 @@ func (e *screenshotEnv) addAuthCookie(accountID uuid.UUID) error {
 	}})
 }
 
-func (e *screenshotEnv) startAppServer() {
-	go server.Start()
+func (e *screenshotEnv) startAppServer() error {
 	baseURL := os.Getenv("BASE_URL")
+	aliveURL := baseURL + "/api/v1/canvases/is-alive"
+	if isServerAlive(aliveURL) {
+		return nil
+	}
+
+	go server.Start()
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
-		resp, err := http.Get(baseURL + "/api/v1/canvases/is-alive")
-		if err == nil {
-			_ = resp.Body.Close()
-			return
+		if isServerAlive(aliveURL) {
+			return nil
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
-	time.Sleep(600 * time.Millisecond)
+
+	return fmt.Errorf("server did not become ready at %s", aliveURL)
 }
 
 func (e *screenshotEnv) startVite() error {
+	if isViteAlive("http://127.0.0.1:5173/") {
+		return nil
+	}
+
 	cmd := exec.Command("npm", "run", "dev", "--", "--host", "127.0.0.1", "--port", "5173")
 	cmd.Dir = "web_src"
 	cmd.Env = append(os.Environ(), "BROWSER=none", "API_PORT=8001")
@@ -500,9 +523,7 @@ func (e *screenshotEnv) startVite() error {
 
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		resp, err := http.Get("http://127.0.0.1:5173/")
-		if err == nil {
-			_ = resp.Body.Close()
+		if isViteAlive("http://127.0.0.1:5173/") {
 			return nil
 		}
 		time.Sleep(200 * time.Millisecond)
@@ -590,19 +611,19 @@ func (e *screenshotEnv) captureCanvasScreenshot(path string) error {
 		return fmt.Errorf("unexpected clip data")
 	}
 
-	x, ok := clipMap["x"].(float64)
+	x, ok := numberFromMap(clipMap, "x")
 	if !ok {
 		return fmt.Errorf("invalid clip x")
 	}
-	y, ok := clipMap["y"].(float64)
+	y, ok := numberFromMap(clipMap, "y")
 	if !ok {
 		return fmt.Errorf("invalid clip y")
 	}
-	width, ok := clipMap["width"].(float64)
+	width, ok := numberFromMap(clipMap, "width")
 	if !ok {
 		return fmt.Errorf("invalid clip width")
 	}
-	height, ok := clipMap["height"].(float64)
+	height, ok := numberFromMap(clipMap, "height")
 	if !ok {
 		return fmt.Errorf("invalid clip height")
 	}
@@ -621,6 +642,31 @@ func (e *screenshotEnv) captureCanvasScreenshot(path string) error {
 	}
 
 	return nil
+}
+
+func numberFromMap(values map[string]any, key string) (float64, bool) {
+	raw, ok := values[key]
+	if !ok || raw == nil {
+		return 0, false
+	}
+	switch value := raw.(type) {
+	case float64:
+		return value, true
+	case int:
+		return float64(value), true
+	case int32:
+		return float64(value), true
+	case int64:
+		return float64(value), true
+	case uint:
+		return float64(value), true
+	case uint32:
+		return float64(value), true
+	case uint64:
+		return float64(value), true
+	default:
+		return 0, false
+	}
 }
 
 func readTemplateWorkflow(templatePath string) (*pb.Workflow, error) {
@@ -764,6 +810,24 @@ func setScreenshotEnv() {
 	os.Setenv("APP_ENV", "development")
 	os.Setenv("OWNER_SETUP_ENABLED", "yes")
 	os.Setenv("ENABLE_PASSWORD_LOGIN", "yes")
+}
+
+func isServerAlive(url string) bool {
+	resp, err := http.Get(url)
+	if err != nil {
+		return false
+	}
+	_ = resp.Body.Close()
+	return true
+}
+
+func isViteAlive(url string) bool {
+	resp, err := http.Get(url)
+	if err != nil {
+		return false
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode >= 200 && resp.StatusCode < 500
 }
 
 func escapeQuotes(value string) string {

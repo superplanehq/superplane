@@ -208,7 +208,7 @@ gen.integrations.local.update: gen.integrations.docs
 	rm -rf ../docs/src/content/docs/integrations
 	mkdir -p ../docs/src/content/docs/integrations
 	cp docs/integrations/*.mdx ../docs/src/content/docs/integrations
-	if [ -d docs/integrations/Core ]; then mkdir -p ../docs/src/content/docs/integrations/Core; cp docs/integrations/Core/*.png ../docs/src/content/docs/integrations/Core; fi
+	if [ -d docs/integrations ]; then rsync -a --include='*/' --include='*.png' --exclude='*' docs/integrations/ ../docs/src/content/docs/integrations/; fi
 
 MODULES := authorization,organizations,applications,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,workflows
 REST_API_MODULES := authorization,organizations,applications,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,workflows

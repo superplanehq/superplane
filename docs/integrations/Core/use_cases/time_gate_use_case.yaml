@@ -1,0 +1,71 @@
+metadata:
+  name: "Time Gate use case"
+  description: "Allow events only during business hours."
+  isTemplate: false
+spec:
+  nodes:
+    - id: "manual-trigger"
+      name: "Start"
+      type: "TYPE_TRIGGER"
+      configuration: {}
+      metadata: null
+      position:
+        x: -40
+        "y": 320
+      component: null
+      blueprint: null
+      trigger:
+        name: "start"
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+    - id: "time-gate"
+      name: "Time Gate"
+      type: "TYPE_COMPONENT"
+      configuration:
+        mode: "include_range"
+        days:
+          - "monday"
+          - "tuesday"
+          - "wednesday"
+          - "thursday"
+          - "friday"
+        startTime: "09:00"
+        endTime: "17:00"
+        timezone: "0"
+      metadata: null
+      position:
+        x: 420
+        "y": 320
+      component:
+        name: "time_gate"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+    - id: "time-gate-output"
+      name: "Continue"
+      type: "TYPE_COMPONENT"
+      configuration: {}
+      metadata: null
+      position:
+        x: 880
+        "y": 320
+      component:
+        name: "noop"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+  edges:
+    - sourceId: "manual-trigger"
+      targetId: "time-gate"
+      channel: "default"
+    - sourceId: "time-gate"
+      targetId: "time-gate-output"
+      channel: "default"

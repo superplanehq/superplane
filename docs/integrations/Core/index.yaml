@@ -9,6 +9,11 @@ triggers:
     description: |
       Manually start a run from the SuperPlane UI, useful for testing,
       on-demand actions, or operator-initiated runs.
+    exampleUseCases:
+      - title: Start a run manually
+        description: |
+          Trigger a workflow on demand from the UI and continue processing.
+        canvas: docs/integrations/Core/use_cases/manual_run_use_case.yaml
     exampleOutput: pkg/triggers/start/example_data.json
 
   - title: Webhook
@@ -35,6 +40,11 @@ triggers:
       This is useful for running tasks on a recurring basis (such as nightly
       builds, backups, periodic checks, or scheduled deployments) without manual
       intervention.
+    exampleUseCases:
+      - title: Run a task on a schedule
+        description: |
+          Trigger a workflow on a cron schedule and continue to the next step.
+        canvas: docs/integrations/Core/use_cases/schedule_use_case.yaml
     exampleOutput: pkg/triggers/schedule/example_data.json
 
 components:
@@ -44,6 +54,11 @@ components:
       Pauses the run and waits for users to approve or reject before continuing.
       Most useful when manual oversight is required, such as for deploying to
       production or handling sensitive operations.
+    exampleUseCases:
+      - title: Gate a deployment with approval
+        description: |
+          Pause the workflow and require a human approval before continuing.
+        canvas: docs/integrations/Core/use_cases/approval_use_case.yaml
     exampleOutput: pkg/components/approval/example_output.json
 
   - title: Filter
@@ -51,18 +66,33 @@ components:
     description: |
       Filter only allows events that match your expression to pass through,
       letting you control which events continue in the pipeline.
+    exampleUseCases:
+      - title: Filter events by condition
+        description: |
+          Let only matching events through before continuing the workflow.
+        canvas: docs/integrations/Core/use_cases/filter_use_case.yaml
     exampleOutput: pkg/components/filter/example_output.json
 
   - title: If
     subtitle: Branch the workflow based on a condition or expression evaluation.
     description: |
       Evaluate a boolean expression to decide how to route each event.
+    exampleUseCases:
+      - title: Branch based on an expression
+        description: |
+          Route events down the true branch when the expression matches.
+        canvas: docs/integrations/Core/use_cases/if_use_case.yaml
     exampleOutput: pkg/components/if/example_output.json
 
   - title: HTTP Request
     subtitle: Send an HTTP request and use the response in downstream steps.
     description: |
       Send HTTP requests to external services or APIs and process their responses.
+    exampleUseCases:
+      - title: Call an external HTTP endpoint
+        description: |
+          Post a payload to an HTTP endpoint and continue once it completes.
+        canvas: docs/integrations/Core/use_cases/http_request_use_case.yaml
     exampleOutput: pkg/components/http/example_output.json
 
   - title: Merge
@@ -72,22 +102,42 @@ components:
       continuing with the run.  Commonly used to synchronize parallel event
       streams, aggregate data from several sources, or ensure that several
       conditions are met before proceeding.
+    exampleUseCases:
+      - title: Merge multiple starts into one flow
+        description: |
+          Wait for two upstream triggers before continuing to the next step.
+        canvas: docs/integrations/Core/use_cases/merge_use_case.yaml
     exampleOutput: pkg/components/merge/example_output.json
 
   - title: Time Gate
     subtitle: Route events only within a specified time window or schedule.
     description: |
       Route events based on time conditions - include or exclude specific time windows
+    exampleUseCases:
+      - title: Allow events only during business hours
+        description: |
+          Gate executions to a weekday time range before proceeding.
+        canvas: docs/integrations/Core/use_cases/time_gate_use_case.yaml
     exampleOutput: pkg/components/timegate/example_output.json
 
   - title: Wait
     subtitle: Pause execution for a duration or until a condition is met.
     description: |
       Pause execution for a duration or until a condition is met.
+    exampleUseCases:
+      - title: Pause for a fixed interval
+        description: |
+          Delay the workflow for a set amount of time before continuing.
+        canvas: docs/integrations/Core/use_cases/wait_use_case.yaml
     exampleOutput: pkg/components/wait/example_output.json
 
   - title: No Operation
     subtitle: Acts as a passthrough. Useful for debugging and structuring flows.
     description: |
       Pass events through unchanged, performing no logic or transformation.  
+    exampleUseCases:
+      - title: Pass data through unchanged
+        description: |
+          Use a no-op step to keep the workflow structure explicit.
+        canvas: docs/integrations/Core/use_cases/noop_use_case.yaml
     exampleOutput: pkg/components/noop/example_output.json

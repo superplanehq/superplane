@@ -1,0 +1,44 @@
+metadata:
+  name: "Schedule use case"
+  description: "Run on a schedule and then process the result."
+  isTemplate: false
+spec:
+  nodes:
+    - id: "schedule-trigger"
+      name: "Schedule"
+      type: "TYPE_TRIGGER"
+      configuration:
+        cron: "0 9 * * 1-5"
+        timezone: "UTC"
+      metadata: null
+      position:
+        x: -40
+        "y": 320
+      component: null
+      blueprint: null
+      trigger:
+        name: "schedule"
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+    - id: "scheduled-task"
+      name: "Run task"
+      type: "TYPE_COMPONENT"
+      configuration: {}
+      metadata: null
+      position:
+        x: 420
+        "y": 320
+      component:
+        name: "noop"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+  edges:
+    - sourceId: "schedule-trigger"
+      targetId: "scheduled-task"
+      channel: "default"
