@@ -19,6 +19,12 @@ type UseMonacoExpressionAutocompleteProps = {
   allowOutsideExpression?: boolean;
 };
 
+const suggestionSortPriority = {
+  $: 1,
+  root: 2,
+  previous: 3,
+} as const;
+
 const modelContextMap = new WeakMap<MonacoEditor.ITextModel, ModelContext>();
 const providerRegistry = new Map<string, IDisposable>();
 const triggerSuggestCommand = { id: "editor.action.triggerSuggest", title: "Trigger Suggest" };
@@ -228,9 +234,22 @@ export const useMonacoExpressionAutocomplete = ({
               expressionContext.expressionText,
               expressionContext.expressionCursor,
               context.exampleObj ?? {},
-              { allowInStrings: allowOutsideExpression },
-            );
+              { allowInStrings: allowOutsideExpression, limit: 100 },
+            ).sort((a, b) => {
+              const aPriority = suggestionSortPriority[a.label as keyof typeof suggestionSortPriority];
+              const bPriority = suggestionSortPriority[b.label as keyof typeof suggestionSortPriority];
 
+              if (aPriority !== undefined && bPriority !== undefined) {
+                return aPriority - bPriority;
+              }
+              if (aPriority !== undefined) {
+                return -1;
+              }
+              if (bPriority !== undefined) {
+                return 1;
+              }
+              return a.label.localeCompare(b.label);
+            });
             const left = expressionContext.expressionText.slice(0, expressionContext.expressionCursor);
             const leftFilterMatch = left.match(/[$A-Za-z_][$A-Za-z0-9_]*$|\$$/);
             const fallbackFilterText = leftFilterMatch?.[0] ?? currentFilterText;
@@ -253,6 +272,13 @@ export const useMonacoExpressionAutocomplete = ({
 
               const filterText = fallbackFilterText || suggestion.label;
 
+              // Set sortText to ensure Monaco respects our priority order
+              const priority = suggestionSortPriority[suggestion.label as keyof typeof suggestionSortPriority];
+              const sortText =
+                priority !== undefined
+                  ? String(priority).padStart(4, "0") // 0001, 0002, 0003 for special items
+                  : suggestion.label.toLowerCase(); // Alphabetical for others
+
               return {
                 label: suggestion.label,
                 kind: getCompletionKind(monaco, suggestion.kind),
@@ -260,13 +286,13 @@ export const useMonacoExpressionAutocomplete = ({
                 range,
                 detail: suggestion.detail ?? suggestion.kind,
                 filterText,
+                sortText,
                 command: triggerSuggestCommand,
                 insertTextRules: shouldInsertAsSnippet(insertText)
                   ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
                   : undefined,
               };
             });
-
             return { suggestions: items };
           },
         });

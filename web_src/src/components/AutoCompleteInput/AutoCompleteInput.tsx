@@ -22,6 +22,12 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   expressionMode?: "wrapped" | "raw";
 }
 
+const suggestionSortPriority = {
+  $: 1,
+  root: 2,
+  previous: 3,
+} as const;
+
 export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInputProps>(
   function AutoCompleteInputRender(props, forwardedRef) {
     const {
@@ -893,7 +899,23 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         return;
       }
 
-      const newSuggestions = getSuggestions(context.expressionText, context.expressionCursor, exampleObj ?? {});
+      const newSuggestions = getSuggestions(context.expressionText, context.expressionCursor, exampleObj ?? {}, {
+        limit: 150,
+      }).sort((a, b) => {
+        const aPriority = suggestionSortPriority[a.label as keyof typeof suggestionSortPriority];
+        const bPriority = suggestionSortPriority[b.label as keyof typeof suggestionSortPriority];
+
+        if (aPriority !== undefined && bPriority !== undefined) {
+          return aPriority - bPriority;
+        }
+        if (aPriority !== undefined) {
+          return -1;
+        }
+        if (bPriority !== undefined) {
+          return 1;
+        }
+        return a.label.localeCompare(b.label);
+      });
       setSuggestions(newSuggestions);
       setIsOpen(newSuggestions.length > 0);
       const nextHighlightedIndex = showValuePreview && newSuggestions.length > 0 ? 0 : -1;
@@ -1406,9 +1428,14 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                 >
                   {(() => {
                     const nodeDataSuggestions = suggestions.filter(
-                      (s) => s.label === "$" || s.nodeName || (s.kind !== "function" && s.kind !== "keyword"),
+                      (s) =>
+                        ["$", "root", "previous"].includes(s.label) ||
+                        s.nodeName ||
+                        (s.kind !== "function" && s.kind !== "keyword"),
                     );
-                    const functionSuggestions = suggestions.filter((s) => s.kind === "function");
+                    const functionSuggestions = suggestions.filter(
+                      (s) => s.kind === "function" && !["root", "previous"].includes(s.label),
+                    );
 
                     const renderSuggestionItem = (suggestionItem: Suggestion, index: number) => (
                       <div
