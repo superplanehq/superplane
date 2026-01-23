@@ -74,11 +74,18 @@ sentry:
   environment: ""
 
 #
-# Secret used to sign JWT tokens
+# Secret used to sign JWT session tokens
 #
 jwt:
   secretName: ""
   secret: ""
+
+#
+# Secret used to sign OIDC tokens (RSA private keys, base64-encoded)
+#
+oidc:
+  secretName: ""
+  keys: {}
 
 session:
   secretName: ""

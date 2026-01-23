@@ -1,0 +1,13 @@
+{{- if eq .Values.oidc.secretName "" }}
+{{- $keys := .Values.oidc.keys | required ".Values.oidc.keys is required." -}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "secrets.oidc.name" . }}
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+data:
+{{- range $name, $value := $keys }}
+  {{ $name }}: {{ $value }}
+{{- end }}
+{{- end }}

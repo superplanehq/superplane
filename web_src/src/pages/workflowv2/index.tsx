@@ -364,7 +364,7 @@ export function WorkflowPageV2() {
 
   /**
    * Debounced auto-save function for node position changes.
-   * Waits 1 second after the last position change before saving.
+   * Waits 100ms after the last position change before saving.
    * Only saves position changes, not structural modifications (deletions, additions, etc).
    * If there are unsaved structural changes, position auto-save is skipped.
    */
@@ -503,7 +503,7 @@ export function WorkflowPageV2() {
             });
           }
         }
-      }, 300),
+      }, 100),
     [
       organizationId,
       workflowId,
@@ -1449,7 +1449,10 @@ export function WorkflowPageV2() {
   );
 
   const handleAnnotationUpdate = useCallback(
-    (nodeId: string, updates: { text?: string; color?: string }) => {
+    (
+      nodeId: string,
+      updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
+    ) => {
       if (!workflow || !organizationId || !workflowId) return;
       if (Object.keys(updates).length === 0) return;
 
@@ -1458,18 +1461,35 @@ export function WorkflowPageV2() {
       const latestWorkflow =
         queryClient.getQueryData<WorkflowsWorkflow>(workflowKeys.detail(organizationId, workflowId)) || workflow;
 
+      // Separate position updates from configuration updates
+      const { x, y, ...configurationUpdates } = updates;
+      const hasPositionUpdate = x !== undefined || y !== undefined;
+      const hasConfigurationUpdate = Object.keys(configurationUpdates).length > 0;
+
       const updatedNodes = latestWorkflow?.spec?.nodes?.map((node) => {
         if (node.id !== nodeId || node.type !== "TYPE_WIDGET") {
           return node;
         }
 
-        return {
-          ...node,
-          configuration: {
+        const updatedNode = { ...node };
+
+        // Update position if provided
+        if (hasPositionUpdate) {
+          updatedNode.position = {
+            x: x !== undefined ? x : node.position?.x || 0,
+            y: y !== undefined ? y : node.position?.y || 0,
+          };
+        }
+
+        // Update configuration if provided
+        if (hasConfigurationUpdate) {
+          updatedNode.configuration = {
             ...node.configuration,
-            ...updates,
-          },
-        };
+            ...configurationUpdates,
+          };
+        }
+
+        return updatedNode;
       });
 
       const updatedWorkflow = {
@@ -1483,9 +1503,20 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (canAutoSave) {
-        const existing = pendingAnnotationUpdatesRef.current.get(nodeId) || {};
-        pendingAnnotationUpdatesRef.current.set(nodeId, { ...existing, ...updates });
-        debouncedAnnotationAutoSave();
+        // Queue configuration updates for auto-save
+        if (hasConfigurationUpdate) {
+          const existing = pendingAnnotationUpdatesRef.current.get(nodeId) || {};
+          pendingAnnotationUpdatesRef.current.set(nodeId, { ...existing, ...configurationUpdates });
+          debouncedAnnotationAutoSave();
+        }
+        // Queue position updates for auto-save
+        if (hasPositionUpdate) {
+          pendingPositionUpdatesRef.current.set(nodeId, {
+            x: x !== undefined ? x : latestWorkflow?.spec?.nodes?.find((n) => n.id === nodeId)?.position?.x || 0,
+            y: y !== undefined ? y : latestWorkflow?.spec?.nodes?.find((n) => n.id === nodeId)?.position?.y || 0,
+          });
+          debouncedAutoSave();
+        }
       } else {
         markUnsavedChange("position");
       }
@@ -1497,6 +1528,7 @@ export function WorkflowPageV2() {
       queryClient,
       saveWorkflowSnapshot,
       debouncedAnnotationAutoSave,
+      debouncedAutoSave,
       canAutoSave,
       markUnsavedChange,
     ],
@@ -2973,10 +3005,13 @@ function prepareNode(
 }
 
 function prepareAnnotationNode(node: ComponentsNode): CanvasNode {
+  const width = (node.configuration?.width as number) || 320;
+  const height = (node.configuration?.height as number) || 200;
   return {
     id: node.id!,
     position: { x: node.position?.x!, y: node.position?.y! },
     selectable: false,
+    style: { width, height },
     data: {
       type: "annotation",
       label: node.name || "Annotation",
@@ -2986,6 +3021,8 @@ function prepareAnnotationNode(node: ComponentsNode): CanvasNode {
         title: node.name || "Annotation",
         annotationText: node.configuration?.text || "",
         annotationColor: node.configuration?.color || "yellow",
+        width,
+        height,
       },
     },
   };

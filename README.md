@@ -51,8 +51,8 @@ Then open [http://localhost:3000](http://localhost:3000).
 
 You can deploy SuperPlane on a single host or on Kubernetes:
 
-- **[Single Host Installation](https://docs.superplane.com/installation/single-host/aws-ec2/)** - Deploy on AWS EC2, GCP Compute Engine, or other cloud providers
-- **[Kubernetes Installation](https://docs.superplane.com/installation/kubernetes/gke/)** - Deploy on GKE, EKS, or any Kubernetes cluster
+- **[Single Host Installation](https://docs.superplane.com/installation/overview/#single-host-installation)** - Deploy on AWS EC2, GCP Compute Engine, or other cloud providers
+- **[Kubernetes Installation](https://docs.superplane.com/installation/overview/#kubernetes)** - Deploy on GKE, EKS, or any Kubernetes cluster
 
 ## Contributing
 

@@ -50,6 +50,7 @@ services:
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv
+      OIDC_KEYS_PATH: /app/test/fixtures/oidc-keys
       NO_ENCRYPTION: "yes"
       SESSION_SECRET: 1234567890abcdefghijklmnopqrstuv
       GITHUB_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
