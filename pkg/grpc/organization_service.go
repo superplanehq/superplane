@@ -17,7 +17,7 @@ import (
 type OrganizationService struct {
 	authorizationService authorization.Authorization
 	registry             *registry.Registry
-	oidcSigner           *oidc.Signer
+	oidcProvider         oidc.Provider
 	baseURL              string
 	webhooksBaseURL      string
 }
@@ -25,13 +25,13 @@ type OrganizationService struct {
 func NewOrganizationService(
 	authorizationService authorization.Authorization,
 	registry *registry.Registry,
-	oidcSigner *oidc.Signer,
+	oidcProvider oidc.Provider,
 	baseURL string,
 	webhooksBaseURL string,
 ) *OrganizationService {
 	return &OrganizationService{
 		registry:             registry,
-		oidcSigner:           oidcSigner,
+		oidcProvider:         oidcProvider,
 		baseURL:              baseURL,
 		webhooksBaseURL:      webhooksBaseURL,
 		authorizationService: authorizationService,
@@ -117,7 +117,7 @@ func (s *OrganizationService) InstallApplication(ctx context.Context, req *pb.In
 	return organizations.InstallApplication(
 		ctx,
 		s.registry,
-		s.oidcSigner,
+		s.oidcProvider,
 		s.baseURL,
 		s.webhooksBaseURL,
 		orgID,
@@ -132,7 +132,7 @@ func (s *OrganizationService) UpdateApplication(ctx context.Context, req *pb.Upd
 	return organizations.UpdateApplication(
 		ctx,
 		s.registry,
-		s.oidcSigner,
+		s.oidcProvider,
 		s.baseURL,
 		s.webhooksBaseURL,
 		orgID,

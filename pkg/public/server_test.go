@@ -18,20 +18,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
 )
-
-func testOIDCSigner(t *testing.T) *oidc.Signer {
-	t.Helper()
-
-	keysPath := filepath.Join("..", "..", "test", "fixtures", "oidc-keys")
-	signer, err := oidc.NewSignerFromKeyDir(keysPath)
-	require.NoError(t, err)
-	return signer
-}
 
 func Test__HealthCheckEndpoint(t *testing.T) {
 	authService, err := authorization.NewAuthService()

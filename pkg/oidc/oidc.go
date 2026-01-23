@@ -1,9 +1,11 @@
 package oidc
 
-import "time"
+import (
+	"time"
+)
 
 type Provider interface {
-	Sign(subject string, duration time.Duration) (string, error)
+	Sign(subject string, duration time.Duration, audience string, additionalClaims map[string]any) (string, error)
 	PublicJWKs() []PublicJWK
 }
 

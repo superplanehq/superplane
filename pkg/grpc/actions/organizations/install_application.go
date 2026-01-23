@@ -19,7 +19,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func InstallApplication(ctx context.Context, registry *registry.Registry, oidcSigner *oidc.Signer, baseURL string, webhooksBaseURL string, orgID string, appName, installationName string, appConfig *structpb.Struct) (*pb.InstallApplicationResponse, error) {
+func InstallApplication(ctx context.Context, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, webhooksBaseURL string, orgID string, appName, installationName string, appConfig *structpb.Struct) (*pb.InstallApplicationResponse, error) {
 	app, err := registry.GetApplication(appName)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "application %s not found", appName)
@@ -68,7 +68,7 @@ func InstallApplication(ctx context.Context, registry *registry.Registry, oidcSi
 		WebhooksBaseURL: webhooksBaseURL,
 		OrganizationID:  orgID,
 		InstallationID:  appInstallation.ID.String(),
-		OIDCSigner:      oidcSigner,
+		OIDC:            oidcProvider,
 	})
 
 	err = database.Conn().Save(appInstallation).Error

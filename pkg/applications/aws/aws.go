@@ -108,10 +108,6 @@ func (a *AWS) Triggers() []core.Trigger {
 }
 
 func (a *AWS) Sync(ctx core.SyncContext) error {
-	if ctx.OIDCSigner == nil {
-		return fmt.Errorf("OIDC signer is not configured")
-	}
-
 	config := Configuration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)
@@ -142,7 +138,7 @@ func (a *AWS) Sync(ctx core.SyncContext) error {
 		subject = fmt.Sprintf("app-installation:%s", ctx.AppInstallation.ID())
 	}
 
-	oidcToken, err := ctx.OIDCSigner.GenerateWithClaims(subject, 5*time.Minute, issuer, audience, nil)
+	oidcToken, err := ctx.OIDC.Sign(subject, 5*time.Minute, audience, nil)
 	if err != nil {
 		return fmt.Errorf("failed to generate OIDC token: %w", err)
 	}

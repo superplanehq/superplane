@@ -19,7 +19,7 @@ import (
 	"gorm.io/datatypes"
 )
 
-func UpdateApplication(ctx context.Context, registry *registry.Registry, oidcSigner *oidc.Signer, baseURL string, webhooksBaseURL string, orgID string, installationID string, configuration map[string]any) (*pb.UpdateApplicationResponse, error) {
+func UpdateApplication(ctx context.Context, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, webhooksBaseURL string, orgID string, installationID string, configuration map[string]any) (*pb.UpdateApplicationResponse, error) {
 	installation, err := uuid.Parse(installationID)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid installation ID: %v", err)
@@ -61,7 +61,7 @@ func UpdateApplication(ctx context.Context, registry *registry.Registry, oidcSig
 		OrganizationID:  orgID,
 		InstallationID:  installationID,
 		AppInstallation: appCtx,
-		OIDCSigner:      oidcSigner,
+		OIDC:            oidcProvider,
 	})
 
 	if syncErr != nil {

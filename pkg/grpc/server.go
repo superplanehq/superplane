@@ -53,7 +53,7 @@ func sentryRecoveryHandler(p any) error {
 	return status.Errorf(codes.Internal, "internal server error")
 }
 
-func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, oidcSigner *oidc.Signer, port int) {
+func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, oidcProvider oidc.Provider, port int) {
 	endpoint := fmt.Sprintf("0.0.0.0:%d", port)
 	lis, err := net.Listen("tcp", endpoint)
 
@@ -88,7 +88,7 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 	//
 	// Initialize services exposed by this server.
 	//
-	organizationService := NewOrganizationService(authService, registry, oidcSigner, baseURL, webhooksBaseURL)
+	organizationService := NewOrganizationService(authService, registry, oidcProvider, baseURL, webhooksBaseURL)
 	organizationPb.RegisterOrganizationsServer(grpcServer, organizationService)
 
 	userService := NewUsersService(authService)

@@ -38,7 +38,7 @@ func TestNewProviderFromKeyDirLoadsSymlinkedKey(t *testing.T) {
 	if len(provider.PublicJWKs()) != 1 {
 		t.Fatalf("expected 1 public JWK, got %d", len(provider.PublicJWKs()))
 	}
-	if _, err := provider.Sign("subject", time.Minute); err != nil {
+	if _, err := provider.Sign("subject", time.Minute, "test", nil); err != nil {
 		t.Fatalf("Sign: %v", err)
 	}
 }

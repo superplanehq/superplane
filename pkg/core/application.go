@@ -157,7 +157,7 @@ type SyncContext struct {
 	InstallationID  string
 	HTTP            HTTPContext
 	AppInstallation AppInstallationContext
-	OIDCSigner      *oidc.Signer
+	OIDC            oidc.Provider
 }
 
 /*

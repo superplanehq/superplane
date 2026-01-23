@@ -77,15 +77,26 @@ func (s *RSAProvider) PublicJWKs() []PublicJWK {
 	return s.publicJWKs
 }
 
-func (s *RSAProvider) Sign(subject string, duration time.Duration) (string, error) {
+func (s *RSAProvider) Sign(subject string, duration time.Duration, audience string, additionalClaims map[string]any) (string, error) {
 	now := time.Now()
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+	claims := jwt.MapClaims{
 		"iat": now.Unix(),
 		"nbf": now.Unix(),
 		"exp": now.Add(duration).Unix(),
 		"sub": subject,
-	})
+	}
 
+	if audience != "" {
+		claims["aud"] = audience
+	} else {
+		claims["aud"] = "superplane"
+	}
+
+	for key, value := range additionalClaims {
+		claims[key] = value
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	token.Header["kid"] = s.activeKeyID
 	tokenString, err := token.SignedString(s.privateKey)
 	if err != nil {
