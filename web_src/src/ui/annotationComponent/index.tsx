@@ -1,9 +1,15 @@
-import React, { useEffect, useLayoutEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
+import { NodeResizer, type ResizeParams } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { SelectionWrapper } from "../selectionWrapper";
 import { setActiveNoteId } from "./noteFocus";
 import { ComponentActionsProps } from "../types/componentActions";
+
+const DEFAULT_WIDTH = 320;
+const DEFAULT_HEIGHT = 200;
+const MIN_WIDTH = 200;
+const MIN_HEIGHT = 120;
 
 type AnnotationColor = "yellow" | "blue" | "green" | "purple";
 
@@ -43,7 +49,16 @@ export interface AnnotationComponentProps extends ComponentActionsProps {
   noteId?: string;
   selected?: boolean;
   hideActionsButton?: boolean;
-  onAnnotationUpdate?: (updates: { text?: string; color?: AnnotationColor }) => void;
+  width?: number;
+  height?: number;
+  onAnnotationUpdate?: (updates: {
+    text?: string;
+    color?: AnnotationColor;
+    width?: number;
+    height?: number;
+    x?: number;
+    y?: number;
+  }) => void;
 }
 
 const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
@@ -54,18 +69,21 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
   selected = false,
   onDelete,
   hideActionsButton,
+  width: propWidth = DEFAULT_WIDTH,
+  height: propHeight = DEFAULT_HEIGHT,
   onAnnotationUpdate,
 }) => {
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const lastPointerDownOutsideRef = React.useRef(false);
 
-  const syncTextareaHeight = () => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    textarea.style.height = "auto";
-    textarea.style.height = `${textarea.scrollHeight}px`;
-  };
+  // Local state for dimensions - updated in real-time during resize
+  const [dimensions, setDimensions] = useState({ width: propWidth, height: propHeight });
+
+  // Sync dimensions when props change (e.g., after save or on initial load)
+  useEffect(() => {
+    setDimensions({ width: propWidth, height: propHeight });
+  }, [propWidth, propHeight]);
 
   useEffect(() => {
     if (!noteId) return;
@@ -76,7 +94,6 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
       textarea.value = nextValue;
     }
     noteDrafts.set(noteId, nextValue);
-    requestAnimationFrame(syncTextareaHeight);
   }, [annotationText, noteId]);
 
   useLayoutEffect(() => {
@@ -89,7 +106,6 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
     const draft = noteDrafts.get(noteId) ?? "";
     if (textarea.value !== draft) {
       textarea.value = draft;
-      syncTextareaHeight();
     }
   }, [noteId, annotationText]);
 
@@ -128,14 +144,37 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
     [],
   );
 
+  // Update local state during resize for real-time visual feedback
+  const handleResize = useCallback((_event: unknown, params: ResizeParams) => {
+    setDimensions({ width: Math.round(params.width), height: Math.round(params.height) });
+  }, []);
+
+  // Save dimensions and position when resize ends
+  const handleResizeEnd = useCallback(
+    (_event: unknown, params: ResizeParams) => {
+      const newWidth = Math.round(params.width);
+      const newHeight = Math.round(params.height);
+      const newX = Math.round(params.x);
+      const newY = Math.round(params.y);
+      onAnnotationUpdate?.({ width: newWidth, height: newHeight, x: newX, y: newY });
+    },
+    [onAnnotationUpdate],
+  );
+
   return (
     <SelectionWrapper selected={selected}>
+      <NodeResizer
+        minWidth={MIN_WIDTH}
+        minHeight={MIN_HEIGHT}
+        onResize={handleResize}
+        onResizeEnd={handleResizeEnd}
+        lineClassName="!border-slate-400 !border-dashed"
+        handleClassName="!h-2 !w-2 !rounded-sm !border !border-slate-400 !bg-white"
+      />
       <div
         ref={containerRef}
-        className={cn(
-          "group relative flex w-[20rem] flex-col rounded-md outline outline-slate-950/20",
-          colorStyles.container,
-        )}
+        style={{ width: dimensions.width, height: dimensions.height }}
+        className={cn("group relative flex flex-col rounded-md outline outline-slate-950/20", colorStyles.container)}
       >
         <div className={cn("canvas-node-drag-handle h-5 w-full rounded-t-md cursor-grab", colorStyles.background)}>
           <div className="flex h-full w-full flex-col items-stretch justify-center gap-0.5 px-2">
@@ -193,7 +232,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
           </>
         )}
 
-        <div className="px-3 pb-3">
+        <div className="flex-1 overflow-hidden px-3 pb-3">
           <textarea
             ref={textareaRef}
             data-note-id={noteId || undefined}
@@ -204,7 +243,6 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                 noteDrafts.set(noteId, value);
                 setActiveNoteId(noteId);
               }
-              syncTextareaHeight();
               if (onAnnotationUpdate) {
                 onAnnotationUpdate({ text: value });
               }
@@ -227,7 +265,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
               lastPointerDownOutsideRef.current = false;
             }}
             className={cn(
-              "nodrag min-h-[120px] w-full resize-none bg-transparent text-sm leading-normal outline-none",
+              "nodrag h-full w-full resize-none bg-transparent text-sm leading-normal outline-none",
               "text-gray-800",
               "placeholder:text-black/50",
             )}
@@ -247,5 +285,7 @@ export const AnnotationComponent = React.memo(
     prev.annotationText === next.annotationText &&
     prev.annotationColor === next.annotationColor &&
     prev.selected === next.selected &&
-    prev.hideActionsButton === next.hideActionsButton,
+    prev.hideActionsButton === next.hideActionsButton &&
+    prev.width === next.width &&
+    prev.height === next.height,
 );
