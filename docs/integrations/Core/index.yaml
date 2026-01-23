@@ -1,0 +1,82 @@
+title: Core
+
+overview:
+  Core components and triggers for building with SuperPlane.
+
+triggers:
+  - title: Manual Run
+    subtitle: Trigger a run manually, by clicking a button in the UI.
+    description: |
+      Manually start a run from the SuperPlane UI, useful for testing,
+      on-demand actions, or operator-initiated runs.
+
+  - title: Webhook
+    subtitle: Kick off a run by sending an HTTP request (webhook) from an external system.
+    description: |
+      Start a run by sending an HTTP request to a unique webhook URL. This
+      trigger lets external systems or services initiate a run in SuperPlane.
+    exampleOutput: pkg/components/webhook/example_output.json
+
+  - title: Schedule
+    subtitle: Automatically trigger runs on a recurring schedule.
+    description: |
+      Automatically start a run according to a schedule you define.
+      This is useful for running tasks on a recurring basis (such as nightly
+      builds, backups, periodic checks, or scheduled deployments) without manual
+      intervention.
+    exampleOutput: pkg/components/schedule/example_output.json
+
+components:
+  - title: Approval
+    subtitle: Require a user or external approval before proceeding to the next step.
+    description: |
+      Pauses the run and waits for users to approve or reject before continuing.
+      Most useful when manual oversight is required, such as for deploying to
+      production or handling sensitive operations.
+    exampleOutput: pkg/components/approval/example_output.json
+
+  - title: Filter
+    subtitle: Only allow events to pass if they meet specific criteria or conditions.
+    description: |
+      Filter only allows events that match your expression to pass through,
+      letting you control which events continue in the pipeline.
+    exampleOutput: pkg/components/filter/example_output.json
+
+  - title: If
+    subtitle: Branch the workflow based on a condition or expression evaluation.
+    description: |
+      Evaluate a boolean expression to decide how to route each event.
+    exampleOutput: pkg/components/if/example_output.json
+
+  - title: HTTP Request
+    subtitle: Send an HTTP request and use the response in downstream steps.
+    description: |
+      Send HTTP requests to external services or APIs and process their responses.
+    exampleOutput: pkg/components/http/example_output.json
+
+  - title: Merge
+    subtitle: Wait for all incoming sources before proceeding—fan-in parallel branches.
+    description: |
+      Wait for and combine results from multiple upstream nodes before
+      continuing with the run.  Commonly used to synchronize parallel event
+      streams, aggregate data from several sources, or ensure that several
+      conditions are met before proceeding.
+    exampleOutput: pkg/components/merge/example_output.json
+
+  - title: Time Gate
+    subtitle: Route events only within a specified time window or schedule.
+    description: |
+      Route events based on time conditions - include or exclude specific time windows
+    exampleOutput: pkg/components/timegate/example_output.json
+
+  - title: Wait
+    subtitle: Pause execution for a duration or until a condition is met.
+    description: |
+      Pause execution for a duration or until a condition is met.
+    exampleOutput: pkg/components/wait/example_output.json
+
+  - title: No Operation
+    subtitle: Acts as a passthrough. Useful for debugging and structuring flows.
+    description: |
+      Pass events through unchanged, performing no logic or transformation.  
+    exampleOutput: pkg/components/noop/example_output.json
