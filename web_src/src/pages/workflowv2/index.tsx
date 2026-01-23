@@ -1151,7 +1151,7 @@ export function WorkflowPageV2() {
       }
 
       const rootNodeId = workflowNodes.find((node) => {
-        if (!chainNodeIds.has(node.id)) return false;
+        if (!node.id || !chainNodeIds.has(node.id)) return false;
         return !workflowEdges.some(
           (edge) => edge.targetId === node.id && edge.sourceId && chainNodeIds.has(edge.sourceId as string),
         );
