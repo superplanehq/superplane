@@ -1,0 +1,99 @@
+{
+    "type": "pagerduty.incidents.list",
+    "data": {
+        "incidents": [
+            {
+                "id": "PT4KHLK",
+                "incident_number": 1234,
+                "title": "Server is on fire",
+                "description": "The production server is experiencing critical issues",
+                "status": "triggered",
+                "urgency": "high",
+                "html_url": "https://example.pagerduty.com/incidents/PT4KHLK",
+                "created_at": "2024-01-15T12:00:00Z",
+                "updated_at": "2024-01-15T12:00:00Z",
+                "service": {
+                    "id": "PX123456",
+                    "type": "service_reference",
+                    "summary": "Production API",
+                    "html_url": "https://example.pagerduty.com/services/PX123456"
+                },
+                "escalation_policy": {
+                    "id": "PABCDEF",
+                    "type": "escalation_policy_reference",
+                    "summary": "Default Escalation Policy",
+                    "html_url": "https://example.pagerduty.com/escalation_policies/PABCDEF"
+                },
+                "assignments": [
+                    {
+                        "at": "2024-01-15T12:00:00Z",
+                        "assignee": {
+                            "id": "PUSER01",
+                            "type": "user_reference",
+                            "summary": "John Doe",
+                            "html_url": "https://example.pagerduty.com/users/PUSER01"
+                        }
+                    }
+                ],
+                "acknowledgements": [],
+                "priority": {
+                    "id": "P1PRIORITY",
+                    "type": "priority_reference",
+                    "summary": "P1"
+                }
+            },
+            {
+                "id": "PT4KHLM",
+                "incident_number": 1235,
+                "title": "Database connection issues",
+                "description": "Database connections are timing out",
+                "status": "acknowledged",
+                "urgency": "high",
+                "html_url": "https://example.pagerduty.com/incidents/PT4KHLM",
+                "created_at": "2024-01-15T12:30:00Z",
+                "updated_at": "2024-01-15T12:35:00Z",
+                "service": {
+                    "id": "PX123456",
+                    "type": "service_reference",
+                    "summary": "Production API",
+                    "html_url": "https://example.pagerduty.com/services/PX123456"
+                },
+                "escalation_policy": {
+                    "id": "PABCDEF",
+                    "type": "escalation_policy_reference",
+                    "summary": "Default Escalation Policy",
+                    "html_url": "https://example.pagerduty.com/escalation_policies/PABCDEF"
+                },
+                "assignments": [
+                    {
+                        "at": "2024-01-15T12:30:00Z",
+                        "assignee": {
+                            "id": "PUSER01",
+                            "type": "user_reference",
+                            "summary": "John Doe",
+                            "html_url": "https://example.pagerduty.com/users/PUSER01"
+                        }
+                    }
+                ],
+                "acknowledgements": [
+                    {
+                        "at": "2024-01-15T12:35:00Z",
+                        "acknowledger": {
+                            "id": "PUSER01",
+                            "type": "user_reference",
+                            "summary": "John Doe",
+                            "html_url": "https://example.pagerduty.com/users/PUSER01"
+                        }
+                    }
+                ],
+                "priority": {
+                    "id": "P2PRIORITY",
+                    "type": "priority_reference",
+                    "summary": "P2"
+                }
+            }
+        ],
+        "total": 2
+    },
+    "timestamp": "2024-01-15T13:00:00Z"
+}
