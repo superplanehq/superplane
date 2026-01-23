@@ -23,6 +23,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -30,8 +31,8 @@ import (
 	nooptrace "go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/oidc"
 	pbApplications "github.com/superplanehq/superplane/pkg/protos/applications"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
@@ -65,6 +66,7 @@ type Server struct {
 	encryptor             crypto.Encryptor
 	registry              *registry.Registry
 	jwt                   *jwt.Signer
+	oidcProvider          oidc.Provider
 	authService           authorization.Authorization
 	timeoutHandlerTimeout time.Duration
 	upgrader              *websocket.Upgrader
@@ -86,6 +88,7 @@ func NewServer(
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
 	jwtSigner *jwt.Signer,
+	oidcProvider oidc.Provider,
 	basePath string,
 	baseURL string,
 	webhooksBaseURL string,
@@ -112,6 +115,7 @@ func NewServer(
 		timeoutHandlerTimeout: 15 * time.Second,
 		encryptor:             encryptor,
 		jwt:                   jwtSigner,
+		oidcProvider:          oidcProvider,
 		registry:              registry,
 		authService:           authorizationService,
 		upgrader: &websocket.Upgrader{
@@ -382,6 +386,10 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.HandleFunc("/health", s.HealthCheck).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/setup-owner", s.setupOwner).Methods("POST")
 
+	// OIDC discovery endpoints
+	publicRoute.HandleFunc("/.well-known/openid-configuration", s.handleOIDCConfiguration).Methods("GET")
+	publicRoute.HandleFunc("/.well-known/jwks.json", s.handleOIDCJWKS).Methods("GET")
+
 	// Test endpoints
 	publicRoute.HandleFunc("/server1", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -423,6 +431,46 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	}
 
 	s.Router = r
+}
+
+type oidcDiscoveryResponse struct {
+	Issuer                           string   `json:"issuer"`
+	JWKSURI                          string   `json:"jwks_uri"`
+	IDTokenSigningAlgValuesSupported []string `json:"id_token_signing_alg_values_supported"`
+	SubjectTypesSupported            []string `json:"subject_types_supported"`
+	ResponseTypesSupported           []string `json:"response_types_supported"`
+}
+
+type jwksResponse struct {
+	Keys []oidc.PublicJWK `json:"keys"`
+}
+
+func (s *Server) handleOIDCConfiguration(w http.ResponseWriter, _ *http.Request) {
+	baseURL := strings.TrimRight(s.BaseURL, "/")
+	response := oidcDiscoveryResponse{
+		Issuer:                           baseURL,
+		JWKSURI:                          baseURL + "/.well-known/jwks.json",
+		IDTokenSigningAlgValuesSupported: []string{"RS256"},
+		SubjectTypesSupported:            []string{"public"},
+		ResponseTypesSupported:           []string{"id_token"},
+	}
+	respondJSON(w, response)
+}
+
+func (s *Server) handleOIDCJWKS(w http.ResponseWriter, _ *http.Request) {
+	response := jwksResponse{
+		Keys: s.oidcProvider.PublicJWKs(),
+	}
+	respondJSON(w, response)
+}
+
+func respondJSON(w http.ResponseWriter, payload any) {
+	w.Header().Set("Content-Type", "application/json")
+	encoder := json.NewEncoder(w)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(payload); err != nil {
+		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) HandleAppInstallationRequest(w http.ResponseWriter, r *http.Request) {

@@ -38,6 +38,8 @@ START_INTERNAL_API="${START_INTERNAL_API:-yes}"
 START_GRPC_GATEWAY="${START_GRPC_GATEWAY:-yes}"
 START_CONSUMERS="${START_CONSUMERS:-yes}"
 START_WEB_SERVER="${START_WEB_SERVER:-yes}"
+JWT_SECRET="${JWT_SECRET:-}"
+OIDC_KEYS_PATH="${OIDC_KEYS_PATH:-/app/data/oidc-keys}"
 START_EVENT_DISTRIBUTER="${START_EVENT_DISTRIBUTER:-yes}"
 START_WORKFLOW_EVENT_ROUTER="${START_WORKFLOW_EVENT_ROUTER:-yes}"
 START_WORKFLOW_NODE_EXECUTOR="${START_WORKFLOW_NODE_EXECUTOR:-yes}"
@@ -68,6 +70,17 @@ if [ -z "${JWT_SECRET:-}" ] || [ "${JWT_SECRET}" = "1234567890abcdefghijklmnopqr
 fi
 if [ -z "${SESSION_SECRET:-}" ] || [ "${SESSION_SECRET}" = "1234567890abcdefghijklmnopqrstuv" ]; then
   SESSION_SECRET=$(generate_secret)
+fi
+
+mkdir -p "${OIDC_KEYS_PATH}"
+if [ -z "$(find "${OIDC_KEYS_PATH}" -type f 2>/dev/null | head -n 1)" ]; then
+  if ! command -v openssl >/dev/null 2>&1; then
+    echo "openssl is required to generate OIDC keys."
+    exit 1
+  fi
+  oidc_key_file="${OIDC_KEYS_PATH}/$(date -u +%s).pem"
+  openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out "${oidc_key_file}"
+  chmod 600 "${oidc_key_file}"
 fi
 
 # Generate random subdomain for localtunnel if it doesn't exist
@@ -121,6 +134,7 @@ export START_WEBHOOK_CLEANUP_WORKER="${START_WEBHOOK_CLEANUP_WORKER}"
 export START_WORKFLOW_CLEANUP_WORKER="${START_WORKFLOW_CLEANUP_WORKER}"
 export ENCRYPTION_KEY="${ENCRYPTION_KEY}"
 export JWT_SECRET="${JWT_SECRET}"
+export OIDC_KEYS_PATH="${OIDC_KEYS_PATH}"
 export SESSION_SECRET="${SESSION_SECRET}"
 export NO_ENCRYPTION="${NO_ENCRYPTION}"
 export SUPERPLANE_BEACON_ENABLED="${SUPERPLANE_BEACON_ENABLED}"

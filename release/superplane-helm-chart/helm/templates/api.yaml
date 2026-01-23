@@ -98,6 +98,8 @@ spec:
               value: "{{ .Values.api.dbPoolSize }}"
             - name: TEMPLATE_DIR
               value: /app/templates
+            - name: OIDC_KEYS_PATH
+              value: /app/oidc-keys
             - name: BLOCK_SIGNUP
 {{- if .Values.api.blockSignup }}
               value: "yes"
@@ -116,6 +118,11 @@ spec:
               value: {{ ternary "yes" "no" .Values.installation.beaconEnabled | quote }}
             - name: SUPERPLANE_INSTALLATION_TYPE
               value: {{ .Values.installation.type | quote }}
+
+          volumeMounts:
+            - name: oidc-keys
+              mountPath: /app/oidc-keys
+              readOnly: true
 
           ports:
             - name: http
@@ -145,3 +152,8 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+
+      volumes:
+        - name: oidc-keys
+          secret:
+            secretName: {{ include "secrets.oidc.name" . }}

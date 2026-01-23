@@ -6,6 +6,14 @@
 {{- end }}
 {{- end }}
 
+{{- define "secrets.oidc.name" }}
+{{- if eq .Values.oidc.secretName "" }}
+{{- printf "%s-oidc" .Release.Name }}
+{{- else }}
+{{- .Values.oidc.secretName }}
+{{- end }}
+{{- end }}
+
 {{- define "secrets.authentication.name" }}
 {{- if eq .Values.authentication.secretName "" }}
 {{- printf "%s-authentication" .Release.Name }}

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/public"
 	registry "github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/services"
@@ -161,7 +163,7 @@ func startInternalAPI(baseURL, webhooksBaseURL, basePath string, encryptor crypt
 	grpc.RunServer(baseURL, webhooksBaseURL, basePath, encryptor, authService, registry, lookupInternalAPIPort())
 }
 
-func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, authService authorization.Authorization) {
+func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcProvider oidc.Provider, authService authorization.Authorization) {
 	log.Println("Starting Public API with integrated Web Server")
 
 	appEnv := os.Getenv("APP_ENV")
@@ -169,7 +171,7 @@ func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, regist
 	blockSignup := os.Getenv("BLOCK_SIGNUP") == "yes"
 
 	webhooksBaseURL := getWebhookBaseURL(baseURL)
-	server, err := public.NewServer(encryptor, registry, jwtSigner, basePath, baseURL, webhooksBaseURL, appEnv, templateDir, authService, blockSignup)
+	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcProvider, basePath, baseURL, webhooksBaseURL, appEnv, templateDir, authService, blockSignup)
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)
 	}
@@ -321,13 +323,23 @@ func Start() {
 		panic("JWT_SECRET must be set")
 	}
 
+	oidcKeysPath := os.Getenv("OIDC_KEYS_PATH")
+	if oidcKeysPath == "" {
+		panic("OIDC_KEYS_PATH must be set")
+	}
+
 	jwtSigner := jwt.NewSigner(jwtSecret)
+	oidcProvider, err := oidc.NewProviderFromKeyDir(oidcKeysPath)
+	if err != nil {
+		panic(fmt.Sprintf("failed to load OIDC keys: %v", err))
+	}
+
 	registry := registry.NewRegistry(encryptorInstance)
 
 	templates.Setup(registry)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
-		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, authService)
+		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcProvider, authService)
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
