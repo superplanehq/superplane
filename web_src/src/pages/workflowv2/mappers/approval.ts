@@ -82,7 +82,8 @@ export const APPROVAL_STATE_MAP: EventStateMap = {
 export const approvalStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
   if (
     execution.resultMessage &&
-    (execution.resultReason === "RESULT_REASON_ERROR" || execution.result === "RESULT_FAILED")
+    (execution.resultReason === "RESULT_REASON_ERROR" ||
+      (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
   ) {
     return "error";
   }

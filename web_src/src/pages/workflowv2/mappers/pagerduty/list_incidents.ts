@@ -232,7 +232,8 @@ export const listIncidentsStateFunction: StateFunction = (execution: WorkflowsWo
   // Handle error states
   if (
     execution.resultMessage &&
-    (execution.resultReason === "RESULT_REASON_ERROR" || execution.result === "RESULT_FAILED")
+    (execution.resultReason === "RESULT_REASON_ERROR" ||
+      (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
   ) {
     return "error";
   }

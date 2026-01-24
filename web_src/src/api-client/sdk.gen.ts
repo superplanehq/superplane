@@ -185,6 +185,9 @@ import type {
   WorkflowsListEventExecutionsData,
   WorkflowsListEventExecutionsResponse2,
   WorkflowsListEventExecutionsError,
+  WorkflowsResolveExecutionErrorsData,
+  WorkflowsResolveExecutionErrorsResponse2,
+  WorkflowsResolveExecutionErrorsError,
   WorkflowsInvokeNodeExecutionActionData,
   WorkflowsInvokeNodeExecutionActionResponse2,
   WorkflowsInvokeNodeExecutionActionError,
@@ -1250,6 +1253,27 @@ export const workflowsListEventExecutions = <ThrowOnError extends boolean = true
   >({
     url: "/api/v1/workflows/{workflowId}/events/{eventId}/executions",
     ...options,
+  });
+};
+
+/**
+ * Resolve execution errors
+ * Marks workflow node execution errors as resolved
+ */
+export const workflowsResolveExecutionErrors = <ThrowOnError extends boolean = true>(
+  options: Options<WorkflowsResolveExecutionErrorsData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).patch<
+    WorkflowsResolveExecutionErrorsResponse2,
+    WorkflowsResolveExecutionErrorsError,
+    ThrowOnError
+  >({
+    url: "/api/v1/workflows/{workflowId}/executions/resolve",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
   });
 };
 
