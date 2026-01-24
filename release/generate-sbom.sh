@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-if [ "${1-}" = "" ]; then
+if [ -z "${1:-}" ]; then
   echo "Usage: release/generate-sbom.sh <version>"
   echo ""
   echo "Example:"
@@ -20,7 +20,7 @@ echo "* Image: ${IMAGE_NAME}"
 echo "* Output: ${SBOM_OUTPUT}"
 
 # Check if syft is installed
-if ! command -v syft &> /dev/null; then
+if ! command -v syft >/dev/null 2>&1; then
   echo "Error: syft is not installed."
   echo "Install it with: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin"
   exit 1
