@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useTheme } from "@/hooks/useTheme";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import Editor from "@monaco-editor/react";
 import { Play } from "lucide-react";
@@ -35,6 +36,7 @@ export const EmitEventModal = ({ isOpen, onClose, nodeName, channels, onEmit, in
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const { isDark } = useTheme();
 
   // Update eventData when initialData changes
   useEffect(() => {
@@ -132,6 +134,7 @@ export const EmitEventModal = ({ isOpen, onClose, nodeName, channels, onEmit, in
               <Editor
                 height="300px"
                 defaultLanguage="json"
+                theme={isDark ? "vs-dark" : "light"}
                 value={eventData}
                 onChange={(value) => setEventData(value || "{}")}
                 onMount={(editor) => {
