@@ -1,0 +1,21 @@
+{
+  "rule": {
+    "id": "rule_abc123",
+    "action": "redirect",
+    "expression": "http.request.uri.path eq \"/old-path\"",
+    "description": "Redirect old path to new path",
+    "enabled": true,
+    "action_parameters": {
+      "from_value": {
+        "status_code": 301,
+        "target_url": {
+          "value": "https://example.com/new-path"
+        },
+        "preserve_query_string": false
+      }
+    }
+  },
+  "zoneId": "zone_xyz789",
+  "ruleId": "rule_abc123",
+  "enabled": true
+}
