@@ -12,7 +12,7 @@ export const SelectionWrapper: React.FC<SelectionWrapperProps> = ({
   children,
 }) => {
   const baseClasses = fullRounded ? "rounded-full" : "rounded-md";
-  const selectedClasses = selected ? " ring-[3px] ring-sky-300 ring-offset-4" : "";
+  const selectedClasses = selected ? " ring-[3px] ring-sky-300 dark:ring-sky-500 ring-offset-4 dark:ring-offset-gray-800" : "";
 
   return <div className={`${baseClasses}${selectedClasses}`}>{children}</div>;
 };

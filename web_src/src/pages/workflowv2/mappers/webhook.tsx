@@ -281,7 +281,7 @@ const ResetAuthButton: React.FC<{
               <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">{labels.successTitle}</p>
               <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">{labels.successDescription}</p>
               <div className="mt-2 relative group">
-                <pre className="text-sm text-yellow-900 dark:text-yellow-100 bg-white dark:bg-gray-800 border border-yellow-300 dark:border-yellow-600 p-2 rounded font-mono break-all">
+                <pre className="text-sm text-yellow-900 dark:text-yellow-100 bg-white dark:bg-neutral-800 border border-yellow-300 dark:border-yellow-600 p-2 rounded font-mono break-all">
                   {newSecret}
                 </pre>
                 <CopyCodeButton code={newSecret} />

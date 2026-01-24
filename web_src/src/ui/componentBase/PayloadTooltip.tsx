@@ -1,6 +1,7 @@
 import Tippy from "@tippyjs/react/headless";
 import { ReactElement } from "react";
 import Editor from "@monaco-editor/react";
+import { useTheme } from "@/hooks/useTheme";
 import "tippy.js/dist/tippy.css";
 
 interface PayloadTooltipProps {
@@ -11,6 +12,9 @@ interface PayloadTooltipProps {
 }
 
 export function PayloadTooltip({ children, title, value, contentType = "json" }: PayloadTooltipProps) {
+  const { isDark } = useTheme();
+  const editorTheme = isDark ? "vs-dark" : "vs";
+
   const renderContent = () => {
     // For JSON objects, use Monaco Editor
     if (contentType === "json" && typeof value === "object") {
@@ -28,7 +32,7 @@ export function PayloadTooltip({ children, title, value, contentType = "json" }:
             width="100%"
             defaultLanguage="json"
             value={stringValue}
-            theme="vs"
+            theme={editorTheme}
             options={{
               readOnly: true,
               minimap: { enabled: false },
@@ -66,7 +70,7 @@ export function PayloadTooltip({ children, title, value, contentType = "json" }:
             width="100%"
             defaultLanguage="xml"
             value={stringValue}
-            theme="vs"
+            theme={editorTheme}
             options={{
               readOnly: true,
               minimap: { enabled: false },
@@ -103,7 +107,7 @@ export function PayloadTooltip({ children, title, value, contentType = "json" }:
           width="100%"
           defaultLanguage="plaintext"
           value={stringValue}
-          theme="vs"
+          theme={editorTheme}
           options={{
             readOnly: true,
             minimap: { enabled: false },
@@ -133,11 +137,11 @@ export function PayloadTooltip({ children, title, value, contentType = "json" }:
       render={(attrs) => (
         <div
           {...attrs}
-          className={`bg-white border-2 border-gray-200 rounded-md ${maxWidth} max-h-[400px] overflow-auto text-left shadow-lg`}
+          className={`bg-white dark:bg-slate-800 border-2 border-gray-200 dark:border-slate-600 rounded-md ${maxWidth} max-h-[400px] overflow-auto text-left shadow-lg`}
           style={{ zIndex: 10000 }}
         >
-          <div className="flex items-center border-b p-2">
-            <span className="font-medium text-gray-500 text-sm">{title}</span>
+          <div className="flex items-center border-b border-gray-200 dark:border-slate-600 p-2">
+            <span className="font-medium text-gray-500 dark:text-gray-300 text-sm">{title}</span>
           </div>
           <div className="p-2">{renderContent()}</div>
         </div>
