@@ -414,7 +414,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
       <div className="flex items-center justify-center py-8">
         <div className="flex flex-col items-center gap-2">
           <div className="animate-spin rounded-full h-6 w-6 border-b border-blue-600"></div>
-          <div className="text-xs text-gray-500">Loading execution chain...</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">Loading execution chain...</div>
         </div>
       </div>
     );
@@ -428,8 +428,8 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
             size: 24,
             className: "text-red-500",
           })}
-          <div className="text-sm font-medium text-gray-800">Failed to Load</div>
-          <div className="text-xs text-gray-500">{error}</div>
+          <div className="text-sm font-medium text-gray-800 dark:text-gray-200">Failed to Load</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">{error}</div>
         </div>
       </div>
     );
@@ -443,14 +443,14 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
           <div className="pb-15">
             {triggerEvent && (
               <div className="mb-6 border-b-1 border-border pb-4">
-                <h2 className="text-sm font-medium text-gray-800 flex items-center gap-2">
+                <h2 className="text-sm font-medium text-gray-800 dark:text-gray-200 flex items-center gap-2">
                   {triggerEvent.id && (
-                    <span className="text-[13px] text-gray-500 font-mono">#{triggerEvent.id.slice(0, 4)}</span>
+                    <span className="text-[13px] text-gray-500 dark:text-gray-400 font-mono">#{triggerEvent.id.slice(0, 4)}</span>
                   )}
                   {triggerEvent.title || "Execution Chain"}
                 </h2>
                 {summaryInfo && (
-                  <div className="text-[13px] text-gray-500">
+                  <div className="text-[13px] text-gray-500 dark:text-gray-400">
                     {summaryInfo.timeAgo}
                     {summaryInfo.duration && (
                       <>
@@ -467,7 +467,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
             {/* Event Section (now scrollable) */}
             {triggerEvent && (
               <div className="mb-6">
-                <h2 className="text-[13px] font-medium text-gray-500 mb-3">This run was triggered by</h2>
+                <h2 className="text-[13px] font-medium text-gray-500 dark:text-gray-400 mb-3">This run was triggered by</h2>
                 <ChainItem
                   item={convertSidebarEventToChainItem(triggerEvent, workflowNodes, components, triggers, getTabData)}
                   index={-1}
@@ -482,7 +482,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
 
             {/* Executions Section */}
             <div>
-              <h2 className="text-[13px] font-medium text-gray-500 mb-3">
+              <h2 className="text-[13px] font-medium text-gray-500 dark:text-gray-400 mb-3">
                 {chainItems.length} Step{chainItems.length === 1 ? "" : "s"}
               </h2>
               {chainItems.length > 0 ? (
@@ -506,10 +506,10 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
                   <div className="flex flex-col items-center gap-2 text-center">
                     {React.createElement(resolveIcon("layers"), {
                       size: 24,
-                      className: "text-gray-400",
+                      className: "text-gray-400 dark:text-gray-500",
                     })}
-                    <div className="text-sm font-medium text-gray-500">No Executions Found</div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-sm font-medium text-gray-500 dark:text-gray-400">No Executions Found</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
                       This trigger event doesn't have any associated executions yet.
                     </div>
                   </div>

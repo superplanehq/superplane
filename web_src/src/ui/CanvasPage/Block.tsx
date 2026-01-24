@@ -9,6 +9,7 @@ import MergeComponent, { type MergeComponentProps } from "../merge";
 import { ComponentActionsProps } from "../types/componentActions";
 import { ComponentBase, ComponentBaseProps } from "../componentBase";
 import { AnnotationComponent, type AnnotationComponentProps } from "../annotationComponent";
+import { useTheme } from "@/hooks/useTheme";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
 type BlockType = "trigger" | "component" | "composite" | "merge" | "switch" | "annotation";
@@ -150,6 +151,8 @@ function LeftHandle({ data, nodeId }: BlockProps) {
 }
 
 function RightHandle({ data, nodeId }: BlockProps) {
+  const { isDark } = useTheme();
+
   // Hide right handle for template nodes, pending connection nodes, and annotation nodes
   const isTemplate = (data as any).isTemplate;
   const isPendingConnection = (data as any).isPendingConnection;
@@ -294,9 +297,9 @@ function RightHandle({ data, nodeId }: BlockProps) {
               left: labelStartX,
               top: `calc(50% + ${offsetY}px)`,
               transform: "translateY(-50%)",
-              color: "#8B9AAC",
+              color: isDark ? "#9CA3AF" : "#8B9AAC",
               lineHeight: `${handleSize}px`,
-              background: "#F8FAFC",
+              background: isDark ? "#1f2937" : "#F8FAFC",
               paddingLeft: 4,
               paddingRight: 4,
             }}
@@ -340,13 +343,13 @@ function AiPopup({ show, suggestion, onApply, onDismiss }: BlockAi) {
 
   return (
     <div className="absolute left-0 -translate-y-[100%] text-left text-base">
-      <div className="bg-white rounded-lg shadow p-3 relative mb-2 border-blue-500 border-2">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-3 relative mb-2 border-blue-500 border-2">
         <div className="flex items-center gap-1 mb-2">
           <SparklesIcon className="inline-block text-blue-500" size={14} />
-          <div className="text-gray-800 font-bold">Improvements</div>
+          <div className="text-gray-800 dark:text-gray-200 font-bold">Improvements</div>
         </div>
 
-        <div className="text-sm">{suggestion}</div>
+        <div className="text-sm dark:text-gray-300">{suggestion}</div>
 
         <div className="flex gap-2 mt-2">
           <Button size="sm" variant="default" className="mt-2" onClick={handleApply}>
