@@ -4,7 +4,7 @@ import React from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import "./App.css";
-import { useTheme } from "./hooks/useTheme";
+import { ThemeProvider, useTheme } from "./hooks/useTheme";
 
 // Import pages
 import AuthGuard from "./components/AuthGuard";
@@ -40,8 +40,7 @@ const withAuthOnly = (Component: React.ComponentType) => (
   </AuthGuard>
 );
 
-function App() {
-  // Initialize theme at the top level
+function AppContent() {
   const { effectiveTheme } = useTheme();
 
   return (
@@ -53,6 +52,14 @@ function App() {
         <Toaster position="bottom-center" closeButton theme={effectiveTheme} />
       </AccountProvider>
     </QueryClientProvider>
+  );
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }
 

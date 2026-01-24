@@ -8,6 +8,7 @@ import { Input } from "../../../components/Input/input";
 import { useDeleteOrganization, useUpdateOrganization } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { ThemeSelector } from "../../../components/ThemeSelector";
+import { isThemeConfigEnabled } from "../../../lib/env";
 
 interface GeneralProps {
   organization: OrganizationsOrganization;
@@ -90,22 +91,24 @@ export function General({ organization }: GeneralProps) {
         </Field>
       </Fieldset>
 
-      <Fieldset className="bg-white dark:bg-neutral-800 rounded-lg border border-gray-300 dark:border-neutral-700 p-6 space-y-4">
-        <div>
-          <Heading level={3} className="!text-lg text-gray-900 dark:text-gray-100">
-            Appearance
-          </Heading>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Choose how Superplane looks to you
-          </p>
-        </div>
-        <Field>
-          <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-            Theme
-          </Label>
-          <ThemeSelector />
-        </Field>
-      </Fieldset>
+      {isThemeConfigEnabled() && (
+        <Fieldset className="bg-white dark:bg-neutral-800 rounded-lg border border-gray-300 dark:border-neutral-700 p-6 space-y-4">
+          <div>
+            <Heading level={3} className="!text-lg text-gray-900 dark:text-gray-100">
+              Appearance
+            </Heading>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Choose how Superplane looks to you
+            </p>
+          </div>
+          <Field>
+            <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+              Theme
+            </Label>
+            <ThemeSelector />
+          </Field>
+        </Fieldset>
+      )}
 
       <Fieldset className="bg-white dark:bg-neutral-800 border border-gray-300 dark:border-neutral-700 rounded-lg p-6 space-y-4">
         {!showDeleteForm ? (
