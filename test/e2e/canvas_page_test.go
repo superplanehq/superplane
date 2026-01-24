@@ -258,7 +258,7 @@ func (s *CanvasPageSteps) openNodeSettings(node string) {
 }
 
 func (s *CanvasPageSteps) typeExpression(value string) {
-	s.session.TypeIn(q.TestID("expression-field-expression"), value)
+	s.session.FillIn(q.TestID("expression-field-expression"), value)
 }
 
 func (s *CanvasPageSteps) assertAutocompleteNodeSuggestionVisible() {

@@ -221,23 +221,6 @@ func (s *TestSession) FillIn(q queries.Query, value string) {
 	}
 }
 
-func (s *TestSession) Focus(q queries.Query) {
-	s.t.Logf("Focusing %q", q.Describe())
-
-	if err := q.Run(s).Focus(); err != nil {
-		s.t.Fatalf("focus %q: %v", q.Describe(), err)
-	}
-}
-
-func (s *TestSession) TypeIn(q queries.Query, value string) {
-	s.t.Logf("Typing %q into %q", value, q.Describe())
-
-	s.Focus(q)
-	if err := q.Run(s).PressSequentially(value, pw.LocatorPressSequentiallyOptions{Timeout: pw.Float(s.timeoutMs)}); err != nil {
-		s.t.Fatalf("type %q into %q: %v", value, q.Describe(), err)
-	}
-}
-
 func (s *TestSession) VisitHomePage() {
 	s.Visit("/" + s.OrgID.String() + "/")
 }
