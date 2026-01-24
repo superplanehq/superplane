@@ -76,7 +76,7 @@ const OrganizationSelect: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-100 p-8">
+      <div className="min-h-screen bg-slate-100 dark:bg-neutral-900 p-8">
         <div className="flex flex-col items-center space-y-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500"></div>
           <Text className="text-gray-500 dark:text-gray-400">Loading...</Text>
@@ -86,18 +86,18 @@ const OrganizationSelect: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-slate-100 dark:bg-neutral-900">
       <div className="p-8">
         <div className="flex mb-4">
           <img src={SuperplaneLogo} alt="Superplane" className="h-6" />
         </div>
         <div className="max-w-7xl w-full">
           <div className="mb-6">
-            <Text className="font-medium text-gray-800 text-left">
+            <Text className="font-medium text-gray-800 dark:text-white text-left">
               Hey there{account?.name ? `, ${account.name}` : ""}!
             </Text>
             {organizations.length > 0 && (
-              <Text className="font-medium text-gray-500 text-left">
+              <Text className="font-medium text-gray-500 dark:text-gray-400 text-left">
                 Select one of your organizations below to get started:
               </Text>
             )}
@@ -111,8 +111,8 @@ const OrganizationSelect: React.FC = () => {
 
           {organizations.length === 0 && (
             <div className="text-left py-2 mb-4">
-              <Text className="font-medium text-gray-800">You're not a member of any organizations yet.</Text>
-              <Text className="font-medium text-gray-800">Create a new organization to get started!</Text>
+              <Text className="font-medium text-gray-800 dark:text-gray-100">You're not a member of any organizations yet.</Text>
+              <Text className="font-medium text-gray-800 dark:text-gray-100">Create a new organization to get started!</Text>
             </div>
           )}
 
@@ -120,7 +120,7 @@ const OrganizationSelect: React.FC = () => {
             {organizations.map((org) => (
               <div
                 key={org.id}
-                className="h-48 bg-white dark:bg-gray-900 rounded-md shadow-sm p-6 outline outline-slate-950/10 hover:outline-slate-950/20 hover:shadow-md transition-colors cursor-pointer"
+                className="h-48 bg-white dark:bg-neutral-800 rounded-md shadow-sm p-6 outline outline-slate-950/10 dark:outline-neutral-700 hover:outline-slate-950/20 dark:hover:outline-neutral-600 hover:shadow-md transition-colors cursor-pointer"
                 onClick={() => handleOrganizationSelect(org)}
               >
                 <div className="flex flex-col h-full justify-between">
@@ -146,13 +146,13 @@ const OrganizationSelect: React.FC = () => {
             ))}
 
             <div
-              className="h-48 bg-white/50 hover:bg-white border-1 border-dashed border-gray-400 rounded-lg p-6 flex flex-col items-center justify-center transition-colors cursor-pointer"
+              className="h-48 bg-white/50 dark:bg-neutral-800/50 hover:bg-white dark:hover:bg-neutral-800 border-1 border-dashed border-gray-400 dark:border-neutral-600 rounded-lg p-6 flex flex-col items-center justify-center transition-colors cursor-pointer"
               onClick={() => navigate("/create")}
             >
               <div className="flex items-center">
-                <h4 className="text-lg font-medium text-gray-800 text-center">+ Create new</h4>
+                <h4 className="text-lg font-medium text-gray-800 dark:text-white text-center">+ Create new</h4>
               </div>
-              <Text className="text-[13px] text-gray-500 font-medium text-center">
+              <Text className="text-[13px] text-gray-500 dark:text-gray-400 font-medium text-center">
                 Start fresh with a new organization
               </Text>
             </div>
