@@ -147,7 +147,7 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 func (s *CanvasSteps) StartAddingTimeGate(name string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 
-	source := q.TestID("building-block-time_gate")
+	source := q.TestID("building-block-timeGate")
 	target := q.TestID("rf__wrapper")
 
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
@@ -159,7 +159,7 @@ func (s *CanvasSteps) StartAddingTimeGate(name string, pos models.Position) {
 func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 
-	source := q.TestID("building-block-time_gate")
+	source := q.TestID("building-block-timeGate")
 	target := q.TestID("rf__wrapper")
 
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)

@@ -63,7 +63,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   noop: noopMapper,
   if: ifMapper,
   http: httpMapper,
-  time_gate: timeGateMapper,
+  timeGate: timeGateMapper,
   filter: filterMapper,
   wait: waitMapper,
   approval: approvalMapper,
@@ -106,7 +106,7 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   http: HTTP_STATE_REGISTRY,
   filter: FILTER_STATE_REGISTRY,
   if: IF_STATE_REGISTRY,
-  time_gate: TIME_GATE_STATE_REGISTRY,
+  timeGate: TIME_GATE_STATE_REGISTRY,
   wait: WAIT_STATE_REGISTRY,
   merge: MERGE_STATE_REGISTRY,
 };

@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	registry.RegisterComponent("time_gate", &TimeGate{})
+	registry.RegisterComponent("timeGate", &TimeGate{})
 }
 
 const (
@@ -41,7 +41,7 @@ type Spec struct {
 }
 
 func (tg *TimeGate) Name() string {
-	return "time_gate"
+	return "timeGate"
 }
 
 func (tg *TimeGate) Label() string {
