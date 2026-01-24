@@ -94,7 +94,7 @@ export function Roles({ organizationId }: RolesProps) {
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
+      <div className="bg-white dark:bg-neutral-800 rounded-lg border border-gray-300 dark:border-neutral-700 overflow-hidden">
         <div className="px-6 pt-6 pb-4 flex items-center justify-start">
           <Button className="flex items-center" onClick={handleCreateRole}>
             <Icon name="plus" />
@@ -132,7 +132,7 @@ export function Roles({ organizationId }: RolesProps) {
                         <TableCell>
                           <div className="flex justify-end">
                             {isDefault ? (
-                              <span className="text-xs text-gray-700 dark:text-gray-400 px-2 py-1 bg-gray-200 dark:bg-gray-800 rounded">
+                              <span className="text-xs text-gray-700 dark:text-gray-400 px-2 py-1 bg-gray-200 dark:bg-neutral-800 rounded">
                                 Default Role
                               </span>
                             ) : (

@@ -137,7 +137,7 @@ export function Groups({ organizationId }: GroupsProps) {
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
+      <div className="bg-white dark:bg-neutral-800 rounded-lg border border-gray-300 dark:border-neutral-700 overflow-hidden">
         {filteredAndSortedGroups.length > 0 && (
           <div className="px-6 pt-6 pb-4 flex items-center justify-start">
             <Button className="flex items-center" onClick={handleCreateGroup}>
@@ -212,10 +212,10 @@ export function Groups({ organizationId }: GroupsProps) {
                   <TableRow key={index} className="last:[&>td]:border-b-0">
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Icon name="users" size="sm" className="text-gray-800" />
+                        <Icon name="users" size="sm" className="text-gray-800 dark:text-gray-200" />
                         <Link
                           href={group.metadata?.name ? getGroupMembersPath(group.metadata.name) : "#"}
-                          className="cursor-pointer text-sm !font-semibold text-gray-800 !underline underline-offset-2"
+                          className="cursor-pointer text-sm !font-semibold text-gray-800 dark:text-gray-200 !underline underline-offset-2"
                         >
                           {group.spec?.displayName}
                         </Link>

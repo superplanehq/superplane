@@ -79,11 +79,11 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 </span>
               </HoverCardTrigger>
               <HoverCardContent side="top" className="w-64 space-y-3 text-xs">
-                <p className="text-sm font-medium text-neutral-900">Artifacts</p>
+                <p className="text-sm font-medium text-neutral-900 dark:text-gray-200">Artifacts</p>
                 <div className="space-y-3">
                   {Object.entries(providedArtifacts).map(([name, value]) => (
                     <div key={name} className="space-y-1">
-                      <p className="font-medium text-neutral-900">{name}</p>
+                      <p className="font-medium text-neutral-900 dark:text-gray-200">{name}</p>
                       <a
                         href={value}
                         target="_blank"
@@ -106,7 +106,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 </span>
               </HoverCardTrigger>
               <HoverCardContent side="top" className="w-64 text-xs">
-                <p className="text-sm font-medium text-neutral-900 mb-2">Rejection Comment</p>
+                <p className="text-sm font-medium text-neutral-900 dark:text-gray-200 mb-2">Rejection Comment</p>
                 <p className="text-muted-foreground">{rejectionComment}</p>
               </HoverCardContent>
             </HoverCard>
@@ -180,13 +180,13 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
         </Item>
         {showRejectionForm && (
           <div
-            className="w-full border bg-gray-50 px-3 py-2 my-2 rounded-lg text-left"
+            className="w-full border dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-3 py-2 my-2 rounded-lg text-left"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex flex-col gap-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <Label htmlFor="rejection-comment" className="text-sm font-semibold text-gray-800">
+                  <Label htmlFor="rejection-comment" className="text-sm font-semibold text-gray-800 dark:text-gray-200">
                     Comment
                   </Label>
                 </div>
@@ -231,7 +231,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
         )}
         {showApprovalForm && (
           <div
-            className="w-full border my-2 bg-gray-50 px-3 py-2 rounded-lg text-left"
+            className="w-full border dark:border-gray-600 my-2 bg-gray-50 dark:bg-gray-800 px-3 py-2 rounded-lg text-left"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex flex-col gap-4">
@@ -239,7 +239,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 <div key={index} className="flex flex-col gap-2">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <Label htmlFor={`artifact-${index}`} className="text-sm font-semibold text-neutral-900">
+                      <Label htmlFor={`artifact-${index}`} className="text-sm font-semibold text-neutral-900 dark:text-gray-200">
                         {artifact.label}
                       </Label>
                       <span className="ml-2 text-sm text-muted-foreground">{artifact.optional ? "Optional" : ""}</span>
