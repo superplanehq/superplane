@@ -3341,6 +3341,8 @@ function prepareMergeNode(
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
         eventStateMap: mergeStateMap,
+        error: node.errorMessage,
+        warning: node.warningMessage,
       },
     },
   };

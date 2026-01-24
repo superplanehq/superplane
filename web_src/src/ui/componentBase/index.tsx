@@ -357,7 +357,10 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="absolute -top-6 left-1 bg-orange-500 rounded-t-md h-6 p-1 cursor-pointer">
+                <div
+                  data-testid="node-warning-badge"
+                  className="absolute -top-6 left-1 bg-orange-500 rounded-t-md h-6 p-1 cursor-pointer"
+                >
                   <AlertTriangle size={16} className="text-white" />
                 </div>
               </TooltipTrigger>
