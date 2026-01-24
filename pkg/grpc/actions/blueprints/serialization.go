@@ -74,6 +74,9 @@ func ParseBlueprint(registry *registry.Registry, organizationID string, blueprin
 		}
 	}
 
+	// Find shadowed names within connected components
+	nodeWarnings := actions.FindShadowedNameWarnings(blueprint.Nodes, blueprint.Edges)
+
 	for i, edge := range blueprint.Edges {
 		if edge.SourceId == "" || edge.TargetId == "" {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source_id and target_id are required", i)
@@ -88,13 +91,19 @@ func ParseBlueprint(registry *registry.Registry, organizationID string, blueprin
 		return nil, nil, err
 	}
 
-	// Convert proto nodes to models, adding validation errors where applicable
+	// Convert proto nodes to models, adding validation errors and warnings where applicable
 	nodes := actions.ProtoToNodes(blueprint.Nodes)
 	for i := range nodes {
 		if errorMsg, hasError := nodeValidationErrors[nodes[i].ID]; hasError {
 			nodes[i].ErrorMessage = &errorMsg
 		} else {
 			nodes[i].ErrorMessage = nil
+		}
+
+		if warningMsg, hasWarning := nodeWarnings[nodes[i].ID]; hasWarning {
+			nodes[i].WarningMessage = &warningMsg
+		} else {
+			nodes[i].WarningMessage = nil
 		}
 	}
 

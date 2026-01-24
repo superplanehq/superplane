@@ -33,6 +33,7 @@ type ComponentsNode struct {
 	IsCollapsed     *bool                         `json:"isCollapsed,omitempty"`
 	AppInstallation *ComponentsAppInstallationRef `json:"appInstallation,omitempty"`
 	ErrorMessage    *string                       `json:"errorMessage,omitempty"`
+	WarningMessage  *string                       `json:"warningMessage,omitempty"`
 }
 
 // NewComponentsNode instantiates a new ComponentsNode object
@@ -472,6 +473,38 @@ func (o *ComponentsNode) SetErrorMessage(v string) {
 	o.ErrorMessage = &v
 }
 
+// GetWarningMessage returns the WarningMessage field value if set, zero value otherwise.
+func (o *ComponentsNode) GetWarningMessage() string {
+	if o == nil || IsNil(o.WarningMessage) {
+		var ret string
+		return ret
+	}
+	return *o.WarningMessage
+}
+
+// GetWarningMessageOk returns a tuple with the WarningMessage field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ComponentsNode) GetWarningMessageOk() (*string, bool) {
+	if o == nil || IsNil(o.WarningMessage) {
+		return nil, false
+	}
+	return o.WarningMessage, true
+}
+
+// HasWarningMessage returns a boolean if a field has been set.
+func (o *ComponentsNode) HasWarningMessage() bool {
+	if o != nil && !IsNil(o.WarningMessage) {
+		return true
+	}
+
+	return false
+}
+
+// SetWarningMessage gets a reference to the given string and assigns it to the WarningMessage field.
+func (o *ComponentsNode) SetWarningMessage(v string) {
+	o.WarningMessage = &v
+}
+
 func (o ComponentsNode) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -520,6 +553,9 @@ func (o ComponentsNode) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.ErrorMessage) {
 		toSerialize["errorMessage"] = o.ErrorMessage
+	}
+	if !IsNil(o.WarningMessage) {
+		toSerialize["warningMessage"] = o.WarningMessage
 	}
 	return toSerialize, nil
 }

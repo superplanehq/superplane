@@ -133,6 +133,7 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 	}
 
 	nodeIDs := make(map[string]bool)
+	nodeTypeByID := make(map[string]compb.Node_Type)
 	nodeValidationErrors := make(map[string]string)
 
 	for i, node := range workflow.Spec.Nodes {
@@ -149,16 +150,15 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 		}
 
 		nodeIDs[node.Id] = true
+		nodeTypeByID[node.Id] = node.Type
 
 		if err := validateNodeRef(registry, orgID, node); err != nil {
 			nodeValidationErrors[node.Id] = err.Error()
 		}
 	}
 
-	nodeTypes := make(map[string]compb.Node_Type)
-	for _, node := range workflow.Spec.Nodes {
-		nodeTypes[node.Id] = node.Type
-	}
+	// Find shadowed names within connected components
+	nodeWarnings := actions.FindShadowedNameWarnings(workflow.Spec.Nodes, workflow.Spec.Edges)
 
 	for i, edge := range workflow.Spec.Edges {
 		if edge.SourceId == "" || edge.TargetId == "" {
@@ -173,11 +173,11 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target node %s not found", i, edge.TargetId)
 		}
 
-		if nodeTypes[edge.SourceId] == compb.Node_TYPE_WIDGET {
+		if nodeTypeByID[edge.SourceId] == compb.Node_TYPE_WIDGET {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as source nodes", i)
 		}
 
-		if nodeTypes[edge.TargetId] == compb.Node_TYPE_WIDGET {
+		if nodeTypeByID[edge.TargetId] == compb.Node_TYPE_WIDGET {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as target nodes", i)
 		}
 	}
@@ -186,13 +186,19 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 		return nil, nil, err
 	}
 
-	// Convert proto nodes to models, adding validation errors where applicable
+	// Convert proto nodes to models, adding validation errors and warnings where applicable
 	nodes := actions.ProtoToNodes(workflow.Spec.Nodes)
 	for i := range nodes {
 		if errorMsg, hasError := nodeValidationErrors[nodes[i].ID]; hasError {
 			nodes[i].ErrorMessage = &errorMsg
 		} else {
 			nodes[i].ErrorMessage = nil
+		}
+
+		if warningMsg, hasWarning := nodeWarnings[nodes[i].ID]; hasWarning {
+			nodes[i].WarningMessage = &warningMsg
+		} else {
+			nodes[i].WarningMessage = nil
 		}
 	}
 

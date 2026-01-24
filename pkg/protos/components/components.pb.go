@@ -569,6 +569,7 @@ type Node struct {
 	IsCollapsed     bool                   `protobuf:"varint,11,opt,name=is_collapsed,json=isCollapsed,proto3" json:"is_collapsed,omitempty"`
 	AppInstallation *AppInstallationRef    `protobuf:"bytes,12,opt,name=app_installation,json=appInstallation,proto3" json:"app_installation,omitempty"`
 	ErrorMessage    string                 `protobuf:"bytes,13,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	WarningMessage  string                 `protobuf:"bytes,14,opt,name=warning_message,json=warningMessage,proto3" json:"warning_message,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -690,6 +691,13 @@ func (x *Node) GetAppInstallation() *AppInstallationRef {
 func (x *Node) GetErrorMessage() string {
 	if x != nil {
 		return x.ErrorMessage
+	}
+	return ""
+}
+
+func (x *Node) GetWarningMessage() string {
+	if x != nil {
+		return x.WarningMessage
 	}
 	return ""
 }
@@ -1179,7 +1187,7 @@ const file_components_proto_rawDesc = "" +
 	"parameters\x18\x03 \x03(\v2\x1f.Superplane.Configuration.FieldR\n" +
 	"parameters\"`\n" +
 	"\x1cListComponentActionsResponse\x12@\n" +
-	"\aactions\x18\x01 \x03(\v2&.Superplane.Components.ComponentActionR\aactions\"\x9a\a\n" +
+	"\aactions\x18\x01 \x03(\v2&.Superplane.Components.ComponentActionR\aactions\"\xc3\a\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x124\n" +
@@ -1194,7 +1202,8 @@ const file_components_proto_rawDesc = "" +
 	" \x01(\v2%.Superplane.Components.Node.WidgetRefR\x06widget\x12!\n" +
 	"\fis_collapsed\x18\v \x01(\bR\visCollapsed\x12T\n" +
 	"\x10app_installation\x18\f \x01(\v2).Superplane.Components.AppInstallationRefR\x0fappInstallation\x12#\n" +
-	"\rerror_message\x18\r \x01(\tR\ferrorMessage\x1a\"\n" +
+	"\rerror_message\x18\r \x01(\tR\ferrorMessage\x12'\n" +
+	"\x0fwarning_message\x18\x0e \x01(\tR\x0ewarningMessage\x1a\"\n" +
 	"\fComponentRef\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x1a \n" +
 	"\n" +

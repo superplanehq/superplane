@@ -360,37 +360,70 @@ export function mapCanvasNodesToLogEntries(options: {
 }): LogEntry[] {
   const { nodes, workflowUpdatedAt, onNodeSelect } = options;
 
-  return (
-    nodes
-      .filter((node: ComponentsNode) => node.errorMessage)
-      .map((node, index) => {
-        const title = createElement(
-          Fragment,
-          null,
-          "Component not configured - ",
-          createElement(
-            "button",
-            {
-              type: "button",
-              className: "text-blue-600 underline hover:text-blue-700",
-              onClick: () => onNodeSelect(node.id || ""),
-            },
-            node.id,
-          ),
-          " - ",
-          node.errorMessage,
-        );
+  const entries: LogEntry[] = [];
 
-        return {
-          id: `log-${index + 1}`,
-          source: "canvas",
-          timestamp: workflowUpdatedAt,
-          title,
-          type: "warning",
-          searchText: `component not configured ${node.id} ${node.errorMessage}`,
-        } as LogEntry;
-      }) || []
-  );
+  // Add error entries for nodes with configuration errors
+  nodes
+    .filter((node: ComponentsNode) => node.errorMessage)
+    .forEach((node, index) => {
+      const title = createElement(
+        Fragment,
+        null,
+        "Component not configured - ",
+        createElement(
+          "button",
+          {
+            type: "button",
+            className: "text-blue-600 underline hover:text-blue-700",
+            onClick: () => onNodeSelect(node.id || ""),
+          },
+          node.id,
+        ),
+        " - ",
+        node.errorMessage,
+      );
+
+      entries.push({
+        id: `error-${index + 1}`,
+        source: "canvas",
+        timestamp: workflowUpdatedAt,
+        title,
+        type: "warning",
+        searchText: `component not configured ${node.id} ${node.errorMessage}`,
+      } as LogEntry);
+    });
+
+  // Add warning entries for nodes with warnings (like shadowed names)
+  nodes
+    .filter((node: ComponentsNode) => node.warningMessage)
+    .forEach((node, index) => {
+      const title = createElement(
+        Fragment,
+        null,
+        createElement(
+          "button",
+          {
+            type: "button",
+            className: "text-blue-600 underline hover:text-blue-700",
+            onClick: () => onNodeSelect(node.id || ""),
+          },
+          node.name || node.id,
+        ),
+        " - ",
+        node.warningMessage,
+      );
+
+      entries.push({
+        id: `warning-${index + 1}`,
+        source: "canvas",
+        timestamp: workflowUpdatedAt,
+        title,
+        type: "warning",
+        searchText: `${node.name} ${node.id} ${node.warningMessage}`,
+      } as LogEntry);
+    });
+
+  return entries;
 }
 
 export function buildCanvasStatusLogEntry(options: {

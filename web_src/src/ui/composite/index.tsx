@@ -61,6 +61,7 @@ export interface CompositeProps extends ComponentActionsProps {
   selected?: boolean;
   isMissing?: boolean;
   error?: string;
+  warning?: string;
 
   onExpandChildEvents?: () => void;
   onReRunChildEvents?: () => void;
@@ -88,6 +89,7 @@ export const Composite: React.FC<CompositeProps> = ({
   selected = false,
   isMissing = false,
   error,
+  warning,
   onRun,
   runDisabled,
   runDisabledTooltip,
@@ -229,6 +231,7 @@ export const Composite: React.FC<CompositeProps> = ({
       emptyStateProps={{ title: "No executions received yet" }}
       customField={customField}
       error={error}
+      warning={warning}
     />
   );
 };
