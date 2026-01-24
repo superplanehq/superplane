@@ -17,7 +17,6 @@ import {
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
 import { getTriggerRenderer } from "..";
-import githubIcon from "@/assets/icons/integrations/github.svg";
 import { buildGithubExecutionSubtitle } from "./utils";
 import { Icon } from "@/components/Icon";
 
@@ -34,26 +33,26 @@ export const RUN_WORKFLOW_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   running: {
     icon: "loader-circle",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-blue-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-blue-100 dark:bg-blue-900/50",
     badgeColor: "bg-blue-500",
   },
   passed: {
     icon: "circle-check",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-green-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-green-100 dark:bg-green-900/50",
     badgeColor: "bg-emerald-500",
   },
   failed: {
     icon: "circle-x",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-red-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-red-100 dark:bg-red-900/50",
     badgeColor: "bg-red-400",
   },
   stopped: {
     icon: "circle-stop",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-gray-100 dark:bg-gray-700",
     badgeColor: "bg-gray-500",
   },
 };
@@ -113,7 +112,7 @@ export const runWorkflowMapper: ComponentBaseMapper = {
   ): ComponentBaseProps {
     return {
       title: node.name!,
-      iconSrc: githubIcon,
+      appName: "github",
       iconColor: getColorClass(componentDefinition?.color!),
       collapsed: node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),

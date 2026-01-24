@@ -15,7 +15,6 @@ import {
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import { ComponentBaseMapper, OutputPayload, EventStateRegistry, StateFunction } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
-import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import { ListIssuesConfiguration, PrometheusResponse } from "./types";
 import { formatTimeAgo } from "@/utils/date";
 
@@ -91,7 +90,7 @@ export const listIssuesMapper: ComponentBaseMapper = {
     const specs = getSpecs(configuration);
 
     return {
-      iconSrc: dash0Icon,
+      appName: "dash0",
       collapsedBackground: "bg-white",
       collapsed: node.isCollapsed,
       title: node.name!,
@@ -217,20 +216,20 @@ export const LIST_ISSUES_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   clear: {
     icon: "circle-check",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-gray-100 dark:bg-gray-700",
     badgeColor: "bg-gray-500",
   },
   degraded: {
     icon: "alert-triangle",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-yellow-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-yellow-100 dark:bg-yellow-900/50",
     badgeColor: "bg-yellow-500",
   },
   critical: {
     icon: "circle-x",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-red-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-red-100 dark:bg-red-900/50",
     badgeColor: "bg-red-500",
   },
 };

@@ -44,7 +44,7 @@ export const MergeComponent: React.FC<MergeComponentProps> = ({
       eventTitle: nextInQueue.title,
       eventState: "queued",
       handleComponent: nextInQueue.subtitle ? (
-        <div className="mt-2 text-right text-xs text-gray-500">{nextInQueue.subtitle}</div>
+        <div className="mt-2 text-right text-xs text-gray-500 dark:text-gray-400">{nextInQueue.subtitle}</div>
       ) : undefined,
     });
   }

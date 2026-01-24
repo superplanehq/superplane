@@ -1,4 +1,4 @@
-import { resolveIcon } from "@/lib/utils";
+import { resolveIcon, APP_LOGO_MAP, DARK_ICONS_NEEDING_INVERT } from "@/lib/utils";
 import React from "react";
 import { toTestId } from "../../utils/testID";
 import { ComponentActionsProps } from "../types/componentActions";
@@ -7,6 +7,7 @@ export interface ComponentHeaderProps extends ComponentActionsProps {
   iconSrc?: string;
   iconSlug?: string;
   iconColor?: string;
+  appName?: string;
   title: string;
   onDoubleClick?: () => void;
   statusBadgeColor?: string;
@@ -16,11 +17,14 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
   iconSrc,
   iconSlug,
   iconColor,
+  appName,
   title,
   onDoubleClick,
   statusBadgeColor,
   isCompactView = false,
 }) => {
+  const resolvedIconSrc = iconSrc ?? (appName ? APP_LOGO_MAP[appName] : undefined);
+  const needsInvert = appName && DARK_ICONS_NEEDING_INVERT.includes(appName);
   const Icon = React.useMemo(() => {
     return resolveIcon(iconSlug);
   }, [iconSlug]);
@@ -31,15 +35,15 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
       data-view-mode={isCompactView ? "compact" : "expanded"}
       className={
         "canvas-node-drag-handle text-left text-lg w-full px-2 py-1.5 flex items-center flex-col rounded-t-md items-center relative" +
-        (isCompactView ? "" : " border-b border-slate-950/20")
+        (isCompactView ? "" : " border-b border-slate-950/20 dark:border-gray-600")
       }
       onDoubleClick={onDoubleClick}
     >
       <div className="flex w-full items-center justify-between">
         <div className="flex items-center">
           <div className="mr-2 flex h-4 w-4 items-center justify-center overflow-hidden">
-            {iconSrc ? (
-              <img src={iconSrc} alt={title} className="max-w-5 max-h-5 object-contain" />
+            {resolvedIconSrc ? (
+              <img src={resolvedIconSrc} alt={title} className={`max-w-5 max-h-5 object-contain ${needsInvert ? "dark:invert" : ""}`} />
             ) : (
               <Icon size={16} className={iconColor} />
             )}

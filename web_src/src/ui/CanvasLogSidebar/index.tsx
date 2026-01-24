@@ -219,7 +219,7 @@ export function CanvasLogSidebar({
   return (
     <aside className="absolute left-0 right-0 bottom-0 z-31 pointer-events-auto">
       <div
-        className="bg-white outline outline-slate-950/15 flex flex-col"
+        className="bg-white dark:bg-gray-900 outline outline-slate-950/15 dark:outline-gray-700 flex flex-col"
         style={{ height: sidebarHeight, minHeight, maxHeight }}
       >
         <div className="h-0.5 cursor-row-resize rounded-t-lg transition-colors" onMouseDown={handleResizeStart} />
