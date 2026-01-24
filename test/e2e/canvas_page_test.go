@@ -23,6 +23,27 @@ func TestCanvasPage(t *testing.T) {
 		steps.assertNodeIsAdded("Hello")
 	})
 
+	t.Run("adding multiple nodes generates unique names", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
+		steps.start()
+		steps.givenACanvasExists()
+
+		// Add three noop nodes with auto-generated names
+		name1 := steps.addNoopWithDefaultName(models.Position{X: 500, Y: 200})
+		name2 := steps.addNoopWithDefaultName(models.Position{X: 500, Y: 400})
+		name3 := steps.addNoopWithDefaultName(models.Position{X: 500, Y: 600})
+
+		// First should be "noop", second "noop2", third "noop3"
+		require.Equal(t, "noop", name1, "first node should be named 'noop'")
+		require.Equal(t, "noop2", name2, "second node should be named 'noop2'")
+		require.Equal(t, "noop3", name3, "third node should be named 'noop3'")
+
+		// Verify all nodes exist on canvas
+		steps.assertNodeIsAdded("noop")
+		steps.assertNodeIsAdded("noop2")
+		steps.assertNodeIsAdded("noop3")
+	})
+
 	// Note: "duplicating a node on canvas" test removed - duplicate action no longer available in UI
 
 	t.Run("collapsing and expanding a node on canvas", func(t *testing.T) {
@@ -131,6 +152,10 @@ func (s *CanvasPageSteps) addManualTrigger(name string) {
 
 func (s *CanvasPageSteps) addFilter(name string) {
 	s.canvas.AddFilter(name, models.Position{X: 900, Y: 200})
+}
+
+func (s *CanvasPageSteps) addNoopWithDefaultName(pos models.Position) string {
+	return s.canvas.AddNoopWithDefaultName(pos)
 }
 
 func (s *CanvasPageSteps) addTwoNodesAndConnect() {
