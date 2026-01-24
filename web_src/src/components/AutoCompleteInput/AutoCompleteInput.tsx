@@ -104,6 +104,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const backdropRef = useRef<HTMLDivElement>(null);
     const mirrorRef = useRef<HTMLSpanElement>(null);
+    const isInteractingWithSuggestionsRef = useRef(false);
+    const suppressSuggestionsRef = useRef(false);
     useImperativeHandle(forwardedRef, () => inputRef.current as HTMLTextAreaElement);
 
     // Auto-resize textarea based on content (and backdrop in preview mode)
@@ -891,6 +893,11 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         return;
       }
 
+      if (suppressSuggestionsRef.current) {
+        suppressSuggestionsRef.current = false;
+        return;
+      }
+
       const context = getExpressionContext(inputValue, cursorPosition);
       if (!context || !isAllowedToSuggest(inputValue, cursorPosition)) {
         setSuggestions([]);
@@ -944,6 +951,9 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     // Handle clicking outside to close suggestions
     useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
+        if (suggestionsRef.current?.contains(event.target as Node)) {
+          return;
+        }
         if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
           setIsOpen(false);
           setIsFocused(false);
@@ -1004,9 +1014,12 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     };
 
     const handleSuggestionClick = (suggestionItem: ReturnType<typeof getSuggestions>[number]) => {
+      suppressSuggestionsRef.current = true;
       const cursorPosition = inputRef.current?.selectionStart || 0;
       const context = getExpressionContext(inputValue, cursorPosition);
       if (!context) {
+        suppressSuggestionsRef.current = false;
+        isInteractingWithSuggestionsRef.current = false;
         setIsOpen(false);
         return;
       }
@@ -1025,6 +1038,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         inputRef.current?.focus();
         const cursorTarget = context.startOffset + range.start + insertText.length;
         inputRef.current?.setSelectionRange(cursorTarget, cursorTarget);
+        isInteractingWithSuggestionsRef.current = false;
+        suppressSuggestionsRef.current = false;
       });
 
       setIsOpen(false);
@@ -1163,6 +1178,13 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
               }
             }}
             onBlur={() => {
+              if (isInteractingWithSuggestionsRef.current) {
+                requestAnimationFrame(() => {
+                  inputRef.current?.focus();
+                  isInteractingWithSuggestionsRef.current = false;
+                });
+                return;
+              }
               // Small delay to allow click on suggestions
               setTimeout(() => {
                 setIsFocused(false);
@@ -1448,10 +1470,13 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                           highlightedIndex === index && "bg-gray-100 dark:bg-gray-700",
                         ])}
                         onMouseDown={(e) => {
+                          isInteractingWithSuggestionsRef.current = true;
                           e.preventDefault(); // Prevent blur on the input
+                          e.stopPropagation();
                           handleSuggestionClick(suggestionItem);
                         }}
-                        onMouseEnter={() => {
+                        onMouseEnter={(e) => {
+                          e.stopPropagation();
                           setHighlightedIndex(index);
                           setHighlightedSuggestion(suggestionItem);
                           if (exampleObj) {

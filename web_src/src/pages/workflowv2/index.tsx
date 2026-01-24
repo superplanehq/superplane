@@ -1068,7 +1068,7 @@ export function WorkflowPageV2() {
           }
 
           const exampleData = triggerMetadata?.exampleData;
-          if (exampleData && typeof exampleData === "object" && Object.keys(exampleData).length > 0) {
+          if (exampleData && typeof exampleData === "object") {
             exampleObj[chainNodeId] = exampleData as Record<string, unknown>;
           }
           return;
@@ -1091,7 +1091,7 @@ export function WorkflowPageV2() {
         );
         if (!latestExecution?.outputs) {
           const exampleOutput = componentMetadata?.exampleOutput;
-          if (exampleOutput && typeof exampleOutput === "object" && Object.keys(exampleOutput).length > 0) {
+          if (exampleOutput && typeof exampleOutput === "object") {
             exampleObj[chainNodeId] = exampleOutput as Record<string, unknown>;
           }
           return;
