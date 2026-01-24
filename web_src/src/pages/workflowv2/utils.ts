@@ -204,7 +204,13 @@ export function mapQueueItemsToSidebarEvents(
   });
 }
 
-export function mapExecutionStateToLogType(state?: string): "success" | "error" {
+export function mapExecutionStateToLogType(
+  execution: WorkflowsWorkflowNodeExecution,
+  state?: string,
+): "success" | "error" | "resolved-error" {
+  if (execution.resultReason === "RESULT_REASON_ERROR_RESOLVED") {
+    return "resolved-error";
+  }
   return state === "error" ? "error" : "success";
 }
 
@@ -227,7 +233,7 @@ export function buildRunItemFromExecution(options: {
   const componentName = componentNode?.component?.name || "";
   const stateResolver = getState(componentName);
   const state = stateResolver(execution);
-  const executionState = state || "unknown";
+  const executionState = execution.resultReason === "RESULT_REASON_ERROR_RESOLVED" ? "error" : state || "unknown";
   const nodeId = componentNode?.id || execution.nodeId || "";
   const detail = execution.resultMessage;
   const triggerNode = event ? nodes.find((node) => node.id === event.nodeId) : undefined;
@@ -271,7 +277,7 @@ export function buildRunItemFromExecution(options: {
 
   return {
     id: execution.id || `${execution.nodeId}-execution`,
-    type: mapExecutionStateToLogType(state),
+    type: mapExecutionStateToLogType(execution, state),
     title,
     timestamp: timestampOverride || execution.updatedAt || execution.createdAt || execution.rootEvent?.createdAt || "",
     isRunning: execution.state === "STATE_STARTED" || execution.state === "STATE_PENDING",

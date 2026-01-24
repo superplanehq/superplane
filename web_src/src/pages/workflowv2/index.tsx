@@ -66,6 +66,7 @@ import {
   getState,
   getStateMap,
 } from "./mappers";
+import { resolveExecutionErrors } from "./mappers/dash0";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
@@ -710,6 +711,7 @@ export function WorkflowPageV2() {
   } | null>(null);
   const [liveRunEntries, setLiveRunEntries] = useState<LogEntry[]>([]);
   const [liveCanvasEntries, setLiveCanvasEntries] = useState<LogEntry[]>([]);
+  const [resolvedExecutionIds, setResolvedExecutionIds] = useState<Set<string>>(new Set());
   const handleExecutionChainHandled = useCallback(() => setFocusRequest(null), []);
 
   const handleSidebarChange = useCallback(
@@ -873,7 +875,28 @@ export function WorkflowPageV2() {
     });
     const allCanvasEntries = [...liveCanvasEntries, ...canvasEntries];
 
-    return [...allRunEntries, ...allCanvasEntries].sort((a, b) => {
+    const resolvedEntries = [...allRunEntries, ...allCanvasEntries].map((entry) => {
+      if (!entry.runItems?.length || resolvedExecutionIds.size === 0) {
+        return entry;
+      }
+
+      const runItems = entry.runItems.map((item) => {
+        if (!resolvedExecutionIds.has(item.id)) {
+          return item;
+        }
+        return {
+          ...item,
+          type: "resolved-error" as const,
+        };
+      });
+
+      return {
+        ...entry,
+        runItems,
+      };
+    });
+
+    return resolvedEntries.sort((a, b) => {
       const aTime = Date.parse(a.timestamp || "") || 0;
       const bTime = Date.parse(b.timestamp || "") || 0;
       return aTime - bTime;
@@ -884,6 +907,7 @@ export function WorkflowPageV2() {
     handleLogRunExecutionSelect,
     liveCanvasEntries,
     liveRunEntries,
+    resolvedExecutionIds,
     workflow?.metadata?.updatedAt,
     workflow?.spec?.nodes,
     workflowEventsResponse?.events,
@@ -2512,6 +2536,35 @@ export function WorkflowPageV2() {
     workflow,
   });
 
+  const [isResolvingErrors, setIsResolvingErrors] = useState(false);
+
+  const handleResolveExecutionErrors = useCallback(
+    async (executionIds: string[]) => {
+      if (!workflowId || executionIds.length === 0 || isResolvingErrors) {
+        return;
+      }
+
+      setIsResolvingErrors(true);
+      try {
+        await resolveExecutionErrors(workflowId, executionIds);
+        setResolvedExecutionIds((prev) => {
+          const next = new Set(prev);
+          executionIds.forEach((id) => next.add(id));
+          return next;
+        });
+        await queryClient.invalidateQueries({ queryKey: workflowKeys.eventList(workflowId, 50) });
+        await queryClient.invalidateQueries({ queryKey: workflowKeys.nodeExecutions() });
+        showSuccessToast("Execution errors resolved");
+      } catch (error) {
+        console.error("Failed to resolve execution errors:", error);
+        showErrorToast("Failed to resolve execution errors");
+      } finally {
+        setIsResolvingErrors(false);
+      }
+    },
+    [workflowId, isResolvingErrors, queryClient],
+  );
+
   // Provide state function based on component type
   const getExecutionState = useCallback(
     (nodeId: string, execution: WorkflowsWorkflowNodeExecution): { map: EventStateMap; state: EventState } => {
@@ -2703,6 +2756,7 @@ export function WorkflowPageV2() {
         triggers={triggers}
         blueprints={blueprints}
         logEntries={logEntries}
+        onResolveExecutionErrors={handleResolveExecutionErrors}
         focusRequest={focusRequest}
         onExecutionChainHandled={handleExecutionChainHandled}
         breadcrumbs={[
