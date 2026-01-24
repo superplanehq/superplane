@@ -130,6 +130,7 @@ export type ComponentsNode = {
   isCollapsed?: boolean;
   appInstallation?: ComponentsAppInstallationRef;
   errorMessage?: string;
+  warningMessage?: string;
 };
 
 export type ComponentsNodeType = "TYPE_COMPONENT" | "TYPE_BLUEPRINT" | "TYPE_TRIGGER" | "TYPE_WIDGET";

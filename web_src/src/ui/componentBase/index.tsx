@@ -1,15 +1,15 @@
-import React from "react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
+import { AlertTriangle } from "lucide-react";
+import React from "react";
+import { ChildEvents, type ChildEventsInfo } from "../childEvents";
 import { ComponentHeader } from "../componentHeader";
-import { SpecsTooltip } from "./SpecsTooltip";
-import { PayloadTooltip } from "./PayloadTooltip";
+import { EmptyState } from "../emptyState";
+import { MetadataItem, MetadataList } from "../metadataList";
 import { SelectionWrapper } from "../selectionWrapper";
 import { ComponentActionsProps } from "../types/componentActions";
-import { MetadataItem, MetadataList } from "../metadataList";
-import { EmptyState } from "../emptyState";
-import { ChildEvents, type ChildEventsInfo } from "../childEvents";
-import { AlertTriangle } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { PayloadTooltip } from "./PayloadTooltip";
+import { SpecsTooltip } from "./SpecsTooltip";
 
 interface EventSectionDisplayProps {
   section: EventSection;
@@ -225,6 +225,7 @@ export interface ComponentBaseProps extends ComponentActionsProps {
     description?: string;
   };
   error?: string;
+  warning?: string;
 }
 
 export const ComponentBase: React.FC<ComponentBaseProps> = ({
@@ -256,8 +257,11 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   includeEmptyState = false,
   emptyStateProps,
   error,
+  warning,
 }) => {
   const hasError = error && error.trim() !== "";
+  const hasWarning = warning && warning.trim() !== "";
+  const hasBadge = hasError || hasWarning;
   const RunIcon = React.useMemo(() => resolveIcon("play"), []);
   const DuplicateIcon = React.useMemo(() => resolveIcon("copy"), []);
   const DeleteIcon = React.useMemo(() => resolveIcon("trash-2"), []);
@@ -349,16 +353,19 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           statusBadgeColor={compactStatusBadgeColor}
         />
 
-        {hasError && (
+        {hasBadge && (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="absolute -top-6 left-1 bg-orange-500 rounded-t-md h-6 p-1 cursor-pointer">
+                <div
+                  data-testid="node-warning-badge"
+                  className="absolute -top-6 left-1 bg-orange-500 rounded-t-md h-6 p-1 cursor-pointer"
+                >
                   <AlertTriangle size={16} className="text-white" />
                 </div>
               </TooltipTrigger>
               <TooltipContent>
-                <p className="max-w-xs text-sm">{error}</p>
+                <p className="max-w-xs text-sm">{hasError ? error : warning}</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

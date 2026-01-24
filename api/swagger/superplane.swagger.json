@@ -3179,6 +3179,9 @@
         },
         "errorMessage": {
           "type": "string"
+        },
+        "warningMessage": {
+          "type": "string"
         }
       }
     },

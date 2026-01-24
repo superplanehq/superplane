@@ -13,6 +13,8 @@ export interface MergeComponentProps extends ComponentActionsProps {
   selected?: boolean;
   collapsedBackground?: string;
   eventStateMap?: EventStateMap;
+  error?: string;
+  warning?: string;
 }
 
 export const MergeComponent: React.FC<MergeComponentProps> = ({
@@ -23,6 +25,8 @@ export const MergeComponent: React.FC<MergeComponentProps> = ({
   selected = false,
   collapsedBackground,
   eventStateMap,
+  error,
+  warning,
   onRun,
   runDisabled,
   runDisabledTooltip,
@@ -58,6 +62,8 @@ export const MergeComponent: React.FC<MergeComponentProps> = ({
       collapsedBackground={collapsedBackground}
       selected={selected}
       eventStateMap={eventStateMap}
+      error={error}
+      warning={warning}
       onRun={onRun}
       runDisabled={runDisabled}
       runDisabledTooltip={runDisabledTooltip}
