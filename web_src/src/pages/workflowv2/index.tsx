@@ -1167,23 +1167,19 @@ export function WorkflowPageV2() {
         exampleObj.__previousByDepth = previousByDepth;
       }
 
+      // Build name -> nodeId map, keeping the FIRST (closest) node when names are duplicated
+      // chainNodeIds is ordered from closest to farthest, so the first occurrence wins
       const nameToNodeId = new Map<string, string>();
-      const duplicateNames = new Set<string>();
       for (const [nId, nodeName] of Object.entries(nodeNamesById)) {
         if (!nodeName || nodeName === "__nodeNames") {
           continue;
         }
 
-        const existing = nameToNodeId.get(nodeName);
-        if (existing && existing !== nId) {
-          duplicateNames.add(nodeName);
-          continue;
+        // Only add if we haven't seen this name yet (keep the closest one)
+        if (!nameToNodeId.has(nodeName)) {
+          nameToNodeId.set(nodeName, nId);
         }
-
-        nameToNodeId.set(nodeName, nId);
       }
-
-      duplicateNames.forEach((name) => nameToNodeId.delete(name));
 
       const namedExampleObj: Record<string, unknown> = {};
       for (const [nodeName, nodeId] of nameToNodeId.entries()) {
@@ -1209,6 +1205,16 @@ export function WorkflowPageV2() {
 
       if (exampleObj.__previousByDepth) {
         namedExampleObj.__previousByDepth = exampleObj.__previousByDepth;
+      }
+
+      // Remove the current node from suggestions - you can't reference your own output
+      const currentNodeName = currentNode?.name?.trim();
+      const currentNodeId = currentNode?.id;
+      if (currentNodeName) {
+        delete namedExampleObj[currentNodeName];
+      }
+      if (currentNodeId) {
+        delete nodeMetadata[currentNodeId];
       }
 
       if (Object.keys(nodeMetadata).length > 0) {

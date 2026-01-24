@@ -39,9 +39,9 @@ interface SettingsTabProps {
 }
 
 export function SettingsTab({
-  nodeId,
+  nodeId: _nodeId,
   nodeName,
-  nodeLabel,
+  nodeLabel: _nodeLabel,
   configuration,
   configurationFields,
   onSave,
@@ -61,41 +61,8 @@ export function SettingsTab({
   const [selectedAppInstallation, setSelectedAppInstallation] = useState<ComponentsAppInstallationRef | undefined>(
     appInstallationRef,
   );
-  const resolvedAutocompleteExampleObj = useMemo(() => {
-    if (!autocompleteExampleObj) {
-      return autocompleteExampleObj;
-    }
-
-    if (!nodeId) {
-      return autocompleteExampleObj;
-    }
-
-    const nodeNameLabel = nodeName.trim();
-    if (!nodeNameLabel) {
-      return autocompleteExampleObj;
-    }
-
-    const base = autocompleteExampleObj as Record<string, unknown>;
-    const existingNames = base.__nodeNames;
-    const nextNodeNames =
-      typeof existingNames === "object" && existingNames !== null && !Array.isArray(existingNames)
-        ? { ...(existingNames as Record<string, unknown>), [nodeId]: nodeNameLabel }
-        : { [nodeId]: nodeNameLabel };
-
-    let nextGlobals: Record<string, unknown> = { ...base, __nodeNames: nextNodeNames };
-    const currentValue = base[nodeId];
-    if (typeof currentValue === "object" && currentValue !== null && !Array.isArray(currentValue)) {
-      const currentRecord = currentValue as Record<string, unknown>;
-      if (typeof currentRecord.__nodeName !== "string") {
-        nextGlobals = {
-          ...nextGlobals,
-          [nodeId]: { ...currentRecord, __nodeName: nodeNameLabel },
-        };
-      }
-    }
-
-    return nextGlobals;
-  }, [autocompleteExampleObj, nodeId, nodeLabel, nodeName]);
+  // Use autocompleteExampleObj directly - current node is already filtered out
+  const resolvedAutocompleteExampleObj = autocompleteExampleObj;
 
   const defaultValues = useMemo(() => {
     return parseDefaultValues(configurationFields);

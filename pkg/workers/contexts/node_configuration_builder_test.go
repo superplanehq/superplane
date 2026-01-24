@@ -190,10 +190,74 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root_ByName(t *testing.T) {
 	assert.Equal(t, "42", result["count"])
 }
 
-func Test_NodeConfigurationBuilder_NodeNameNotUnique(t *testing.T) {
+func Test_NodeConfigurationBuilder_NodeNameNotUnique_UsesClosestInChain(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
+	// Create a workflow with two nodes having the same name "filter"
+	// node-1 (filter) -> node-2 (filter) -> node-3 (target)
+	// When node-3 references "filter", it should get node-2's data (the closest one)
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{
+			{
+				NodeID: "node-1",
+				Name:   "filter",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+			{
+				NodeID: "node-2",
+				Name:   "filter",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+			{
+				NodeID: "node-3",
+				Name:   "target",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: "node-1", TargetID: "node-2", Channel: "default"},
+			{SourceID: "node-2", TargetID: "node-3", Channel: "default"},
+		},
+	)
+
+	// Create executions for the chain
+	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
+
+	execution1 := support.CreateWorkflowNodeExecution(t, workflow.ID, "node-1", rootEvent.ID, rootEvent.ID, nil)
+	node1Data := map[string]any{"result": "first-filter"}
+	event1 := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, "node-1", "default", &execution1.ID, node1Data)
+
+	execution2 := support.CreateNextNodeExecution(t, workflow.ID, "node-2", rootEvent.ID, event1.ID, &execution1.ID)
+	node2Data := map[string]any{"result": "second-filter"}
+	support.EmitWorkflowEventForNodeWithData(t, workflow.ID, "node-2", "default", &execution2.ID, node2Data)
+
+	// Build configuration from node-3's perspective - should get node-2's data (closest "filter")
+	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+		WithPreviousExecution(&execution2.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{"node-2": node2Data})
+
+	configuration := map[string]any{
+		"field": "{{ $[\"filter\"].result }}",
+	}
+
+	result, err := builder.Build(configuration)
+	require.NoError(t, err)
+	assert.Equal(t, "second-filter", result["field"])
+}
+
+func Test_NodeConfigurationBuilder_NodeNameNotUnique_NoneInChain(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	// Create a workflow with two nodes having the same name but neither in the execution chain
 	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
