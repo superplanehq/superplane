@@ -112,20 +112,20 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
         aria-label="Open organization menu"
         aria-expanded={isMenuOpen}
       >
-        <img src={SuperplaneLogo} alt="Logo" className="w-7 h-7" />
+        <img src={SuperplaneLogo} alt="Logo" className="w-7 h-7 dark:invert" />
         {organizationId && (
           <ChevronDown size={16} className={`text-gray-400 transition-transform ${isMenuOpen ? "rotate-180" : ""}`} />
         )}
       </button>
       {organizationId && isMenuOpen && (
-        <div className="absolute left-0 top-13 z-50 w-60 rounded-md outline outline-slate-950/20 bg-white shadow-lg">
-          <div className="px-4 pt-3 pb-4 border-b border-gray-300">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-100 bg-gray-800 inline px-1 py-0.5 rounded">
+        <div className="absolute left-0 top-13 z-50 w-60 rounded-md outline outline-slate-950/20 dark:outline-slate-700 bg-white dark:bg-gray-800 shadow-lg">
+          <div className="px-4 pt-3 pb-4 border-b border-gray-300 dark:border-gray-700">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-100 bg-gray-800 dark:bg-gray-600 inline px-1 py-0.5 rounded">
               Org
             </p>
             <div className="flex items-center gap-3 mt-2">
               <div className="min-w-0">
-                <p className="font-semibold text-gray-800 truncate text-sm">{organizationName}</p>
+                <p className="font-semibold text-gray-800 dark:text-gray-100 truncate text-sm">{organizationName}</p>
               </div>
             </div>
             <div className="mt-2 flex flex-col">
@@ -135,10 +135,13 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
                   <a
                     key={link.label}
                     href={link.href}
-                    className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+                    className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-sky-100 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-100"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                    <MenuIcon
+                      size={16}
+                      className="text-gray-500 dark:text-gray-400 transition group-hover:text-gray-800 dark:group-hover:text-gray-100"
+                    />
                     <span>{link.label}</span>
                   </a>
                 );
@@ -151,8 +154,12 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
             </p>
             <div className="flex items-center gap-3 mt-2">
               <div className="min-w-0">
-                <p className="font-semibold text-gray-800 truncate text-sm">{account?.name || "Loading..."}</p>
-                <p className="text-[13px] text-gray-500 font-medium truncate">{account?.email || "Loading..."}</p>
+                <p className="font-semibold text-gray-800 dark:text-gray-100 truncate text-sm">
+                  {account?.name || "Loading..."}
+                </p>
+                <p className="text-[13px] text-gray-500 dark:text-gray-400 font-medium truncate">
+                  {account?.email || "Loading..."}
+                </p>
               </div>
             </div>
             <div className="mt-2 flex flex-col">
@@ -162,10 +169,13 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
                   <a
                     key={link.label}
                     href={link.href}
-                    className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+                    className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-sky-100 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-100"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                    <MenuIcon
+                      size={16}
+                      className="text-gray-500 dark:text-gray-400 transition group-hover:text-gray-800 dark:group-hover:text-gray-100"
+                    />
                     <span>{link.label}</span>
                   </a>
                 ) : (
@@ -173,9 +183,12 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
                     key={link.label}
                     type="button"
                     onClick={link.onClick}
-                    className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+                    className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-sky-100 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-100"
                   >
-                    <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                    <MenuIcon
+                      size={16}
+                      className="text-gray-500 dark:text-gray-400 transition group-hover:text-gray-800 dark:group-hover:text-gray-100"
+                    />
                     <span>{link.label}</span>
                   </button>
                 );

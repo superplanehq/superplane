@@ -61,7 +61,7 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
       key={index}
       className={
         `px-2 pt-2 relative ${lastSection ? "rounded-b-md" : ""} ${LastEventBackground}` +
-        (index < totalSections - 1 ? " border-b border-slate-950/20" : "") +
+        (index < totalSections - 1 ? " border-b border-slate-950/20 dark:border-gray-600" : "") +
         ` ${className}`
       }
     >
@@ -74,7 +74,7 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
         {section.eventSubtitle && (
           <span
             title={String(section.eventSubtitle)}
-            className="text-[13px] font-medium truncate flex-shrink-0 max-w-[65%] text-gray-950/50"
+            className="text-[13px] font-medium truncate flex-shrink-0 max-w-[65%] text-gray-950/50 dark:text-gray-400"
           >
             {section.showAutomaticTime && durationText ? durationText : section.eventSubtitle}
           </span>
@@ -82,9 +82,9 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
       </div>
       <div className="flex justify-left items-center mt-1 gap-2">
         {section.eventId && (
-          <span className="text-[13px] text-gray-950/50 font-mono">#{section.eventId?.slice(0, 4)}</span>
+          <span className="text-[13px] text-gray-950/50 dark:text-gray-400 font-mono">#{section.eventId?.slice(0, 4)}</span>
         )}
-        <span className="text-sm text-gray-700 font-inter truncate text-md min-w-0 font-medium truncate">
+        <span className="text-sm text-gray-700 dark:text-gray-300 font-inter truncate text-md min-w-0 font-medium truncate">
           {section.eventTitle}
         </span>
       </div>
@@ -142,50 +142,50 @@ export type EventStateMap = Record<EventState, EventStateStyle>;
 export const DEFAULT_EVENT_STATE_MAP: EventStateMap = {
   triggered: {
     icon: "circle",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-violet-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-violet-100 dark:bg-violet-900/50",
     badgeColor: "bg-violet-400",
   },
   success: {
     icon: "circle-check",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-green-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-green-100 dark:bg-green-900/50",
     badgeColor: "bg-emerald-500",
   },
   failed: {
     icon: "circle-x",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-red-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-red-100 dark:bg-red-900/50",
     badgeColor: "bg-red-400",
   },
   cancelled: {
     icon: "circle-slash-2",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-gray-100 dark:bg-gray-700",
     badgeColor: "bg-gray-500",
   },
   error: {
     icon: "triangle-alert",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-red-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-red-100 dark:bg-red-900/50",
     badgeColor: "bg-red-500",
   },
   neutral: {
     icon: "circle",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-50",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-gray-50 dark:bg-gray-700",
     badgeColor: "bg-gray-400",
   },
   queued: {
     icon: "circle-dashed",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-orange-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-orange-100 dark:bg-orange-900/50",
     badgeColor: "bg-yellow-600",
   },
   running: {
     icon: "refresh-cw",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-sky-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-sky-100 dark:bg-sky-900/50",
     badgeColor: "bg-blue-500",
   },
 };
@@ -207,6 +207,7 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   iconSrc?: string;
   iconSlug?: string;
   iconColor?: string;
+  appName?: string;
   title: string;
   specs?: ComponentBaseSpec[];
   hideCount?: boolean;
@@ -231,6 +232,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   iconSrc,
   iconSlug,
   iconColor,
+  appName,
   title,
   specs,
   collapsed: _collapsed = false,
@@ -275,7 +277,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   return (
     <SelectionWrapper selected={selected}>
       <div
-        className={`group relative flex flex-col outline-1 outline-slate-950/20 rounded-md w-[23rem] bg-white ${hasError ? "!outline-orange-500" : ""}`}
+        className={`group relative flex flex-col outline-1 outline-slate-950/20 dark:outline-gray-600 rounded-md w-[23rem] bg-white dark:bg-gray-800 ${hasError ? "!outline-orange-500" : ""}`}
         data-view-mode={isCompactView ? "compact" : "expanded"}
       >
         <div className="absolute -top-8 right-0 z-10 h-8 w-44 opacity-0" />
@@ -290,7 +292,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                 onRun();
               }}
               disabled={runDisabled}
-              className="flex items-center gap-1 px-1 py-0.5 text-[13px] font-medium text-gray-500 transition hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex items-center gap-1 px-1 py-0.5 text-[13px] font-medium text-gray-500 dark:text-gray-400 transition hover:text-gray-800 dark:hover:text-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <RunIcon className="h-4 w-4" />
               <span>Run</span>
@@ -305,7 +307,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                 event.stopPropagation();
                 onDuplicate();
               }}
-              className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+              className="flex items-center justify-center p-1 text-gray-500 dark:text-gray-400 transition hover:text-gray-800 dark:hover:text-gray-200"
             >
               <DuplicateIcon className="h-4 w-4" />
             </button>
@@ -319,7 +321,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                 event.stopPropagation();
                 onToggleView();
               }}
-              className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+              className="flex items-center justify-center p-1 text-gray-500 dark:text-gray-400 transition hover:text-gray-800 dark:hover:text-gray-200"
             >
               <ToggleViewIcon className="h-4 w-4" />
             </button>
@@ -333,7 +335,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                 event.stopPropagation();
                 onDelete();
               }}
-              className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+              className="flex items-center justify-center p-1 text-gray-500 dark:text-gray-400 transition hover:text-gray-800 dark:hover:text-gray-200"
             >
               <DeleteIcon className="h-4 w-4" />
             </button>
@@ -343,6 +345,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           iconSrc={iconSrc}
           iconSlug={iconSlug}
           iconColor={iconColor}
+          appName={appName}
           title={title}
           onDoubleClick={onToggleCollapse}
           isCompactView={isCompactView}
@@ -369,9 +372,9 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
             {!hideMetadataList && metadata && metadata.length > 0 && <MetadataList items={metadata} />}
 
             {specs && specs.length > 0 && (
-              <div className="px-2 py-1.5 border-b border-slate-950/20 text-gray-500 flex flex-col gap-1.5">
+              <div className="px-2 py-1.5 border-b border-slate-950/20 dark:border-gray-600 text-gray-500 dark:text-gray-400 flex flex-col gap-1.5">
                 {specs.map((spec, index) => (
-                  <div key={index} className="flex items-center text-md text-gray-500">
+                  <div key={index} className="flex items-center text-md text-gray-500 dark:text-gray-400">
                     <div className="w-4 h-4 mr-2">
                       {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 16 })}
                     </div>
@@ -381,7 +384,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                         specValues={spec.values}
                         hideCount={hideCount}
                       >
-                        <span className="text-[13px] underline underline-offset-3 decoration-dotted decoration-1 decoration-gray-500 rounded-md font-inter font-medium cursor-help">
+                        <span className="text-[13px] underline underline-offset-3 decoration-dotted decoration-1 decoration-gray-500 dark:decoration-gray-400 rounded-md font-inter font-medium cursor-help">
                           {hideCount ? "" : spec.values.length}{" "}
                           {spec.title + (spec.values.length > 1 && !hideCount ? "s" : "")}
                         </span>
@@ -404,7 +407,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
 
             {eventSections?.map((section, index) => (
               <EventSectionDisplay
-                className={"pb-3" + (!!includeEmptyState || !!customField ? " border-b border-slate-950/20" : "")}
+                className={"pb-3" + (!!includeEmptyState || !!customField ? " border-b border-slate-950/20 dark:border-gray-600" : "")}
                 key={index}
                 section={section}
                 index={index}
