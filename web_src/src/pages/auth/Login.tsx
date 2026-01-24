@@ -300,7 +300,7 @@ export const Login: React.FC = () => {
     <div className="min-h-screen bg-slate-100 dark:bg-neutral-900 flex items-center justify-center px-4 py-10">
       <div className="max-w-sm w-full bg-white dark:bg-neutral-800 rounded-lg outline outline-gray-950/10 dark:outline-neutral-700 shadow-sm p-8">
         <div className="text-center">
-          <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto h-8 w-8" />
+          <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto h-8 w-8 dark:invert" />
           <h1 className="mt-4 !text-lg font-medium text-gray-900 dark:text-white">
             {isSignupMode ? "Create your account" : "Welcome to SuperPlane"}
           </h1>
