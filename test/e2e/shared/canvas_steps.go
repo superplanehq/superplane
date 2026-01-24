@@ -144,6 +144,20 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 	s.session.Sleep(500)
 }
 
+func (s *CanvasSteps) AddFilter(name string, pos models.Position) {
+	s.OpenBuildingBlocksSidebar()
+
+	source := q.TestID("building-block-filter")
+	target := q.TestID("rf__wrapper")
+
+	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.session.Sleep(300)
+	s.session.FillIn(q.TestID("node-name-input"), name)
+	s.session.FillIn(q.TestID("expression-field-expression"), "true")
+	s.session.Click(q.TestID("save-node-button"))
+	s.session.Sleep(500)
+}
+
 func (s *CanvasSteps) StartAddingTimeGate(name string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 
