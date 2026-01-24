@@ -9,7 +9,6 @@ import { getBackgroundColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import { ComponentBaseMapper, OutputPayload } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
-import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
 import { BaseNodeMetadata, Incident } from "./types";
 import { getDetailsForIncident } from "./base";
 import { formatTimeAgo } from "@/utils/date";
@@ -26,7 +25,7 @@ export const createIncidentMapper: ComponentBaseMapper = {
     const componentName = componentDefinition.name!;
 
     return {
-      iconSrc: pdIcon,
+      appName: "pagerduty",
       collapsedBackground: getBackgroundColorClass(componentDefinition.color),
       collapsed: node.isCollapsed,
       title: node.name!,

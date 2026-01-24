@@ -2,7 +2,7 @@ import type { SuperplaneBlueprintsOutputChannel, SuperplaneComponentsOutputChann
 import { Button } from "@/components/ui/button";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { resolveIcon } from "@/lib/utils";
+import { resolveIcon, APP_LOGO_MAP, DARK_ICONS_NEEDING_INVERT } from "@/lib/utils";
 import { isCustomComponentsEnabled } from "@/lib/env";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { ChevronRight, GripVerticalIcon, Plus, Search, StickyNote, X } from "lucide-react";
@@ -10,13 +10,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
-import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import githubIcon from "@/assets/icons/integrations/github.svg";
-import openAiIcon from "@/assets/icons/integrations/openai.svg";
-import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
-import slackIcon from "@/assets/icons/integrations/slack.svg";
-import smtpIcon from "@/assets/icons/integrations/smtp.svg";
-import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 export interface BuildingBlock {
   name: string;
@@ -158,20 +151,20 @@ export function BuildingBlocksSidebar({
   return (
     <div
       ref={sidebarRef}
-      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white"
+      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white dark:bg-gray-900"
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
       data-testid="building-blocks-sidebar"
     >
       {/* Resize handle */}
       <div
         onMouseDown={handleMouseDown}
-        className={`absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-gray-100 transition-colors flex items-center justify-center group ${
-          isResizing ? "bg-blue-50" : ""
+        className={`absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center justify-center group ${
+          isResizing ? "bg-blue-50 dark:bg-blue-900/50" : ""
         }`}
         style={{ marginLeft: "-8px" }}
       >
         <div
-          className={`w-2 h-14 rounded-full bg-gray-300 group-hover:bg-gray-800 transition-colors ${
+          className={`w-2 h-14 rounded-full bg-gray-300 dark:bg-gray-600 group-hover:bg-gray-800 dark:group-hover:bg-gray-400 transition-colors ${
             isResizing ? "bg-blue-500" : ""
           }`}
         />
@@ -187,7 +180,7 @@ export function BuildingBlocksSidebar({
           </div>
           <div
             onClick={() => onToggle(false)}
-            className="absolute top-4 right-4 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
+            className="absolute top-4 right-4 w-6 h-6 hover:bg-slate-950/5 dark:hover:bg-gray-700 rounded flex items-center justify-center cursor-pointer leading-none"
           >
             <X size={16} />
           </div>
@@ -311,17 +304,8 @@ function CategorySection({
           const iconSlug = block.type === "blueprint" ? "component" : block.icon || "zap";
 
           // Use SVG icons for application components/triggers
-          const appLogoMap: Record<string, string> = {
-            dash0: dash0Icon,
-            github: githubIcon,
-            openai: openAiIcon,
-            "open-ai": openAiIcon,
-            pagerduty: pagerDutyIcon,
-            semaphore: SemaphoreLogo,
-            slack: slackIcon,
-            smtp: smtpIcon,
-          };
-          const appIconSrc = block.appName ? appLogoMap[block.appName] : undefined;
+          const appIconSrc = block.appName ? APP_LOGO_MAP[block.appName] : undefined;
+          const needsInvert = block.appName && DARK_ICONS_NEEDING_INVERT.includes(block.appName);
           const IconComponent = resolveIcon(iconSlug);
 
           const isLive = !!block.isLive;
@@ -395,12 +379,12 @@ function CategorySection({
               }}
               aria-disabled={!isLive}
               title={isLive ? undefined : "Coming soon"}
-              className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing hover:bg-sky-100`}
+              className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing hover:bg-sky-100 dark:hover:bg-sky-900/50`}
               size="sm"
             >
               <ItemMedia>
                 {appIconSrc ? (
-                  <img src={appIconSrc} alt={block.label || block.name} className="size-3.5" />
+                  <img src={appIconSrc} alt={block.label || block.name} className={`size-3.5 ${needsInvert ? "dark:invert" : ""}`} />
                 ) : (
                   <IconComponent size={14} className="text-gray-500" />
                 )}
