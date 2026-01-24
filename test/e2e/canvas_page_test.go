@@ -89,6 +89,19 @@ func TestCanvasPage(t *testing.T) {
 		steps.deleteConnectionBetweenNodes("First", "Second")
 		steps.assertNodesAreNotConnectedInDB("First", "Second")
 	})
+
+	t.Run("autocomplete suggests node data in filter expression", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
+		steps.start()
+		steps.givenACanvasExists()
+		steps.addManualTrigger("Start")
+		steps.addFilter("Filter")
+		steps.connectNodes("Start", "Filter")
+		steps.saveCanvas()
+		steps.openNodeSettings("Filter")
+		steps.typeExpression("$")
+		steps.assertAutocompleteNodeSuggestionVisible()
+	})
 }
 
 type CanvasPageSteps struct {
@@ -112,10 +125,26 @@ func (s *CanvasPageSteps) addNoop(name string) {
 	s.canvas.AddNoop(name, models.Position{X: 500, Y: 200})
 }
 
+func (s *CanvasPageSteps) addManualTrigger(name string) {
+	s.canvas.AddManualTrigger(name, models.Position{X: 500, Y: 200})
+}
+
+func (s *CanvasPageSteps) addFilter(name string) {
+	s.canvas.AddFilter(name, models.Position{X: 900, Y: 200})
+}
+
 func (s *CanvasPageSteps) addTwoNodesAndConnect() {
 	s.canvas.AddManualTrigger("First", models.Position{X: 500, Y: 200})
 	s.canvas.AddNoop("Second", models.Position{X: 900, Y: 200})
 	s.canvas.Connect("First", "Second")
+}
+
+func (s *CanvasPageSteps) connectNodes(sourceName, targetName string) {
+	s.canvas.Connect(sourceName, targetName)
+}
+
+func (s *CanvasPageSteps) saveCanvas() {
+	s.canvas.Save()
 }
 
 func (s *CanvasPageSteps) deleteConnectionBetweenNodes(sourceName, targetName string) {
@@ -222,6 +251,19 @@ func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems
 func (s *CanvasPageSteps) openSidebarForNode(node string) {
 	s.session.Click(q.TestID("node", node, "header"))
 	s.session.TakeScreenshot()
+}
+
+func (s *CanvasPageSteps) openNodeSettings(node string) {
+	s.canvas.StartEditingNode(node)
+}
+
+func (s *CanvasPageSteps) typeExpression(value string) {
+	s.session.TypeIn(q.TestID("expression-field-expression"), value)
+}
+
+func (s *CanvasPageSteps) assertAutocompleteNodeSuggestionVisible() {
+	s.session.AssertVisible(q.Locator(`div[data-suggestion-index="0"]`))
+	s.session.AssertVisible(q.Locator(`div[data-suggestion-index="0"] span:has-text("node")`))
 }
 
 func (s *CanvasPageSteps) assertQueuedItemsCount(nodeName string, expected int) {
