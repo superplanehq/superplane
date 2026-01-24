@@ -126,7 +126,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 			[]models.WorkflowNode{
 				{
 					NodeID: "node-1",
-					Name:   "Test Node",
+					Name:   "node-1",
 					Type:   models.NodeTypeComponent,
 					Ref: datatypes.NewJSONType(models.NodeRef{
 						Component: &models.ComponentRef{Name: "noop"},

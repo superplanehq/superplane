@@ -544,13 +544,13 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
       const v = (globals as Record<string, unknown>)[k];
       const tailDot = isExpandableValue(v) ? "." : "";
       const metadata = getNodeMetadata(globals, k, v);
+      const labelDetail = metadata.nodeName ? formatNodeNameLabel(metadata.nodeName) : undefined;
       return {
         label: `["${k}"]`,
         kind: "variable",
         insertText: `$[${quoteKey(k, envTrigger.quote)}]${tailDot}`,
         detail: getValueTypeLabel(v),
-        labelDetail: formatNodeNameLabel(metadata.nodeName),
-        nodeId: metadata.nodeName ? k : undefined,
+        labelDetail,
         nodeName: metadata.nodeName,
         componentType: metadata.componentType,
         description: metadata.description,
@@ -570,13 +570,13 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
       .map((k) => {
         const v = (globals as Record<string, unknown>)[k];
         const metadata = getNodeMetadata(globals, k, v);
+        const labelDetail = metadata.nodeName ? formatNodeNameLabel(metadata.nodeName) : undefined;
         return {
           label: `["${k}"]`,
           kind: "variable",
           insertText: quoteKey(k, bracketCtx.quote), // only the key token
           detail: getValueTypeLabel(v),
-          labelDetail: formatNodeNameLabel(metadata.nodeName),
-          nodeId: metadata.nodeName ? k : undefined,
+          labelDetail,
           nodeName: metadata.nodeName,
           componentType: metadata.componentType,
           description: metadata.description,
@@ -812,8 +812,25 @@ function detectEnvKeyTrigger(left: string): EnvKeyTrigger | null {
 }
 
 function listGlobalKeys(globals: Record<string, unknown>): string[] {
-  const keys = Object.keys(globals ?? {});
-  return keys.filter((key) => !key.startsWith("__"));
+  const keys = Object.keys(globals ?? {}).filter((key) => !key.startsWith("__"));
+  const nodeNames = isRecord(globals) ? (globals as Record<string, unknown>).__nodeNames : undefined;
+
+  if (!isRecord(nodeNames)) {
+    return keys;
+  }
+
+  const nodeIds = new Set(Object.keys(nodeNames));
+  const nameKeys = new Set<string>();
+
+  for (const entry of Object.values(nodeNames)) {
+    const name = extractNodeName(entry);
+    if (name && !name.startsWith("__")) {
+      nameKeys.add(name);
+    }
+  }
+
+  const nonNodeKeys = keys.filter((key) => !nodeIds.has(key));
+  return Array.from(new Set([...nonNodeKeys, ...nameKeys]));
 }
 
 function isExpandableValue(v: unknown): boolean {
@@ -846,19 +863,19 @@ function getNodeMetadata(globals: Record<string, unknown>, key: string, value: u
   const nodeNames = isRecord(globals) ? (globals as Record<string, unknown>).__nodeNames : undefined;
   if (isRecord(nodeNames)) {
     const entry = nodeNames[key];
-    if (typeof entry === "string" && entry.trim()) {
-      metadata.nodeName = metadata.nodeName || entry;
-    } else if (isRecord(entry)) {
-      // New format: { name, componentType, description }
-      const name = entry.name ?? entry.nodeName ?? entry.label;
-      if (typeof name === "string" && name.trim()) {
-        metadata.nodeName = metadata.nodeName || name;
-      }
-      if (typeof entry.componentType === "string" && entry.componentType.trim()) {
-        metadata.componentType = entry.componentType;
-      }
-      if (typeof entry.description === "string" && entry.description.trim()) {
-        metadata.description = entry.description;
+    applyNodeEntryMetadata(metadata, entry);
+
+    if (!metadata.nodeName) {
+      for (const entryValue of Object.values(nodeNames)) {
+        const entryName = extractNodeName(entryValue);
+        if (!entryName || entryName !== key) {
+          continue;
+        }
+
+        applyNodeEntryMetadata(metadata, entryValue);
+        if (metadata.nodeName) {
+          break;
+        }
       }
     }
   }
@@ -869,6 +886,40 @@ function getNodeMetadata(globals: Record<string, unknown>, key: string, value: u
 function formatNodeNameLabel(nodeName?: string): string | undefined {
   if (!nodeName) return undefined;
   return `- (${nodeName})`;
+}
+
+function extractNodeName(entry: unknown): string | undefined {
+  if (typeof entry === "string") {
+    return entry.trim() ? entry : undefined;
+  }
+  if (isRecord(entry)) {
+    const name = entry.name ?? entry.nodeName ?? entry.label;
+    if (typeof name === "string" && name.trim()) {
+      return name;
+    }
+  }
+  return undefined;
+}
+
+function applyNodeEntryMetadata(metadata: NodeMetadata, entry: unknown): void {
+  if (typeof entry === "string" && entry.trim()) {
+    metadata.nodeName = metadata.nodeName || entry;
+    return;
+  }
+  if (!isRecord(entry)) {
+    return;
+  }
+
+  const name = extractNodeName(entry);
+  if (name) {
+    metadata.nodeName = metadata.nodeName || name;
+  }
+  if (typeof entry.componentType === "string" && entry.componentType.trim()) {
+    metadata.componentType = entry.componentType;
+  }
+  if (typeof entry.description === "string" && entry.description.trim()) {
+    metadata.description = entry.description;
+  }
 }
 
 function getValueTypeLabel(value: unknown): string {

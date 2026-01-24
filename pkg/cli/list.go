@@ -3,61 +3,12 @@ package cli
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
+	"text/tabwriter"
+	"time"
 
 	"github.com/spf13/cobra"
 )
-
-var listSecretsCmd = &cobra.Command{
-	Use:     "secrets",
-	Short:   "List secrets for an organization or canvas",
-	Long:    `Retrieve a list of all secrets for the specified organization or canvas`,
-	Aliases: []string{"secret"},
-	Args:    cobra.ExactArgs(0),
-
-	Run: func(cmd *cobra.Command, args []string) {
-		c := DefaultClient()
-		domainType, domainID := getDomainOrExit(c, cmd)
-
-		response, httpResponse, err := c.SecretAPI.
-			SecretsListSecrets(context.Background()).
-			DomainId(domainID).
-			DomainType(domainType).
-			Execute()
-
-		if err != nil {
-			b, _ := io.ReadAll(httpResponse.Body)
-			fmt.Printf("%s\n", string(b))
-			os.Exit(1)
-		}
-
-		if len(response.Secrets) == 0 {
-			fmt.Println("No secrets found.")
-			return
-		}
-
-		fmt.Printf("Found %d secrets:\n\n", len(response.Secrets))
-		for i, secret := range response.Secrets {
-			fmt.Printf("%d. %s (ID: %s)\n", i+1, *secret.GetMetadata().Name, *secret.GetMetadata().Id)
-			fmt.Printf("   Domain Type: %s\n", *secret.GetMetadata().DomainType)
-			fmt.Printf("   Domain ID: %s\n", *secret.GetMetadata().DomainId)
-			fmt.Printf("   Provider: %s\n", string(*secret.GetSpec().Provider))
-			fmt.Printf("   Created at: %s\n", *secret.GetMetadata().CreatedAt)
-
-			if secret.GetSpec().Local != nil && secret.GetSpec().Local.Data != nil {
-				fmt.Println("   Values:")
-				for k, v := range *secret.GetSpec().Local.Data {
-					fmt.Printf("     %s = %s\n", k, v)
-				}
-			}
-
-			if i < len(response.Secrets)-1 {
-				fmt.Println()
-			}
-		}
-	},
-}
 
 // Root list command
 var listCmd = &cobra.Command{
@@ -67,7 +18,32 @@ var listCmd = &cobra.Command{
 	Aliases: []string{"ls"},
 }
 
+var listCanvasCmd = &cobra.Command{
+	Use:     "canvas",
+	Short:   "List canvases",
+	Aliases: []string{"canvases"},
+	Args:    cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		client := DefaultClient()
+		ctx := context.Background()
+		response, _, err := client.WorkflowAPI.WorkflowsListWorkflows(ctx).Execute()
+		Check(err)
+
+		writer := tabwriter.NewWriter(os.Stdout, 0, 8, 2, ' ', 0)
+		fmt.Fprintln(writer, "ID\tNAME\tCREATED_AT")
+		for _, workflow := range response.Workflows {
+			metadata := workflow.GetMetadata()
+			createdAt := ""
+			if metadata.HasCreatedAt() {
+				createdAt = metadata.GetCreatedAt().Format(time.RFC3339)
+			}
+			fmt.Fprintf(writer, "%s\t%s\t%s\n", metadata.GetId(), metadata.GetName(), createdAt)
+		}
+		_ = writer.Flush()
+	},
+}
+
 func init() {
 	RootCmd.AddCommand(listCmd)
-	listCmd.AddCommand(listSecretsCmd)
+	listCmd.AddCommand(listCanvasCmd)
 }

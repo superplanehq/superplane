@@ -352,17 +352,30 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 		return messageChain, nil
 	}
 
-	unresolved := unresolvedNodeRefs(referencedNodes, messageChain)
-	if len(unresolved) == 0 {
-		return messageChain, nil
-	}
-
-	refToNodeID, err := b.resolveNodeRefs(unresolved)
+	// Fetch root event early - needed for both chain resolution and data population
+	rootEvent, err := b.fetchRootEvent()
 	if err != nil {
 		return nil, err
 	}
 
-	rootEvent, err := b.fetchRootEvent()
+	// Get execution chain first to help resolve ambiguous names
+	var executionChainNodeIDs []string
+	if b.previousExecutionID != nil {
+		executionsInChain, err := b.listExecutionsInChain()
+		if err != nil {
+			return nil, err
+		}
+		for _, execution := range executionsInChain {
+			executionChainNodeIDs = append(executionChainNodeIDs, execution.NodeID)
+		}
+	}
+
+	// Also include the root event's node (triggers don't create executions)
+	if rootEvent != nil && rootEvent.NodeID != "" {
+		executionChainNodeIDs = append(executionChainNodeIDs, rootEvent.NodeID)
+	}
+
+	refToNodeID, err := b.resolveNodeRefs(referencedNodes, executionChainNodeIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -374,7 +387,7 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 	}
 
 	if b.previousExecutionID == nil {
-		return nil, fmt.Errorf("node %s not found in execution chain", unresolved[0])
+		return nil, fmt.Errorf("node name %s not found in execution chain", firstChainRef(chainRefs))
 	}
 
 	err = b.populateFromExecutions(messageChain, chainRefs)
@@ -383,6 +396,13 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 	}
 
 	return messageChain, nil
+}
+
+func firstChainRef(chainRefs map[string]string) string {
+	for nodeRef := range chainRefs {
+		return nodeRef
+	}
+	return ""
 }
 
 func extractInputMap(input any) map[string]any {
@@ -394,36 +414,70 @@ func extractInputMap(input any) map[string]any {
 	return inputMap
 }
 
-func unresolvedNodeRefs(referencedNodes []string, messageChain map[string]any) []string {
-	unresolved := make([]string, 0, len(referencedNodes))
-	for _, nodeRef := range referencedNodes {
-		if _, ok := messageChain[nodeRef]; !ok {
-			unresolved = append(unresolved, nodeRef)
-		}
-	}
-
-	return unresolved
-}
-
-func (b *NodeConfigurationBuilder) resolveNodeRefs(nodeRefs []string) (map[string]string, error) {
+func (b *NodeConfigurationBuilder) resolveNodeRefs(nodeRefs []string, executionChainNodeIDs []string) (map[string]string, error) {
 	nodes, err := models.FindWorkflowNodesInTransaction(b.tx, b.workflowID)
 	if err != nil {
 		return nil, err
 	}
 
-	nodeIDs := make(map[string]struct{}, len(nodes))
+	nameToNodeID := make(map[string]string, len(nodes))
+	ambiguousNames := make(map[string][]string) // name -> list of node IDs with that name
 	for _, node := range nodes {
-		nodeIDs[node.NodeID] = struct{}{}
+		if node.Name == "" {
+			continue
+		}
+
+		if nodeIDs, ok := ambiguousNames[node.Name]; ok {
+			ambiguousNames[node.Name] = append(nodeIDs, node.NodeID)
+			continue
+		}
+
+		if existing, ok := nameToNodeID[node.Name]; ok {
+			if existing != node.NodeID {
+				delete(nameToNodeID, node.Name)
+				ambiguousNames[node.Name] = []string{existing, node.NodeID}
+			}
+			continue
+		}
+
+		nameToNodeID[node.Name] = node.NodeID
+	}
+
+	// Build a map of node ID to its position in the execution chain (lower = closer)
+	executionChainOrder := make(map[string]int, len(executionChainNodeIDs))
+	for i, nodeID := range executionChainNodeIDs {
+		executionChainOrder[nodeID] = i
 	}
 
 	refToNodeID := make(map[string]string, len(nodeRefs))
 	for _, nodeRef := range nodeRefs {
-		if _, ok := nodeIDs[nodeRef]; ok {
-			refToNodeID[nodeRef] = nodeRef
+		if nodeID, ok := nameToNodeID[nodeRef]; ok {
+			refToNodeID[nodeRef] = nodeID
 			continue
 		}
 
-		return nil, fmt.Errorf("node %s not found in execution chain", nodeRef)
+		if nodeIDs, ok := ambiguousNames[nodeRef]; ok {
+			// Find the closest node in the execution chain
+			closestNodeID := ""
+			closestOrder := -1
+			for _, nodeID := range nodeIDs {
+				if order, inChain := executionChainOrder[nodeID]; inChain {
+					if closestOrder == -1 || order < closestOrder {
+						closestOrder = order
+						closestNodeID = nodeID
+					}
+				}
+			}
+
+			if closestNodeID != "" {
+				refToNodeID[nodeRef] = closestNodeID
+				continue
+			}
+
+			return nil, fmt.Errorf("node name %s is not unique and none of the matching nodes are in the execution chain", nodeRef)
+		}
+
+		return nil, fmt.Errorf("node name %s not found in execution chain", nodeRef)
 	}
 
 	return refToNodeID, nil
