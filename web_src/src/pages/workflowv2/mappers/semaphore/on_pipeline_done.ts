@@ -87,12 +87,12 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data?.data as OnPipelineDoneEventData;
-      const result = eventData.pipeline?.result || "";
+      const result = eventData?.pipeline?.result || "";
       const timeAgo = lastEvent.createdAt ? formatTimeAgo(new Date(lastEvent.createdAt)) : "";
       const subtitle = result && timeAgo ? `${result} · ${timeAgo}` : result || timeAgo;
 
       props.lastEventData = {
-        title: eventData.pipeline?.name || "",
+        title: eventData?.pipeline?.name || "",
         subtitle,
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",

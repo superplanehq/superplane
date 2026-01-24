@@ -160,7 +160,7 @@ export const mergeMapper: ComponentBaseMapper = {
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
     lastExecutions: WorkflowsWorkflowNodeExecution[],
-    nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
+    _nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
     additionalData?: unknown,
   ): ComponentBaseProps {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
@@ -171,10 +171,8 @@ export const mergeMapper: ComponentBaseMapper = {
       collapsedBackground: getBackgroundColorClass("white"),
       collapsed: node.isCollapsed,
       title: node.name || componentDefinition?.label || "Merge",
-      eventSections: lastExecution
-        ? getMergeEventSections(nodes, lastExecution, nodeQueueItems, additionalData)
-        : getQueueOnlyEventSections(nodes, nodeQueueItems),
-      includeEmptyState: !lastExecution && (!nodeQueueItems || nodeQueueItems.length === 0),
+      eventSections: lastExecution ? getMergeEventSections(nodes, lastExecution, additionalData) : undefined,
+      includeEmptyState: !lastExecution,
       eventStateMap: MERGE_STATE_MAP,
     };
   },
@@ -211,7 +209,6 @@ export const mergeMapper: ComponentBaseMapper = {
 function getMergeEventSections(
   nodes: ComponentsNode[],
   execution: WorkflowsWorkflowNodeExecution,
-  nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
   additionalData?: unknown,
 ): EventSection[] {
   const sections: EventSection[] = [];
@@ -231,49 +228,7 @@ function getMergeEventSections(
     eventId: execution.rootEvent?.id,
   });
 
-  // Add queue section if there are queued items
-  if (nodeQueueItems && nodeQueueItems.length > 0) {
-    const queueItem = nodeQueueItems[nodeQueueItems.length - 1];
-    const queueRootTriggerNode = nodes.find((n) => n.id === queueItem.rootEvent?.nodeId);
-    const queueRootTriggerRenderer = getTriggerRenderer(queueRootTriggerNode?.trigger?.name || "");
-
-    if (queueItem.rootEvent) {
-      const { title } = queueRootTriggerRenderer.getTitleAndSubtitle(queueItem.rootEvent);
-      sections.push({
-        receivedAt: queueItem.createdAt ? new Date(queueItem.createdAt) : undefined,
-        eventTitle: title,
-        eventState: "queued" as const,
-      });
-    }
-  }
-
   return sections;
-}
-
-function getQueueOnlyEventSections(
-  nodes: ComponentsNode[],
-  nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
-): EventSection[] | undefined {
-  if (!nodeQueueItems || nodeQueueItems.length === 0) {
-    return undefined;
-  }
-
-  const queueItem = nodeQueueItems[nodeQueueItems.length - 1];
-  const queueRootTriggerNode = nodes.find((n) => n.id === queueItem.rootEvent?.nodeId);
-  const queueRootTriggerRenderer = getTriggerRenderer(queueRootTriggerNode?.trigger?.name || "");
-
-  if (queueItem.rootEvent) {
-    const { title } = queueRootTriggerRenderer.getTitleAndSubtitle(queueItem.rootEvent);
-    return [
-      {
-        receivedAt: queueItem.createdAt ? new Date(queueItem.createdAt) : undefined,
-        eventTitle: title,
-        eventState: "queued" as const,
-      },
-    ];
-  }
-
-  return undefined;
 }
 
 function getMergeSubtitle(execution: WorkflowsWorkflowNodeExecution, additionalData?: unknown): string {
