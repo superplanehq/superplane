@@ -12,14 +12,7 @@ import { Button } from "@/components/ui/button";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
 import { Alert, AlertDescription } from "@/ui/alert";
-import { resolveIcon } from "@/lib/utils";
-import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import githubIcon from "@/assets/icons/integrations/github.svg";
-import openAiIcon from "@/assets/icons/integrations/openai.svg";
-import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
-import slackIcon from "@/assets/icons/integrations/slack.svg";
-import smtpIcon from "@/assets/icons/integrations/smtp.svg";
-import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+import { resolveIcon, APP_LOGO_MAP, DARK_ICONS_NEEDING_INVERT } from "@/lib/utils";
 
 interface ApplicationDetailsProps {
   organizationId: string;
@@ -36,23 +29,14 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
 
   const { data: availableApps = [] } = useAvailableApplications();
   const appDefinition = installation ? availableApps.find((app) => app.name === installation.spec?.appName) : undefined;
-  const appLogoMap: Record<string, string> = {
-    dash0: dash0Icon,
-    github: githubIcon,
-    openai: openAiIcon,
-    "open-ai": openAiIcon,
-    pagerduty: pagerDutyIcon,
-    semaphore: SemaphoreLogo,
-    slack: slackIcon,
-    smtp: smtpIcon,
-  };
 
   const renderAppIcon = (slug: string | undefined, appName: string | undefined, className: string) => {
-    const logo = appName ? appLogoMap[appName] : undefined;
+    const logo = appName ? APP_LOGO_MAP[appName] : undefined;
     if (logo) {
+      const needsInvert = appName && DARK_ICONS_NEEDING_INVERT.includes(appName);
       return (
         <span className={className}>
-          <img src={logo} alt="" className="h-full w-full object-contain" />
+          <img src={logo} alt="" className={`h-full w-full object-contain ${needsInvert ? "dark:invert" : ""}`} />
         </span>
       );
     }
@@ -177,7 +161,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
           </button>
           <h4 className="text-2xl font-semibold">Application Details</h4>
         </div>
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+        <div className="bg-white dark:bg-neutral-900 rounded-lg border border-gray-300 dark:border-neutral-700 p-6">
           <p className="text-gray-500 dark:text-gray-400">Application installation not found</p>
         </div>
       </div>
@@ -212,7 +196,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
+          <div className="bg-white dark:bg-neutral-900 rounded-lg border border-gray-300 dark:border-neutral-700">
             <div className="p-6">
               <h2 className="text-lg font-medium mb-4">Installation Details</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -245,7 +229,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
           </div>
 
           {/* Used By */}
-          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
+          <div className="bg-white dark:bg-neutral-900 rounded-lg border border-gray-300 dark:border-neutral-700">
             <div className="p-6">
               <h2 className="text-lg font-medium mb-4">Used By</h2>
               {workflowGroups.length > 0 ? (
@@ -258,7 +242,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
                       <button
                         key={group.workflowId}
                         onClick={() => window.open(`/${organizationId}/workflows/${group.workflowId}`, "_blank")}
-                        className="w-full flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
+                        className="w-full flex items-center gap-2 p-3 bg-gray-50 dark:bg-neutral-800/50 rounded-md border border-gray-300 dark:border-neutral-700 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors text-left"
                       >
                         <div className="flex-1">
                           <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
@@ -283,7 +267,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
           </div>
 
           {/* Danger Zone */}
-          <div className="bg-white dark:bg-gray-900 rounded-lg border border-red-200 dark:border-red-800">
+          <div className="bg-white dark:bg-neutral-900 rounded-lg border border-red-200 dark:border-red-800">
             <div className="p-6">
               <h2 className="text-lg font-medium text-red-600 dark:text-red-400 mb-2">Danger Zone</h2>
               <p className="text-sm text-gray-800 dark:text-gray-100 mb-4">
@@ -303,7 +287,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
         </TabsContent>
 
         <TabsContent value="configuration">
-          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
+          <div className="bg-white dark:bg-neutral-900 rounded-lg border border-gray-300 dark:border-neutral-700">
             <div className="p-6">
               {installation?.status?.browserAction && (
                 <Alert className="mb-6 bg-orange-100 dark:bg-yellow-900/20 border-orange-200 dark:border-yellow-800">
@@ -374,7 +358,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full mx-4">
+          <div className="bg-white dark:bg-neutral-900 rounded-lg shadow-xl max-w-md w-full mx-4">
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">
                 Uninstall {installation?.metadata?.name || "application"}?
