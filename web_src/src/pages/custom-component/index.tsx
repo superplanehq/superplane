@@ -16,7 +16,7 @@ import { CustomComponentBuilderPage } from "../../ui/CustomComponentBuilderPage"
 import { filterVisibleConfiguration } from "../../utils/components";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
 import { getComponentBaseMapper } from "../workflowv2/mappers";
-import { generateNodeId } from "../workflowv2/utils";
+import { generateNodeId, generateUniqueNodeName } from "../workflowv2/utils";
 
 const elk = new ELK();
 const BUNDLE_ICON_SLUG = "component";
@@ -536,11 +536,20 @@ export const CustomComponent = () => {
         // Filter configuration to only include visible fields
         const filteredConfiguration = filterVisibleConfiguration(configuration, component.configuration || []);
 
+        // Get existing node names for unique name generation (exclude template nodes)
+        const existingNodeNames = (nodesRef.current || [])
+          .filter((n) => n.id !== templateNodeId)
+          .map((n) => (n.data as any).label || "")
+          .filter(Boolean);
+
+        // Generate unique node name based on component name + ordinal
+        const uniqueNodeName = generateUniqueNodeName(component.name!, existingNodeNames);
+
         // Create new node
-        const newNodeId = generateNodeId(component.name!, nodeName.trim());
+        const newNodeId = generateNodeId(component.name!, uniqueNodeName);
         const mockNode = {
           component: { name: component.name },
-          name: nodeName.trim(),
+          name: uniqueNodeName,
           configuration: filteredConfiguration,
         };
         const blockData = createBlockData(mockNode, component);
@@ -707,11 +716,17 @@ export const CustomComponent = () => {
         component.configuration || [],
       );
 
+      // Get existing node names for unique name generation
+      const existingNodeNames = (nodesRef.current || []).map((n) => (n.data as any).label || "").filter(Boolean);
+
+      // Generate unique node name based on component name + ordinal
+      const uniqueNodeName = generateUniqueNodeName(component.name!, existingNodeNames);
+
       // Add new node
-      const newNodeId = generateNodeId(component.name!, newNodeData.nodeName.trim());
+      const newNodeId = generateNodeId(component.name!, uniqueNodeName);
       const mockNode = {
         component: { name: component.name },
-        name: newNodeData.nodeName.trim(),
+        name: uniqueNodeName,
         configuration: filteredConfiguration,
       };
       const blockData = createBlockData(mockNode, component);
@@ -819,14 +834,17 @@ export const CustomComponent = () => {
       // Save snapshot before making changes
       saveSnapshot();
 
-      // Generate a new unique node ID
-      const nodeData = nodeToDuplicate.data as any;
-      const originalName = nodeData.label || "node";
-      const duplicateName = `${originalName} copy`;
-
       // Get component name for ID generation
+      const nodeData = nodeToDuplicate.data as any;
       const componentName = nodeData._originalComponent || "component";
-      const newNodeId = generateNodeId(componentName, duplicateName);
+
+      // Get existing node names for unique name generation
+      const existingNodeNames = (nodesRef.current || []).map((n) => (n.data as any).label || "").filter(Boolean);
+
+      // Generate unique node name based on component name + ordinal
+      const uniqueNodeName = generateUniqueNodeName(componentName, existingNodeNames);
+
+      const newNodeId = generateNodeId(componentName, uniqueNodeName);
 
       // Create the duplicate node with offset position
       const offsetX = 50; // Offset to the right
@@ -841,11 +859,11 @@ export const CustomComponent = () => {
         },
         data: {
           ...nodeData,
-          label: duplicateName,
+          label: uniqueNodeName,
           ...(nodeData.component && {
             component: {
               ...nodeData.component,
-              title: duplicateName,
+              title: uniqueNodeName,
             },
           }),
         },
@@ -1011,9 +1029,18 @@ export const CustomComponent = () => {
         data.buildingBlock.configuration || [],
       );
 
+      // Get existing node names for unique name generation (exclude the placeholder being configured)
+      const existingNodeNames = (blueprint.nodes || [])
+        .filter((n: ComponentsNode) => n.id !== data.placeholderId)
+        .map((n: ComponentsNode) => n.name || "")
+        .filter(Boolean);
+
+      // Generate unique node name based on component name + ordinal
+      const uniqueNodeName = generateUniqueNodeName(data.buildingBlock.name || "node", existingNodeNames);
+
       const updatedNode: ComponentsNode = {
         ...blueprint.nodes![nodeIndex],
-        name: data.nodeName.trim(),
+        name: uniqueNodeName,
         type:
           data.buildingBlock.type === "trigger"
             ? "TYPE_TRIGGER"

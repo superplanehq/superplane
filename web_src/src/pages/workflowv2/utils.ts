@@ -1,25 +1,65 @@
 import {
   ComponentsEdge,
   ComponentsNode,
+  WorkflowsWorkflow,
   WorkflowsWorkflowEvent,
   WorkflowsWorkflowEventWithExecutions,
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
-  WorkflowsWorkflow,
 } from "@/api-client";
-import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import { flattenObject } from "@/lib/utils";
+import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
+import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
+import { SidebarEvent } from "@/ui/componentSidebar/types";
 import { formatTimeAgo } from "@/utils/date";
 import { createElement, Fragment, type ReactNode } from "react";
 import { getComponentBaseMapper, getState, getTriggerRenderer } from "./mappers";
-import { SidebarEvent } from "@/ui/componentSidebar/types";
-import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 
 export function generateNodeId(blockName: string, nodeName: string): string {
   const randomChars = Math.random().toString(36).substring(2, 8);
   const sanitizedBlock = blockName.toLowerCase().replace(/[^a-z0-9]/g, "-");
   const sanitizedName = nodeName.toLowerCase().replace(/[^a-z0-9]/g, "-");
   return `${sanitizedBlock}-${sanitizedName}-${randomChars}`;
+}
+
+/**
+ * Generates a unique node name based on component name + ordinal number.
+ * First instance: "if", second: "if2", third: "if3", etc.
+ *
+ * @param componentName - The component name (e.g., "semaphore.onPipelineDone")
+ * @param existingNodeNames - Array of existing node names on the canvas
+ * @returns A unique node name (e.g., "semaphore.onPipelineDone" or "semaphore.onPipelineDone2")
+ */
+export function generateUniqueNodeName(componentName: string, existingNodeNames: string[]): string {
+  // Escape special regex characters in the component name
+  const escapedName = componentName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  // Check if the base name (without number) already exists
+  const baseNameExists = existingNodeNames.includes(componentName);
+
+  // Find all existing nodes with this base name pattern (name + number)
+  const pattern = new RegExp(`^${escapedName}(\\d+)$`);
+  const existingOrdinals: number[] = [];
+
+  for (const name of existingNodeNames) {
+    const match = name.match(pattern);
+    if (match) {
+      existingOrdinals.push(parseInt(match[1], 10));
+    }
+  }
+
+  // If no existing nodes with this name, return the base name
+  if (!baseNameExists && existingOrdinals.length === 0) {
+    return componentName;
+  }
+
+  // Find the next available ordinal (starting from 2)
+  let nextOrdinal = 2;
+  if (existingOrdinals.length > 0) {
+    nextOrdinal = Math.max(...existingOrdinals) + 1;
+  }
+
+  return `${componentName}${nextOrdinal}`;
 }
 
 export function mapTriggerEventsToSidebarEvents(
@@ -77,9 +117,9 @@ export function mapExecutionsToSidebarEvents(
     const { title, subtitle } = execution.rootEvent
       ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent)
       : {
-          title: execution.id || "Execution",
-          subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
-        };
+        title: execution.id || "Execution",
+        subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
+      };
 
     const values = execution.rootEvent ? rootTriggerRenderer.getRootEventValues(execution.rootEvent) : {};
 
@@ -120,9 +160,9 @@ export function getNextInQueueInfo(
   const { title, subtitle } = queueItem.rootEvent
     ? rootTriggerRenderer.getTitleAndSubtitle(queueItem.rootEvent)
     : {
-        title: queueItem.id || "Execution",
-        subtitle: queueItem.createdAt ? formatTimeAgo(new Date(queueItem.createdAt)).replace(" ago", "") : "",
-      };
+      title: queueItem.id || "Execution",
+      subtitle: queueItem.createdAt ? formatTimeAgo(new Date(queueItem.createdAt)).replace(" ago", "") : "",
+    };
 
   return {
     title,
@@ -144,9 +184,9 @@ export function mapQueueItemsToSidebarEvents(
     const { title, subtitle } = item.rootEvent
       ? rootTriggerRenderer.getTitleAndSubtitle(item.rootEvent)
       : {
-          title: item.id || "Execution",
-          subtitle: item.createdAt ? formatTimeAgo(new Date(item.createdAt)).replace(" ago", "") : "",
-        };
+        title: item.id || "Execution",
+        subtitle: item.createdAt ? formatTimeAgo(new Date(item.createdAt)).replace(" ago", "") : "",
+      };
 
     const values = item.rootEvent ? rootTriggerRenderer.getRootEventValues(item.rootEvent) : {};
 
@@ -199,31 +239,31 @@ export function buildRunItemFromExecution(options: {
     componentNode?.name || componentNode?.id || execution.nodeId || "Execution",
     nodeId
       ? createElement(
-          Fragment,
-          null,
-          " · ",
-          createElement(
-            "button",
-            {
-              type: "button",
-              className: "text-blue-600 underline hover:text-blue-700",
-              onClick: () => {
-                if (onExecutionSelect && event?.id && executionId) {
-                  onExecutionSelect({
-                    nodeId,
-                    eventId: event.id,
-                    executionId,
-                    triggerEvent,
-                  });
-                  return;
-                }
+        Fragment,
+        null,
+        " · ",
+        createElement(
+          "button",
+          {
+            type: "button",
+            className: "text-blue-600 underline hover:text-blue-700",
+            onClick: () => {
+              if (onExecutionSelect && event?.id && executionId) {
+                onExecutionSelect({
+                  nodeId,
+                  eventId: event.id,
+                  executionId,
+                  triggerEvent,
+                });
+                return;
+              }
 
-                onNodeSelect(nodeId);
-              },
+              onNodeSelect(nodeId);
             },
-            nodeId,
-          ),
-        )
+          },
+          nodeId,
+        ),
+      )
       : null,
     " · ",
     executionState,
@@ -528,35 +568,35 @@ function buildConnectionListItems(
     items.push(
       listContext
         ? createElement(
-            "details",
-            { key: "more", className: "group contents" },
+          "details",
+          { key: "more", className: "group contents" },
+          createElement(
+            "summary",
+            { className: "list-item cursor-pointer text-slate-900 underline group-open:hidden" },
+            `+${remainingCount} more`,
+          ),
+          ...hiddenItems.map((item, index) =>
             createElement(
-              "summary",
-              { className: "list-item cursor-pointer text-slate-900 underline group-open:hidden" },
-              `+${remainingCount} more`,
-            ),
-            ...hiddenItems.map((item, index) =>
-              createElement(
-                "li",
-                { key: `more-edge-${index}`, className: "hidden group-open:list-item" },
-                item.content,
-              ),
-            ),
-          )
-        : createElement(
-            "details",
-            { key: "more", className: "group inline-block" },
-            createElement(
-              "summary",
-              { className: "cursor-pointer text-slate-900 underline group-open:hidden" },
-              `+${remainingCount} more`,
-            ),
-            createElement(
-              "ul",
-              { className: "mt-1 list-disc pl-5 space-y-1 text-slate-600" },
-              ...hiddenItems.map((item, index) => createElement("li", { key: `more-edge-${index}` }, item.content)),
+              "li",
+              { key: `more-edge-${index}`, className: "hidden group-open:list-item" },
+              item.content,
             ),
           ),
+        )
+        : createElement(
+          "details",
+          { key: "more", className: "group inline-block" },
+          createElement(
+            "summary",
+            { className: "cursor-pointer text-slate-900 underline group-open:hidden" },
+            `+${remainingCount} more`,
+          ),
+          createElement(
+            "ul",
+            { className: "mt-1 list-disc pl-5 space-y-1 text-slate-600" },
+            ...hiddenItems.map((item, index) => createElement("li", { key: `more-edge-${index}` }, item.content)),
+          ),
+        ),
     );
     labels.push(`+${remainingCount} more`);
   }
@@ -617,35 +657,35 @@ function buildNodeListItems(
     items.push(
       listContext
         ? createElement(
-            "details",
-            { key: "more", className: "group contents" },
+          "details",
+          { key: "more", className: "group contents" },
+          createElement(
+            "summary",
+            { className: "list-item cursor-pointer text-slate-900 underline group-open:hidden" },
+            `+${remainingCount} more`,
+          ),
+          ...hiddenItems.map((item, index) =>
             createElement(
-              "summary",
-              { className: "list-item cursor-pointer text-slate-900 underline group-open:hidden" },
-              `+${remainingCount} more`,
-            ),
-            ...hiddenItems.map((item, index) =>
-              createElement(
-                "li",
-                { key: `more-node-${index}`, className: "hidden group-open:list-item" },
-                item.content,
-              ),
-            ),
-          )
-        : createElement(
-            "details",
-            { key: "more", className: "group inline-block" },
-            createElement(
-              "summary",
-              { className: "cursor-pointer text-slate-900 underline group-open:hidden" },
-              `+${remainingCount} more`,
-            ),
-            createElement(
-              "ul",
-              { className: "mt-1 list-disc pl-5 space-y-1 text-slate-600" },
-              ...hiddenItems.map((item, index) => createElement("li", { key: `more-node-${index}` }, item.content)),
+              "li",
+              { key: `more-node-${index}`, className: "hidden group-open:list-item" },
+              item.content,
             ),
           ),
+        )
+        : createElement(
+          "details",
+          { key: "more", className: "group inline-block" },
+          createElement(
+            "summary",
+            { className: "cursor-pointer text-slate-900 underline group-open:hidden" },
+            `+${remainingCount} more`,
+          ),
+          createElement(
+            "ul",
+            { className: "mt-1 list-disc pl-5 space-y-1 text-slate-600" },
+            ...hiddenItems.map((item, index) => createElement("li", { key: `more-node-${index}` }, item.content)),
+          ),
+        ),
     );
     labels.push(`+${remainingCount} more`);
   }
@@ -880,9 +920,9 @@ export function summarizeWorkflowChanges(options: {
     formatSummaryConnectionEntry("Added", "connection", addedConnections, afterNodes, onNodeSelect, { linkIds: true }),
     removedNodeIds.size === 0
       ? formatSummaryConnectionEntry("Removed", "connection", removedConnectionsStandalone, beforeNodes, onNodeSelect, {
-          linkIds: true,
-          existingNodesById: afterNodes,
-        })
+        linkIds: true,
+        existingNodesById: afterNodes,
+      })
       : undefined,
     formatSummaryConnectionEntry("Updated", "connection", updatedConnections, afterNodes, onNodeSelect, {
       linkIds: true,
