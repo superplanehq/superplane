@@ -268,6 +268,14 @@ func (s *TestSession) AssertVisible(q queries.Query) {
 	}
 }
 
+func (s *TestSession) AssertHidden(q queries.Query) {
+	s.t.Logf("Asserting %q is hidden", q.Describe())
+
+	if err := q.Run(s).WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateHidden, Timeout: pw.Float(s.timeoutMs)}); err != nil {
+		s.t.Fatalf("asserting %q is hidden: %v", q.Describe(), err)
+	}
+}
+
 func (s *TestSession) AssertDisabled(q queries.Query) {
 	s.t.Logf("Asserting %q is disabled", q.Describe())
 
