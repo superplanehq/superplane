@@ -255,6 +255,8 @@ func (s *CanvasPageSteps) openSidebarForNode(node string) {
 
 func (s *CanvasPageSteps) openNodeSettings(node string) {
 	s.canvas.StartEditingNode(node)
+	s.session.Click(q.Text("Configuration"))
+	s.session.Sleep(200)
 }
 
 func (s *CanvasPageSteps) typeExpression(value string) {
