@@ -241,7 +241,7 @@ export function CanvasLogSidebar({
         style={{ height: sidebarHeight, minHeight, maxHeight }}
       >
         <div className="h-0.5 cursor-row-resize rounded-t-lg transition-colors" onMouseDown={handleResizeStart} />
-        <div className="flex items-center justify-between pl-4 pr-2 border-b border-gray-200 h-8">
+        <div className="flex items-center justify-between pl-4 pr-2 border-b border-gray-200 dark:border-gray-700 h-8">
           <div className="flex items-center gap-4 -mb-2">
             <button
               type="button"
@@ -249,8 +249,8 @@ export function CanvasLogSidebar({
               className={cn(
                 "flex items-center gap-2 pb-2 text-[13px] font-medium leading-none border-b transition-colors",
                 normalizedFilter.size === 0
-                  ? "border-gray-800 text-gray-800"
-                  : "border-transparent text-gray-500 hover:text-gray-800",
+                  ? "border-gray-800 text-gray-800 dark:border-gray-200 dark:text-gray-200"
+                  : "border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200",
               )}
             >
               <ScrollText className="h-4 w-4" />
@@ -262,8 +262,8 @@ export function CanvasLogSidebar({
               className={cn(
                 "group flex items-center gap-2 pb-2 text-[13px] font-medium leading-none border-b transition-colors",
                 normalizedFilter.size === 1 && normalizedFilter.has("error")
-                  ? "border-gray-800 text-gray-800"
-                  : "border-transparent text-gray-500 hover:text-gray-800",
+                  ? "border-gray-800 text-gray-800 dark:border-gray-200 dark:text-gray-200"
+                  : "border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200",
               )}
             >
               <CircleX
@@ -272,8 +272,8 @@ export function CanvasLogSidebar({
                   counts.error > 0
                     ? "text-red-500"
                     : normalizedFilter.size === 1 && normalizedFilter.has("error")
-                      ? "text-gray-800"
-                      : "text-gray-500 group-hover:text-gray-800",
+                      ? "text-gray-800 dark:text-gray-200"
+                      : "text-gray-500 group-hover:text-gray-800 dark:text-gray-400 dark:group-hover:text-gray-200",
                 )}
               />
               <span
@@ -282,8 +282,8 @@ export function CanvasLogSidebar({
                   counts.error > 0
                     ? "text-red-500"
                     : normalizedFilter.size === 1 && normalizedFilter.has("error")
-                      ? "text-gray-800"
-                      : "text-gray-500 group-hover:text-gray-800",
+                      ? "text-gray-800 dark:text-gray-200"
+                      : "text-gray-500 group-hover:text-gray-800 dark:text-gray-400 dark:group-hover:text-gray-200",
                 )}
               >
                 {counts.error}
@@ -295,8 +295,8 @@ export function CanvasLogSidebar({
               className={cn(
                 "group flex items-center gap-2 pb-2 text-[13px] font-medium leading-none border-b transition-colors",
                 normalizedFilter.size === 1 && normalizedFilter.has("warning")
-                  ? "border-gray-800 text-gray-800"
-                  : "border-transparent text-gray-500 hover:text-gray-800",
+                  ? "border-gray-800 text-gray-800 dark:border-gray-200 dark:text-gray-200"
+                  : "border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200",
               )}
             >
               <TriangleAlert
@@ -305,8 +305,8 @@ export function CanvasLogSidebar({
                   counts.warning > 0
                     ? "text-orange-500"
                     : normalizedFilter.size === 1 && normalizedFilter.has("warning")
-                      ? "text-gray-800"
-                      : "text-gray-500 group-hover:text-gray-800",
+                      ? "text-gray-800 dark:text-gray-200"
+                      : "text-gray-500 group-hover:text-gray-800 dark:text-gray-400 dark:group-hover:text-gray-200",
                 )}
               />
               <span
@@ -315,8 +315,8 @@ export function CanvasLogSidebar({
                   counts.warning > 0
                     ? "text-orange-500"
                     : normalizedFilter.size === 1 && normalizedFilter.has("warning")
-                      ? "text-gray-800"
-                      : "text-gray-500 group-hover:text-gray-800",
+                      ? "text-gray-800 dark:text-gray-200"
+                      : "text-gray-500 group-hover:text-gray-800 dark:text-gray-400 dark:group-hover:text-gray-200",
                 )}
               >
                 {counts.warning}
@@ -343,30 +343,30 @@ export function CanvasLogSidebar({
               variant="ghost"
               size="icon-sm"
               onClick={onClose}
-              className="size-5 rounded hover:bg-gray-100 -mt-0.5"
+              className="size-5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 -mt-0.5"
             >
               <X className="h-3 w-3" />
             </Button>
           </div>
         </div>
-        <div className="px-2 border-b border-slate-200 h-8">
+        <div className="px-2 border-b border-slate-200 dark:border-gray-700 h-8">
           <InputGroup className="h-8 border-0 shadow-none !ring-0 !focus-within:ring-0 focus-within:ring-offset-0">
             <InputGroupAddon className="border-0 shadow-none">
-              <Search className="h-4 w-4 -ml-1 text-gray-500" />
+              <Search className="h-4 w-4 -ml-1 text-gray-500 dark:text-gray-400" />
             </InputGroupAddon>
             <InputGroupInput
               placeholder="Search through Logs…"
               value={searchValue}
               onChange={(event) => onSearchChange(event.target.value)}
-              className="h-7 !text-[13px] border-0 shadow-none focus:ring-0 focus-visible:ring-0 focus-visible:border-0"
+              className="h-7 !text-[13px] border-0 shadow-none focus:ring-0 focus-visible:ring-0 focus-visible:border-0 dark:text-gray-200 dark:placeholder:text-gray-500"
             />
           </InputGroup>
         </div>
         <div className="flex-1 overflow-auto" data-log-scroll ref={scrollContainerRef}>
           {entries.length === 0 ? (
-            <div className="px-4 py-1.5 text-[13px] text-gray-800">No logs found.</div>
+            <div className="px-4 py-1.5 text-[13px] text-gray-800 dark:text-gray-200">No logs found.</div>
           ) : (
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-gray-200 dark:divide-gray-700">
               {[...entries].map((entry) => (
                 <LogEntryRow
                   key={entry.id}
@@ -412,14 +412,14 @@ function LogEntryRow({
         <button
           type="button"
           onClick={() => onToggleRun(entry.id)}
-          className="flex w-full items-center gap-3 px-4 py-1.5 text-sm text-gray-800 hover:bg-gray-50 min-h-8"
+          className="flex w-full items-center gap-3 px-4 py-1.5 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 min-h-8"
           aria-expanded={isExpanded}
         >
-          <div className="h-4 w-4 rounded-full text-xs font-mono text-gray-500 flex items-center justify-center border border-gray-400">
+          <div className="h-4 w-4 rounded-full text-xs font-mono text-gray-500 dark:text-gray-400 flex items-center justify-center border border-gray-400 dark:border-gray-500">
             {runItems.length}
           </div>
           <div className="flex-1 min-w-0 text-left font-mono text-xs mt-0.5">{entry.title}</div>
-          <span className="ml-auto text-xs text-gray-500 tabular-nums whitespace-nowrap">
+          <span className="ml-auto text-xs text-gray-500 dark:text-gray-400 tabular-nums whitespace-nowrap">
             {formatLogTimestamp(entry.timestamp)}
           </span>
         </button>
@@ -428,10 +428,10 @@ function LogEntryRow({
             {runItems.map((item) => (
               <div
                 key={item.id}
-                className="flex items-start gap-3 px-11 pr-4 py-1.5 text-sm text-gray-800 bg-gray-50 border-t border-gray-200 transition-colors min-h-8"
+                className="flex items-start gap-3 px-11 pr-4 py-1.5 text-sm text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 transition-colors min-h-8"
               >
                 <div className="pt-0.5">
-                  {item.isRunning ? <MoreHorizontal className="h-4 w-4 text-gray-500" /> : icon[item.type]}
+                  {item.isRunning ? <MoreHorizontal className="h-4 w-4 text-gray-500 dark:text-gray-400" /> : icon[item.type]}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -450,11 +450,11 @@ function LogEntryRow({
                       ) : null}
                     </div>
 
-                    <span className="text-xs text-gray-500 tabular-nums whitespace-nowrap">
+                    <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums whitespace-nowrap">
                       {formatLogTimestamp(item.timestamp)}
                     </span>
                   </div>
-                  {item.detail && <div className="mt-1 text-xs text-gray-800">{item.detail}</div>}
+                  {item.detail && <div className="mt-1 text-xs text-gray-800 dark:text-gray-200">{item.detail}</div>}
                 </div>
               </div>
             ))}
@@ -467,32 +467,32 @@ function LogEntryRow({
   const hasDetail = Boolean(entry.detail);
 
   return (
-    <div className="flex items-start gap-3 px-4 py-1.5 text-[13px] text-gray-800">
+    <div className="flex items-start gap-3 px-4 py-1.5 text-[13px] text-gray-800 dark:text-gray-200">
       <div className="pt-0.5">{icon[entry.type]}</div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           {hasDetail ? (
             <button
               type="button"
-              className="flex flex-1 min-w-0 items-center gap-2 text-left hover:text-gray-800"
+              className="flex flex-1 min-w-0 items-center gap-2 text-left hover:text-gray-800 dark:hover:text-gray-100"
               onClick={() => setIsDetailExpanded((prev) => !prev)}
               aria-expanded={isDetailExpanded}
             >
               {isDetailExpanded ? (
-                <ChevronDown className="h-4 w-4 text-gray-500" />
+                <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
               ) : (
-                <ChevronRight className="h-4 w-4 text-gray-500" />
+                <ChevronRight className="h-4 w-4 text-gray-500 dark:text-gray-400" />
               )}
               <div className="min-w-0">{entry.title}</div>
             </button>
           ) : (
             <div className="flex-1 min-w-0 text-xs font-mono mt-0.5">{entry.title}</div>
           )}
-          <span className="text-xs text-gray-500 tabular-nums whitespace-nowrap">
+          <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums whitespace-nowrap">
             {formatLogTimestamp(entry.timestamp)}
           </span>
         </div>
-        {entry.detail && isDetailExpanded && <div className="mt-2 text-[13px] text-gray-500">{entry.detail}</div>}
+        {entry.detail && isDetailExpanded && <div className="mt-2 text-[13px] text-gray-500 dark:text-gray-400">{entry.detail}</div>}
       </div>
     </div>
   );

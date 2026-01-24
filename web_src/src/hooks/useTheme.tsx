@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, createContext, useContext, type ReactNode } from "react";
 
 export type ThemePreference = "system" | "light" | "dark";
 
@@ -18,7 +18,16 @@ function getSystemTheme(): "light" | "dark" {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-export function useTheme() {
+interface ThemeContextValue {
+  preference: ThemePreference;
+  effectiveTheme: "light" | "dark";
+  setPreference: (preference: ThemePreference) => void;
+  isDark: boolean;
+}
+
+const ThemeContext = createContext<ThemeContextValue | null>(null);
+
+export function ThemeProvider({ children }: { children: ReactNode }) {
   const [preference, setPreferenceState] = useState<ThemePreference>(getStoredPreference);
   const [systemTheme, setSystemTheme] = useState<"light" | "dark">(getSystemTheme);
 
@@ -53,10 +62,24 @@ export function useTheme() {
     localStorage.setItem(STORAGE_KEY, newPreference);
   }, []);
 
-  return {
-    preference,
-    effectiveTheme,
-    setPreference,
-    isDark: effectiveTheme === "dark",
-  };
+  return (
+    <ThemeContext.Provider
+      value={{
+        preference,
+        effectiveTheme,
+        setPreference,
+        isDark: effectiveTheme === "dark",
+      }}
+    >
+      {children}
+    </ThemeContext.Provider>
+  );
+}
+
+export function useTheme(): ThemeContextValue {
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error("useTheme must be used within a ThemeProvider");
+  }
+  return context;
 }
