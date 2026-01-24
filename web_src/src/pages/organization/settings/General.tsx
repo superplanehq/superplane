@@ -7,6 +7,7 @@ import { Heading } from "../../../components/Heading/heading";
 import { Input } from "../../../components/Input/input";
 import { useDeleteOrganization, useUpdateOrganization } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
+import { ThemeSelector } from "../../../components/ThemeSelector";
 
 interface GeneralProps {
   organization: OrganizationsOrganization;
@@ -67,7 +68,7 @@ export function General({ organization }: GeneralProps) {
   };
   return (
     <div className="space-y-6 pt-6 text-left">
-      <Fieldset className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
+      <Fieldset className="bg-white dark:bg-neutral-800 rounded-lg border border-gray-300 dark:border-neutral-700 p-6 space-y-6">
         <Field className="space-y-4">
           <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Organization Name</Label>
           <Input type="text" value={name} onChange={(e) => setName(e.target.value)} className="max-w-sm" />
@@ -89,12 +90,29 @@ export function General({ organization }: GeneralProps) {
         </Field>
       </Fieldset>
 
-      <Fieldset className="bg-white border border-gray-300 rounded-lg p-6 space-y-4">
+      <Fieldset className="bg-white dark:bg-neutral-800 rounded-lg border border-gray-300 dark:border-neutral-700 p-6 space-y-4">
+        <div>
+          <Heading level={3} className="!text-lg text-gray-900 dark:text-gray-100">
+            Appearance
+          </Heading>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Choose how Superplane looks to you
+          </p>
+        </div>
+        <Field>
+          <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            Theme
+          </Label>
+          <ThemeSelector />
+        </Field>
+      </Fieldset>
+
+      <Fieldset className="bg-white dark:bg-neutral-800 border border-gray-300 dark:border-neutral-700 rounded-lg p-6 space-y-4">
         {!showDeleteForm ? (
           <button
             type="button"
             onClick={() => setShowDeleteForm(true)}
-            className="flex items-center gap-2 text-sm text-gray-800 hover:text-red-500"
+            className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-300 hover:text-red-500"
           >
             <Trash2 className="h-4 w-4" />
             Delete Organization...

@@ -102,7 +102,7 @@ export function CreateCanvasModal({
       <DialogTitle>
         {fromTemplate ? "New Canvas from template" : mode === "edit" ? "Edit Canvas" : "New Canvas"}
       </DialogTitle>
-      <DialogDescription className="text-sm !text-[var(--color-gray-800)]">
+      <DialogDescription className="text-sm">
         {fromTemplate
           ? "Create a canvas from this template. Give it a name and optional description to get started."
           : mode === "edit"
