@@ -209,3 +209,21 @@ func (s *WorkflowService) CancelExecution(ctx context.Context, req *pb.CancelExe
 
 	return workflows.CancelExecution(ctx, s.authService, s.encryptor, organizationID, s.registry, workflowID, executionID)
 }
+
+func (s *WorkflowService) ResolveExecutionErrors(ctx context.Context, req *pb.ResolveExecutionErrorsRequest) (*pb.ResolveExecutionErrorsResponse, error) {
+	workflowID, err := uuid.Parse(req.WorkflowId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid workflow_id")
+	}
+
+	executionIDs := make([]uuid.UUID, 0, len(req.ExecutionIds))
+	for _, executionID := range req.ExecutionIds {
+		parsedID, err := uuid.Parse(executionID)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, "invalid execution_id")
+		}
+		executionIDs = append(executionIDs, parsedID)
+	}
+
+	return workflows.ResolveExecutionErrors(ctx, workflowID, executionIDs)
+}

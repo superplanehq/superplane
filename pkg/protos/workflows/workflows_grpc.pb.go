@@ -33,6 +33,7 @@ const (
 	Workflows_InvokeNodeTriggerAction_FullMethodName   = "/Superplane.Workflows.Workflows/InvokeNodeTriggerAction"
 	Workflows_ListChildExecutions_FullMethodName       = "/Superplane.Workflows.Workflows/ListChildExecutions"
 	Workflows_CancelExecution_FullMethodName           = "/Superplane.Workflows.Workflows/CancelExecution"
+	Workflows_ResolveExecutionErrors_FullMethodName    = "/Superplane.Workflows.Workflows/ResolveExecutionErrors"
 	Workflows_ListWorkflowEvents_FullMethodName        = "/Superplane.Workflows.Workflows/ListWorkflowEvents"
 	Workflows_ListEventExecutions_FullMethodName       = "/Superplane.Workflows.Workflows/ListEventExecutions"
 )
@@ -55,6 +56,7 @@ type WorkflowsClient interface {
 	InvokeNodeTriggerAction(ctx context.Context, in *InvokeNodeTriggerActionRequest, opts ...grpc.CallOption) (*InvokeNodeTriggerActionResponse, error)
 	ListChildExecutions(ctx context.Context, in *ListChildExecutionsRequest, opts ...grpc.CallOption) (*ListChildExecutionsResponse, error)
 	CancelExecution(ctx context.Context, in *CancelExecutionRequest, opts ...grpc.CallOption) (*CancelExecutionResponse, error)
+	ResolveExecutionErrors(ctx context.Context, in *ResolveExecutionErrorsRequest, opts ...grpc.CallOption) (*ResolveExecutionErrorsResponse, error)
 	ListWorkflowEvents(ctx context.Context, in *ListWorkflowEventsRequest, opts ...grpc.CallOption) (*ListWorkflowEventsResponse, error)
 	ListEventExecutions(ctx context.Context, in *ListEventExecutionsRequest, opts ...grpc.CallOption) (*ListEventExecutionsResponse, error)
 }
@@ -207,6 +209,16 @@ func (c *workflowsClient) CancelExecution(ctx context.Context, in *CancelExecuti
 	return out, nil
 }
 
+func (c *workflowsClient) ResolveExecutionErrors(ctx context.Context, in *ResolveExecutionErrorsRequest, opts ...grpc.CallOption) (*ResolveExecutionErrorsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveExecutionErrorsResponse)
+	err := c.cc.Invoke(ctx, Workflows_ResolveExecutionErrors_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *workflowsClient) ListWorkflowEvents(ctx context.Context, in *ListWorkflowEventsRequest, opts ...grpc.CallOption) (*ListWorkflowEventsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListWorkflowEventsResponse)
@@ -245,6 +257,7 @@ type WorkflowsServer interface {
 	InvokeNodeTriggerAction(context.Context, *InvokeNodeTriggerActionRequest) (*InvokeNodeTriggerActionResponse, error)
 	ListChildExecutions(context.Context, *ListChildExecutionsRequest) (*ListChildExecutionsResponse, error)
 	CancelExecution(context.Context, *CancelExecutionRequest) (*CancelExecutionResponse, error)
+	ResolveExecutionErrors(context.Context, *ResolveExecutionErrorsRequest) (*ResolveExecutionErrorsResponse, error)
 	ListWorkflowEvents(context.Context, *ListWorkflowEventsRequest) (*ListWorkflowEventsResponse, error)
 	ListEventExecutions(context.Context, *ListEventExecutionsRequest) (*ListEventExecutionsResponse, error)
 }
@@ -297,6 +310,9 @@ func (UnimplementedWorkflowsServer) ListChildExecutions(context.Context, *ListCh
 }
 func (UnimplementedWorkflowsServer) CancelExecution(context.Context, *CancelExecutionRequest) (*CancelExecutionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CancelExecution not implemented")
+}
+func (UnimplementedWorkflowsServer) ResolveExecutionErrors(context.Context, *ResolveExecutionErrorsRequest) (*ResolveExecutionErrorsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveExecutionErrors not implemented")
 }
 func (UnimplementedWorkflowsServer) ListWorkflowEvents(context.Context, *ListWorkflowEventsRequest) (*ListWorkflowEventsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListWorkflowEvents not implemented")
@@ -576,6 +592,24 @@ func _Workflows_CancelExecution_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Workflows_ResolveExecutionErrors_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveExecutionErrorsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowsServer).ResolveExecutionErrors(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Workflows_ResolveExecutionErrors_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowsServer).ResolveExecutionErrors(ctx, req.(*ResolveExecutionErrorsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Workflows_ListWorkflowEvents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListWorkflowEventsRequest)
 	if err := dec(in); err != nil {
@@ -674,6 +708,10 @@ var Workflows_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CancelExecution",
 			Handler:    _Workflows_CancelExecution_Handler,
+		},
+		{
+			MethodName: "ResolveExecutionErrors",
+			Handler:    _Workflows_ResolveExecutionErrors_Handler,
 		},
 		{
 			MethodName: "ListWorkflowEvents",

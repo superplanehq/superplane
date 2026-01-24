@@ -2313,6 +2313,46 @@
         ]
       }
     },
+    "/api/v1/workflows/{workflowId}/executions/resolve": {
+      "patch": {
+        "summary": "Resolve execution errors",
+        "description": "Marks workflow node execution errors as resolved",
+        "operationId": "Workflows_ResolveExecutionErrors",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/WorkflowsResolveExecutionErrorsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/WorkflowsResolveExecutionErrorsBody"
+            }
+          }
+        ],
+        "tags": [
+          "WorkflowNodeExecution"
+        ]
+      }
+    },
     "/api/v1/workflows/{workflowId}/executions/{executionId}/actions/{actionName}": {
       "post": {
         "summary": "Invoke execution action",
@@ -4681,7 +4721,8 @@
       "type": "string",
       "enum": [
         "RESULT_REASON_OK",
-        "RESULT_REASON_ERROR"
+        "RESULT_REASON_ERROR",
+        "RESULT_REASON_ERROR_RESOLVED"
       ],
       "default": "RESULT_REASON_OK"
     },
@@ -4907,6 +4948,20 @@
           }
         }
       }
+    },
+    "WorkflowsResolveExecutionErrorsBody": {
+      "type": "object",
+      "properties": {
+        "executionIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "WorkflowsResolveExecutionErrorsResponse": {
+      "type": "object"
     },
     "WorkflowsUpdateWorkflowBody": {
       "type": "object",

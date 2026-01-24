@@ -321,6 +321,8 @@ func NodeExecutionResultReasonToProto(reason string) pb.WorkflowNodeExecution_Re
 		return pb.WorkflowNodeExecution_RESULT_REASON_OK
 	case models.WorkflowNodeExecutionResultReasonError:
 		return pb.WorkflowNodeExecution_RESULT_REASON_ERROR
+	case models.WorkflowNodeExecutionResultReasonErrorResolved:
+		return pb.WorkflowNodeExecution_RESULT_REASON_ERROR_RESOLVED
 	default:
 		return pb.WorkflowNodeExecution_RESULT_REASON_OK
 	}
