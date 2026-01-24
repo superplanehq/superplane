@@ -873,6 +873,7 @@ export function WorkflowPageV2() {
       workflowUpdatedAt: workflow?.metadata?.updatedAt || "",
       onNodeSelect: handleLogNodeSelect,
     });
+
     const allCanvasEntries = [...liveCanvasEntries, ...canvasEntries];
 
     const resolvedEntries = [...allRunEntries, ...allCanvasEntries].map((entry) => {
@@ -2967,6 +2968,7 @@ function prepareTriggerNode(
         ...triggerProps,
         collapsed: node.isCollapsed,
         error: node.errorMessage,
+        warning: node.warningMessage,
       },
     },
   };
@@ -3012,6 +3014,7 @@ function prepareCompositeNode(
         description: blueprintMetadata?.description,
         isMissing: isMissing,
         error: node.errorMessage,
+        warning: node.warningMessage,
         parameters:
           Object.keys(node.configuration!).length > 0
             ? [
@@ -3275,6 +3278,7 @@ function prepareComponentBaseNode(
         ...componentBaseProps,
         emptyStateProps,
         error: node.errorMessage,
+        warning: node.warningMessage,
       },
     },
   };

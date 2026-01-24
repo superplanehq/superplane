@@ -635,6 +635,11 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			errorMessage = &node.ErrorMessage
 		}
 
+		var warningMessage *string
+		if node.WarningMessage != "" {
+			warningMessage = &node.WarningMessage
+		}
+
 		result[i] = models.Node{
 			ID:                node.Id,
 			Name:              node.Name,
@@ -645,6 +650,7 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			IsCollapsed:       node.IsCollapsed,
 			AppInstallationID: appInstallationID,
 			ErrorMessage:      errorMessage,
+			WarningMessage:    warningMessage,
 		}
 	}
 	return result
@@ -701,6 +707,10 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 
 		if node.ErrorMessage != nil && *node.ErrorMessage != "" {
 			result[i].ErrorMessage = *node.ErrorMessage
+		}
+
+		if node.WarningMessage != nil && *node.WarningMessage != "" {
+			result[i].WarningMessage = *node.WarningMessage
 		}
 	}
 

@@ -225,6 +225,7 @@ export interface ComponentBaseProps extends ComponentActionsProps {
     description?: string;
   };
   error?: string;
+  warning?: string;
 }
 
 export const ComponentBase: React.FC<ComponentBaseProps> = ({
@@ -256,8 +257,11 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   includeEmptyState = false,
   emptyStateProps,
   error,
+  warning,
 }) => {
   const hasError = error && error.trim() !== "";
+  const hasWarning = warning && warning.trim() !== "";
+  const hasBadge = hasError || hasWarning;
   const RunIcon = React.useMemo(() => resolveIcon("play"), []);
   const DuplicateIcon = React.useMemo(() => resolveIcon("copy"), []);
   const DeleteIcon = React.useMemo(() => resolveIcon("trash-2"), []);
@@ -349,7 +353,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           statusBadgeColor={compactStatusBadgeColor}
         />
 
-        {hasError && (
+        {hasBadge && (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -358,7 +362,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                 </div>
               </TooltipTrigger>
               <TooltipContent>
-                <p className="max-w-xs text-sm">{error}</p>
+                <p className="max-w-xs text-sm">{hasError ? error : warning}</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
