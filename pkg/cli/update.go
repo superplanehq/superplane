@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/superplanehq/superplane/pkg/cli/models"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
@@ -27,24 +28,22 @@ var updateCmd = &cobra.Command{
 		Check(err)
 
 		switch kind {
-		case canvasKind:
-			resource, err := ParseCanvasResource(data)
+		case models.CanvasKind:
+			resource, err := models.ParseCanvas(data)
 			Check(err)
 
 			client := DefaultClient()
 			ctx := context.Background()
 
-			workflowID := *resource.Metadata.Id
-			if workflowID == "" {
-				workflowID, err = findWorkflowIDByName(ctx, client, *resource.Metadata.Name)
-				Check(err)
-			}
-
-			workflow := WorkflowFromCanvasResource(*resource)
+			workflow := models.WorkflowFromCanvas(*resource)
 			body := openapi_client.WorkflowsUpdateWorkflowBody{}
 			body.SetWorkflow(workflow)
 
-			_, _, err = client.WorkflowAPI.WorkflowsUpdateWorkflow(ctx, workflowID).Body(body).Execute()
+			_, _, err = client.WorkflowAPI.
+				WorkflowsUpdateWorkflow(ctx, *resource.Metadata.Id).
+				Body(body).
+				Execute()
+
 			Check(err)
 		default:
 			Fail(fmt.Sprintf("Unsupported resource kind '%s' for update", kind))

@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/superplanehq/superplane/pkg/cli/models"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
@@ -26,11 +27,11 @@ var createCmd = &cobra.Command{
 		Check(err)
 
 		switch kind {
-		case canvasKind:
-			resource, err := ParseCanvasResource(data)
+		case models.CanvasKind:
+			resource, err := models.ParseCanvas(data)
 			Check(err)
 
-			workflow := WorkflowFromCanvasResource(*resource)
+			workflow := models.WorkflowFromCanvas(*resource)
 			request := openapi_client.WorkflowsCreateWorkflowRequest{}
 			request.SetWorkflow(workflow)
 
@@ -51,14 +52,14 @@ var createCanvasCmd = &cobra.Command{
 		name := args[0]
 		client := DefaultClient()
 
-		resource := CanvasResource{
-			APIVersion: canvasAPIVersion,
-			Kind:       canvasKind,
+		resource := models.Canvas{
+			APIVersion: APIVersion,
+			Kind:       models.CanvasKind,
 			Metadata:   &openapi_client.WorkflowsWorkflowMetadata{Name: &name},
-			Spec:       EmptyWorkflowSpec(),
+			Spec:       models.EmptyWorkflowSpec(),
 		}
 
-		workflow := WorkflowFromCanvasResource(resource)
+		workflow := models.WorkflowFromCanvas(resource)
 		request := openapi_client.WorkflowsCreateWorkflowRequest{}
 		request.SetWorkflow(workflow)
 

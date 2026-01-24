@@ -6,7 +6,10 @@ import (
 	"os"
 
 	"github.com/ghodss/yaml"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
+	"github.com/superplanehq/superplane/pkg/cli/models"
+	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 // Root describe command
@@ -18,30 +21,35 @@ var getCmd = &cobra.Command{
 }
 
 var getCanvasCmd = &cobra.Command{
-	Use:   "canvas <canvas-name>",
+	Use:   "canvas <name-or-id>",
 	Short: "Get a canvas",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		name := args[0]
+		nameOrID := args[0]
 		client := DefaultClient()
 		ctx := context.Background()
 
-		workflowID, err := findWorkflowIDByName(ctx, client, name)
+		workflowID, err := findWorkflowID(ctx, client, nameOrID)
 		Check(err)
 
 		response, _, err := client.WorkflowAPI.WorkflowsDescribeWorkflow(ctx, workflowID).Execute()
 		Check(err)
 
-		if response.Workflow == nil {
-			Fail(fmt.Sprintf("canvas %q not found", name))
-		}
-
-		resource := CanvasResourceFromWorkflow(*response.Workflow)
+		resource := models.CanvasResourceFromWorkflow(*response.Workflow)
 		output, err := yaml.Marshal(resource)
 		Check(err)
 
 		fmt.Fprintln(os.Stdout, string(output))
 	},
+}
+
+func findWorkflowID(ctx context.Context, client *openapi_client.APIClient, nameOrID string) (string, error) {
+	_, err := uuid.Parse(nameOrID)
+	if err == nil {
+		return nameOrID, nil
+	}
+
+	return findWorkflowIDByName(ctx, client, nameOrID)
 }
 
 func init() {
