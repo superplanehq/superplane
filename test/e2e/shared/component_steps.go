@@ -123,7 +123,7 @@ func (s *ComponentSteps) AddWait(name string, pos models.Position, duration int,
 func (s *ComponentSteps) StartAddingTimeGate(name string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 
-	source := q.TestID("building-block-time_gate")
+	source := q.TestID("building-block-timeGate")
 	target := q.TestID("rf__wrapper")
 
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
@@ -135,7 +135,7 @@ func (s *ComponentSteps) StartAddingTimeGate(name string, pos models.Position) {
 func (s *ComponentSteps) AddTimeGate(name string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 
-	source := q.TestID("building-block-time_gate")
+	source := q.TestID("building-block-timeGate")
 	target := q.TestID("rf__wrapper")
 
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)

@@ -158,6 +158,7 @@ export interface CanvasPageProps {
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   onNodeDelete?: (nodeId: string) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
+  onResolveExecutionErrors?: (executionIds: string[]) => void;
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
   onNodesPositionChange?: (updates: Array<{ nodeId: string; position: { x: number; y: number } }>) => void;
   onCancelQueueItem?: (nodeId: string, queueItemId: string) => void;
@@ -821,6 +822,7 @@ function CanvasPage(props: CanvasPageProps) {
               focusRequest={props.focusRequest}
               onExecutionChainHandled={props.onExecutionChainHandled}
               initialFocusNodeId={props.initialFocusNodeId}
+              onResolveExecutionErrors={props.onResolveExecutionErrors}
             />
           </ReactFlowProvider>
 
@@ -1257,6 +1259,7 @@ function CanvasContent({
   logEntries = [],
   focusRequest,
   initialFocusNodeId,
+  onResolveExecutionErrors,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1304,6 +1307,7 @@ function CanvasContent({
   focusRequest?: FocusRequest | null;
   onExecutionChainHandled?: () => void;
   initialFocusNodeId?: string | null;
+  onResolveExecutionErrors?: (executionIds: string[]) => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
@@ -1854,7 +1858,7 @@ function CanvasContent({
       if (entry.type === "run") {
         const runItems = entry.runItems || [];
         const filteredRunItems = runItems.filter((item) => {
-          const typeMatch = showAll || logFilter.has(item.type);
+          const typeMatch = showAll || (item.type !== "resolved-error" && logFilter.has(item.type));
           const searchMatch =
             matchesSearch(item.searchText) || matchesSearch(typeof item.title === "string" ? item.title : "");
           return typeMatch && searchMatch;
@@ -1871,7 +1875,7 @@ function CanvasContent({
         return acc;
       }
 
-      if (!showAll && !logFilter.has(entry.type)) {
+      if (!showAll && (entry.type === "resolved-error" || !logFilter.has(entry.type))) {
         return acc;
       }
 
@@ -2072,6 +2076,7 @@ function CanvasContent({
         onClose={() => setIsLogSidebarOpen(false)}
         filter={logFilter}
         onFilterChange={setLogFilter}
+        onResolveErrors={onResolveExecutionErrors}
         height={logSidebarHeight}
         onHeightChange={setLogSidebarHeight}
         scope={logScope}

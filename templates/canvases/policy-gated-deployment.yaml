@@ -56,7 +56,7 @@ spec:
         x: 864
         "y": 320
       component:
-        name: "time_gate"
+        name: "timeGate"
       blueprint: null
       trigger: null
       widget: null

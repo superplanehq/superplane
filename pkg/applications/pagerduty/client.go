@@ -578,3 +578,75 @@ func (c *Client) ListEscalationPolicies() ([]EscalationPolicy, error) {
 
 	return response.EscalationPolicies, nil
 }
+
+// Incident represents a PagerDuty incident returned from the API
+type Incident struct {
+	ID               string            `json:"id"`
+	IncidentNumber   int               `json:"incident_number"`
+	Title            string            `json:"title"`
+	Description      string            `json:"description"`
+	Status           string            `json:"status"`
+	Urgency          string            `json:"urgency"`
+	HTMLURL          string            `json:"html_url"`
+	CreatedAt        string            `json:"created_at"`
+	UpdatedAt        string            `json:"updated_at"`
+	Service          *ServiceRef       `json:"service"`
+	EscalationPolicy *ServiceRef       `json:"escalation_policy"`
+	Assignments      []Assignment      `json:"assignments"`
+	Acknowledgements []Acknowledgement `json:"acknowledgements"`
+	Priority         *PriorityRef      `json:"priority"`
+}
+
+// ServiceRef represents a reference to a service in incident responses
+type ServiceRef struct {
+	ID      string `json:"id"`
+	Type    string `json:"type"`
+	Summary string `json:"summary"`
+	HTMLURL string `json:"html_url"`
+}
+
+// Assignment represents an incident assignment
+type Assignment struct {
+	At       string      `json:"at"`
+	Assignee *ServiceRef `json:"assignee"`
+}
+
+// Acknowledgement represents an incident acknowledgement
+type Acknowledgement struct {
+	At           string      `json:"at"`
+	Acknowledger *ServiceRef `json:"acknowledger"`
+}
+
+// PriorityRef represents a reference to a priority
+type PriorityRef struct {
+	ID      string `json:"id"`
+	Type    string `json:"type"`
+	Summary string `json:"summary"`
+}
+
+// ListIncidents retrieves incidents from PagerDuty filtered by status and optionally by service IDs.
+// By default, it returns open incidents (triggered and acknowledged).
+func (c *Client) ListIncidents(serviceIDs []string) ([]Incident, error) {
+	apiURL := fmt.Sprintf("%s/incidents?statuses[]=triggered&statuses[]=acknowledged", c.BaseURL)
+
+	// Add service ID filters if provided
+	for _, serviceID := range serviceIDs {
+		apiURL += fmt.Sprintf("&service_ids[]=%s", serviceID)
+	}
+
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Incidents []Incident `json:"incidents"`
+	}
+
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Incidents, nil
+}

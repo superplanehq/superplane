@@ -11,7 +11,7 @@ import (
 
 func TestTimeGate_Name(t *testing.T) {
 	tg := &TimeGate{}
-	assert.Equal(t, "time_gate", tg.Name())
+	assert.Equal(t, "timeGate", tg.Name())
 }
 
 func TestTimeGate_Label(t *testing.T) {

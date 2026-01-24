@@ -29,7 +29,7 @@ type ResponsePayload struct {
 }
 
 func (c *CreateResponse) Name() string {
-	return "openai.text_prompt"
+	return "openai.textPrompt"
 }
 
 func (c *CreateResponse) Label() string {

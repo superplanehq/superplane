@@ -47,6 +47,7 @@ import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
+import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 
 /**
@@ -62,10 +63,11 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   noop: noopMapper,
   if: ifMapper,
   http: httpMapper,
-  time_gate: timeGateMapper,
+  timeGate: timeGateMapper,
   filter: filterMapper,
   wait: waitMapper,
   approval: approvalMapper,
+  merge: mergeMapper,
 };
 
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
@@ -104,8 +106,9 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   http: HTTP_STATE_REGISTRY,
   filter: FILTER_STATE_REGISTRY,
   if: IF_STATE_REGISTRY,
-  time_gate: TIME_GATE_STATE_REGISTRY,
+  timeGate: TIME_GATE_STATE_REGISTRY,
   wait: WAIT_STATE_REGISTRY,
+  merge: MERGE_STATE_REGISTRY,
 };
 
 const customFieldRenderers: Record<string, CustomFieldRenderer> = {
@@ -230,6 +233,7 @@ export function getExecutionDetails(
   componentName: string,
   execution: WorkflowsWorkflowNodeExecution,
   node: ComponentsNode,
+  nodes?: ComponentsNode[],
 ): Record<string, any> | undefined {
   const parts = componentName?.split(".");
   let mapper: ComponentBaseMapper | undefined;
@@ -245,7 +249,7 @@ export function getExecutionDetails(
     }
   }
 
-  return mapper?.getExecutionDetails?.(execution, node);
+  return mapper?.getExecutionDetails?.(execution, node, nodes);
 }
 
 function withCustomName(renderer: TriggerRenderer): TriggerRenderer {

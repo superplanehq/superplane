@@ -22,6 +22,12 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   expressionMode?: "wrapped" | "raw";
 }
 
+const suggestionSortPriority = {
+  $: 1,
+  root: 2,
+  previous: 3,
+} as const;
+
 export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInputProps>(
   function AutoCompleteInputRender(props, forwardedRef) {
     const {
@@ -98,6 +104,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const backdropRef = useRef<HTMLDivElement>(null);
     const mirrorRef = useRef<HTMLSpanElement>(null);
+    const isInteractingWithSuggestionsRef = useRef(false);
+    const suppressSuggestionsRef = useRef(false);
     useImperativeHandle(forwardedRef, () => inputRef.current as HTMLTextAreaElement);
 
     // Auto-resize textarea based on content (and backdrop in preview mode)
@@ -885,6 +893,11 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         return;
       }
 
+      if (suppressSuggestionsRef.current) {
+        suppressSuggestionsRef.current = false;
+        return;
+      }
+
       const context = getExpressionContext(inputValue, cursorPosition);
       if (!context || !isAllowedToSuggest(inputValue, cursorPosition)) {
         setSuggestions([]);
@@ -893,7 +906,23 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         return;
       }
 
-      const newSuggestions = getSuggestions(context.expressionText, context.expressionCursor, exampleObj ?? {});
+      const newSuggestions = getSuggestions(context.expressionText, context.expressionCursor, exampleObj ?? {}, {
+        limit: 150,
+      }).sort((a, b) => {
+        const aPriority = suggestionSortPriority[a.label as keyof typeof suggestionSortPriority];
+        const bPriority = suggestionSortPriority[b.label as keyof typeof suggestionSortPriority];
+
+        if (aPriority !== undefined && bPriority !== undefined) {
+          return aPriority - bPriority;
+        }
+        if (aPriority !== undefined) {
+          return -1;
+        }
+        if (bPriority !== undefined) {
+          return 1;
+        }
+        return a.label.localeCompare(b.label);
+      });
       setSuggestions(newSuggestions);
       setIsOpen(newSuggestions.length > 0);
       const nextHighlightedIndex = showValuePreview && newSuggestions.length > 0 ? 0 : -1;
@@ -922,6 +951,9 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     // Handle clicking outside to close suggestions
     useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
+        if (suggestionsRef.current?.contains(event.target as Node)) {
+          return;
+        }
         if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
           setIsOpen(false);
           setIsFocused(false);
@@ -982,9 +1014,12 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     };
 
     const handleSuggestionClick = (suggestionItem: ReturnType<typeof getSuggestions>[number]) => {
+      suppressSuggestionsRef.current = true;
       const cursorPosition = inputRef.current?.selectionStart || 0;
       const context = getExpressionContext(inputValue, cursorPosition);
       if (!context) {
+        suppressSuggestionsRef.current = false;
+        isInteractingWithSuggestionsRef.current = false;
         setIsOpen(false);
         return;
       }
@@ -1003,6 +1038,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         inputRef.current?.focus();
         const cursorTarget = context.startOffset + range.start + insertText.length;
         inputRef.current?.setSelectionRange(cursorTarget, cursorTarget);
+        isInteractingWithSuggestionsRef.current = false;
+        suppressSuggestionsRef.current = false;
       });
 
       setIsOpen(false);
@@ -1141,6 +1178,13 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
               }
             }}
             onBlur={() => {
+              if (isInteractingWithSuggestionsRef.current) {
+                requestAnimationFrame(() => {
+                  inputRef.current?.focus();
+                  isInteractingWithSuggestionsRef.current = false;
+                });
+                return;
+              }
               // Small delay to allow click on suggestions
               setTimeout(() => {
                 setIsFocused(false);
@@ -1270,12 +1314,15 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                               {highlightedSuggestion.nodeName}
                             </span>
                           </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-500">ID</span>
-                            <span className="text-gray-400 truncate ml-2 max-w-[120px]">
-                              {highlightedSuggestion.nodeId}
-                            </span>
-                          </div>
+                          {highlightedSuggestion.nodeId &&
+                            highlightedSuggestion.nodeId !== highlightedSuggestion.nodeName && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">ID</span>
+                                <span className="text-gray-400 truncate ml-2 max-w-[120px]">
+                                  {highlightedSuggestion.nodeId}
+                                </span>
+                              </div>
+                            )}
                         </div>
                       </>
                     ) : /* Function suggestions */
@@ -1406,9 +1453,14 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                 >
                   {(() => {
                     const nodeDataSuggestions = suggestions.filter(
-                      (s) => s.label === "$" || s.nodeName || (s.kind !== "function" && s.kind !== "keyword"),
+                      (s) =>
+                        ["$", "root", "previous"].includes(s.label) ||
+                        s.nodeName ||
+                        (s.kind !== "function" && s.kind !== "keyword"),
                     );
-                    const functionSuggestions = suggestions.filter((s) => s.kind === "function");
+                    const functionSuggestions = suggestions.filter(
+                      (s) => s.kind === "function" && !["root", "previous"].includes(s.label),
+                    );
 
                     const renderSuggestionItem = (suggestionItem: Suggestion, index: number) => (
                       <div
@@ -1421,10 +1473,13 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                           highlightedIndex === index && "bg-gray-100 dark:bg-gray-700",
                         ])}
                         onMouseDown={(e) => {
+                          isInteractingWithSuggestionsRef.current = true;
                           e.preventDefault(); // Prevent blur on the input
+                          e.stopPropagation();
                           handleSuggestionClick(suggestionItem);
                         }}
-                        onMouseEnter={() => {
+                        onMouseEnter={(e) => {
+                          e.stopPropagation();
                           setHighlightedIndex(index);
                           setHighlightedSuggestion(suggestionItem);
                           if (exampleObj) {
@@ -1441,7 +1496,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                             {formatFunctionSignature(suggestionItem)}
                           </span>
                         )}
-                        {suggestionItem.label === "$" && (
+                        {["$", "root", "previous"].includes(suggestionItem.label) && (
                           <span className="flex-shrink-0 px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded">
                             event data
                           </span>

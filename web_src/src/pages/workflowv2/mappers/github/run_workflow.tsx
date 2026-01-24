@@ -66,7 +66,8 @@ export const runWorkflowStateFunction: StateFunction = (execution: WorkflowsWork
 
   if (
     execution.resultMessage &&
-    (execution.resultReason === "RESULT_REASON_ERROR" || execution.result === "RESULT_FAILED")
+    (execution.resultReason === "RESULT_REASON_ERROR" ||
+      (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
   ) {
     return "error";
   }
@@ -109,7 +110,7 @@ export const runWorkflowMapper: ComponentBaseMapper = {
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
     lastExecutions: WorkflowsWorkflowNodeExecution[],
-    nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
+    _nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
     return {
       title: node.name!,
@@ -117,8 +118,8 @@ export const runWorkflowMapper: ComponentBaseMapper = {
       iconColor: getColorClass(componentDefinition?.color!),
       collapsed: node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
-      eventSections: runWorkflowEventSections(nodes, lastExecutions[0], nodeQueueItems),
-      includeEmptyState: !hasExecutionOrQueueItems(lastExecutions[0], nodeQueueItems),
+      eventSections: runWorkflowEventSections(nodes, lastExecutions[0]),
+      includeEmptyState: !lastExecutions[0],
       metadata: runWorkflowMetadataList(node),
       specs: runWorkflowSpecs(node),
       eventStateMap: RUN_WORKFLOW_STATE_MAP,
@@ -202,19 +203,11 @@ function runWorkflowSpecs(node: ComponentsNode): ComponentBaseSpec[] {
   return specs;
 }
 
-function hasExecutionOrQueueItems(
-  execution: WorkflowsWorkflowNodeExecution,
-  nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
-): boolean {
-  return !!execution || (nodeQueueItems && nodeQueueItems.length > 0);
-}
-
 function runWorkflowEventSections(
   nodes: ComponentsNode[],
   execution: WorkflowsWorkflowNodeExecution,
-  nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
 ): EventSection[] | undefined {
-  if (!hasExecutionOrQueueItems(execution, nodeQueueItems)) {
+  if (!execution) {
     return undefined;
   }
 
@@ -233,24 +226,6 @@ function runWorkflowEventSections(
       eventTitle: title,
       eventState: runWorkflowStateFunction(execution),
     });
-  }
-
-  //
-  // If there are queue items, add section for next in queue.
-  //
-  if (nodeQueueItems && nodeQueueItems.length > 0) {
-    const queueItem = nodeQueueItems[nodeQueueItems.length - 1];
-    const rootTriggerNode = nodes.find((n) => n.id === queueItem.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-    if (queueItem.rootEvent) {
-      const { title } = rootTriggerRenderer.getTitleAndSubtitle(queueItem.rootEvent);
-      sections.push({
-        receivedAt: queueItem.createdAt ? new Date(queueItem.createdAt) : undefined,
-        eventTitle: title,
-        eventState: "next-in-queue" as const,
-      });
-    }
   }
 
   return sections;

@@ -40,3 +40,34 @@ func getDomainOrExit(client *openapi_client.APIClient, cmd *cobra.Command) (stri
 
 	return string(openapi_client.AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_ORGANIZATION), *response.OrganizationId
 }
+
+func findWorkflowIDByName(ctx context.Context, client *openapi_client.APIClient, name string) (string, error) {
+	response, _, err := client.WorkflowAPI.WorkflowsListWorkflows(ctx).Execute()
+	if err != nil {
+		return "", err
+	}
+
+	var matches []openapi_client.WorkflowsWorkflow
+	for _, workflow := range response.GetWorkflows() {
+		if workflow.Metadata == nil || workflow.Metadata.Name == nil {
+			continue
+		}
+		if *workflow.Metadata.Name == name {
+			matches = append(matches, workflow)
+		}
+	}
+
+	if len(matches) == 0 {
+		return "", fmt.Errorf("canvas %q not found", name)
+	}
+
+	if len(matches) > 1 {
+		return "", fmt.Errorf("multiple canvases named %q found", name)
+	}
+
+	if matches[0].Metadata == nil || matches[0].Metadata.Id == nil {
+		return "", fmt.Errorf("canvas %q is missing an id", name)
+	}
+
+	return *matches[0].Metadata.Id, nil
+}

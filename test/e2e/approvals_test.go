@@ -233,10 +233,7 @@ func (s *ApprovalSteps) waitForApprovalMetadata(nodeName string, approvedCount i
 }
 
 func (s *ApprovalSteps) assertNoApproveButtons() {
-	approveButtons := s.session.Page().Locator(`button:has-text("Approve")`)
-	count, err := approveButtons.Count()
-	require.NoError(s.t, err)
-	require.Equal(s.t, 0, count, "expected no approve buttons for current user")
+	s.session.AssertHidden(q.Locator(`button:has-text("Approve")`))
 }
 
 func (s *ApprovalSteps) assertApprovalExecutionFinishedAndOutputNodeProcessed() {

@@ -52,7 +52,7 @@ export function usePushThroughHandler({ workflowId, organizationId, workflow }: 
     (nodeId: string) => {
       const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
       const name = node?.component?.name;
-      return name === "wait" || name === "time_gate";
+      return name === "wait" || name === "timeGate";
     },
     [workflow],
   );

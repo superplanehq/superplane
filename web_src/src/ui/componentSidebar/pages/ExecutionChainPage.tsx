@@ -18,14 +18,14 @@ import { getExecutionDetails } from "@/pages/workflowv2/mappers";
 function buildExecutionTabData(
   execution: WorkflowsWorkflowNodeExecution,
   workflowNode: ComponentsNode,
-  _workflowNodes: ComponentsNode[],
+  workflowNodes: ComponentsNode[],
 ): { current?: Record<string, any>; payload?: any } {
   const tabData: { current?: Record<string, any>; payload?: any } = {};
 
   let currentData: Record<string, any> = {};
 
   if (workflowNode?.component?.name) {
-    const customDetails = getExecutionDetails(workflowNode.component.name, execution, workflowNode);
+    const customDetails = getExecutionDetails(workflowNode.component.name, execution, workflowNode, workflowNodes);
     if (customDetails && Object.keys(customDetails).length > 0) {
       currentData = { ...customDetails };
     }

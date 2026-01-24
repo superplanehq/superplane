@@ -360,7 +360,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         <div
           className={`uppercase text-[11px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-white ${EventBadgeColor}`}
         >
-          <span>{event.state || "neutral"}</span>
+          <span>{eventStateStyle.label || event.state || "neutral"}</span>
         </div>
         {event.subtitle && (
           <span className="text-[13px] font-medium truncate flex-shrink-0 max-w-[65%] text-gray-950/50">

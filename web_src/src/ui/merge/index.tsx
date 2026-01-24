@@ -1,4 +1,4 @@
-import { ComponentBase, type EventSection } from "../componentBase";
+import { ComponentBase, type EventSection, type EventStateMap } from "../componentBase";
 import { ComponentActionsProps } from "../types/componentActions";
 
 export interface MergeComponentProps extends ComponentActionsProps {
@@ -12,6 +12,7 @@ export interface MergeComponentProps extends ComponentActionsProps {
   collapsed?: boolean;
   selected?: boolean;
   collapsedBackground?: string;
+  eventStateMap?: EventStateMap;
 }
 
 export const MergeComponent: React.FC<MergeComponentProps> = ({
@@ -21,6 +22,7 @@ export const MergeComponent: React.FC<MergeComponentProps> = ({
   collapsed = false,
   selected = false,
   collapsedBackground,
+  eventStateMap,
   onRun,
   runDisabled,
   runDisabledTooltip,
@@ -55,6 +57,7 @@ export const MergeComponent: React.FC<MergeComponentProps> = ({
       collapsed={collapsed}
       collapsedBackground={collapsedBackground}
       selected={selected}
+      eventStateMap={eventStateMap}
       onRun={onRun}
       runDisabled={runDisabled}
       runDisabledTooltip={runDisabledTooltip}

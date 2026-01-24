@@ -188,6 +188,18 @@ service Workflows {
     };
   }
 
+  rpc ResolveExecutionErrors(ResolveExecutionErrorsRequest) returns (ResolveExecutionErrorsResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/workflows/{workflow_id}/executions/resolve"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Resolve execution errors";
+      description: "Marks workflow node execution errors as resolved";
+      tags: "WorkflowNodeExecution";
+    };
+  }
+
   rpc ListWorkflowEvents(ListWorkflowEventsRequest) returns (ListWorkflowEventsResponse) {
     option (google.api.http) = {
       get: "/api/v1/workflows/{workflow_id}/events"
@@ -373,6 +385,7 @@ message WorkflowNodeExecution {
   enum ResultReason {
     RESULT_REASON_OK = 0;
     RESULT_REASON_ERROR = 1;
+    RESULT_REASON_ERROR_RESOLVED = 2;
   }
 
   string id = 1;
@@ -473,6 +486,13 @@ message CancelExecutionRequest {
 }
 
 message CancelExecutionResponse {}
+
+message ResolveExecutionErrorsRequest {
+  string workflow_id = 1;
+  repeated string execution_ids = 2;
+}
+
+message ResolveExecutionErrorsResponse {}
 
 //
 // Standalone messages
