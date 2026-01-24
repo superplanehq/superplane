@@ -70,6 +70,28 @@ func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 	s.session.Sleep(1000)
 }
 
+// AddNoopWithDefaultName adds a noop node using the auto-generated name and returns that name.
+func (s *CanvasSteps) AddNoopWithDefaultName(pos models.Position) string {
+	s.OpenBuildingBlocksSidebar()
+
+	source := q.TestID("building-block-noop")
+	target := q.TestID("rf__wrapper")
+
+	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.session.Sleep(500)
+
+	// Get the auto-generated name from the input field
+	nameInput := q.TestID("node-name-input")
+	loc := nameInput.Run(s.session)
+	generatedName, err := loc.InputValue()
+	require.NoError(s.t, err)
+
+	s.session.Click(q.TestID("save-node-button"))
+	s.session.Sleep(1000)
+
+	return generatedName
+}
+
 func (s *CanvasSteps) Save() {
 	saveButton := q.TestID("save-canvas-button")
 	loc := saveButton.Run(s.session)

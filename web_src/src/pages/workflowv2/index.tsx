@@ -77,6 +77,7 @@ import {
   buildCanvasStatusLogEntry,
   buildTabData,
   generateNodeId,
+  generateUniqueNodeName,
   getNextInQueueInfo,
   mapCanvasNodesToLogEntries,
   mapExecutionsToSidebarEvents,
@@ -1595,18 +1596,24 @@ export function WorkflowPageV2() {
       // Save snapshot before making changes
       saveWorkflowSnapshot(workflow);
 
-      const { buildingBlock, nodeName, configuration, position, sourceConnection, appInstallationRef } = newNodeData;
+      const { buildingBlock, configuration, position, sourceConnection, appInstallationRef } = newNodeData;
 
       // Filter configuration to only include visible fields
       const filteredConfiguration = filterVisibleConfiguration(configuration, buildingBlock.configuration || []);
 
+      // Get existing node names for unique name generation
+      const existingNodeNames = (workflow.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
+
+      // Generate unique node name based on component name + ordinal
+      const uniqueNodeName = generateUniqueNodeName(buildingBlock.name || "node", existingNodeNames);
+
       // Generate a unique node ID
-      const newNodeId = generateNodeId(buildingBlock.name || "node", nodeName.trim());
+      const newNodeId = generateNodeId(buildingBlock.name || "node", uniqueNodeName);
 
       // Create the new node
       const newNode: ComponentsNode = {
         id: newNodeId,
-        name: nodeName.trim(),
+        name: uniqueNodeName,
         type:
           buildingBlock.type === "trigger"
             ? "TYPE_TRIGGER"
@@ -1776,10 +1783,19 @@ export function WorkflowPageV2() {
         data.buildingBlock.configuration || [],
       );
 
+      // Get existing node names for unique name generation (exclude the placeholder being configured)
+      const existingNodeNames = (workflow.spec?.nodes || [])
+        .filter((n) => n.id !== data.placeholderId)
+        .map((n) => n.name || "")
+        .filter(Boolean);
+
+      // Generate unique node name based on component name + ordinal
+      const uniqueNodeName = generateUniqueNodeName(data.buildingBlock.name || "node", existingNodeNames);
+
       // Update placeholder with real component data
       const updatedNode: ComponentsNode = {
         ...workflow.spec!.nodes![nodeIndex],
-        name: data.nodeName.trim(),
+        name: uniqueNodeName,
         type:
           data.buildingBlock.type === "trigger"
             ? "TYPE_TRIGGER"
@@ -2243,7 +2259,13 @@ export function WorkflowPageV2() {
         blockName = blueprintMetadata?.name || "blueprint";
       }
 
-      const newNodeId = generateNodeId(blockName, nodeToDuplicate.name || "node");
+      // Get existing node names for unique name generation
+      const existingNodeNames = (workflow.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
+
+      // Generate unique node name based on component name + ordinal
+      const uniqueNodeName = generateUniqueNodeName(blockName, existingNodeNames);
+
+      const newNodeId = generateNodeId(blockName, uniqueNodeName);
 
       const offsetX = 50;
       const offsetY = 50;
@@ -2251,7 +2273,7 @@ export function WorkflowPageV2() {
       const duplicateNode: ComponentsNode = {
         ...nodeToDuplicate,
         id: newNodeId,
-        name: nodeToDuplicate.name || "node",
+        name: uniqueNodeName,
         position: {
           x: (nodeToDuplicate.position?.x || 0) + offsetX,
           y: (nodeToDuplicate.position?.y || 0) + offsetY,
