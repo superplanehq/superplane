@@ -89,7 +89,7 @@ const OrganizationSelect: React.FC = () => {
     <div className="min-h-screen bg-slate-100 dark:bg-neutral-900">
       <div className="p-8">
         <div className="flex mb-4">
-          <img src={SuperplaneLogo} alt="Superplane" className="h-6" />
+          <img src={SuperplaneLogo} alt="Superplane" className="h-6 dark:invert" />
         </div>
         <div className="max-w-7xl w-full">
           <div className="mb-6">
