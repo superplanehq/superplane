@@ -3,6 +3,27 @@ import { twMerge } from "tailwind-merge";
 import { Puzzle, type LucideIcon } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 
+import dash0Icon from "@/assets/icons/integrations/dash0.svg";
+import githubIcon from "@/assets/icons/integrations/github.svg";
+import openAiIcon from "@/assets/icons/integrations/openai.svg";
+import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import slackIcon from "@/assets/icons/integrations/slack.svg";
+import smtpIcon from "@/assets/icons/integrations/smtp.svg";
+import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+
+export const APP_LOGO_MAP: Record<string, string> = {
+  dash0: dash0Icon,
+  github: githubIcon,
+  openai: openAiIcon,
+  "open-ai": openAiIcon,
+  pagerduty: pagerDutyIcon,
+  semaphore: SemaphoreLogo,
+  slack: slackIcon,
+  smtp: smtpIcon,
+};
+
+export const DARK_ICONS_NEEDING_INVERT = ["github", "openai", "open-ai", "semaphore", "smtp"];
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }

@@ -9,7 +9,6 @@ import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/compon
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import { MetadataItem } from "@/ui/metadataList";
-import smtpIcon from "@/assets/icons/integrations/smtp.svg";
 import { formatTimeAgo } from "@/utils/date";
 
 interface SendEmailConfiguration {
@@ -37,7 +36,7 @@ export const sendEmailMapper: ComponentBaseMapper = {
 
     return {
       title: node.name!,
-      iconSrc: smtpIcon,
+      appName: "smtp",
       iconSlug: "smtp",
       iconColor: getColorClass(componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(componentDefinition.color),

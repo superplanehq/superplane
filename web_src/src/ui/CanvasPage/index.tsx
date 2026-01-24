@@ -15,6 +15,7 @@ import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTheme } from "@/hooks/useTheme";
 
 import {
   ComponentsAppInstallationRef,
@@ -1049,13 +1050,13 @@ function Sidebar({
 
     return (
       <div
-        className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white"
+        className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white dark:bg-gray-900"
         style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
       >
         <div className="flex items-center justify-center h-full">
           <div className="flex flex-col items-center gap-3">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-            <p className="text-sm text-gray-500">Loading events...</p>
+            <Loader2 className="h-8 w-8 animate-spin text-gray-500 dark:text-gray-400" />
+            <p className="text-sm text-gray-500 dark:text-gray-400">Loading events...</p>
           </div>
         </div>
       </div>
@@ -1306,6 +1307,7 @@ function CanvasContent({
   initialFocusNodeId?: string | null;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
+  const { isDark } = useTheme();
 
   // Determine selection key code to support both Control (Windows/Linux) and Meta (Mac)
   // Similar to existing keyboard shortcuts that check (e.ctrlKey || e.metaKey)
@@ -1968,7 +1970,7 @@ function CanvasContent({
             style={{ opacity: isInitialized ? 1 : 0 }}
             className="h-full w-full"
           >
-            <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
+            <Background gap={8} size={2} bgColor={isDark ? "#171717" : "#F1F5F9"} color={isDark ? "#262626" : "#d9d9d9ff"} />
             <ZoomSlider
               position="bottom-left"
               orientation="horizontal"
@@ -2011,7 +2013,7 @@ function CanvasContent({
             </ZoomSlider>
             <Panel
               position="bottom-left"
-              className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8"
+              className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 outline-1 outline-slate-950/20 dark:outline-gray-600 flex items-center gap-1 rounded-md p-0.5 h-8"
               style={{ marginLeft: 300 }}
             >
               <Tooltip>
@@ -2035,8 +2037,8 @@ function CanvasContent({
                     className="h-8 items-center text-xs font-medium"
                     onClick={() => handleLogButtonClick("error")}
                   >
-                    <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"} />
-                    <span className={logCounts.error > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"}>
+                    <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800 dark:text-gray-200"} />
+                    <span className={logCounts.error > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800 dark:text-gray-200"}>
                       {logCounts.error}
                     </span>
                   </Button>
@@ -2052,10 +2054,10 @@ function CanvasContent({
                     onClick={() => handleLogButtonClick("warning")}
                   >
                     <TriangleAlert
-                      className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800"}
+                      className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800 dark:text-gray-200"}
                     />
                     <span
-                      className={logCounts.warning > 0 ? "tabular-nums text-orange-500" : "tabular-nums text-gray-800"}
+                      className={logCounts.warning > 0 ? "tabular-nums text-orange-500" : "tabular-nums text-gray-800 dark:text-gray-200"}
                     >
                       {logCounts.warning}
                     </span>

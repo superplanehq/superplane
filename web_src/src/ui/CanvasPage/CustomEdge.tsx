@@ -74,8 +74,8 @@ export function CustomEdge({
           }}
           className="edge-label nodrag nopan flex items-center justify-center"
         >
-          <div className="rounded-full bg-slate-100 p-1">
-            <CircleX size={18} className="text-slate-500" />
+          <div className="rounded-full bg-slate-100 dark:bg-gray-700 p-1">
+            <CircleX size={18} className="text-slate-500 dark:text-gray-400" />
           </div>
         </div>
       </EdgeLabelRenderer>
