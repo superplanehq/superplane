@@ -216,6 +216,7 @@ func (s *MergeTestSteps) CreateWorkflow() {
 	n1 := &models.WorkflowNode{
 		WorkflowID: wf.ID,
 		NodeID:     "start-node",
+		Name:       "start-node",
 		Type:       models.NodeTypeComponent,
 		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "start"}}),
 	}
@@ -224,6 +225,7 @@ func (s *MergeTestSteps) CreateWorkflow() {
 	n2 := &models.WorkflowNode{
 		WorkflowID: wf.ID,
 		NodeID:     "process-1",
+		Name:       "process-1",
 		Type:       models.NodeTypeComponent,
 		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "process-1"}}),
 	}
@@ -232,6 +234,7 @@ func (s *MergeTestSteps) CreateWorkflow() {
 	n3 := &models.WorkflowNode{
 		WorkflowID: wf.ID,
 		NodeID:     "process-3",
+		Name:       "process-3",
 		Type:       models.NodeTypeComponent,
 		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "process-2"}}),
 	}
@@ -240,6 +243,7 @@ func (s *MergeTestSteps) CreateWorkflow() {
 	n4 := &models.WorkflowNode{
 		WorkflowID: wf.ID,
 		NodeID:     "merge-node",
+		Name:       "merge-node",
 		Type:       models.NodeTypeComponent,
 		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "merge"}}),
 	}
@@ -287,6 +291,7 @@ func (s *MergeTestSteps) CreateWorkflowSingleSourceMultipleEdges() {
 	n1 := &models.WorkflowNode{
 		WorkflowID: wf.ID,
 		NodeID:     "start-node",
+		Name:       "start-node",
 		Type:       models.NodeTypeComponent,
 		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "start"}}),
 	}
@@ -295,6 +300,7 @@ func (s *MergeTestSteps) CreateWorkflowSingleSourceMultipleEdges() {
 	n2 := &models.WorkflowNode{
 		WorkflowID: wf.ID,
 		NodeID:     "process-1",
+		Name:       "process-1",
 		Type:       models.NodeTypeComponent,
 		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "process-1"}}),
 	}
@@ -303,6 +309,7 @@ func (s *MergeTestSteps) CreateWorkflowSingleSourceMultipleEdges() {
 	n4 := &models.WorkflowNode{
 		WorkflowID: wf.ID,
 		NodeID:     "merge-node",
+		Name:       "merge-node",
 		Type:       models.NodeTypeComponent,
 		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "merge"}}),
 	}
