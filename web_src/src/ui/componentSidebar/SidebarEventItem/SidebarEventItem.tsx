@@ -336,7 +336,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
     <div
       key={event.title + index}
       className={
-        `cursor-pointer p-2 relative rounded-md border-1 border-slate-950/20 hover:translate-x-1 transition-transform duration-200 ${EventBackground}` +
+        `cursor-pointer p-2 relative rounded-md border-1 border-slate-950/20 dark:border-gray-600 hover:translate-x-1 transition-transform duration-200 ${EventBackground}` +
         (totalItems && index < totalItems - 1 ? " mb-4" : "")
       }
       data-testid="sidebar-event-item"
@@ -363,7 +363,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
           <span>{eventStateStyle.label || event.state || "neutral"}</span>
         </div>
         {event.subtitle && (
-          <span className="text-[13px] font-medium truncate flex-shrink-0 max-w-[65%] text-gray-950/50">
+          <span className="text-[13px] font-medium truncate flex-shrink-0 max-w-[65%] text-gray-950/50 dark:text-gray-400">
             {event.subtitle}
           </span>
         )}
@@ -373,9 +373,9 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       <div className="flex items-center mt-1 gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
           {event.triggerEventId && (
-            <span className="text-[13px] text-gray-950/50 font-mono">#{event.triggerEventId.slice(0, 4)}</span>
+            <span className="text-[13px] text-gray-950/50 dark:text-gray-400 font-mono">#{event.triggerEventId.slice(0, 4)}</span>
           )}
-          <span className="text-sm text-gray-800 font-inter truncate text-md min-w-0 font-medium">{event.title}</span>
+          <span className="text-sm text-gray-800 dark:text-gray-200 font-inter truncate text-md min-w-0 font-medium">{event.title}</span>
         </div>
       </div>
 
@@ -383,7 +383,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       {showActionsMenu && (isHovered || isDropdownOpen) && (
         <div className="absolute top-0 right-0 h-full flex items-center bg-transparent">
           <div
-            className="h-full bg-white/50 backdrop-blur-[3px] rounded-r-md shadow-sm p-1 pt-2"
+            className="h-full bg-white/50 dark:bg-gray-800/50 backdrop-blur-[3px] rounded-r-md shadow-sm p-1 pt-2"
             onClick={(e) => e.stopPropagation()}
           >
             <SidebarEventActionsMenu

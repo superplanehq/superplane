@@ -91,7 +91,7 @@ export function Profile() {
       </Heading>
       <div className="space-y-6">
         {/* Profile Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-neutral-800 rounded-lg border border-gray-300 dark:border-neutral-700 p-6">
           <div className="space-y-6">
             {/* User Avatar and Basic Info */}
             <div className="flex items-center space-x-4">
@@ -136,7 +136,7 @@ export function Profile() {
         </Text>
 
         {/* API Token Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-neutral-800 rounded-lg border border-gray-300 dark:border-neutral-700 p-6">
           <div className="space-y-4">
             {/* Token Status */}
             {!user.hasToken && (
@@ -167,7 +167,7 @@ export function Profile() {
                     type={tokenVisible ? "text" : "password"}
                     value={token}
                     readOnly
-                    className="flex-1 font-mono text-sm bg-gray-50 dark:bg-gray-900"
+                    className="flex-1 font-mono text-sm bg-gray-50 dark:bg-neutral-900"
                   />
                   <Button
                     variant="outline"

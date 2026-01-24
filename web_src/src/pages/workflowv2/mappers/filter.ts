@@ -23,14 +23,14 @@ export const FILTER_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   passed: {
     icon: "circle-check",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-green-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-green-100 dark:bg-green-900/50",
     badgeColor: "bg-emerald-500",
   },
   rejected: {
     icon: "circle-x",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-gray-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-gray-100 dark:bg-gray-700",
     badgeColor: "bg-gray-500",
   },
 };

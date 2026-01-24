@@ -8,7 +8,6 @@ import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import { ComponentBaseMapper, OutputPayload } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
-import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import { QueryPrometheusConfiguration } from "./types";
 import { formatTimeAgo } from "@/utils/date";
 
@@ -24,7 +23,7 @@ export const queryPrometheusMapper: ComponentBaseMapper = {
     const componentName = componentDefinition.name!;
 
     return {
-      iconSrc: dash0Icon,
+      appName: "dash0",
       collapsedBackground: "bg-white",
       collapsed: node.isCollapsed,
       title: node.name!,

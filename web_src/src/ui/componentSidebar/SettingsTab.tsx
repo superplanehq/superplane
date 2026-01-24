@@ -260,7 +260,7 @@ export function SettingsTab({
             {availableInstallations.length === 0 ? (
               // Warning when no installations available
               <Alert className="bg-orange-50 dark:bg-amber-950">
-                <AlertTriangle className="h-4 w-4" />
+                <AlertTriangle className="h-4 w-4 text-amber-900 dark:text-amber-100" />
                 <AlertTitle className="text-amber-900 dark:text-amber-100">App Installation Required</AlertTitle>
                 <AlertDescription className="text-amber-900 dark:text-amber-200">
                   This component requires a {appName} installation.{" "}

@@ -29,7 +29,7 @@ export interface ChildEventsProps {
 
 export const ChildEvents: React.FC<ChildEventsProps> = ({
   childEventsInfo,
-  className = "mt-1 ml-3 text-gray-500",
+  className = "mt-1 ml-3 text-gray-500 dark:text-gray-400",
   onReRunChildEvents,
   onExpandChildEvents,
   showItems = true,
@@ -49,7 +49,7 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
     <div className={className}>
       <div className="flex items-center justify-between gap-2">
         <div className={"flex items-center gap-2 w-full"}>
-          <ChildEventsArrowIcon size={18} className="text-gray-500" />
+          <ChildEventsArrowIcon size={18} className="text-gray-500 dark:text-gray-400" />
           <span className="text-sm">
             {childEventsInfo.count} child event{childEventsInfo.count === 1 ? "" : "s"} {childEventsInfo.state || ""}
           </span>
@@ -58,7 +58,7 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
           {onExpandChildEvents && (
             <ExpandIcon
               size={16}
-              className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer mt-1"
+              className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:scale-110 cursor-pointer mt-1"
               data-testid="expand-run-button"
               onClick={(e) => {
                 e.stopPropagation();
@@ -69,7 +69,7 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
           {onReRunChildEvents && (
             <ReRunChildEventsIcon
               size={18}
-              className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer"
+              className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:scale-110 cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
                 onReRunChildEvents(childEventsInfo);
@@ -79,7 +79,7 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
         </div>
       </div>
       {showItems && childEventsInfo.items && childEventsInfo.items.length > 0 && (
-        <div className="flex flex-col items-start justify-between pl-7 py-1 text-gray-500 w-full">
+        <div className="flex flex-col items-start justify-between pl-7 py-1 text-gray-500 dark:text-gray-400 w-full">
           {childEventsInfo.items.map((item, idx) => {
             const Icon =
               item.state === "processed"
@@ -89,10 +89,10 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
                   : resolveIcon("clock");
             const colorClass =
               item.state === "processed"
-                ? "text-green-700"
+                ? "text-green-700 dark:text-green-400"
                 : item.state === "discarded"
-                  ? "text-red-700"
-                  : "text-blue-800";
+                  ? "text-red-700 dark:text-red-400"
+                  : "text-blue-800 dark:text-blue-400";
 
             return (
               <div key={`${item.label}-${idx}`} className="flex justify-between items-center gap-3 py-1 w-full">
@@ -106,7 +106,7 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
         </div>
       )}
       {showItems && childEventsInfo.waitingInfos && childEventsInfo.waitingInfos.length > 0 && (
-        <div className="flex flex-col items-center justify-between pl-2 py-1 text-gray-500 w-full">
+        <div className="flex flex-col items-center justify-between pl-2 py-1 text-gray-500 dark:text-gray-400 w-full">
           {childEventsInfo.waitingInfos.map((waitingInfo) => {
             const Icon = resolveIcon(waitingInfo.icon);
             return (
@@ -115,7 +115,7 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
                 className="flex justify-between items-center gap-3 pl-2 py-1 rounded-md w-full"
               >
                 <span className="text-sm text-right flex items-center gap-2">
-                  <Icon size={18} className="text-gray-500" />
+                  <Icon size={18} className="text-gray-500 dark:text-gray-400" />
                   {waitingInfo.info}
                 </span>
               </div>
