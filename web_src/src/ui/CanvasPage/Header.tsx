@@ -109,7 +109,7 @@ export function Header({
 
   return (
     <>
-      <header className="bg-white border-b border-slate-950/15">
+      <header className="bg-white dark:bg-neutral-900 border-b border-slate-950/15 dark:border-neutral-700">
         <div className="relative flex items-center justify-between h-12 px-4">
           <div className="flex items-center gap-3">
             <OrganizationMenuButton organizationId={organizationId} onLogoClick={onLogoClick} />
@@ -124,30 +124,30 @@ export function Header({
                   aria-expanded={isMenuOpen}
                   disabled={workflowsLoading}
                 >
-                  <span className="text-sm text-gray-800 font-medium">
+                  <span className="text-sm text-gray-800 dark:text-gray-200 font-medium">
                     {currentWorkflowName || (workflowsLoading ? "Loading..." : "Select canvas")}
                   </span>
                   <ChevronDown
                     size={16}
-                    className={`text-gray-400 transition-transform ${isMenuOpen ? "rotate-180" : ""}`}
+                    className={`text-gray-400 dark:text-gray-500 transition-transform ${isMenuOpen ? "rotate-180" : ""}`}
                   />
                 </button>
                 {isMenuOpen && !workflowsLoading && (
-                  <div className="absolute left-0 top-13 z-50 min-w-[15rem] w-max rounded-md outline outline-slate-950/20 bg-white shadow-lg">
+                  <div className="absolute left-0 top-13 z-50 min-w-[15rem] w-max rounded-md outline outline-slate-950/20 dark:outline-neutral-700 bg-white dark:bg-neutral-800 shadow-lg">
                     <div className="px-4 pt-3 pb-4">
                       {/* All Canvases Link */}
                       <div className="mb-2">
                         <a
                           href={organizationId ? `/${organizationId}` : "/"}
-                          className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:text-gray-800"
+                          className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
                           onClick={() => setIsMenuOpen(false)}
                         >
-                          <Home size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                          <Home size={16} className="text-gray-500 dark:text-gray-400 transition group-hover:text-gray-800 dark:group-hover:text-gray-200" />
                           <span>All Canvases</span>
                         </a>
                       </div>
                       {/* Divider */}
-                      <div className="border-b border-gray-300 mb-2"></div>
+                      <div className="border-b border-gray-300 dark:border-neutral-600 mb-2"></div>
                       {/* Canvas List */}
                       <div className="mt-2 flex flex-col">
                         {workflows.map((workflow) => {
@@ -159,12 +159,12 @@ export function Header({
                               onClick={() => handleWorkflowClick(workflow.metadata?.id || "")}
                               className={`group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-left ${
                                 isSelected
-                                  ? "bg-sky-100 text-gray-800"
-                                  : "text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+                                  ? "bg-sky-100 dark:bg-sky-900/30 text-gray-800 dark:text-gray-200"
+                                  : "text-gray-500 dark:text-gray-400 hover:bg-sky-100 dark:hover:bg-sky-900/30 hover:text-gray-800 dark:hover:text-gray-200"
                               }`}
                             >
                               {isSelected ? (
-                                <Palette size={16} className="text-gray-800 transition group-hover:text-gray-800" />
+                                <Palette size={16} className="text-gray-800 dark:text-gray-200 transition group-hover:text-gray-800 dark:group-hover:text-gray-200" />
                               ) : (
                                 <span className="w-4" />
                               )}
@@ -216,13 +216,13 @@ export function Header({
               </Select>
             )}
             {unsavedMessage && (
-              <span className="text-xs font-medium text-yellow-700 bg-orange-100 px-2 py-1 rounded hidden sm:inline">
+              <span className="text-xs font-medium text-yellow-700 dark:text-yellow-400 bg-orange-100 dark:bg-orange-900/30 px-2 py-1 rounded hidden sm:inline">
                 {unsavedMessage}
               </span>
             )}
             {onToggleAutoSave && (
               <div className="flex items-center gap-2">
-                <label htmlFor="auto-save-toggle" className="text-sm text-gray-800 hidden sm:inline">
+                <label htmlFor="auto-save-toggle" className="text-sm text-gray-800 dark:text-gray-200 hidden sm:inline">
                   Auto-save
                 </label>
                 <Switch id="auto-save-toggle" checked={isAutoSaveEnabled} onCheckedChange={onToggleAutoSave} />
