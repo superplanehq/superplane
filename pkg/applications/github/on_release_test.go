@@ -174,4 +174,38 @@ func Test__OnRelease__Setup(t *testing.T) {
 		assert.Equal(t, webhookRequest.EventType, "release")
 		assert.Equal(t, webhookRequest.Repository, "hello")
 	})
+
+	t.Run("metadata is updated when repository changes", func(t *testing.T) {
+		worldRepo := Repository{ID: 654321, Name: "world", URL: "https://github.com/testhq/world"}
+		appCtx := &contexts.AppInstallationContext{
+			Metadata: Metadata{
+				Repositories: []Repository{helloRepo, worldRepo},
+			},
+		}
+
+		nodeMetadataCtx := contexts.MetadataContext{}
+
+		// First setup with hello repository
+		require.NoError(t, trigger.Setup(core.TriggerContext{
+			AppInstallation: appCtx,
+			Metadata:        &nodeMetadataCtx,
+			Configuration:   map[string]any{"repository": "hello"},
+		}))
+		require.Equal(t, nodeMetadataCtx.Get(), NodeMetadata{Repository: &helloRepo})
+
+		// Update configuration to use world repository
+		require.NoError(t, trigger.Setup(core.TriggerContext{
+			AppInstallation: appCtx,
+			Metadata:        &nodeMetadataCtx,
+			Configuration:   map[string]any{"repository": "world"},
+		}))
+
+		// Verify metadata was updated to world repository
+		require.Equal(t, nodeMetadataCtx.Get(), NodeMetadata{Repository: &worldRepo})
+		require.Len(t, appCtx.WebhookRequests, 2)
+
+		webhookRequest := appCtx.WebhookRequests[1].(WebhookConfiguration)
+		assert.Equal(t, webhookRequest.EventType, "release")
+		assert.Equal(t, webhookRequest.Repository, "world")
+	})
 }
