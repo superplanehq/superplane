@@ -7,7 +7,6 @@ import {
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import githubIcon from "@/assets/icons/integrations/github.svg";
 import { MetadataItem } from "@/ui/metadataList";
 import { OutputPayload, ComponentBaseMapper } from "../types";
 import { Issue } from "./types";
@@ -51,7 +50,7 @@ export function baseProps(
   const componentName = componentDefinition.name!;
 
   return {
-    iconSrc: githubIcon,
+    appName: "github",
     iconColor: getColorClass(componentDefinition.color),
     collapsedBackground: getBackgroundColorClass(componentDefinition.color),
     collapsed: node.isCollapsed,

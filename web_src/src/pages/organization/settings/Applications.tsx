@@ -1,4 +1,4 @@
-import { AppWindow, Loader2 } from "lucide-react";
+import { AppWindow, Loader2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
@@ -10,18 +10,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ConfigurationFieldRenderer } from "../../../ui/configurationFieldRenderer";
 import type { ApplicationsApplicationDefinition } from "../../../api-client/types.gen";
-import { resolveIcon } from "@/lib/utils";
+import { resolveIcon, APP_LOGO_MAP, DARK_ICONS_NEEDING_INVERT } from "@/lib/utils";
 import { getApiErrorMessage } from "@/utils/errors";
-import { Icon } from "@/components/Icon";
-import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import githubIcon from "@/assets/icons/integrations/github.svg";
-import openAiIcon from "@/assets/icons/integrations/openai.svg";
-import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
-import slackIcon from "@/assets/icons/integrations/slack.svg";
-import smtpIcon from "@/assets/icons/integrations/smtp.svg";
-import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 interface ApplicationsProps {
   organizationId: string;
@@ -42,23 +35,14 @@ export function Applications({ organizationId }: ApplicationsProps) {
   const selectedInstructions = useMemo(() => {
     return selectedApplication?.installationInstructions?.trim();
   }, [selectedApplication?.installationInstructions]);
-  const appLogoMap: Record<string, string> = {
-    dash0: dash0Icon,
-    github: githubIcon,
-    openai: openAiIcon,
-    "open-ai": openAiIcon,
-    pagerduty: pagerDutyIcon,
-    semaphore: SemaphoreLogo,
-    slack: slackIcon,
-    smtp: smtpIcon,
-  };
 
   const renderAppIcon = (slug: string | undefined, appName: string | undefined, className: string) => {
-    const logo = appName ? appLogoMap[appName] : undefined;
+    const logo = appName ? APP_LOGO_MAP[appName] : undefined;
     if (logo) {
+      const needsInvert = appName && DARK_ICONS_NEEDING_INVERT.includes(appName);
       return (
         <span className={className}>
-          <img src={logo} alt="" className="h-full w-full object-contain" />
+          <img src={logo} alt="" className={`h-full w-full object-contain ${needsInvert ? "dark:invert" : ""}`} />
         </span>
       );
     }
@@ -141,14 +125,14 @@ export function Applications({ organizationId }: ApplicationsProps) {
                 return (
                   <div
                     key={app.metadata?.id}
-                    className="bg-white border border-gray-300 dark:border-gray-700 rounded-md p-4 flex items-start justify-between gap-4"
+                    className="bg-white dark:bg-neutral-800 border border-gray-300 dark:border-neutral-700 rounded-md p-4 flex items-start justify-between gap-4"
                   >
                     <div className="flex items-start gap-3">
                       <div className="mt-0.5 flex h-4 w-4 items-center justify-center">
                         {renderAppIcon(appDefinition?.icon, appName, "w-4 h-4 text-gray-500 dark:text-gray-400")}
                       </div>
                       <div>
-                        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                        <h3 className="text-sm font-semibold text-gray-800 dark:text-white">
                           {appLabel || app.metadata?.name || app.spec?.appName}
                         </h3>
                         {appDefinition?.description ? (
@@ -207,14 +191,14 @@ export function Applications({ organizationId }: ApplicationsProps) {
                   return (
                     <div
                       key={app.name}
-                      className="bg-white border border-gray-300 dark:border-gray-700 rounded-md p-4 flex items-start justify-between gap-4"
+                      className="bg-white dark:bg-neutral-800 border border-gray-300 dark:border-neutral-700 rounded-md p-4 flex items-start justify-between gap-4"
                     >
                       <div className="flex items-start gap-3">
                         <div className="mt-0.5 flex h-4 w-4 items-center justify-center">
                           {renderAppIcon(app.icon, appName, "w-4 h-4 text-gray-500 dark:text-gray-400")}
                         </div>
                         <div>
-                          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                          <h3 className="text-sm font-semibold text-gray-800 dark:text-white">
                             {app.label || app.name}
                           </h3>
                           {app.description ? (
@@ -239,109 +223,102 @@ export function Applications({ organizationId }: ApplicationsProps) {
       </div>
 
       {/* Install Modal */}
-      {isModalOpen &&
-        selectedApplication &&
-        (() => {
-          const appName = selectedApplication.name;
-          return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-              <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                      {renderAppIcon(selectedApplication.icon, appName, "w-6 h-6 text-gray-500 dark:text-gray-400")}
-                      <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">
-                        Install {selectedApplication.label || selectedApplication.name}
-                      </h3>
-                    </div>
-                    <button
-                      onClick={handleCloseModal}
-                      className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
-                      disabled={installMutation.isPending}
-                    >
-                      <Icon name="x" size="sm" />
-                    </button>
+      <Dialog open={isModalOpen && !!selectedApplication} onOpenChange={(open) => !open && handleCloseModal()}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" showCloseButton={false}>
+          {selectedApplication && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {renderAppIcon(selectedApplication.icon, selectedApplication.name, "w-6 h-6 text-muted-foreground")}
+                    <DialogTitle>Install {selectedApplication.label || selectedApplication.name}</DialogTitle>
                   </div>
-
-                  <div className="space-y-4">
-                    {selectedInstructions && (
-                      <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-100 [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:space-y-1">
-                        <ReactMarkdown>{selectedInstructions}</ReactMarkdown>
-                      </div>
-                    )}
-                    {/* Installation Name Field */}
-                    <div>
-                      <Label className="text-gray-800 dark:text-gray-100 mb-2">
-                        Installation Name
-                        <span className="text-gray-800 ml-1">*</span>
-                      </Label>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                        A unique name for this installation
-                      </p>
-                      <Input
-                        type="text"
-                        value={installationName}
-                        onChange={(e) => setInstallationName(e.target.value)}
-                        placeholder="e.g., my-app-integration"
-                        required
-                      />
-                    </div>
-
-                    {/* Configuration Fields */}
-                    {selectedApplication.configuration && selectedApplication.configuration.length > 0 && (
-                      <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
-                        {selectedApplication.configuration.map((field) => {
-                          if (!field.name) return null;
-                          return (
-                            <ConfigurationFieldRenderer
-                              key={field.name}
-                              field={field}
-                              value={configuration[field.name]}
-                              onChange={(value) => handleConfigurationChange(field.name || "", value)}
-                              allValues={configuration}
-                              domainId={organizationId}
-                              domainType="DOMAIN_TYPE_ORGANIZATION"
-                              organizationId={organizationId}
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex justify-start gap-3 mt-6">
-                    <Button
-                      color="blue"
-                      onClick={handleInstall}
-                      disabled={installMutation.isPending || !installationName.trim()}
-                      className="flex items-center gap-2"
-                    >
-                      {installMutation.isPending ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Installing...
-                        </>
-                      ) : (
-                        "Install"
-                      )}
-                    </Button>
-                    <Button variant="outline" onClick={handleCloseModal} disabled={installMutation.isPending}>
-                      Cancel
-                    </Button>
-                  </div>
-
-                  {installMutation.isError && (
-                    <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                      <p className="text-sm text-red-800 dark:text-red-200">
-                        Failed to install application: {getApiErrorMessage(installMutation.error)}
-                      </p>
-                    </div>
-                  )}
+                  <button
+                    onClick={handleCloseModal}
+                    className="text-muted-foreground hover:text-foreground"
+                    disabled={installMutation.isPending}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                {selectedInstructions && (
+                  <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-100 [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:space-y-1">
+                    <ReactMarkdown>{selectedInstructions}</ReactMarkdown>
+                  </div>
+                )}
+                {/* Installation Name Field */}
+                <div>
+                  <Label className="mb-2">
+                    Installation Name
+                    <span className="text-muted-foreground ml-1">*</span>
+                  </Label>
+                  <p className="text-xs text-muted-foreground mb-2">A unique name for this installation</p>
+                  <Input
+                    type="text"
+                    value={installationName}
+                    onChange={(e) => setInstallationName(e.target.value)}
+                    placeholder="e.g., my-app-integration"
+                    required
+                  />
+                </div>
+
+                {/* Configuration Fields */}
+                {selectedApplication.configuration && selectedApplication.configuration.length > 0 && (
+                  <div className="border-t border-border pt-6 space-y-4">
+                    {selectedApplication.configuration.map((field) => {
+                      if (!field.name) return null;
+                      return (
+                        <ConfigurationFieldRenderer
+                          key={field.name}
+                          field={field}
+                          value={configuration[field.name]}
+                          onChange={(value) => handleConfigurationChange(field.name || "", value)}
+                          allValues={configuration}
+                          domainId={organizationId}
+                          domainType="DOMAIN_TYPE_ORGANIZATION"
+                          organizationId={organizationId}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          );
-        })()}
+
+              <div className="flex justify-start gap-3 mt-6">
+                <Button
+                  color="blue"
+                  onClick={handleInstall}
+                  disabled={installMutation.isPending || !installationName.trim()}
+                  className="flex items-center gap-2"
+                >
+                  {installMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Installing...
+                    </>
+                  ) : (
+                    "Install"
+                  )}
+                </Button>
+                <Button variant="outline" onClick={handleCloseModal} disabled={installMutation.isPending}>
+                  Cancel
+                </Button>
+              </div>
+
+              {installMutation.isError && (
+                <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                  <p className="text-sm text-red-800 dark:text-red-200">
+                    Failed to install application: {getApiErrorMessage(installMutation.error)}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
