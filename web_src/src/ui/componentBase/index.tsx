@@ -1,15 +1,15 @@
-import React from "react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
+import { AlertTriangle } from "lucide-react";
+import React from "react";
+import { ChildEvents, type ChildEventsInfo } from "../childEvents";
 import { ComponentHeader } from "../componentHeader";
-import { SpecsTooltip } from "./SpecsTooltip";
-import { PayloadTooltip } from "./PayloadTooltip";
+import { EmptyState } from "../emptyState";
+import { MetadataItem, MetadataList } from "../metadataList";
 import { SelectionWrapper } from "../selectionWrapper";
 import { ComponentActionsProps } from "../types/componentActions";
-import { MetadataItem, MetadataList } from "../metadataList";
-import { EmptyState } from "../emptyState";
-import { ChildEvents, type ChildEventsInfo } from "../childEvents";
-import { AlertTriangle } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { PayloadTooltip } from "./PayloadTooltip";
+import { SpecsTooltip } from "./SpecsTooltip";
 
 interface EventSectionDisplayProps {
   section: EventSection;

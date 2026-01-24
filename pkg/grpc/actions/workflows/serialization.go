@@ -133,11 +133,8 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 	}
 
 	nodeIDs := make(map[string]bool)
+	nodeTypeByID := make(map[string]compb.Node_Type)
 	nodeValidationErrors := make(map[string]string)
-	nodeWarnings := make(map[string]string)
-
-	// Track node names for shadowed name detection (excludes widgets)
-	nodeNameToIDs := make(map[string][]string)
 
 	for i, node := range workflow.Spec.Nodes {
 		if node.Id == "" {
@@ -153,32 +150,15 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 		}
 
 		nodeIDs[node.Id] = true
-
-		// Track node names for shadowed name detection (skip widgets like annotations)
-		if node.Type != compb.Node_TYPE_WIDGET {
-			nodeNameToIDs[node.Name] = append(nodeNameToIDs[node.Name], node.Id)
-		}
+		nodeTypeByID[node.Id] = node.Type
 
 		if err := validateNodeRef(registry, orgID, node); err != nil {
 			nodeValidationErrors[node.Id] = err.Error()
 		}
 	}
 
-	// Add warnings for nodes with shadowed (duplicate) names
-	// These are warnings, not errors - they don't block execution
-	for name, ids := range nodeNameToIDs {
-		if len(ids) > 1 {
-			warningMsg := fmt.Sprintf("Multiple components named %q", name)
-			for _, nodeID := range ids {
-				nodeWarnings[nodeID] = warningMsg
-			}
-		}
-	}
-
-	nodeTypes := make(map[string]compb.Node_Type)
-	for _, node := range workflow.Spec.Nodes {
-		nodeTypes[node.Id] = node.Type
-	}
+	// Find shadowed names within connected components
+	nodeWarnings := actions.FindShadowedNameWarnings(workflow.Spec.Nodes, workflow.Spec.Edges)
 
 	for i, edge := range workflow.Spec.Edges {
 		if edge.SourceId == "" || edge.TargetId == "" {
@@ -193,11 +173,11 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target node %s not found", i, edge.TargetId)
 		}
 
-		if nodeTypes[edge.SourceId] == compb.Node_TYPE_WIDGET {
+		if nodeTypeByID[edge.SourceId] == compb.Node_TYPE_WIDGET {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as source nodes", i)
 		}
 
-		if nodeTypes[edge.TargetId] == compb.Node_TYPE_WIDGET {
+		if nodeTypeByID[edge.TargetId] == compb.Node_TYPE_WIDGET {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as target nodes", i)
 		}
 	}

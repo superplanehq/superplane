@@ -52,10 +52,6 @@ func ParseBlueprint(registry *registry.Registry, organizationID string, blueprin
 
 	nodeIDs := make(map[string]bool)
 	nodeValidationErrors := make(map[string]string)
-	nodeWarnings := make(map[string]string)
-
-	// Track node names for shadowed name detection
-	nodeNameToIDs := make(map[string][]string)
 
 	for i, node := range blueprint.Nodes {
 		if node.Id == "" {
@@ -72,25 +68,14 @@ func ParseBlueprint(registry *registry.Registry, organizationID string, blueprin
 
 		nodeIDs[node.Id] = true
 
-		// Track node names for shadowed name detection
-		nodeNameToIDs[node.Name] = append(nodeNameToIDs[node.Name], node.Id)
-
 		// Collect validation errors instead of failing immediately
 		if err := validateNodeRef(registry, organizationID, node); err != nil {
 			nodeValidationErrors[node.Id] = err.Error()
 		}
 	}
 
-	// Add warnings for nodes with shadowed (duplicate) names
-	// These are warnings, not errors - they don't block execution
-	for name, ids := range nodeNameToIDs {
-		if len(ids) > 1 {
-			warningMsg := fmt.Sprintf("Multiple components named %q", name)
-			for _, nodeID := range ids {
-				nodeWarnings[nodeID] = warningMsg
-			}
-		}
-	}
+	// Find shadowed names within connected components
+	nodeWarnings := actions.FindShadowedNameWarnings(blueprint.Nodes, blueprint.Edges)
 
 	for i, edge := range blueprint.Edges {
 		if edge.SourceId == "" || edge.TargetId == "" {
