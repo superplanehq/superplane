@@ -261,7 +261,9 @@ func (tg *TimeGate) HandlePushThrough(ctx core.ActionContext) error {
 	}
 
 	pushedThroughAt := time.Now().Format(time.RFC3339)
-	metadata.PushedThroughBy = ctx.Auth.AuthenticatedUser()
+	if ctx.Auth != nil {
+		metadata.PushedThroughBy = ctx.Auth.AuthenticatedUser()
+	}
 	metadata.PushedThroughAt = &pushedThroughAt
 
 	if err := ctx.Metadata.Set(metadata); err != nil {
