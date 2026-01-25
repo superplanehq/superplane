@@ -35,14 +35,14 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 The Schedule trigger starts workflow executions automatically based on a configured schedule.
 
-## Use Cases
+### Use Cases
 
 - **Periodic tasks**: Run daily reports, backups, or maintenance tasks
 - **Data synchronization**: Regularly sync data between systems
 - **Monitoring**: Periodic health checks and monitoring
 - **Batch processing**: Process data on a recurring schedule
 
-## Schedule Types
+### Schedule Types
 
 - **Minutes**: Trigger every N minutes (1-59)
 - **Hours**: Trigger every N hours at a specific minute (1-23 hours)
@@ -51,23 +51,23 @@ The Schedule trigger starts workflow executions automatically based on a configu
 - **Months**: Trigger every N months on a specific day and time (1-24 months)
 - **Cron**: Use a cron expression for advanced scheduling patterns
 
-## Timezone Support
+### Timezone Support
 
 For days, weeks, months, and cron schedules, you can specify a timezone to ensure triggers occur at the correct local time.
 
-## Cron Expressions
+### Cron Expressions
 
 Supports both 5-field and 6-field cron expressions:
 - **5-field**: `minute hour day month dayofweek` (e.g., `30 14 * * MON-FRI`)
 - **6-field**: `second minute hour day month dayofweek` (e.g., `0 30 14 * * MON-FRI`)
 
-## Event Data
+### Event Data
 
 Each scheduled execution includes calendar information:
 - **calendar**: Year, month, day, hour, minute, second, week_day
 - **timezone**: Timezone information (for applicable schedule types)
 
-## Examples
+### Examples
 
 - **Every 15 minutes**: Minutes schedule with 15-minute interval
 - **Daily at 9 AM**: Days schedule with hour=9, minute=0
@@ -97,24 +97,24 @@ Each scheduled execution includes calendar information:
 
 The Manual Run trigger allows you to start workflow executions manually from the SuperPlane UI.
 
-## Use Cases
+### Use Cases
 
 - **Testing workflows**: Manually trigger workflows during development and testing
 - **One-off tasks**: Run workflows on-demand for specific operations
 - **Debugging**: Manually execute workflows to debug issues
 - **Ad-hoc processing**: Process data when needed without automation
 
-## How It Works
+### How It Works
 
 1. Add the Manual Run trigger as the starting node of your workflow
 2. Click the "Run" button in the workflow UI to start an execution
 3. The workflow begins immediately with empty event data
 
-## Configuration
+### Configuration
 
 The Manual Run trigger requires no configuration. It's ready to use immediately after being added to a workflow.
 
-## Event Data
+### Event Data
 
 Manual runs start with an empty event payload. You can use this as a starting point and add data through subsequent components.
 
@@ -132,39 +132,39 @@ Manual runs start with an empty event payload. You can use this as a starting po
 
 The Webhook trigger starts a new workflow execution when an HTTP request is received at the generated webhook URL.
 
-## Use Cases
+### Use Cases
 
 - **External system integration**: Receive events from third-party services
 - **CI/CD pipelines**: Trigger workflows from build systems
 - **Form submissions**: Process data from web forms
 - **Event notifications**: Receive notifications from external applications
 
-## How It Works
+### How It Works
 
 1. When you add a Webhook trigger to a workflow, SuperPlane generates a unique webhook URL
 2. Configure the authentication method for the webhook
 3. External systems can send HTTP requests to this URL
 4. Each request starts a new workflow execution with the request data
 
-## Authentication Methods
+### Authentication Methods
 
 - **Signature (HMAC)**: Verify requests using HMAC-SHA256 signature in the `X-Signature-256` header
 - **Bearer Token**: Require a Bearer token in the `Authorization` header
 - **None (unsafe)**: No authentication (not recommended for production)
 
-## Request Data
+### Request Data
 
 The webhook payload includes:
 - **body**: Parsed request body (JSON if possible, otherwise raw data)
 - **headers**: All HTTP headers from the request
 
-## Security
+### Security
 
 - Each webhook has a unique secret key for authentication
 - Secrets can be reset using the "Reset Authentication" action
 - Maximum payload size: 64KB
 
-## Example Usage
+### Example Usage
 
 Send a POST request to the webhook URL with your payload. The workflow will receive the data and start execution.
 
@@ -190,14 +190,14 @@ Send a POST request to the webhook URL with your payload. The workflow will rece
 
 The Approval component pauses workflow execution and waits for manual approval from specified users, groups, or roles before continuing.
 
-## Use Cases
+### Use Cases
 
 - **Deployment approvals**: Require approval before deploying to production
 - **Financial transactions**: Get approval for high-value operations
 - **Content moderation**: Review content before publishing
 - **Compliance workflows**: Ensure regulatory approvals are obtained
 
-## How It Works
+### How It Works
 
 1. When the Approval component executes, it creates approval requirements based on the configured approvers
 2. The workflow pauses and waits for all required approvals
@@ -206,7 +206,7 @@ The Approval component pauses workflow execution and waits for manual approval f
    - **Approved channel**: All required approvers approved
    - **Rejected channel**: At least one approver rejected
 
-## Configuration
+### Configuration
 
 - **Approvers**: List of users, groups, or roles who must approve
   - **Any user**: Any authenticated user can approve
@@ -214,12 +214,12 @@ The Approval component pauses workflow execution and waits for manual approval f
   - **Group**: Any member of the specified group can approve
   - **Role**: Any user with the specified role can approve
 
-## Output Channels
+### Output Channels
 
 - **Approved**: Emitted when all required approvers have approved
 - **Rejected**: Emitted when at least one approver rejects (after all have responded)
 
-## Actions
+### Actions
 
 - **approve**: Approve a pending requirement (can include an optional comment)
 - **reject**: Reject a pending requirement (requires a reason)
@@ -258,27 +258,27 @@ The Approval component pauses workflow execution and waits for manual approval f
 
 The Filter component evaluates a boolean expression against incoming events and only forwards events that match the condition.
 
-## Use Cases
+### Use Cases
 
 - **Data validation**: Only process events that meet certain criteria
 - **Event filtering**: Filter out unwanted events before processing
 - **Conditional routing**: Stop processing events that don't match requirements
 - **Data quality**: Ensure only valid data continues through the workflow
 
-## How It Works
+### How It Works
 
 1. The Filter component evaluates a boolean expression against the incoming event data
 2. If the expression evaluates to `true`, the event is emitted to the default output channel
 3. If the expression evaluates to `false`, the execution passes without emitting (effectively filtering out the event)
 
-## Expression Environment
+### Expression Environment
 
 The expression has access to:
 - **$**: The current event data
 - **root()**: Access to the root event data
 - **previous()**: Access to previous node outputs (optionally with depth parameter)
 
-## Examples
+### Examples
 
 - `$.status == "active"`: Only forward events where status is "active"
 - `$.amount > 1000`: Filter events with amount greater than 1000
@@ -300,18 +300,18 @@ The expression has access to:
 
 The HTTP component allows you to make HTTP requests to external APIs and services as part of your workflow.
 
-## Use Cases
+### Use Cases
 
 - **API integration**: Call external REST APIs
 - **Webhook notifications**: Send notifications to external systems
 - **Data fetching**: Retrieve data from external services
 - **Service orchestration**: Coordinate with microservices
 
-## Supported Methods
+### Supported Methods
 
 - GET, POST, PUT, DELETE, PATCH
 
-## Request Configuration
+### Request Configuration
 
 - **URL**: The endpoint to call (supports expressions)
 - **Method**: HTTP method to use
@@ -323,21 +323,21 @@ The HTTP component allows you to make HTTP requests to external APIs and service
   - **Plain Text**: Raw text content
   - **XML**: XML formatted content
 
-## Response Handling
+### Response Handling
 
 The component emits the response with:
 - **status**: HTTP status code
 - **headers**: Response headers
 - **body**: Parsed response body (JSON if possible, otherwise string)
 
-## Error Handling & Retries
+### Error Handling & Retries
 
 Configure timeout and retry behavior:
 - **Fixed timeout**: Same timeout for all retry attempts
 - **Exponential backoff**: Timeout increases with each retry (capped at 120s)
 - **Success codes**: Define which status codes are considered successful (default: 2xx)
 
-## Output Events
+### Output Events
 
 - **http.request.finished**: Emitted on successful request
 - **http.request.failed**: Emitted when request fails after all retries
@@ -370,32 +370,32 @@ Configure timeout and retry behavior:
 
 The If component evaluates a boolean expression and routes events to different output channels based on the result.
 
-## Use Cases
+### Use Cases
 
 - **Conditional branching**: Route events down different paths based on conditions
 - **Decision logic**: Implement if-then-else logic in workflows
 - **Data routing**: Send events to different processing paths
 - **Workflow control**: Control workflow flow based on event properties
 
-## How It Works
+### How It Works
 
 1. The If component evaluates a boolean expression against the incoming event data
 2. If the expression evaluates to `true`, the event is emitted to the "True" output channel
 3. If the expression evaluates to `false`, the event is emitted to the "False" output channel
 
-## Output Channels
+### Output Channels
 
 - **True**: Events where the expression evaluates to `true`
 - **False**: Events where the expression evaluates to `false`
 
-## Expression Environment
+### Expression Environment
 
 The expression has access to:
 - **$**: The current event data
 - **root()**: Access to the root event data
 - **previous()**: Access to previous node outputs (optionally with depth parameter)
 
-## Examples
+### Examples
 
 - `$.status == "approved"`: Route approved items to True channel
 - `$.amount > 1000`: Route high-value items to True channel
@@ -417,31 +417,31 @@ The expression has access to:
 
 The Merge component waits for events from all upstream nodes before forwarding a combined result downstream.
 
-## Use Cases
+### Use Cases
 
 - **Parallel processing**: Wait for multiple parallel operations to complete
 - **Data aggregation**: Combine results from multiple sources
 - **Synchronization**: Synchronize multiple workflow branches
 - **Fan-in patterns**: Collect outputs from multiple upstream nodes
 
-## How It Works
+### How It Works
 
 1. The Merge component waits for events from all distinct upstream source nodes
 2. Once all inputs are received, it emits the combined data to the Success channel
 3. Optional timeout and conditional stop features allow early completion
 
-## Configuration Options
+### Configuration Options
 
 - **Enable Timeout**: Cancel merge after a specified time if not all inputs are received
 - **Enable Conditional Stop**: Stop waiting early when a condition is met (e.g., if one branch fails)
 
-## Output Channels
+### Output Channels
 
 - **Success**: Emitted when all upstream inputs are received
 - **Timeout**: Emitted if the timeout is reached before all inputs are received
 - **Fail**: Emitted if the conditional stop expression evaluates to true
 
-## Behavior
+### Behavior
 
 - Tracks distinct source nodes (ignoring multiple channels from the same source)
 - Combines all received event data into the output
@@ -475,13 +475,13 @@ The Merge component waits for events from all upstream nodes before forwarding a
 
 The No Operation component is a pass-through component that forwards events to downstream nodes without any modification or processing.
 
-## Use Cases
+### Use Cases
 
 - **Testing workflows**: Use this component to test workflow connections and flow without side effects
 - **Placeholder nodes**: Temporarily replace components during workflow development
 - **Event forwarding**: Simply forward events when no processing is needed
 
-## Behavior
+### Behavior
 
 When executed, the No Operation component immediately emits the incoming event data to the default output channel without any transformation. It has no configuration options and requires no setup.
 
@@ -501,28 +501,28 @@ When executed, the No Operation component immediately emits the incoming event d
 
 The Time Gate component delays event processing until a specific time window is reached, allowing you to control when events proceed through your workflow.
 
-## Use Cases
+### Use Cases
 
 - **Business hours**: Only process events during business hours
 - **Scheduled releases**: Delay deployments until off-peak hours
 - **Holiday handling**: Exclude specific dates from processing
 - **Time-based routing**: Route events based on time of day or specific dates
 
-## Modes
+### Modes
 
 - **Include Range**: Only allow events through during specified time windows on selected days
 - **Exclude Range**: Block events during specified time windows on selected days
 - **Include Specific Times**: Only allow events through during specific date ranges (e.g., holiday seasons)
 - **Exclude Specific Times**: Block events during specific date ranges (e.g., maintenance windows)
 
-## Configuration
+### Configuration
 
 - **Time Range**: Start and end times in HH:MM format (24-hour)
 - **Days of Week**: Select which days the time range applies to (for range modes)
 - **Date Range**: Start and end dates in MM/DD format (for specific time modes)
 - **Timezone**: Specify timezone for time calculations
 
-## Behavior
+### Behavior
 
 - Events wait until the next valid time window is reached
 - Supports cross-year date ranges (e.g., Dec 25 to Jan 5)
@@ -545,14 +545,14 @@ The Time Gate component delays event processing until a specific time window is 
 
 The Wait component pauses workflow execution for a specified duration or until a specific time is reached.
 
-## Use Cases
+### Use Cases
 
 - **Rate limiting**: Add delays between API calls
 - **Scheduled execution**: Wait until a specific time before proceeding
 - **Retry delays**: Wait before retrying failed operations
 - **Time-based workflows**: Delay processing until a specific date/time
 
-## Wait Modes
+### Wait Modes
 
 - **Interval**: Wait for a fixed duration (seconds, minutes, or hours)
   - Supports expressions for dynamic wait times
@@ -563,14 +563,14 @@ The Wait component pauses workflow execution for a specified duration or until a
   - Supports expressions for dynamic target times
   - Example: `{{$.release_date}}` or `{{$.run_time + duration("48h")}}`
 
-## Behavior
+### Behavior
 
 - Execution pauses until the wait period completes
 - Can be manually pushed through using the "Push Through" action
 - Automatically resumes when the wait time expires
 - Emits metadata including start time, finish time, and result
 
-## Output
+### Output
 
 The component emits a payload with:
 - **started_at**: When the wait began

@@ -121,15 +121,16 @@ func writeComponentSection(buf *bytes.Buffer, components []core.Component) {
 	for _, component := range components {
 		buf.WriteString(fmt.Sprintf("<a id=\"%s\"></a>\n\n", slugify(component.Label())))
 		buf.WriteString(fmt.Sprintf("## %s\n\n", component.Label()))
-		
+
 		// Write documentation if available, otherwise fall back to description
 		doc := component.Documentation()
 		if doc != "" {
-			writeParagraph(buf, doc)
+			adjustedDoc := adjustHeadingLevels(doc)
+			writeParagraph(buf, adjustedDoc)
 		} else {
 			writeParagraph(buf, component.Description())
 		}
-		
+
 		writeExampleSection("Example Output", component.ExampleOutput(), buf)
 	}
 }
@@ -142,15 +143,16 @@ func writeTriggerSection(buf *bytes.Buffer, triggers []core.Trigger) {
 	for _, trigger := range triggers {
 		buf.WriteString(fmt.Sprintf("<a id=\"%s\"></a>\n\n", slugify(trigger.Label())))
 		buf.WriteString(fmt.Sprintf("## %s\n\n", trigger.Label()))
-		
+
 		// Write documentation if available, otherwise fall back to description
 		doc := trigger.Documentation()
 		if doc != "" {
-			writeParagraph(buf, doc)
+			adjustedDoc := adjustHeadingLevels(doc)
+			writeParagraph(buf, adjustedDoc)
 		} else {
 			writeParagraph(buf, trigger.Description())
 		}
-		
+
 		writeExampleSection("Example Data", trigger.ExampleData(), buf)
 	}
 }
@@ -199,6 +201,40 @@ func writeParagraph(buf *bytes.Buffer, text string) {
 	}
 	buf.WriteString(trimmed)
 	buf.WriteString("\n\n")
+}
+
+// adjustHeadingLevels increments all markdown heading levels by 1
+// H2 (##) becomes H3 (###), H3 becomes H4, etc.
+func adjustHeadingLevels(text string) string {
+	lines := strings.Split(text, "\n")
+	var result []string
+
+	for _, line := range lines {
+		// Check if line is a markdown heading (starts with #)
+		if strings.HasPrefix(strings.TrimSpace(line), "#") {
+			// Count leading # characters
+			trimmed := strings.TrimSpace(line)
+			level := 0
+			for _, r := range trimmed {
+				if r == '#' {
+					level++
+				} else {
+					break
+				}
+			}
+			// Increment heading level by adding one more #
+			if level > 0 && level < 6 {
+				// Add one more # to increase the heading level
+				result = append(result, strings.Repeat("#", level+1)+trimmed[level:])
+			} else {
+				result = append(result, line)
+			}
+		} else {
+			result = append(result, line)
+		}
+	}
+
+	return strings.Join(result, "\n")
 }
 
 func writeOverviewSection(buf *bytes.Buffer, description string) {

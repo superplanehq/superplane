@@ -29,20 +29,20 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 The On Incident trigger starts a workflow execution when PagerDuty incident events occur.
 
-## Use Cases
+### Use Cases
 
 - **Incident automation**: Automate responses to incident events
 - **Notification workflows**: Send notifications when incidents are triggered or resolved
 - **Integration workflows**: Sync incidents with external systems
 - **Escalation handling**: Handle incident escalations automatically
 
-## Configuration
+### Configuration
 
 - **Service**: Select the PagerDuty service to monitor
 - **Events**: Select which incident events to listen for (triggered, acknowledged, resolved)
 - **Urgencies**: Filter by urgency level (low, high) - leave empty to listen to all urgencies
 
-## Event Data
+### Event Data
 
 Each incident event includes:
 - **event**: Event type (incident.triggered, incident.acknowledged, incident.resolved)
@@ -50,7 +50,7 @@ Each incident event includes:
 - **service**: Service information
 - **assignments**: Current incident assignments
 
-## Webhook Setup
+### Webhook Setup
 
 This trigger automatically sets up a PagerDuty webhook subscription when configured. The subscription is managed by SuperPlane and will be cleaned up when the trigger is removed.
 
@@ -135,18 +135,18 @@ This trigger automatically sets up a PagerDuty webhook subscription when configu
 
 The On Incident Status Update trigger starts a workflow execution when PagerDuty incident status changes.
 
-## Use Cases
+### Use Cases
 
 - **Status tracking**: Track incident status changes and update systems
 - **Workflow automation**: Trigger workflows when incidents are acknowledged or resolved
 - **Notification systems**: Notify teams about status updates
 - **Integration workflows**: Sync status changes with external systems
 
-## Configuration
+### Configuration
 
 - **Service**: Select the PagerDuty service to monitor for status updates
 
-## Event Data
+### Event Data
 
 Each status update event includes:
 - **event**: Event type (incident.status_updated)
@@ -155,7 +155,7 @@ Each status update event includes:
 - **service**: Service information
 - **assignments**: Current incident assignments
 
-## Webhook Setup
+### Webhook Setup
 
 This trigger automatically sets up a PagerDuty webhook subscription when configured. The subscription is managed by SuperPlane and will be cleaned up when the trigger is removed.
 
@@ -202,14 +202,14 @@ This trigger automatically sets up a PagerDuty webhook subscription when configu
 
 The Create Incident component creates a new incident in PagerDuty.
 
-## Use Cases
+### Use Cases
 
 - **Alert escalation**: Create incidents from monitoring alerts
 - **Error tracking**: Automatically create incidents when errors are detected
 - **Manual incident creation**: Create incidents from workflow events
 - **Integration workflows**: Create incidents from external system events
 
-## Configuration
+### Configuration
 
 - **Title**: A succinct description of the incident (required, supports expressions)
 - **Description**: Additional details about the incident (optional, supports expressions)
@@ -217,7 +217,7 @@ The Create Incident component creates a new incident in PagerDuty.
 - **Service**: Select the PagerDuty service to create the incident in
 - **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
 
-## Output
+### Output
 
 Returns the created incident object including:
 - **id**: Incident ID
@@ -319,24 +319,24 @@ Returns the created incident object including:
 
 The List Incidents component queries PagerDuty for open incidents and routes execution based on urgency levels.
 
-## Use Cases
+### Use Cases
 
 - **Health checks**: Check for active incidents and route based on severity
 - **Incident monitoring**: Monitor incident status across services
 - **Automated response**: Trigger workflows based on incident presence
 - **Reporting**: Collect incident data for reporting or analysis
 
-## Configuration
+### Configuration
 
 - **Services**: Optional list of services to filter incidents (leave empty to get incidents from all services)
 
-## Output Channels
+### Output Channels
 
 - **Clear**: No open incidents found
 - **Low**: Only low urgency incidents found
 - **High**: One or more high urgency incidents found
 
-## Output
+### Output
 
 Returns a list of open incidents with:
 - **id**: Incident ID
@@ -457,14 +457,14 @@ Returns a list of open incidents with:
 
 The Update Incident component modifies an existing PagerDuty incident.
 
-## Use Cases
+### Use Cases
 
 - **Status updates**: Update incident status (acknowledge, resolve)
 - **Priority management**: Change incident priority
 - **Assignment**: Assign incidents to users or escalation policies
 - **Note addition**: Add notes to incidents with updates
 
-## Configuration
+### Configuration
 
 - **Incident ID**: The ID of the incident to update (e.g., A12BC34567...)
 - **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
@@ -476,7 +476,7 @@ The Update Incident component modifies an existing PagerDuty incident.
 - **Assignees**: Assign to specific users (optional)
 - **Note**: Add a note to the incident (optional, supports expressions)
 
-## Output
+### Output
 
 Returns the updated incident object with all current information.
 

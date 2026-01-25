@@ -26,18 +26,18 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 The On Pipeline Done trigger starts a workflow execution when a Semaphore pipeline completes.
 
-## Use Cases
+### Use Cases
 
 - **Pipeline orchestration**: Chain workflows together based on pipeline completion
 - **Status monitoring**: Monitor CI/CD pipeline results
 - **Notification workflows**: Send notifications when pipelines succeed or fail
 - **Post-processing**: Process artifacts or results after pipeline completion
 
-## Configuration
+### Configuration
 
 - **Project**: Select the Semaphore project to monitor
 
-## Event Data
+### Event Data
 
 Each pipeline done event includes:
 - **pipeline**: Pipeline information including ID, state, and result
@@ -46,7 +46,7 @@ Each pipeline done event includes:
 - **result**: Pipeline result (passed, failed, stopped, etc.)
 - **state**: Pipeline state (done)
 
-## Webhook Setup
+### Webhook Setup
 
 This trigger automatically sets up a Semaphore webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
 
@@ -135,14 +135,14 @@ This trigger automatically sets up a Semaphore webhook when configured. The webh
 
 The Run Workflow component triggers a Semaphore CI/CD workflow and waits for it to complete.
 
-## Use Cases
+### Use Cases
 
 - **CI/CD orchestration**: Trigger builds and deployments from SuperPlane workflows
 - **Pipeline automation**: Run Semaphore pipelines as part of workflow automation
 - **Multi-stage deployments**: Coordinate complex deployment pipelines
 - **Workflow chaining**: Chain multiple Semaphore workflows together
 
-## How It Works
+### How It Works
 
 1. Creates and starts a Semaphore workflow with the specified pipeline file and parameters
 2. Waits for the pipeline to complete (monitored via webhook and polling)
@@ -150,7 +150,7 @@ The Run Workflow component triggers a Semaphore CI/CD workflow and waits for it 
    - **Passed channel**: Pipeline completed successfully
    - **Failed channel**: Pipeline failed or was cancelled
 
-## Configuration
+### Configuration
 
 - **Project**: Select the Semaphore project containing the workflow
 - **Pipeline File**: Path to the pipeline YAML file (e.g., `.semaphore/pipeline.yml`)
@@ -158,12 +158,12 @@ The Run Workflow component triggers a Semaphore CI/CD workflow and waits for it 
 - **Commit SHA**: Optional specific commit SHA to run (if not provided, uses latest from ref)
 - **Parameters**: Optional workflow parameters as key-value pairs (supports expressions)
 
-## Output Channels
+### Output Channels
 
 - **Passed**: Emitted when pipeline completes successfully
 - **Failed**: Emitted when pipeline fails or is cancelled
 
-## Notes
+### Notes
 
 - The component automatically sets up webhook monitoring for pipeline completion
 - Falls back to polling if webhook doesn't arrive
