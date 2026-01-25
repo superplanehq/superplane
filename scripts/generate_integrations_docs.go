@@ -73,10 +73,10 @@ func writeCoreComponentsDoc(components []core.Component, triggers []core.Trigger
 	var buf bytes.Buffer
 	writeFrontMatter(&buf, "Core", 1)
 	writeOverviewSection(&buf, "Built-in SuperPlane components.")
-	writeCardGridComponents(&buf, components)
 	writeCardGridTriggers(&buf, triggers)
-	writeComponentSection(&buf, components)
+	writeCardGridComponents(&buf, components)
 	writeTriggerSection(&buf, triggers)
+	writeComponentSection(&buf, components)
 
 	return writeFile(filepath.Join(docsRoot, "Core.mdx"), buf.Bytes())
 }
@@ -92,8 +92,8 @@ func writeAppIndex(
 	writeFrontMatter(&buf, app.Label(), order)
 
 	writeOverviewSection(&buf, app.Description())
-	writeCardGridComponents(&buf, components)
 	writeCardGridTriggers(&buf, triggers)
+	writeCardGridComponents(&buf, components)
 
 	if instructions := strings.TrimSpace(app.InstallationInstructions()); instructions != "" {
 		buf.WriteString("## Installation\n\n")
@@ -101,8 +101,8 @@ func writeAppIndex(
 		buf.WriteString("\n\n")
 	}
 
-	writeComponentSection(&buf, components)
 	writeTriggerSection(&buf, triggers)
+	writeComponentSection(&buf, components)
 
 	return writeFile(path, buf.Bytes())
 }
