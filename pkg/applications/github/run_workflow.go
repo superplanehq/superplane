@@ -62,6 +62,43 @@ func (r *RunWorkflow) Description() string {
 	return "Run GitHub Actions workflow"
 }
 
+func (r *RunWorkflow) Documentation() string {
+	return `The Run Workflow component triggers a GitHub Actions workflow and waits for it to complete.
+
+## Use Cases
+
+- **CI/CD orchestration**: Trigger builds and deployments from SuperPlane workflows
+- **Automated testing**: Run test suites as part of workflow automation
+- **Multi-stage pipelines**: Coordinate complex deployment pipelines
+- **Workflow chaining**: Chain multiple GitHub Actions workflows together
+
+## How It Works
+
+1. Dispatches the specified GitHub Actions workflow with optional inputs
+2. Waits for the workflow run to complete (monitored via webhook and polling)
+3. Routes execution based on workflow conclusion:
+   - **Passed channel**: Workflow completed successfully
+   - **Failed channel**: Workflow failed or was cancelled
+
+## Configuration
+
+- **Repository**: Select the GitHub repository containing the workflow
+- **Workflow File**: Path to the workflow file (e.g., ` + "`.github/workflows/ci.yml`" + `)
+- **Branch or Tag**: Git reference to run the workflow on (default: main)
+- **Inputs**: Optional workflow inputs as key-value pairs (supports expressions)
+
+## Output Channels
+
+- **Passed**: Emitted when workflow completes successfully
+- **Failed**: Emitted when workflow fails or is cancelled
+
+## Notes
+
+- The component automatically sets up webhook monitoring for workflow completion
+- Falls back to polling if webhook doesn't arrive
+- Can be cancelled, which will cancel the running GitHub Actions workflow`
+}
+
 func (r *RunWorkflow) Icon() string {
 	return "workflow"
 }

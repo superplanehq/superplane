@@ -27,16 +27,32 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## On Incident
 
-Listen to incident events
+The On Incident trigger starts a workflow execution when PagerDuty incident events occur.
 
-### Configuration
+## Use Cases
 
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| events | Events | multi-select | yes | - |
-| service | Service | app-installation-resource | yes | The PagerDuty service to monitor for incidents |
-| urgencies | Urgencies | multi-select | no | Filter incidents by urgency |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
+- **Incident automation**: Automate responses to incident events
+- **Notification workflows**: Send notifications when incidents are triggered or resolved
+- **Integration workflows**: Sync incidents with external systems
+- **Escalation handling**: Handle incident escalations automatically
+
+## Configuration
+
+- **Service**: Select the PagerDuty service to monitor
+- **Events**: Select which incident events to listen for (triggered, acknowledged, resolved)
+- **Urgencies**: Filter by urgency level (low, high) - leave empty to listen to all urgencies
+
+## Event Data
+
+Each incident event includes:
+- **event**: Event type (incident.triggered, incident.acknowledged, incident.resolved)
+- **incident**: Complete incident information including title, description, urgency, status
+- **service**: Service information
+- **assignments**: Current incident assignments
+
+## Webhook Setup
+
+This trigger automatically sets up a PagerDuty webhook subscription when configured. The subscription is managed by SuperPlane and will be cleaned up when the trigger is removed.
 
 ### Example Data
 
@@ -117,14 +133,31 @@ Listen to incident events
 
 ## On Incident Status Update
 
-Listen to incident status update events
+The On Incident Status Update trigger starts a workflow execution when PagerDuty incident status changes.
 
-### Configuration
+## Use Cases
 
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| service | Service | app-installation-resource | yes | The PagerDuty service to monitor for incident status updates |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
+- **Status tracking**: Track incident status changes and update systems
+- **Workflow automation**: Trigger workflows when incidents are acknowledged or resolved
+- **Notification systems**: Notify teams about status updates
+- **Integration workflows**: Sync status changes with external systems
+
+## Configuration
+
+- **Service**: Select the PagerDuty service to monitor for status updates
+
+## Event Data
+
+Each status update event includes:
+- **event**: Event type (incident.status_updated)
+- **incident**: Complete incident information including current status
+- **status**: New incident status
+- **service**: Service information
+- **assignments**: Current incident assignments
+
+## Webhook Setup
+
+This trigger automatically sets up a PagerDuty webhook subscription when configured. The subscription is managed by SuperPlane and will be cleaned up when the trigger is removed.
 
 ### Example Data
 
@@ -167,17 +200,32 @@ Listen to incident status update events
 
 ## Create Incident
 
-Create a new incident in PagerDuty
+The Create Incident component creates a new incident in PagerDuty.
 
-### Configuration
+## Use Cases
 
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| title | Incident Title | string | yes | A succinct description of the incident |
-| description | Description | string | no | Additional details about the incident |
-| urgency | Urgency | select | yes | - |
-| service | Service | app-installation-resource | yes | The PagerDuty service to create the incident for |
-| fromEmail | From Email | string | no | Email address of a valid PagerDuty user. Required for App OAuth and account-level API tokens, optional for user-level API tokens. |
+- **Alert escalation**: Create incidents from monitoring alerts
+- **Error tracking**: Automatically create incidents when errors are detected
+- **Manual incident creation**: Create incidents from workflow events
+- **Integration workflows**: Create incidents from external system events
+
+## Configuration
+
+- **Title**: A succinct description of the incident (required, supports expressions)
+- **Description**: Additional details about the incident (optional, supports expressions)
+- **Urgency**: Incident urgency level (high or low)
+- **Service**: Select the PagerDuty service to create the incident in
+- **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
+
+## Output
+
+Returns the created incident object including:
+- **id**: Incident ID
+- **incident_number**: Human-readable incident number
+- **status**: Current incident status
+- **urgency**: Incident urgency
+- **service**: Service information
+- **created_at**: Incident creation timestamp
 
 ### Example Output
 
@@ -269,13 +317,35 @@ Create a new incident in PagerDuty
 
 ## List Incidents
 
-Query PagerDuty to get a list of all open incidents (triggered and acknowledged)
+The List Incidents component queries PagerDuty for open incidents and routes execution based on urgency levels.
 
-### Configuration
+## Use Cases
 
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| services | Services | app-installation-resource | no | Filter incidents by specific services. If not specified, all services are included. |
+- **Health checks**: Check for active incidents and route based on severity
+- **Incident monitoring**: Monitor incident status across services
+- **Automated response**: Trigger workflows based on incident presence
+- **Reporting**: Collect incident data for reporting or analysis
+
+## Configuration
+
+- **Services**: Optional list of services to filter incidents (leave empty to get incidents from all services)
+
+## Output Channels
+
+- **Clear**: No open incidents found
+- **Low**: Only low urgency incidents found
+- **High**: One or more high urgency incidents found
+
+## Output
+
+Returns a list of open incidents with:
+- **id**: Incident ID
+- **incident_number**: Human-readable incident number
+- **status**: Incident status (triggered, acknowledged)
+- **urgency**: Incident urgency (low, high)
+- **title**: Incident title
+- **service**: Service information
+- **assignments**: Current assignments
 
 ### Example Output
 
@@ -385,21 +455,30 @@ Query PagerDuty to get a list of all open incidents (triggered and acknowledged)
 
 ## Update Incident
 
-Update an existing incident in PagerDuty
+The Update Incident component modifies an existing PagerDuty incident.
 
-### Configuration
+## Use Cases
 
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| incidentId | Incident ID | string | yes | The ID of the incident to update (e.g., A12BC34567...) |
-| fromEmail | From Email | string | no | Email address of a valid PagerDuty user. Required for App OAuth and account-level API tokens, optional for user-level API tokens. |
-| status | Status | select | no | Update the incident status |
-| priority | Priority | app-installation-resource | no | Update the incident priority |
-| title | Title | string | no | Update the incident title |
-| description | Description | text | no | Update the incident description (body) |
-| escalationPolicy | Escalation Policy | app-installation-resource | no | Update the escalation policy |
-| assignees | Assignees | list | no | Update incident assignees (user IDs) |
-| note | Note | text | no | Add a note/comment to the incident |
+- **Status updates**: Update incident status (acknowledge, resolve)
+- **Priority management**: Change incident priority
+- **Assignment**: Assign incidents to users or escalation policies
+- **Note addition**: Add notes to incidents with updates
+
+## Configuration
+
+- **Incident ID**: The ID of the incident to update (e.g., A12BC34567...)
+- **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
+- **Status**: Update incident status (acknowledged, resolved)
+- **Priority**: Update incident priority (select from available priorities)
+- **Title**: Update incident title (optional, supports expressions)
+- **Description**: Update incident description (optional, supports expressions)
+- **Escalation Policy**: Change escalation policy (optional)
+- **Assignees**: Assign to specific users (optional)
+- **Note**: Add a note to the incident (optional, supports expressions)
+
+## Output
+
+Returns the updated incident object with all current information.
 
 ### Example Output
 

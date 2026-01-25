@@ -33,6 +33,34 @@ func (c *CreateIssue) Description() string {
 	return "Create a new issue in a GitHub repository"
 }
 
+func (c *CreateIssue) Documentation() string {
+	return `The Create Issue component creates a new issue in a specified GitHub repository.
+
+## Use Cases
+
+- **Automated bug reporting**: Create issues automatically when errors are detected
+- **Task creation**: Generate issues from external systems or workflows
+- **Notification tracking**: Convert notifications into trackable issues
+- **Workflow automation**: Create issues as part of automated processes
+
+## Configuration
+
+- **Repository**: Select the GitHub repository where the issue will be created
+- **Title**: The issue title (supports expressions)
+- **Body**: The issue body/description (supports markdown and expressions)
+- **Assignees**: Optional list of GitHub usernames to assign the issue to
+- **Labels**: Optional list of labels to apply to the issue
+
+## Output
+
+Returns the created issue object with details including:
+- Issue number
+- URL
+- State
+- Created timestamp
+- All issue metadata`
+}
+
 func (c *CreateIssue) Icon() string {
 	return "github"
 }

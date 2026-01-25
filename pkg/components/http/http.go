@@ -76,6 +76,53 @@ func (e *HTTP) Description() string {
 	return "Make HTTP requests"
 }
 
+func (e *HTTP) Documentation() string {
+	return `The HTTP component allows you to make HTTP requests to external APIs and services as part of your workflow.
+
+## Use Cases
+
+- **API integration**: Call external REST APIs
+- **Webhook notifications**: Send notifications to external systems
+- **Data fetching**: Retrieve data from external services
+- **Service orchestration**: Coordinate with microservices
+
+## Supported Methods
+
+- GET, POST, PUT, DELETE, PATCH
+
+## Request Configuration
+
+- **URL**: The endpoint to call (supports expressions)
+- **Method**: HTTP method to use
+- **Query Parameters**: Optional URL query parameters
+- **Headers**: Custom HTTP headers (header names cannot use expressions)
+- **Body**: Request body in various formats:
+  - **JSON**: Structured JSON payload
+  - **Form Data**: URL-encoded form data
+  - **Plain Text**: Raw text content
+  - **XML**: XML formatted content
+
+## Response Handling
+
+The component emits the response with:
+- **status**: HTTP status code
+- **headers**: Response headers
+- **body**: Parsed response body (JSON if possible, otherwise string)
+
+## Error Handling & Retries
+
+Configure timeout and retry behavior:
+- **Fixed timeout**: Same timeout for all retry attempts
+- **Exponential backoff**: Timeout increases with each retry (capped at 120s)
+- **Success codes**: Define which status codes are considered successful (default: 2xx)
+
+## Output Events
+
+- **http.request.finished**: Emitted on successful request
+- **http.request.failed**: Emitted when request fails after all retries
+- **http.request.error**: Emitted on network/parsing errors`
+}
+
 func (e *HTTP) Icon() string {
 	return "globe"
 }

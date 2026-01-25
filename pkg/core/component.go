@@ -32,6 +32,13 @@ type Component interface {
 	Description() string
 
 	/*
+	 * Detailed markdown documentation explaining how to use the component.
+	 * This should provide in-depth information about the component's purpose,
+	 * configuration options, use cases, and examples.
+	 */
+	Documentation() string
+
+	/*
 	 * The icon for the component.
 	 * This is used in the UI to represent the component.
 	 */

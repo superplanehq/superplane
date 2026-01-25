@@ -40,6 +40,41 @@ func (f *If) Description() string {
 	return "Route events based on expression"
 }
 
+func (f *If) Documentation() string {
+	return `The If component evaluates a boolean expression and routes events to different output channels based on the result.
+
+## Use Cases
+
+- **Conditional branching**: Route events down different paths based on conditions
+- **Decision logic**: Implement if-then-else logic in workflows
+- **Data routing**: Send events to different processing paths
+- **Workflow control**: Control workflow flow based on event properties
+
+## How It Works
+
+1. The If component evaluates a boolean expression against the incoming event data
+2. If the expression evaluates to ` + "`true`" + `, the event is emitted to the "True" output channel
+3. If the expression evaluates to ` + "`false`" + `, the event is emitted to the "False" output channel
+
+## Output Channels
+
+- **True**: Events where the expression evaluates to ` + "`true`" + `
+- **False**: Events where the expression evaluates to ` + "`false`" + `
+
+## Expression Environment
+
+The expression has access to:
+- **$**: The current event data
+- **root()**: Access to the root event data
+- **previous()**: Access to previous node outputs (optionally with depth parameter)
+
+## Examples
+
+- ` + "`$.status == \"approved\"`" + `: Route approved items to True channel
+- ` + "`$.amount > 1000`" + `: Route high-value items to True channel
+- ` + "`$.user.role == \"admin\"`" + `: Route admin actions to True channel`
+}
+
 func (f *If) Icon() string {
 	return "split"
 }

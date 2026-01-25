@@ -31,6 +31,32 @@ func (c *GetIssue) Description() string {
 	return "Get a GitHub issue by number"
 }
 
+func (c *GetIssue) Documentation() string {
+	return `The Get Issue component retrieves a specific issue from a GitHub repository by its issue number.
+
+## Use Cases
+
+- **Issue lookup**: Fetch issue details for processing or display
+- **Workflow automation**: Get issue information to make decisions in workflows
+- **Data enrichment**: Retrieve issue data to combine with other information
+- **Status checking**: Check issue status before performing actions
+
+## Configuration
+
+- **Repository**: Select the GitHub repository containing the issue
+- **Issue Number**: The issue number to retrieve (supports expressions)
+
+## Output
+
+Returns the complete issue object including:
+- Issue number, title, and body
+- State (open/closed)
+- Labels and assignees
+- Created and updated timestamps
+- Author information
+- Comments count and other metadata`
+}
+
 func (c *GetIssue) Icon() string {
 	return "github"
 }

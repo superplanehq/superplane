@@ -36,6 +36,10 @@ func (s *PanicableTrigger) Description() string {
 	return s.underlying.Description()
 }
 
+func (s *PanicableTrigger) Documentation() string {
+	return s.underlying.Documentation()
+}
+
 func (s *PanicableTrigger) Icon() string {
 	return s.underlying.Icon()
 }

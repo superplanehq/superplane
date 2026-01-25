@@ -31,6 +31,34 @@ func (p *OnPullRequest) Description() string {
 	return "Listen to pull request events"
 }
 
+func (p *OnPullRequest) Documentation() string {
+	return `The On Pull Request trigger starts a workflow execution when pull request events occur in a GitHub repository.
+
+## Use Cases
+
+- **PR automation**: Automate actions when PRs are opened, merged, or closed
+- **Code review workflows**: Trigger review processes or notifications
+- **CI/CD integration**: Run tests or builds on PR events
+- **Status updates**: Update systems when PR status changes
+
+## Configuration
+
+- **Repository**: Select the GitHub repository to monitor
+- **Actions**: Select which PR actions to listen for (opened, closed, synchronize, etc.)
+
+## Event Data
+
+Each PR event includes:
+- **action**: The action that triggered the event (opened, closed, synchronize, etc.)
+- **pull_request**: Complete PR information including title, body, state, labels
+- **repository**: Repository information
+- **sender**: User who triggered the event
+
+## Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.`
+}
+
 func (p *OnPullRequest) Icon() string {
 	return "github"
 }

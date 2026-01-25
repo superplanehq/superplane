@@ -10,10 +10,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/registry"
 
 	// Import server to auto-register all integrations, components, and triggers via init()
@@ -123,8 +121,15 @@ func writeComponentSection(buf *bytes.Buffer, components []core.Component) {
 	for _, component := range components {
 		buf.WriteString(fmt.Sprintf("<a id=\"%s\"></a>\n\n", slugify(component.Label())))
 		buf.WriteString(fmt.Sprintf("## %s\n\n", component.Label()))
-		writeParagraph(buf, component.Description())
-		writeConfigurationSection(buf, component.Configuration())
+		
+		// Write documentation if available, otherwise fall back to description
+		doc := component.Documentation()
+		if doc != "" {
+			writeParagraph(buf, doc)
+		} else {
+			writeParagraph(buf, component.Description())
+		}
+		
 		writeExampleSection("Example Output", component.ExampleOutput(), buf)
 	}
 }
@@ -137,9 +142,15 @@ func writeTriggerSection(buf *bytes.Buffer, triggers []core.Trigger) {
 	for _, trigger := range triggers {
 		buf.WriteString(fmt.Sprintf("<a id=\"%s\"></a>\n\n", slugify(trigger.Label())))
 		buf.WriteString(fmt.Sprintf("## %s\n\n", trigger.Label()))
-		writeParagraph(buf, trigger.Description())
-		config := actions.AppendGlobalTriggerFields(trigger.Configuration())
-		writeConfigurationSection(buf, config)
+		
+		// Write documentation if available, otherwise fall back to description
+		doc := trigger.Documentation()
+		if doc != "" {
+			writeParagraph(buf, doc)
+		} else {
+			writeParagraph(buf, trigger.Description())
+		}
+		
 		writeExampleSection("Example Data", trigger.ExampleData(), buf)
 	}
 }
@@ -195,30 +206,6 @@ func writeOverviewSection(buf *bytes.Buffer, description string) {
 	buf.WriteString("\n\n")
 }
 
-func writeConfigurationSection(buf *bytes.Buffer, fields []configuration.Field) {
-	if len(fields) == 0 {
-		return
-	}
-
-	buf.WriteString("### Configuration\n\n")
-	buf.WriteString("| Name | Label | Type | Required | Description |\n")
-	buf.WriteString("| --- | --- | --- | --- | --- |\n")
-	for _, field := range fields {
-		required := "no"
-		if field.Required {
-			required = "yes"
-		}
-		buf.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s |\n",
-			formatTableValue(field.Name),
-			formatTableValue(field.Label),
-			formatTableValue(field.Type),
-			required,
-			formatTableValue(field.Description),
-		))
-	}
-	buf.WriteString("\n")
-}
-
 func writeExampleSection(title string, data map[string]any, buf *bytes.Buffer) {
 	if len(data) == 0 {
 		return
@@ -255,17 +242,6 @@ func appFilename(app core.Application) string {
 		return slugify(app.Name())
 	}
 	return label
-}
-
-func formatTableValue(value string) string {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return "-"
-	}
-	escaped := strings.ReplaceAll(trimmed, "|", "\\|")
-	escaped = strings.ReplaceAll(escaped, "{", "&#123;")
-	escaped = strings.ReplaceAll(escaped, "}", "&#125;")
-	return escaped
 }
 
 func escapeQuotes(value string) string {

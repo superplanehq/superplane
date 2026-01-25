@@ -31,6 +31,34 @@ func (t *OnIncidentStatusUpdate) Description() string {
 	return "Listen to incident status update events"
 }
 
+func (t *OnIncidentStatusUpdate) Documentation() string {
+	return `The On Incident Status Update trigger starts a workflow execution when PagerDuty incident status changes.
+
+## Use Cases
+
+- **Status tracking**: Track incident status changes and update systems
+- **Workflow automation**: Trigger workflows when incidents are acknowledged or resolved
+- **Notification systems**: Notify teams about status updates
+- **Integration workflows**: Sync status changes with external systems
+
+## Configuration
+
+- **Service**: Select the PagerDuty service to monitor for status updates
+
+## Event Data
+
+Each status update event includes:
+- **event**: Event type (incident.status_updated)
+- **incident**: Complete incident information including current status
+- **status**: New incident status
+- **service**: Service information
+- **assignments**: Current incident assignments
+
+## Webhook Setup
+
+This trigger automatically sets up a PagerDuty webhook subscription when configured. The subscription is managed by SuperPlane and will be cleaned up when the trigger is removed.`
+}
+
 func (t *OnIncidentStatusUpdate) Icon() string {
 	return "alert-triangle"
 }

@@ -36,22 +36,31 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Update Redirect Rule
 
-Update a redirect rule in a Cloudflare zone
+The Update Redirect Rule component modifies an existing redirect rule in a Cloudflare zone.
 
-### Configuration
+## Use Cases
 
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| zone | Zone | app-installation-resource | yes | The Cloudflare zone containing the redirect rule |
-| ruleId | Rule ID | string | yes | The ID of the redirect rule to update |
-| description | Rule Description | string | no | A descriptive name for this redirect rule |
-| matchType | Match Type | select | yes | - |
-| sourceUrlPattern | Source URL Pattern | string | no | URL pattern with wildcards. Use * to match any path segment. Example: https://example.com/old/* |
-| expression | Match Expression | text | no | Cloudflare filter expression. Example: (http.host eq "example.com" and http.request.uri.path eq "/old-path") |
-| targetUrl | Target URL | string | yes | The URL to redirect to. For wildcard patterns, use $&#123;1&#125;, $&#123;2&#125;, etc. to reference captured groups. |
-| statusCode | Status Code | select | yes | - |
-| preserveQueryString | Preserve Query String | boolean | no | Whether to preserve the query string when redirecting |
-| enabled | Enabled | boolean | no | Whether the redirect rule is enabled |
+- **URL management**: Update redirect rules dynamically based on workflow events
+- **A/B testing**: Switch redirect targets for testing purposes
+- **Maintenance**: Temporarily redirect traffic during maintenance
+- **Migration**: Update redirects as part of site migration workflows
+
+## Configuration
+
+- **Zone**: Select the Cloudflare zone containing the redirect rule
+- **Rule ID**: The ID of the redirect rule to update
+- **Description**: Optional description for the rule
+- **Match Type**: How to match URLs (exact match or expression-based)
+- **Source URL Pattern**: URL pattern to match (for exact match type)
+- **Expression**: Cloudflare expression for matching (for expression type)
+- **Target URL**: The URL to redirect to (supports expressions)
+- **Status Code**: HTTP status code for redirect (301, 302, 307, 308)
+- **Preserve Query String**: Whether to preserve query parameters in redirect
+- **Enabled**: Whether the rule is active
+
+## Output
+
+Returns the updated redirect rule with all current configuration.
 
 ### Example Output
 

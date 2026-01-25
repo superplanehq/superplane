@@ -44,6 +44,34 @@ func (c *UpdateRedirectRule) Description() string {
 	return "Update a redirect rule in a Cloudflare zone"
 }
 
+func (c *UpdateRedirectRule) Documentation() string {
+	return `The Update Redirect Rule component modifies an existing redirect rule in a Cloudflare zone.
+
+## Use Cases
+
+- **URL management**: Update redirect rules dynamically based on workflow events
+- **A/B testing**: Switch redirect targets for testing purposes
+- **Maintenance**: Temporarily redirect traffic during maintenance
+- **Migration**: Update redirects as part of site migration workflows
+
+## Configuration
+
+- **Zone**: Select the Cloudflare zone containing the redirect rule
+- **Rule ID**: The ID of the redirect rule to update
+- **Description**: Optional description for the rule
+- **Match Type**: How to match URLs (exact match or expression-based)
+- **Source URL Pattern**: URL pattern to match (for exact match type)
+- **Expression**: Cloudflare expression for matching (for expression type)
+- **Target URL**: The URL to redirect to (supports expressions)
+- **Status Code**: HTTP status code for redirect (301, 302, 307, 308)
+- **Preserve Query String**: Whether to preserve query parameters in redirect
+- **Enabled**: Whether the rule is active
+
+## Output
+
+Returns the updated redirect rule with all current configuration.`
+}
+
 func (c *UpdateRedirectRule) Icon() string {
 	return "cloud"
 }

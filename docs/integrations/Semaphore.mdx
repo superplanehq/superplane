@@ -24,14 +24,31 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## On Pipeline Done
 
-Listen to Semaphore pipeline done events
+The On Pipeline Done trigger starts a workflow execution when a Semaphore pipeline completes.
 
-### Configuration
+## Use Cases
 
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| project | Project | app-installation-resource | yes | - |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
+- **Pipeline orchestration**: Chain workflows together based on pipeline completion
+- **Status monitoring**: Monitor CI/CD pipeline results
+- **Notification workflows**: Send notifications when pipelines succeed or fail
+- **Post-processing**: Process artifacts or results after pipeline completion
+
+## Configuration
+
+- **Project**: Select the Semaphore project to monitor
+
+## Event Data
+
+Each pipeline done event includes:
+- **pipeline**: Pipeline information including ID, state, and result
+- **workflow**: Workflow information including ID and URL
+- **project**: Project information
+- **result**: Pipeline result (passed, failed, stopped, etc.)
+- **state**: Pipeline state (done)
+
+## Webhook Setup
+
+This trigger automatically sets up a Semaphore webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
 
 ### Example Data
 
@@ -116,17 +133,41 @@ Listen to Semaphore pipeline done events
 
 ## Run Workflow
 
-Run Semaphore workflow
+The Run Workflow component triggers a Semaphore CI/CD workflow and waits for it to complete.
 
-### Configuration
+## Use Cases
 
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| project | Project | app-installation-resource | yes | - |
-| pipelineFile | Pipeline file | string | yes | - |
-| ref | Pipeline file location | git-ref | yes | - |
-| commitSha | Commit SHA | string | no | - |
-| parameters | Parameters | list | no | - |
+- **CI/CD orchestration**: Trigger builds and deployments from SuperPlane workflows
+- **Pipeline automation**: Run Semaphore pipelines as part of workflow automation
+- **Multi-stage deployments**: Coordinate complex deployment pipelines
+- **Workflow chaining**: Chain multiple Semaphore workflows together
+
+## How It Works
+
+1. Creates and starts a Semaphore workflow with the specified pipeline file and parameters
+2. Waits for the pipeline to complete (monitored via webhook and polling)
+3. Routes execution based on pipeline result:
+   - **Passed channel**: Pipeline completed successfully
+   - **Failed channel**: Pipeline failed or was cancelled
+
+## Configuration
+
+- **Project**: Select the Semaphore project containing the workflow
+- **Pipeline File**: Path to the pipeline YAML file (e.g., `.semaphore/pipeline.yml`)
+- **Ref**: Git reference to run the workflow on (branch, tag, or commit SHA)
+- **Commit SHA**: Optional specific commit SHA to run (if not provided, uses latest from ref)
+- **Parameters**: Optional workflow parameters as key-value pairs (supports expressions)
+
+## Output Channels
+
+- **Passed**: Emitted when pipeline completes successfully
+- **Failed**: Emitted when pipeline fails or is cancelled
+
+## Notes
+
+- The component automatically sets up webhook monitoring for pipeline completion
+- Falls back to polling if webhook doesn't arrive
+- Can be cancelled, which will stop the running Semaphore workflow
 
 ### Example Output
 

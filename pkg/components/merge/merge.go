@@ -35,6 +35,40 @@ type Merge struct{}
 func (m *Merge) Name() string        { return "merge" }
 func (m *Merge) Label() string       { return "Merge" }
 func (m *Merge) Description() string { return "Merge multiple upstream inputs and forward" }
+func (m *Merge) Documentation() string {
+	return `The Merge component waits for events from all upstream nodes before forwarding a combined result downstream.
+
+## Use Cases
+
+- **Parallel processing**: Wait for multiple parallel operations to complete
+- **Data aggregation**: Combine results from multiple sources
+- **Synchronization**: Synchronize multiple workflow branches
+- **Fan-in patterns**: Collect outputs from multiple upstream nodes
+
+## How It Works
+
+1. The Merge component waits for events from all distinct upstream source nodes
+2. Once all inputs are received, it emits the combined data to the Success channel
+3. Optional timeout and conditional stop features allow early completion
+
+## Configuration Options
+
+- **Enable Timeout**: Cancel merge after a specified time if not all inputs are received
+- **Enable Conditional Stop**: Stop waiting early when a condition is met (e.g., if one branch fails)
+
+## Output Channels
+
+- **Success**: Emitted when all upstream inputs are received
+- **Timeout**: Emitted if the timeout is reached before all inputs are received
+- **Fail**: Emitted if the conditional stop expression evaluates to true
+
+## Behavior
+
+- Tracks distinct source nodes (ignoring multiple channels from the same source)
+- Combines all received event data into the output
+- Supports timeout to prevent indefinite waiting
+- Supports conditional early stop based on expression evaluation`
+}
 func (m *Merge) Icon() string        { return "arrow-right-from-line" }
 func (m *Merge) Color() string       { return "gray" }
 
