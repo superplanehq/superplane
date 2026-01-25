@@ -1,15 +1,16 @@
 ---
 title: "Slack"
 sidebar:
-  label: "Slack"
-type: "application"
-name: "slack"
-label: "Slack"
+  order: 9
 ---
 
-## Overview
-
 Send and react to Slack messages and interactions
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On App Mention" href="#on-app-mention" description="Listen to messages mentioning the Slack App" />
+</CardGrid>
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
@@ -19,44 +20,10 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Send Text Message" href="#send-text-message" description="Send a text message to a Slack channel" />
 </CardGrid>
 
-## Triggers
-
-<CardGrid>
-  <LinkCard title="On App Mention" href="#on-app-mention" description="Listen to messages mentioning the Slack App" />
-</CardGrid>
-
 ## Installation
 
 You can install the Slack app without the **Bot Token** and **Signing Secret**.
 After installation, follow the setup prompt to create the Slack app and add those values.
-
-<a id="send-text-message"></a>
-
-## Send Text Message
-
-Send a text message to a Slack channel
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| channel | Channel | app-installation-resource | yes | - |
-| text | Text | text | yes | - |
-
-### Example Output
-
-```json
-{
-  "data": {
-    "channel": "C123456",
-    "text": "Hello from SuperPlane",
-    "ts": "1700000000.000100",
-    "user": "U123456"
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "slack.message.sent"
-}
-```
 
 <a id="on-app-mention"></a>
 
@@ -97,6 +64,34 @@ Listen to messages mentioning the Slack App
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "slack.app.mention"
+}
+```
+
+<a id="send-text-message"></a>
+
+## Send Text Message
+
+Send a text message to a Slack channel
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| channel | Channel | app-installation-resource | yes | - |
+| text | Text | text | yes | - |
+
+### Example Output
+
+```json
+{
+  "data": {
+    "channel": "C123456",
+    "text": "Hello from SuperPlane",
+    "ts": "1700000000.000100",
+    "user": "U123456"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "slack.message.sent"
 }
 ```
 
