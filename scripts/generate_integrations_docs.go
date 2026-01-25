@@ -10,10 +10,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/registry"
 
 	// Import server to auto-register all integrations, components, and triggers via init()
@@ -123,8 +121,16 @@ func writeComponentSection(buf *bytes.Buffer, components []core.Component) {
 	for _, component := range components {
 		buf.WriteString(fmt.Sprintf("<a id=\"%s\"></a>\n\n", slugify(component.Label())))
 		buf.WriteString(fmt.Sprintf("## %s\n\n", component.Label()))
-		writeParagraph(buf, component.Description())
-		writeConfigurationSection(buf, component.Configuration())
+
+		// Write documentation if available, otherwise fall back to description
+		doc := component.Documentation()
+		if doc != "" {
+			adjustedDoc := adjustHeadingLevels(doc)
+			writeParagraph(buf, adjustedDoc)
+		} else {
+			writeParagraph(buf, component.Description())
+		}
+
 		writeExampleSection("Example Output", component.ExampleOutput(), buf)
 	}
 }
@@ -137,9 +143,16 @@ func writeTriggerSection(buf *bytes.Buffer, triggers []core.Trigger) {
 	for _, trigger := range triggers {
 		buf.WriteString(fmt.Sprintf("<a id=\"%s\"></a>\n\n", slugify(trigger.Label())))
 		buf.WriteString(fmt.Sprintf("## %s\n\n", trigger.Label()))
-		writeParagraph(buf, trigger.Description())
-		config := actions.AppendGlobalTriggerFields(trigger.Configuration())
-		writeConfigurationSection(buf, config)
+
+		// Write documentation if available, otherwise fall back to description
+		doc := trigger.Documentation()
+		if doc != "" {
+			adjustedDoc := adjustHeadingLevels(doc)
+			writeParagraph(buf, adjustedDoc)
+		} else {
+			writeParagraph(buf, trigger.Description())
+		}
+
 		writeExampleSection("Example Data", trigger.ExampleData(), buf)
 	}
 }
@@ -190,33 +203,43 @@ func writeParagraph(buf *bytes.Buffer, text string) {
 	buf.WriteString("\n\n")
 }
 
+// adjustHeadingLevels increments all markdown heading levels by 1
+// H2 (##) becomes H3 (###), H3 becomes H4, etc.
+func adjustHeadingLevels(text string) string {
+	lines := strings.Split(text, "\n")
+	var result []string
+
+	for _, line := range lines {
+		// Check if line is a markdown heading (starts with #)
+		if strings.HasPrefix(strings.TrimSpace(line), "#") {
+			// Count leading # characters
+			trimmed := strings.TrimSpace(line)
+			level := 0
+			for _, r := range trimmed {
+				if r == '#' {
+					level++
+				} else {
+					break
+				}
+			}
+			// Increment heading level by adding one more #
+			if level > 0 && level < 6 {
+				// Add one more # to increase the heading level
+				result = append(result, strings.Repeat("#", level+1)+trimmed[level:])
+			} else {
+				result = append(result, line)
+			}
+		} else {
+			result = append(result, line)
+		}
+	}
+
+	return strings.Join(result, "\n")
+}
+
 func writeOverviewSection(buf *bytes.Buffer, description string) {
 	buf.WriteString(description)
 	buf.WriteString("\n\n")
-}
-
-func writeConfigurationSection(buf *bytes.Buffer, fields []configuration.Field) {
-	if len(fields) == 0 {
-		return
-	}
-
-	buf.WriteString("### Configuration\n\n")
-	buf.WriteString("| Name | Label | Type | Required | Description |\n")
-	buf.WriteString("| --- | --- | --- | --- | --- |\n")
-	for _, field := range fields {
-		required := "no"
-		if field.Required {
-			required = "yes"
-		}
-		buf.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s |\n",
-			formatTableValue(field.Name),
-			formatTableValue(field.Label),
-			formatTableValue(field.Type),
-			required,
-			formatTableValue(field.Description),
-		))
-	}
-	buf.WriteString("\n")
 }
 
 func writeExampleSection(title string, data map[string]any, buf *bytes.Buffer) {
@@ -255,17 +278,6 @@ func appFilename(app core.Application) string {
 		return slugify(app.Name())
 	}
 	return label
-}
-
-func formatTableValue(value string) string {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return "-"
-	}
-	escaped := strings.ReplaceAll(trimmed, "|", "\\|")
-	escaped = strings.ReplaceAll(escaped, "{", "&#123;")
-	escaped = strings.ReplaceAll(escaped, "}", "&#125;")
-	return escaped
 }
 
 func escapeQuotes(value string) string {

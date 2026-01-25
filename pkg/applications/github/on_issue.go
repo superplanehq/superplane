@@ -29,6 +29,34 @@ func (i *OnIssue) Description() string {
 	return "Listen to issue events"
 }
 
+func (i *OnIssue) Documentation() string {
+	return `The On Issue trigger starts a workflow execution when issue events occur in a GitHub repository.
+
+## Use Cases
+
+- **Issue automation**: Automate responses to new or updated issues
+- **Notification workflows**: Send notifications when issues are created or closed
+- **Task management**: Sync issues with external task management systems
+- **Label automation**: Automatically label or categorize issues
+
+## Configuration
+
+- **Repository**: Select the GitHub repository to monitor
+- **Actions**: Select which issue actions to listen for (opened, closed, reopened, etc.)
+
+## Event Data
+
+Each issue event includes:
+- **action**: The action that triggered the event (opened, closed, reopened, etc.)
+- **issue**: Complete issue information including title, body, state, labels, assignees
+- **repository**: Repository information
+- **sender**: User who triggered the event
+
+## Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.`
+}
+
 func (i *OnIssue) Icon() string {
 	return "github"
 }

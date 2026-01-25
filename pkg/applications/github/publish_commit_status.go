@@ -37,6 +37,30 @@ func (c *PublishCommitStatus) Description() string {
 	return "Publish a status check to a GitHub commit"
 }
 
+func (c *PublishCommitStatus) Documentation() string {
+	return `The Publish Commit Status component creates a status check on a GitHub commit, commonly used for CI/CD integrations.
+
+## Use Cases
+
+- **CI/CD integration**: Report build and test results to GitHub
+- **Status reporting**: Update commit status from external systems
+- **Deployment tracking**: Mark commits as deployed or failed
+- **Quality gates**: Report code quality check results
+
+## Configuration
+
+- **Repository**: Select the GitHub repository
+- **Commit SHA**: The full 40-character commit SHA (supports expressions)
+- **State**: Status state - pending, success, failure, or error
+- **Context**: A label to identify this status check (e.g., "ci/build", "deploy/production")
+- **Description**: Short description of the status (max ~140 characters, optional)
+- **Target URL**: Link to build logs, test results, or deployment details (optional)
+
+## Output
+
+Returns the created status object with all status information.`
+}
+
 func (c *PublishCommitStatus) Icon() string {
 	return "github"
 }

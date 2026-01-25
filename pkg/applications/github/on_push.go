@@ -29,6 +29,35 @@ func (p *OnPush) Description() string {
 	return "Listen to GitHub push events"
 }
 
+func (p *OnPush) Documentation() string {
+	return `The On Push trigger starts a workflow execution when code is pushed to a GitHub repository.
+
+## Use Cases
+
+- **CI/CD automation**: Trigger builds and deployments on code pushes
+- **Code quality checks**: Run linting and tests on every push
+- **Notification workflows**: Send notifications when code is pushed
+- **Documentation updates**: Automatically update documentation on push
+
+## Configuration
+
+- **Repository**: Select the GitHub repository to monitor
+- **Refs**: Configure which branches/tags to monitor (e.g., ` + "`refs/heads/main`" + `, ` + "`refs/tags/*`" + `)
+
+## Event Data
+
+Each push event includes:
+- **repository**: Repository information
+- **ref**: The branch or tag that was pushed to
+- **commits**: Array of commit information
+- **pusher**: Information about who pushed
+- **before/after**: Commit SHAs before and after the push
+
+## Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.`
+}
+
 func (p *OnPush) Icon() string {
 	return "github"
 }

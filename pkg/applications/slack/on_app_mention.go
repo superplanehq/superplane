@@ -33,6 +33,33 @@ func (t *OnAppMention) Description() string {
 	return "Listen to messages mentioning the Slack App"
 }
 
+func (t *OnAppMention) Documentation() string {
+	return `The On App Mention trigger starts a workflow execution when the Slack app is mentioned in a message.
+
+## Use Cases
+
+- **Slash commands**: Process commands from Slack messages
+- **Bot interactions**: Create interactive Slack bots
+- **Team workflows**: Trigger workflows from Slack conversations
+- **Notification processing**: Process and respond to mentions
+
+## Configuration
+
+- **Channel**: Optional channel filter - if specified, only mentions in this channel will trigger (leave empty to listen to all channels)
+
+## Event Data
+
+Each mention event includes:
+- **event**: Event information including message text, channel, and timestamp
+- **user**: User who mentioned the app
+- **channel**: Channel where the mention occurred
+- **text**: The message text containing the mention
+
+## Setup
+
+This trigger automatically sets up a Slack event subscription when configured. The subscription is managed by SuperPlane and will be cleaned up when the trigger is removed.`
+}
+
 func (t *OnAppMention) Icon() string {
 	return "slack"
 }

@@ -38,6 +38,32 @@ func (c *SendTextMessage) Description() string {
 	return "Send a text message to a Slack channel"
 }
 
+func (c *SendTextMessage) Documentation() string {
+	return `The Send Text Message component sends a text message to a Slack channel.
+
+## Use Cases
+
+- **Notifications**: Send notifications about workflow events or system status
+- **Alerts**: Alert teams about important events or errors
+- **Updates**: Provide status updates on long-running processes
+- **Team communication**: Automate team communications from workflows
+
+## Configuration
+
+- **Channel**: Select the Slack channel to send the message to
+- **Text**: The message text to send (supports expressions and Slack markdown formatting)
+
+## Output
+
+Returns metadata about the sent message including channel information.
+
+## Notes
+
+- The Slack app must be installed and have permission to post to the selected channel
+- Supports Slack markdown formatting in message text
+- Messages are sent as the configured Slack bot user`
+}
+
 func (c *SendTextMessage) Icon() string {
 	return "slack"
 }

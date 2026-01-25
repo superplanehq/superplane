@@ -40,6 +40,36 @@ func (c *CreateResponse) Description() string {
 	return "Generate a text response using OpenAI"
 }
 
+func (c *CreateResponse) Documentation() string {
+	return `The Text Prompt component generates text responses using OpenAI's language models.
+
+## Use Cases
+
+- **Content generation**: Generate text content, summaries, or descriptions
+- **Natural language processing**: Process and transform text using AI
+- **Automated responses**: Generate responses to user queries or events
+- **Data transformation**: Convert structured data into natural language
+
+## Configuration
+
+- **Model**: Select the OpenAI model to use (e.g., gpt-4, gpt-3.5-turbo)
+- **Prompt**: The text prompt to send to the model (supports expressions)
+
+## Output
+
+Returns the generated response including:
+- **text**: The generated text response
+- **model**: The model used for generation
+- **usage**: Token usage information (prompt tokens, completion tokens, total tokens)
+- **id**: Response ID for tracking
+
+## Notes
+
+- Requires a valid OpenAI API key configured in the application settings
+- Response quality and speed depend on the selected model
+- Token usage is tracked and may incur costs based on your OpenAI plan`
+}
+
 func (c *CreateResponse) Icon() string {
 	return "sparkles"
 }

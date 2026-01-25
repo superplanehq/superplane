@@ -20,6 +20,7 @@ type panickingComponent struct {
 func (p *panickingComponent) Name() string                                   { return p.name }
 func (p *panickingComponent) Label() string                                  { return "Panicking Component" }
 func (p *panickingComponent) Description() string                            { return "description" }
+func (p *panickingComponent) Documentation() string                          { return "" }
 func (p *panickingComponent) Icon() string                                   { return "icon" }
 func (p *panickingComponent) Color() string                                  { return "red" }
 func (p *panickingComponent) ExampleOutput() map[string]any                  { return nil }

@@ -32,6 +32,28 @@ func (c *DeleteRelease) Description() string {
 	return "Delete a release from a GitHub repository"
 }
 
+func (c *DeleteRelease) Documentation() string {
+	return `The Delete Release component removes a release from a GitHub repository.
+
+## Use Cases
+
+- **Cleanup**: Remove old or incorrect releases
+- **Rollback**: Delete releases that were created in error
+- **Maintenance**: Clean up draft or test releases
+- **Automated cleanup**: Remove releases as part of maintenance workflows
+
+## Configuration
+
+- **Repository**: Select the GitHub repository
+- **Release Strategy**: How to find the release (by tag name or latest)
+- **Tag Name**: Git tag name of the release to delete (if using tag strategy)
+- **Delete Tag**: Also delete the associated Git tag (optional)
+
+## Output
+
+Returns confirmation of the deletion.`
+}
+
 func (c *DeleteRelease) Icon() string {
 	return "github"
 }
