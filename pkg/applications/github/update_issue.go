@@ -35,6 +35,31 @@ func (c *UpdateIssue) Description() string {
 	return "Update a GitHub issue"
 }
 
+func (c *UpdateIssue) Documentation() string {
+	return `The Update Issue component modifies an existing GitHub issue with new information.
+
+## Use Cases
+
+- **Status updates**: Change issue state (open/closed) based on workflow results
+- **Label management**: Add or update labels on issues
+- **Assignee updates**: Assign issues to team members automatically
+- **Content updates**: Update issue title or body with new information
+
+## Configuration
+
+- **Repository**: Select the GitHub repository containing the issue
+- **Issue Number**: The issue number to update
+- **Title**: New title for the issue (optional, supports expressions)
+- **Body**: New body/description for the issue (optional, supports expressions)
+- **State**: Change issue state to "open" or "closed" (optional)
+- **Assignees**: List of GitHub usernames to assign the issue to (optional)
+- **Labels**: List of labels to apply to the issue (optional)
+
+## Output
+
+Returns the updated issue object with all current information.`
+}
+
 func (c *UpdateIssue) Icon() string {
 	return "github"
 }

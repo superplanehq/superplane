@@ -30,6 +30,34 @@ func (p *OnPRComment) Description() string {
 	return "Listen to all comment events on pull requests"
 }
 
+func (p *OnPRComment) Documentation() string {
+	return `The On PR Comment trigger starts a workflow execution when comments are added to pull requests.
+
+## Use Cases
+
+- **Command processing**: Process slash commands in PR comments (e.g., /deploy, /test)
+- **Bot interactions**: Respond to comments with automated actions
+- **Review automation**: Trigger workflows based on comment content
+- **Notification systems**: Notify teams when important comments are added
+
+## Configuration
+
+- **Repository**: Select the GitHub repository to monitor
+- **Content Filter**: Optional regex pattern to filter comments (e.g., ` + "`/solve`" + ` to only trigger on comments containing "/solve")
+
+## Event Data
+
+Each comment event includes:
+- **comment**: Comment information including body, author, created timestamp
+- **pull_request**: PR information the comment was added to
+- **repository**: Repository information
+- **sender**: User who added the comment
+
+## Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.`
+}
+
 func (p *OnPRComment) Icon() string {
 	return "github"
 }

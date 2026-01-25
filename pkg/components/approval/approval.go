@@ -297,6 +297,44 @@ func (a *Approval) Description() string {
 	return "Collect approvals on events"
 }
 
+func (a *Approval) Documentation() string {
+	return `The Approval component pauses workflow execution and waits for manual approval from specified users, groups, or roles before continuing.
+
+## Use Cases
+
+- **Deployment approvals**: Require approval before deploying to production
+- **Financial transactions**: Get approval for high-value operations
+- **Content moderation**: Review content before publishing
+- **Compliance workflows**: Ensure regulatory approvals are obtained
+
+## How It Works
+
+1. When the Approval component executes, it creates approval requirements based on the configured approvers
+2. The workflow pauses and waits for all required approvals
+3. Approvers receive notifications and can approve or reject from the workflow UI
+4. Once all approvals are collected, the workflow continues:
+   - **Approved channel**: All required approvers approved
+   - **Rejected channel**: At least one approver rejected
+
+## Configuration
+
+- **Approvers**: List of users, groups, or roles who must approve
+  - **Any user**: Any authenticated user can approve
+  - **Specific user**: Only the specified user can approve
+  - **Group**: Any member of the specified group can approve
+  - **Role**: Any user with the specified role can approve
+
+## Output Channels
+
+- **Approved**: Emitted when all required approvers have approved
+- **Rejected**: Emitted when at least one approver rejects (after all have responded)
+
+## Actions
+
+- **approve**: Approve a pending requirement (can include an optional comment)
+- **reject**: Reject a pending requirement (requires a reason)`
+}
+
 func (a *Approval) Icon() string {
 	return "hand"
 }

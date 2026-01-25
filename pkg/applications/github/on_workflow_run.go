@@ -31,6 +31,35 @@ func (w *OnWorkflowRun) Description() string {
 	return "Listen to workflow run events"
 }
 
+func (w *OnWorkflowRun) Documentation() string {
+	return `The On Workflow Run trigger starts a workflow execution when GitHub Actions workflow runs complete.
+
+## Use Cases
+
+- **Workflow orchestration**: Chain workflows together based on completion
+- **Status monitoring**: Monitor CI/CD pipeline results
+- **Notification workflows**: Send notifications when workflows succeed or fail
+- **Post-processing**: Process artifacts or results after workflow completion
+
+## Configuration
+
+- **Repository**: Select the GitHub repository to monitor
+- **Conclusions**: Select which workflow conclusions to listen for (success, failure, cancelled, etc.)
+- **Workflow Files**: Optional list of specific workflow files to monitor (leave empty for all workflows)
+
+## Event Data
+
+Each workflow run event includes:
+- **action**: The action that triggered the event (completed, requested, etc.)
+- **workflow_run**: Complete workflow run information including status, conclusion, logs URL
+- **repository**: Repository information
+- **sender**: User who triggered the workflow
+
+## Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.`
+}
+
 func (w *OnWorkflowRun) Icon() string {
 	return "github"
 }

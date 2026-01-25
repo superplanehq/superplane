@@ -33,6 +33,35 @@ func (c *CreateIncident) Description() string {
 	return "Create a new incident in PagerDuty"
 }
 
+func (c *CreateIncident) Documentation() string {
+	return `The Create Incident component creates a new incident in PagerDuty.
+
+## Use Cases
+
+- **Alert escalation**: Create incidents from monitoring alerts
+- **Error tracking**: Automatically create incidents when errors are detected
+- **Manual incident creation**: Create incidents from workflow events
+- **Integration workflows**: Create incidents from external system events
+
+## Configuration
+
+- **Title**: A succinct description of the incident (required, supports expressions)
+- **Description**: Additional details about the incident (optional, supports expressions)
+- **Urgency**: Incident urgency level (high or low)
+- **Service**: Select the PagerDuty service to create the incident in
+- **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
+
+## Output
+
+Returns the created incident object including:
+- **id**: Incident ID
+- **incident_number**: Human-readable incident number
+- **status**: Current incident status
+- **urgency**: Incident urgency
+- **service**: Service information
+- **created_at**: Incident creation timestamp`
+}
+
 func (c *CreateIncident) Icon() string {
 	return "alert-triangle"
 }
