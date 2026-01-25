@@ -1,10 +1,5 @@
 ---
 title: "PagerDuty"
-sidebar:
-  label: "PagerDuty"
-type: "application"
-name: "pagerduty"
-label: "PagerDuty"
 ---
 
 ## Overview
@@ -17,6 +12,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in PagerDuty" />
+  <LinkCard title="List Incidents" href="#list-incidents" description="Query PagerDuty to get a list of all open incidents (triggered and acknowledged)" />
   <LinkCard title="Update Incident" href="#update-incident" description="Update an existing incident in PagerDuty" />
 </CardGrid>
 
@@ -126,6 +122,122 @@ Create a new incident in PagerDuty
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "pagerduty.incident"
+}
+```
+
+<a id="list-incidents"></a>
+
+## List Incidents
+
+Query PagerDuty to get a list of all open incidents (triggered and acknowledged)
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| services | Services | app-installation-resource | no | Filter incidents by specific services. If not specified, all services are included. |
+
+### Example Output
+
+```json
+{
+  "data": {
+    "incidents": [
+      {
+        "acknowledgements": [],
+        "assignments": [
+          {
+            "assignee": {
+              "html_url": "https://example.pagerduty.com/users/PUSER01",
+              "id": "PUSER01",
+              "summary": "John Doe",
+              "type": "user_reference"
+            },
+            "at": "2024-01-15T12:00:00Z"
+          }
+        ],
+        "created_at": "2024-01-15T12:00:00Z",
+        "description": "The production server is experiencing critical issues",
+        "escalation_policy": {
+          "html_url": "https://example.pagerduty.com/escalation_policies/PABCDEF",
+          "id": "PABCDEF",
+          "summary": "Default Escalation Policy",
+          "type": "escalation_policy_reference"
+        },
+        "html_url": "https://example.pagerduty.com/incidents/PT4KHLK",
+        "id": "PT4KHLK",
+        "incident_number": 1234,
+        "priority": {
+          "id": "P1PRIORITY",
+          "summary": "P1",
+          "type": "priority_reference"
+        },
+        "service": {
+          "html_url": "https://example.pagerduty.com/services/PX123456",
+          "id": "PX123456",
+          "summary": "Production API",
+          "type": "service_reference"
+        },
+        "status": "triggered",
+        "title": "Server is on fire",
+        "updated_at": "2024-01-15T12:00:00Z",
+        "urgency": "high"
+      },
+      {
+        "acknowledgements": [
+          {
+            "acknowledger": {
+              "html_url": "https://example.pagerduty.com/users/PUSER01",
+              "id": "PUSER01",
+              "summary": "John Doe",
+              "type": "user_reference"
+            },
+            "at": "2024-01-15T12:35:00Z"
+          }
+        ],
+        "assignments": [
+          {
+            "assignee": {
+              "html_url": "https://example.pagerduty.com/users/PUSER01",
+              "id": "PUSER01",
+              "summary": "John Doe",
+              "type": "user_reference"
+            },
+            "at": "2024-01-15T12:30:00Z"
+          }
+        ],
+        "created_at": "2024-01-15T12:30:00Z",
+        "description": "Database connections are timing out",
+        "escalation_policy": {
+          "html_url": "https://example.pagerduty.com/escalation_policies/PABCDEF",
+          "id": "PABCDEF",
+          "summary": "Default Escalation Policy",
+          "type": "escalation_policy_reference"
+        },
+        "html_url": "https://example.pagerduty.com/incidents/PT4KHLM",
+        "id": "PT4KHLM",
+        "incident_number": 1235,
+        "priority": {
+          "id": "P2PRIORITY",
+          "summary": "P2",
+          "type": "priority_reference"
+        },
+        "service": {
+          "html_url": "https://example.pagerduty.com/services/PX123456",
+          "id": "PX123456",
+          "summary": "Production API",
+          "type": "service_reference"
+        },
+        "status": "acknowledged",
+        "title": "Database connection issues",
+        "updated_at": "2024-01-15T12:35:00Z",
+        "urgency": "high"
+      }
+    ],
+    "total": 2
+  },
+  "timestamp": "2024-01-15T13:00:00Z",
+  "type": "pagerduty.incidents.list"
 }
 ```
 

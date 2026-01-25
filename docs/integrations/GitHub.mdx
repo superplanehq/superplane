@@ -1,10 +1,5 @@
 ---
 title: "GitHub"
-sidebar:
-  label: "GitHub"
-type: "application"
-name: "github"
-label: "GitHub"
 ---
 
 ## Overview
@@ -32,11 +27,12 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="On Branch Created" href="#on-branch-created" description="Listen to GitHub branch creation events" />
   <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events" />
   <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to issue comment events" />
+  <LinkCard title="On PR Comment" href="#on-pr-comment" description="Listen to all comment events on pull requests" />
   <LinkCard title="On Pull Request" href="#on-pull-request" description="Listen to pull request events" />
-  <LinkCard title="On PR Review Comment" href="#on-pr-review-comment" description="Listen to pull request review comment events" />
   <LinkCard title="On Push" href="#on-push" description="Listen to GitHub push events" />
   <LinkCard title="On Release" href="#on-release" description="Listen to release events" />
   <LinkCard title="On Tag Created" href="#on-tag-created" description="Listen to GitHub tag creation events" />
+  <LinkCard title="On Workflow Run" href="#on-workflow-run" description="Listen to workflow run events" />
 </CardGrid>
 
 <a id="create-issue"></a>
@@ -84,7 +80,7 @@ Create a new release in a GitHub repository
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
-| repository | Repository | string | yes | - |
+| repository | Repository | app-installation-resource | yes | - |
 | versionStrategy | Version Strategy | select | yes | How to determine the release version |
 | tagName | Tag Name | string | no | The name of the tag to create the release for |
 | name | Release Name | string | no | The title of the release |
@@ -120,7 +116,7 @@ Delete a release from a GitHub repository
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
-| repository | Repository | string | yes | - |
+| repository | Repository | app-installation-resource | yes | - |
 | releaseStrategy | Release to Delete | select | yes | How to identify which release to delete |
 | tagName | Tag Name | string | no | Git tag identifying the release to delete. Supports template variables from previous steps. |
 | deleteTag | Also delete Git tag | boolean | no | When enabled, also deletes the associated Git tag from the repository |
@@ -288,7 +284,7 @@ Update an existing release in a GitHub repository
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
-| repository | Repository | string | yes | - |
+| repository | Repository | app-installation-resource | yes | - |
 | releaseStrategy | Release Strategy | select | yes | How to identify which release to update |
 | tagName | Tag Name | string | no | Git tag identifying the release to update. Supports template variables from previous steps. |
 | name | Release Name | string | no | Update the release title (leave empty to keep current) |
@@ -447,6 +443,52 @@ Listen to issue comment events
 }
 ```
 
+<a id="on-pr-comment"></a>
+
+## On PR Comment
+
+Listen to all comment events on pull requests
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| repository | Repository | app-installation-resource | yes | - |
+| contentFilter | Content Filter | string | no | Optional regex pattern to filter comments by content |
+| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "created",
+    "comment": {
+      "body": "Looks good to me",
+      "html_url": "https://github.com/acme/widgets/pull/101#discussion_r7001",
+      "id": 7001
+    },
+    "pull_request": {
+      "html_url": "https://github.com/acme/widgets/pull/101",
+      "number": 101,
+      "title": "Add new endpoint"
+    },
+    "repository": {
+      "full_name": "acme/widgets",
+      "html_url": "https://github.com/acme/widgets",
+      "id": 123456
+    },
+    "sender": {
+      "html_url": "https://github.com/octocat",
+      "id": 101,
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.pullRequestReviewComment"
+}
+```
+
 <a id="on-pull-request"></a>
 
 ## On Pull Request
@@ -491,52 +533,6 @@ Listen to pull request events
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.pullRequest"
-}
-```
-
-<a id="on-pr-review-comment"></a>
-
-## On PR Review Comment
-
-Listen to pull request review comment events
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | app-installation-resource | yes | - |
-| contentFilter | Content Filter | string | no | Optional regex pattern to filter comments by content |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
-
-### Example Data
-
-```json
-{
-  "data": {
-    "action": "created",
-    "comment": {
-      "body": "Looks good to me",
-      "html_url": "https://github.com/acme/widgets/pull/101#discussion_r7001",
-      "id": 7001
-    },
-    "pull_request": {
-      "html_url": "https://github.com/acme/widgets/pull/101",
-      "number": 101,
-      "title": "Add new endpoint"
-    },
-    "repository": {
-      "full_name": "acme/widgets",
-      "html_url": "https://github.com/acme/widgets",
-      "id": 123456
-    },
-    "sender": {
-      "html_url": "https://github.com/octocat",
-      "id": 101,
-      "login": "octocat"
-    }
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.pullRequestReviewComment"
 }
 ```
 
@@ -860,6 +856,213 @@ Listen to GitHub tag creation events
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.tagCreated"
+}
+```
+
+<a id="on-workflow-run"></a>
+
+## On Workflow Run
+
+Listen to workflow run events
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| repository | Repository | app-installation-resource | yes | - |
+| conclusions | Conclusions | multi-select | no | - |
+| workflowFiles | Workflow Files | list | yes | Path to workflow files, e.g. .github/workflows/ci.yml |
+| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "completed",
+    "organization": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+      "description": "Example organization for demo data",
+      "events_url": "https://api.github.com/orgs/example-org/events",
+      "hooks_url": "https://api.github.com/orgs/example-org/hooks",
+      "id": 12345678,
+      "issues_url": "https://api.github.com/orgs/example-org/issues",
+      "login": "example-org",
+      "members_url": "https://api.github.com/orgs/example-org/members{/member}",
+      "node_id": "O_kgDOBb1AaA",
+      "public_members_url": "https://api.github.com/orgs/example-org/public_members{/member}",
+      "repos_url": "https://api.github.com/orgs/example-org/repos",
+      "url": "https://api.github.com/orgs/example-org"
+    },
+    "repository": {
+      "created_at": "2024-05-10T12:00:00Z",
+      "default_branch": "main",
+      "description": "Example repository for webhook payloads",
+      "fork": false,
+      "full_name": "example-org/example-repo",
+      "html_url": "https://github.com/example-org/example-repo",
+      "id": 987654321,
+      "name": "example-repo",
+      "node_id": "R_kgDOAbCdEf",
+      "owner": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+        "gravatar_id": "",
+        "html_url": "https://github.com/example-org",
+        "id": 12345678,
+        "login": "example-org",
+        "node_id": "O_kgDOBb1AaA",
+        "site_admin": false,
+        "type": "Organization",
+        "url": "https://api.github.com/users/example-org"
+      },
+      "private": false,
+      "pushed_at": "2026-03-10T14:22:11Z",
+      "updated_at": "2026-03-10T13:50:00Z",
+      "url": "https://api.github.com/repos/example-org/example-repo"
+    },
+    "sender": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/87654321?v=4",
+      "gravatar_id": "",
+      "html_url": "https://github.com/alexdoe",
+      "id": 87654321,
+      "login": "alexdoe",
+      "node_id": "MDQ6VXNlcjg3NjU0MzIx",
+      "site_admin": false,
+      "type": "User",
+      "url": "https://api.github.com/users/alexdoe"
+    },
+    "workflow": {
+      "badge_url": "https://github.com/example-org/example-repo/workflows/CI/badge.svg",
+      "created_at": "2024-05-10T12:00:00Z",
+      "html_url": "https://github.com/example-org/example-repo/actions/workflows/ci.yml",
+      "id": 9876543,
+      "name": "CI",
+      "node_id": "W_kwDOBb1AaA0123456",
+      "path": ".github/workflows/ci.yml",
+      "state": "active",
+      "updated_at": "2026-03-01T10:00:00Z",
+      "url": "https://api.github.com/repos/example-org/example-repo/actions/workflows/9876543"
+    },
+    "workflow_run": {
+      "actor": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/87654321?v=4",
+        "gravatar_id": "",
+        "html_url": "https://github.com/alexdoe",
+        "id": 87654321,
+        "login": "alexdoe",
+        "node_id": "MDQ6VXNlcjg3NjU0MzIx",
+        "site_admin": false,
+        "type": "User",
+        "url": "https://api.github.com/users/alexdoe"
+      },
+      "artifacts_url": "https://api.github.com/repos/example-org/example-repo/actions/runs/12345678901/artifacts",
+      "cancel_url": "https://api.github.com/repos/example-org/example-repo/actions/runs/12345678901/cancel",
+      "check_suite_id": 11223344556,
+      "check_suite_node_id": "CS_kwDOBb1AaA0000000",
+      "check_suite_url": "https://api.github.com/repos/example-org/example-repo/check-suites/11223344556",
+      "conclusion": "success",
+      "created_at": "2026-03-10T14:22:11Z",
+      "event": "push",
+      "head_branch": "main",
+      "head_commit": {
+        "author": {
+          "email": "alex.doe@example.com",
+          "name": "Alex Doe"
+        },
+        "committer": {
+          "email": "noreply@example.com",
+          "name": "GitHub"
+        },
+        "id": "4f9c2e1a7b3d45c0d1e9f23456789abcdeffed01",
+        "message": "feat: add lightweight metrics endpoint (#42)\n\nAdds a basic /metrics handler with a minimal gauge.",
+        "timestamp": "2026-03-10T14:22:11+01:00",
+        "tree_id": "7a8b9c0d1e2f3a4b5c6d7e8f90123456789abcde"
+      },
+      "head_repository": {
+        "description": "Example repository for webhook payloads",
+        "fork": false,
+        "full_name": "example-org/example-repo",
+        "html_url": "https://github.com/example-org/example-repo",
+        "id": 987654321,
+        "name": "example-repo",
+        "node_id": "R_kgDOAbCdEf",
+        "owner": {
+          "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+          "gravatar_id": "",
+          "html_url": "https://github.com/example-org",
+          "id": 12345678,
+          "login": "example-org",
+          "node_id": "O_kgDOBb1AaA",
+          "site_admin": false,
+          "type": "Organization",
+          "url": "https://api.github.com/users/example-org"
+        },
+        "private": false,
+        "url": "https://api.github.com/repos/example-org/example-repo"
+      },
+      "head_sha": "4f9c2e1a7b3d45c0d1e9f23456789abcdeffed01",
+      "html_url": "https://github.com/example-org/example-repo/actions/runs/12345678901",
+      "id": 12345678901,
+      "jobs_url": "https://api.github.com/repos/example-org/example-repo/actions/runs/12345678901/jobs",
+      "logs_url": "https://api.github.com/repos/example-org/example-repo/actions/runs/12345678901/logs",
+      "name": "CI",
+      "node_id": "WFR_kwLOBb1AaA123456789",
+      "path": ".github/workflows/ci.yml",
+      "pull_requests": [],
+      "referenced_workflows": [],
+      "repository": {
+        "clone_url": "https://github.com/example-org/example-repo.git",
+        "created_at": "2024-05-10T12:00:00Z",
+        "default_branch": "main",
+        "description": "Example repository for webhook payloads",
+        "fork": false,
+        "full_name": "example-org/example-repo",
+        "git_url": "git://github.com/example-org/example-repo.git",
+        "html_url": "https://github.com/example-org/example-repo",
+        "id": 987654321,
+        "name": "example-repo",
+        "node_id": "R_kgDOAbCdEf",
+        "owner": {
+          "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+          "gravatar_id": "",
+          "html_url": "https://github.com/example-org",
+          "id": 12345678,
+          "login": "example-org",
+          "node_id": "O_kgDOBb1AaA",
+          "site_admin": false,
+          "type": "Organization",
+          "url": "https://api.github.com/users/example-org"
+        },
+        "private": false,
+        "pushed_at": "2026-03-10T14:22:11Z",
+        "ssh_url": "git@github.com:example-org/example-repo.git",
+        "updated_at": "2026-03-10T13:50:00Z",
+        "url": "https://api.github.com/repos/example-org/example-repo"
+      },
+      "rerun_url": "https://api.github.com/repos/example-org/example-repo/actions/runs/12345678901/rerun",
+      "run_attempt": 1,
+      "run_number": 42,
+      "run_started_at": "2026-03-10T14:22:11Z",
+      "status": "completed",
+      "triggering_actor": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/87654321?v=4",
+        "gravatar_id": "",
+        "html_url": "https://github.com/alexdoe",
+        "id": 87654321,
+        "login": "alexdoe",
+        "node_id": "MDQ6VXNlcjg3NjU0MzIx",
+        "site_admin": false,
+        "type": "User",
+        "url": "https://api.github.com/users/alexdoe"
+      },
+      "updated_at": "2026-03-10T14:25:30Z",
+      "url": "https://api.github.com/repos/example-org/example-repo/actions/runs/12345678901",
+      "workflow_id": 9876543,
+      "workflow_url": "https://api.github.com/repos/example-org/example-repo/actions/workflows/9876543"
+    }
+  },
+  "timestamp": "2026-03-10T14:25:30.31254162Z",
+  "type": "github.workflowRun"
 }
 ```
 

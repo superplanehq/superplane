@@ -1,8 +1,5 @@
 ---
 title: "Core"
-sidebar:
-  label: "Core"
-type: "core"
 ---
 
 ## Overview
@@ -171,7 +168,9 @@ Merge multiple upstream inputs and forward
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
+| enableTimeout | Enable Timeout | boolean | no | Cancel merge after a specified time if not all inputs are received. |
 | executionTimeout | Execution Timeout | object | no | - |
+| enableStopIf | Enable Conditional Stop | boolean | no | Stop waiting early when a condition is met. |
 | stopIfExpression | Stop if | expression | no | When true, stop waiting and finish immediately. |
 
 ### Example Output
@@ -339,6 +338,14 @@ Start a new execution chain manually
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
 | customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
+
+### Example Data
+
+```json
+{
+  "foo": "bar"
+}
+```
 
 <a id="webhook"></a>
 
