@@ -30,12 +30,17 @@ func main() {
 	reg := registry.NewRegistry(crypto.NewNoOpEncryptor())
 	apps := reg.ListApplications()
 
+	// Sort apps by name
+	sort.Slice(apps, func(i, j int) bool {
+		return apps[i].Label() < apps[j].Label()
+	})
+
 	if err := writeCoreComponentsDoc(reg.ListComponents(), reg.ListTriggers()); err != nil {
 		exitWithError(err)
 	}
 
-	for _, app := range apps {
-		if err := writeAppDocs(app); err != nil {
+	for i, app := range apps {
+		if err := writeAppDocs(app, i+2); err != nil {
 			exitWithError(err)
 		}
 	}
@@ -47,14 +52,14 @@ func createOutputDirectory() {
 	}
 }
 
-func writeAppDocs(app core.Application) error {
+func writeAppDocs(app core.Application, order int) error {
 	components := app.Components()
 	triggers := app.Triggers()
 
 	sort.Slice(components, func(i, j int) bool { return components[i].Name() < components[j].Name() })
 	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
 
-	return writeAppIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.mdx", appFilename(app))), app, components, triggers)
+	return writeAppIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.mdx", appFilename(app))), app, components, triggers, order)
 }
 
 func writeCoreComponentsDoc(components []core.Component, triggers []core.Trigger) error {
@@ -66,7 +71,7 @@ func writeCoreComponentsDoc(components []core.Component, triggers []core.Trigger
 	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
 
 	var buf bytes.Buffer
-	writeFrontMatter(&buf, "Core")
+	writeFrontMatter(&buf, "Core", 1)
 	writeOverviewSection(&buf, "Built-in SuperPlane components.")
 	writeCardGridComponents(&buf, components)
 	writeCardGridTriggers(&buf, triggers)
@@ -81,9 +86,10 @@ func writeAppIndex(
 	app core.Application,
 	components []core.Component,
 	triggers []core.Trigger,
+	order int,
 ) error {
 	var buf bytes.Buffer
-	writeFrontMatter(&buf, app.Label())
+	writeFrontMatter(&buf, app.Label(), order)
 
 	writeOverviewSection(&buf, app.Description())
 	writeCardGridComponents(&buf, components)
@@ -101,9 +107,11 @@ func writeAppIndex(
 	return writeFile(path, buf.Bytes())
 }
 
-func writeFrontMatter(buf *bytes.Buffer, title string) {
+func writeFrontMatter(buf *bytes.Buffer, title string, order int) {
 	buf.WriteString("---\n")
 	buf.WriteString(fmt.Sprintf("title: \"%s\"\n", escapeQuotes(title)))
+	buf.WriteString("sidebar:\n")
+	buf.WriteString(fmt.Sprintf("  order: %d\n", order))
 	buf.WriteString("---\n\n")
 }
 
@@ -183,12 +191,7 @@ func writeParagraph(buf *bytes.Buffer, text string) {
 }
 
 func writeOverviewSection(buf *bytes.Buffer, description string) {
-	trimmed := strings.TrimSpace(description)
-	if trimmed == "" {
-		return
-	}
-	buf.WriteString("## Overview\n\n")
-	buf.WriteString(trimmed)
+	buf.WriteString(description)
 	buf.WriteString("\n\n")
 }
 
