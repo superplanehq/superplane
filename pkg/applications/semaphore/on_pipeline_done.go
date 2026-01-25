@@ -34,6 +34,34 @@ func (p *OnPipelineDone) Description() string {
 	return "Listen to Semaphore pipeline done events"
 }
 
+func (p *OnPipelineDone) Documentation() string {
+	return `The On Pipeline Done trigger starts a workflow execution when a Semaphore pipeline completes.
+
+## Use Cases
+
+- **Pipeline orchestration**: Chain workflows together based on pipeline completion
+- **Status monitoring**: Monitor CI/CD pipeline results
+- **Notification workflows**: Send notifications when pipelines succeed or fail
+- **Post-processing**: Process artifacts or results after pipeline completion
+
+## Configuration
+
+- **Project**: Select the Semaphore project to monitor
+
+## Event Data
+
+Each pipeline done event includes:
+- **pipeline**: Pipeline information including ID, state, and result
+- **workflow**: Workflow information including ID and URL
+- **project**: Project information
+- **result**: Pipeline result (passed, failed, stopped, etc.)
+- **state**: Pipeline state (done)
+
+## Webhook Setup
+
+This trigger automatically sets up a Semaphore webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.`
+}
+
 func (p *OnPipelineDone) Icon() string {
 	return "workflow"
 }

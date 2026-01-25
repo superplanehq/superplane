@@ -33,6 +33,35 @@ func (t *OnIncident) Description() string {
 	return "Listen to incident events"
 }
 
+func (t *OnIncident) Documentation() string {
+	return `The On Incident trigger starts a workflow execution when PagerDuty incident events occur.
+
+## Use Cases
+
+- **Incident automation**: Automate responses to incident events
+- **Notification workflows**: Send notifications when incidents are triggered or resolved
+- **Integration workflows**: Sync incidents with external systems
+- **Escalation handling**: Handle incident escalations automatically
+
+## Configuration
+
+- **Service**: Select the PagerDuty service to monitor
+- **Events**: Select which incident events to listen for (triggered, acknowledged, resolved)
+- **Urgencies**: Filter by urgency level (low, high) - leave empty to listen to all urgencies
+
+## Event Data
+
+Each incident event includes:
+- **event**: Event type (incident.triggered, incident.acknowledged, incident.resolved)
+- **incident**: Complete incident information including title, description, urgency, status
+- **service**: Service information
+- **assignments**: Current incident assignments
+
+## Webhook Setup
+
+This trigger automatically sets up a PagerDuty webhook subscription when configured. The subscription is managed by SuperPlane and will be cleaned up when the trigger is removed.`
+}
+
 func (t *OnIncident) Icon() string {
 	return "alert-triangle"
 }

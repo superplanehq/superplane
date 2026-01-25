@@ -52,6 +52,43 @@ func (w *Wait) Description() string {
 	return "Wait for a certain amount of time"
 }
 
+func (w *Wait) Documentation() string {
+	return `The Wait component pauses workflow execution for a specified duration or until a specific time is reached.
+
+## Use Cases
+
+- **Rate limiting**: Add delays between API calls
+- **Scheduled execution**: Wait until a specific time before proceeding
+- **Retry delays**: Wait before retrying failed operations
+- **Time-based workflows**: Delay processing until a specific date/time
+
+## Wait Modes
+
+- **Interval**: Wait for a fixed duration (seconds, minutes, or hours)
+  - Supports expressions for dynamic wait times
+  - Example: ` + "`{{$.retry_delay}}`" + ` or ` + "`{{$.status == \"urgent\" ? 0 : 30}}`" + `
+  
+- **Countdown**: Wait until a specific date/time is reached
+  - Supports ISO 8601 date formats
+  - Supports expressions for dynamic target times
+  - Example: ` + "`{{$.release_date}}`" + ` or ` + "`{{$.run_time + duration(\"48h\")}}`" + `
+
+## Behavior
+
+- Execution pauses until the wait period completes
+- Can be manually pushed through using the "Push Through" action
+- Automatically resumes when the wait time expires
+- Emits metadata including start time, finish time, and result
+
+## Output
+
+The component emits a payload with:
+- **started_at**: When the wait began
+- **finished_at**: When the wait completed
+- **result**: Completion status (completed, cancelled)
+- **reason**: How it completed (timeout, manual_override, user_cancel)`
+}
+
 func (w *Wait) Icon() string {
 	return "alarm-clock"
 }

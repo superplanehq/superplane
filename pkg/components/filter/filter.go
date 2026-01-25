@@ -38,6 +38,36 @@ func (f *Filter) Description() string {
 	return "Filter events based on their content"
 }
 
+func (f *Filter) Documentation() string {
+	return `The Filter component evaluates a boolean expression against incoming events and only forwards events that match the condition.
+
+## Use Cases
+
+- **Data validation**: Only process events that meet certain criteria
+- **Event filtering**: Filter out unwanted events before processing
+- **Conditional routing**: Stop processing events that don't match requirements
+- **Data quality**: Ensure only valid data continues through the workflow
+
+## How It Works
+
+1. The Filter component evaluates a boolean expression against the incoming event data
+2. If the expression evaluates to ` + "`true`" + `, the event is emitted to the default output channel
+3. If the expression evaluates to ` + "`false`" + `, the execution passes without emitting (effectively filtering out the event)
+
+## Expression Environment
+
+The expression has access to:
+- **$**: The current event data
+- **root()**: Access to the root event data
+- **previous()**: Access to previous node outputs (optionally with depth parameter)
+
+## Examples
+
+- ` + "`$.status == \"active\"`" + `: Only forward events where status is "active"
+- ` + "`$.amount > 1000`" + `: Filter events with amount greater than 1000
+- ` + "`$.user.role == \"admin\" && $.action == \"delete\"`" + `: Complex condition checking multiple fields`
+}
+
 func (f *Filter) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }

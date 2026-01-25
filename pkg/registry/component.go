@@ -37,6 +37,10 @@ func (s *PanicableComponent) Description() string {
 	return s.underlying.Description()
 }
 
+func (s *PanicableComponent) Documentation() string {
+	return s.underlying.Documentation()
+}
+
 func (s *PanicableComponent) Icon() string {
 	return s.underlying.Icon()
 }

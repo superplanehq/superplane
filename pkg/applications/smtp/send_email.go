@@ -42,6 +42,41 @@ func (c *SendEmail) Description() string {
 	return "Send an email via SMTP"
 }
 
+func (c *SendEmail) Documentation() string {
+	return `The Send Email component sends emails through a configured SMTP server.
+
+## Use Cases
+
+- **Notifications**: Send email notifications for workflow events
+- **Alerts**: Email alerts for errors or important events
+- **Reports**: Send automated reports via email
+- **User communications**: Send emails to users as part of workflows
+
+## Configuration
+
+- **To**: Recipient email addresses (comma-separated for multiple recipients, supports expressions)
+- **CC**: Carbon copy recipients (optional, comma-separated)
+- **BCC**: Blind carbon copy recipients (optional, comma-separated)
+- **Subject**: Email subject line (supports expressions)
+- **Body**: Email body content (supports expressions and HTML)
+- **Is HTML**: Toggle to send HTML-formatted emails
+- **From Name**: Sender display name (optional, uses app default if not specified)
+- **From Email**: Sender email address (optional, uses app default if not specified)
+- **Reply To**: Reply-to email address (optional)
+
+## SMTP Configuration
+
+The SMTP server must be configured in the application settings before using this component. Configure:
+- SMTP host and port
+- Authentication credentials
+- TLS/SSL settings
+- Default sender information
+
+## Output
+
+Returns metadata about the sent email including recipients and subject.`
+}
+
 func (c *SendEmail) Icon() string {
 	return "smtp"
 }

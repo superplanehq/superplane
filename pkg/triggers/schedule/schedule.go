@@ -69,6 +69,49 @@ func (s *Schedule) Description() string {
 	return "Start a new execution chain on a schedule"
 }
 
+func (s *Schedule) Documentation() string {
+	return `The Schedule trigger starts workflow executions automatically based on a configured schedule.
+
+## Use Cases
+
+- **Periodic tasks**: Run daily reports, backups, or maintenance tasks
+- **Data synchronization**: Regularly sync data between systems
+- **Monitoring**: Periodic health checks and monitoring
+- **Batch processing**: Process data on a recurring schedule
+
+## Schedule Types
+
+- **Minutes**: Trigger every N minutes (1-59)
+- **Hours**: Trigger every N hours at a specific minute (1-23 hours)
+- **Days**: Trigger every N days at a specific time (1-31 days)
+- **Weeks**: Trigger every N weeks on specific weekdays at a specific time (1-52 weeks)
+- **Months**: Trigger every N months on a specific day and time (1-24 months)
+- **Cron**: Use a cron expression for advanced scheduling patterns
+
+## Timezone Support
+
+For days, weeks, months, and cron schedules, you can specify a timezone to ensure triggers occur at the correct local time.
+
+## Cron Expressions
+
+Supports both 5-field and 6-field cron expressions:
+- **5-field**: ` + "`minute hour day month dayofweek`" + ` (e.g., ` + "`30 14 * * MON-FRI`" + `)
+- **6-field**: ` + "`second minute hour day month dayofweek`" + ` (e.g., ` + "`0 30 14 * * MON-FRI`" + `)
+
+## Event Data
+
+Each scheduled execution includes calendar information:
+- **calendar**: Year, month, day, hour, minute, second, week_day
+- **timezone**: Timezone information (for applicable schedule types)
+
+## Examples
+
+- **Every 15 minutes**: Minutes schedule with 15-minute interval
+- **Daily at 9 AM**: Days schedule with hour=9, minute=0
+- **Weekdays at 2 PM**: Weeks schedule with weekDays=[Monday-Friday], hour=14
+- **First of every month**: Months schedule with dayOfMonth=1`
+}
+
 func (s *Schedule) Icon() string {
 	return "alarm-clock"
 }

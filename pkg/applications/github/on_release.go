@@ -29,6 +29,34 @@ func (r *OnRelease) Description() string {
 	return "Listen to release events"
 }
 
+func (r *OnRelease) Documentation() string {
+	return `The On Release trigger starts a workflow execution when release events occur in a GitHub repository.
+
+## Use Cases
+
+- **Deployment automation**: Trigger deployments when releases are published
+- **Notification workflows**: Send notifications about new releases
+- **Release processing**: Process release artifacts or metadata
+- **Distribution workflows**: Distribute releases to multiple systems
+
+## Configuration
+
+- **Repository**: Select the GitHub repository to monitor
+- **Actions**: Select which release actions to listen for (published, created, etc.)
+
+## Event Data
+
+Each release event includes:
+- **action**: The action that triggered the event (published, created, etc.)
+- **release**: Complete release information including tag, name, body, assets
+- **repository**: Repository information
+- **sender**: User who triggered the event
+
+## Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.`
+}
+
 func (r *OnRelease) Icon() string {
 	return "github"
 }

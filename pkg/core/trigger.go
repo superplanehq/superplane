@@ -28,6 +28,13 @@ type Trigger interface {
 	Description() string
 
 	/*
+	 * Detailed markdown documentation explaining how to use the trigger.
+	 * This should provide in-depth information about the trigger's purpose,
+	 * configuration options, use cases, and examples.
+	 */
+	Documentation() string
+
+	/*
 	 * The icon for the trigger.
 	 */
 	Icon() string

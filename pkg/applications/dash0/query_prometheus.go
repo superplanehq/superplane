@@ -35,6 +35,38 @@ func (q *QueryPrometheus) Description() string {
 	return "Execute a PromQL query against Dash0 Prometheus API and return the response data"
 }
 
+func (q *QueryPrometheus) Documentation() string {
+	return `The Query Prometheus component executes PromQL queries against the Dash0 Prometheus API.
+
+## Use Cases
+
+- **Metrics monitoring**: Query application and infrastructure metrics
+- **Alerting**: Check metric thresholds and trigger alerts
+- **Data analysis**: Analyze time-series data from your applications
+- **Performance monitoring**: Monitor system performance metrics
+
+## Configuration
+
+- **PromQL Query**: The Prometheus Query Language query to execute (supports expressions)
+- **Dataset**: The dataset to query (default: "default")
+- **Query Type**: 
+  - **Instant**: Query a single point in time
+  - **Range**: Query a time range with optional start, end, and step parameters
+
+## Output
+
+Returns the Prometheus query response including:
+- **status**: Query status (success or error)
+- **data**: Query results with metric labels and values
+- **dataType**: Result type (vector, matrix, scalar, or string)
+
+## Notes
+
+- Requires Dash0 API token and base URL configured in application settings
+- Supports all standard PromQL functions and operators
+- Range queries require start, end, and step parameters`
+}
+
 func (q *QueryPrometheus) Icon() string {
 	return "database"
 }
