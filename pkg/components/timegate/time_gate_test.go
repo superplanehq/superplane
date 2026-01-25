@@ -95,6 +95,14 @@ func TestTimeGate_HandleAction_PushThrough_Finishes(t *testing.T) {
 		Name:           "pushThrough",
 		ExecutionState: stateCtx,
 		Parameters:     map[string]any{},
+		Metadata:       &contexts.MetadataContext{},
+		Auth: &contexts.AuthContext{
+			User: &core.User{
+				ID:    "123",
+				Name:  "Test User",
+				Email: "test@example.com",
+			},
+		},
 	}
 
 	err := tg.HandleAction(ctx)
