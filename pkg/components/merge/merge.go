@@ -69,8 +69,8 @@ func (m *Merge) Documentation() string {
 - Supports timeout to prevent indefinite waiting
 - Supports conditional early stop based on expression evaluation`
 }
-func (m *Merge) Icon() string        { return "arrow-right-from-line" }
-func (m *Merge) Color() string       { return "gray" }
+func (m *Merge) Icon() string  { return "arrow-right-from-line" }
+func (m *Merge) Color() string { return "gray" }
 
 func (m *Merge) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{
