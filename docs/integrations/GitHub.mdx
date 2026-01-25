@@ -1,15 +1,24 @@
 ---
 title: "GitHub"
 sidebar:
-  label: "GitHub"
-type: "application"
-name: "github"
-label: "GitHub"
+  order: 4
 ---
 
-## Overview
-
 Manage and react to changes in your GitHub repositories
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Branch Created" href="#on-branch-created" description="Listen to GitHub branch creation events" />
+  <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events" />
+  <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to issue comment events" />
+  <LinkCard title="On PR Comment" href="#on-pr-comment" description="Listen to all comment events on pull requests" />
+  <LinkCard title="On Pull Request" href="#on-pull-request" description="Listen to pull request events" />
+  <LinkCard title="On Push" href="#on-push" description="Listen to GitHub push events" />
+  <LinkCard title="On Release" href="#on-release" description="Listen to release events" />
+  <LinkCard title="On Tag Created" href="#on-tag-created" description="Listen to GitHub tag creation events" />
+  <LinkCard title="On Workflow Run" href="#on-workflow-run" description="Listen to workflow run events" />
+</CardGrid>
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
@@ -25,295 +34,6 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
   <LinkCard title="Update Release" href="#update-release" description="Update an existing release in a GitHub repository" />
 </CardGrid>
-
-## Triggers
-
-<CardGrid>
-  <LinkCard title="On Branch Created" href="#on-branch-created" description="Listen to GitHub branch creation events" />
-  <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events" />
-  <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to issue comment events" />
-  <LinkCard title="On Pull Request" href="#on-pull-request" description="Listen to pull request events" />
-  <LinkCard title="On PR Review Comment" href="#on-pr-review-comment" description="Listen to pull request review comment events" />
-  <LinkCard title="On Push" href="#on-push" description="Listen to GitHub push events" />
-  <LinkCard title="On Release" href="#on-release" description="Listen to release events" />
-  <LinkCard title="On Tag Created" href="#on-tag-created" description="Listen to GitHub tag creation events" />
-</CardGrid>
-
-<a id="create-issue"></a>
-
-## Create Issue
-
-Create a new issue in a GitHub repository
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | app-installation-resource | yes | - |
-| title | Title | string | yes | - |
-| body | Body | text | no | - |
-| assignees | Assignees | list | no | - |
-| labels | Labels | list | no | - |
-
-### Example Output
-
-```json
-{
-  "data": {
-    "html_url": "https://github.com/acme/widgets/issues/42",
-    "id": 101,
-    "number": 42,
-    "state": "open",
-    "title": "Fix flaky build",
-    "user": {
-      "login": "octocat"
-    }
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.issue"
-}
-```
-
-<a id="create-release"></a>
-
-## Create Release
-
-Create a new release in a GitHub repository
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | string | yes | - |
-| versionStrategy | Version Strategy | select | yes | How to determine the release version |
-| tagName | Tag Name | string | no | The name of the tag to create the release for |
-| name | Release Name | string | no | The title of the release |
-| draft | Draft | boolean | no | Mark this release as a draft |
-| prerelease | Prerelease | boolean | no | Mark this release as a prerelease |
-| generateReleaseNotes | Generate release notes | boolean | no | Automatically generate release notes from commits since the last release |
-| body | Additional notes | text | no | Optional text to append after auto-generated release notes. If auto-generation is off, this becomes the entire release description. |
-
-### Example Output
-
-```json
-{
-  "data": {
-    "draft": false,
-    "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
-    "id": 3001,
-    "name": "Release 1.2.3",
-    "prerelease": false,
-    "tag_name": "v1.2.3"
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.release"
-}
-```
-
-<a id="delete-release"></a>
-
-## Delete Release
-
-Delete a release from a GitHub repository
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | string | yes | - |
-| releaseStrategy | Release to Delete | select | yes | How to identify which release to delete |
-| tagName | Tag Name | string | no | Git tag identifying the release to delete. Supports template variables from previous steps. |
-| deleteTag | Also delete Git tag | boolean | no | When enabled, also deletes the associated Git tag from the repository |
-
-### Example Output
-
-```json
-{
-  "data": {
-    "deleted_at": "2026-01-16T17:55:00Z",
-    "draft": false,
-    "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
-    "id": 3001,
-    "name": "Release 1.2.3",
-    "prerelease": false,
-    "tag_deleted": true,
-    "tag_name": "v1.2.3"
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.release"
-}
-```
-
-<a id="get-issue"></a>
-
-## Get Issue
-
-Get a GitHub issue by number
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | app-installation-resource | yes | - |
-| issueNumber | Issue Number | string | yes | - |
-
-### Example Output
-
-```json
-{
-  "data": {
-    "comments": 3,
-    "html_url": "https://github.com/acme/widgets/issues/42",
-    "id": 101,
-    "number": 42,
-    "state": "open",
-    "title": "Fix flaky build",
-    "user": {
-      "login": "octocat"
-    }
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.issue"
-}
-```
-
-<a id="publish-commit-status"></a>
-
-## Publish Commit Status
-
-Publish a status check to a GitHub commit
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | app-installation-resource | yes | - |
-| sha | Commit SHA | string | yes | The full SHA of the commit to attach the status to |
-| state | State | select | yes | - |
-| context | Context | string | yes | A label to identify this status check |
-| description | Description | text | no | Short description of the status (max ~140 characters) |
-| targetUrl | Target URL | string | no | e.g. Link to build logs, test results, ... |
-
-### Example Output
-
-```json
-{
-  "data": {
-    "context": "ci/build",
-    "created_at": "2026-01-16T17:45:00Z",
-    "description": "All checks passed",
-    "state": "success",
-    "target_url": "https://ci.example.com/builds/123",
-    "updated_at": "2026-01-16T17:45:10Z"
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.commitStatus"
-}
-```
-
-<a id="run-workflow"></a>
-
-## Run Workflow
-
-Run GitHub Actions workflow
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | app-installation-resource | yes | - |
-| workflowFile | Workflow file | string | yes | - |
-| ref | Branch or tag | git-ref | yes | - |
-| inputs | Inputs | list | no | - |
-
-### Example Output
-
-```json
-{
-  "data": {
-    "workflow_run": {
-      "conclusion": "success",
-      "html_url": "https://github.com/acme/widgets/actions/runs/9001",
-      "id": 9001,
-      "status": "completed"
-    }
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.workflow.finished"
-}
-```
-
-<a id="update-issue"></a>
-
-## Update Issue
-
-Update a GitHub issue
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | app-installation-resource | yes | - |
-| issueNumber | Issue Number | number | yes | - |
-| title | Title | string | no | - |
-| body | Body | text | no | - |
-| state | State | select | no | - |
-| assignees | Assignees | list | no | - |
-| labels | Labels | list | no | - |
-
-### Example Output
-
-```json
-{
-  "data": {
-    "html_url": "https://github.com/acme/widgets/issues/42",
-    "id": 101,
-    "number": 42,
-    "state": "closed",
-    "title": "Fix flaky build",
-    "updated_at": "2026-01-16T17:40:00Z"
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.issue"
-}
-```
-
-<a id="update-release"></a>
-
-## Update Release
-
-Update an existing release in a GitHub repository
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | string | yes | - |
-| releaseStrategy | Release Strategy | select | yes | How to identify which release to update |
-| tagName | Tag Name | string | no | Git tag identifying the release to update. Supports template variables from previous steps. |
-| name | Release Name | string | no | Update the release title (leave empty to keep current) |
-| generateReleaseNotes | Generate release notes | boolean | no | Automatically generate release notes from commits since the last release. If body is also provided, custom text is appended. |
-| body | Release Notes | text | no | Update release description (leave empty to keep current) |
-| draft | Draft | boolean | no | Mark release as draft or publish it |
-| prerelease | Prerelease | boolean | no | Mark as prerelease or stable release |
-
-### Example Output
-
-```json
-{
-  "data": {
-    "draft": false,
-    "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
-    "id": 3001,
-    "name": "Release 1.2.3",
-    "prerelease": false,
-    "tag_name": "v1.2.3",
-    "updated_at": "2026-01-16T17:50:00Z"
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.release"
-}
-```
 
 <a id="on-branch-created"></a>
 
@@ -447,6 +167,52 @@ Listen to issue comment events
 }
 ```
 
+<a id="on-pr-comment"></a>
+
+## On PR Comment
+
+Listen to all comment events on pull requests
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| repository | Repository | app-installation-resource | yes | - |
+| contentFilter | Content Filter | string | no | Optional regex pattern to filter comments by content |
+| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "created",
+    "comment": {
+      "body": "Looks good to me",
+      "html_url": "https://github.com/acme/widgets/pull/101#discussion_r7001",
+      "id": 7001
+    },
+    "pull_request": {
+      "html_url": "https://github.com/acme/widgets/pull/101",
+      "number": 101,
+      "title": "Add new endpoint"
+    },
+    "repository": {
+      "full_name": "acme/widgets",
+      "html_url": "https://github.com/acme/widgets",
+      "id": 123456
+    },
+    "sender": {
+      "html_url": "https://github.com/octocat",
+      "id": 101,
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.pullRequestReviewComment"
+}
+```
+
 <a id="on-pull-request"></a>
 
 ## On Pull Request
@@ -491,52 +257,6 @@ Listen to pull request events
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.pullRequest"
-}
-```
-
-<a id="on-pr-review-comment"></a>
-
-## On PR Review Comment
-
-Listen to pull request review comment events
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | app-installation-resource | yes | - |
-| contentFilter | Content Filter | string | no | Optional regex pattern to filter comments by content |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
-
-### Example Data
-
-```json
-{
-  "data": {
-    "action": "created",
-    "comment": {
-      "body": "Looks good to me",
-      "html_url": "https://github.com/acme/widgets/pull/101#discussion_r7001",
-      "id": 7001
-    },
-    "pull_request": {
-      "html_url": "https://github.com/acme/widgets/pull/101",
-      "number": 101,
-      "title": "Add new endpoint"
-    },
-    "repository": {
-      "full_name": "acme/widgets",
-      "html_url": "https://github.com/acme/widgets",
-      "id": 123456
-    },
-    "sender": {
-      "html_url": "https://github.com/octocat",
-      "id": 101,
-      "login": "octocat"
-    }
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.pullRequestReviewComment"
 }
 ```
 
@@ -860,6 +580,489 @@ Listen to GitHub tag creation events
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.tagCreated"
+}
+```
+
+<a id="on-workflow-run"></a>
+
+## On Workflow Run
+
+Listen to workflow run events
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| repository | Repository | app-installation-resource | yes | - |
+| conclusions | Conclusions | multi-select | no | - |
+| workflowFiles | Workflow Files | list | yes | Path to workflow files, e.g. .github/workflows/ci.yml |
+| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "completed",
+    "organization": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+      "description": "Example organization for demo data",
+      "events_url": "https://api.github.com/orgs/example-org/events",
+      "hooks_url": "https://api.github.com/orgs/example-org/hooks",
+      "id": 12345678,
+      "issues_url": "https://api.github.com/orgs/example-org/issues",
+      "login": "example-org",
+      "members_url": "https://api.github.com/orgs/example-org/members{/member}",
+      "node_id": "O_kgDOBb1AaA",
+      "public_members_url": "https://api.github.com/orgs/example-org/public_members{/member}",
+      "repos_url": "https://api.github.com/orgs/example-org/repos",
+      "url": "https://api.github.com/orgs/example-org"
+    },
+    "repository": {
+      "created_at": "2024-05-10T12:00:00Z",
+      "default_branch": "main",
+      "description": "Example repository for webhook payloads",
+      "fork": false,
+      "full_name": "example-org/example-repo",
+      "html_url": "https://github.com/example-org/example-repo",
+      "id": 987654321,
+      "name": "example-repo",
+      "node_id": "R_kgDOAbCdEf",
+      "owner": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+        "gravatar_id": "",
+        "html_url": "https://github.com/example-org",
+        "id": 12345678,
+        "login": "example-org",
+        "node_id": "O_kgDOBb1AaA",
+        "site_admin": false,
+        "type": "Organization",
+        "url": "https://api.github.com/users/example-org"
+      },
+      "private": false,
+      "pushed_at": "2026-03-10T14:22:11Z",
+      "updated_at": "2026-03-10T13:50:00Z",
+      "url": "https://api.github.com/repos/example-org/example-repo"
+    },
+    "sender": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/87654321?v=4",
+      "gravatar_id": "",
+      "html_url": "https://github.com/alexdoe",
+      "id": 87654321,
+      "login": "alexdoe",
+      "node_id": "MDQ6VXNlcjg3NjU0MzIx",
+      "site_admin": false,
+      "type": "User",
+      "url": "https://api.github.com/users/alexdoe"
+    },
+    "workflow": {
+      "badge_url": "https://github.com/example-org/example-repo/workflows/CI/badge.svg",
+      "created_at": "2024-05-10T12:00:00Z",
+      "html_url": "https://github.com/example-org/example-repo/actions/workflows/ci.yml",
+      "id": 9876543,
+      "name": "CI",
+      "node_id": "W_kwDOBb1AaA0123456",
+      "path": ".github/workflows/ci.yml",
+      "state": "active",
+      "updated_at": "2026-03-01T10:00:00Z",
+      "url": "https://api.github.com/repos/example-org/example-repo/actions/workflows/9876543"
+    },
+    "workflow_run": {
+      "actor": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/87654321?v=4",
+        "gravatar_id": "",
+        "html_url": "https://github.com/alexdoe",
+        "id": 87654321,
+        "login": "alexdoe",
+        "node_id": "MDQ6VXNlcjg3NjU0MzIx",
+        "site_admin": false,
+        "type": "User",
+        "url": "https://api.github.com/users/alexdoe"
+      },
+      "artifacts_url": "https://api.github.com/repos/example-org/example-repo/actions/runs/12345678901/artifacts",
+      "cancel_url": "https://api.github.com/repos/example-org/example-repo/actions/runs/12345678901/cancel",
+      "check_suite_id": 11223344556,
+      "check_suite_node_id": "CS_kwDOBb1AaA0000000",
+      "check_suite_url": "https://api.github.com/repos/example-org/example-repo/check-suites/11223344556",
+      "conclusion": "success",
+      "created_at": "2026-03-10T14:22:11Z",
+      "event": "push",
+      "head_branch": "main",
+      "head_commit": {
+        "author": {
+          "email": "alex.doe@example.com",
+          "name": "Alex Doe"
+        },
+        "committer": {
+          "email": "noreply@example.com",
+          "name": "GitHub"
+        },
+        "id": "4f9c2e1a7b3d45c0d1e9f23456789abcdeffed01",
+        "message": "feat: add lightweight metrics endpoint (#42)\n\nAdds a basic /metrics handler with a minimal gauge.",
+        "timestamp": "2026-03-10T14:22:11+01:00",
+        "tree_id": "7a8b9c0d1e2f3a4b5c6d7e8f90123456789abcde"
+      },
+      "head_repository": {
+        "description": "Example repository for webhook payloads",
+        "fork": false,
+        "full_name": "example-org/example-repo",
+        "html_url": "https://github.com/example-org/example-repo",
+        "id": 987654321,
+        "name": "example-repo",
+        "node_id": "R_kgDOAbCdEf",
+        "owner": {
+          "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+          "gravatar_id": "",
+          "html_url": "https://github.com/example-org",
+          "id": 12345678,
+          "login": "example-org",
+          "node_id": "O_kgDOBb1AaA",
+          "site_admin": false,
+          "type": "Organization",
+          "url": "https://api.github.com/users/example-org"
+        },
+        "private": false,
+        "url": "https://api.github.com/repos/example-org/example-repo"
+      },
+      "head_sha": "4f9c2e1a7b3d45c0d1e9f23456789abcdeffed01",
+      "html_url": "https://github.com/example-org/example-repo/actions/runs/12345678901",
+      "id": 12345678901,
+      "jobs_url": "https://api.github.com/repos/example-org/example-repo/actions/runs/12345678901/jobs",
+      "logs_url": "https://api.github.com/repos/example-org/example-repo/actions/runs/12345678901/logs",
+      "name": "CI",
+      "node_id": "WFR_kwLOBb1AaA123456789",
+      "path": ".github/workflows/ci.yml",
+      "pull_requests": [],
+      "referenced_workflows": [],
+      "repository": {
+        "clone_url": "https://github.com/example-org/example-repo.git",
+        "created_at": "2024-05-10T12:00:00Z",
+        "default_branch": "main",
+        "description": "Example repository for webhook payloads",
+        "fork": false,
+        "full_name": "example-org/example-repo",
+        "git_url": "git://github.com/example-org/example-repo.git",
+        "html_url": "https://github.com/example-org/example-repo",
+        "id": 987654321,
+        "name": "example-repo",
+        "node_id": "R_kgDOAbCdEf",
+        "owner": {
+          "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+          "gravatar_id": "",
+          "html_url": "https://github.com/example-org",
+          "id": 12345678,
+          "login": "example-org",
+          "node_id": "O_kgDOBb1AaA",
+          "site_admin": false,
+          "type": "Organization",
+          "url": "https://api.github.com/users/example-org"
+        },
+        "private": false,
+        "pushed_at": "2026-03-10T14:22:11Z",
+        "ssh_url": "git@github.com:example-org/example-repo.git",
+        "updated_at": "2026-03-10T13:50:00Z",
+        "url": "https://api.github.com/repos/example-org/example-repo"
+      },
+      "rerun_url": "https://api.github.com/repos/example-org/example-repo/actions/runs/12345678901/rerun",
+      "run_attempt": 1,
+      "run_number": 42,
+      "run_started_at": "2026-03-10T14:22:11Z",
+      "status": "completed",
+      "triggering_actor": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/87654321?v=4",
+        "gravatar_id": "",
+        "html_url": "https://github.com/alexdoe",
+        "id": 87654321,
+        "login": "alexdoe",
+        "node_id": "MDQ6VXNlcjg3NjU0MzIx",
+        "site_admin": false,
+        "type": "User",
+        "url": "https://api.github.com/users/alexdoe"
+      },
+      "updated_at": "2026-03-10T14:25:30Z",
+      "url": "https://api.github.com/repos/example-org/example-repo/actions/runs/12345678901",
+      "workflow_id": 9876543,
+      "workflow_url": "https://api.github.com/repos/example-org/example-repo/actions/workflows/9876543"
+    }
+  },
+  "timestamp": "2026-03-10T14:25:30.31254162Z",
+  "type": "github.workflowRun"
+}
+```
+
+<a id="create-issue"></a>
+
+## Create Issue
+
+Create a new issue in a GitHub repository
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| repository | Repository | app-installation-resource | yes | - |
+| title | Title | string | yes | - |
+| body | Body | text | no | - |
+| assignees | Assignees | list | no | - |
+| labels | Labels | list | no | - |
+
+### Example Output
+
+```json
+{
+  "data": {
+    "html_url": "https://github.com/acme/widgets/issues/42",
+    "id": 101,
+    "number": 42,
+    "state": "open",
+    "title": "Fix flaky build",
+    "user": {
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.issue"
+}
+```
+
+<a id="create-release"></a>
+
+## Create Release
+
+Create a new release in a GitHub repository
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| repository | Repository | app-installation-resource | yes | - |
+| versionStrategy | Version Strategy | select | yes | How to determine the release version |
+| tagName | Tag Name | string | no | The name of the tag to create the release for |
+| name | Release Name | string | no | The title of the release |
+| draft | Draft | boolean | no | Mark this release as a draft |
+| prerelease | Prerelease | boolean | no | Mark this release as a prerelease |
+| generateReleaseNotes | Generate release notes | boolean | no | Automatically generate release notes from commits since the last release |
+| body | Additional notes | text | no | Optional text to append after auto-generated release notes. If auto-generation is off, this becomes the entire release description. |
+
+### Example Output
+
+```json
+{
+  "data": {
+    "draft": false,
+    "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
+    "id": 3001,
+    "name": "Release 1.2.3",
+    "prerelease": false,
+    "tag_name": "v1.2.3"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.release"
+}
+```
+
+<a id="delete-release"></a>
+
+## Delete Release
+
+Delete a release from a GitHub repository
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| repository | Repository | app-installation-resource | yes | - |
+| releaseStrategy | Release to Delete | select | yes | How to identify which release to delete |
+| tagName | Tag Name | string | no | Git tag identifying the release to delete. Supports template variables from previous steps. |
+| deleteTag | Also delete Git tag | boolean | no | When enabled, also deletes the associated Git tag from the repository |
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted_at": "2026-01-16T17:55:00Z",
+    "draft": false,
+    "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
+    "id": 3001,
+    "name": "Release 1.2.3",
+    "prerelease": false,
+    "tag_deleted": true,
+    "tag_name": "v1.2.3"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.release"
+}
+```
+
+<a id="get-issue"></a>
+
+## Get Issue
+
+Get a GitHub issue by number
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| repository | Repository | app-installation-resource | yes | - |
+| issueNumber | Issue Number | string | yes | - |
+
+### Example Output
+
+```json
+{
+  "data": {
+    "comments": 3,
+    "html_url": "https://github.com/acme/widgets/issues/42",
+    "id": 101,
+    "number": 42,
+    "state": "open",
+    "title": "Fix flaky build",
+    "user": {
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.issue"
+}
+```
+
+<a id="publish-commit-status"></a>
+
+## Publish Commit Status
+
+Publish a status check to a GitHub commit
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| repository | Repository | app-installation-resource | yes | - |
+| sha | Commit SHA | string | yes | The full SHA of the commit to attach the status to |
+| state | State | select | yes | - |
+| context | Context | string | yes | A label to identify this status check |
+| description | Description | text | no | Short description of the status (max ~140 characters) |
+| targetUrl | Target URL | string | no | e.g. Link to build logs, test results, ... |
+
+### Example Output
+
+```json
+{
+  "data": {
+    "context": "ci/build",
+    "created_at": "2026-01-16T17:45:00Z",
+    "description": "All checks passed",
+    "state": "success",
+    "target_url": "https://ci.example.com/builds/123",
+    "updated_at": "2026-01-16T17:45:10Z"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.commitStatus"
+}
+```
+
+<a id="run-workflow"></a>
+
+## Run Workflow
+
+Run GitHub Actions workflow
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| repository | Repository | app-installation-resource | yes | - |
+| workflowFile | Workflow file | string | yes | - |
+| ref | Branch or tag | git-ref | yes | - |
+| inputs | Inputs | list | no | - |
+
+### Example Output
+
+```json
+{
+  "data": {
+    "workflow_run": {
+      "conclusion": "success",
+      "html_url": "https://github.com/acme/widgets/actions/runs/9001",
+      "id": 9001,
+      "status": "completed"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.workflow.finished"
+}
+```
+
+<a id="update-issue"></a>
+
+## Update Issue
+
+Update a GitHub issue
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| repository | Repository | app-installation-resource | yes | - |
+| issueNumber | Issue Number | number | yes | - |
+| title | Title | string | no | - |
+| body | Body | text | no | - |
+| state | State | select | no | - |
+| assignees | Assignees | list | no | - |
+| labels | Labels | list | no | - |
+
+### Example Output
+
+```json
+{
+  "data": {
+    "html_url": "https://github.com/acme/widgets/issues/42",
+    "id": 101,
+    "number": 42,
+    "state": "closed",
+    "title": "Fix flaky build",
+    "updated_at": "2026-01-16T17:40:00Z"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.issue"
+}
+```
+
+<a id="update-release"></a>
+
+## Update Release
+
+Update an existing release in a GitHub repository
+
+### Configuration
+
+| Name | Label | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| repository | Repository | app-installation-resource | yes | - |
+| releaseStrategy | Release Strategy | select | yes | How to identify which release to update |
+| tagName | Tag Name | string | no | Git tag identifying the release to update. Supports template variables from previous steps. |
+| name | Release Name | string | no | Update the release title (leave empty to keep current) |
+| generateReleaseNotes | Generate release notes | boolean | no | Automatically generate release notes from commits since the last release. If body is also provided, custom text is appended. |
+| body | Release Notes | text | no | Update release description (leave empty to keep current) |
+| draft | Draft | boolean | no | Mark release as draft or publish it |
+| prerelease | Prerelease | boolean | no | Mark as prerelease or stable release |
+
+### Example Output
+
+```json
+{
+  "data": {
+    "draft": false,
+    "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
+    "id": 3001,
+    "name": "Release 1.2.3",
+    "prerelease": false,
+    "tag_name": "v1.2.3",
+    "updated_at": "2026-01-16T17:50:00Z"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.release"
 }
 ```
 
