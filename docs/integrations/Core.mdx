@@ -215,19 +215,16 @@ Just pass events through without any additional processing
 
 ## Time Gate
 
-Route events based on time conditions - include or exclude specific time windows
+Route events based on active days and time windows, with optional excluded dates
 
 ### Configuration
 
 | Name | Label | Type | Required | Description |
 | --- | --- | --- | --- | --- |
-| mode | Mode | select | yes | - |
-| days | Days of Week | multi-select | no | - |
-| startDayInYear | Start Day (MM/DD) | day-in-year | no | Start day in MM/DD format (e.g., 12/25 for Christmas) |
-| startTime | Start Time (HH:MM) | time | yes | Start time in HH:MM format (24-hour), e.g., 09:30 |
-| endDayInYear | End Day (MM/DD) | day-in-year | no | End day in MM/DD format (e.g., 01/01 for New Year) |
-| endTime | End Time (HH:MM) | time | yes | End time in HH:MM format (24-hour), e.g., 17:30 |
-| timezone | Timezone | select | yes | Timezone offset for time-based calculations (default: UTC) |
+| days | Active Days | days-of-week | yes | Select the days of the week when the gate can open |
+| timeRange | Active Time | time-range | yes | Time range in HH:MM-HH:MM format (24-hour), e.g., 09:00-17:30 |
+| timezone | Timezone | timezone | yes | Timezone offset for time-based calculations (default: current) |
+| excludeDates | Exclude Dates (MM/DD) | list (day-in-year) | no | Optional list of specific dates (MM/DD) to exclude, such as holidays |
 
 ### Example Output
 
@@ -368,4 +365,3 @@ Start a new execution chain when a webhook is called
   }
 }
 ```
-

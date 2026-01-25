@@ -18,6 +18,8 @@ const (
 	FieldTypeDate        = "date"
 	FieldTypeDateTime    = "datetime"
 	FieldTypeTimezone    = "timezone"
+	FieldTypeDaysOfWeek  = "days-of-week"
+	FieldTypeTimeRange   = "time-range"
 
 	/*
 	 * Special field types
