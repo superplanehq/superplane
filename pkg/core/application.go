@@ -10,7 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/oidc"
 )
 
-type Application interface {
+type Integration interface {
 	/*
 	 * The name of the application.
 	 */

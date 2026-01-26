@@ -14,7 +14,7 @@
       "name": "Organizations"
     },
     {
-      "name": "Applications"
+      "name": "Integrations"
     },
     {
       "name": "Secrets"
@@ -58,30 +58,6 @@
     "application/json"
   ],
   "paths": {
-    "/api/v1/applications": {
-      "get": {
-        "summary": "List available applications",
-        "description": "List available applications",
-        "operationId": "Applications_ListApplications",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneApplicationsListApplicationsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "tags": [
-          "Application"
-        ]
-      }
-    },
     "/api/v1/blueprints": {
       "get": {
         "summary": "List blueprints",
@@ -662,6 +638,30 @@
         ]
       }
     },
+    "/api/v1/integrations": {
+      "get": {
+        "summary": "List available integrations",
+        "description": "List available integrations",
+        "operationId": "Integrations_ListIntegrations",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneIntegrationsListIntegrationsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Integration"
+        ]
+      }
+    },
     "/api/v1/invite-links/{token}/accept": {
       "post": {
         "summary": "Accept an invite link",
@@ -874,16 +874,16 @@
         ]
       }
     },
-    "/api/v1/organizations/{id}/applications": {
+    "/api/v1/organizations/{id}/integrations": {
       "get": {
-        "summary": "List applications in an organization",
-        "description": "Returns a list of applications in an organization",
-        "operationId": "Organizations_ListApplications",
+        "summary": "List integrations in an organization",
+        "description": "Returns a list of integrations in an organization",
+        "operationId": "Organizations_ListIntegrations",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneOrganizationsListApplicationsResponse"
+              "$ref": "#/definitions/SuperplaneOrganizationsListIntegrationsResponse"
             }
           },
           "default": {
@@ -906,14 +906,14 @@
         ]
       },
       "post": {
-        "summary": "Install application on organization",
-        "description": "Install an application on an organization",
-        "operationId": "Organizations_InstallApplication",
+        "summary": "Create organization integration",
+        "description": "Create an organization integration",
+        "operationId": "Organizations_CreateIntegration",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/OrganizationsInstallApplicationResponse"
+              "$ref": "#/definitions/OrganizationsCreateIntegrationResponse"
             }
           },
           "default": {
@@ -935,7 +935,7 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/OrganizationsInstallApplicationBody"
+              "$ref": "#/definitions/OrganizationsCreateIntegrationBody"
             }
           }
         ],
@@ -944,16 +944,16 @@
         ]
       }
     },
-    "/api/v1/organizations/{id}/applications/{installationId}": {
+    "/api/v1/organizations/{id}/integrations/{integrationId}": {
       "get": {
-        "summary": "Describe an application in an organization",
-        "description": "Returns details of a specific application in an organization",
-        "operationId": "Organizations_DescribeApplication",
+        "summary": "Describe an integration in an organization",
+        "description": "Returns details of a specific integration in an organization",
+        "operationId": "Organizations_DescribeIntegration",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/OrganizationsDescribeApplicationResponse"
+              "$ref": "#/definitions/OrganizationsDescribeIntegrationResponse"
             }
           },
           "default": {
@@ -971,7 +971,7 @@
             "type": "string"
           },
           {
-            "name": "installationId",
+            "name": "integrationId",
             "in": "path",
             "required": true,
             "type": "string"
@@ -982,14 +982,14 @@
         ]
       },
       "delete": {
-        "summary": "Uninstall application",
-        "description": "Uninstalls an application from an organization",
-        "operationId": "Organizations_UninstallApplication",
+        "summary": "Delete organization integration",
+        "description": "Deletes an integration from an organization",
+        "operationId": "Organizations_DeleteIntegration",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/OrganizationsUninstallApplicationResponse"
+              "$ref": "#/definitions/OrganizationsDeleteIntegrationResponse"
             }
           },
           "default": {
@@ -1007,7 +1007,7 @@
             "type": "string"
           },
           {
-            "name": "installationId",
+            "name": "integrationId",
             "in": "path",
             "required": true,
             "type": "string"
@@ -1018,14 +1018,14 @@
         ]
       },
       "patch": {
-        "summary": "Update application installation",
-        "description": "Updates the configuration of an installed application",
-        "operationId": "Organizations_UpdateApplication",
+        "summary": "Update integration",
+        "description": "Updates the configuration for an organization integration",
+        "operationId": "Organizations_UpdateIntegration",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/OrganizationsUpdateApplicationResponse"
+              "$ref": "#/definitions/OrganizationsUpdateIntegrationResponse"
             }
           },
           "default": {
@@ -1043,7 +1043,7 @@
             "type": "string"
           },
           {
-            "name": "installationId",
+            "name": "integrationId",
             "in": "path",
             "required": true,
             "type": "string"
@@ -1053,7 +1053,7 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/OrganizationsUpdateApplicationBody"
+              "$ref": "#/definitions/OrganizationsUpdateIntegrationBody"
             }
           }
         ],
@@ -1062,16 +1062,16 @@
         ]
       }
     },
-    "/api/v1/organizations/{id}/applications/{installationId}/resources": {
+    "/api/v1/organizations/{id}/integrations/{integrationId}/resources": {
       "get": {
-        "summary": "List application resources",
-        "description": "Lists resources for an application installation",
-        "operationId": "Organizations_ListApplicationResources",
+        "summary": "List integration resources",
+        "description": "Lists resources for an integration",
+        "operationId": "Organizations_ListIntegrationResources",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/OrganizationsListApplicationResourcesResponse"
+              "$ref": "#/definitions/OrganizationsListIntegrationResourcesResponse"
             }
           },
           "default": {
@@ -1089,7 +1089,7 @@
             "type": "string"
           },
           {
-            "name": "installationId",
+            "name": "integrationId",
             "in": "path",
             "required": true,
             "type": "string"
@@ -2827,64 +2827,6 @@
     }
   },
   "definitions": {
-    "AppInstallationNodeRef": {
-      "type": "object",
-      "properties": {
-        "workflowId": {
-          "type": "string"
-        },
-        "workflowName": {
-          "type": "string"
-        },
-        "nodeId": {
-          "type": "string"
-        },
-        "nodeName": {
-          "type": "string"
-        }
-      }
-    },
-    "ApplicationsApplicationDefinition": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "label": {
-          "type": "string"
-        },
-        "icon": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "configuration": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ConfigurationField"
-          }
-        },
-        "components": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsComponent"
-          }
-        },
-        "triggers": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/TriggersTrigger"
-          }
-        },
-        "installationInstructions": {
-          "type": "string"
-        }
-      }
-    },
     "AuthorizationDomainType": {
       "type": "string",
       "enum": [
@@ -3026,17 +2968,6 @@
         }
       }
     },
-    "ComponentsAppInstallationRef": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        }
-      }
-    },
     "ComponentsComponent": {
       "type": "object",
       "properties": {
@@ -3114,6 +3045,17 @@
         }
       }
     },
+    "ComponentsIntegrationRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
     "ComponentsListComponentActionsResponse": {
       "type": "object",
       "properties": {
@@ -3174,8 +3116,8 @@
         "isCollapsed": {
           "type": "boolean"
         },
-        "appInstallation": {
-          "$ref": "#/definitions/ComponentsAppInstallationRef"
+        "integration": {
+          "$ref": "#/definitions/ComponentsIntegrationRef"
         },
         "errorMessage": {
           "type": "string"
@@ -3709,6 +3651,64 @@
         }
       }
     },
+    "IntegrationNodeRef": {
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "string"
+        },
+        "workflowName": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "nodeName": {
+          "type": "string"
+        }
+      }
+    },
+    "IntegrationsIntegrationDefinition": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "configuration": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationField"
+          }
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsComponent"
+          }
+        },
+        "triggers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/TriggersTrigger"
+          }
+        },
+        "installationInstructions": {
+          "type": "string"
+        }
+      }
+    },
     "MeRegenerateTokenResponse": {
       "type": "object",
       "properties": {
@@ -3749,88 +3749,6 @@
         }
       }
     },
-    "OrganizationsAppInstallation": {
-      "type": "object",
-      "properties": {
-        "metadata": {
-          "$ref": "#/definitions/OrganizationsAppInstallationMetadata"
-        },
-        "spec": {
-          "$ref": "#/definitions/OrganizationsAppInstallationSpec"
-        },
-        "status": {
-          "$ref": "#/definitions/OrganizationsAppInstallationStatus"
-        }
-      }
-    },
-    "OrganizationsAppInstallationMetadata": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
-    "OrganizationsAppInstallationResourceRef": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "id": {
-          "type": "string"
-        }
-      }
-    },
-    "OrganizationsAppInstallationSpec": {
-      "type": "object",
-      "properties": {
-        "appName": {
-          "type": "string"
-        },
-        "configuration": {
-          "type": "object"
-        }
-      }
-    },
-    "OrganizationsAppInstallationStatus": {
-      "type": "object",
-      "properties": {
-        "state": {
-          "type": "string"
-        },
-        "stateDescription": {
-          "type": "string"
-        },
-        "metadata": {
-          "type": "object"
-        },
-        "browserAction": {
-          "$ref": "#/definitions/OrganizationsBrowserAction"
-        },
-        "usedIn": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/AppInstallationNodeRef"
-          }
-        }
-      }
-    },
     "OrganizationsBrowserAction": {
       "type": "object",
       "properties": {
@@ -3851,6 +3769,28 @@
         }
       }
     },
+    "OrganizationsCreateIntegrationBody": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "integrationName": {
+          "type": "string"
+        },
+        "configuration": {
+          "type": "object"
+        }
+      }
+    },
+    "OrganizationsCreateIntegrationResponse": {
+      "type": "object",
+      "properties": {
+        "integration": {
+          "$ref": "#/definitions/OrganizationsIntegration"
+        }
+      }
+    },
     "OrganizationsCreateInvitationBody": {
       "type": "object",
       "properties": {
@@ -3867,14 +3807,17 @@
         }
       }
     },
+    "OrganizationsDeleteIntegrationResponse": {
+      "type": "object"
+    },
     "OrganizationsDeleteOrganizationResponse": {
       "type": "object"
     },
-    "OrganizationsDescribeApplicationResponse": {
+    "OrganizationsDescribeIntegrationResponse": {
       "type": "object",
       "properties": {
-        "installation": {
-          "$ref": "#/definitions/OrganizationsAppInstallation"
+        "integration": {
+          "$ref": "#/definitions/OrganizationsIntegration"
         }
       }
     },
@@ -3894,13 +3837,57 @@
         }
       }
     },
-    "OrganizationsInstallApplicationBody": {
+    "OrganizationsIntegration": {
       "type": "object",
       "properties": {
-        "appName": {
+        "metadata": {
+          "$ref": "#/definitions/OrganizationsIntegrationMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/OrganizationsIntegrationSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/OrganizationsIntegrationStatus"
+        }
+      }
+    },
+    "OrganizationsIntegrationMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
           "type": "string"
         },
-        "installationName": {
+        "name": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "OrganizationsIntegrationResourceRef": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        }
+      }
+    },
+    "OrganizationsIntegrationSpec": {
+      "type": "object",
+      "properties": {
+        "integrationName": {
           "type": "string"
         },
         "configuration": {
@@ -3908,11 +3895,27 @@
         }
       }
     },
-    "OrganizationsInstallApplicationResponse": {
+    "OrganizationsIntegrationStatus": {
       "type": "object",
       "properties": {
-        "installation": {
-          "$ref": "#/definitions/OrganizationsAppInstallation"
+        "state": {
+          "type": "string"
+        },
+        "stateDescription": {
+          "type": "string"
+        },
+        "metadata": {
+          "type": "object"
+        },
+        "browserAction": {
+          "$ref": "#/definitions/OrganizationsBrowserAction"
+        },
+        "usedIn": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/IntegrationNodeRef"
+          }
         }
       }
     },
@@ -3962,14 +3965,14 @@
         }
       }
     },
-    "OrganizationsListApplicationResourcesResponse": {
+    "OrganizationsListIntegrationResourcesResponse": {
       "type": "object",
       "properties": {
         "resources": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/OrganizationsAppInstallationResourceRef"
+            "$ref": "#/definitions/OrganizationsIntegrationResourceRef"
           }
         }
       }
@@ -4030,10 +4033,7 @@
         }
       }
     },
-    "OrganizationsUninstallApplicationResponse": {
-      "type": "object"
-    },
-    "OrganizationsUpdateApplicationBody": {
+    "OrganizationsUpdateIntegrationBody": {
       "type": "object",
       "properties": {
         "configuration": {
@@ -4041,11 +4041,11 @@
         }
       }
     },
-    "OrganizationsUpdateApplicationResponse": {
+    "OrganizationsUpdateIntegrationResponse": {
       "type": "object",
       "properties": {
-        "installation": {
-          "$ref": "#/definitions/OrganizationsAppInstallation"
+        "integration": {
+          "$ref": "#/definitions/OrganizationsIntegration"
         }
       }
     },
@@ -4352,18 +4352,6 @@
         }
       }
     },
-    "SuperplaneApplicationsListApplicationsResponse": {
-      "type": "object",
-      "properties": {
-        "applications": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ApplicationsApplicationDefinition"
-          }
-        }
-      }
-    },
     "SuperplaneBlueprintsOutputChannel": {
       "type": "object",
       "properties": {
@@ -4403,6 +4391,18 @@
         }
       }
     },
+    "SuperplaneIntegrationsListIntegrationsResponse": {
+      "type": "object",
+      "properties": {
+        "integrations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/IntegrationsIntegrationDefinition"
+          }
+        }
+      }
+    },
     "SuperplaneMeUser": {
       "type": "object",
       "properties": {
@@ -4424,14 +4424,14 @@
         }
       }
     },
-    "SuperplaneOrganizationsListApplicationsResponse": {
+    "SuperplaneOrganizationsListIntegrationsResponse": {
       "type": "object",
       "properties": {
-        "applications": {
+        "integrations": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/OrganizationsAppInstallation"
+            "$ref": "#/definitions/OrganizationsIntegration"
           }
         }
       }

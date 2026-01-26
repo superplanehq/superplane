@@ -24,7 +24,7 @@ func Test__AppInstallationRequestWorker_Sync(t *testing.T) {
 	// Register a dummy application and install it.
 	//
 	var syncCalled bool
-	r.Registry.Applications["dummy"] = support.NewDummyApplication(func(ctx core.SyncContext) error {
+	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
 		ctx.AppInstallation.SetState("ready", "")
 		syncCalled = true
 		return nil
@@ -68,7 +68,7 @@ func Test__AppInstallationRequestWorker_SyncError(t *testing.T) {
 	// Register a dummy application and install it.
 	//
 	var syncCalled bool
-	r.Registry.Applications["dummy"] = support.NewDummyApplication(func(ctx core.SyncContext) error {
+	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
 		syncCalled = true
 		return errors.New("sync failed")
 	})

@@ -15,7 +15,7 @@ import (
 var (
 	registeredComponents   = make(map[string]core.Component)
 	registeredTriggers     = make(map[string]core.Trigger)
-	registeredApplications = make(map[string]core.Application)
+	registeredIntegrations = make(map[string]core.Integration)
 	registeredWidgets      = make(map[string]core.Widget)
 	mu                     sync.RWMutex
 )
@@ -32,10 +32,10 @@ func RegisterTrigger(name string, t core.Trigger) {
 	registeredTriggers[name] = t
 }
 
-func RegisterApplication(name string, i core.Application) {
+func RegisterIntegration(name string, i core.Integration) {
 	mu.Lock()
 	defer mu.Unlock()
-	registeredApplications[name] = i
+	registeredIntegrations[name] = i
 }
 
 func RegisterWidget(name string, w core.Widget) {
@@ -47,7 +47,7 @@ func RegisterWidget(name string, w core.Widget) {
 type Registry struct {
 	httpClient   *http.Client
 	Encryptor    crypto.Encryptor
-	Applications map[string]core.Application
+	Integrations map[string]core.Integration
 	Components   map[string]core.Component
 	Triggers     map[string]core.Trigger
 	Widgets      map[string]core.Widget
@@ -59,7 +59,7 @@ func NewRegistry(encryptor crypto.Encryptor) *Registry {
 		httpClient:   &http.Client{Timeout: 30 * time.Second},
 		Components:   map[string]core.Component{},
 		Triggers:     map[string]core.Trigger{},
-		Applications: map[string]core.Application{},
+		Integrations: map[string]core.Integration{},
 		Widgets:      map[string]core.Widget{},
 	}
 
@@ -83,8 +83,8 @@ func (r *Registry) Init() {
 		r.Triggers[name] = NewPanicableTrigger(trigger)
 	}
 
-	for name, application := range registeredApplications {
-		r.Applications[name] = NewPanicableApplication(application)
+	for name, integration := range registeredIntegrations {
+		r.Integrations[name] = NewPanicableIntegration(integration)
 	}
 
 	//
@@ -128,7 +128,7 @@ func (r *Registry) GetTrigger(name string) (core.Trigger, error) {
 		return trigger, nil
 	}
 
-	return r.GetApplicationTrigger(parts[0], name)
+	return r.GetIntegrationTrigger(parts[0], name)
 }
 
 func (r *Registry) ListComponents() []core.Component {
@@ -159,7 +159,7 @@ func (r *Registry) GetComponent(name string) (core.Component, error) {
 		return component, nil
 	}
 
-	return r.GetApplicationComponent(parts[0], name)
+	return r.GetIntegrationComponent(parts[0], name)
 }
 
 func (r *Registry) GetWidget(name string) (core.Widget, error) {
@@ -185,54 +185,50 @@ func (r *Registry) ListWidgets() []core.Widget {
 	return widgets
 }
 
-func (r *Registry) GetApplication(name string) (core.Application, error) {
-	application, ok := r.Applications[name]
+func (r *Registry) GetIntegration(name string) (core.Integration, error) {
+	integration, ok := r.Integrations[name]
 	if !ok {
-		return nil, fmt.Errorf("application %s not registered", name)
+		return nil, fmt.Errorf("integration %s not registered", name)
 	}
 
-	return application, nil
+	return integration, nil
 }
 
-func (r *Registry) ListApplications() []core.Application {
-	applications := make([]core.Application, 0, len(r.Applications))
-	for _, application := range r.Applications {
-		applications = append(applications, application)
+func (r *Registry) ListIntegrations() []core.Integration {
+	integrations := make([]core.Integration, 0, len(r.Integrations))
+	for _, integration := range r.Integrations {
+		integrations = append(integrations, integration)
 	}
 
-	sort.Slice(applications, func(i, j int) bool {
-		return applications[i].Name() < applications[j].Name()
-	})
-
-	return applications
+	return integrations
 }
 
-func (r *Registry) GetApplicationTrigger(appName, triggerName string) (core.Trigger, error) {
-	application, err := r.GetApplication(appName)
+func (r *Registry) GetIntegrationTrigger(integrationName, triggerName string) (core.Trigger, error) {
+	integration, err := r.GetIntegration(integrationName)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, trigger := range application.Triggers() {
+	for _, trigger := range integration.Triggers() {
 		if trigger.Name() == triggerName {
 			return trigger, nil
 		}
 	}
 
-	return nil, fmt.Errorf("trigger %s not found for app %s", triggerName, appName)
+	return nil, fmt.Errorf("trigger %s not found for integration %s", triggerName, integrationName)
 }
 
-func (r *Registry) GetApplicationComponent(appName, componentName string) (core.Component, error) {
-	application, err := r.GetApplication(appName)
+func (r *Registry) GetIntegrationComponent(integrationName, componentName string) (core.Component, error) {
+	integration, err := r.GetIntegration(integrationName)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, component := range application.Components() {
+	for _, component := range integration.Components() {
 		if component.Name() == componentName {
 			return component, nil
 		}
 	}
 
-	return nil, fmt.Errorf("component %s not found for app %s", componentName, appName)
+	return nil, fmt.Errorf("component %s not found for integration %s", componentName, integrationName)
 }

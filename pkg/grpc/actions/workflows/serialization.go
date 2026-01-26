@@ -286,12 +286,12 @@ func findAndValidateTrigger(registry *registry.Registry, organizationID string, 
 		return registry.GetTrigger(parts[0])
 	}
 
-	err := validateAppInstallation(organizationID, node.AppInstallation)
+	err := validateIntegration(organizationID, node.Integration)
 	if err != nil {
 		return nil, err
 	}
 
-	return registry.GetApplicationTrigger(parts[0], node.Trigger.Name)
+	return registry.GetIntegrationTrigger(parts[0], node.Trigger.Name)
 }
 
 func findAndValidateWidget(registry *registry.Registry, organizationID string, node *compb.Node) (core.Widget, error) {
@@ -312,15 +312,15 @@ func findAndValidateComponent(registry *registry.Registry, organizationID string
 		return registry.GetComponent(parts[0])
 	}
 
-	err := validateAppInstallation(organizationID, node.AppInstallation)
+	err := validateIntegration(organizationID, node.Integration)
 	if err != nil {
 		return nil, err
 	}
 
-	return registry.GetApplicationComponent(parts[0], node.Component.Name)
+	return registry.GetIntegrationComponent(parts[0], node.Component.Name)
 }
 
-func validateAppInstallation(organizationID string, ref *compb.AppInstallationRef) error {
+func validateIntegration(organizationID string, ref *compb.IntegrationRef) error {
 	if ref == nil || ref.Id == "" {
 		return fmt.Errorf("app installation is required")
 	}

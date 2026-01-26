@@ -33,10 +33,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
-	pbApplications "github.com/superplanehq/superplane/pkg/protos/applications"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
+	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbMe "github.com/superplanehq/superplane/pkg/protos/me"
 	pbOrg "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
@@ -191,7 +191,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
-	err = pbApplications.RegisterApplicationsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbIntegrations.RegisterIntegrationsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
 	}
@@ -250,7 +250,6 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/organizations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/invite-links").Handler(protectedAccountGRPCHandler)
 	s.Router.PathPrefix("/api/v1/integrations").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/applications").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/secrets").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/me").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/components").Handler(protectedGRPCHandler)
@@ -489,7 +488,7 @@ func (s *Server) HandleAppInstallationRequest(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	app, err := s.registry.GetApplication(appInstallation.AppName)
+	app, err := s.registry.GetIntegration(appInstallation.AppName)
 	if err != nil {
 		http.Error(w, "app not found", http.StatusNotFound)
 		return

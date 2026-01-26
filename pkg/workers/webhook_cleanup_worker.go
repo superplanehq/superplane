@@ -91,7 +91,7 @@ func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, webhoo
 		return err
 	}
 
-	app, err := w.registry.GetApplication(appInstallation.AppName)
+	app, err := w.registry.GetIntegration(appInstallation.AppName)
 	if err != nil {
 		return err
 	}

@@ -97,9 +97,9 @@ func (w *AppInstallationRequestWorker) syncAppInstallation(tx *gorm.DB, request 
 		return fmt.Errorf("failed to find app installation: %v", err)
 	}
 
-	app, err := w.registry.GetApplication(installation.AppName)
+	app, err := w.registry.GetIntegration(installation.AppName)
 	if err != nil {
-		return fmt.Errorf("application %s not found", installation.AppName)
+		return fmt.Errorf("integration %s not found", installation.AppName)
 	}
 
 	appCtx := contexts.NewAppInstallationContext(tx, nil, installation, w.encryptor, w.registry)

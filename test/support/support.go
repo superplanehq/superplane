@@ -21,8 +21,6 @@ import (
 	"gorm.io/gorm/clause"
 
 	// Import components, triggers, and applications to register them via init()
-	_ "github.com/superplanehq/superplane/pkg/applications/github"
-	_ "github.com/superplanehq/superplane/pkg/applications/semaphore"
 	_ "github.com/superplanehq/superplane/pkg/components/approval"
 	_ "github.com/superplanehq/superplane/pkg/components/filter"
 	_ "github.com/superplanehq/superplane/pkg/components/http"
@@ -30,6 +28,8 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/merge"
 	_ "github.com/superplanehq/superplane/pkg/components/noop"
 	_ "github.com/superplanehq/superplane/pkg/components/wait"
+	_ "github.com/superplanehq/superplane/pkg/integrations/github"
+	_ "github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
 	_ "github.com/superplanehq/superplane/pkg/widgets/annotation"

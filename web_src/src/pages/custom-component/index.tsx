@@ -5,11 +5,11 @@ import ELK from "elkjs/lib/elk.bundled.js";
 import { AlertCircle, Component as ComponentIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ComponentsComponent, ComponentsNode, ComponentsAppInstallationRef } from "../../api-client";
+import { ComponentsComponent, ComponentsIntegrationRef, ComponentsNode } from "../../api-client";
 import { Heading } from "../../components/Heading/heading";
 import { Button } from "../../components/ui/button";
 import { useBlueprint, useComponents, useUpdateBlueprint } from "../../hooks/useBlueprintData";
-import { useAvailableApplications, useInstalledApplications } from "../../hooks/useApplications";
+import { useAvailableIntegrations, useConnectedIntegrations } from "../../hooks/useIntegrations";
 import { BlockData } from "../../ui/CanvasPage/Block";
 import type { BreadcrumbItem, NewNodeData } from "../../ui/CustomComponentBuilderPage";
 import { CustomComponentBuilderPage } from "../../ui/CustomComponentBuilderPage";
@@ -138,8 +138,8 @@ export const CustomComponent = () => {
   // Fetch blueprint and components
   const { data: blueprint, isLoading: blueprintLoading } = useBlueprint(organizationId || "", blueprintId || "");
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
-  const { data: availableApplications = [], isLoading: applicationsLoading } = useAvailableApplications();
-  const { data: installedApplications = [] } = useInstalledApplications(organizationId!);
+  const { data: availableIntegrations = [], isLoading: integrationsLoading } = useAvailableIntegrations();
+  const { data: integrations = [] } = useConnectedIntegrations(organizationId!);
   const updateBlueprintMutation = useUpdateBlueprint(organizationId!, blueprintId!);
 
   usePageTitle([blueprint?.name || "Custom Component"]);
@@ -161,13 +161,13 @@ export const CustomComponent = () => {
   // Merge components from applications into the main components array
   const allComponents = useMemo(() => {
     const merged = [...components];
-    availableApplications.forEach((app) => {
-      if (app.components) {
-        merged.push(...app.components);
+    availableIntegrations.forEach((i) => {
+      if (i.components) {
+        merged.push(...i.components);
       }
     });
     return merged;
-  }, [components, availableApplications]);
+  }, [components, availableIntegrations]);
 
   // Save initial blueprint snapshot for revert functionality
   const saveSnapshot = useCallback(() => {
@@ -264,7 +264,7 @@ export const CustomComponent = () => {
               ...blockData,
               _originalComponent: node.component?.name,
               _originalConfiguration: node.configuration || {},
-              _appInstallationRef: node.appInstallation,
+              _integrationRef: node.integration,
             },
             position: node.position || { x: 0, y: 0 },
             selected: existingNode?.selected ?? false, // Preserve selection
@@ -368,7 +368,7 @@ export const CustomComponent = () => {
               name: nodeData.label as string,
               type: "TYPE_COMPONENT",
               configuration: nodeData._originalConfiguration || {},
-              appInstallation: nodeData._appInstallationRef,
+              integration: nodeData._integrationRef,
               position: {
                 x: Math.round(node.position.x),
                 y: Math.round(node.position.y),
@@ -495,8 +495,8 @@ export const CustomComponent = () => {
 
       // Check if this component is from an application
       let appName: string | undefined;
-      const componentApp = availableApplications.find((app) =>
-        app.components?.some((c) => c.name === (node.data as any)._originalComponent),
+      const componentApp = availableIntegrations.find((i) =>
+        i.components?.some((c) => c.name === (node.data as any)._originalComponent),
       );
       if (componentApp) {
         appName = componentApp.name;
@@ -511,10 +511,10 @@ export const CustomComponent = () => {
         configurationFields: component.configuration || [],
         appName,
         blockName: (node.data as any)._originalComponent,
-        appInstallationRef: (node.data as any)._appInstallationRef,
+        integrationRef: (node.data as any)._integrationRef,
       };
     },
-    [availableApplications],
+    [availableIntegrations],
   );
 
   const handleNodeConfigurationSave = useCallback(
@@ -522,7 +522,7 @@ export const CustomComponent = () => {
       nodeId: string,
       configuration: Record<string, any>,
       nodeName: string,
-      appInstallationRef?: ComponentsAppInstallationRef,
+      integrationRef?: ComponentsIntegrationRef,
     ) => {
       saveSnapshot();
 
@@ -571,7 +571,7 @@ export const CustomComponent = () => {
             ...blockData,
             _originalComponent: component.name,
             _originalConfiguration: filteredConfiguration,
-            _appInstallationRef: appInstallationRef,
+            _integrationRef: integrationRef,
           },
           selected: true,
         };
@@ -665,7 +665,7 @@ export const CustomComponent = () => {
           ...nodeData,
           label: nodeName.trim(),
           _originalConfiguration: filteredConfiguration,
-          _appInstallationRef: appInstallationRef,
+          _integrationRef: integrationRef,
         };
 
         if (nodeData.component) {
@@ -748,7 +748,7 @@ export const CustomComponent = () => {
           ...blockData,
           _originalComponent: component.name,
           _originalConfiguration: filteredConfiguration,
-          _appInstallationRef: newNodeData.appInstallationRef,
+          _integrationRef: newNodeData.integrationRef,
         },
         selected: true,
       };
@@ -914,7 +914,7 @@ export const CustomComponent = () => {
             name: nodeData.label as string,
             type: "TYPE_COMPONENT",
             configuration: nodeData._originalConfiguration || {},
-            appInstallation: nodeData._appInstallationRef,
+            integration: nodeData._integrationRef,
             position: {
               x: Math.round(node.position.x),
               y: Math.round(node.position.y),
@@ -999,7 +999,7 @@ export const CustomComponent = () => {
         sourceConnection: (templateNode.data as any).sourceConnection as
           | { nodeId: string; handleId: string | null }
           | undefined,
-        appName: buildingBlock?.appName,
+        integrationName: buildingBlock?.integrationName,
       });
     },
     [nodes],
@@ -1012,7 +1012,7 @@ export const CustomComponent = () => {
       buildingBlock: any;
       nodeName: string;
       configuration: Record<string, any>;
-      appName?: string;
+      integrationName?: string;
     }): Promise<void> => {
       if (!blueprint || !organizationId || !blueprintId) {
         return;
@@ -1128,7 +1128,7 @@ export const CustomComponent = () => {
           buildingBlock: block,
           nodeName: block.name || "",
           configuration: defaultConfiguration,
-          appName: block.appName,
+          integrationName: block.integrationName,
         });
 
         setTemplateNodeId(null);
@@ -1155,7 +1155,7 @@ export const CustomComponent = () => {
           configuration: {},
           position: templateNode.position,
           sourceConnection: (templateNode.data as any).sourceConnection,
-          appName: block.appName,
+          integrationName: block.integrationName,
         });
         setIsBuildingBlocksSidebarOpen(false);
         return;
@@ -1207,7 +1207,7 @@ export const CustomComponent = () => {
         configuration: {},
         position: pendingNodePosition,
         sourceConnection: pendingNodeSourceConnection,
-        appName: block.appName,
+        integrationName: block.integrationName,
       });
 
       setIsBuildingBlocksSidebarOpen(false);
@@ -1246,7 +1246,7 @@ export const CustomComponent = () => {
     return handleSaveBlueprint();
   }, [handleSaveBlueprint]);
 
-  if (blueprintLoading || componentsLoading || applicationsLoading) {
+  if (blueprintLoading || componentsLoading || integrationsLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b border-blue-600"></div>
@@ -1322,15 +1322,15 @@ export const CustomComponent = () => {
               configuration: {},
               position: templateNode.position,
               sourceConnection: (templateNode.data as any).sourceConnection,
-              appName: buildingBlock.appName,
+              integrationName: buildingBlock.integrationName,
             });
           }
         }}
         onRemoveTemplateNode={(nodeId) => setNodes((nds) => nds.filter((n) => n.id !== nodeId))}
         organizationId={organizationId}
         components={components}
-        availableApplications={availableApplications}
-        installedApplications={installedApplications}
+        availableIntegrations={availableIntegrations}
+        integrations={integrations}
         onSave={handleSave}
         isSaving={updateBlueprintMutation.isPending}
         unsavedMessage={hasUnsavedChanges ? "You have unsaved changes" : undefined}

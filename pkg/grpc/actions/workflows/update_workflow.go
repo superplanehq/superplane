@@ -217,10 +217,10 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 	now := time.Now()
 
 	var appInstallationID *uuid.UUID
-	if node.AppInstallationID != nil && *node.AppInstallationID != "" {
-		parsedID, err := uuid.Parse(*node.AppInstallationID)
+	if node.IntegrationID != nil && *node.IntegrationID != "" {
+		parsedID, err := uuid.Parse(*node.IntegrationID)
 		if err != nil {
-			return nil, fmt.Errorf("invalid app installation ID: %v", err)
+			return nil, fmt.Errorf("invalid integration ID: %v", err)
 		}
 		appInstallationID = &parsedID
 	}

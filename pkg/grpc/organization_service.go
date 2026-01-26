@@ -97,53 +97,53 @@ func (s *OrganizationService) AcceptInviteLink(ctx context.Context, req *pb.Invi
 	return organizations.AcceptInviteLink(ctx, s.authorizationService, accountID, req.Token)
 }
 
-func (s *OrganizationService) ListApplications(ctx context.Context, req *pb.ListApplicationsRequest) (*pb.ListApplicationsResponse, error) {
+func (s *OrganizationService) ListIntegrations(ctx context.Context, req *pb.ListIntegrationsRequest) (*pb.ListIntegrationsResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.ListApplications(ctx, s.registry, orgID)
+	return organizations.ListIntegrations(ctx, s.registry, orgID)
 }
 
-func (s *OrganizationService) DescribeApplication(ctx context.Context, req *pb.DescribeApplicationRequest) (*pb.DescribeApplicationResponse, error) {
+func (s *OrganizationService) DescribeIntegration(ctx context.Context, req *pb.DescribeIntegrationRequest) (*pb.DescribeIntegrationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.DescribeApplication(ctx, s.registry, orgID, req.InstallationId)
+	return organizations.DescribeIntegration(ctx, s.registry, orgID, req.IntegrationId)
 }
 
-func (s *OrganizationService) ListApplicationResources(ctx context.Context, req *pb.ListApplicationResourcesRequest) (*pb.ListApplicationResourcesResponse, error) {
+func (s *OrganizationService) ListIntegrationResources(ctx context.Context, req *pb.ListIntegrationResourcesRequest) (*pb.ListIntegrationResourcesResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.ListApplicationResources(ctx, s.registry, orgID, req.InstallationId, req.Type)
+	return organizations.ListIntegrationResources(ctx, s.registry, orgID, req.IntegrationId, req.Type)
 }
 
-func (s *OrganizationService) InstallApplication(ctx context.Context, req *pb.InstallApplicationRequest) (*pb.InstallApplicationResponse, error) {
+func (s *OrganizationService) CreateIntegration(ctx context.Context, req *pb.CreateIntegrationRequest) (*pb.CreateIntegrationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.InstallApplication(
+	return organizations.CreateIntegration(
 		ctx,
 		s.registry,
 		s.oidcProvider,
 		s.baseURL,
 		s.webhooksBaseURL,
 		orgID,
-		req.AppName,
-		req.InstallationName,
+		req.IntegrationName,
+		req.Name,
 		req.Configuration,
 	)
 }
 
-func (s *OrganizationService) UpdateApplication(ctx context.Context, req *pb.UpdateApplicationRequest) (*pb.UpdateApplicationResponse, error) {
+func (s *OrganizationService) UpdateIntegration(ctx context.Context, req *pb.UpdateIntegrationRequest) (*pb.UpdateIntegrationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.UpdateApplication(
+	return organizations.UpdateIntegration(
 		ctx,
 		s.registry,
 		s.oidcProvider,
 		s.baseURL,
 		s.webhooksBaseURL,
 		orgID,
-		req.InstallationId,
+		req.IntegrationId,
 		req.Configuration.AsMap(),
 	)
 }
 
-func (s *OrganizationService) UninstallApplication(ctx context.Context, req *pb.UninstallApplicationRequest) (*pb.UninstallApplicationResponse, error) {
+func (s *OrganizationService) DeleteIntegration(ctx context.Context, req *pb.DeleteIntegrationRequest) (*pb.DeleteIntegrationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.UninstallApplication(ctx, orgID, req.InstallationId)
+	return organizations.DeleteIntegration(ctx, orgID, req.IntegrationId)
 }
 
 func accountIDFromContext(ctx context.Context) (string, error) {

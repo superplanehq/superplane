@@ -55,7 +55,7 @@ func Test__WebhookProvisioner_RetryOnError(t *testing.T) {
 
 	provisioner := NewWebhookProvisioner("https://example.com", &BadEncryptor{}, r.Registry)
 
-	r.Registry.Applications["dummy"] = support.NewDummyApplicationWithSetupWebhook(
+	r.Registry.Integrations["dummy"] = support.NewDummyIntegrationWithSetupWebhook(
 		nil,
 		func(ctx core.SetupWebhookContext) (any, error) {
 			return nil, errors.New("oops")
@@ -98,7 +98,7 @@ func Test__WebhookProvisioner_MaxRetriesExceeded(t *testing.T) {
 
 	provisioner := NewWebhookProvisioner("https://example.com", &BadEncryptor{}, r.Registry)
 
-	r.Registry.Applications["dummy"] = support.NewDummyApplicationWithSetupWebhook(
+	r.Registry.Integrations["dummy"] = support.NewDummyIntegrationWithSetupWebhook(
 		nil,
 		func(ctx core.SetupWebhookContext) (any, error) {
 			return nil, errors.New("oops")

@@ -90,7 +90,7 @@ func (w *WebhookProvisioner) processAppInstallationWebhook(tx *gorm.DB, webhook 
 		return w.handleWebhookError(tx, webhook, err)
 	}
 
-	app, err := w.registry.GetApplication(appInstallation.AppName)
+	app, err := w.registry.GetIntegration(appInstallation.AppName)
 	if err != nil {
 		return w.handleWebhookError(tx, webhook, err)
 	}

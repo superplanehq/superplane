@@ -150,70 +150,70 @@ service Organizations {
     };
   }
 
-  rpc ListApplications(ListApplicationsRequest) returns (ListApplicationsResponse) {
+  rpc ListIntegrations(ListIntegrationsRequest) returns (ListIntegrationsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/applications"
+      get: "/api/v1/organizations/{id}/integrations"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List applications in an organization";
-      description: "Returns a list of applications in an organization";
+      summary: "List integrations in an organization";
+      description: "Returns a list of integrations in an organization";
       tags: "Organization";
     };
   }
 
-  rpc DescribeApplication(DescribeApplicationRequest) returns (DescribeApplicationResponse) {
+  rpc DescribeIntegration(DescribeIntegrationRequest) returns (DescribeIntegrationResponse) {
     option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/applications/{installation_id}"
+      get: "/api/v1/organizations/{id}/integrations/{integration_id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Describe an application in an organization";
-      description: "Returns details of a specific application in an organization";
+      summary: "Describe an integration in an organization";
+      description: "Returns details of a specific integration in an organization";
       tags: "Organization";
     };
   }
 
-  rpc ListApplicationResources(ListApplicationResourcesRequest) returns (ListApplicationResourcesResponse) {
+  rpc ListIntegrationResources(ListIntegrationResourcesRequest) returns (ListIntegrationResourcesResponse) {
     option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/applications/{installation_id}/resources"
+      get: "/api/v1/organizations/{id}/integrations/{integration_id}/resources"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List application resources";
-      description: "Lists resources for an application installation";
+      summary: "List integration resources";
+      description: "Lists resources for an integration";
       tags: "Organization";
     };
   }
 
-  rpc InstallApplication(InstallApplicationRequest) returns (InstallApplicationResponse) {
+  rpc CreateIntegration(CreateIntegrationRequest) returns (CreateIntegrationResponse) {
     option (google.api.http) = {
-      post: "/api/v1/organizations/{id}/applications"
+      post: "/api/v1/organizations/{id}/integrations"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Install application on organization";
-      description: "Install an application on an organization";
+      summary: "Create organization integration";
+      description: "Create an organization integration";
       tags: "Organization";
     };
   }
 
-  rpc UpdateApplication(UpdateApplicationRequest) returns (UpdateApplicationResponse) {
+  rpc UpdateIntegration(UpdateIntegrationRequest) returns (UpdateIntegrationResponse) {
     option (google.api.http) = {
-      patch: "/api/v1/organizations/{id}/applications/{installation_id}"
+      patch: "/api/v1/organizations/{id}/integrations/{integration_id}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update application installation";
-      description: "Updates the configuration of an installed application";
+      summary: "Update integration";
+      description: "Updates the configuration for an organization integration";
       tags: "Organization";
     };
   }
 
-  rpc UninstallApplication(UninstallApplicationRequest) returns (UninstallApplicationResponse) {
+  rpc DeleteIntegration(DeleteIntegrationRequest) returns (DeleteIntegrationResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/organizations/{id}/applications/{installation_id}"
+      delete: "/api/v1/organizations/{id}/integrations/{integration_id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Uninstall application";
-      description: "Uninstalls an application from an organization";
+      summary: "Delete organization integration";
+      description: "Deletes an integration from an organization";
       tags: "Organization";
     };
   }
@@ -327,68 +327,68 @@ message RemoveUserRequest {
 
 message RemoveUserResponse {}
 
-message ListApplicationsRequest {
+message ListIntegrationsRequest {
   string id = 1;
 }
 
-message ListApplicationsResponse {
-  repeated AppInstallation applications = 1;
+message ListIntegrationsResponse {
+  repeated Integration integrations = 1;
 }
 
-message InstallApplicationRequest {
+message CreateIntegrationRequest {
   string id = 1;
-  string app_name = 2;
-  string installation_name = 3;
+  string name = 2;
+  string integration_name = 3;
   google.protobuf.Struct configuration = 4;
 }
 
-message InstallApplicationResponse {
-  AppInstallation installation = 1;
+message CreateIntegrationResponse {
+  Integration integration = 1;
 }
 
-message DescribeApplicationRequest {
+message DescribeIntegrationRequest {
   string id = 1;
-  string installation_id = 2;
+  string integration_id = 2;
 }
 
-message DescribeApplicationResponse {
-  AppInstallation installation = 1;
+message DescribeIntegrationResponse {
+  Integration integration = 1;
 }
 
-message ListApplicationResourcesRequest {
+message ListIntegrationResourcesRequest {
   string id = 1;
-  string installation_id = 2;
+  string integration_id = 2;
   string type = 3;
 }
 
-message ListApplicationResourcesResponse {
-  repeated AppInstallationResourceRef resources = 1;
+message ListIntegrationResourcesResponse {
+  repeated IntegrationResourceRef resources = 1;
 }
 
-message AppInstallationResourceRef {
+message IntegrationResourceRef {
   string type = 1;
   string name = 2;
   string id = 3;
 }
 
-message UpdateApplicationRequest {
+message UpdateIntegrationRequest {
   string id = 1;
-  string installation_id = 2;
+  string integration_id = 2;
   google.protobuf.Struct configuration = 3;
 }
 
-message UpdateApplicationResponse {
-  AppInstallation installation = 1;
+message UpdateIntegrationResponse {
+  Integration integration = 1;
 }
 
-message UninstallApplicationRequest {
+message DeleteIntegrationRequest {
   string id = 1;
-  string installation_id = 2;
+  string integration_id = 2;
 }
 
-message UninstallApplicationResponse {}
+message DeleteIntegrationResponse {}
 
-message AppInstallation {
+message Integration {
   message Metadata {
     string id = 1;
     string name = 2;
@@ -397,7 +397,7 @@ message AppInstallation {
   }
 
   message Spec {
-    string app_name = 1;
+    string integration_name = 1;
     google.protobuf.Struct configuration = 2;
   }
 

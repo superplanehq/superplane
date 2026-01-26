@@ -41,7 +41,7 @@ func (c *AppInstallationContext) ID() uuid.UUID {
 }
 
 func (c *AppInstallationContext) RequestWebhook(configuration any) error {
-	app, err := c.registry.GetApplication(c.appInstallation.AppName)
+	app, err := c.registry.GetIntegration(c.appInstallation.AppName)
 	if err != nil {
 		return err
 	}
@@ -126,9 +126,9 @@ func (c *AppInstallationContext) GetConfig(name string) ([]byte, error) {
 		return nil, fmt.Errorf("config %s not found", name)
 	}
 
-	app, err := c.registry.GetApplication(c.appInstallation.AppName)
+	app, err := c.registry.GetIntegration(c.appInstallation.AppName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get app %s: %w", c.appInstallation.AppName, err)
+		return nil, fmt.Errorf("failed to get integration %s: %w", c.appInstallation.AppName, err)
 	}
 
 	configDef, err := findConfigDef(app.Configuration(), name)
