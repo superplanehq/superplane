@@ -47,7 +47,7 @@ func (tg *TimeGate) Description() string {
 }
 
 func (tg *TimeGate) Documentation() string {
-	return `The Time Gate component delays event processing until a specific time window is reached, allowing you to control when events proceed through your workflow.
+	return `The Time Gate component delays event processing until the next valid day and time window, with optional excluded dates.
 
 ## Use Cases
 
@@ -56,24 +56,17 @@ func (tg *TimeGate) Documentation() string {
 - **Holiday handling**: Exclude specific dates from processing
 - **Time-based routing**: Route events based on time of day or specific dates
 
-## Modes
-
-- **Include Range**: Only allow events through during specified time windows on selected days
-- **Exclude Range**: Block events during specified time windows on selected days
-- **Include Specific Times**: Only allow events through during specific date ranges (e.g., holiday seasons)
-- **Exclude Specific Times**: Block events during specific date ranges (e.g., maintenance windows)
-
 ## Configuration
 
-- **Time Range**: Start and end times in HH:MM format (24-hour)
-- **Days of Week**: Select which days the time range applies to (for range modes)
-- **Date Range**: Start and end dates in MM/DD format (for specific time modes)
-- **Timezone**: Specify timezone for time calculations
+- **Active Days**: Days of the week when the gate can open
+- **Active Time**: Start and end times in HH:MM-HH:MM format (24-hour)
+- **Timezone**: Timezone offset for time calculations (default: current)
+- **Exclude Dates**: Specific MM/DD dates that override the rules above
 
 ## Behavior
 
 - Events wait until the next valid time window is reached
-- Supports cross-year date ranges (e.g., Dec 25 to Jan 5)
+- Exclude dates override the day/time rules
 - Can be manually pushed through using the "Push Through" action
 - Automatically schedules execution when the time window is reached`
 }

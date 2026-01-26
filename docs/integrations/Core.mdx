@@ -25,7 +25,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="If" href="#if" description="Route events based on expression" />
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
-  <LinkCard title="Time Gate" href="#time-gate" description="Route events based on time conditions - include or exclude specific time windows" />
+  <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
   <LinkCard title="Wait" href="#wait" description="Wait for a certain amount of time" />
 </CardGrid>
 
@@ -499,21 +499,28 @@ When executed, the No Operation component immediately emits the incoming event d
 
 ## Time Gate
 
-Route events based on active days and time windows, with optional excluded dates
+The Time Gate component delays event processing until the next valid day and time window, with optional excluded dates.
+
+### Use Cases
+
+- **Business hours**: Only process events during business hours
+- **Scheduled releases**: Delay deployments until off-peak hours
+- **Holiday handling**: Exclude specific dates from processing
+- **Time-based routing**: Route events based on time of day or specific dates
 
 ### Configuration
 
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| days | Active Days | days-of-week | yes | Select the days of the week when the gate can open |
-| timeRange | Active Time | time-range | yes | Time range in HH:MM-HH:MM format (24-hour), e.g., 09:00-17:30 |
-| timezone | Timezone | timezone | yes | Timezone offset for time-based calculations (default: current) |
-| excludeDates | Exclude Dates (MM/DD) | list (day-in-year) | no | Optional list of specific dates (MM/DD) to exclude, such as holidays |
+- **Active Days**: Days of the week when the gate can open
+- **Active Time**: Start and end times in HH:MM-HH:MM format (24-hour)
+- **Timezone**: Timezone offset for time calculations (default: current)
+- **Exclude Dates**: Specific MM/DD dates that override the rules above
+
 ### Behavior
 
 - Events wait until the next valid time window is reached
 - Exclude dates override the day/time rules
 - Can be manually pushed through using the "Push Through" action
+- Automatically schedules execution when the time window is reached
 
 ### Example Output
 
@@ -582,3 +589,4 @@ The component emits a payload with:
   "type": "wait.finished"
 }
 ```
+
