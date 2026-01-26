@@ -41,6 +41,29 @@ func (c *CreateEvent) Color() string {
 	return "gray"
 }
 
+func (c *CreateEvent) Documentation() string {
+	return `The Create Event component creates a new event in Datadog.
+
+## Use Cases
+
+- **Deployment tracking**: Log deployment events to correlate with metrics
+- **Incident annotation**: Add context to incidents with custom events
+- **Workflow notifications**: Create events to track workflow execution milestones
+
+## Outputs
+
+The component emits an event containing:
+- ` + "`id`" + `: The unique identifier of the created event
+- ` + "`title`" + `: The event title
+- ` + "`text`" + `: The event body
+- ` + "`date_happened`" + `: Unix timestamp when the event occurred
+- ` + "`alert_type`" + `: The severity level (info, warning, error, success)
+- ` + "`priority`" + `: Event priority (normal, low)
+- ` + "`tags`" + `: Array of tags attached to the event
+- ` + "`url`" + `: Link to view the event in Datadog
+`
+}
+
 func (c *CreateEvent) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
