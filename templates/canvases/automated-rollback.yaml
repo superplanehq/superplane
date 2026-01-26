@@ -1,0 +1,297 @@
+metadata:
+  name: "Automated Rollback"
+  description: "Automatically trigger rollback workflows when deployments fail and verify system health with Dash0 monitoring."
+  isTemplate: false
+spec:
+  nodes:
+    - id: "component-node-yh15un"
+      name: "Slack: Rollback Success"
+      type: "TYPE_COMPONENT"
+      configuration:
+        channel: "C09AJT3BF1Q"
+        text: "✅ Rollback completed successfully\n\nThe system has been restored to the last known good state for {{ $['Listen for Failed deployments'].data.repository.name }}\n\nWorkflow: {{$['Execute Rollback'].data.workflow_run.html_url}}\n\n🟢 No further action required."
+      metadata:
+        channel:
+          id: "C09AJT3BF1Q"
+          name: "all-efod-test-org"
+      position:
+        x: 1764
+        "y": 290
+      component:
+        name: "slack.sendTextMessage"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: true
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "component-node-fswk8u"
+      name: "Wait for the system to recover"
+      type: "TYPE_COMPONENT"
+      configuration:
+        mode: "interval"
+        unit: "minutes"
+        waitFor: "10"
+      metadata: null
+      position:
+        x: 1758
+        "y": 392
+      component:
+        name: "wait"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "component-node-g0f7j5"
+      name: "Check if there are any alerts"
+      type: "TYPE_COMPONENT"
+      configuration: {}
+      metadata:
+        checkRules:
+          - id: "0310867c-4c22-49dd-8987-9995eda6ba7c"
+            name: "HTTP response time"
+          - id: "7c09c551-88f2-4c9d-b7e3-6fb05655b0fd"
+            name: "5xx check"
+          - id: "acc0f539-efe6-4507-904d-5ab40d0517fb"
+            name: "4xx check"
+      position:
+        x: 2258
+        "y": 392
+      component:
+        name: "dash0.listIssues"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "component-node-yfk4ek"
+      name: "Slack: Rollback Failed"
+      type: "TYPE_COMPONENT"
+      configuration:
+        channel: "C09AJT3BF1Q"
+        text: "❌ Rollback failed\n\nRollback for {{ $['Listen for Failed deployments'].data.repository.full_name }} failed.\n\nWorkflow: {{ $['Execute Rollback'].data.html_url }}\n\n⚠️ Action required: Open the workflow link to troubleshoot."
+      metadata:
+        channel:
+          id: "C09AJT3BF1Q"
+          name: "all-efod-test-org"
+      position:
+        x: 1763
+        "y": 618
+      component:
+        name: "slack.sendTextMessage"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: true
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "component-node-aktoyi"
+      name: "Slack: Starting Rollback"
+      type: "TYPE_COMPONENT"
+      configuration:
+        channel: "C09AJT3BF1Q"
+        text: "❌ Deployment failed\n🔄 Rollback started\n\nRepository: {{ $['Listen for Failed deployments'].data.repository.full_name }}\n\n\nFailed Workflow Link: {{$['Listen for Failed deployments'].data.workflow_run.html_url}}\n\nRollback is currently in progress."
+      metadata:
+        channel:
+          id: "C09AJT3BF1Q"
+          name: "all-efod-test-org"
+      position:
+        x: 1116
+        "y": 293
+      component:
+        name: "slack.sendTextMessage"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: true
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "component-node-pdfas0"
+      name: "Slack: Health checks failing"
+      type: "TYPE_COMPONENT"
+      configuration:
+        channel: "C09AJT3BF1Q"
+        text: "⚠️ Health checks still failing 10 minutes after rollback\n\nDash0 reports {{ len($['Check if there are any alerts'].data.data.result) }} failing check(s)\n\n🔴 Critical: {{ count($['Check if there are any alerts'].data.data.result, .value[1] == \"2\") }} | 🟡 Degraded: {{ count($['Check if there are any alerts'].data.data.result, .value[1] == \"1\") }}\n\n🚨 Action required: Investigate Dash0, the system is still unhealthy after rollback."
+      metadata:
+        channel:
+          id: "C09AJT3BF1Q"
+          name: "all-efod-test-org"
+      position:
+        x: 2857
+        "y": 433
+      component:
+        name: "slack.sendTextMessage"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: true
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "github-onworkflowrun-github-onworkflowrun-k6enyi"
+      name: "Listen for Failed deployments"
+      type: "TYPE_TRIGGER"
+      configuration:
+        conclusions:
+          - "failure"
+        repository: "monarch-app"
+        workflowFiles:
+          - ".github/workflows/deploy.yml"
+      metadata:
+        repository:
+          id: 1059283987
+          name: "monarch-app"
+          url: "https://github.com/puppies-inc/monarch-app"
+      position:
+        x: 554
+        "y": 404
+      component: null
+      blueprint: null
+      trigger:
+        name: "github.onWorkflowRun"
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "github-runworkflow-github-runworkflow-z5400d"
+      name: "Execute Rollback"
+      type: "TYPE_COMPONENT"
+      configuration:
+        ref: "main"
+        repository: "monarch-app"
+        workflowFile: ".github/workflows/rollback.yml"
+      metadata:
+        repository:
+          id: 1059283987
+          name: "monarch-app"
+          url: "https://github.com/puppies-inc/monarch-app"
+      position:
+        x: 1119
+        "y": 403
+      component:
+        name: "github.runWorkflow"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "annotation-note-ar1tgr"
+      name: "Note"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 439
+        text: "## GitHub deployment failure trigger\n\nThis node listens to deployment workflows in your repository and forwards all **failed** events.\n\n\n### To set up\n1. Click the node to open the sidebar configuration.\n2. Follow the instructions to connect your GitHub account.\n3. Once connected, select the node again and choose:\n   - Repository\n   - Workflow\n   - Branch (optional)\n\n\n### How this works\nWhen a deployment workflow fails, SuperPlane captures the event and triggers this Canvas.  \nThe failure details flow downstream and are used to initiate an automated rollback."
+        width: 368
+      metadata: null
+      position:
+        x: 547
+        "y": -89
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "annotation-note-ar2rbk"
+      name: "Note"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 278
+        text: "### Automated rollback execution\n\nWhen a failed deployment is detected, two actions happen in parallel:\n\n**Notification**: A Slack message is sent immediately to inform the team that a rollback is starting.\n\n**Rollback**: The configured rollback workflow is triggered in GitHub Actions.\n\nSuperPlane tracks the rollback workflow progress and routes the event based on the outcome - success or failure."
+        width: 363
+      metadata: null
+      position:
+        x: 1093
+        "y": -75
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "annotation-note-ar3hlt"
+      name: "Note"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 370
+        text: "### Post-rollback health verification\n\nAfter a successful rollback, the **Wait** component pauses the Canvas for 10 minutes to allow the system to stabilize before running health checks.\n\nThe **Slack** components use data from **payloads emitted by upstream components** to construct success and failure messages.  \nFor example, repository names and workflow URLs are pulled directly from the trigger event.\n\n**Payload data** can be used in various component configurations, including wait durations and message templates.  \n\nOpen any node sidebar to explore available event data and configuration options."
+        width: 402
+      metadata: null
+      position:
+        x: 1754
+        "y": -143
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "annotation-note-ar4res"
+      name: "Note"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 211
+        text: "### Health check and notifications\n\nThe **Dash0 List Issues** component queries your Dash0 instance for any failing check rules.\n\nTo use this component, you need to have **check rules** configured in your Dash0 instance.  \nThe component evaluates their status and routes the event based on severity.\n\nIf **degraded** or **critical** checks are detected, a Slack message is sent with a summary of the failing checks.\n\nOpen the Slack node sidebar to see how advanced expressions are used to count and categorize alerts in the message."
+        width: 975
+      metadata: null
+      position:
+        x: 2258
+        "y": 101
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+  edges:
+    - sourceId: "component-node-fswk8u"
+      targetId: "component-node-g0f7j5"
+      channel: "default"
+    - sourceId: "component-node-g0f7j5"
+      targetId: "component-node-pdfas0"
+      channel: "degraded"
+    - sourceId: "component-node-g0f7j5"
+      targetId: "component-node-pdfas0"
+      channel: "critical"
+    - sourceId: "github-onworkflowrun-github-onworkflowrun-k6enyi"
+      targetId: "component-node-aktoyi"
+      channel: "default"
+    - sourceId: "github-onworkflowrun-github-onworkflowrun-k6enyi"
+      targetId: "github-runworkflow-github-runworkflow-z5400d"
+      channel: "default"
+    - sourceId: "github-runworkflow-github-runworkflow-z5400d"
+      targetId: "component-node-fswk8u"
+      channel: "passed"
+    - sourceId: "github-runworkflow-github-runworkflow-z5400d"
+      targetId: "component-node-yh15un"
+      channel: "passed"
+    - sourceId: "github-runworkflow-github-runworkflow-z5400d"
+      targetId: "component-node-yfk4ek"
+      channel: "failed"

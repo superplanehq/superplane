@@ -1,34 +1,123 @@
 metadata:
-  name: "Policy-gated deployment"
+  name: "Policy Gated Deployment"
   description: "Gate deployments with a policy check, business hours, and approval."
-  isTemplate: true
+  isTemplate: false
 spec:
   nodes:
-    - id: "manual-trigger"
-      name: "Deploy request"
-      type: "TYPE_TRIGGER"
-      configuration: {}
+    - id: "annotation-note-s1wdt3"
+      name: "Note"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 501
+        text: "## GitHub CI workflow trigger\n\nThis node listens to CI workflows in your repository and forwards all **successful** events.\n\n\n### To set up\n1. Click the node to open the sidebar configuration.\n2. Follow the instructions to connect your GitHub account.\n3. Once connected, select the node again and choose:\n   - Repository\n   - Workflow\n   - Branch (optional)\n\n\n### How this works\nSuperPlane lets you connect external resources, like GitHub, and react to changes in them.  \n**Trigger type** components listen for specific events and start a Canvas run when those events happen.  \nFrom there, the event data flows through the Canvas and can be used by downstream components."
+        width: 362
       metadata: null
       position:
-        x: -35
-        "y": 321
+        x: 135
+        "y": 616
       component: null
       blueprint: null
-      trigger:
-        name: "start"
-      widget: null
+      trigger: null
+      widget:
+        name: "annotation"
       isCollapsed: false
       appInstallation: null
       errorMessage: ""
-    - id: "policy-filter"
-      name: "Policy check"
-      type: "TYPE_COMPONENT"
+      warningMessage: ""
+    - id: "annotation-note-l5pp1j"
+      name: "Note"
+      type: "TYPE_WIDGET"
       configuration:
-        expression: "true"
+        color: "yellow"
+        height: 278
+        text: "### Time gate\n\nThis component lets the event through only during working hours.\n\nIf an event arrives outside of the allowed time window, it is put on hold and automatically resumes at the first moment the conditions are met.\n\nYou can override this behavior per event.  \nSelect this componentHover over the waiting item in the sidebar and select **Push Through** from the item menu.\n"
+        width: 363
       metadata: null
       position:
-        x: 413
-        "y": 320
+        x: 1079
+        "y": 559
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "annotation-note-fids38"
+      name: "Note"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 307
+        text: "### Approval\n\nThis component pauses the workflow and requires one or more people to approve before the event can continue.\n\nWhen an event reaches this step, it enters a waiting state until the required approvals are collected.  \nApprovers can review the context, add comments, and either approve or reject the request.\n\nIf the approval is rejected, the event stops and is marked as rejected.  \nIf all required approvals are granted, the event resumes and continues downstream."
+        width: 359
+      metadata: null
+      position:
+        x: 1567
+        "y": -49
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "annotation-note-fhs8t3"
+      name: "Note"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 337
+        text: "### GitHub Actions runner\n\nThis component triggers a GitHub Actions workflow and waits for its execution to complete.\n\nWhen an event reaches this step, SuperPlane dispatches the selected workflow in the configured repository and tracks its progress.  \nThe Canvas run is paused while the workflow is running and resumes once the workflow finishes.\n\nExecution details, such as status, conclusion, and relevant metadata, are emitted as output and can be used by downstream components.\n\nOpen the node sidebar to configure the repository, workflow, inputs, and execution options.\n"
+        width: 353
+      metadata: null
+      position:
+        x: 2195
+        "y": 592
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "annotation-note-xw4fhl"
+      name: "Note"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 219
+        text: "### Result handling and notifications\n\nIn the final section of this Canvas, we use the **OpenAI**, **Slack**, and **PagerDuty** components to handle the outcome of the GitHub Actions workflow.\n\nIf the workflow completes successfully, the **OpenAI** component generates a concise summary of the run, including key details and context.  \nThat summary is then posted to the selected **Slack** channel to notify the team.\n\nIf the workflow fails, the **PagerDuty** component is triggered to open an incident, ensuring the failure is escalated and acted on promptly.\n"
+        width: 739
+      metadata: null
+      position:
+        x: 2745
+        "y": 40
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "component-node-c4ecox"
+      name: "Forward only builds from main branch"
+      type: "TYPE_COMPONENT"
+      configuration:
+        expression: "$[\"Listen for successful CI\"].data.workflow_run.head_branch == \"main\""
+      metadata: null
+      position:
+        x: 600
+        "y": 322
       component:
         name: "filter"
       blueprint: null
@@ -37,8 +126,56 @@ spec:
       isCollapsed: false
       appInstallation: null
       errorMessage: ""
-    - id: "business-hours"
-      name: "Business hours"
+      warningMessage: ""
+    - id: "annotation-note-yngiv2"
+      name: "Note"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 231
+        text: "### Branch filter\n\nThis component listens to events emitted by the previous component and evaluates the branch name.\n\nOnly workflow runs originating from the **main** branch are allowed to pass through.  \nEvents from all other branches are filtered out.\n\nOpen the node sidebar to see how this filter is configured.\n"
+        width: 372
+      metadata: null
+      position:
+        x: 597
+        "y": 51
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "github-onworkflowrun-github-onworkflowrun-gavi3b"
+      name: "Listen for successful CI"
+      type: "TYPE_TRIGGER"
+      configuration:
+        conclusions:
+          - "success"
+        repository: "monarch-app"
+        workflowFiles:
+          - ".github/workflows/ci.yml"
+      metadata:
+        repository:
+          id: 1059283987
+          name: "monarch-app"
+          url: "https://github.com/puppies-inc/monarch-app"
+      position:
+        x: 136
+        "y": 324
+      component: null
+      blueprint: null
+      trigger:
+        name: "github.onWorkflowRun"
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "timegate-timegate-vjyba3"
+      name: "Run only during work hours"
       type: "TYPE_COMPONENT"
       configuration:
         days:
@@ -47,14 +184,12 @@ spec:
           - "wednesday"
           - "thursday"
           - "friday"
-        endTime: "17:00"
-        mode: "include_range"
-        startTime: "09:00"
-        timezone: "0"
+        timeRange: "09:00 - 17:00"
+        timezone: "1"
       metadata: null
       position:
-        x: 864
-        "y": 320
+        x: 1078
+        "y": 321
       component:
         name: "timeGate"
       blueprint: null
@@ -63,16 +198,17 @@ spec:
       isCollapsed: false
       appInstallation: null
       errorMessage: ""
-    - id: "approval"
-      name: "Team approval"
+      warningMessage: ""
+    - id: "approval-approval-pxl5ja"
+      name: "Get Approvals"
       type: "TYPE_COMPONENT"
       configuration:
         items:
           - type: "anyone"
       metadata: null
       position:
-        x: 1335
-        "y": 320
+        x: 1567
+        "y": 321
       component:
         name: "approval"
       blueprint: null
@@ -81,51 +217,116 @@ spec:
       isCollapsed: false
       appInstallation: null
       errorMessage: ""
-    - id: "deploy"
-      name: "Deploy"
+      warningMessage: ""
+    - id: "github-runworkflow-github-runworkflow-3ywh59"
+      name: "Run Deployment"
       type: "TYPE_COMPONENT"
-      configuration: {}
-      metadata: null
+      configuration:
+        ref: "main"
+        repository: "terraform"
+        workflowFile: ".github/workflows/deploy.yml"
+      metadata:
+        repository:
+          id: 1046227550
+          name: "terraform"
+          url: "https://github.com/puppies-inc/terraform"
       position:
-        x: 1885
-        "y": 216
+        x: 2192
+        "y": 315
       component:
-        name: "noop"
+        name: "github.runWorkflow"
       blueprint: null
       trigger: null
       widget: null
       isCollapsed: false
       appInstallation: null
       errorMessage: ""
-    - id: "rejected"
-      name: "Deployment blocked"
+      warningMessage: ""
+    - id: "openai-textprompt-openai-textprompt-x2hhhi"
+      name: "Generate Summary"
       type: "TYPE_COMPONENT"
-      configuration: {}
+      configuration:
+        input: "You are generating the final Slack message text that will be sent directly to Slack.\n\nYour task:\n- Review the JSON data provided below\n- Produce a concise Slack message summarizing:\n  - What was deployed\n  - When it was deployed\n  - The deployed commit (with link)\n  - The deployment pipeline (with link)\n\nCRITICAL formatting rules:\n- Insert REAL line breaks by pressing Enter between lines\n- DO NOT use escaped newline characters like \\n\n- Output must contain multiple lines exactly as Slack should display them\n- Use Slack link format: <url|label>\n- Plain text only, no Markdown blocks\n- No explanations, no surrounding text\n\nOutput rules:\n- Return ONLY the Slack message text\n- Do not repeat the input data\n- Do not describe what you are doing\n\nInput data:\n{{root().data}}\n{{ $['Get Approvals'].data }}\n{{ $[\"Run Deployment\"].data }}\n"
+        model: "gpt-5.2"
       metadata: null
       position:
-        x: 1893
-        "y": 501
+        x: 2736
+        "y": 322
       component:
-        name: "noop"
+        name: "openai.textPrompt"
       blueprint: null
       trigger: null
       widget: null
       isCollapsed: false
       appInstallation: null
       errorMessage: ""
+      warningMessage: ""
+    - id: "pagerduty-createincident-pagerduty-createincident-vwbqsu"
+      name: "Create PD Incident"
+      type: "TYPE_COMPONENT"
+      configuration:
+        description: "The deployment to production has failed. \n\nLink to the workflow: {{ $[\"Run Deployment\"].data.workflow_run.html_url }}"
+        service: "PQEAM2I"
+        title: "Production Deployment failed"
+        urgency: "high"
+      metadata:
+        service:
+          html_url: "https://superplane-test.eu.pagerduty.com/service-directory/PQEAM2I"
+          id: "PQEAM2I"
+          name: "Default Service"
+      position:
+        x: 2740
+        "y": 514
+      component:
+        name: "pagerduty.createIncident"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: true
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "slack-sendtextmessage-slack-sendtextmessage-c2n7es"
+      name: "Send Slack Message"
+      type: "TYPE_COMPONENT"
+      configuration:
+        channel: "C09AJT3BF1Q"
+        text: "{{$['Generate Summary'].data.text}}"
+      metadata:
+        channel:
+          id: "C09AJT3BF1Q"
+          name: "all-efod-test-org"
+      position:
+        x: 3221
+        "y": 321
+      component:
+        name: "slack.sendTextMessage"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: true
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
   edges:
-    - sourceId: "manual-trigger"
-      targetId: "policy-filter"
+    - sourceId: "github-onworkflowrun-github-onworkflowrun-gavi3b"
+      targetId: "component-node-c4ecox"
       channel: "default"
-    - sourceId: "policy-filter"
-      targetId: "business-hours"
+    - sourceId: "component-node-c4ecox"
+      targetId: "timegate-timegate-vjyba3"
       channel: "default"
-    - sourceId: "business-hours"
-      targetId: "approval"
-      channel: "default"
-    - sourceId: "approval"
-      targetId: "deploy"
+    - sourceId: "approval-approval-pxl5ja"
+      targetId: "github-runworkflow-github-runworkflow-3ywh59"
       channel: "approved"
-    - sourceId: "approval"
-      targetId: "rejected"
-      channel: "rejected"
+    - sourceId: "github-runworkflow-github-runworkflow-3ywh59"
+      targetId: "openai-textprompt-openai-textprompt-x2hhhi"
+      channel: "passed"
+    - sourceId: "openai-textprompt-openai-textprompt-x2hhhi"
+      targetId: "slack-sendtextmessage-slack-sendtextmessage-c2n7es"
+      channel: "default"
+    - sourceId: "github-runworkflow-github-runworkflow-3ywh59"
+      targetId: "pagerduty-createincident-pagerduty-createincident-vwbqsu"
+      channel: "failed"
+    - sourceId: "timegate-timegate-vjyba3"
+      targetId: "approval-approval-pxl5ja"
+      channel: "default"
