@@ -126,7 +126,7 @@ export const Composite: React.FC<CompositeProps> = ({
     // Add visible events
     visibleEvents.forEach((event) => {
       sections.push({
-        eventId: event.id?.slice(0, 4),
+        eventId: event.id?.slice(0, 4) || "",
         eventState: mapLastRunStateToEventState(event.state),
         eventTitle: event.title,
         eventSubtitle: event.subtitle,
@@ -141,6 +141,7 @@ export const Composite: React.FC<CompositeProps> = ({
     // Add "View More" section if there are hidden events
     if (hiddenEventsCount > 0) {
       sections.push({
+        eventId: "",
         eventState: "neutral",
         eventTitle: `+${hiddenEventsCount} more`,
         handleComponent: (
@@ -151,15 +152,6 @@ export const Composite: React.FC<CompositeProps> = ({
             Click to view more events
           </div>
         ),
-      });
-    }
-
-    // Add next in queue if provided
-    if (nextInQueue) {
-      sections.push({
-        eventState: "queued",
-        eventTitle: nextInQueue.title,
-        eventSubtitle: nextInQueue.subtitle,
       });
     }
 

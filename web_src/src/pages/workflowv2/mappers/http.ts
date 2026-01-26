@@ -503,7 +503,7 @@ function getHTTPEventSections(
     eventTitle: title,
     eventSubtitle: generateEventSubtitle(),
     eventState: stateFunction(execution),
-    eventId: execution.rootEvent?.id,
+    eventId: execution.rootEvent!.id!,
     showAutomaticTime: stateFunction(execution) === "running", // Show live timer for running state
   };
 

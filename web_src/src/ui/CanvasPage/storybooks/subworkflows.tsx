@@ -639,6 +639,7 @@ export const Provisioner = {
               receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
               eventTitle: "FEAT: Add new feature",
               eventSubtitle: "ef546d40",
+              eventId: "1234",
             },
           ],
         } as ComponentBaseProps,
@@ -657,6 +658,7 @@ export const Provisioner = {
           collapsed: false,
           eventSections: [
             {
+              eventId: "1234",
               eventState: "success",
               receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
               eventTitle: "FEAT: Add new feature",
@@ -704,6 +706,7 @@ export const Desprovisioner = {
               receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
               eventTitle: "FEAT: Add new feature",
               eventSubtitle: "ef546d40",
+              eventId: "1234",
             },
           ],
         } as ComponentBaseProps,
@@ -726,6 +729,7 @@ export const Desprovisioner = {
               receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
               eventTitle: "FEAT: Add new feature",
               eventSubtitle: "ef546d40",
+              eventId: "1234",
             },
           ],
         } as ComponentBaseProps,

@@ -9,7 +9,7 @@ interface TriggerLastEventData {
   subtitle?: string;
   receivedAt: Date;
   state: LastEventState;
-  eventId?: string;
+  eventId: string;
 }
 
 export interface TriggerProps extends Omit<ComponentBaseProps, "eventSections"> {
