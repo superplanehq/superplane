@@ -221,7 +221,10 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   eventSections?: EventSection[];
   selected?: boolean;
   metadata?: MetadataItem[];
-  customField?: React.ReactNode;
+  /** Custom content rendered on the node */
+  customField?: React.ReactNode | ((onRun?: () => void, nodeId?: string) => React.ReactNode);
+  /** Where to render customField: "before" (before events) or "after" (after events, default) */
+  customFieldPosition?: "before" | "after";
   eventStateMap?: EventStateMap;
   includeEmptyState?: boolean;
   emptyStateProps?: {
@@ -258,6 +261,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   hideMetadataList,
   metadata,
   customField,
+  customFieldPosition = "after",
   eventStateMap,
   includeEmptyState = false,
   emptyStateProps,
@@ -414,21 +418,34 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
               </div>
             )}
 
+            {customFieldPosition === "before" &&
+              (typeof customField === "function" ? customField(onRun) : customField || null)}
+
             {eventSections?.map((section, index) => (
               <EventSectionDisplay
-                className={"pb-3" + (!!includeEmptyState || !!customField ? " border-b border-slate-950/20" : "")}
+                className={
+                  "pb-3" +
+                  (!!includeEmptyState || (!!customField && customFieldPosition === "after")
+                    ? " border-b border-slate-950/20"
+                    : "")
+                }
                 key={index}
                 section={section}
                 index={index}
                 totalSections={eventSections.length}
                 stateMap={eventStateMap}
-                lastSection={index === eventSections.length - 1 && !includeEmptyState && !customField}
+                lastSection={
+                  index === eventSections.length - 1 &&
+                  !includeEmptyState &&
+                  !(customField && customFieldPosition === "after")
+                }
               />
             ))}
 
             {includeEmptyState && <EmptyState {...emptyStateProps} />}
 
-            {customField || null}
+            {customFieldPosition === "after" &&
+              (typeof customField === "function" ? customField(onRun) : customField || null)}
           </>
         )}
       </div>

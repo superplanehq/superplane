@@ -100,17 +100,23 @@ export interface EventStateRegistry {
 }
 
 /**
- * A custom field renderer renders additional UI elements in the settings tab
- * for specific component/trigger types
+ * A custom field renderer renders additional UI elements on canvas nodes
+ * for specific component/trigger types. Can be used for both settings sidebar
+ * (via getCustomFieldRenderer) and canvas nodes (via customField prop).
  */
 export interface CustomFieldRenderer {
   /**
    * Render custom UI for the given node configuration
    * @param node The node from the backend
    * @param configuration Current node configuration
+   * @param context Optional context with additional handlers (e.g., onRun for triggering the emit modal with initial data)
    * @returns React node to render
    */
-  render(node: ComponentsNode, configuration: Record<string, unknown>): ReactNode;
+  render(
+    node: ComponentsNode,
+    configuration: Record<string, unknown>,
+    context?: { onRun?: (initialData?: string) => void },
+  ): ReactNode;
 }
 
 export interface OutputPayload {

@@ -17,13 +17,37 @@ interface EmitEventModalProps {
   organizationId: string;
   channels: string[];
   onEmit: (channel: string, data: any) => Promise<void>;
+  initialData?: string;
 }
 
-export const EmitEventModal = ({ isOpen, onClose, nodeName, channels, onEmit }: EmitEventModalProps) => {
+export const EmitEventModal = ({ isOpen, onClose, nodeName, channels, onEmit, initialData }: EmitEventModalProps) => {
   const [selectedChannel, setSelectedChannel] = useState<string>(channels[0] || "default");
-  const [eventData, setEventData] = useState<string>("{}");
+  const [eventData, setEventData] = useState<string>(() => {
+    if (initialData) {
+      try {
+        // Format the JSON with proper indentation
+        return JSON.stringify(JSON.parse(initialData), null, 2);
+      } catch {
+        return initialData;
+      }
+    }
+    return "{}";
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+
+  // Update eventData when initialData changes
+  useEffect(() => {
+    if (initialData && isOpen) {
+      try {
+        setEventData(JSON.stringify(JSON.parse(initialData), null, 2));
+      } catch {
+        setEventData(initialData);
+      }
+    } else if (!initialData && isOpen) {
+      setEventData("{}");
+    }
+  }, [initialData, isOpen]);
 
   // Cleanup editor when component unmounts
   useEffect(() => {
@@ -37,7 +61,15 @@ export const EmitEventModal = ({ isOpen, onClose, nodeName, channels, onEmit }: 
 
   const handleClose = () => {
     setSelectedChannel(channels[0] || "default");
-    setEventData("{}");
+    if (initialData) {
+      try {
+        setEventData(JSON.stringify(JSON.parse(initialData), null, 2));
+      } catch {
+        setEventData(initialData);
+      }
+    } else {
+      setEventData("{}");
+    }
     setIsSubmitting(false);
     onClose();
   };

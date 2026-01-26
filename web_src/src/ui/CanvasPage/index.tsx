@@ -344,6 +344,7 @@ function CanvasPage(props: CanvasPageProps) {
     nodeId: string;
     nodeName: string;
     channels: string[];
+    initialData?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -405,20 +406,31 @@ function CanvasPage(props: CanvasPageProps) {
   );
 
   const handleNodeRun = useCallback(
-    (nodeId: string) => {
+    (nodeId?: string, initialData?: string) => {
       // Hard guard: if running is disabled (e.g., unsaved changes), do nothing
       if (props.runDisabled) return;
+
+      // Check for pending run data from custom field
+      // Note: This uses a window property as a workaround to pass nodeId and initialData
+      // through the onRun callback chain without breaking existing signatures
+      const pendingData = (window as any).__pendingRunData;
+      const actualNodeId = nodeId || pendingData?.nodeId;
+      const actualInitialData = initialData || pendingData?.initialData;
+
+      if (!actualNodeId) return;
+
       // Find the node to get its name and channels
-      const node = state.nodes.find((n) => n.id === nodeId);
+      const node = state.nodes.find((n) => n.id === actualNodeId);
       if (!node) return;
 
-      const nodeName = (node.data as any).label || nodeId;
+      const nodeName = (node.data as any).label || actualNodeId;
       const channels = (node.data as any).outputChannels || ["default"];
 
       setEmitModalData({
-        nodeId,
+        nodeId: actualNodeId,
         nodeName,
         channels,
+        initialData: actualInitialData,
       });
     },
     [state.nodes, props.runDisabled],
@@ -794,7 +806,7 @@ function CanvasPage(props: CanvasPageProps) {
               hideHeader={true}
               onToggleView={handleToggleView}
               onToggleCollapse={props.onToggleCollapse}
-              onRun={handleNodeRun}
+              onRun={(nodeId) => handleNodeRun(nodeId)}
               onDuplicate={props.onDuplicate}
               onConfigure={props.onConfigure}
               onDeactivate={props.onDeactivate}
@@ -899,6 +911,7 @@ function CanvasPage(props: CanvasPageProps) {
           organizationId={props.organizationId || ""}
           channels={emitModalData.channels}
           onEmit={handleEmit}
+          initialData={emitModalData.initialData}
         />
       )}
     </div>

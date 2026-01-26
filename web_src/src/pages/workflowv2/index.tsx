@@ -2600,7 +2600,7 @@ export function WorkflowPageV2() {
   );
 
   const getCustomField = useCallback(
-    (nodeId: string) => {
+    (nodeId: string, onRun?: (initialData?: string) => void) => {
       const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return null;
 
@@ -2618,7 +2618,7 @@ export function WorkflowPageV2() {
 
       // Return a function that takes the current configuration
       return (configuration: Record<string, unknown>) => {
-        return renderer.render(node, configuration);
+        return renderer.render(node, configuration, onRun ? { onRun } : undefined);
       };
     },
     [workflow],
