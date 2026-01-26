@@ -143,7 +143,7 @@ export const webhookTriggerRenderer: TriggerRenderer = {
         subtitle: formatTimeAgo(eventDate),
         receivedAt: eventDate,
         state: "triggered",
-        eventId: lastEvent.id,
+        eventId: lastEvent.id!,
       };
     }
 

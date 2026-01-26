@@ -68,6 +68,7 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
     receivedAt: stage.receivedAt,
     eventState: stage.eventState,
     eventTitle: stage.eventTitle,
+    eventId: "",
     handleComponent: hideHandle ? undefined : (
       <Handle
         type="source"

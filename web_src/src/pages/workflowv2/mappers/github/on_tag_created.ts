@@ -53,7 +53,7 @@ export const onTagCreatedTriggerRenderer: TriggerRenderer = {
         subtitle: buildGithubSubtitle(eventData?.ref || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
-        eventId: lastEvent.id,
+        eventId: lastEvent.id!,
       };
     }
 

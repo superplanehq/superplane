@@ -268,7 +268,7 @@ function runWorkflowEventSections(
     eventTitle: title,
     eventSubtitle,
     eventState: executionState,
-    eventId: execution.rootEvent?.id,
+    eventId: execution.rootEvent!.id!,
   });
 
   return sections;

@@ -137,7 +137,7 @@ export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
         subtitle: buildGithubSubtitle(conclusion, lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
-        eventId: lastEvent.id,
+        eventId: lastEvent.id!,
       };
     }
 
