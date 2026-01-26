@@ -100,6 +100,7 @@ export const listIncidentsMapper: ComponentBaseMapper = {
 
     return {
       iconSrc: pdIcon,
+      appName: "pagerduty",
       collapsedBackground: getBackgroundColorClass(componentDefinition.color),
       collapsed: node.isCollapsed,
       title: node.name!,
