@@ -154,12 +154,11 @@ func (c *RunFunction) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	output := map[string]any{"requestId": result.RequestID}
-
 	if result.FunctionError != "" {
-		output["functionError"] = result.FunctionError
+		return c.handleFunctionError(result)
 	}
 
+	output := map[string]any{"requestId": result.RequestID}
 	if report, err := parseLambdaLogReport(result.LogResult); err == nil {
 		output["report"] = report
 	}
@@ -172,6 +171,15 @@ func (c *RunFunction) Execute(ctx core.ExecutionContext) error {
 	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "aws.lambda.run", []any{output})
+}
+
+func (c *RunFunction) handleFunctionError(result *InvokeResult) error {
+	var errorResponse ErrorResponse
+	if err := json.Unmarshal(result.Payload, &errorResponse); err != nil {
+		return fmt.Errorf("failed to unmarshal error response: %w", err)
+	}
+
+	return fmt.Errorf("Lambda function error: %s: %s", errorResponse.ErrorType, errorResponse.ErrorMessage)
 }
 
 func (c *RunFunction) Cancel(ctx core.ExecutionContext) error {
@@ -212,6 +220,12 @@ func regionFromArn(arn string) (string, bool) {
 		return "", false
 	}
 	return parts[3], strings.TrimSpace(parts[3]) != ""
+}
+
+type ErrorResponse struct {
+	ErrorType    string   `json:"errorType"`
+	ErrorMessage string   `json:"errorMessage"`
+	Trace        []string `json:"trace"`
 }
 
 type LambdaLogReport struct {
