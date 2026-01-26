@@ -1,0 +1,57 @@
+---
+title: "AWS"
+sidebar:
+  order: 2
+---
+
+Manage resources and execute AWS commands in workflows
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Lambda - Run Function" href="#lambda---run-function" description="Invoke a Lambda function, optionally creating it from inline JavaScript" />
+</CardGrid>
+
+## Installation
+
+Initially, you can leave the **"IAM Role ARN"** field empty, as you will be guided through the identity provider and IAM role creation process.
+
+<a id="lambda---run-function"></a>
+
+## Lambda - Run Function
+
+The Run Lambda component invokes a Lambda function.
+
+### Use Cases
+
+- **Automated workflows**: Trigger Lambda functions from SuperPlane workflows
+- **Event processing**: Process events from other applications
+- **Data transformation**: Transform data in real-time
+- **API integrations**: Call Lambda functions from other applications
+
+### How It Works
+
+1. Invokes the specified Lambda function with the provided payload
+2. Returns the function's response including status code, payload, and log output
+3. Optionally creates a new Lambda function from inline JavaScript code
+
+### Example Output
+
+```json
+{
+  "payload": {
+    "message": "hello from lambda"
+  },
+  "report": {
+    "billedDuration": "100 ms",
+    "duration": "89.81 ms",
+    "initDuration": "160.97 ms",
+    "maxMemoryUsed": "82 MB",
+    "memorySize": "128 MB"
+  },
+  "requestId": "9f8d2b5e-1c7a-4d62-8f1a-0f8b8e4f3a12"
+}
+```
+

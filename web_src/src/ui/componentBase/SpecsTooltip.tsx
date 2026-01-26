@@ -30,14 +30,57 @@ export function SpecsTooltip({ children, specTitle, specValues, tooltipTitle, hi
               key={index}
               className={`flex flex-wrap max-w-[800px] items-center gap-2 p-2 ${index === specValues.length - 1 ? "border-b-0" : "border-b"}`}
             >
-              {value.badges.map((badge, badgeIndex) => (
-                <span
-                  key={badgeIndex}
-                  className={`px-2 py-1 rounded text-xs font-mono whitespace-nowrap ${badge.bgColor} ${badge.textColor}`}
-                >
-                  {badge.label}
-                </span>
-              ))}
+              {value.badges.flatMap((badge, badgeIndex) => {
+                const maxChunkLength = 120;
+                if (badge.label.length <= maxChunkLength) {
+                  return (
+                    <span
+                      key={`${badgeIndex}-0`}
+                      className={`px-2 py-1 rounded text-xs font-mono whitespace-nowrap ${badge.bgColor} ${badge.textColor}`}
+                    >
+                      {badge.label}
+                    </span>
+                  );
+                }
+
+                const separatorRegex = /[\s,()[\]{}<>:+\-*/=|&.!?]/;
+                const chunks: string[] = [];
+                let remaining = badge.label;
+
+                while (remaining.length > maxChunkLength) {
+                  let splitAt = -1;
+                  for (let i = maxChunkLength - 1; i >= 0; i -= 1) {
+                    if (separatorRegex.test(remaining[i])) {
+                      splitAt = i + 1;
+                      break;
+                    }
+                  }
+
+                  if (splitAt <= 0) {
+                    splitAt = maxChunkLength;
+                  }
+
+                  const chunk = remaining.slice(0, splitAt).trim();
+                  if (chunk.length > 0) {
+                    chunks.push(chunk);
+                  }
+
+                  remaining = remaining.slice(splitAt).trim();
+                }
+
+                if (remaining.length > 0) {
+                  chunks.push(remaining);
+                }
+
+                return chunks.map((chunk, chunkIndex) => (
+                  <span
+                    key={`${badgeIndex}-${chunkIndex}`}
+                    className={`px-2 py-1 rounded text-xs font-mono whitespace-nowrap ${chunkIndex === 0 ? "basis-full" : ""} ${badge.bgColor} ${badge.textColor}`}
+                  >
+                    {chunk}
+                  </span>
+                ));
+              })}
             </div>
           ))}
         </div>

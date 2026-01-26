@@ -21,10 +21,10 @@ func isCamelCase(s string) bool {
 	return !strings.ContainsAny(s, "_-")
 }
 
-// isValidName validates component/trigger names (simple or dotted like "app.name")
+// isValidName validates component/trigger names (simple or dotted like "app.name" or "app.sub.name")
 func isValidName(name string) bool {
 	parts := strings.Split(name, ".")
-	if len(parts) > 2 {
+	if len(parts) > 3 {
 		return false
 	}
 	for _, part := range parts {

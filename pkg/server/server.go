@@ -22,6 +22,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/workers"
 
 	// Import integrations, components and triggers to register them via init()
+	_ "github.com/superplanehq/superplane/pkg/applications/aws"
 	_ "github.com/superplanehq/superplane/pkg/applications/cloudflare"
 	_ "github.com/superplanehq/superplane/pkg/applications/dash0"
 	_ "github.com/superplanehq/superplane/pkg/applications/datadog"
@@ -45,7 +46,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/widgets/annotation"
 )
 
-func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, authService authorization.Authorization) {
+func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, authService authorization.Authorization) {
 	log.Println("Starting Workers")
 
 	rabbitMQURL, err := config.RabbitMQURL()
@@ -82,7 +83,7 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		log.Println("Starting App Installation Request Worker")
 
 		webhooksBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewAppInstallationRequestWorker(encryptor, registry, baseURL, webhooksBaseURL)
+		w := workers.NewAppInstallationRequestWorker(encryptor, registry, oidcProvider, baseURL, webhooksBaseURL)
 		go w.Start(context.Background())
 	}
 
@@ -160,9 +161,9 @@ func startEmailConsumersWithService(rabbitMQURL string, emailService services.Em
 	go notificationEmailConsumer.Start()
 }
 
-func startInternalAPI(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry) {
+func startInternalAPI(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, oidcProvider oidc.Provider) {
 	log.Println("Starting Internal API")
-	grpc.RunServer(baseURL, webhooksBaseURL, basePath, encryptor, authService, registry, lookupInternalAPIPort())
+	grpc.RunServer(baseURL, webhooksBaseURL, basePath, encryptor, authService, registry, oidcProvider, lookupInternalAPIPort())
 }
 
 func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcProvider oidc.Provider, authService authorization.Authorization) {
@@ -331,7 +332,7 @@ func Start() {
 	}
 
 	jwtSigner := jwt.NewSigner(jwtSecret)
-	oidcProvider, err := oidc.NewProviderFromKeyDir(oidcKeysPath)
+	oidcProvider, err := oidc.NewProviderFromKeyDir(baseURL, oidcKeysPath)
 	if err != nil {
 		panic(fmt.Sprintf("failed to load OIDC keys: %v", err))
 	}
@@ -346,10 +347,10 @@ func Start() {
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
 		webhooksBaseURL := getWebhookBaseURL(baseURL)
-		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, authService, registry)
+		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, authService, registry, oidcProvider)
 	}
 
-	startWorkers(jwtSigner, encryptorInstance, registry, baseURL, authService)
+	startWorkers(jwtSigner, encryptorInstance, registry, oidcProvider, baseURL, authService)
 
 	log.Println("SuperPlane is UP.")
 

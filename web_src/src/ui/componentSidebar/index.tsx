@@ -8,6 +8,7 @@ import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ChildEventsState } from "../composite";
 import { TabData } from "./SidebarEventItem/SidebarEventItem";
@@ -31,7 +32,7 @@ import { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
 
-const APP_LOGO_MAP: Record<string, string> = {
+const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   dash0: dash0Icon,
   github: githubIcon,
   openai: openAiIcon,
@@ -39,6 +40,9 @@ const APP_LOGO_MAP: Record<string, string> = {
   pagerduty: pagerDutyIcon,
   semaphore: SemaphoreLogo,
   slack: slackIcon,
+  aws: {
+    lambda: awsLambdaIcon,
+  },
 };
 
 interface ComponentSidebarProps {
@@ -118,6 +122,7 @@ interface ComponentSidebarProps {
   nodeConfigMode?: "create" | "edit";
   nodeName?: string;
   nodeLabel?: string;
+  blockName?: string;
   nodeConfiguration?: Record<string, unknown>;
   nodeConfigurationFields?: ConfigurationField[];
   onNodeConfigSave?: (
@@ -200,6 +205,7 @@ export const ComponentSidebar = ({
   nodeConfigMode = "edit",
   nodeName = "",
   nodeLabel,
+  blockName,
   nodeConfiguration = {},
   nodeConfigurationFields = [],
   onNodeConfigSave,
@@ -484,7 +490,10 @@ export const ComponentSidebar = ({
   }, [onHighlightedNodesChange]);
 
   const isDetailView = page !== "overview";
-  const headerIconSrc = iconSrc ?? (appName ? APP_LOGO_MAP[appName] : undefined);
+  const nameParts = blockName?.split(".") ?? [];
+  const appLogo = nameParts[0] ? APP_LOGO_MAP[nameParts[0]] : undefined;
+  const appIconSrc = typeof appLogo === "string" ? appLogo : nameParts[1] ? appLogo?.[nameParts[1]] : undefined;
+  const headerIconSrc = iconSrc ?? appIconSrc;
 
   if (!isOpen) return null;
 

@@ -16,6 +16,7 @@ import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import smtpIcon from "@/assets/icons/integrations/smtp.svg";
+import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 export interface BuildingBlock {
@@ -311,7 +312,7 @@ function CategorySection({
           const iconSlug = block.type === "blueprint" ? "component" : block.icon || "zap";
 
           // Use SVG icons for application components/triggers
-          const appLogoMap: Record<string, string> = {
+          const appLogoMap: Record<string, string | Record<string, string>> = {
             dash0: dash0Icon,
             github: githubIcon,
             openai: openAiIcon,
@@ -320,8 +321,13 @@ function CategorySection({
             semaphore: SemaphoreLogo,
             slack: slackIcon,
             smtp: smtpIcon,
+            aws: {
+              lambda: awsLambdaIcon,
+            },
           };
-          const appIconSrc = block.appName ? appLogoMap[block.appName] : undefined;
+          const nameParts = block.name?.split(".") ?? [];
+          const appLogo = nameParts[0] ? appLogoMap[nameParts[0]] : undefined;
+          const appIconSrc = typeof appLogo === "string" ? appLogo : nameParts[1] ? appLogo?.[nameParts[1]] : undefined;
           const IconComponent = resolveIcon(iconSlug);
 
           const isLive = !!block.isLive;

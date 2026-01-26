@@ -18,7 +18,7 @@ func Test__AppInstallationRequestWorker_Sync(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewAppInstallationRequestWorker(r.Encryptor, r.Registry, "http://localhost:8000", "http://localhost:8000")
+	worker := NewAppInstallationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
 
 	//
 	// Register a dummy application and install it.
@@ -62,7 +62,7 @@ func Test__AppInstallationRequestWorker_SyncError(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewAppInstallationRequestWorker(r.Encryptor, r.Registry, "http://localhost:8000", "http://localhost:8000")
+	worker := NewAppInstallationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
 
 	//
 	// Register a dummy application and install it.

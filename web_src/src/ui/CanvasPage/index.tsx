@@ -95,6 +95,7 @@ export interface NodeEditData {
   configuration: Record<string, any>;
   configurationFields: ConfigurationField[];
   appName?: string;
+  blockName?: string;
   appInstallationRef?: ComponentsAppInstallationRef;
 }
 
@@ -152,6 +153,7 @@ export interface CanvasPageProps {
     nodeId: string,
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
   ) => void;
+  onAnnotationBlur?: () => void;
   getCustomField?: (nodeId: string) => ((configuration: Record<string, unknown>) => React.ReactNode) | null;
   onSave?: (nodes: CanvasNode[]) => void;
   installedApplications?: OrganizationsAppInstallation[];
@@ -290,6 +292,7 @@ const nodeTypes = {
             ? (nodeId, updates) => callbacks.onAnnotationUpdate.current?.(nodeId, updates)
             : undefined
         }
+        onAnnotationBlur={callbacks.onAnnotationBlur.current ? () => callbacks.onAnnotationBlur.current?.() : undefined}
         ai={{
           show: callbacks.aiState.sidebarOpen,
           suggestion: callbacks.aiState.suggestions[nodeProps.id] || null,
@@ -343,6 +346,7 @@ function CanvasPage(props: CanvasPageProps) {
     nodeId: string;
     nodeName: string;
     channels: string[];
+    initialData?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -404,20 +408,31 @@ function CanvasPage(props: CanvasPageProps) {
   );
 
   const handleNodeRun = useCallback(
-    (nodeId: string) => {
+    (nodeId?: string, initialData?: string) => {
       // Hard guard: if running is disabled (e.g., unsaved changes), do nothing
       if (props.runDisabled) return;
+
+      // Check for pending run data from custom field
+      // Note: This uses a window property as a workaround to pass nodeId and initialData
+      // through the onRun callback chain without breaking existing signatures
+      const pendingData = (window as any).__pendingRunData;
+      const actualNodeId = nodeId || pendingData?.nodeId;
+      const actualInitialData = initialData || pendingData?.initialData;
+
+      if (!actualNodeId) return;
+
       // Find the node to get its name and channels
-      const node = state.nodes.find((n) => n.id === nodeId);
+      const node = state.nodes.find((n) => n.id === actualNodeId);
       if (!node) return;
 
-      const nodeName = (node.data as any).label || nodeId;
+      const nodeName = (node.data as any).label || actualNodeId;
       const channels = (node.data as any).outputChannels || ["default"];
 
       setEmitModalData({
-        nodeId,
+        nodeId: actualNodeId,
         nodeName,
         channels,
+        initialData: actualInitialData,
       });
     },
     [state.nodes, props.runDisabled],
@@ -793,11 +808,12 @@ function CanvasPage(props: CanvasPageProps) {
               hideHeader={true}
               onToggleView={handleToggleView}
               onToggleCollapse={props.onToggleCollapse}
-              onRun={handleNodeRun}
+              onRun={(nodeId) => handleNodeRun(nodeId)}
               onDuplicate={props.onDuplicate}
               onConfigure={props.onConfigure}
               onDeactivate={props.onDeactivate}
               onAnnotationUpdate={props.onAnnotationUpdate}
+              onAnnotationBlur={props.onAnnotationBlur}
               runDisabled={props.runDisabled}
               runDisabledTooltip={props.runDisabledTooltip}
               onBuildingBlockDrop={handleBuildingBlockDrop}
@@ -898,6 +914,7 @@ function CanvasPage(props: CanvasPageProps) {
           organizationId={props.organizationId || ""}
           channels={emitModalData.channels}
           onEmit={handleEmit}
+          initialData={emitModalData.initialData}
         />
       )}
     </div>
@@ -1114,6 +1131,7 @@ function Sidebar({
       nodeConfigMode="edit"
       nodeName={editingNodeData?.nodeName || ""}
       nodeLabel={editingNodeData?.displayLabel}
+      blockName={editingNodeData?.blockName}
       nodeConfiguration={editingNodeData?.configuration || {}}
       nodeConfigurationFields={editingNodeData?.configurationFields || []}
       onNodeConfigSave={onSaveConfiguration}
@@ -1235,6 +1253,7 @@ function CanvasContent({
   onToggleView,
   onToggleCollapse,
   onAnnotationUpdate,
+  onAnnotationBlur,
   onBuildingBlockDrop,
   onBuildingBlocksSidebarToggle,
   onConnectionDropInEmptySpace,
@@ -1280,6 +1299,7 @@ function CanvasContent({
     nodeId: string,
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
   ) => void;
+  onAnnotationBlur?: () => void;
   onBuildingBlockDrop?: (block: BuildingBlock, position?: { x: number; y: number }) => void;
   onBuildingBlocksSidebarToggle?: (open: boolean) => void;
   onConnectionDropInEmptySpace?: (
@@ -1472,6 +1492,8 @@ function CanvasContent({
 
   const onAnnotationUpdateRef = useRef(onAnnotationUpdate);
   onAnnotationUpdateRef.current = onAnnotationUpdate;
+  const onAnnotationBlurRef = useRef(onAnnotationBlur);
+  onAnnotationBlurRef.current = onAnnotationBlur;
 
   const handleSave = useCallback(() => {
     if (onSave) {
@@ -1698,6 +1720,7 @@ function CanvasContent({
     onDeactivate: onDeactivateRef,
     onToggleView: onToggleViewRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
+    onAnnotationBlur: onAnnotationBlurRef,
     aiState: state.ai,
     runDisabled,
     runDisabledTooltip,
@@ -1713,6 +1736,7 @@ function CanvasContent({
     onDeactivate: onDeactivateRef,
     onToggleView: onToggleViewRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
+    onAnnotationBlur: onAnnotationBlurRef,
     aiState: state.ai,
     runDisabled,
     runDisabledTooltip,

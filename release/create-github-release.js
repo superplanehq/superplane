@@ -33,7 +33,7 @@ async function main() {
   const sbomPath = path.join(buildRoot, "superplane-sbom.json");
   const sbomAssetName = "superplane-sbom.json";
   const cliAssetsDir = path.join(repoRoot, "release/cli");
-  const cliAssetPrefix = `superplane-cli-${version}-`;
+  const cliAssetPrefix = `superplane-cli-`;
 
   if (!fs.existsSync(artifactPath)) {
     console.error(

@@ -510,6 +510,7 @@ export const CustomComponent = () => {
         configuration: (node.data as any)._originalConfiguration || {},
         configurationFields: component.configuration || [],
         appName,
+        blockName: (node.data as any)._originalComponent,
         appInstallationRef: (node.data as any)._appInstallationRef,
       };
     },

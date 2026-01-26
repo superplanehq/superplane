@@ -48,12 +48,14 @@ import {
   triggerRenderers as smtpTriggerRenderers,
   eventStateRegistry as smtpEventStateRegistry,
 } from "./smtp";
+import { componentMappers as awsComponentMappers, triggerRenderers as awsTriggerRenderers } from "./aws";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
 import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
+import { startTriggerRenderer } from "./start";
 
 /**
  * Registry mapping trigger names to their renderers.
@@ -62,6 +64,7 @@ import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 const triggerRenderers: Record<string, TriggerRenderer> = {
   schedule: scheduleTriggerRenderer,
   webhook: webhookTriggerRenderer,
+  start: startTriggerRenderer,
 };
 
 const componentBaseMappers: Record<string, ComponentBaseMapper> = {
@@ -83,6 +86,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   datadog: datadogComponentMappers,
   slack: slackComponentMappers,
   smtp: smtpComponentMappers,
+  aws: awsComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -93,6 +97,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   datadog: datadogTriggerRenderers,
   slack: slackTriggerRenderers,
   smtp: smtpTriggerRenderers,
+  aws: awsTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -145,7 +150,7 @@ export function getTriggerRenderer(name: string): TriggerRenderer {
     return withCustomName(defaultTriggerRenderer);
   }
 
-  const triggerName = parts[1];
+  const triggerName = parts.slice(1).join(".");
   return withCustomName(appTriggers[triggerName] || defaultTriggerRenderer);
 }
 
@@ -165,7 +170,7 @@ export function getComponentBaseMapper(name: string): ComponentBaseMapper {
     return noopMapper;
   }
 
-  const componentName = parts[1];
+  const componentName = parts.slice(1).join(".");
   return appMapper[componentName] || noopMapper;
 }
 
@@ -193,7 +198,7 @@ export function getEventStateRegistry(name: string): EventStateRegistry {
     return DEFAULT_STATE_REGISTRY;
   }
 
-  const componentName = parts[1];
+  const componentName = parts.slice(1).join(".");
   return appRegistry[componentName] || DEFAULT_STATE_REGISTRY;
 }
 
@@ -229,7 +234,7 @@ export function getCustomFieldRenderer(componentName: string): CustomFieldRender
     return undefined;
   }
 
-  const name = parts[1];
+  const name = parts.slice(1).join(".");
   return appRenderers[name];
 }
 
@@ -252,7 +257,7 @@ export function getExecutionDetails(
     const appName = parts[0];
     const appMapper = appMappers[appName];
     if (appMapper) {
-      const componentNamePart = parts[1];
+      const componentNamePart = parts.slice(1).join(".");
       mapper = appMapper[componentNamePart];
     }
   }
