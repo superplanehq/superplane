@@ -147,7 +147,7 @@ func (t *OnMonitorAlert) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 	}
 
 	// Filter by tags if configured
-	if config.Tags != "" && !matchesTags(payload.Tags, config.Tags) {
+	if strings.TrimSpace(config.Tags) != "" && !matchesTags(payload.Tags, config.Tags) {
 		return http.StatusOK, nil
 	}
 
