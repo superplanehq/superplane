@@ -6,13 +6,14 @@ import (
 	"time"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/applications/aws/common"
+	"github.com/superplanehq/superplane/pkg/applications/aws/lambda"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 const (
-	defaultAudience            = "sts.amazonaws.com"
 	defaultSessionDurationSecs = 3600
 )
 
@@ -25,14 +26,12 @@ type AWS struct{}
 type Configuration struct {
 	RoleArn                string `json:"roleArn" mapstructure:"roleArn"`
 	Region                 string `json:"region" mapstructure:"region"`
-	Audience               string `json:"audience" mapstructure:"audience"`
 	SessionDurationSeconds int    `json:"sessionDurationSeconds" mapstructure:"sessionDurationSeconds"`
 }
 
 type SessionMetadata struct {
 	RoleArn   string `json:"roleArn"`
 	Region    string `json:"region"`
-	Audience  string `json:"audience"`
 	ExpiresAt string `json:"expiresAt"`
 }
 
@@ -49,36 +48,22 @@ func (a *AWS) Icon() string {
 }
 
 func (a *AWS) Description() string {
-	return "Generate short-lived AWS session tokens using SuperPlane OIDC"
+	return "Manage resources and execute AWS commands in workflows"
 }
 
 func (a *AWS) InstallationInstructions() string {
-	return ""
+	return "Initially, you can leave the **\"IAM Role ARN\"** field empty, as you will be guided through the identity provider and IAM role creation process."
 }
 
 func (a *AWS) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "roleArn",
-			Label:       "Role ARN",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "Role ARN that SuperPlane should assume",
-		},
-		{
 			Name:        "region",
 			Label:       "STS Region or Endpoint",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "AWS region for STS (e.g. us-east-1). Use a full URL for nonstandard endpoints.",
-		},
-		{
-			Name:        "audience",
-			Label:       "OIDC Audience",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Default:     defaultAudience,
-			Description: "OIDC audience to include in the token (usually sts.amazonaws.com)",
+			Default:     "us-east-1",
+			Description: "AWS region for STS",
 		},
 		{
 			Name:        "sessionDurationSeconds",
@@ -94,12 +79,19 @@ func (a *AWS) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "roleArn",
+			Label:       "IAM Role ARN",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "ARN for the IAM role that SuperPlane should assume. Leave empty to be guided through the identity provider and IAM role creation process.",
+		},
 	}
 }
 
 func (a *AWS) Components() []core.Component {
 	return []core.Component{
-		&RunLambda{},
+		&lambda.RunFunction{},
 	}
 }
 
@@ -113,21 +105,42 @@ func (a *AWS) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
 
-	roleArn := strings.TrimSpace(config.RoleArn)
-	if roleArn == "" {
-		return fmt.Errorf("roleArn is required")
+	if config.RoleArn == "" {
+		return a.showBrowserAction(ctx)
 	}
 
-	issuer := strings.TrimRight(strings.TrimSpace(ctx.BaseURL), "/")
-	if issuer == "" {
-		return fmt.Errorf("baseURL is required to generate OIDC tokens")
-	}
+	return a.generateCredentials(ctx, config)
+}
 
-	audience := strings.TrimSpace(config.Audience)
-	if audience == "" {
-		audience = defaultAudience
-	}
+func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
+	ctx.AppInstallation.NewBrowserAction(core.BrowserAction{
+		Description: fmt.Sprintf(`
+**1. Create Identity Provider**
 
+- Go to AWS IAM Console → Identity Providers → Add provider
+- Choose "OpenID Connect" as the provider type
+- Provider URL: **%s**
+- Audience: **%s**
+
+**2. Create IAM Role**
+
+- Go to AWS IAM Console → Roles → Create role
+- Choose "Web identity" as trusted entity type
+- Select the identity provider created in step 1
+- Add the permissions to the role
+- Give it a name and description, and create it
+
+**3. Complete the installation setup**
+
+- Copy the ARN of the IAM role created in step 2
+- Paste it into the "Role ARN" field in the installation configuration
+`, ctx.BaseURL, ctx.AppInstallation.ID().String()),
+	})
+
+	return nil
+}
+
+func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration) error {
 	durationSeconds := config.SessionDurationSeconds
 	if durationSeconds <= 0 {
 		durationSeconds = defaultSessionDurationSecs
@@ -138,13 +151,13 @@ func (a *AWS) Sync(ctx core.SyncContext) error {
 		subject = fmt.Sprintf("app-installation:%s", ctx.AppInstallation.ID())
 	}
 
-	oidcToken, err := ctx.OIDC.Sign(subject, 5*time.Minute, audience, nil)
+	oidcToken, err := ctx.OIDC.Sign(subject, 5*time.Minute, ctx.AppInstallation.ID().String(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to generate OIDC token: %w", err)
 	}
 
 	sessionName := fmt.Sprintf("SuperPlane-%s", ctx.AppInstallation.ID())
-	credentials, err := assumeRoleWithWebIdentity(ctx.HTTP, config.Region, roleArn, sessionName, oidcToken, durationSeconds)
+	credentials, err := assumeRoleWithWebIdentity(ctx.HTTP, config.Region, config.RoleArn, sessionName, oidcToken, durationSeconds)
 	if err != nil {
 		return err
 	}
@@ -160,13 +173,13 @@ func (a *AWS) Sync(ctx core.SyncContext) error {
 	}
 
 	ctx.AppInstallation.SetMetadata(SessionMetadata{
-		RoleArn:   roleArn,
+		RoleArn:   config.RoleArn,
 		Region:    strings.TrimSpace(config.Region),
-		Audience:  audience,
 		ExpiresAt: credentials.Expiration.Format(time.RFC3339),
 	})
 
 	ctx.AppInstallation.SetState("ready", "")
+	ctx.AppInstallation.RemoveBrowserAction()
 
 	refreshAfter := time.Until(credentials.Expiration) / 2
 	if refreshAfter < time.Minute {
@@ -185,7 +198,38 @@ func (a *AWS) CompareWebhookConfig(aConfig, bConfig any) (bool, error) {
 }
 
 func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.ApplicationResource, error) {
-	return []core.ApplicationResource{}, nil
+	switch resourceType {
+	case "lambda.function":
+		creds, err := common.CredentialsFromInstallation(ctx.AppInstallation)
+		if err != nil {
+			return nil, err
+		}
+
+		region := common.RegionFromInstallation(ctx.AppInstallation)
+		if strings.TrimSpace(region) == "" {
+			return nil, fmt.Errorf("region is required")
+		}
+
+		client := lambda.NewClient(ctx.HTTP, creds, region)
+		functions, err := client.ListFunctions()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list lambda functions: %w", err)
+		}
+
+		resources := make([]core.ApplicationResource, 0, len(functions))
+		for _, function := range functions {
+			resources = append(resources, core.ApplicationResource{
+				Type: resourceType,
+				Name: function.FunctionName,
+				ID:   function.FunctionArn,
+			})
+		}
+
+		return resources, nil
+
+	default:
+		return []core.ApplicationResource{}, nil
+	}
 }
 
 func (a *AWS) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {

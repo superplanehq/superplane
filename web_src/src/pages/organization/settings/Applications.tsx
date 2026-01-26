@@ -21,6 +21,7 @@ import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import smtpIcon from "@/assets/icons/integrations/smtp.svg";
+import awsIcon from "@/assets/icons/integrations/aws.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 interface ApplicationsProps {
@@ -43,6 +44,7 @@ export function Applications({ organizationId }: ApplicationsProps) {
     return selectedApplication?.installationInstructions?.trim();
   }, [selectedApplication?.installationInstructions]);
   const appLogoMap: Record<string, string> = {
+    aws: awsIcon,
     dash0: dash0Icon,
     github: githubIcon,
     openai: openAiIcon,

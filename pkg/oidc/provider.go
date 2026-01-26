@@ -18,6 +18,7 @@ import (
 )
 
 type RSAProvider struct {
+	issuer      string
 	privateKey  *rsa.PrivateKey
 	publicKeys  map[string]*rsa.PublicKey
 	publicJWKs  []PublicJWK
@@ -29,7 +30,7 @@ type keyEntry struct {
 	key  *rsa.PrivateKey
 }
 
-func NewProviderFromKeyDir(keysPath string) (Provider, error) {
+func NewProviderFromKeyDir(issuer, keysPath string) (Provider, error) {
 	entries, err := os.ReadDir(keysPath)
 	if err != nil {
 		return nil, err
@@ -70,7 +71,7 @@ func NewProviderFromKeyDir(keysPath string) (Provider, error) {
 	})
 
 	activeKey := keys[len(keys)-1].key
-	return newSignerFromKeys(activeKey, keys)
+	return newSignerFromKeys(issuer, activeKey, keys)
 }
 
 func (s *RSAProvider) PublicJWKs() []PublicJWK {
@@ -80,6 +81,7 @@ func (s *RSAProvider) PublicJWKs() []PublicJWK {
 func (s *RSAProvider) Sign(subject string, duration time.Duration, audience string, additionalClaims map[string]any) (string, error) {
 	now := time.Now()
 	claims := jwt.MapClaims{
+		"iss": s.issuer,
 		"iat": now.Unix(),
 		"nbf": now.Unix(),
 		"exp": now.Add(duration).Unix(),
@@ -106,7 +108,7 @@ func (s *RSAProvider) Sign(subject string, duration time.Duration, audience stri
 	return tokenString, nil
 }
 
-func newSignerFromKeys(activeKey *rsa.PrivateKey, keys []keyEntry) (Provider, error) {
+func newSignerFromKeys(issuer string, activeKey *rsa.PrivateKey, keys []keyEntry) (Provider, error) {
 	publicKeys := make(map[string]*rsa.PublicKey, len(keys))
 	publicJWKs := make([]PublicJWK, 0, len(keys))
 
@@ -132,6 +134,7 @@ func newSignerFromKeys(activeKey *rsa.PrivateKey, keys []keyEntry) (Provider, er
 	}
 
 	return &RSAProvider{
+		issuer:      issuer,
 		privateKey:  activeKey,
 		publicKeys:  publicKeys,
 		publicJWKs:  publicJWKs,

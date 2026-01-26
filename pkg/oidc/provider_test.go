@@ -31,7 +31,7 @@ func TestNewProviderFromKeyDirLoadsSymlinkedKey(t *testing.T) {
 		t.Fatalf("symlink key: %v", err)
 	}
 
-	provider, err := NewProviderFromKeyDir(dir)
+	provider, err := NewProviderFromKeyDir("test", dir)
 	if err != nil {
 		t.Fatalf("NewProviderFromKeyDir: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestNewProviderFromKeyDirSkipsNonRegularFiles(t *testing.T) {
 		t.Fatalf("write key: %v", err)
 	}
 
-	provider, err := NewProviderFromKeyDir(dir)
+	provider, err := NewProviderFromKeyDir("test", dir)
 	if err != nil {
 		t.Fatalf("NewProviderFromKeyDir: %v", err)
 	}

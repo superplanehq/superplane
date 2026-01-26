@@ -45,6 +45,7 @@ export interface NodeEditData {
   configuration: Record<string, any>;
   configurationFields: ConfigurationField[];
   appName?: string;
+  blockName?: string;
   appInstallationRef?: any;
 }
 
@@ -885,6 +886,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
             nodeConfigMode="edit"
             nodeName={editingNodeData?.nodeName || ""}
             nodeLabel={editingNodeData?.displayLabel}
+            blockName={editingNodeData?.blockName}
             nodeConfiguration={editingNodeData?.configuration || {}}
             nodeConfigurationFields={editingNodeData?.configurationFields || []}
             onNodeConfigSave={handleSaveConfiguration}

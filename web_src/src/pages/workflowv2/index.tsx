@@ -1342,6 +1342,7 @@ export function WorkflowPageV2() {
       let configurationFields: ComponentsComponent["configuration"] = [];
       let displayLabel: string | undefined = node.name || undefined;
       let appName: string | undefined;
+      let blockName: string | undefined;
 
       if (node.type === "TYPE_BLUEPRINT") {
         const blueprintMetadata = blueprints.find((b) => b.id === node.blueprint?.id);
@@ -1351,6 +1352,7 @@ export function WorkflowPageV2() {
         const componentMetadata = allComponents.find((c) => c.name === node.component?.name);
         configurationFields = componentMetadata?.configuration || [];
         displayLabel = componentMetadata?.label || displayLabel;
+        blockName = node.component?.name;
 
         // Check if this component is from an application
         const componentApp = availableApplications.find((app) =>
@@ -1363,6 +1365,7 @@ export function WorkflowPageV2() {
         const triggerMetadata = allTriggers.find((t) => t.name === node.trigger?.name);
         configurationFields = triggerMetadata?.configuration || [];
         displayLabel = triggerMetadata?.label || displayLabel;
+        blockName = node.trigger?.name;
 
         // Check if this trigger is from an application
         const triggerApp = availableApplications.find((app) =>
@@ -1388,6 +1391,7 @@ export function WorkflowPageV2() {
           },
           configurationFields,
           appName,
+          blockName,
           appInstallationRef: node.appInstallation,
         };
       }
@@ -1399,6 +1403,7 @@ export function WorkflowPageV2() {
         configuration: node.configuration || {},
         configurationFields,
         appName,
+        blockName,
         appInstallationRef: node.appInstallation,
       };
     },

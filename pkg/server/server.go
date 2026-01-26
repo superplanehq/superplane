@@ -331,7 +331,7 @@ func Start() {
 	}
 
 	jwtSigner := jwt.NewSigner(jwtSecret)
-	oidcProvider, err := oidc.NewProviderFromKeyDir(oidcKeysPath)
+	oidcProvider, err := oidc.NewProviderFromKeyDir(baseURL, oidcKeysPath)
 	if err != nil {
 		panic(fmt.Sprintf("failed to load OIDC keys: %v", err))
 	}

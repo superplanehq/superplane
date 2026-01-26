@@ -19,6 +19,7 @@ import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import smtpIcon from "@/assets/icons/integrations/smtp.svg";
+import awsIcon from "@/assets/icons/integrations/aws.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 interface ApplicationDetailsProps {
@@ -37,6 +38,7 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
   const { data: availableApps = [] } = useAvailableApplications();
   const appDefinition = installation ? availableApps.find((app) => app.name === installation.spec?.appName) : undefined;
   const appLogoMap: Record<string, string> = {
+    aws: awsIcon,
     dash0: dash0Icon,
     github: githubIcon,
     openai: openAiIcon,
@@ -313,15 +315,17 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
                         <ReactMarkdown>{installation.status.browserAction.description}</ReactMarkdown>
                       )}
                     </AlertDescription>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleBrowserAction}
-                      className="shrink-0 px-3 py-1.5"
-                    >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Continue
-                    </Button>
+                    {installation.status.browserAction.url && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleBrowserAction}
+                        className="shrink-0 px-3 py-1.5"
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Continue
+                      </Button>
+                    )}
                   </div>
                 </Alert>
               )}
