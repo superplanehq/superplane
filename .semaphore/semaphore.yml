@@ -47,9 +47,9 @@ blocks:
           commands:
             - make check.db.structure
             - make check.db.migrations
-        - name: 'Check: Integrations Docs'
+        - name: 'Check: Components Docs'
           commands:
-            - make gen.integrations.docs
+            - make gen.components.docs
             - git diff --exit-code docs/integrations
         - name: 'Check: Go Format'
           commands:
