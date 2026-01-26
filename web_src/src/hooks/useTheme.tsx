@@ -6,10 +6,12 @@ const STORAGE_KEY = "superplane-theme-preference";
 
 function getStoredPreference(): ThemePreference {
   if (typeof window === "undefined") return "light";
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored === "light" || stored === "dark" || stored === "system") {
-    return stored;
-  }
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === "light" || stored === "dark" || stored === "system") {
+      return stored;
+    }
+  } catch {}
   return "light";
 }
 
@@ -59,7 +61,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Save preference to localStorage
   const setPreference = useCallback((newPreference: ThemePreference) => {
     setPreferenceState(newPreference);
-    localStorage.setItem(STORAGE_KEY, newPreference);
+    try {
+      localStorage.setItem(STORAGE_KEY, newPreference);
+    } catch {}
   }, []);
 
   return (
