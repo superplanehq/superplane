@@ -18,7 +18,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/server"
 )
 
-const docsRoot = "docs/integrations"
+const docsRoot = "docs/components"
 
 var camelBoundary = regexp.MustCompile(`([a-z0-9])([A-Z])`)
 
