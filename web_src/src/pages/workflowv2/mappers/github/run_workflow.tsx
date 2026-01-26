@@ -224,7 +224,9 @@ function runWorkflowEventSections(
       showAutomaticTime: true,
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
+      eventSubtitle: buildGithubExecutionSubtitle(execution),
       eventState: runWorkflowStateFunction(execution),
+      eventId: execution.rootEvent!.id!,
     });
   }
 

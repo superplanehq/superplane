@@ -87,6 +87,7 @@ func resolveCustomName(node *models.WorkflowNode, payload map[string]any) (*stri
 	}
 
 	builder := contexts.NewNodeConfigurationBuilder(database.Conn(), node.WorkflowID).
+		WithNodeID(node.NodeID).
 		WithInput(map[string]any{node.NodeID: payload})
 	resolved, err := builder.ResolveExpression(template)
 	if err != nil {

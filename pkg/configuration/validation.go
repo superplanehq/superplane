@@ -218,6 +218,40 @@ func validateMultiSelect(field Field, value any) error {
 	return nil
 }
 
+func validateDaysOfWeek(_ Field, value any) error {
+	var selectedValues []string
+	switch v := value.(type) {
+	case []any:
+		for _, item := range v {
+			dayValue, ok := item.(string)
+			if !ok {
+				return fmt.Errorf("all items must be strings")
+			}
+			selectedValues = append(selectedValues, dayValue)
+		}
+	case []string:
+		selectedValues = append(selectedValues, v...)
+	default:
+		return fmt.Errorf("must be a list of values")
+	}
+
+	if len(selectedValues) == 0 {
+		return fmt.Errorf("must contain at least one day")
+	}
+
+	validDays := []string{
+		"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+	}
+
+	for _, day := range selectedValues {
+		if !slices.Contains(validDays, day) {
+			return fmt.Errorf("invalid day '%s': must be one of monday, tuesday, wednesday, thursday, friday, saturday, sunday", day)
+		}
+	}
+
+	return nil
+}
+
 func validateObject(field Field, value any) error {
 	if field.TypeOptions != nil && field.TypeOptions.Object != nil && len(field.TypeOptions.Object.Schema) > 0 {
 		obj, ok := value.(map[string]any)
@@ -266,6 +300,15 @@ func validateList(field Field, value any) error {
 			}
 
 			err := ValidateConfiguration(itemDef.Schema, itemMap)
+			if err != nil {
+				return fmt.Errorf("item at index %d: %w", i, err)
+			}
+		} else if itemDef.Type != "" {
+			if item == nil {
+				return fmt.Errorf("item at index %d cannot be empty", i)
+			}
+
+			err := validateFieldValue(Field{Type: itemDef.Type, Required: true}, item)
 			if err != nil {
 				return fmt.Errorf("item at index %d: %w", i, err)
 			}
@@ -332,6 +375,38 @@ func validateTime(field Field, value any) error {
 	_, err := time.Parse(format, timeStr)
 	if err != nil {
 		return fmt.Errorf("must be a valid time in format %s", format)
+	}
+
+	return nil
+}
+
+func validateTimeRange(_ Field, value any) error {
+	timeRangeStr, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("must be a string")
+	}
+
+	if timeRangeStr == "" {
+		return fmt.Errorf("time range cannot be empty")
+	}
+
+	startStr, endStr, err := parseTimeRange(timeRangeStr)
+	if err != nil {
+		return err
+	}
+
+	startTime, err := time.Parse("15:04", startStr)
+	if err != nil {
+		return fmt.Errorf("start time must be a valid time in format HH:MM")
+	}
+
+	endTime, err := time.Parse("15:04", endStr)
+	if err != nil {
+		return fmt.Errorf("end time must be a valid time in format HH:MM")
+	}
+
+	if !startTime.Before(endTime) {
+		return fmt.Errorf("start time must be before end time")
 	}
 
 	return nil
@@ -481,6 +556,9 @@ func validateFieldValue(field Field, value any) error {
 	case FieldTypeMultiSelect:
 		return validateMultiSelect(field, value)
 
+	case FieldTypeDaysOfWeek:
+		return validateDaysOfWeek(field, value)
+
 	case FieldTypeAppInstallationResource:
 		// If Multi is true, validate as array of strings
 		// Otherwise, validate as a single string
@@ -533,6 +611,9 @@ func validateFieldValue(field Field, value any) error {
 
 	case FieldTypeTime:
 		return validateTime(field, value)
+
+	case FieldTypeTimeRange:
+		return validateTimeRange(field, value)
 
 	case FieldTypeDate:
 		return validateDate(field, value)
@@ -858,4 +939,19 @@ func validateTimezone(_ Field, value any) error {
 	}
 
 	return nil
+}
+
+func parseTimeRange(timeRangeStr string) (string, string, error) {
+	parts := strings.Split(timeRangeStr, "-")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("time range must be in format HH:MM-HH:MM")
+	}
+
+	startStr := strings.TrimSpace(parts[0])
+	endStr := strings.TrimSpace(parts[1])
+	if startStr == "" || endStr == "" {
+		return "", "", fmt.Errorf("time range must be in format HH:MM-HH:MM")
+	}
+
+	return startStr, endStr, nil
 }

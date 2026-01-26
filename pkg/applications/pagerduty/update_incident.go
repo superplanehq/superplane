@@ -37,6 +37,33 @@ func (c *UpdateIncident) Description() string {
 	return "Update an existing incident in PagerDuty"
 }
 
+func (c *UpdateIncident) Documentation() string {
+	return `The Update Incident component modifies an existing PagerDuty incident.
+
+## Use Cases
+
+- **Status updates**: Update incident status (acknowledge, resolve)
+- **Priority management**: Change incident priority
+- **Assignment**: Assign incidents to users or escalation policies
+- **Note addition**: Add notes to incidents with updates
+
+## Configuration
+
+- **Incident ID**: The ID of the incident to update (e.g., A12BC34567...)
+- **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
+- **Status**: Update incident status (acknowledged, resolved)
+- **Priority**: Update incident priority (select from available priorities)
+- **Title**: Update incident title (optional, supports expressions)
+- **Description**: Update incident description (optional, supports expressions)
+- **Escalation Policy**: Change escalation policy (optional)
+- **Assignees**: Assign to specific users (optional)
+- **Note**: Add a note to the incident (optional, supports expressions)
+
+## Output
+
+Returns the updated incident object with all current information.`
+}
+
 func (c *UpdateIncident) Icon() string {
 	return "edit"
 }

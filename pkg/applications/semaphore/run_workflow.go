@@ -76,6 +76,44 @@ func (r *RunWorkflow) Description() string {
 	return "Run Semaphore workflow"
 }
 
+func (r *RunWorkflow) Documentation() string {
+	return `The Run Workflow component triggers a Semaphore CI/CD workflow and waits for it to complete.
+
+## Use Cases
+
+- **CI/CD orchestration**: Trigger builds and deployments from SuperPlane workflows
+- **Pipeline automation**: Run Semaphore pipelines as part of workflow automation
+- **Multi-stage deployments**: Coordinate complex deployment pipelines
+- **Workflow chaining**: Chain multiple Semaphore workflows together
+
+## How It Works
+
+1. Creates and starts a Semaphore workflow with the specified pipeline file and parameters
+2. Waits for the pipeline to complete (monitored via webhook and polling)
+3. Routes execution based on pipeline result:
+   - **Passed channel**: Pipeline completed successfully
+   - **Failed channel**: Pipeline failed or was cancelled
+
+## Configuration
+
+- **Project**: Select the Semaphore project containing the workflow
+- **Pipeline File**: Path to the pipeline YAML file (e.g., ` + "`.semaphore/pipeline.yml`" + `)
+- **Ref**: Git reference to run the workflow on (branch, tag, or commit SHA)
+- **Commit SHA**: Optional specific commit SHA to run (if not provided, uses latest from ref)
+- **Parameters**: Optional workflow parameters as key-value pairs (supports expressions)
+
+## Output Channels
+
+- **Passed**: Emitted when pipeline completes successfully
+- **Failed**: Emitted when pipeline fails or is cancelled
+
+## Notes
+
+- The component automatically sets up webhook monitoring for pipeline completion
+- Falls back to polling if webhook doesn't arrive
+- Can be cancelled, which will stop the running Semaphore workflow`
+}
+
 func (r *RunWorkflow) Icon() string {
 	return "workflow"
 }

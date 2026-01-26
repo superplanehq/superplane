@@ -39,6 +39,38 @@ func (l *ListIncidents) Description() string {
 	return "Query PagerDuty to get a list of all open incidents (triggered and acknowledged)"
 }
 
+func (l *ListIncidents) Documentation() string {
+	return `The List Incidents component queries PagerDuty for open incidents and routes execution based on urgency levels.
+
+## Use Cases
+
+- **Health checks**: Check for active incidents and route based on severity
+- **Incident monitoring**: Monitor incident status across services
+- **Automated response**: Trigger workflows based on incident presence
+- **Reporting**: Collect incident data for reporting or analysis
+
+## Configuration
+
+- **Services**: Optional list of services to filter incidents (leave empty to get incidents from all services)
+
+## Output Channels
+
+- **Clear**: No open incidents found
+- **Low**: Only low urgency incidents found
+- **High**: One or more high urgency incidents found
+
+## Output
+
+Returns a list of open incidents with:
+- **id**: Incident ID
+- **incident_number**: Human-readable incident number
+- **status**: Incident status (triggered, acknowledged)
+- **urgency**: Incident urgency (low, high)
+- **title**: Incident title
+- **service**: Service information
+- **assignments**: Current assignments`
+}
+
 func (l *ListIncidents) Icon() string {
 	return "alert-triangle"
 }

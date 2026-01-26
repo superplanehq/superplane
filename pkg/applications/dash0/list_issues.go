@@ -39,6 +39,35 @@ func (l *ListIssues) Description() string {
 	return "Query Dash0 to get a list of all current issues using the metric dash0.issue.status"
 }
 
+func (l *ListIssues) Documentation() string {
+	return `The List Issues component queries Dash0 to retrieve all current issues and routes execution based on issue severity.
+
+## Use Cases
+
+- **Health monitoring**: Check system health and route based on issue severity
+- **Alert routing**: Route alerts to different channels based on issue status
+- **Issue tracking**: Monitor and process active issues
+- **Automated remediation**: Trigger remediation workflows based on issues
+
+## Configuration
+
+- **Check Rules**: Optional list of check rules to filter issues (leave empty to get all issues)
+
+## Output Channels
+
+- **Clear**: No active issues detected
+- **Degraded**: One or more degraded issues detected
+- **Critical**: One or more critical issues detected
+
+## Output
+
+Returns a list of issues with:
+- **check_rule**: The check rule that generated the issue
+- **status**: Issue status (clear, degraded, critical)
+- **labels**: Metric labels associated with the issue
+- **metadata**: Additional issue metadata`
+}
+
 func (l *ListIssues) Icon() string {
 	return "alert-triangle"
 }
@@ -141,6 +170,7 @@ func (l *ListIssues) Execute(ctx core.ExecutionContext) error {
 
 	// Determine the output channel based on issue severity
 	channel := l.determineOutputChannel(data)
+	data["status"] = channel
 
 	return ctx.ExecutionState.Emit(
 		channel,

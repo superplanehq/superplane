@@ -202,12 +202,8 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 	s.session.Sleep(300)
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
-
-	s.session.Click(q.TestID("field-mode-select"))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("Exclude Range")`))
-
-	s.session.FillIn(q.TestID("time-field-startTime"), "00:00")
-	s.session.FillIn(q.TestID("time-field-endTime"), "23:59")
+	s.session.FillIn(q.TestID("time-field-timerange-start"), "00:00")
+	s.session.FillIn(q.TestID("time-field-timerange-end"), "23:59")
 
 	s.session.Click(q.TestID("field-timezone-select"))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("GMT+0 (London, Dublin, UTC)")`))
@@ -340,12 +336,47 @@ func (s *CanvasSteps) GetExecutionsForNodeInState(name string, state string) []m
 	return executions
 }
 
+func (s *CanvasSteps) GetExecutionsForNodeInStates(name string, states []string) []models.WorkflowNodeExecution {
+	node := s.GetNodeFromDB(name)
+
+	var executions []models.WorkflowNodeExecution
+
+	query := database.Conn().
+		Where("workflow_id = ?", s.WorkflowID).
+		Where("node_id = ?", node.NodeID).
+		Where("state IN ?", states).
+		Order("created_at DESC")
+
+	err := query.Find(&executions).Error
+	require.NoError(s.t, err)
+
+	return executions
+}
+
 func (s *CanvasSteps) WaitForExecution(name string, state string, timeout time.Duration) {
 	found := false
 	start := time.Now()
 
 	for time.Since(start) < timeout {
 		executions := s.GetExecutionsForNodeInState(name, state)
+		if len(executions) > 0 {
+			found = true
+			break
+		}
+
+		s.t.Log("waiting for execution of node", name)
+		s.session.Sleep(1000)
+	}
+
+	require.True(s.t, found, "timed out waiting for execution of node %s", name)
+}
+
+func (s *CanvasSteps) WaitForExecutionInStates(name string, states []string, timeout time.Duration) {
+	found := false
+	start := time.Now()
+
+	for time.Since(start) < timeout {
+		executions := s.GetExecutionsForNodeInStates(name, states)
 		if len(executions) > 0 {
 			found = true
 			break

@@ -38,7 +38,7 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
     const eventData = lastEvent.data?.data as OnIncidentEventData;
-    return getDetailsForIncident(eventData?.incident!, eventData.agent);
+    return getDetailsForIncident(eventData?.incident!, eventData?.agent);
   },
 
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
@@ -85,7 +85,7 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
         subtitle,
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
-        eventId: lastEvent.id,
+        eventId: lastEvent.id!,
       };
     }
 

@@ -1,0 +1,233 @@
+metadata:
+  name: "Incident Router"
+  description: "Route P1 incidents from Slack mentions to PagerDuty and GitHub with AI-generated titles and descriptions."
+  isTemplate: false
+spec:
+  nodes:
+    - id: "slack-onappmention-slack-onappmention-knb9lx"
+      name: "Listen to mentions of the Slack Bot"
+      type: "TYPE_TRIGGER"
+      configuration:
+        channel: "C09AJT3BF1Q"
+      metadata:
+        appSubscriptionID: "cd55b360-bedd-4e08-818b-29fa52f3813f"
+        channel:
+          id: "C09AJT3BF1Q"
+          name: "all-efod-test-org"
+      position:
+        x: 384
+        "y": 501
+      component: null
+      blueprint: null
+      trigger:
+        name: "slack.onAppMention"
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "component-node-micxb6"
+      name: "filter"
+      type: "TYPE_COMPONENT"
+      configuration:
+        expression: "indexOf(lower($[\"Listen to mentions of the Slack Bot\"].data.blocks[0].elements[0].elements[1].text), \"p1\") != -1"
+      metadata: null
+      position:
+        x: 893
+        "y": 500
+      component:
+        name: "filter"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "component-node-683h8w"
+      name: "Generate issue title"
+      type: "TYPE_COMPONENT"
+      configuration:
+        input: "You are generating a PagerDuty incident TITLE based on a Slack message.\n\nInput:\n- A single Slack message text mentioned to a bot.\n\nYour task:\n- Read the Slack message.\n- Extract the core problem or symptom.\n- Generate a short, clear incident title suitable for PagerDuty.\n\nHard rules:\n- Output a single line of plain text.\n- NO markdown, NO emojis, NO quotes.\n- NO trailing punctuation.\n- Title length: 5 to 12 words.\n- Use present tense.\n- Be specific, not generic.\n- Do not include usernames, channel names, timestamps, or Slack formatting.\n- Do not include severity labels unless explicitly mentioned in the message.\n- Do not add explanations or context.\n\nIf the message is unclear or too generic:\n- Produce a neutral title describing the symptom.\n- Do not invent details.\n\nInput Slack message:\n{{ $[\"Listen to mentions of the Slack Bot\"].data.text }}\n"
+        model: "gpt-5.2"
+      metadata: null
+      position:
+        x: 1357
+        "y": 499
+      component:
+        name: "openai.textPrompt"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "component-node-hw4ezb"
+      name: "Generate issue description"
+      type: "TYPE_COMPONENT"
+      configuration:
+        input: "You are generating a PagerDuty incident DESCRIPTION based on a Slack message.\n\nInput:\n- A single Slack message text mentioned to a bot.\n\nYour task:\n- Rewrite the Slack message into a clear incident description.\n- Preserve the original meaning and important details.\n- Expand abbreviations only if they are obvious from context.\n\nHard rules:\n- Output plain text only (no Markdown, no emojis).\n- Use real line breaks (press Enter) for readability.\n- Keep it short and structured (3 to 6 lines max).\n- Do not invent causes, impact, or remediation.\n- Do not suggest next steps or actions.\n- Do not include Slack-specific elements (usernames, channel names, message IDs, reactions).\n- Do not add a title or summary line.\n\nContent guidelines:\n- Line 1: What is happening (symptom or alert).\n- Line 2: Affected service or component (if mentioned).\n- Line 3: When it started or was observed (if mentioned).\n- Optional additional lines only if the message clearly contains that info.\n\nIf the message is vague:\n- Restate the problem as clearly as possible using the available words.\n- Do not guess.\n\nInput Slack message:\n{{ $[\"Listen to mentions of the Slack Bot\"].data.text }}\n"
+        model: "gpt-5.2"
+      metadata: null
+      position:
+        x: 1836
+        "y": 499
+      component:
+        name: "openai.textPrompt"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "component-node-rcby5g"
+      name: "Create PD incident"
+      type: "TYPE_COMPONENT"
+      configuration:
+        description: "{{ $[\"Generate issue description\"].data.text }}"
+        service: "PQEAM2I"
+        title: "{{ $[\"Generate issue title\"].data.text }}"
+        urgency: "high"
+      metadata:
+        service:
+          html_url: "https://superplane-test.eu.pagerduty.com/service-directory/PQEAM2I"
+          id: "PQEAM2I"
+          name: "Default Service"
+      position:
+        x: 2393
+        "y": 291
+      component:
+        name: "pagerduty.createIncident"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "component-node-c9hql3"
+      name: "Create issue on GitHub"
+      type: "TYPE_COMPONENT"
+      configuration:
+        body: "Description:\n{{$['Generate issue description'].data.text}}\n\n- [ ] Resolve the incident\n- [ ] Root cause investigation\n- [ ] Corrective Action scheduled and logged\n- [ ] Create and attach postmortem report "
+        repository: "puppy-describer"
+        title: "Incident: {{ $[\"Generate issue title\"].data.text }}"
+      metadata:
+        repository:
+          id: 1046188046
+          name: "puppy-describer"
+          url: "https://github.com/puppies-inc/puppy-describer"
+      position:
+        x: 2392
+        "y": 636
+      component:
+        name: "github.createIssue"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "annotation-annotation-nz01hz"
+      name: "annotation"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 332
+        text: "## Slack bot trigger\n\nThis node listens for mentions of the SuperPlane Slack bot in a configured channel.\n\nWhen someone mentions the bot, the message content flows downstream for processing.  \nThis allows you to start workflows directly from Slack.\n\n\n### To set up\n1. Click the node to open the sidebar configuration.\n2. Follow the instructions to connect your Slack workspace.\n3. Select the channel to monitor for bot mentions."
+        width: 366
+      metadata: null
+      position:
+        x: 387
+        "y": 62
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "annotation-annotation2-88tc68"
+      name: "annotation2"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 241
+        text: "### Message filter\n\nThis component filters messages to continue only if they contain **\"p1\"** in the text.\n\nThe filter uses an **expression** that evaluates the message content from the event payload.  \nPayloads contain all information emitted by upstream components.\n\nOpen the node sidebar to see how the expression accesses nested payload fields."
+        width: 376
+      metadata: null
+      position:
+        x: 874
+        "y": 144
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "annotation-annotation3-q7feag"
+      name: "annotation3"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 161
+        text: "### AI-generated title and description\n\nThese **OpenAI** components dynamically generate a meaningful incident title and description based on the Slack message content.\n\nThe AI extracts the core problem from the message and formats it appropriately for PagerDuty and GitHub.\n\nTo use these components, connect your OpenAI account using an API key."
+        width: 870
+      metadata: null
+      position:
+        x: 1324
+        "y": 215
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "annotation-annotation4-l5nxvh"
+      name: "annotation4"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 214
+        text: "### Incident creation and tracking\n\nThe AI-generated title and description are used to:\n\n**PagerDuty**: Create a high-urgency incident to alert the on-call team.\n\n**GitHub**: Open an issue with a checklist for follow-up tasks including incident resolution, root cause investigation, and postmortem report."
+        width: 383
+      metadata: null
+      position:
+        x: 2395
+        "y": -23
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+  edges:
+    - sourceId: "slack-onappmention-slack-onappmention-knb9lx"
+      targetId: "component-node-micxb6"
+      channel: "default"
+    - sourceId: "component-node-micxb6"
+      targetId: "component-node-683h8w"
+      channel: "default"
+    - sourceId: "component-node-683h8w"
+      targetId: "component-node-hw4ezb"
+      channel: "default"
+    - sourceId: "component-node-hw4ezb"
+      targetId: "component-node-rcby5g"
+      channel: "default"
+    - sourceId: "component-node-hw4ezb"
+      targetId: "component-node-c9hql3"
+      channel: "default"

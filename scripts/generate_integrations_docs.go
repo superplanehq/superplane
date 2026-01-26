@@ -10,31 +10,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/registry"
 
-	// Import integrations to register them via init().
-	_ "github.com/superplanehq/superplane/pkg/applications/dash0"
-	_ "github.com/superplanehq/superplane/pkg/applications/github"
-	_ "github.com/superplanehq/superplane/pkg/applications/openai"
-	_ "github.com/superplanehq/superplane/pkg/applications/pagerduty"
-	_ "github.com/superplanehq/superplane/pkg/applications/semaphore"
-	_ "github.com/superplanehq/superplane/pkg/applications/slack"
-	_ "github.com/superplanehq/superplane/pkg/applications/smtp"
-	_ "github.com/superplanehq/superplane/pkg/components/approval"
-	_ "github.com/superplanehq/superplane/pkg/components/filter"
-	_ "github.com/superplanehq/superplane/pkg/components/http"
-	_ "github.com/superplanehq/superplane/pkg/components/if"
-	_ "github.com/superplanehq/superplane/pkg/components/merge"
-	_ "github.com/superplanehq/superplane/pkg/components/noop"
-	_ "github.com/superplanehq/superplane/pkg/components/timegate"
-	_ "github.com/superplanehq/superplane/pkg/components/wait"
-	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
-	_ "github.com/superplanehq/superplane/pkg/triggers/start"
-	_ "github.com/superplanehq/superplane/pkg/triggers/webhook"
+	// Import server to auto-register all integrations, components, and triggers via init()
+	_ "github.com/superplanehq/superplane/pkg/server"
 )
 
 const docsRoot = "docs/integrations"
@@ -42,55 +23,58 @@ const docsRoot = "docs/integrations"
 var camelBoundary = regexp.MustCompile(`([a-z0-9])([A-Z])`)
 
 func main() {
+	createOutputDirectory()
+
 	reg := registry.NewRegistry(crypto.NewNoOpEncryptor())
 	apps := reg.ListApplications()
 
-	if err := os.MkdirAll(docsRoot, 0o755); err != nil {
-		exitWithError(err)
-	}
+	// Sort apps by name
+	sort.Slice(apps, func(i, j int) bool {
+		return apps[i].Label() < apps[j].Label()
+	})
 
 	if err := writeCoreComponentsDoc(reg.ListComponents(), reg.ListTriggers()); err != nil {
 		exitWithError(err)
 	}
 
-	for _, app := range apps {
-		if err := writeAppDocs(app); err != nil {
+	for i, app := range apps {
+		if err := writeAppDocs(app, i+2); err != nil {
 			exitWithError(err)
 		}
 	}
 }
 
-func writeAppDocs(app core.Application) error {
+func createOutputDirectory() {
 	if err := os.MkdirAll(docsRoot, 0o755); err != nil {
-		return err
+		os.Exit(1)
 	}
+}
 
+func writeAppDocs(app core.Application, order int) error {
 	components := app.Components()
 	triggers := app.Triggers()
 
 	sort.Slice(components, func(i, j int) bool { return components[i].Name() < components[j].Name() })
 	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
 
-	return writeAppIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.mdx", appFilename(app))), app, components, triggers)
+	return writeAppIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.mdx", appFilename(app))), app, components, triggers, order)
 }
 
 func writeCoreComponentsDoc(components []core.Component, triggers []core.Trigger) error {
-	if len(components) == 0 {
-		if len(triggers) == 0 {
-			return nil
-		}
+	if len(components) == 0 && len(triggers) == 0 {
+		return nil
 	}
 
 	sort.Slice(components, func(i, j int) bool { return components[i].Name() < components[j].Name() })
 	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
 
 	var buf bytes.Buffer
-	writeCoreFrontMatter(&buf)
+	writeFrontMatter(&buf, "Core", 1)
 	writeOverviewSection(&buf, "Built-in SuperPlane components.")
-	writeCardGridComponents(&buf, components)
 	writeCardGridTriggers(&buf, triggers)
-	writeComponentSection(&buf, components)
+	writeCardGridComponents(&buf, components)
 	writeTriggerSection(&buf, triggers)
+	writeComponentSection(&buf, components)
 
 	return writeFile(filepath.Join(docsRoot, "Core.mdx"), buf.Bytes())
 }
@@ -100,13 +84,14 @@ func writeAppIndex(
 	app core.Application,
 	components []core.Component,
 	triggers []core.Trigger,
+	order int,
 ) error {
 	var buf bytes.Buffer
-	writeAppFrontMatter(&buf, app)
+	writeFrontMatter(&buf, app.Label(), order)
 
 	writeOverviewSection(&buf, app.Description())
-	writeCardGridComponents(&buf, components)
 	writeCardGridTriggers(&buf, triggers)
+	writeCardGridComponents(&buf, components)
 
 	if instructions := strings.TrimSpace(app.InstallationInstructions()); instructions != "" {
 		buf.WriteString("## Installation\n\n")
@@ -114,29 +99,17 @@ func writeAppIndex(
 		buf.WriteString("\n\n")
 	}
 
-	writeComponentSection(&buf, components)
 	writeTriggerSection(&buf, triggers)
+	writeComponentSection(&buf, components)
 
 	return writeFile(path, buf.Bytes())
 }
 
-func writeAppFrontMatter(buf *bytes.Buffer, app core.Application) {
+func writeFrontMatter(buf *bytes.Buffer, title string, order int) {
 	buf.WriteString("---\n")
-	buf.WriteString(fmt.Sprintf("title: \"%s\"\n", escapeQuotes(app.Label())))
+	buf.WriteString(fmt.Sprintf("title: \"%s\"\n", escapeQuotes(title)))
 	buf.WriteString("sidebar:\n")
-	buf.WriteString(fmt.Sprintf("  label: \"%s\"\n", escapeQuotes(app.Label())))
-	buf.WriteString(fmt.Sprintf("type: \"%s\"\n", escapeQuotes("application")))
-	buf.WriteString(fmt.Sprintf("name: \"%s\"\n", escapeQuotes(app.Name())))
-	buf.WriteString(fmt.Sprintf("label: \"%s\"\n", escapeQuotes(app.Label())))
-	buf.WriteString("---\n\n")
-}
-
-func writeCoreFrontMatter(buf *bytes.Buffer) {
-	buf.WriteString("---\n")
-	buf.WriteString(fmt.Sprintf("title: \"%s\"\n", escapeQuotes("Core")))
-	buf.WriteString("sidebar:\n")
-	buf.WriteString(fmt.Sprintf("  label: \"%s\"\n", escapeQuotes("Core")))
-	buf.WriteString(fmt.Sprintf("type: \"%s\"\n", escapeQuotes("core")))
+	buf.WriteString(fmt.Sprintf("  order: %d\n", order))
 	buf.WriteString("---\n\n")
 }
 
@@ -148,8 +121,16 @@ func writeComponentSection(buf *bytes.Buffer, components []core.Component) {
 	for _, component := range components {
 		buf.WriteString(fmt.Sprintf("<a id=\"%s\"></a>\n\n", slugify(component.Label())))
 		buf.WriteString(fmt.Sprintf("## %s\n\n", component.Label()))
-		writeParagraph(buf, component.Description())
-		writeConfigurationSection(buf, component.Configuration())
+
+		// Write documentation if available, otherwise fall back to description
+		doc := component.Documentation()
+		if doc != "" {
+			adjustedDoc := adjustHeadingLevels(doc)
+			writeParagraph(buf, adjustedDoc)
+		} else {
+			writeParagraph(buf, component.Description())
+		}
+
 		writeExampleSection("Example Output", component.ExampleOutput(), buf)
 	}
 }
@@ -162,9 +143,16 @@ func writeTriggerSection(buf *bytes.Buffer, triggers []core.Trigger) {
 	for _, trigger := range triggers {
 		buf.WriteString(fmt.Sprintf("<a id=\"%s\"></a>\n\n", slugify(trigger.Label())))
 		buf.WriteString(fmt.Sprintf("## %s\n\n", trigger.Label()))
-		writeParagraph(buf, trigger.Description())
-		config := actions.AppendGlobalTriggerFields(trigger.Configuration())
-		writeConfigurationSection(buf, config)
+
+		// Write documentation if available, otherwise fall back to description
+		doc := trigger.Documentation()
+		if doc != "" {
+			adjustedDoc := adjustHeadingLevels(doc)
+			writeParagraph(buf, adjustedDoc)
+		} else {
+			writeParagraph(buf, trigger.Description())
+		}
+
 		writeExampleSection("Example Data", trigger.ExampleData(), buf)
 	}
 }
@@ -175,7 +163,7 @@ func writeCardGridComponents(buf *bytes.Buffer, components []core.Component) {
 	}
 
 	buf.WriteString("import { CardGrid, LinkCard } from \"@astrojs/starlight/components\";\n\n")
-	buf.WriteString("## Components\n\n")
+	buf.WriteString("## Actions\n\n")
 	buf.WriteString("<CardGrid>\n")
 	for _, component := range components {
 		description := strings.TrimSpace(component.Description())
@@ -215,56 +203,43 @@ func writeParagraph(buf *bytes.Buffer, text string) {
 	buf.WriteString("\n\n")
 }
 
-func writeOverviewSection(buf *bytes.Buffer, description string) {
-	trimmed := strings.TrimSpace(description)
-	if trimmed == "" {
-		return
-	}
-	buf.WriteString("## Overview\n\n")
-	buf.WriteString(trimmed)
-	buf.WriteString("\n\n")
-}
+// adjustHeadingLevels increments all markdown heading levels by 1
+// H2 (##) becomes H3 (###), H3 becomes H4, etc.
+func adjustHeadingLevels(text string) string {
+	lines := strings.Split(text, "\n")
+	var result []string
 
-func writeOutputChannels(buf *bytes.Buffer, channels []core.OutputChannel) {
-	if len(channels) == 0 {
-		channels = []core.OutputChannel{core.DefaultOutputChannel}
-	}
-
-	buf.WriteString("## Output Channels\n\n")
-	buf.WriteString("| Name | Label | Description |\n")
-	buf.WriteString("| --- | --- | --- |\n")
-	for _, channel := range channels {
-		buf.WriteString(fmt.Sprintf("| %s | %s | %s |\n",
-			formatTableValue(channel.Name),
-			formatTableValue(channel.Label),
-			formatTableValue(channel.Description),
-		))
-	}
-	buf.WriteString("\n")
-}
-
-func writeConfigurationSection(buf *bytes.Buffer, fields []configuration.Field) {
-	if len(fields) == 0 {
-		return
-	}
-
-	buf.WriteString("### Configuration\n\n")
-	buf.WriteString("| Name | Label | Type | Required | Description |\n")
-	buf.WriteString("| --- | --- | --- | --- | --- |\n")
-	for _, field := range fields {
-		required := "no"
-		if field.Required {
-			required = "yes"
+	for _, line := range lines {
+		// Check if line is a markdown heading (starts with #)
+		if strings.HasPrefix(strings.TrimSpace(line), "#") {
+			// Count leading # characters
+			trimmed := strings.TrimSpace(line)
+			level := 0
+			for _, r := range trimmed {
+				if r == '#' {
+					level++
+				} else {
+					break
+				}
+			}
+			// Increment heading level by adding one more #
+			if level > 0 && level < 6 {
+				// Add one more # to increase the heading level
+				result = append(result, strings.Repeat("#", level+1)+trimmed[level:])
+			} else {
+				result = append(result, line)
+			}
+		} else {
+			result = append(result, line)
 		}
-		buf.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s |\n",
-			formatTableValue(field.Name),
-			formatTableValue(field.Label),
-			formatTableValue(field.Type),
-			required,
-			formatTableValue(field.Description),
-		))
 	}
-	buf.WriteString("\n")
+
+	return strings.Join(result, "\n")
+}
+
+func writeOverviewSection(buf *bytes.Buffer, description string) {
+	buf.WriteString(description)
+	buf.WriteString("\n\n")
 }
 
 func writeExampleSection(title string, data map[string]any, buf *bytes.Buffer) {
@@ -303,17 +278,6 @@ func appFilename(app core.Application) string {
 		return slugify(app.Name())
 	}
 	return label
-}
-
-func formatTableValue(value string) string {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return "-"
-	}
-	escaped := strings.ReplaceAll(trimmed, "|", "\\|")
-	escaped = strings.ReplaceAll(escaped, "{", "&#123;")
-	escaped = strings.ReplaceAll(escaped, "}", "&#125;")
-	return escaped
 }
 
 func escapeQuotes(value string) string {
