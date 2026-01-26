@@ -170,6 +170,7 @@ func (l *ListIssues) Execute(ctx core.ExecutionContext) error {
 
 	// Determine the output channel based on issue severity
 	channel := l.determineOutputChannel(data)
+	data["status"] = channel
 
 	return ctx.ExecutionState.Emit(
 		channel,
