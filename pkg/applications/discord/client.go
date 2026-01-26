@@ -116,16 +116,16 @@ func (c *Client) GetChannel(channelID string) (*Channel, error) {
 
 // Embed represents a Discord message embed
 type Embed struct {
-	Title       string        `json:"title,omitempty"`
-	Description string        `json:"description,omitempty"`
-	URL         string        `json:"url,omitempty"`
-	Color       int           `json:"color,omitempty"`
-	Timestamp   string        `json:"timestamp,omitempty"`
-	Footer      *EmbedFooter  `json:"footer,omitempty"`
-	Author      *EmbedAuthor  `json:"author,omitempty"`
-	Fields      []EmbedField  `json:"fields,omitempty"`
-	Thumbnail   *EmbedMedia   `json:"thumbnail,omitempty"`
-	Image       *EmbedMedia   `json:"image,omitempty"`
+	Title       string       `json:"title,omitempty"`
+	Description string       `json:"description,omitempty"`
+	URL         string       `json:"url,omitempty"`
+	Color       int          `json:"color,omitempty"`
+	Timestamp   string       `json:"timestamp,omitempty"`
+	Footer      *EmbedFooter `json:"footer,omitempty"`
+	Author      *EmbedAuthor `json:"author,omitempty"`
+	Fields      []EmbedField `json:"fields,omitempty"`
+	Thumbnail   *EmbedMedia  `json:"thumbnail,omitempty"`
+	Image       *EmbedMedia  `json:"image,omitempty"`
 }
 
 type EmbedFooter struct {
@@ -157,12 +157,12 @@ type CreateMessageRequest struct {
 
 // Message represents a Discord message object
 type Message struct {
-	ID        string `json:"id"`
-	Type      int    `json:"type"`
-	Content   string `json:"content"`
-	ChannelID string `json:"channel_id"`
-	Author    User   `json:"author"`
-	Timestamp string `json:"timestamp"`
+	ID        string  `json:"id"`
+	Type      int     `json:"type"`
+	Content   string  `json:"content"`
+	ChannelID string  `json:"channel_id"`
+	Author    User    `json:"author"`
+	Timestamp string  `json:"timestamp"`
 	Embeds    []Embed `json:"embeds,omitempty"`
 }
 
