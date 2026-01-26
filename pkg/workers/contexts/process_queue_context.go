@@ -37,6 +37,7 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 	}
 
 	configBuilder := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
+		WithNodeID(node.NodeID).
 		WithRootEvent(&queueItem.RootEventID).
 		WithPreviousExecution(event.ExecutionID).
 		WithInput(map[string]any{event.NodeID: event.Data.Data()})
@@ -75,6 +76,7 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 	}
 	ctx.ExpressionEnv = func(expression string) (map[string]any, error) {
 		builder := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
+			WithNodeID(node.NodeID).
 			WithRootEvent(&queueItem.RootEventID).
 			WithInput(map[string]any{event.NodeID: event.Data.Data()})
 		if event.ExecutionID != nil {
