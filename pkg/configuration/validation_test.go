@@ -207,6 +207,104 @@ func TestValidateConfiguration_ValidationRules(t *testing.T) {
 	}
 }
 
+func TestValidateConfiguration_DaysOfWeek(t *testing.T) {
+	fields := []Field{
+		{
+			Name:     "days",
+			Type:     FieldTypeDaysOfWeek,
+			Required: true,
+		},
+	}
+
+	tests := []struct {
+		name        string
+		config      map[string]any
+		expectError bool
+	}{
+		{
+			name: "valid days list",
+			config: map[string]any{
+				"days": []any{"monday", "wednesday", "friday"},
+			},
+			expectError: false,
+		},
+		{
+			name: "empty days list",
+			config: map[string]any{
+				"days": []any{},
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid day value",
+			config: map[string]any{
+				"days": []any{"monday", "funday"},
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateConfiguration(fields, tt.config)
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateConfiguration_TimeRange(t *testing.T) {
+	fields := []Field{
+		{
+			Name:     "timeRange",
+			Type:     FieldTypeTimeRange,
+			Required: true,
+		},
+	}
+
+	tests := []struct {
+		name        string
+		config      map[string]any
+		expectError bool
+	}{
+		{
+			name: "valid time range",
+			config: map[string]any{
+				"timeRange": "09:00-17:00",
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid format",
+			config: map[string]any{
+				"timeRange": "09:00/17:00",
+			},
+			expectError: true,
+		},
+		{
+			name: "start after end",
+			config: map[string]any{
+				"timeRange": "18:00-09:00",
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateConfiguration(fields, tt.config)
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestValidateTime_CustomFormat(t *testing.T) {
 	tests := []struct {
 		name        string
