@@ -1,13 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { resolveIcon } from "@/lib/utils";
+import { resolveIcon, APP_LOGO_MAP, DARK_ICONS_NEEDING_INVERT } from "@/lib/utils";
 import { Check, Copy, X } from "lucide-react";
-import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import githubIcon from "@/assets/icons/integrations/github.svg";
-import openAiIcon from "@/assets/icons/integrations/openai.svg";
-import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
-import slackIcon from "@/assets/icons/integrations/slack.svg";
-import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ChildEventsState } from "../composite";
 import { TabData } from "./SidebarEventItem/SidebarEventItem";
@@ -31,15 +25,6 @@ import { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
 
-const APP_LOGO_MAP: Record<string, string> = {
-  dash0: dash0Icon,
-  github: githubIcon,
-  openai: openAiIcon,
-  "open-ai": openAiIcon,
-  pagerduty: pagerDutyIcon,
-  semaphore: SemaphoreLogo,
-  slack: slackIcon,
-};
 
 interface ComponentSidebarProps {
   isOpen?: boolean;
@@ -491,7 +476,7 @@ export const ComponentSidebar = ({
   return (
     <div
       ref={sidebarRef}
-      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-hidden bg-white flex flex-col"
+      className="border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-hidden bg-white dark:bg-gray-900 flex flex-col"
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
     >
       {/* Resize handle */}
@@ -515,7 +500,7 @@ export const ComponentSidebar = ({
               <div className="flex items-center gap-2">
                 <div className={`h-7 rounded-full overflow-hidden flex items-center justify-center`}>
                   {headerIconSrc ? (
-                    <img src={headerIconSrc} alt={nodeName} className="w-4 h-4 object-contain" />
+                    <img src={headerIconSrc} alt={nodeName} className={`w-4 h-4 object-contain ${appName && DARK_ICONS_NEEDING_INVERT.includes(appName) ? "dark:invert" : ""}`} />
                   ) : (
                     <Icon size={16} />
                   )}
@@ -547,7 +532,7 @@ export const ComponentSidebar = ({
       </div>
       <div className="relative flex-1 min-h-0 overflow-hidden">
         <div
-          className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-in-out ${
+          className={`absolute inset-0 flex flex-col bg-white dark:bg-gray-900 transition-transform duration-300 ease-in-out ${
             isDetailView ? "-translate-x-full" : "translate-x-0"
           } ${isDetailView ? "pointer-events-none" : "pointer-events-auto"}`}
         >
@@ -642,12 +627,12 @@ export const ComponentSidebar = ({
         </div>
 
         <div
-          className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-in-out ${
+          className={`absolute inset-0 flex flex-col bg-white dark:bg-gray-900 transition-transform duration-300 ease-in-out ${
             isDetailView ? "translate-x-0" : "translate-x-full"
           } ${isDetailView ? "pointer-events-auto" : "pointer-events-none"}`}
         >
           {page !== "overview" && (
-            <div className="flex flex-col flex-1 min-h-0 bg-white">
+            <div className="flex flex-col flex-1 min-h-0 bg-white dark:bg-gray-900">
               <PageHeader
                 page={page as "history" | "queue" | "execution-chain"}
                 onBackToOverview={handleBackToOverview}
