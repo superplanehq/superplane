@@ -23,6 +23,7 @@ var previousDepthRegex = regexp.MustCompile(`\bprevious\s*\(([^)]*)\)`)
 type NodeConfigurationBuilder struct {
 	tx                  *gorm.DB
 	workflowID          uuid.UUID
+	nodeID              string
 	previousExecutionID *uuid.UUID
 	rootEventID         *uuid.UUID
 	input               any
@@ -39,6 +40,11 @@ func NewNodeConfigurationBuilder(tx *gorm.DB, workflowID uuid.UUID) *NodeConfigu
 
 func (b *NodeConfigurationBuilder) ForBlueprintNode(parentBlueprintNode *models.WorkflowNode) *NodeConfigurationBuilder {
 	b.parentBlueprintNode = parentBlueprintNode
+	return b
+}
+
+func (b *NodeConfigurationBuilder) WithNodeID(nodeID string) *NodeConfigurationBuilder {
+	b.nodeID = nodeID
 	return b
 }
 
@@ -683,7 +689,7 @@ func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, ha
 		return step, nil, nil
 	}
 
-	executionsInChain, err := b.listExecutionsInChain()
+	executionsInChain, err := b.listLinearExecutionsInChain()
 	if err != nil {
 		return step, nil, err
 	}
@@ -764,6 +770,70 @@ func (b *NodeConfigurationBuilder) singleInputPayload() (any, bool, error) {
 }
 
 func (b *NodeConfigurationBuilder) listExecutionsInChain() ([]models.WorkflowNodeExecution, error) {
+	executions, err := b.listLinearExecutionsInChain()
+	if err != nil {
+		return nil, err
+	}
+
+	if b.nodeID == "" || b.rootEventID == nil {
+		return executions, nil
+	}
+
+	upstreamNodeIDs, err := b.listUpstreamNodeIDs()
+	if err != nil {
+		return nil, err
+	}
+	if len(upstreamNodeIDs) == 0 {
+		return executions, nil
+	}
+
+	var upstreamExecutions []models.WorkflowNodeExecution
+	err = b.tx.
+		Where("workflow_id = ? AND root_event_id = ? AND node_id IN ?", b.workflowID, *b.rootEventID, upstreamNodeIDs).
+		Find(&upstreamExecutions).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	executionByID := make(map[uuid.UUID]models.WorkflowNodeExecution, len(executions)+len(upstreamExecutions))
+	for _, execution := range executions {
+		executionByID[execution.ID] = execution
+	}
+	for _, execution := range upstreamExecutions {
+		executionByID[execution.ID] = execution
+	}
+
+	combined := make([]models.WorkflowNodeExecution, 0, len(executionByID))
+	for _, execution := range executionByID {
+		combined = append(combined, execution)
+	}
+	sort.Slice(combined, func(i, j int) bool {
+		left := combined[i].CreatedAt
+		right := combined[j].CreatedAt
+		if left == nil && right == nil {
+			return combined[i].ID.String() > combined[j].ID.String()
+		}
+		if left == nil {
+			return false
+		}
+		if right == nil {
+			return true
+		}
+		if left.Equal(*right) {
+			return combined[i].ID.String() > combined[j].ID.String()
+		}
+		return left.After(*right)
+	})
+
+	return combined, nil
+}
+
+func (b *NodeConfigurationBuilder) listLinearExecutionsInChain() ([]models.WorkflowNodeExecution, error) {
+	if b.previousExecutionID == nil {
+		return nil, nil
+	}
+
 	var executions []models.WorkflowNodeExecution
 
 	err := b.tx.Raw(`
@@ -820,6 +890,47 @@ func (b *NodeConfigurationBuilder) listExecutionsInChain() ([]models.WorkflowNod
 	}
 
 	return executions, nil
+}
+
+func (b *NodeConfigurationBuilder) listUpstreamNodeIDs() ([]string, error) {
+	if b.nodeID == "" {
+		return nil, nil
+	}
+
+	workflow, err := models.FindWorkflowWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return nil, err
+	}
+	if len(workflow.Edges) == 0 {
+		return nil, nil
+	}
+
+	incoming := make(map[string][]string, len(workflow.Edges))
+	for _, edge := range workflow.Edges {
+		incoming[edge.TargetID] = append(incoming[edge.TargetID], edge.SourceID)
+	}
+
+	seen := map[string]struct{}{}
+	queue := []string{b.nodeID}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		for _, source := range incoming[current] {
+			if _, exists := seen[source]; exists {
+				continue
+			}
+			seen[source] = struct{}{}
+			queue = append(queue, source)
+		}
+	}
+
+	ids := make([]string, 0, len(seen))
+	for nodeID := range seen {
+		ids = append(ids, nodeID)
+	}
+	sort.Strings(ids)
+	return ids, nil
 }
 
 func parseReferencedNodes(expression string) ([]string, error) {

@@ -823,6 +823,7 @@ function CanvasPage(props: CanvasPageProps) {
               onExecutionChainHandled={props.onExecutionChainHandled}
               initialFocusNodeId={props.initialFocusNodeId}
               onResolveExecutionErrors={props.onResolveExecutionErrors}
+              title={props.title}
             />
           </ReactFlowProvider>
 
@@ -1260,6 +1261,7 @@ function CanvasContent({
   focusRequest,
   initialFocusNodeId,
   onResolveExecutionErrors,
+  title,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1308,6 +1310,7 @@ function CanvasContent({
   onExecutionChainHandled?: () => void;
   initialFocusNodeId?: string | null;
   onResolveExecutionErrors?: (executionIds: string[]) => void;
+  title?: string;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
@@ -1981,6 +1984,7 @@ function CanvasContent({
                 setIsSelectionModeEnabled((prev) => !prev);
                 setIsTemporarilyEnabled(false);
               }}
+              screenshotName={title}
             >
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -2016,7 +2020,7 @@ function CanvasContent({
             <Panel
               position="bottom-left"
               className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8"
-              style={{ marginLeft: 300 }}
+              style={{ marginLeft: 340 }}
             >
               <Tooltip>
                 <TooltipTrigger asChild>
