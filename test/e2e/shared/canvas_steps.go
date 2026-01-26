@@ -202,12 +202,8 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 	s.session.Sleep(300)
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
-
-	s.session.Click(q.TestID("field-mode-select"))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("Exclude Range")`))
-
-	s.session.FillIn(q.TestID("time-field-startTime"), "00:00")
-	s.session.FillIn(q.TestID("time-field-endTime"), "23:59")
+	s.session.FillIn(q.TestID("time-field-timerange-start"), "00:00")
+	s.session.FillIn(q.TestID("time-field-timerange-end"), "23:59")
 
 	s.session.Click(q.TestID("field-timezone-select"))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("GMT+0 (London, Dublin, UTC)")`))
