@@ -85,7 +85,7 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
         subtitle,
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
-        eventId: lastEvent.id,
+        eventId: lastEvent.id!,
       };
     }
 

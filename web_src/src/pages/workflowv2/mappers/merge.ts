@@ -225,7 +225,7 @@ function getMergeEventSections(
     eventTitle: eventTitle,
     eventSubtitle: eventSubtitle,
     eventState: mergeStateFunction(execution),
-    eventId: execution.rootEvent?.id,
+    eventId: execution.rootEvent!.id!,
   });
 
   return sections;

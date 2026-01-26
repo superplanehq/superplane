@@ -452,6 +452,95 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain(t *testing.T) {
 	assert.Equal(t, "2", result["from_node2"])
 }
 
+func Test_NodeConfigurationBuilder_Chain_IncludesParallelUpstreamExecutions(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	startNode := "start"
+	action1Node := "action-1"
+	action2Node := "action-2"
+	action3Node := "action-3"
+	mergeNode := "merge"
+
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.WorkflowNode{
+			{
+				NodeID: startNode,
+				Name:   startNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: action1Node,
+				Name:   action1Node,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+			{
+				NodeID: action2Node,
+				Name:   action2Node,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+			{
+				NodeID: action3Node,
+				Name:   action3Node,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+			{
+				NodeID: mergeNode,
+				Name:   mergeNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "merge"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: startNode, TargetID: action1Node, Channel: "default"},
+			{SourceID: startNode, TargetID: action2Node, Channel: "default"},
+			{SourceID: startNode, TargetID: action3Node, Channel: "default"},
+			{SourceID: action1Node, TargetID: mergeNode, Channel: "default"},
+			{SourceID: action2Node, TargetID: mergeNode, Channel: "default"},
+			{SourceID: action3Node, TargetID: mergeNode, Channel: "default"},
+		},
+	)
+
+	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, startNode, "default", nil)
+
+	execution1 := support.CreateWorkflowNodeExecution(t, workflow.ID, action1Node, rootEvent.ID, rootEvent.ID, nil)
+	action1Data := map[string]any{"value": "from-action-1"}
+	support.EmitWorkflowEventForNodeWithData(t, workflow.ID, action1Node, "default", &execution1.ID, action1Data)
+
+	execution2 := support.CreateWorkflowNodeExecution(t, workflow.ID, action2Node, rootEvent.ID, rootEvent.ID, nil)
+	action2Data := map[string]any{"value": "from-action-2"}
+	support.EmitWorkflowEventForNodeWithData(t, workflow.ID, action2Node, "default", &execution2.ID, action2Data)
+
+	execution3 := support.CreateWorkflowNodeExecution(t, workflow.ID, action3Node, rootEvent.ID, rootEvent.ID, nil)
+	action3Data := map[string]any{"value": "from-action-3"}
+	support.EmitWorkflowEventForNodeWithData(t, workflow.ID, action3Node, "default", &execution3.ID, action3Data)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+		WithNodeID(mergeNode).
+		WithPreviousExecution(&execution1.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{action1Node: action1Data})
+
+	configuration := map[string]any{
+		"action1": "{{ $[\"action-1\"].value }}",
+		"action2": "{{ $[\"action-2\"].value }}",
+		"action3": "{{ $[\"action-3\"].value }}",
+	}
+
+	result, err := builder.Build(configuration)
+	require.NoError(t, err)
+	assert.Equal(t, "from-action-1", result["action1"])
+	assert.Equal(t, "from-action-2", result["action2"])
+	assert.Equal(t, "from-action-3", result["action3"])
+}
+
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Previous(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

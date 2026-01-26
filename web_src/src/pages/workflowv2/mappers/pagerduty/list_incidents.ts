@@ -320,7 +320,7 @@ function baseEventSections(
       eventTitle: title,
       eventSubtitle,
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent?.id,
+      eventId: execution.rootEvent!.id!,
     },
   ];
 }
