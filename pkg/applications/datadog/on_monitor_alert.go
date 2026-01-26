@@ -40,6 +40,35 @@ func (t *OnMonitorAlert) Color() string {
 	return "gray"
 }
 
+func (t *OnMonitorAlert) Documentation() string {
+	return `The On Monitor Alert trigger starts a workflow execution when Datadog monitor alerts fire.
+
+## Use Cases
+
+- **Automated incident response**: Trigger runbooks when alerts fire
+- **Alert routing**: Route alerts to different workflows based on tags or severity
+- **Metric-based automation**: Execute actions when thresholds are breached
+
+## Webhook Configuration
+
+Configure a webhook in Datadog to send alerts to the SuperPlane webhook URL. Include the X-Superplane-Signature-256 header with an HMAC-SHA256 signature.
+
+## Event Payload
+
+The trigger emits an event containing:
+- ` + "`id`" + `: The alert event ID
+- ` + "`event_type`" + `: Type of event
+- ` + "`alert_type`" + `: Alert severity
+- ` + "`alert_transition`" + `: State change (Triggered, Recovered, etc.)
+- ` + "`monitor_id`" + `: The monitor's numeric ID
+- ` + "`monitor_name`" + `: Human-readable monitor name
+- ` + "`title`" + `: Alert title
+- ` + "`body`" + `: Alert message body
+- ` + "`date`" + `: Unix timestamp of the alert
+- ` + "`tags`" + `: Array of tags from the monitor
+`
+}
+
 func (t *OnMonitorAlert) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
