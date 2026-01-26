@@ -251,7 +251,7 @@ function getApprovalEventSections(
     eventTitle: eventTitle,
     eventSubtitle: eventSubtitle,
     eventState: approvalStateFunction(execution),
-    eventId: execution.rootEvent?.id,
+    eventId: execution.rootEvent!.id!,
   };
 
   return [eventSection];

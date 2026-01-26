@@ -59,13 +59,16 @@ function getNoopEventSections(
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const subtitleTimestamp = execution.updatedAt || execution.createdAt;
+  const eventSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : "";
 
   return [
     {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
+      eventSubtitle,
       eventState: executionToEventSectionState(execution),
-      eventId: execution.rootEvent?.id,
+      eventId: execution.rootEvent!.id!,
     },
   ];
 }

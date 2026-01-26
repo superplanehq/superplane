@@ -76,8 +76,9 @@ function baseEventSections(
     {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
+      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent?.id,
+      eventId: execution.rootEvent!.id!,
     },
   ];
 }

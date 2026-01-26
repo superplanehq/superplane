@@ -20,7 +20,6 @@ export interface MergeComponentProps extends ComponentActionsProps {
 export const MergeComponent: React.FC<MergeComponentProps> = ({
   title = "Merge",
   lastEvent,
-  nextInQueue,
   collapsed = false,
   selected = false,
   collapsedBackground,
@@ -41,15 +40,6 @@ export const MergeComponent: React.FC<MergeComponentProps> = ({
   if (lastEvent) {
     eventSections.push({
       ...lastEvent,
-    });
-  }
-  if (nextInQueue) {
-    eventSections.push({
-      eventTitle: nextInQueue.title,
-      eventState: "queued",
-      handleComponent: nextInQueue.subtitle ? (
-        <div className="mt-2 text-right text-xs text-gray-500 dark:text-gray-400">{nextInQueue.subtitle}</div>
-      ) : undefined,
     });
   }
 

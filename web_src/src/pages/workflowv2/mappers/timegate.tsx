@@ -237,7 +237,7 @@ function getTimeGateEventSections(
     receivedAt: new Date(execution.createdAt!),
     eventTitle: title,
     eventState: executionState,
-    eventId: execution.rootEvent?.id,
+    eventId: execution.rootEvent!.id!,
     eventSubtitle: subtitle,
   };
 

@@ -118,7 +118,7 @@ function baseEventSections(
       eventTitle: title,
       eventState: getState(componentName)(execution),
       eventSubtitle: buildGithubExecutionSubtitle(execution),
-      eventId: execution.rootEvent?.id,
+      eventId: execution.rootEvent!.id!,
     },
   ];
 }
