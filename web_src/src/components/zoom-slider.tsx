@@ -25,12 +25,14 @@ export function ZoomSlider({
   children,
   isSelectionModeEnabled,
   onSelectionModeToggle,
+  screenshotName,
   ...props
 }: Omit<PanelProps, "children"> & {
   orientation?: "horizontal" | "vertical";
   children?: React.ReactNode;
   isSelectionModeEnabled?: boolean;
   onSelectionModeToggle?: () => void;
+  screenshotName?: string;
 }) {
   const { zoom } = useViewport();
   const { zoomTo, zoomIn, zoomOut, fitView, getNodes } = useReactFlow();
@@ -83,11 +85,12 @@ export function ZoomSlider({
     }).then((dataUrl) => {
       const link = document.createElement("a");
       const date = new Date().toISOString().split("T")[0];
-      link.download = `workflow-screenshot-${date}.png`;
+      const name = screenshotName || "Workflow";
+      link.download = `${name} screenshot ${date}.png`;
       link.href = dataUrl;
       link.click();
     });
-  }, [getNodes]);
+  }, [getNodes, screenshotName]);
 
   // Add keyboard shortcuts for zoom controls
   useEffect(() => {
