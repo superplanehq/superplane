@@ -64,7 +64,7 @@ export default function InviteLinkAccept() {
 
   if (status === "error") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-6">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-neutral-900 px-6">
         <div className="max-w-md text-center">
           <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Invite link not available</h1>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
@@ -76,7 +76,7 @@ export default function InviteLinkAccept() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-6">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-neutral-900 px-6">
       <div className="flex flex-col items-center space-y-4">
         <div className="animate-spin rounded-full h-8 w-8 border-b border-blue-600"></div>
         <p className="text-sm text-gray-500 dark:text-gray-400">

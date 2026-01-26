@@ -22,14 +22,14 @@ export const IF_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   true: {
     icon: "circle-check",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-green-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-green-100 dark:bg-green-900/50",
     badgeColor: "bg-emerald-500",
   },
   false: {
     icon: "circle-x",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-red-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-red-100 dark:bg-red-900/50",
     badgeColor: "bg-red-400",
   },
 };

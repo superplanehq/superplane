@@ -5,3 +5,7 @@ export const isCustomComponentsEnabled = () => {
 export const isRBACEnabled = () => {
   return import.meta.env.VITE_RBAC_ENABLED === "true";
 };
+
+export const isThemeConfigEnabled = () => {
+  return import.meta.env.VITE_ENABLE_THEMES === "true";
+};
