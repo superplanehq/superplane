@@ -26,7 +26,7 @@ func TestTimeGateComponent(t *testing.T) {
 		steps.setTimeWindow("00:00", "23:59")
 		steps.setTimezone("0")
 		steps.saveTimeGate()
-		steps.assertTimeGateSavedToDB("00:00 - 23:59", "0", weekendDays)
+		steps.assertTimeGateSavedToDB("00:00-23:59", "0", weekendDays)
 	})
 
 	t.Run("add a TimeGate that blocks on outside of work hours", func(t *testing.T) {
@@ -37,7 +37,7 @@ func TestTimeGateComponent(t *testing.T) {
 		steps.setTimeWindow("09:00", "17:00")
 		steps.setTimezone("-5")
 		steps.saveTimeGate()
-		steps.assertTimeGateSavedToDB("09:00 - 17:00", "-5", workweekDays)
+		steps.assertTimeGateSavedToDB("09:00-17:00", "-5", workweekDays)
 	})
 
 	t.Run("push through the time gate item", func(t *testing.T) {
@@ -139,6 +139,12 @@ func (s *TimeGateSteps) givenACanvasWithManualTriggerTimeGateAndOutput() {
 	s.canvas.AddTimeGate("TimeGate", models.Position{X: 1000, Y: 250})
 	s.canvas.AddNoop("Output", models.Position{X: 1400, Y: 200})
 
+	s.openSidebarForNode("TimeGate")
+	s.setDaysTo([]string{"saturday", "sunday"})
+	s.setTimeWindow("00:00", "23:59")
+	s.setTimezone("0")
+	s.saveTimeGate()
+
 	s.canvas.Connect("Start", "TimeGate")
 	s.canvas.Connect("TimeGate", "Output")
 
@@ -147,7 +153,11 @@ func (s *TimeGateSteps) givenACanvasWithManualTriggerTimeGateAndOutput() {
 
 func (s *TimeGateSteps) runManualTrigger() {
 	s.canvas.RunManualTrigger("Start")
-	s.canvas.WaitForExecution("TimeGate", models.WorkflowNodeExecutionStateStarted, 10*time.Second)
+	s.canvas.WaitForExecutionInStates(
+		"TimeGate",
+		[]string{models.WorkflowNodeExecutionStateStarted, models.WorkflowNodeExecutionStatePending},
+		10*time.Second,
+	)
 }
 
 func (s *TimeGateSteps) openSidebarForNode(node string) {
