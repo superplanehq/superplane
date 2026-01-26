@@ -5,9 +5,10 @@ import {
   WorkflowsWorkflowNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper, OutputPayload } from "./types";
-import { ComponentBaseProps, EventSection, EventState } from "@/ui/componentBase";
+import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getTriggerRenderer, getStateMap } from ".";
 import { formatTimeAgo } from "@/utils/date";
+import { defaultStateFunction } from "./stateRegistry";
 
 export const noopMapper: ComponentBaseMapper = {
   props(
@@ -67,20 +68,8 @@ function getNoopEventSections(
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
       eventSubtitle,
-      eventState: executionToEventSectionState(execution),
+      eventState: defaultStateFunction(execution),
       eventId: execution.rootEvent!.id!,
     },
   ];
-}
-
-function executionToEventSectionState(execution: WorkflowsWorkflowNodeExecution): EventState {
-  if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
-    return "running";
-  }
-
-  if (execution.state == "STATE_FINISHED" && execution.result == "RESULT_PASSED") {
-    return "success";
-  }
-
-  return "failed";
 }

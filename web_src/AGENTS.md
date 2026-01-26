@@ -63,6 +63,7 @@ src/
 
 - **State management**: Use React state in story decorators for interactivity
 - **Comprehensive examples**: Show empty states, error states, loading states
+- **State maps and resolution**: Every statemap must include an explicit error state and a clear resolution path when developing new components
 - **Interactive callbacks**: Implement all callbacks with console logging
 - **Mock data**: Create realistic test data that demonstrates all features
 
