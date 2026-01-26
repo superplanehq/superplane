@@ -1,9 +1,18 @@
 "use client";
 
-import React, { useEffect } from "react";
-import { Maximize, Minus, MousePointer2, Plus } from "lucide-react";
+import React, { useCallback, useEffect } from "react";
+import { Camera, Maximize, Minus, MousePointer2, Plus } from "lucide-react";
+import { toPng } from "html-to-image";
 
-import { Panel, useViewport, useStore, useReactFlow, type PanelProps } from "@xyflow/react";
+import {
+  Panel,
+  useViewport,
+  useStore,
+  useReactFlow,
+  getNodesBounds,
+  getViewportForBounds,
+  type PanelProps,
+} from "@xyflow/react";
 
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
@@ -16,17 +25,72 @@ export function ZoomSlider({
   children,
   isSelectionModeEnabled,
   onSelectionModeToggle,
+  screenshotName,
   ...props
 }: Omit<PanelProps, "children"> & {
   orientation?: "horizontal" | "vertical";
   children?: React.ReactNode;
   isSelectionModeEnabled?: boolean;
   onSelectionModeToggle?: () => void;
+  screenshotName?: string;
 }) {
   const { zoom } = useViewport();
-  const { zoomTo, zoomIn, zoomOut, fitView } = useReactFlow();
+  const { zoomTo, zoomIn, zoomOut, fitView, getNodes } = useReactFlow();
   const minZoom = useStore((state) => state.minZoom);
   const maxZoom = useStore((state) => state.maxZoom);
+
+  const handleScreenshot = useCallback(() => {
+    const nodes = getNodes();
+    if (nodes.length === 0) return;
+
+    const nodesBounds = getNodesBounds(nodes);
+    const padding = 0.25;
+
+    // Calculate dimensions based on content with padding
+    const contentWidth = nodesBounds.width * (1 + padding * 2);
+    const contentHeight = nodesBounds.height * (1 + padding * 2);
+
+    // Target ~1.5x scale for good resolution, cap at 4096px per side
+    const maxDimension = 4096;
+    const targetScale = 1.5;
+
+    let imageWidth = Math.round(contentWidth * targetScale);
+    let imageHeight = Math.round(contentHeight * targetScale);
+
+    // Scale down if exceeding max dimension while maintaining aspect ratio
+    if (imageWidth > maxDimension || imageHeight > maxDimension) {
+      const scale = maxDimension / Math.max(imageWidth, imageHeight);
+      imageWidth = Math.round(imageWidth * scale);
+      imageHeight = Math.round(imageHeight * scale);
+    }
+
+    // Ensure minimum dimensions for small canvases
+    imageWidth = Math.max(imageWidth, 800);
+    imageHeight = Math.max(imageHeight, 600);
+
+    const viewport = getViewportForBounds(nodesBounds, imageWidth, imageHeight, 0.5, 2, padding);
+    const viewportElement = document.querySelector(".react-flow__viewport") as HTMLElement;
+
+    if (!viewportElement) return;
+
+    toPng(viewportElement, {
+      backgroundColor: "#F1F5F9",
+      width: imageWidth,
+      height: imageHeight,
+      style: {
+        width: String(imageWidth),
+        height: String(imageHeight),
+        transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
+      },
+    }).then((dataUrl) => {
+      const link = document.createElement("a");
+      const date = new Date().toISOString().split("T")[0];
+      const name = screenshotName || "Workflow";
+      link.download = `${name} screenshot ${date}.png`;
+      link.href = dataUrl;
+      link.click();
+    });
+  }, [getNodes, screenshotName]);
 
   // Add keyboard shortcuts for zoom controls
   useEffect(() => {
@@ -51,11 +115,16 @@ export function ZoomSlider({
         e.preventDefault();
         fitView({ duration: 300 });
       }
+      // Screenshot: Ctrl/Cmd + Shift + S
+      else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "s") {
+        e.preventDefault();
+        handleScreenshot();
+      }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [zoomIn, zoomOut, zoomTo, fitView]);
+  }, [zoomIn, zoomOut, zoomTo, fitView, handleScreenshot]);
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -123,6 +192,14 @@ export function ZoomSlider({
             </Button>
           </TooltipTrigger>
           <TooltipContent>Fit all nodes in view (Ctrl/Cmd + 1)</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={handleScreenshot}>
+              <Camera className="h-3 w-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Download screenshot (Ctrl/Cmd + Shift + S)</TooltipContent>
         </Tooltip>
         {onSelectionModeToggle && (
           <Tooltip>
