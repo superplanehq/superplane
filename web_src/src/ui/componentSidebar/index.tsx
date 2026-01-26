@@ -25,7 +25,6 @@ import { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
 
-
 interface ComponentSidebarProps {
   isOpen?: boolean;
   setIsOpen?: (isOpen: boolean) => void;
@@ -103,6 +102,7 @@ interface ComponentSidebarProps {
   nodeConfigMode?: "create" | "edit";
   nodeName?: string;
   nodeLabel?: string;
+  blockName?: string;
   nodeConfiguration?: Record<string, unknown>;
   nodeConfigurationFields?: ConfigurationField[];
   onNodeConfigSave?: (
@@ -185,6 +185,7 @@ export const ComponentSidebar = ({
   nodeConfigMode = "edit",
   nodeName = "",
   nodeLabel,
+  blockName,
   nodeConfiguration = {},
   nodeConfigurationFields = [],
   onNodeConfigSave,
@@ -469,7 +470,10 @@ export const ComponentSidebar = ({
   }, [onHighlightedNodesChange]);
 
   const isDetailView = page !== "overview";
-  const headerIconSrc = iconSrc ?? (appName ? APP_LOGO_MAP[appName] : undefined);
+  const nameParts = blockName?.split(".") ?? [];
+  const appLogo = nameParts[0] ? APP_LOGO_MAP[nameParts[0]] : undefined;
+  const appIconSrc = typeof appLogo === "string" ? appLogo : nameParts[1] ? appLogo?.[nameParts[1]] : undefined;
+  const headerIconSrc = iconSrc ?? appIconSrc;
 
   if (!isOpen) return null;
 
@@ -500,7 +504,11 @@ export const ComponentSidebar = ({
               <div className="flex items-center gap-2">
                 <div className={`h-7 rounded-full overflow-hidden flex items-center justify-center`}>
                   {headerIconSrc ? (
-                    <img src={headerIconSrc} alt={nodeName} className={`w-4 h-4 object-contain ${appName && DARK_ICONS_NEEDING_INVERT.includes(appName) ? "dark:invert" : ""}`} />
+                    <img
+                      src={headerIconSrc}
+                      alt={nodeName}
+                      className={`w-4 h-4 object-contain ${appName && DARK_ICONS_NEEDING_INVERT.includes(appName) ? "dark:invert" : ""}`}
+                    />
                   ) : (
                     <Icon size={16} />
                   )}

@@ -226,8 +226,16 @@ function getApprovalSpecs(items: ApprovalItem[], additionalData?: unknown): Comp
         }
         return {
           badges: [
-            { label: `${label}:`, bgColor: "bg-gray-100 dark:bg-gray-700", textColor: "text-gray-700 dark:text-gray-300" },
-            { label: value || "—", bgColor: "bg-emerald-100 dark:bg-emerald-900/50", textColor: "text-emerald-800 dark:text-emerald-300" },
+            {
+              label: `${label}:`,
+              bgColor: "bg-gray-100 dark:bg-gray-700",
+              textColor: "text-gray-700 dark:text-gray-300",
+            },
+            {
+              label: value || "—",
+              bgColor: "bg-emerald-100 dark:bg-emerald-900/50",
+              textColor: "text-emerald-800 dark:text-emerald-300",
+            },
           ],
         };
       }),

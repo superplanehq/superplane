@@ -87,7 +87,9 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
       </div>
       <div className="flex justify-left items-center mt-1 gap-2">
         {section.eventId && (
-          <span className="text-[13px] text-gray-950/50 dark:text-gray-400 font-mono">#{section.eventId?.slice(0, 4)}</span>
+          <span className="text-[13px] text-gray-950/50 dark:text-gray-400 font-mono">
+            #{section.eventId?.slice(0, 4)}
+          </span>
         )}
         <span className="text-sm text-gray-700 dark:text-gray-300 font-inter truncate text-md min-w-0 font-medium truncate">
           {section.eventTitle}
@@ -419,7 +421,10 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
 
             {eventSections?.map((section, index) => (
               <EventSectionDisplay
-                className={"pb-3" + (!!includeEmptyState || !!customField ? " border-b border-slate-950/20 dark:border-gray-600" : "")}
+                className={
+                  "pb-3" +
+                  (!!includeEmptyState || !!customField ? " border-b border-slate-950/20 dark:border-gray-600" : "")
+                }
                 key={index}
                 section={section}
                 index={index}

@@ -239,7 +239,10 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 <div key={index} className="flex flex-col gap-2">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <Label htmlFor={`artifact-${index}`} className="text-sm font-semibold text-neutral-900 dark:text-gray-200">
+                      <Label
+                        htmlFor={`artifact-${index}`}
+                        className="text-sm font-semibold text-neutral-900 dark:text-gray-200"
+                      >
                         {artifact.label}
                       </Label>
                       <span className="ml-2 text-sm text-muted-foreground">{artifact.optional ? "Optional" : ""}</span>

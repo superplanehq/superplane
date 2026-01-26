@@ -384,7 +384,11 @@ function CategorySection({
             >
               <ItemMedia>
                 {appIconSrc ? (
-                  <img src={appIconSrc} alt={block.label || block.name} className={`size-3.5 ${needsInvert ? "dark:invert" : ""}`} />
+                  <img
+                    src={appIconSrc}
+                    alt={block.label || block.name}
+                    className={`size-3.5 ${needsInvert ? "dark:invert" : ""}`}
+                  />
                 ) : (
                   <IconComponent size={14} className="text-gray-500" />
                 )}

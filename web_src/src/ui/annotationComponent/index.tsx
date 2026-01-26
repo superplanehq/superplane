@@ -209,7 +209,10 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
         <div
           ref={containerRef}
           style={{ width: dimensions.width, height: dimensions.height }}
-          className={cn("group relative flex flex-col rounded-md outline outline-slate-950/20 dark:outline-gray-600", colorStyles.container)}
+          className={cn(
+            "group relative flex flex-col rounded-md outline outline-slate-950/20 dark:outline-gray-600",
+            colorStyles.container,
+          )}
         >
           <div className={cn("canvas-node-drag-handle h-5 w-full rounded-t-md cursor-grab", colorStyles.background)}>
             <div className="flex h-full w-full flex-col items-stretch justify-center gap-0.5 px-2">
@@ -329,9 +332,13 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                       h1: ({ children }) => <h1 className="text-base font-bold mb-2">{children}</h1>,
                       h2: ({ children }) => <h2 className="text-sm font-bold mb-2">{children}</h2>,
                       h3: ({ children }) => <h3 className="text-sm font-semibold mb-1">{children}</h3>,
-                      code: ({ children }) => <code className="bg-black/10 dark:bg-white/10 px-1 rounded text-xs">{children}</code>,
+                      code: ({ children }) => (
+                        <code className="bg-black/10 dark:bg-white/10 px-1 rounded text-xs">{children}</code>
+                      ),
                       pre: ({ children }) => (
-                        <pre className="bg-black/10 dark:bg-white/10 p-2 rounded text-xs overflow-auto mb-2">{children}</pre>
+                        <pre className="bg-black/10 dark:bg-white/10 p-2 rounded text-xs overflow-auto mb-2">
+                          {children}
+                        </pre>
                       ),
                       a: ({ children, href }) => (
                         <a href={href} className="underline text-blue-600 dark:text-blue-400">

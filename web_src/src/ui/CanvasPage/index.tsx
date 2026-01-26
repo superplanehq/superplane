@@ -96,6 +96,7 @@ export interface NodeEditData {
   configuration: Record<string, any>;
   configurationFields: ConfigurationField[];
   appName?: string;
+  blockName?: string;
   appInstallationRef?: ComponentsAppInstallationRef;
 }
 
@@ -1115,6 +1116,7 @@ function Sidebar({
       nodeConfigMode="edit"
       nodeName={editingNodeData?.nodeName || ""}
       nodeLabel={editingNodeData?.displayLabel}
+      blockName={editingNodeData?.blockName}
       nodeConfiguration={editingNodeData?.configuration || {}}
       nodeConfigurationFields={editingNodeData?.configurationFields || []}
       onNodeConfigSave={onSaveConfiguration}
@@ -1977,7 +1979,12 @@ function CanvasContent({
             style={{ opacity: isInitialized ? 1 : 0 }}
             className="h-full w-full"
           >
-            <Background gap={8} size={2} bgColor={isDark ? "#171717" : "#F1F5F9"} color={isDark ? "#262626" : "#d9d9d9ff"} />
+            <Background
+              gap={8}
+              size={2}
+              bgColor={isDark ? "#171717" : "#F1F5F9"}
+              color={isDark ? "#262626" : "#d9d9d9ff"}
+            />
             <ZoomSlider
               position="bottom-left"
               orientation="horizontal"
@@ -2045,8 +2052,18 @@ function CanvasContent({
                     className="h-8 items-center text-xs font-medium"
                     onClick={() => handleLogButtonClick("error")}
                   >
-                    <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800 dark:text-gray-200"} />
-                    <span className={logCounts.error > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800 dark:text-gray-200"}>
+                    <CircleX
+                      className={
+                        logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800 dark:text-gray-200"
+                      }
+                    />
+                    <span
+                      className={
+                        logCounts.error > 0
+                          ? "tabular-nums text-red-500"
+                          : "tabular-nums text-gray-800 dark:text-gray-200"
+                      }
+                    >
                       {logCounts.error}
                     </span>
                   </Button>
@@ -2062,10 +2079,16 @@ function CanvasContent({
                     onClick={() => handleLogButtonClick("warning")}
                   >
                     <TriangleAlert
-                      className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800 dark:text-gray-200"}
+                      className={
+                        logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800 dark:text-gray-200"
+                      }
                     />
                     <span
-                      className={logCounts.warning > 0 ? "tabular-nums text-orange-500" : "tabular-nums text-gray-800 dark:text-gray-200"}
+                      className={
+                        logCounts.warning > 0
+                          ? "tabular-nums text-orange-500"
+                          : "tabular-nums text-gray-800 dark:text-gray-200"
+                      }
                     >
                       {logCounts.warning}
                     </span>

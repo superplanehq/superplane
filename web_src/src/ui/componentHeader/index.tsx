@@ -43,7 +43,11 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
         <div className="flex items-center">
           <div className="mr-2 flex h-4 w-4 items-center justify-center overflow-hidden">
             {resolvedIconSrc ? (
-              <img src={resolvedIconSrc} alt={title} className={`max-w-5 max-h-5 object-contain ${needsInvert ? "dark:invert" : ""}`} />
+              <img
+                src={resolvedIconSrc}
+                alt={title}
+                className={`max-w-5 max-h-5 object-contain ${needsInvert ? "dark:invert" : ""}`}
+              />
             ) : (
               <Icon size={16} className={iconColor} />
             )}

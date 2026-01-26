@@ -37,7 +37,7 @@ func Test__DescribeApplication(t *testing.T) {
 		//
 		// Create installation
 		//
-		installResponse, err := InstallApplication(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), "dummy", installationName, appConfig)
+		installResponse, err := InstallApplication(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", installationName, appConfig)
 		require.NoError(t, err)
 		installationID := installResponse.Installation.Metadata.Id
 
@@ -113,7 +113,7 @@ func Test__DescribeApplication(t *testing.T) {
 		//
 		// Create installation in first organization
 		//
-		installResponse, err := InstallApplication(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), "dummy", installationName, appConfig)
+		installResponse, err := InstallApplication(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", installationName, appConfig)
 		require.NoError(t, err)
 		installationID := installResponse.Installation.Metadata.Id
 
@@ -144,7 +144,7 @@ func Test__DescribeApplication(t *testing.T) {
 		//
 		// Create installation with configuration
 		//
-		installResponse, err := InstallApplication(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), "dummy", installationName, appConfig)
+		installResponse, err := InstallApplication(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", installationName, appConfig)
 		require.NoError(t, err)
 		installationID := installResponse.Installation.Metadata.Id
 

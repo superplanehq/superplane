@@ -431,7 +431,11 @@ function LogEntryRow({
                 className="flex items-start gap-3 px-11 pr-4 py-1.5 text-sm text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 transition-colors min-h-8"
               >
                 <div className="pt-0.5">
-                  {item.isRunning ? <MoreHorizontal className="h-4 w-4 text-gray-500 dark:text-gray-400" /> : icon[item.type]}
+                  {item.isRunning ? (
+                    <MoreHorizontal className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                  ) : (
+                    icon[item.type]
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -492,7 +496,9 @@ function LogEntryRow({
             {formatLogTimestamp(entry.timestamp)}
           </span>
         </div>
-        {entry.detail && isDetailExpanded && <div className="mt-2 text-[13px] text-gray-500 dark:text-gray-400">{entry.detail}</div>}
+        {entry.detail && isDetailExpanded && (
+          <div className="mt-2 text-[13px] text-gray-500 dark:text-gray-400">{entry.detail}</div>
+        )}
       </div>
     </div>
   );

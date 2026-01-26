@@ -297,15 +297,17 @@ export function ApplicationDetails({ organizationId }: ApplicationDetailsProps) 
                         <ReactMarkdown>{installation.status.browserAction.description}</ReactMarkdown>
                       )}
                     </AlertDescription>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleBrowserAction}
-                      className="shrink-0 px-3 py-1.5"
-                    >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Continue
-                    </Button>
+                    {installation.status.browserAction.url && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleBrowserAction}
+                        className="shrink-0 px-3 py-1.5"
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Continue
+                      </Button>
+                    )}
                   </div>
                 </Alert>
               )}
