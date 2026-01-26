@@ -92,15 +92,6 @@ func (c *RunFunction) Configuration() []configuration.Field {
 	}
 }
 
-func (c *RunFunction) ExampleOutput() map[string]any {
-	return map[string]any{
-		"statusCode": 200,
-		"payload": map[string]any{
-			"message": "hello from lambda",
-		},
-	}
-}
-
 func (c *RunFunction) Setup(ctx core.SetupContext) error {
 	config := RunFunctionConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
