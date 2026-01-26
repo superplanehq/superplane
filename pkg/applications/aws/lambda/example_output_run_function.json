@@ -1,0 +1,13 @@
+{
+  "requestId": "9f8d2b5e-1c7a-4d62-8f1a-0f8b8e4f3a12",
+  "report": {
+    "duration": "89.81 ms",
+    "billedDuration": "100 ms",
+    "memorySize": "128 MB",
+    "maxMemoryUsed": "82 MB",
+    "initDuration": "160.97 ms"
+  },
+  "payload": {
+    "message": "hello from lambda"
+  }
+}

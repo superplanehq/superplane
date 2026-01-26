@@ -23,6 +23,6 @@ func (p *TestOIDCProvider) PublicJWKs() []oidc.PublicJWK {
 	}
 }
 
-func (p *TestOIDCProvider) Sign(subject string, duration time.Duration) (string, error) {
-	return "", nil
+func (p *TestOIDCProvider) Sign(subject string, duration time.Duration, audience string, additionalClaims map[string]any) (string, error) {
+	return "test", nil
 }

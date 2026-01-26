@@ -31,14 +31,14 @@ func TestNewProviderFromKeyDirLoadsSymlinkedKey(t *testing.T) {
 		t.Fatalf("symlink key: %v", err)
 	}
 
-	provider, err := NewProviderFromKeyDir(dir)
+	provider, err := NewProviderFromKeyDir("test", dir)
 	if err != nil {
 		t.Fatalf("NewProviderFromKeyDir: %v", err)
 	}
 	if len(provider.PublicJWKs()) != 1 {
 		t.Fatalf("expected 1 public JWK, got %d", len(provider.PublicJWKs()))
 	}
-	if _, err := provider.Sign("subject", time.Minute); err != nil {
+	if _, err := provider.Sign("subject", time.Minute, "test", nil); err != nil {
 		t.Fatalf("Sign: %v", err)
 	}
 }
@@ -58,7 +58,7 @@ func TestNewProviderFromKeyDirSkipsNonRegularFiles(t *testing.T) {
 		t.Fatalf("write key: %v", err)
 	}
 
-	provider, err := NewProviderFromKeyDir(dir)
+	provider, err := NewProviderFromKeyDir("test", dir)
 	if err != nil {
 		t.Fatalf("NewProviderFromKeyDir: %v", err)
 	}

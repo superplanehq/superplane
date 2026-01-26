@@ -18,6 +18,7 @@ import (
 )
 
 type RSAProvider struct {
+	issuer      string
 	privateKey  *rsa.PrivateKey
 	publicKeys  map[string]*rsa.PublicKey
 	publicJWKs  []PublicJWK
@@ -29,7 +30,7 @@ type keyEntry struct {
 	key  *rsa.PrivateKey
 }
 
-func NewProviderFromKeyDir(keysPath string) (Provider, error) {
+func NewProviderFromKeyDir(issuer, keysPath string) (Provider, error) {
 	entries, err := os.ReadDir(keysPath)
 	if err != nil {
 		return nil, err
@@ -70,22 +71,34 @@ func NewProviderFromKeyDir(keysPath string) (Provider, error) {
 	})
 
 	activeKey := keys[len(keys)-1].key
-	return newSignerFromKeys(activeKey, keys)
+	return newSignerFromKeys(issuer, activeKey, keys)
 }
 
 func (s *RSAProvider) PublicJWKs() []PublicJWK {
 	return s.publicJWKs
 }
 
-func (s *RSAProvider) Sign(subject string, duration time.Duration) (string, error) {
+func (s *RSAProvider) Sign(subject string, duration time.Duration, audience string, additionalClaims map[string]any) (string, error) {
 	now := time.Now()
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+	claims := jwt.MapClaims{
+		"iss": s.issuer,
 		"iat": now.Unix(),
 		"nbf": now.Unix(),
 		"exp": now.Add(duration).Unix(),
 		"sub": subject,
-	})
+	}
 
+	if audience != "" {
+		claims["aud"] = audience
+	} else {
+		claims["aud"] = "superplane"
+	}
+
+	for key, value := range additionalClaims {
+		claims[key] = value
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	token.Header["kid"] = s.activeKeyID
 	tokenString, err := token.SignedString(s.privateKey)
 	if err != nil {
@@ -95,7 +108,7 @@ func (s *RSAProvider) Sign(subject string, duration time.Duration) (string, erro
 	return tokenString, nil
 }
 
-func newSignerFromKeys(activeKey *rsa.PrivateKey, keys []keyEntry) (Provider, error) {
+func newSignerFromKeys(issuer string, activeKey *rsa.PrivateKey, keys []keyEntry) (Provider, error) {
 	publicKeys := make(map[string]*rsa.PublicKey, len(keys))
 	publicJWKs := make([]PublicJWK, 0, len(keys))
 
@@ -121,6 +134,7 @@ func newSignerFromKeys(activeKey *rsa.PrivateKey, keys []keyEntry) (Provider, er
 	}
 
 	return &RSAProvider{
+		issuer:      issuer,
 		privateKey:  activeKey,
 		publicKeys:  publicKeys,
 		publicJWKs:  publicJWKs,
