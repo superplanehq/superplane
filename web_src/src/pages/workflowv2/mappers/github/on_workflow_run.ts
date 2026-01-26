@@ -108,7 +108,13 @@ export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
               tooltipTitle: "workflow files",
               iconSlug: "file-code",
               values: configuration.workflowFiles.map((file) => ({
-                badges: [{ label: file, bgColor: "bg-gray-100 dark:bg-gray-700", textColor: "text-gray-700 dark:text-gray-300" }],
+                badges: [
+                  {
+                    label: file,
+                    bgColor: "bg-gray-100 dark:bg-gray-700",
+                    textColor: "text-gray-700 dark:text-gray-300",
+                  },
+                ],
               })),
             },
           ]

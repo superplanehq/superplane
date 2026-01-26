@@ -304,7 +304,9 @@ export const Login: React.FC = () => {
           <h1 className="mt-4 !text-lg font-medium text-gray-900 dark:text-white">
             {isSignupMode ? "Create your account" : "Welcome to SuperPlane"}
           </h1>
-          <p className="mt-1 text-sm text-gray-800 dark:text-gray-200">{isSignupMode ? "Set up your account." : "Log in to continue."}</p>
+          <p className="mt-1 text-sm text-gray-800 dark:text-gray-200">
+            {isSignupMode ? "Set up your account." : "Log in to continue."}
+          </p>
         </div>
 
         <div className="pt-8">

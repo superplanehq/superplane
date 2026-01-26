@@ -97,14 +97,10 @@ export function General({ organization }: GeneralProps) {
             <Heading level={3} className="!text-lg text-gray-900 dark:text-gray-100">
               Appearance
             </Heading>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Choose how Superplane looks to you
-            </p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Choose how Superplane looks to you</p>
           </div>
           <Field>
-            <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              Theme
-            </Label>
+            <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Theme</Label>
             <ThemeSelector />
           </Field>
         </Fieldset>

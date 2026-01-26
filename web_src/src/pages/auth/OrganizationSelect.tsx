@@ -111,8 +111,12 @@ const OrganizationSelect: React.FC = () => {
 
           {organizations.length === 0 && (
             <div className="text-left py-2 mb-4">
-              <Text className="font-medium text-gray-800 dark:text-gray-100">You're not a member of any organizations yet.</Text>
-              <Text className="font-medium text-gray-800 dark:text-gray-100">Create a new organization to get started!</Text>
+              <Text className="font-medium text-gray-800 dark:text-gray-100">
+                You're not a member of any organizations yet.
+              </Text>
+              <Text className="font-medium text-gray-800 dark:text-gray-100">
+                Create a new organization to get started!
+              </Text>
             </div>
           )}
 

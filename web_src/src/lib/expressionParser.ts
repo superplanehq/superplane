@@ -48,7 +48,11 @@ export const parseExpression = (expression: string): ComponentBaseSpecValue[] =>
   for (const term of splittedExpression) {
     const normalizedTerm = term.trim().toLowerCase();
     if (operators.has(normalizedTerm)) {
-      current.badges.push({ label: term, bgColor: "bg-gray-100 dark:bg-gray-700", textColor: "text-gray-700 dark:text-gray-300" });
+      current.badges.push({
+        label: term,
+        bgColor: "bg-gray-100 dark:bg-gray-700",
+        textColor: "text-gray-700 dark:text-gray-300",
+      });
     } else if (logicalOperators.has(normalizedTerm)) {
       current.badges.push({ label: term, bgColor: "bg-gray-500 dark:bg-gray-600", textColor: "text-white" });
       result.push(current);
@@ -56,9 +60,17 @@ export const parseExpression = (expression: string): ComponentBaseSpecValue[] =>
         badges: [],
       };
     } else if (isStaticValue(normalizedTerm)) {
-      current.badges.push({ label: term, bgColor: "bg-green-100 dark:bg-green-900/50", textColor: "text-green-700 dark:text-green-300" });
+      current.badges.push({
+        label: term,
+        bgColor: "bg-green-100 dark:bg-green-900/50",
+        textColor: "text-green-700 dark:text-green-300",
+      });
     } else {
-      current.badges.push({ label: term, bgColor: "bg-purple-100 dark:bg-purple-900/50", textColor: "text-purple-700 dark:text-purple-300" });
+      current.badges.push({
+        label: term,
+        bgColor: "bg-purple-100 dark:bg-purple-900/50",
+        textColor: "text-purple-700 dark:text-purple-300",
+      });
     }
   }
 

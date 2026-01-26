@@ -504,7 +504,11 @@ export const ComponentSidebar = ({
               <div className="flex items-center gap-2">
                 <div className={`h-7 rounded-full overflow-hidden flex items-center justify-center`}>
                   {headerIconSrc ? (
-                    <img src={headerIconSrc} alt={nodeName} className={`w-4 h-4 object-contain ${appName && DARK_ICONS_NEEDING_INVERT.includes(appName) ? "dark:invert" : ""}`} />
+                    <img
+                      src={headerIconSrc}
+                      alt={nodeName}
+                      className={`w-4 h-4 object-contain ${appName && DARK_ICONS_NEEDING_INVERT.includes(appName) ? "dark:invert" : ""}`}
+                    />
                   ) : (
                     <Icon size={16} />
                   )}

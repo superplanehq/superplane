@@ -445,7 +445,9 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
               <div className="mb-6 border-b-1 border-border pb-4">
                 <h2 className="text-sm font-medium text-gray-800 dark:text-gray-200 flex items-center gap-2">
                   {triggerEvent.id && (
-                    <span className="text-[13px] text-gray-500 dark:text-gray-400 font-mono">#{triggerEvent.id.slice(0, 4)}</span>
+                    <span className="text-[13px] text-gray-500 dark:text-gray-400 font-mono">
+                      #{triggerEvent.id.slice(0, 4)}
+                    </span>
                   )}
                   {triggerEvent.title || "Execution Chain"}
                 </h2>
@@ -467,7 +469,9 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
             {/* Event Section (now scrollable) */}
             {triggerEvent && (
               <div className="mb-6">
-                <h2 className="text-[13px] font-medium text-gray-500 dark:text-gray-400 mb-3">This run was triggered by</h2>
+                <h2 className="text-[13px] font-medium text-gray-500 dark:text-gray-400 mb-3">
+                  This run was triggered by
+                </h2>
                 <ChainItem
                   item={convertSidebarEventToChainItem(triggerEvent, workflowNodes, components, triggers, getTabData)}
                   index={-1}

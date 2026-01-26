@@ -296,7 +296,9 @@ export const ChainItem: React.FC<ChainItemProps> = ({
           </div>
           <div className="flex items-center gap-2">
             {/* Component subtitle */}
-            {componentSubtitle && <span className="text-sm text-gray-500 dark:text-gray-300 truncate">{componentSubtitle}</span>}
+            {componentSubtitle && (
+              <span className="text-sm text-gray-500 dark:text-gray-300 truncate">{componentSubtitle}</span>
+            )}
             <div
               className={`uppercase text-[11px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-white ${EventBadgeColor}`}
             >
@@ -432,7 +434,10 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                 {entry.label.includes(" · ") ? (
                                   // Handle combined label with status (e.g., "Check Name · STATUS")
                                   // Status is in label, so we don't show the separate status line
-                                  <div className="text-[13px] text-gray-800 dark:text-gray-200 font-medium truncate" title={entry.label}>
+                                  <div
+                                    className="text-[13px] text-gray-800 dark:text-gray-200 font-medium truncate"
+                                    title={entry.label}
+                                  >
                                     {entry.label.split(" · ").map((part, idx) => (
                                       <span key={idx}>
                                         {idx === 0 ? (
@@ -440,7 +445,9 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                         ) : (
                                           <span>
                                             {" · "}
-                                            <span className="text-[12px] text-gray-600 dark:text-gray-400 font-normal">{part}</span>
+                                            <span className="text-[12px] text-gray-600 dark:text-gray-400 font-normal">
+                                              {part}
+                                            </span>
                                           </span>
                                         )}
                                       </span>
@@ -448,7 +455,10 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                   </div>
                                 ) : (
                                   <>
-                                    <div className="text-[13px] text-gray-800 dark:text-gray-200 font-medium truncate" title={entry.label}>
+                                    <div
+                                      className="text-[13px] text-gray-800 dark:text-gray-200 font-medium truncate"
+                                      title={entry.label}
+                                    >
                                       {entry.label}
                                     </div>
                                     {entry.status && (
@@ -463,7 +473,9 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                   </>
                                 )}
                                 {entry.comment && (
-                                  <div className="text-[12px] text-gray-500 dark:text-gray-400 italic break-words">"{entry.comment}"</div>
+                                  <div className="text-[12px] text-gray-500 dark:text-gray-400 italic break-words">
+                                    "{entry.comment}"
+                                  </div>
                                 )}
                               </div>
                             ))}
@@ -624,7 +636,10 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                               const blockStatusParts = [block.result, block.state, block.resultReason].filter(Boolean);
                               return (
                                 <div key={`${blockTitle}-${blockIndex}`} className="flex flex-col gap-1">
-                                  <div className="text-[13px] text-gray-800 dark:text-gray-200 font-medium truncate" title={blockTitle}>
+                                  <div
+                                    className="text-[13px] text-gray-800 dark:text-gray-200 font-medium truncate"
+                                    title={blockTitle}
+                                  >
                                     {blockTitle}
                                     {blockStatusParts.length > 0 && (
                                       <span className="text-[12px] text-gray-600 dark:text-gray-400 font-normal">
@@ -650,7 +665,10 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                           >
                                             {jobTitle}
                                             {jobStatusParts.length > 0 && (
-                                              <span className="text-gray-500 dark:text-gray-400"> · {jobStatusParts.join(" · ")}</span>
+                                              <span className="text-gray-500 dark:text-gray-400">
+                                                {" "}
+                                                · {jobStatusParts.join(" · ")}
+                                              </span>
                                             )}
                                           </div>
                                         );
@@ -880,7 +898,10 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                             {value.text}
                           </div>
                           {value.comment && (
-                            <div className="text-[12px] text-gray-500 dark:text-gray-400 italic truncate" title={value.comment}>
+                            <div
+                              className="text-[12px] text-gray-500 dark:text-gray-400 italic truncate"
+                              title={value.comment}
+                            >
                               "{value.comment}"
                             </div>
                           )}

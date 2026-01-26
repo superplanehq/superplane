@@ -142,7 +142,10 @@ export function Header({
                           className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
                           onClick={() => setIsMenuOpen(false)}
                         >
-                          <Home size={16} className="text-gray-500 dark:text-gray-400 transition group-hover:text-gray-800 dark:group-hover:text-gray-200" />
+                          <Home
+                            size={16}
+                            className="text-gray-500 dark:text-gray-400 transition group-hover:text-gray-800 dark:group-hover:text-gray-200"
+                          />
                           <span>All Canvases</span>
                         </a>
                       </div>
@@ -164,7 +167,10 @@ export function Header({
                               }`}
                             >
                               {isSelected ? (
-                                <Palette size={16} className="text-gray-800 dark:text-gray-200 transition group-hover:text-gray-800 dark:group-hover:text-gray-200" />
+                                <Palette
+                                  size={16}
+                                  className="text-gray-800 dark:text-gray-200 transition group-hover:text-gray-800 dark:group-hover:text-gray-200"
+                                />
                               ) : (
                                 <span className="w-4" />
                               )}

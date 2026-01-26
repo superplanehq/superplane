@@ -373,9 +373,13 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       <div className="flex items-center mt-1 gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
           {event.triggerEventId && (
-            <span className="text-[13px] text-gray-950/50 dark:text-gray-400 font-mono">#{event.triggerEventId.slice(0, 4)}</span>
+            <span className="text-[13px] text-gray-950/50 dark:text-gray-400 font-mono">
+              #{event.triggerEventId.slice(0, 4)}
+            </span>
           )}
-          <span className="text-sm text-gray-800 dark:text-gray-200 font-inter truncate text-md min-w-0 font-medium">{event.title}</span>
+          <span className="text-sm text-gray-800 dark:text-gray-200 font-inter truncate text-md min-w-0 font-medium">
+            {event.title}
+          </span>
         </div>
       </div>
 

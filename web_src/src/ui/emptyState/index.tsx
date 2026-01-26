@@ -20,7 +20,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
         <Icon size={16} />
       </div>
       <span className="text-sm text-gray-500 dark:text-gray-400">{title}</span>
-      {description && <span className="text-sm text-gray-400 dark:text-gray-500 text-center max-w-xs">{description}</span>}
+      {description && (
+        <span className="text-sm text-gray-400 dark:text-gray-500 text-center max-w-xs">{description}</span>
+      )}
     </div>
   );
 };
