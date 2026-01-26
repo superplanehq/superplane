@@ -286,17 +286,19 @@ export const ChainItem: React.FC<ChainItemProps> = ({
               <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
                 {React.createElement(resolveIcon(item.nodeIconSlug || item.nodeIcon), {
                   size: 16,
-                  className: "text-gray-800",
+                  className: "text-gray-800 dark:text-gray-100",
                 })}
               </div>
             )}
-            <span className="text-sm text-gray-800 truncate min-w-0 font-semibold">
+            <span className="text-sm text-gray-800 dark:text-gray-100 truncate min-w-0 font-semibold">
               {item.nodeDisplayName || item.nodeName || item.componentName}
             </span>
           </div>
           <div className="flex items-center gap-2">
             {/* Component subtitle */}
-            {componentSubtitle && <span className="text-sm text-gray-500 truncate">{componentSubtitle}</span>}
+            {componentSubtitle && (
+              <span className="text-sm text-gray-500 dark:text-gray-300 truncate">{componentSubtitle}</span>
+            )}
             <div
               className={`uppercase text-[11px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-white ${EventBadgeColor}`}
             >
@@ -307,7 +309,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
 
         {/* Second row: Time ago and duration */}
         <div className="flex items-center mt-0 ml-6 gap-2">
-          <span className="text-[13px] text-gray-950/60">
+          <span className="text-[13px] text-gray-950/60 dark:text-gray-300">
             {formatTimeAgo(new Date(item.originalExecution?.createdAt || item.originalEvent?.createdAt || ""))}
             {item.originalExecution?.state === "STATE_FINISHED" &&
               item.originalExecution?.createdAt &&
@@ -343,7 +345,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                   <div className="flex-shrink-0">
                     {React.createElement(resolveIcon("corner-down-right"), {
                       size: 16,
-                      className: "text-gray-400",
+                      className: "text-gray-400 dark:text-gray-400",
                     })}
                   </div>
                   {/* Component Icon */}
@@ -351,11 +353,11 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                     <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
                       {React.createElement(resolveIcon(child.componentIcon), {
                         size: 14,
-                        className: "text-gray-500",
+                        className: "text-gray-500 dark:text-gray-300",
                       })}
                     </div>
                   )}
-                  <span className="text-sm text-gray-500 truncate flex-1">{child.name}</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-300 truncate flex-1">{child.name}</span>
                 </div>
                 <div
                   className={`capitalize text-xs py-[1px] px-[3px] rounded flex items-center justify-center flex-shrink-0 ${
@@ -372,19 +374,19 @@ export const ChainItem: React.FC<ChainItemProps> = ({
         {/* Expandable content */}
         {isOpen && item.tabData && (
           <div
-            className="mt-3 ml-7 rounded-sm bg-white outline outline-slate-950/20 text-gray-500 w-[calc(100%-2rem)] mb-1"
+            className="mt-3 ml-7 rounded-sm bg-white dark:bg-slate-800 outline outline-slate-950/20 dark:outline-slate-600 text-gray-500 dark:text-gray-400 w-[calc(100%-2rem)] mb-1"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Tab Navigation */}
-            <div className="flex items-center h-8 border-b-1 border-gray-300">
+            <div className="flex items-center h-8 border-b-1 border-gray-300 dark:border-slate-600">
               <div className="flex">
                 {item.tabData.current && (
                   <button
                     onClick={() => setActiveTab("current")}
                     className={`py-1.5 ml-4 text-[13px] font-medium rounded-tr-md flex items-center border-b-1 gap-1  ${
                       activeTab === "current"
-                        ? "text-gray-800 border-b-1 border-gray-800"
-                        : "text-gray-500 hover:text-gray-800"
+                        ? "text-gray-800 dark:text-gray-200 border-b-1 border-gray-800 dark:border-gray-200"
+                        : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
                     }`}
                   >
                     {React.createElement(resolveIcon("Croissant"), { size: 16 })}
@@ -397,8 +399,8 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                   onClick={() => setActiveTab("payload")}
                   className={`py-1.5 ml-4 text-[13px] font-medium rounded-tr-md flex items-center border-b-1 gap-1 ${
                     activeTab === "payload"
-                      ? "text-gray-800 border-b-1 border-gray-800"
-                      : "text-gray-500 hover:text-gray-800"
+                      ? "text-gray-800 dark:text-gray-200 border-b-1 border-gray-800 dark:border-gray-200"
+                      : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
                   }`}
                 >
                   {React.createElement(resolveIcon("code"), { size: 16 })}
@@ -417,7 +419,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                         <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
                           {key}:
                         </span>
-                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
+                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 dark:text-gray-200 min-w-0">
                           <div className="flex flex-col gap-3">
                             {value.map((entry, entryIndex) => (
                               <div key={`${entry.label}-${entryIndex}`} className="relative pl-4">
@@ -427,12 +429,15 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                   )}`}
                                 />
                                 {entryIndex < value.length - 1 && (
-                                  <div className="absolute left-[3px] top-4 bottom-[-12px] w-px bg-gray-200" />
+                                  <div className="absolute left-[3px] top-4 bottom-[-12px] w-px bg-gray-200 dark:bg-gray-600" />
                                 )}
                                 {entry.label.includes(" · ") ? (
                                   // Handle combined label with status (e.g., "Check Name · STATUS")
                                   // Status is in label, so we don't show the separate status line
-                                  <div className="text-[13px] text-gray-800 font-medium truncate" title={entry.label}>
+                                  <div
+                                    className="text-[13px] text-gray-800 dark:text-gray-200 font-medium truncate"
+                                    title={entry.label}
+                                  >
                                     {entry.label.split(" · ").map((part, idx) => (
                                       <span key={idx}>
                                         {idx === 0 ? (
@@ -440,7 +445,9 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                         ) : (
                                           <span>
                                             {" · "}
-                                            <span className="text-[12px] text-gray-600 font-normal">{part}</span>
+                                            <span className="text-[12px] text-gray-600 dark:text-gray-400 font-normal">
+                                              {part}
+                                            </span>
                                           </span>
                                         )}
                                       </span>
@@ -448,12 +455,15 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                   </div>
                                 ) : (
                                   <>
-                                    <div className="text-[13px] text-gray-800 font-medium truncate" title={entry.label}>
+                                    <div
+                                      className="text-[13px] text-gray-800 dark:text-gray-200 font-medium truncate"
+                                      title={entry.label}
+                                    >
                                       {entry.label}
                                     </div>
                                     {entry.status && (
                                       <div
-                                        className="text-[12px] text-gray-600 truncate"
+                                        className="text-[12px] text-gray-600 dark:text-gray-400 truncate"
                                         title={`${entry.status}${entry.timestamp ? ` ${entry.timestamp}` : ""}`}
                                       >
                                         {entry.status}
@@ -463,7 +473,9 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                   </>
                                 )}
                                 {entry.comment && (
-                                  <div className="text-[12px] text-gray-500 italic break-words">"{entry.comment}"</div>
+                                  <div className="text-[12px] text-gray-500 dark:text-gray-400 italic break-words">
+                                    "{entry.comment}"
+                                  </div>
                                 )}
                               </div>
                             ))}
@@ -479,7 +491,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                         <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
                           {key}:
                         </span>
-                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
+                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 dark:text-gray-200 min-w-0">
                           <div className="flex flex-col gap-4">
                             {value.map((issue, issueIndex) => (
                               <div key={`${issue.checkName}-${issueIndex}`} className="flex flex-col">
@@ -488,8 +500,8 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                   <span
                                     className={`text-xs font-medium px-1 py-0.5 rounded flex-shrink-0 uppercase leading-tight self-start ${
                                       issue.status === "critical"
-                                        ? "bg-red-100 text-red-700"
-                                        : "bg-yellow-100 text-yellow-700"
+                                        ? "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300"
+                                        : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300"
                                     }`}
                                   >
                                     {issue.status}
@@ -499,7 +511,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                     {/* Check name */}
                                     <div className="mb-1">
                                       <span
-                                        className="text-[13px] font-semibold text-gray-900 break-words"
+                                        className="text-[13px] font-semibold text-gray-900 dark:text-gray-100 break-words"
                                         title={issue.checkName}
                                       >
                                         {issue.checkName}
@@ -511,7 +523,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                 {/* Check summary - spans full width below badge */}
                                 {issue.checkSummary && (
                                   <div
-                                    className="text-[12px] text-gray-700 break-words mt-1 w-full"
+                                    className="text-[12px] text-gray-700 dark:text-gray-300 break-words mt-1 w-full"
                                     title={issue.checkSummary}
                                   >
                                     {issue.checkSummary}
@@ -521,7 +533,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                 {/* Check description - spans full width below badge */}
                                 {issue.checkDescription && (
                                   <div
-                                    className="text-[12px] text-gray-500 italic break-words mt-1 w-full"
+                                    className="text-[12px] text-gray-500 dark:text-gray-400 italic break-words mt-1 w-full"
                                     title={issue.checkDescription}
                                   >
                                     {issue.checkDescription}
@@ -541,9 +553,9 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                         <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
                           {key}:
                         </span>
-                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
+                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 dark:text-gray-200 min-w-0">
                           {value.length === 0 ? (
-                            <span className="text-gray-500 italic">No incidents</span>
+                            <span className="text-gray-500 dark:text-gray-400 italic">No incidents</span>
                           ) : (
                             <div className="flex flex-col gap-3">
                               {value.map((incident, incidentIndex) => (
@@ -554,11 +566,11 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                   />
                                   {/* Timeline connecting line */}
                                   {incidentIndex < value.length - 1 && (
-                                    <div className="absolute left-[3px] top-4 bottom-[-12px] w-px bg-gray-200" />
+                                    <div className="absolute left-[3px] top-4 bottom-[-12px] w-px bg-gray-200 dark:bg-gray-600" />
                                   )}
 
                                   {/* Incident title with link */}
-                                  <div className="text-[13px] text-gray-800 font-medium">
+                                  <div className="text-[13px] text-gray-800 dark:text-gray-200 font-medium">
                                     {incident.html_url ? (
                                       <a
                                         href={incident.html_url}
@@ -579,7 +591,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                     {incident.created_at && (
                                       <>
                                         {" · "}
-                                        <span className="text-[12px] font-normal text-gray-500">
+                                        <span className="text-[12px] font-normal text-gray-500 dark:text-gray-400">
                                           {formatTimeAgo(new Date(incident.created_at))}
                                         </span>
                                       </>
@@ -587,7 +599,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                   </div>
 
                                   {/* Service, status, and priority info */}
-                                  <div className="text-[12px] text-gray-600 truncate">
+                                  <div className="text-[12px] text-gray-600 dark:text-gray-400 truncate">
                                     <span className="capitalize">{incident.status}</span>
                                     {incident.service && (
                                       <>
@@ -617,17 +629,20 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                         <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
                           {key}:
                         </span>
-                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
+                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 dark:text-gray-200 min-w-0">
                           <div className="flex flex-col gap-3">
                             {value.blocks.map((block, blockIndex) => {
                               const blockTitle = block.name || `Block ${blockIndex + 1}`;
                               const blockStatusParts = [block.result, block.state, block.resultReason].filter(Boolean);
                               return (
                                 <div key={`${blockTitle}-${blockIndex}`} className="flex flex-col gap-1">
-                                  <div className="text-[13px] text-gray-800 font-medium truncate" title={blockTitle}>
+                                  <div
+                                    className="text-[13px] text-gray-800 dark:text-gray-200 font-medium truncate"
+                                    title={blockTitle}
+                                  >
                                     {blockTitle}
                                     {blockStatusParts.length > 0 && (
-                                      <span className="text-[12px] text-gray-600 font-normal">
+                                      <span className="text-[12px] text-gray-600 dark:text-gray-400 font-normal">
                                         {" "}
                                         · {blockStatusParts.join(" · ")}
                                       </span>
@@ -641,7 +656,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                         return (
                                           <div
                                             key={`${jobTitle}-${jobIndex}`}
-                                            className="text-[12px] text-gray-600 truncate"
+                                            className="text-[12px] text-gray-600 dark:text-gray-400 truncate"
                                             title={
                                               jobStatusParts.length > 0
                                                 ? `${jobTitle} · ${jobStatusParts.join(" · ")}`
@@ -650,7 +665,10 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                           >
                                             {jobTitle}
                                             {jobStatusParts.length > 0 && (
-                                              <span className="text-gray-500"> · {jobStatusParts.join(" · ")}</span>
+                                              <span className="text-gray-500 dark:text-gray-400">
+                                                {" "}
+                                                · {jobStatusParts.join(" · ")}
+                                              </span>
                                             )}
                                           </div>
                                         );
@@ -672,7 +690,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                         <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
                           {key}:
                         </span>
-                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0 overflow-hidden">
+                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 dark:text-gray-200 min-w-0 overflow-hidden">
                           <div className="flex flex-col gap-2 max-w-full">
                             {value.values.map((specValue, specIndex) => {
                               // Check if the last badge is a logical operator
@@ -781,7 +799,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                         <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
                           {key}:
                         </span>
-                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0 overflow-hidden">
+                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 dark:text-gray-200 min-w-0 overflow-hidden">
                           <div className="flex flex-col gap-2 max-w-full">
                             {value.values.map((specValue, specIndex) => {
                               // Check if the last badge is a logical operator
@@ -802,8 +820,8 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                       {badges.slice(0, -1).map((badge, badgeIndex) => {
                                         // Use red only for null/undefined when failed, otherwise use original colors
                                         const isRed = shouldBeRed(badge.label);
-                                        const badgeBg = isRed ? "bg-red-200" : badge.bgColor;
-                                        const badgeText = isRed ? "text-red-900" : badge.textColor;
+                                        const badgeBg = isRed ? "bg-red-200 dark:bg-red-900/50" : badge.bgColor;
+                                        const badgeText = isRed ? "text-red-900 dark:text-red-300" : badge.textColor;
                                         return (
                                           <span
                                             key={badgeIndex}
@@ -831,8 +849,8 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                   {badges.map((badge, badgeIndex) => {
                                     // Use red only for null/undefined when failed, otherwise use original colors
                                     const isRed = shouldBeRed(badge.label);
-                                    const badgeBg = isRed ? "bg-red-200" : badge.bgColor;
-                                    const badgeText = isRed ? "text-red-900" : badge.textColor;
+                                    const badgeBg = isRed ? "bg-red-200 dark:bg-red-900/50" : badge.bgColor;
+                                    const badgeText = isRed ? "text-red-900 dark:text-red-300" : badge.textColor;
                                     return (
                                       <span
                                         key={badgeIndex}
@@ -855,12 +873,12 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                     return (
                       <div key={key} className="flex items-start gap-1 px-2 rounded-md w-full min-w-0 font-medium">
                         <span
-                          className="text-[13px] flex-shrink-0 text-right w-[30%] truncate text-red-600"
+                          className="text-[13px] flex-shrink-0 text-right w-[30%] truncate text-red-600 dark:text-red-400"
                           title={key}
                         >
                           {key}:
                         </span>
-                        <div className="text-[13px] flex-1 text-left w-[70%] text-red-600 min-w-0">
+                        <div className="text-[13px] flex-1 text-left w-[70%] text-red-600 dark:text-red-400 min-w-0">
                           <div className="break-words whitespace-normal" title={value.message}>
                             {value.message}
                           </div>
@@ -875,12 +893,15 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                         <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
                           {key}:
                         </span>
-                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
+                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 dark:text-gray-200 min-w-0">
                           <div className="truncate" title={value.text}>
                             {value.text}
                           </div>
                           {value.comment && (
-                            <div className="text-[12px] text-gray-500 italic truncate" title={value.comment}>
+                            <div
+                              className="text-[12px] text-gray-500 dark:text-gray-400 italic truncate"
+                              title={value.comment}
+                            >
                               "{value.comment}"
                             </div>
                           )}
@@ -902,7 +923,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                           href={stringValue}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-[13px] flex-1 text-left w-[70%] text-gray-800 cursor-pointer inline-block overflow-hidden text-ellipsis whitespace-nowrap max-w-full"
+                          className="text-[13px] flex-1 text-left w-[70%] text-gray-800 dark:text-gray-200 cursor-pointer inline-block overflow-hidden text-ellipsis whitespace-nowrap max-w-full"
                           style={{ textDecoration: "underline", textDecorationThickness: "1px" }}
                           title={stringValue}
                           onClick={(e) => e.stopPropagation()}
@@ -911,7 +932,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                         </a>
                       ) : (
                         <span
-                          className="text-[13px] flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate"
+                          className="text-[13px] flex-1 truncate text-left w-[70%] hover:underline text-gray-800 dark:text-gray-200 truncate"
                           title={stringValue}
                         >
                           {stringValue}
@@ -930,7 +951,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                     <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
                       <button
                         onClick={() => copyPayloadToClipboard(item.tabData!.payload)}
-                        className="p-1 rounded text-gray-500 hover:text-gray-800"
+                        className="p-1 rounded text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
                       >
                         {React.createElement(resolveIcon("copy"), { size: 14 })}
                       </button>
@@ -941,7 +962,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                           setModalPayload(item.tabData!.payload);
                           setIsPayloadModalOpen(true);
                         }}
-                        className="p-1 text-gray-500 hover:text-gray-800"
+                        className="p-1 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
                       >
                         {React.createElement(resolveIcon("maximize-2"), { size: 14 })}
                       </button>
@@ -957,11 +978,9 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                       fontSize: "12px",
                       fontFamily:
                         'Monaco, Menlo, "Cascadia Code", "Segoe UI Mono", "Roboto Mono", Consolas, "Courier New", monospace',
-                      backgroundColor: "#ffffff",
-                      color: "#24292e",
                       padding: "8px",
                     }}
-                    className="json-viewer-hide-types"
+                    className="json-viewer-hide-types json-viewer-dark-mode"
                     displayObjectSize={false}
                     enableClipboard={false}
                   />
@@ -990,7 +1009,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                     e.stopPropagation();
                     copyPayloadToClipboard(modalPayload);
                   }}
-                  className="px-3 py-1 text-sm text-gray-800 bg-gray-50 hover:bg-gray-200 rounded flex items-center gap-1"
+                  className="px-3 py-1 text-sm text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded flex items-center gap-1"
                 >
                   {React.createElement(resolveIcon("copy"), { size: 14 })}
                   Copy
@@ -1006,10 +1025,8 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                       fontSize: "14px",
                       fontFamily:
                         'Monaco, Menlo, "Cascadia Code", "Segoe UI Mono", "Roboto Mono", Consolas, "Courier New", monospace',
-                      backgroundColor: "#ffffff",
-                      color: "#24292e",
                     }}
-                    className="json-viewer-hide-types"
+                    className="json-viewer-hide-types json-viewer-dark-mode"
                     displayObjectSize={false}
                     enableClipboard={false}
                   />
