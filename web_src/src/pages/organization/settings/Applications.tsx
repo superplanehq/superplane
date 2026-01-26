@@ -223,7 +223,10 @@ export function Applications({ organizationId }: ApplicationsProps) {
       </div>
 
       {/* Install Modal */}
-      <Dialog open={isModalOpen && !!selectedApplication} onOpenChange={(open) => !open && handleCloseModal()}>
+      <Dialog
+        open={isModalOpen && !!selectedApplication}
+        onOpenChange={(open) => !open && !installMutation.isPending && handleCloseModal()}
+      >
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" showCloseButton={false}>
           {selectedApplication && (
             <>
