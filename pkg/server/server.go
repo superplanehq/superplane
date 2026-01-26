@@ -24,6 +24,7 @@ import (
 	// Import integrations, components and triggers to register them via init()
 	_ "github.com/superplanehq/superplane/pkg/applications/cloudflare"
 	_ "github.com/superplanehq/superplane/pkg/applications/dash0"
+	_ "github.com/superplanehq/superplane/pkg/applications/discord"
 	_ "github.com/superplanehq/superplane/pkg/applications/github"
 	_ "github.com/superplanehq/superplane/pkg/applications/openai"
 	_ "github.com/superplanehq/superplane/pkg/applications/pagerduty"

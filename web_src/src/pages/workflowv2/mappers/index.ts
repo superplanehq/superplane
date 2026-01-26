@@ -44,6 +44,11 @@ import {
   eventStateRegistry as smtpEventStateRegistry,
 } from "./smtp";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
+import {
+  componentMappers as discordComponentMappers,
+  triggerRenderers as discordTriggerRenderers,
+  eventStateRegistry as discordEventStateRegistry,
+} from "./discord";
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
@@ -77,6 +82,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   dash0: dash0ComponentMappers,
   slack: slackComponentMappers,
   smtp: smtpComponentMappers,
+  discord: discordComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -86,6 +92,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   dash0: dash0TriggerRenderers,
   slack: slackTriggerRenderers,
   smtp: smtpTriggerRenderers,
+  discord: discordTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -95,6 +102,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   dash0: dash0EventStateRegistry,
   slack: slackEventStateRegistry,
   smtp: smtpEventStateRegistry,
+  discord: discordEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
