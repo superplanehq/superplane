@@ -65,7 +65,7 @@ SuperPlane should be the best product in the industry. This means:
 
 To maintain developer productivity and fast feedback loops, our CI pipeline is optimized to run only necessary tests:
 
-- **Documentation-only changes** - When a PR only modifies markdown files (`.md` files or files in `docs/`), heavy test suites are skipped. Only the License Check runs to ensure the pipeline completes successfully.
+- **Documentation-only changes** - When a PR only modifies markdown files (`.md` files anywhere in the repository), heavy test suites are skipped. Only the License Check runs to ensure the pipeline completes successfully.
 - **Fast feedback** - Documentation contributors receive quick CI results without waiting for full test suites.
 - **Resource efficiency** - Skipping unnecessary tests conserves CI resources for code changes that require them.
 

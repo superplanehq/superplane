@@ -9,6 +9,12 @@ auto_cancel:
     when: branch != 'main'
   queued:
     when: branch != 'main'
+
+# Skip condition for documentation-only changes
+.skip_on_docs_only: &skip_on_docs_only
+  skip:
+    when: "change_in('/', {default_branch: 'main', exclude: ['*.md', '**/*.md']}) == false"
+
 blocks:
   - name: "\U0001F4DC License Check"
     dependencies: []
@@ -22,8 +28,7 @@ blocks:
             - make test.license.check
   - name: "\U0001F9EA QA"
     dependencies: []
-    skip:
-      when: "change_in('/', {default_branch: 'main', exclude: ['*.md', '**/*.md']}) == false"
+    <<: *skip_on_docs_only
     task:
       env_vars:
         - name: DOCKER_BUILDKIT
@@ -62,8 +67,7 @@ blocks:
             - '[ -f junit-report.xml ] && test-results publish junit-report.xml'
   - name: "\U0001F528 Frontend Build"
     dependencies: []
-    skip:
-      when: "change_in('/', {default_branch: 'main', exclude: ['*.md', '**/*.md']}) == false"
+    <<: *skip_on_docs_only
     task:
       prologue:
         commands:
@@ -80,8 +84,7 @@ blocks:
   - name: "\U0001F9EA Frontend Tests"
     dependencies:
       - "\U0001F528 Frontend Build"
-    skip:
-      when: "change_in('/', {default_branch: 'main', exclude: ['*.md', '**/*.md']}) == false"
+    <<: *skip_on_docs_only
     task:
       prologue:
         commands:
