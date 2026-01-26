@@ -173,6 +173,7 @@ func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *mode
 	// and the user should be aware of this.
 	//
 	configBuilder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
+		WithNodeID(node.NodeID).
 		WithRootEvent(&execution.RootEventID).
 		WithPreviousExecution(&execution.ID).
 		ForBlueprintNode(node).
@@ -291,6 +292,7 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 	}
 	ctx.ExpressionEnv = func(expression string) (map[string]any, error) {
 		builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
+			WithNodeID(node.NodeID).
 			WithRootEvent(&execution.RootEventID).
 			WithInput(map[string]any{inputEvent.NodeID: input})
 		if execution.PreviousExecutionID != nil {
