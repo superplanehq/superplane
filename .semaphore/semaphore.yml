@@ -50,7 +50,7 @@ blocks:
         - name: 'Check: Components Docs'
           commands:
             - make gen.components.docs
-            - git diff --exit-code docs/integrations
+            - git diff --exit-code docs/components
         - name: 'Check: Go Format'
           commands:
             - make format.go.check
