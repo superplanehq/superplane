@@ -163,7 +163,7 @@ func writeCardGridComponents(buf *bytes.Buffer, components []core.Component) {
 	}
 
 	buf.WriteString("import { CardGrid, LinkCard } from \"@astrojs/starlight/components\";\n\n")
-	buf.WriteString("## Components\n\n")
+	buf.WriteString("## Actions\n\n")
 	buf.WriteString("<CardGrid>\n")
 	for _, component := range components {
 		description := strings.TrimSpace(component.Description())
