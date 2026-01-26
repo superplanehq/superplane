@@ -37,7 +37,7 @@ func TestTimeGateComponent(t *testing.T) {
 		steps.setTimeWindow("09:00", "17:00")
 		steps.setTimezone("-5")
 		steps.saveTimeGate()
-		steps.assertTimeGateSavedToDB("09:00-17:00", "-5", workweekDays)
+		steps.assertTimeGateSavedToDB("09:00 - 17:00", "-5", workweekDays)
 	})
 
 	t.Run("push through the time gate item", func(t *testing.T) {
@@ -69,6 +69,7 @@ func (s *TimeGateSteps) givenACanvasExists(canvasName string) {
 
 func (s *TimeGateSteps) addTimeGate() {
 	s.canvas.StartAddingTimeGate("TimeGate", models.Position{X: 500, Y: 250})
+	s.session.AssertVisible(q.Locator(`button[aria-label="monday"]`))
 }
 
 func (s *TimeGateSteps) setDaysTo(days []string) {
