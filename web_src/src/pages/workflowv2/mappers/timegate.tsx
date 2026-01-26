@@ -82,20 +82,20 @@ export const TIME_GATE_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   waiting: {
     icon: "clock",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-orange-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-orange-100 dark:bg-orange-900/50",
     badgeColor: "bg-yellow-600",
   },
   opened: {
     icon: "circle-check",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-green-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-green-100 dark:bg-green-900/50",
     badgeColor: "bg-emerald-500",
   },
   "pushed through": {
     icon: "arrow-right",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-amber-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-amber-100 dark:bg-amber-900/50",
     badgeColor: "bg-amber-500",
   },
 };

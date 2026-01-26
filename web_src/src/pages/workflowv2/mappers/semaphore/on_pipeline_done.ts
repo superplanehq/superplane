@@ -2,7 +2,6 @@ import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-c
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
 import { TriggerProps } from "@/ui/trigger";
-import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { formatTimeAgo } from "@/utils/date";
 
 interface OnPipelineDoneMetadata {
@@ -79,7 +78,7 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
 
     const props: TriggerProps = {
       title: node.name!,
-      iconSrc: SemaphoreLogo,
+      appName: "semaphore",
       iconColor: getColorClass(trigger.color),
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: metadataItems,

@@ -237,7 +237,7 @@ export function Members({ organizationId }: MembersProps) {
       )}
 
       {showInviteLinkSection ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+        <div className="bg-white dark:bg-neutral-800 rounded-lg border border-gray-300 dark:border-neutral-700 p-6">
           <div className="flex items-start justify-between gap-6">
             <div>
               <Text className="text-left font-semibold text-gray-800 dark:text-white mb-1">
@@ -287,7 +287,7 @@ export function Members({ organizationId }: MembersProps) {
               <Input
                 readOnly
                 value={inviteLinkUrl}
-                className="flex-1 bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300"
+                className="flex-1 bg-gray-50 dark:bg-neutral-900 text-gray-600 dark:text-gray-300"
               />
               <Button
                 variant="outline"
@@ -301,7 +301,7 @@ export function Members({ organizationId }: MembersProps) {
           )}
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+        <div className="bg-white dark:bg-neutral-800 rounded-lg border border-gray-300 dark:border-neutral-700 p-6">
           <Text className="text-left font-semibold text-gray-800 dark:text-white mb-1">Invite link to add members</Text>
           <Text className="text-sm text-gray-500 dark:text-gray-400">
             Reach out to an organization owner or admin to invite new members.
@@ -310,7 +310,7 @@ export function Members({ organizationId }: MembersProps) {
       )}
 
       {/* Members List */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
+      <div className="bg-white dark:bg-neutral-800 rounded-lg border border-gray-300 dark:border-neutral-700 overflow-hidden">
         <div className="px-6 pt-6 pb-4">
           <div className="flex items-center justify-between mb-4">
             <Text className="text-sm font-medium text-gray-600 dark:text-gray-300">Members ({members.length})</Text>

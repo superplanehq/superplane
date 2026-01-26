@@ -1,7 +1,6 @@
 import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
-import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
 import { BaseNodeMetadata, GitRef } from "./types";
 import { Predicate, buildGithubSubtitle, createGithubMetadataItems } from "./utils";
@@ -40,7 +39,7 @@ export const onTagCreatedTriggerRenderer: TriggerRenderer = {
 
     const props: TriggerProps = {
       title: node.name!,
-      iconSrc: githubIcon,
+      appName: "github",
       iconColor: getColorClass(trigger.color),
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: createGithubMetadataItems(metadata?.repository?.name, configuration?.tags),
