@@ -377,139 +377,142 @@ export function WorkflowPageV2() {
    */
   const debouncedAutoSave = useMemo(
     () =>
-      debounce(async () => {
-        if (!organizationId || !workflowId) return;
+      debounce(
+        async () => {
+          if (!organizationId || !workflowId) return;
 
-        const positionUpdates = new Map(pendingPositionUpdatesRef.current);
-        if (positionUpdates.size === 0) return;
-        const focusedNoteId = getActiveNoteId();
+          const positionUpdates = new Map(pendingPositionUpdatesRef.current);
+          if (positionUpdates.size === 0) return;
+          const focusedNoteId = getActiveNoteId();
 
-        try {
-          if (!canAutoSave) {
-            return;
-          }
-
-          // Check if there are unsaved structural changes
-          // If so, skip auto-save to avoid saving those changes accidentally
-          if (hasNonPositionalUnsavedChanges) {
-            return;
-          }
-
-          if (isTemplate) {
-            return;
-          }
-
-          // Fetch the latest workflow from the cache
-          const latestWorkflow = queryClient.getQueryData<WorkflowsWorkflow>(
-            workflowKeys.detail(organizationId, workflowId),
-          );
-
-          if (!latestWorkflow?.spec?.nodes) return;
-
-          // Apply only position updates to the current state
-          const updatedNodes = latestWorkflow.spec.nodes.map((node) => {
-            if (!node.id) return node;
-
-            const positionUpdate = positionUpdates.get(node.id);
-            if (positionUpdate) {
-              return {
-                ...node,
-                position: positionUpdate,
-              };
+          try {
+            if (!canAutoSave) {
+              return;
             }
-            return node;
-          });
 
-          const updatedWorkflow = {
-            ...latestWorkflow,
-            spec: {
-              ...latestWorkflow.spec,
-              nodes: updatedNodes,
-            },
-          };
-
-          const changeSummary = summarizeWorkflowChanges({
-            before: lastSavedWorkflowRef.current,
-            after: updatedWorkflow,
-            onNodeSelect: (nodeId: string) => logNodeSelectRef.current(nodeId),
-          });
-          const changeMessage = changeSummary.changeCount
-            ? `${changeSummary.changeCount} Canvas changes saved`
-            : "Canvas changes saved";
-
-          // Save the workflow with updated positions
-          await updateWorkflowMutation.mutateAsync({
-            name: latestWorkflow.metadata?.name!,
-            description: latestWorkflow.metadata?.description,
-            nodes: updatedNodes,
-            edges: latestWorkflow.spec?.edges,
-          });
-
-          if (changeSummary.detail) {
-            setLiveCanvasEntries((prev) => [
-              buildCanvasStatusLogEntry({
-                id: `canvas-save-${Date.now()}`,
-                message: changeMessage,
-                type: "success",
-                timestamp: new Date().toISOString(),
-                detail: changeSummary.detail,
-                searchText: changeSummary.searchText,
-              }),
-              ...prev,
-            ]);
-          }
-
-          lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(updatedWorkflow));
-
-          // Clear the saved position updates after successful save
-          // Keep any new updates that came in during the save
-          positionUpdates.forEach((_, nodeId) => {
-            if (pendingPositionUpdatesRef.current.get(nodeId) === positionUpdates.get(nodeId)) {
-              pendingPositionUpdatesRef.current.delete(nodeId);
+            // Check if there are unsaved structural changes
+            // If so, skip auto-save to avoid saving those changes accidentally
+            if (hasNonPositionalUnsavedChanges) {
+              return;
             }
-          });
 
-          // After save, merge any new pending updates into the cache
-          // This prevents the server response from overwriting newer local changes
-          const currentWorkflow = queryClient.getQueryData<WorkflowsWorkflow>(
-            workflowKeys.detail(organizationId, workflowId),
-          );
+            if (isTemplate) {
+              return;
+            }
 
-          if (currentWorkflow?.spec?.nodes && pendingPositionUpdatesRef.current.size > 0) {
-            const mergedNodes = currentWorkflow.spec.nodes.map((node) => {
+            // Fetch the latest workflow from the cache
+            const latestWorkflow = queryClient.getQueryData<WorkflowsWorkflow>(
+              workflowKeys.detail(organizationId, workflowId),
+            );
+
+            if (!latestWorkflow?.spec?.nodes) return;
+
+            // Apply only position updates to the current state
+            const updatedNodes = latestWorkflow.spec.nodes.map((node) => {
               if (!node.id) return node;
 
-              const pendingUpdate = pendingPositionUpdatesRef.current.get(node.id);
-              if (pendingUpdate) {
+              const positionUpdate = positionUpdates.get(node.id);
+              if (positionUpdate) {
                 return {
                   ...node,
-                  position: pendingUpdate,
+                  position: positionUpdate,
                 };
               }
               return node;
             });
 
-            queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), {
-              ...currentWorkflow,
+            const updatedWorkflow = {
+              ...latestWorkflow,
               spec: {
-                ...currentWorkflow.spec,
-                nodes: mergedNodes,
+                ...latestWorkflow.spec,
+                nodes: updatedNodes,
               },
-            });
-          }
+            };
 
-          // Auto-save completed silently (no toast or state changes)
-        } catch (error: any) {
-          console.error("Failed to auto-save canvas changes:", error);
-          // Don't show error toast for auto-save failures to avoid being intrusive
-        } finally {
-          if (focusedNoteId) {
-            requestAnimationFrame(() => {
-              restoreActiveNoteFocus();
+            const changeSummary = summarizeWorkflowChanges({
+              before: lastSavedWorkflowRef.current,
+              after: updatedWorkflow,
+              onNodeSelect: (nodeId: string) => logNodeSelectRef.current(nodeId),
             });
+            const changeMessage = changeSummary.changeCount
+              ? `${changeSummary.changeCount} Canvas changes saved`
+              : "Canvas changes saved";
+
+            // Save the workflow with updated positions
+            await updateWorkflowMutation.mutateAsync({
+              name: latestWorkflow.metadata?.name!,
+              description: latestWorkflow.metadata?.description,
+              nodes: updatedNodes,
+              edges: latestWorkflow.spec?.edges,
+            });
+
+            if (changeSummary.detail) {
+              setLiveCanvasEntries((prev) => [
+                buildCanvasStatusLogEntry({
+                  id: `canvas-save-${Date.now()}`,
+                  message: changeMessage,
+                  type: "success",
+                  timestamp: new Date().toISOString(),
+                  detail: changeSummary.detail,
+                  searchText: changeSummary.searchText,
+                }),
+                ...prev,
+              ]);
+            }
+
+            lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(updatedWorkflow));
+
+            // Clear the saved position updates after successful save
+            // Keep any new updates that came in during the save
+            positionUpdates.forEach((_, nodeId) => {
+              if (pendingPositionUpdatesRef.current.get(nodeId) === positionUpdates.get(nodeId)) {
+                pendingPositionUpdatesRef.current.delete(nodeId);
+              }
+            });
+
+            // After save, merge any new pending updates into the cache
+            // This prevents the server response from overwriting newer local changes
+            const currentWorkflow = queryClient.getQueryData<WorkflowsWorkflow>(
+              workflowKeys.detail(organizationId, workflowId),
+            );
+
+            if (currentWorkflow?.spec?.nodes && pendingPositionUpdatesRef.current.size > 0) {
+              const mergedNodes = currentWorkflow.spec.nodes.map((node) => {
+                if (!node.id) return node;
+
+                const pendingUpdate = pendingPositionUpdatesRef.current.get(node.id);
+                if (pendingUpdate) {
+                  return {
+                    ...node,
+                    position: pendingUpdate,
+                  };
+                }
+                return node;
+              });
+
+              queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), {
+                ...currentWorkflow,
+                spec: {
+                  ...currentWorkflow.spec,
+                  nodes: mergedNodes,
+                },
+              });
+            }
+
+            // Auto-save completed silently (no toast or state changes)
+          } catch (error: any) {
+            console.error("Failed to auto-save canvas changes:", error);
+            // Don't show error toast for auto-save failures to avoid being intrusive
+          } finally {
+            if (focusedNoteId) {
+              requestAnimationFrame(() => {
+                restoreActiveNoteFocus();
+              });
+            }
           }
-        }
-      }, canAutoSave ? 100 : 2000),
+        },
+        canAutoSave ? 100 : 2000,
+      ),
     [
       organizationId,
       workflowId,
@@ -1479,64 +1482,67 @@ export function WorkflowPageV2() {
 
   const debouncedAnnotationAutoSave = useMemo(
     () =>
-      debounce(async () => {
-        if (!organizationId || !workflowId) return;
+      debounce(
+        async () => {
+          if (!organizationId || !workflowId) return;
 
-        const annotationUpdates = new Map(pendingAnnotationUpdatesRef.current);
-        if (annotationUpdates.size === 0) return;
+          const annotationUpdates = new Map(pendingAnnotationUpdatesRef.current);
+          if (annotationUpdates.size === 0) return;
 
-        if (!canAutoSave) {
-          return;
-        }
-
-        if (hasNonPositionalUnsavedChanges) {
-          return;
-        }
-
-        if (isTemplate) {
-          return;
-        }
-
-        const latestWorkflow = queryClient.getQueryData<WorkflowsWorkflow>(
-          workflowKeys.detail(organizationId, workflowId),
-        );
-
-        if (!latestWorkflow?.spec?.nodes) return;
-
-        const updatedNodes = latestWorkflow.spec.nodes.map((node) => {
-          if (!node.id || node.type !== "TYPE_WIDGET") {
-            return node;
+          if (!canAutoSave) {
+            return;
           }
 
-          const updates = annotationUpdates.get(node.id);
-          if (!updates) {
-            return node;
+          if (hasNonPositionalUnsavedChanges) {
+            return;
           }
 
-          return {
-            ...node,
-            configuration: {
-              ...node.configuration,
-              ...updates,
+          if (isTemplate) {
+            return;
+          }
+
+          const latestWorkflow = queryClient.getQueryData<WorkflowsWorkflow>(
+            workflowKeys.detail(organizationId, workflowId),
+          );
+
+          if (!latestWorkflow?.spec?.nodes) return;
+
+          const updatedNodes = latestWorkflow.spec.nodes.map((node) => {
+            if (!node.id || node.type !== "TYPE_WIDGET") {
+              return node;
+            }
+
+            const updates = annotationUpdates.get(node.id);
+            if (!updates) {
+              return node;
+            }
+
+            return {
+              ...node,
+              configuration: {
+                ...node.configuration,
+                ...updates,
+              },
+            };
+          });
+
+          const updatedWorkflow = {
+            ...latestWorkflow,
+            spec: {
+              ...latestWorkflow.spec,
+              nodes: updatedNodes,
             },
           };
-        });
+          await handleSaveWorkflow(updatedWorkflow, { showToast: false });
 
-        const updatedWorkflow = {
-          ...latestWorkflow,
-          spec: {
-            ...latestWorkflow.spec,
-            nodes: updatedNodes,
-          },
-        };
-        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
-
-        annotationUpdates.forEach((updates, nodeId) => {
-          if (pendingAnnotationUpdatesRef.current.get(nodeId) === updates) {
-            pendingAnnotationUpdatesRef.current.delete(nodeId);
-          }
-        });
-      }, canAutoSave ? 100 : 2000),
+          annotationUpdates.forEach((updates, nodeId) => {
+            if (pendingAnnotationUpdatesRef.current.get(nodeId) === updates) {
+              pendingAnnotationUpdatesRef.current.delete(nodeId);
+            }
+          });
+        },
+        canAutoSave ? 100 : 2000,
+      ),
     [
       organizationId,
       workflowId,
@@ -1572,9 +1578,7 @@ export function WorkflowPageV2() {
       const hasPositionUpdate = x !== undefined || y !== undefined;
       const hasConfigurationUpdate = Object.keys(configurationUpdates).length > 0;
       const hasOnlyTextUpdate =
-        !hasPositionUpdate &&
-        Object.keys(configurationUpdates).length === 1 &&
-        configurationUpdates.text !== undefined;
+        !hasPositionUpdate && Object.keys(configurationUpdates).length === 1 && configurationUpdates.text !== undefined;
 
       const shouldUpdateCache = !canAutoSave || !hasOnlyTextUpdate;
       if (shouldUpdateCache) {
