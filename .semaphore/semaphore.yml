@@ -23,7 +23,7 @@ blocks:
   - name: "\U0001F9EA QA"
     dependencies: []
     skip:
-      when: "change_in('/', {default_branch: 'main', exclude: ['*.md', 'docs/**', '**/*.md']}) == false"
+      when: "change_in('/', {default_branch: 'main', exclude: ['*.md', '**/*.md']}) == false"
     task:
       env_vars:
         - name: DOCKER_BUILDKIT
@@ -63,7 +63,7 @@ blocks:
   - name: "\U0001F528 Frontend Build"
     dependencies: []
     skip:
-      when: "change_in('/', {default_branch: 'main', exclude: ['*.md', 'docs/**', '**/*.md']}) == false"
+      when: "change_in('/', {default_branch: 'main', exclude: ['*.md', '**/*.md']}) == false"
     task:
       prologue:
         commands:
@@ -81,7 +81,7 @@ blocks:
     dependencies:
       - "\U0001F528 Frontend Build"
     skip:
-      when: "change_in('/', {default_branch: 'main', exclude: ['*.md', 'docs/**', '**/*.md']}) == false"
+      when: "change_in('/', {default_branch: 'main', exclude: ['*.md', '**/*.md']}) == false"
     task:
       prologue:
         commands:
