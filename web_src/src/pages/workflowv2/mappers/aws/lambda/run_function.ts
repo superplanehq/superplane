@@ -69,7 +69,7 @@ export const runFunctionMapper: ComponentBaseMapper = {
 
     let details: Record<string, string> = {
       "Request ID": stringOrDash(result.requestId),
-      "Duration": stringOrDash(result.report?.duration),
+      Duration: stringOrDash(result.report?.duration),
       "Billed Duration": stringOrDash(result.report?.billedDuration),
       "Memory Size": stringOrDash(result.report?.memorySize),
       "Max Memory Used": stringOrDash(result.report?.maxMemoryUsed),

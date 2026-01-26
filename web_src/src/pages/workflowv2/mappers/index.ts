@@ -43,10 +43,7 @@ import {
   triggerRenderers as smtpTriggerRenderers,
   eventStateRegistry as smtpEventStateRegistry,
 } from "./smtp";
-import {
-  componentMappers as awsComponentMappers,
-  triggerRenderers as awsTriggerRenderers,
-} from "./aws";
+import { componentMappers as awsComponentMappers, triggerRenderers as awsTriggerRenderers } from "./aws";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
