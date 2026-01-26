@@ -60,3 +60,13 @@ SuperPlane should be the best product in the industry. This means:
 - **Performance is non-negotiable** - Optimize aggressively for speed, efficiency, and resource usage. Users notice when things are slow. Make SuperPlane blazingly fast.
 - **Security first, always** - Security is not an afterthought. Follow security best practices, handle secrets properly, and validate inputs. Build security into every layer.
 - **Observability by design** - Make the system deeply observable with comprehensive logging, metrics, and error handling. Production issues should be trivial to diagnose.
+
+## CI Optimization
+
+To maintain developer productivity and fast feedback loops, our CI pipeline is optimized to run only necessary tests:
+
+- **Documentation-only changes** - When a PR only modifies markdown files (`.md` files or files in `docs/`), heavy test suites are skipped. Only the License Check runs to ensure the pipeline completes successfully.
+- **Fast feedback** - Documentation contributors receive quick CI results without waiting for full test suites.
+- **Resource efficiency** - Skipping unnecessary tests conserves CI resources for code changes that require them.
+
+The CI automatically detects documentation-only changes using Semaphore's `change_in()` function. This ensures developers get appropriate feedback based on the type of changes they're making.
