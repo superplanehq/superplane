@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
 
-export type LogEntryType = "success" | "error" | "warning" | "run";
+export type LogEntryType = "success" | "error" | "warning" | "resolved-error" | "run";
 export type LogScope = "runs" | "canvas";
 export type LogScopeFilter = "all" | LogScope;
 export type LogTypeFilter = Set<"success" | "error" | "warning">;
@@ -53,6 +53,7 @@ export interface CanvasLogSidebarProps {
   onClose: () => void;
   filter: LogTypeFilter;
   onFilterChange: (filter: LogTypeFilter) => void;
+  onResolveErrors?: (executionIds: string[]) => void;
   height?: number;
   defaultHeight?: number;
   minHeight?: number;
@@ -104,6 +105,7 @@ export function CanvasLogSidebar({
   counts,
   expandedRuns,
   onToggleRun,
+  onResolveErrors,
 }: CanvasLogSidebarProps) {
   const [internalHeight, setInternalHeight] = useState(defaultHeight);
   const dragStartRef = useRef<{ y: number; height: number } | null>(null);
@@ -117,6 +119,22 @@ export function CanvasLogSidebar({
     }
     return filter;
   }, [filter]);
+
+  const errorExecutionIds = useMemo(() => {
+    const ids = new Set<string>();
+    entries.forEach((entry) => {
+      if (entry.runItems?.length) {
+        entry.runItems.forEach((item) => {
+          if (item.type === "error") {
+            ids.add(item.id);
+          }
+        });
+      }
+    });
+    return Array.from(ids);
+  }, [entries]);
+
+  const canResolveErrors = Boolean(onResolveErrors) && errorExecutionIds.length > 0;
 
   const sidebarHeight = height ?? internalHeight;
   const clampHeight = useCallback(
@@ -305,9 +323,31 @@ export function CanvasLogSidebar({
               </span>
             </button>
           </div>
-          <Button variant="ghost" size="icon-sm" onClick={onClose} className="size-5 rounded hover:bg-gray-100 -mt-0.5">
-            <X className="h-3 w-3" />
-          </Button>
+          <div className="flex items-center gap-2">
+            {canResolveErrors ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (canResolveErrors) {
+                    onResolveErrors?.(errorExecutionIds);
+                  }
+                }}
+                className="h-6 px-2 text-[11px] font-medium"
+              >
+                Resolve all errors
+              </Button>
+            ) : null}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onClose}
+              className="size-5 rounded hover:bg-gray-100 -mt-0.5"
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
         </div>
         <div className="px-2 border-b border-slate-200 h-8">
           <InputGroup className="h-8 border-0 shadow-none !ring-0 !focus-within:ring-0 focus-within:ring-offset-0">
@@ -327,12 +367,13 @@ export function CanvasLogSidebar({
             <div className="px-4 py-1.5 text-[13px] text-gray-800">No logs found.</div>
           ) : (
             <div className="divide-y divide-gray-200">
-              {[...entries].reverse().map((entry) => (
+              {[...entries].map((entry) => (
                 <LogEntryRow
                   key={entry.id}
                   entry={entry}
                   isExpanded={expandedRuns.has(entry.id)}
                   onToggleRun={onToggleRun}
+                  onResolveErrors={onResolveErrors}
                 />
               ))}
             </div>
@@ -347,14 +388,17 @@ function LogEntryRow({
   entry,
   isExpanded,
   onToggleRun,
+  onResolveErrors,
 }: {
   entry: LogEntry;
   isExpanded: boolean;
   onToggleRun: (runId: string) => void;
+  onResolveErrors?: (executionIds: string[]) => void;
 }) {
   const icon = {
     success: <CircleCheck className="h-4 w-4 text-emerald-500" />,
     error: <CircleX className="h-4 w-4 text-red-500" />,
+    "resolved-error": <CircleX className="h-4 w-4 text-gray-400" />,
     warning: <TriangleAlert className="h-4 w-4 text-amber-600" />,
   } as const;
   const [isDetailExpanded, setIsDetailExpanded] = useState(false);
@@ -391,7 +435,21 @@ function LogEntryRow({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <div className="flex-1 min-w-0 text-xs font-mono mt-0.5">{item.title}</div>
+                    <div className="flex-1 min-w-0 text-xs font-mono mt-0.5 flex items-center gap-2">
+                      <span>{item.title}</span>
+                      {item.type === "error" && onResolveErrors ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onResolveErrors([item.id])}
+                          className="h-6 mb-0.5 px-2 text-[11px] font-medium"
+                        >
+                          Resolve
+                        </Button>
+                      ) : null}
+                    </div>
+
                     <span className="text-xs text-gray-500 tabular-nums whitespace-nowrap">
                       {formatLogTimestamp(item.timestamp)}
                     </span>

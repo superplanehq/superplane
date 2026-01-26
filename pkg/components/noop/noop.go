@@ -31,6 +31,20 @@ func (c *NoOp) Description() string {
 	return "Just pass events through without any additional processing"
 }
 
+func (c *NoOp) Documentation() string {
+	return `The No Operation component is a pass-through component that forwards events to downstream nodes without any modification or processing.
+
+## Use Cases
+
+- **Testing workflows**: Use this component to test workflow connections and flow without side effects
+- **Placeholder nodes**: Temporarily replace components during workflow development
+- **Event forwarding**: Simply forward events when no processing is needed
+
+## Behavior
+
+When executed, the No Operation component immediately emits the incoming event data to the default output channel without any transformation. It has no configuration options and requires no setup.`
+}
+
 func (c *NoOp) Icon() string {
 	return "circle-off"
 }

@@ -168,3 +168,41 @@ func TestFilter_Execute_NodeReferenceExpression(t *testing.T) {
 	assert.True(t, stateCtx.Finished)
 	assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
 }
+
+func TestFilter_Execute_RootAndPreviousExpressions(t *testing.T) {
+	filter := &Filter{}
+
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
+
+	ctx := core.ExecutionContext{
+		Configuration: map[string]any{
+			"expression": "root().data.ref == 'main' && previous().data.allow == true",
+		},
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
+		ExpressionEnv: func(expression string) (map[string]any, error) {
+			return map[string]any{
+				"$": map[string]any{},
+				"__root": map[string]any{
+					"data": map[string]any{
+						"ref": "main",
+					},
+				},
+				"__previousByDepth": map[string]any{
+					"1": map[string]any{
+						"data": map[string]any{
+							"allow": true,
+						},
+					},
+				},
+			}, nil
+		},
+	}
+
+	err := filter.Execute(ctx)
+	assert.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.True(t, stateCtx.Finished)
+	assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
+}

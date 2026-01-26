@@ -240,36 +240,8 @@ export const ComponentSidebar = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ChildEventsState | "all">("all");
   const [justCopied, setJustCopied] = useState(false);
-  const resolvedAutocompleteExampleObj = React.useMemo(() => {
-    if (autocompleteExampleObj) {
-      return autocompleteExampleObj;
-    }
-
-    if (!nodeId) {
-      return null;
-    }
-
-    const fallback: Record<string, unknown> = {};
-    for (const event of latestEvents) {
-      if (event.kind === "execution" && event.originalExecution?.input) {
-        fallback[nodeId] = event.originalExecution.input as Record<string, unknown>;
-        break;
-      }
-      if (event.kind === "trigger" && event.originalEvent?.data) {
-        fallback[nodeId] = event.originalEvent.data as Record<string, unknown>;
-        break;
-      }
-      if (event.originalExecution?.input) {
-        fallback[nodeId] = event.originalExecution.input as Record<string, unknown>;
-        break;
-      }
-      if (event.originalEvent?.data) {
-        fallback[nodeId] = event.originalEvent.data as Record<string, unknown>;
-        break;
-      }
-    }
-    return Object.keys(fallback).length > 0 ? fallback : null;
-  }, [autocompleteExampleObj, latestEvents, nodeId]);
+  // Use autocompleteExampleObj directly - current node is already filtered out upstream
+  const resolvedAutocompleteExampleObj = autocompleteExampleObj ?? null;
 
   const handleCopyNodeId = useCallback(async () => {
     if (nodeId) {

@@ -42,6 +42,46 @@ func (w *Webhook) Description() string {
 	return "Start a new execution chain when a webhook is called"
 }
 
+func (w *Webhook) Documentation() string {
+	return `The Webhook trigger starts a new workflow execution when an HTTP request is received at the generated webhook URL.
+
+## Use Cases
+
+- **External system integration**: Receive events from third-party services
+- **CI/CD pipelines**: Trigger workflows from build systems
+- **Form submissions**: Process data from web forms
+- **Event notifications**: Receive notifications from external applications
+
+## How It Works
+
+1. When you add a Webhook trigger to a workflow, SuperPlane generates a unique webhook URL
+2. Configure the authentication method for the webhook
+3. External systems can send HTTP requests to this URL
+4. Each request starts a new workflow execution with the request data
+
+## Authentication Methods
+
+- **Signature (HMAC)**: Verify requests using HMAC-SHA256 signature in the ` + "`X-Signature-256`" + ` header
+- **Bearer Token**: Require a Bearer token in the ` + "`Authorization`" + ` header
+- **None (unsafe)**: No authentication (not recommended for production)
+
+## Request Data
+
+The webhook payload includes:
+- **body**: Parsed request body (JSON if possible, otherwise raw data)
+- **headers**: All HTTP headers from the request
+
+## Security
+
+- Each webhook has a unique secret key for authentication
+- Secrets can be reset using the "Reset Authentication" action
+- Maximum payload size: 64KB
+
+## Example Usage
+
+Send a POST request to the webhook URL with your payload. The workflow will receive the data and start execution.`
+}
+
 func (w *Webhook) Icon() string {
 	return "webhook"
 }

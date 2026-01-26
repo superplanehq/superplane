@@ -296,11 +296,7 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		if execution.PreviousExecutionID != nil {
 			builder = builder.WithPreviousExecution(execution.PreviousExecutionID)
 		}
-		chain, err := builder.BuildMessageChainForExpression(expression)
-		if err != nil {
-			return nil, err
-		}
-		return map[string]any{"$": chain}, nil
+		return builder.BuildExpressionEnv(expression)
 	}
 
 	if node.AppInstallationID != nil {

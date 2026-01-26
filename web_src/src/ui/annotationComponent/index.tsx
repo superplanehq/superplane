@@ -84,6 +84,9 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
   // Edit mode state - when true, show textarea; when false, show rendered markdown
   const [isEditing, setIsEditing] = useState(false);
 
+  // Hover state for showing resize handles
+  const [isHovered, setIsHovered] = useState(false);
+
   // Sync dimensions when props change (e.g., after save or on initial load)
   useEffect(() => {
     setDimensions({ width: propWidth, height: propHeight });
@@ -192,157 +195,161 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
 
   return (
     <SelectionWrapper selected={selected}>
-      <NodeResizer
-        minWidth={MIN_WIDTH}
-        minHeight={MIN_HEIGHT}
-        onResize={handleResize}
-        onResizeEnd={handleResizeEnd}
-        lineClassName="!border-slate-400 !border-dashed"
-        handleClassName="!h-2 !w-2 !rounded-sm !border !border-slate-400 !bg-white"
-      />
-      <div
-        ref={containerRef}
-        style={{ width: dimensions.width, height: dimensions.height }}
-        className={cn("group relative flex flex-col rounded-md outline outline-slate-950/20", colorStyles.container)}
-      >
-        <div className={cn("canvas-node-drag-handle h-5 w-full rounded-t-md cursor-grab", colorStyles.background)}>
-          <div className="flex h-full w-full flex-col items-stretch justify-center gap-0.5 px-2">
-            <span className="h-px w-full bg-black/15" />
-            <span className="h-px w-full bg-black/15" />
-            <span className="h-px w-full bg-black/15" />
+      {/* Wrapper with padding to capture hover on resize handle area */}
+      <div className="px-2 py-1 -m-1" onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
+        <NodeResizer
+          minWidth={MIN_WIDTH}
+          minHeight={MIN_HEIGHT}
+          onResize={handleResize}
+          onResizeEnd={handleResizeEnd}
+          isVisible={isHovered || selected}
+          lineClassName="!border-slate-400 !border-dashed"
+          handleClassName="!h-2 !w-2 !rounded-sm !border !border-slate-400 !bg-white"
+        />
+        <div
+          ref={containerRef}
+          style={{ width: dimensions.width, height: dimensions.height }}
+          className={cn("group relative flex flex-col rounded-md outline outline-slate-950/20", colorStyles.container)}
+        >
+          <div className={cn("canvas-node-drag-handle h-5 w-full rounded-t-md cursor-grab", colorStyles.background)}>
+            <div className="flex h-full w-full flex-col items-stretch justify-center gap-0.5 px-2">
+              <span className="h-px w-full bg-black/15" />
+              <span className="h-px w-full bg-black/15" />
+              <span className="h-px w-full bg-black/15" />
+            </div>
           </div>
-        </div>
 
-        {!hideActionsButton && (
-          <>
-            <div className="absolute -top-12 right-0 z-10 h-12 w-44 opacity-0" />
-            <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
-              <div className="group/swatch relative flex items-center px-0.5 py-0.5">
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                  }}
-                  className={cn("h-4 w-4 rounded-full border transition", NOTE_COLORS[activeColor].dot)}
-                  aria-label={`Current note color: ${NOTE_COLORS[activeColor].label}`}
-                />
-                <div className="absolute right-0 top-1/2 hidden -translate-y-1/2 items-center gap-2 pr-0.5 group-hover/swatch:flex">
-                  {colorOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        onAnnotationUpdate?.({ color: option.value });
-                      }}
-                      className={cn("h-4 w-4 rounded-full border transition", option.dot)}
-                      aria-label={`Set note color to ${NOTE_COLORS[option.value].label}`}
-                    />
-                  ))}
-                </div>
-              </div>
-              {onDelete && (
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onDelete();
-                  }}
-                  className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                  aria-label="Delete note"
-                >
-                  <Trash2 size={16} />
-                </button>
-              )}
-            </div>
-          </>
-        )}
-
-        <div className="flex-1 overflow-hidden px-3 pb-3 relative">
-          {isEditing ? (
+          {!hideActionsButton && (
             <>
-              <textarea
-                ref={textareaRef}
-                data-note-id={noteId || undefined}
-                defaultValue={noteId ? (noteDrafts.get(noteId) ?? annotationText) : annotationText}
-                onInput={(event) => {
-                  const value = (event.target as HTMLTextAreaElement).value;
-                  if (noteId) {
-                    noteDrafts.set(noteId, value);
-                    setActiveNoteId(noteId);
-                  }
-                  if (onAnnotationUpdate) {
-                    onAnnotationUpdate({ text: value });
-                  }
-                }}
-                onBlur={() => {
-                  handleTextCommit();
-                  // Only exit edit mode if the blur was caused by clicking outside the container
-                  // This prevents exiting edit mode when component re-renders during auto-save
-                  if (lastPointerDownOutsideRef.current) {
-                    exitEditMode();
-                  } else {
-                    // Restore focus if blur wasn't from clicking outside
-                    requestAnimationFrame(() => textareaRef.current?.focus());
-                  }
-                }}
-                onFocus={() => {
-                  if (noteId) {
-                    setActiveNoteId(noteId);
-                  }
-                  lastPointerDownOutsideRef.current = false;
-                }}
-                onKeyDown={handleKeyDown}
-                className={cn(
-                  "nodrag h-full w-full resize-none bg-transparent outline-none",
-                  textStyles,
-                  "placeholder:text-black/50",
+              <div className="absolute -top-12 right-0 z-10 h-12 w-44 opacity-0" />
+              <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
+                <div className="group/swatch relative flex items-center px-0.5 py-0.5">
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                    className={cn("h-4 w-4 rounded-full border transition", NOTE_COLORS[activeColor].dot)}
+                    aria-label={`Current note color: ${NOTE_COLORS[activeColor].label}`}
+                  />
+                  <div className="absolute right-0 top-1/2 hidden -translate-y-1/2 items-center gap-2 pr-0.5 group-hover/swatch:flex">
+                    {colorOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          onAnnotationUpdate?.({ color: option.value });
+                        }}
+                        className={cn("h-4 w-4 rounded-full border transition", option.dot)}
+                        aria-label={`Set note color to ${NOTE_COLORS[option.value].label}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+                {onDelete && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onDelete();
+                    }}
+                    className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                    aria-label="Delete note"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 )}
-                placeholder="Start typing..."
-                aria-label={`${title} note`}
-              />
-              <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/5 text-[10px] text-black/40 pointer-events-none select-none">
-                Markdown supported
-              </span>
+              </div>
             </>
-          ) : (
-            <div
-              className={cn("nodrag h-full w-full overflow-auto cursor-text text-left", textStyles)}
-              onDoubleClick={handleDoubleClick}
-            >
-              {annotationText ? (
-                <ReactMarkdown
-                  components={{
-                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                    ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
-                    ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
-                    li: ({ children }) => <li className="mb-1">{children}</li>,
-                    h1: ({ children }) => <h1 className="text-base font-bold mb-2">{children}</h1>,
-                    h2: ({ children }) => <h2 className="text-sm font-bold mb-2">{children}</h2>,
-                    h3: ({ children }) => <h3 className="text-sm font-semibold mb-1">{children}</h3>,
-                    code: ({ children }) => <code className="bg-black/10 px-1 rounded text-xs">{children}</code>,
-                    pre: ({ children }) => (
-                      <pre className="bg-black/10 p-2 rounded text-xs overflow-auto mb-2">{children}</pre>
-                    ),
-                    a: ({ children, href }) => (
-                      <a href={href} className="underline text-blue-600">
-                        {children}
-                      </a>
-                    ),
-                    strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                    em: ({ children }) => <em className="italic">{children}</em>,
-                  }}
-                >
-                  {annotationText}
-                </ReactMarkdown>
-              ) : (
-                <span className="text-black/50">Double click to add and edit notes...</span>
-              )}
-            </div>
           )}
+
+          <div className="flex-1 overflow-hidden px-3 pb-3 relative">
+            {isEditing ? (
+              <>
+                <textarea
+                  ref={textareaRef}
+                  data-note-id={noteId || undefined}
+                  defaultValue={noteId ? (noteDrafts.get(noteId) ?? annotationText) : annotationText}
+                  onInput={(event) => {
+                    const value = (event.target as HTMLTextAreaElement).value;
+                    if (noteId) {
+                      noteDrafts.set(noteId, value);
+                      setActiveNoteId(noteId);
+                    }
+                    if (onAnnotationUpdate) {
+                      onAnnotationUpdate({ text: value });
+                    }
+                  }}
+                  onBlur={() => {
+                    handleTextCommit();
+                    // Only exit edit mode if the blur was caused by clicking outside the container
+                    // This prevents exiting edit mode when component re-renders during auto-save
+                    if (lastPointerDownOutsideRef.current) {
+                      exitEditMode();
+                    } else {
+                      // Restore focus if blur wasn't from clicking outside
+                      requestAnimationFrame(() => textareaRef.current?.focus());
+                    }
+                  }}
+                  onFocus={() => {
+                    if (noteId) {
+                      setActiveNoteId(noteId);
+                    }
+                    lastPointerDownOutsideRef.current = false;
+                  }}
+                  onKeyDown={handleKeyDown}
+                  className={cn(
+                    "nodrag h-full w-full resize-none bg-transparent outline-none",
+                    textStyles,
+                    "placeholder:text-black/50",
+                  )}
+                  placeholder="Start typing..."
+                  aria-label={`${title} note`}
+                />
+                <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/5 text-[10px] text-black/40 pointer-events-none select-none">
+                  Markdown supported
+                </span>
+              </>
+            ) : (
+              <div
+                className={cn("nodrag h-full w-full overflow-auto cursor-text text-left", textStyles)}
+                onDoubleClick={handleDoubleClick}
+              >
+                {annotationText ? (
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                      ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
+                      li: ({ children }) => <li className="mb-1">{children}</li>,
+                      h1: ({ children }) => <h1 className="text-base font-bold mb-2">{children}</h1>,
+                      h2: ({ children }) => <h2 className="text-sm font-bold mb-2">{children}</h2>,
+                      h3: ({ children }) => <h3 className="text-sm font-semibold mb-1">{children}</h3>,
+                      code: ({ children }) => <code className="bg-black/10 px-1 rounded text-xs">{children}</code>,
+                      pre: ({ children }) => (
+                        <pre className="bg-black/10 p-2 rounded text-xs overflow-auto mb-2">{children}</pre>
+                      ),
+                      a: ({ children, href }) => (
+                        <a href={href} className="underline text-blue-600">
+                          {children}
+                        </a>
+                      ),
+                      strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                      em: ({ children }) => <em className="italic">{children}</em>,
+                    }}
+                  >
+                    {annotationText}
+                  </ReactMarkdown>
+                ) : (
+                  <span className="text-black/50">Double click to add and edit notes...</span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </SelectionWrapper>

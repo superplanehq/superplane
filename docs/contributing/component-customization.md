@@ -40,7 +40,7 @@ The main registry file `web_src/src/pages/workflowv2/mappers/index.ts` manages 6
 ### 1. Component Base Mappers (`componentBaseMappers`)
 **Location:** `web_src/src/pages/workflowv2/mappers/index.ts` lines 35-44
 **Purpose:** Maps component rendering logic and properties.
-**Current registrations:** noop, if, http, semaphore, time_gate, filter, wait, approval
+**Current registrations:** noop, if, http, semaphore, timeGate, filter, wait, approval
 
 ```typescript
 const componentBaseMappers: Record<string, ComponentBaseMapper> = {
@@ -48,7 +48,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   if: ifMapper,                  // from ./if.ts
   http: httpMapper,              // from ./http.ts
   semaphore: oldSemaphoreMapper, // from ./semaphore.ts
-  time_gate: timeGateMapper,     // from ./timegate.ts
+  timeGate: timeGateMapper,      // from ./timegate.ts
   filter: filterMapper,          // from ./filter.ts
   wait: waitMapper,              // from ./wait.tsx
   approval: approvalMapper,      // from ./approval.ts

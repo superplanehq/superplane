@@ -6,6 +6,10 @@ import (
 	"github.com/ghodss/yaml"
 )
 
+const (
+	APIVersion = "v1"
+)
+
 // returns tuple (apiVersion, kind, error)
 func ParseYamlResourceHeaders(raw []byte) (string, string, error) {
 	m := make(map[string]interface{})

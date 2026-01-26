@@ -123,7 +123,7 @@ func (s *ComponentSteps) AddWait(name string, pos models.Position, duration int,
 func (s *ComponentSteps) StartAddingTimeGate(name string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 
-	source := q.TestID("building-block-time_gate")
+	source := q.TestID("building-block-timeGate")
 	target := q.TestID("rf__wrapper")
 
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
@@ -135,19 +135,15 @@ func (s *ComponentSteps) StartAddingTimeGate(name string, pos models.Position) {
 func (s *ComponentSteps) AddTimeGate(name string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 
-	source := q.TestID("building-block-time_gate")
+	source := q.TestID("building-block-timeGate")
 	target := q.TestID("rf__wrapper")
 
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(300)
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
-
-	s.session.Click(q.TestID("field-mode-select"))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("Exclude Range")`))
-
-	s.session.FillIn(q.Locator("input[data-testid='time-field-starttime']"), "00:00")
-	s.session.FillIn(q.Locator("input[data-testid='time-field-endtime']"), "23:59")
+	s.session.FillIn(q.TestID("time-field-timerange-start"), "00:00")
+	s.session.FillIn(q.TestID("time-field-timerange-end"), "23:59")
 
 	s.session.Click(q.TestID("field-timezone-select"))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("GMT+0 (London, Dublin, UTC)")`))

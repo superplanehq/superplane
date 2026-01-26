@@ -30,10 +30,21 @@ async function main() {
   const buildRoot = path.join(repoRoot, `build/superplane-single-host-tarball-${version}`);
   const artifactPath = path.join(buildRoot, "superplane-single-host.tar.gz");
   const assetName = "superplane-single-host.tar.gz";
+  const sbomPath = path.join(buildRoot, "superplane-sbom.json");
+  const sbomAssetName = "superplane-sbom.json";
+  const cliAssetsDir = path.join(repoRoot, "release/cli");
+  const cliAssetPrefix = `superplane-cli-${version}-`;
 
   if (!fs.existsSync(artifactPath)) {
     console.error(
       `Error: ${artifactPath} does not exist. Run release/superplane-single-host-tarball/build.sh ${version} first.`
+    );
+    process.exit(1);
+  }
+
+  if (!fs.existsSync(sbomPath)) {
+    console.error(
+      `Error: ${sbomPath} does not exist. Run release/generate-sbom.sh ${version} first.`
     );
     process.exit(1);
   }
@@ -92,9 +103,66 @@ async function main() {
   }
 
   console.log(`* Release created successfully (id: ${releaseId})`);
-  console.log(`* Uploading asset ${assetName} from ${artifactPath}`);
 
-  const assetBuffer = fs.readFileSync(artifactPath);
+  await uploadAsset({
+    repository,
+    releaseId,
+    token,
+    userAgent,
+    apiVersion,
+    assetName,
+    assetPath: artifactPath,
+  });
+
+  await uploadAsset({
+    repository,
+    releaseId,
+    token,
+    userAgent,
+    apiVersion,
+    assetName: sbomAssetName,
+    assetPath: sbomPath,
+  });
+
+  const cliAssets = fs
+    .readdirSync(cliAssetsDir)
+    .filter((name) => name.startsWith(cliAssetPrefix))
+    .map((name) => ({
+      assetName: name,
+      assetPath: path.join(cliAssetsDir, name),
+    }));
+
+  for (const cliAsset of cliAssets) {
+    await uploadAsset({
+      repository,
+      releaseId,
+      token,
+      userAgent,
+      apiVersion,
+      assetName: cliAsset.assetName,
+      assetPath: cliAsset.assetPath,
+    });
+  }
+  console.log("Done.");
+}
+
+async function uploadAsset({
+  repository,
+  releaseId,
+  token,
+  userAgent,
+  apiVersion,
+  assetName,
+  assetPath,
+}) {
+  if (!fs.existsSync(assetPath)) {
+    console.error(`Error: ${assetPath} does not exist.`);
+    process.exit(1);
+  }
+
+  console.log(`* Uploading asset ${assetName} from ${assetPath}`);
+
+  const assetBuffer = fs.readFileSync(assetPath);
 
   const uploadResponse = await requestJson(
     {
@@ -117,14 +185,13 @@ async function main() {
 
   if (uploadResponse.statusCode !== 201) {
     console.error(
-      `Error: Failed to upload asset (HTTP ${uploadResponse.statusCode}). Response:`
+      `Error: Failed to upload asset ${assetName} (HTTP ${uploadResponse.statusCode}). Response:`
     );
     console.error(uploadResponse.body);
     process.exit(1);
   }
 
   console.log(`* ${assetName} uploaded successfully`);
-  console.log("Done.");
 }
 
 function requestJson(options, body) {

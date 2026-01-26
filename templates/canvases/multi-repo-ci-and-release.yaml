@@ -1,0 +1,368 @@
+metadata:
+  name: "Multi-repo CI and release"
+  description: "Coordinate releases across multiple repositories with unified CI builds and deployments."
+  isTemplate: false
+spec:
+  nodes:
+    - id: "github-onrelease-github-onrelease-ljbrv2"
+      name: "Listen for new releases of Front"
+      type: "TYPE_TRIGGER"
+      configuration:
+        actions:
+          - "published"
+        repository: "front"
+      metadata:
+        repository:
+          id: 1046187813
+          name: "front"
+          url: "https://github.com/puppies-inc/front"
+      position:
+        x: 1925
+        "y": 257
+      component: null
+      blueprint: null
+      trigger:
+        name: "github.onRelease"
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "github-onrelease-github-onrelease-utjyd2"
+      name: "Listen for new releases of Billing"
+      type: "TYPE_TRIGGER"
+      configuration:
+        actions:
+          - "published"
+        repository: "billing"
+      metadata:
+        repository:
+          id: 1046188190
+          name: "billing"
+          url: "https://github.com/puppies-inc/billing"
+      position:
+        x: 1928
+        "y": 558
+      component: null
+      blueprint: null
+      trigger:
+        name: "github.onRelease"
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "github-onrelease-github-onrelease-ayop2u"
+      name: "Listen for new releases of App"
+      type: "TYPE_TRIGGER"
+      configuration:
+        actions:
+          - "published"
+        repository: "monarch-app"
+      metadata:
+        repository:
+          id: 1059283987
+          name: "monarch-app"
+          url: "https://github.com/puppies-inc/monarch-app"
+      position:
+        x: 1932
+        "y": 866
+      component: null
+      blueprint: null
+      trigger:
+        name: "github.onRelease"
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "github-runworkflow-github-runworkflow-lduxm8"
+      name: "Build Docker Image - Front"
+      type: "TYPE_COMPONENT"
+      configuration:
+        inputs:
+          - name: "service"
+            value: "{{ root().data.repository.full_name }}"
+          - name: "Release"
+            value: "{{ root().data.release.name }}"
+          - name: "Tag"
+            value: "{{ root().data.release.tag_name }}"
+        ref: "main"
+        repository: "puppy-describer"
+        workflowFile: ".github/workflows/build.yml"
+      metadata:
+        repository:
+          id: 1046188046
+          name: "puppy-describer"
+          url: "https://github.com/puppies-inc/puppy-describer"
+      position:
+        x: 2528
+        "y": 254
+      component:
+        name: "github.runWorkflow"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "github-runworkflow-build-docker-image-8vfqh4"
+      name: "Build Docker Image - Billing"
+      type: "TYPE_COMPONENT"
+      configuration:
+        inputs:
+          - name: "service"
+            value: "{{ root().data.repository.full_name }}"
+          - name: "Release"
+            value: "{{ root().data.release.name }}"
+          - name: "Tag"
+            value: "{{ root().data.release.tag_name }}"
+        ref: "main"
+        repository: "puppy-describer"
+        workflowFile: ".github/workflows/build.yml"
+      metadata:
+        repository:
+          id: 1046188046
+          name: "puppy-describer"
+          url: "https://github.com/puppies-inc/puppy-describer"
+      position:
+        x: 2530
+        "y": 557
+      component:
+        name: "github.runWorkflow"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "github-runworkflow-build-docker-image-obpokg"
+      name: "Build Docker Image - App"
+      type: "TYPE_COMPONENT"
+      configuration:
+        inputs:
+          - name: "service"
+            value: "{{ root().data.repository.full_name }}"
+          - name: "Release"
+            value: "{{ root().data.release.name }}"
+          - name: "Tag"
+            value: "{{ root().data.release.tag_name }}"
+        ref: "main"
+        repository: "puppy-describer"
+        workflowFile: ".github/workflows/build.yml"
+      metadata:
+        repository:
+          id: 1046188046
+          name: "puppy-describer"
+          url: "https://github.com/puppies-inc/puppy-describer"
+      position:
+        x: 2530
+        "y": 866
+      component:
+        name: "github.runWorkflow"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "slack-sendtextmessage-slack-sendtextmessage-pgdv24"
+      name: "Slack: Send alert that build failed"
+      type: "TYPE_COMPONENT"
+      configuration:
+        channel: "C09AJT3BF1Q"
+        text: "Your CI for {{ root().data.repository.full_name }} release: {{ root().data.release.name }} has failed. \n\nCheck workflow here {{previous().data.workflow_run.html_url}}"
+      metadata:
+        channel:
+          id: "C09AJT3BF1Q"
+          name: "all-efod-test-org"
+      position:
+        x: 3241
+        "y": 741
+      component:
+        name: "slack.sendTextMessage"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: true
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "component-node-r7stbz"
+      name: "Slack: Notify on successful deployment"
+      type: "TYPE_COMPONENT"
+      configuration:
+        channel: "C09AJT3BF1Q"
+        text: "Deployment of the {{ root().data.repository.full_name }} - {{ root().data.release.name }} was successful!"
+      metadata:
+        channel:
+          id: "C09AJT3BF1Q"
+          name: "all-efod-test-org"
+      position:
+        x: 3832
+        "y": 438
+      component:
+        name: "slack.sendTextMessage"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: true
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "component-node-lkrxcj"
+      name: "PD: Open Incident if Deploy fails"
+      type: "TYPE_COMPONENT"
+      configuration:
+        description: "Deployment of the service {{ root().data.repository.full_name}} has failed."
+        service: "PQEAM2I"
+        title: "Deployment Failed"
+        urgency: "high"
+      metadata:
+        service:
+          html_url: "https://superplane-test.eu.pagerduty.com/service-directory/PQEAM2I"
+          id: "PQEAM2I"
+          name: "Default Service"
+      position:
+        x: 3829
+        "y": 610
+      component:
+        name: "pagerduty.createIncident"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: true
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "github-runworkflow-github-runworkflow-wy2088"
+      name: "Roll out to Kubernetes"
+      type: "TYPE_COMPONENT"
+      configuration:
+        inputs:
+          - name: "service"
+            value: "{{ root().data.repository.full_name }}"
+          - name: "Release"
+            value: "{{ root().data.release.name }}"
+          - name: "Tag"
+            value: "{{ root().data.release.tag_name }}"
+        ref: "main"
+        repository: "terraform"
+        workflowFile: ".github/workflows/deploy.yml"
+      metadata:
+        repository:
+          id: 1046227550
+          name: "terraform"
+          url: "https://github.com/puppies-inc/terraform"
+      position:
+        x: 3239
+        "y": 406
+      component:
+        name: "github.runWorkflow"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "annotation-annotation-cvxv7j"
+      name: "annotation"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 272
+        text: "## Multi-repo release triggers\n\nThis Canvas listens for new releases published across three different repositories: **Front**, **Billing**, and **App**.\n\nWhen any of these repositories publishes a release, the corresponding CI workflow is triggered.\n\n\n### To set up\n1. Click each trigger node to open the sidebar configuration.\n2. Connect your GitHub account.\n3. Select the repositories you want to monitor for releases."
+        width: 416
+      metadata: null
+      position:
+        x: 1904
+        "y": -114
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "annotation-annotation2-561f8l"
+      name: "annotation2"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 273
+        text: "### CI builds per repository\n\nEach release triggers a separate CI workflow to build the Docker image for that service.\n\nThis pattern uses one build node per repository, but depending on how your CI is organized, you could consolidate into a single workflow that handles all repositories.\n\nThe build workflows receive parameters like service name, release name, and tag from the release event payload."
+        width: 353
+      metadata: null
+      position:
+        x: 2525
+        "y": -124
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "annotation-annotation3-pau27b"
+      name: "annotation3"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 212
+        text: "### Unified deployment and notifications\n\nA single deployment workflow handles all services, using parameters to identify which service and release to deploy.\n\nThese parameters are collected from **event payloads** emitted by upstream components.\n\nThe Slack notifications also use payload data to construct messages dynamically.\n\nBy using **root()** and **previous()** selectors instead of referencing individual nodes, the workflow automatically uses data from whichever repository triggered the release—no need to duplicate logic for each service."
+        width: 954
+      metadata: null
+      position:
+        x: 3246
+        "y": 122
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+  edges:
+    - sourceId: "github-onrelease-github-onrelease-ljbrv2"
+      targetId: "github-runworkflow-github-runworkflow-lduxm8"
+      channel: "default"
+    - sourceId: "github-onrelease-github-onrelease-utjyd2"
+      targetId: "github-runworkflow-build-docker-image-8vfqh4"
+      channel: "default"
+    - sourceId: "github-onrelease-github-onrelease-ayop2u"
+      targetId: "github-runworkflow-build-docker-image-obpokg"
+      channel: "default"
+    - sourceId: "github-runworkflow-github-runworkflow-lduxm8"
+      targetId: "slack-sendtextmessage-slack-sendtextmessage-pgdv24"
+      channel: "failed"
+    - sourceId: "github-runworkflow-build-docker-image-8vfqh4"
+      targetId: "slack-sendtextmessage-slack-sendtextmessage-pgdv24"
+      channel: "failed"
+    - sourceId: "github-runworkflow-build-docker-image-obpokg"
+      targetId: "slack-sendtextmessage-slack-sendtextmessage-pgdv24"
+      channel: "failed"
+    - sourceId: "github-runworkflow-github-runworkflow-lduxm8"
+      targetId: "github-runworkflow-github-runworkflow-wy2088"
+      channel: "passed"
+    - sourceId: "github-runworkflow-build-docker-image-8vfqh4"
+      targetId: "github-runworkflow-github-runworkflow-wy2088"
+      channel: "passed"
+    - sourceId: "github-runworkflow-build-docker-image-obpokg"
+      targetId: "github-runworkflow-github-runworkflow-wy2088"
+      channel: "passed"
+    - sourceId: "github-runworkflow-github-runworkflow-wy2088"
+      targetId: "component-node-r7stbz"
+      channel: "passed"
+    - sourceId: "github-runworkflow-github-runworkflow-wy2088"
+      targetId: "component-node-lkrxcj"
+      channel: "failed"

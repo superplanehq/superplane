@@ -130,6 +130,7 @@ export type ComponentsNode = {
   isCollapsed?: boolean;
   appInstallation?: ComponentsAppInstallationRef;
   errorMessage?: string;
+  warningMessage?: string;
 };
 
 export type ComponentsNodeType = "TYPE_COMPONENT" | "TYPE_BLUEPRINT" | "TYPE_TRIGGER" | "TYPE_WIDGET";
@@ -780,7 +781,10 @@ export type WidgetsWidget = {
 
 export type WorkflowNodeExecutionResult = "RESULT_UNKNOWN" | "RESULT_PASSED" | "RESULT_FAILED" | "RESULT_CANCELLED";
 
-export type WorkflowNodeExecutionResultReason = "RESULT_REASON_OK" | "RESULT_REASON_ERROR";
+export type WorkflowNodeExecutionResultReason =
+  | "RESULT_REASON_OK"
+  | "RESULT_REASON_ERROR"
+  | "RESULT_REASON_ERROR_RESOLVED";
 
 export type WorkflowNodeExecutionState = "STATE_UNKNOWN" | "STATE_PENDING" | "STATE_STARTED" | "STATE_FINISHED";
 
@@ -887,6 +891,14 @@ export type WorkflowsListWorkflowEventsResponse = {
 
 export type WorkflowsListWorkflowsResponse = {
   workflows?: Array<WorkflowsWorkflow>;
+};
+
+export type WorkflowsResolveExecutionErrorsBody = {
+  executionIds?: Array<string>;
+};
+
+export type WorkflowsResolveExecutionErrorsResponse = {
+  [key: string]: unknown;
 };
 
 export type WorkflowsUpdateWorkflowBody = {
@@ -2735,6 +2747,35 @@ export type WorkflowsListEventExecutionsResponses = {
 
 export type WorkflowsListEventExecutionsResponse2 =
   WorkflowsListEventExecutionsResponses[keyof WorkflowsListEventExecutionsResponses];
+
+export type WorkflowsResolveExecutionErrorsData = {
+  body: WorkflowsResolveExecutionErrorsBody;
+  path: {
+    workflowId: string;
+  };
+  query?: never;
+  url: "/api/v1/workflows/{workflowId}/executions/resolve";
+};
+
+export type WorkflowsResolveExecutionErrorsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type WorkflowsResolveExecutionErrorsError =
+  WorkflowsResolveExecutionErrorsErrors[keyof WorkflowsResolveExecutionErrorsErrors];
+
+export type WorkflowsResolveExecutionErrorsResponses = {
+  /**
+   * A successful response.
+   */
+  200: WorkflowsResolveExecutionErrorsResponse;
+};
+
+export type WorkflowsResolveExecutionErrorsResponse2 =
+  WorkflowsResolveExecutionErrorsResponses[keyof WorkflowsResolveExecutionErrorsResponses];
 
 export type WorkflowsInvokeNodeExecutionActionData = {
   body: WorkflowsInvokeNodeExecutionActionBody;

@@ -3,6 +3,9 @@ package contexts
 import (
 	"fmt"
 	"regexp"
+	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/expr-lang/expr"
@@ -15,6 +18,7 @@ import (
 )
 
 var expressionRegex = regexp.MustCompile(`\{\{(.*?)\}\}`)
+var previousDepthRegex = regexp.MustCompile(`\bprevious\s*\(([^)]*)\)`)
 
 type NodeConfigurationBuilder struct {
 	tx                  *gorm.DB
@@ -243,6 +247,41 @@ func (b *NodeConfigurationBuilder) BuildMessageChainForExpression(expression str
 	return b.buildMessageChain(referencedNodes)
 }
 
+func (b *NodeConfigurationBuilder) BuildExpressionEnv(expression string) (map[string]any, error) {
+	messageChain, err := b.BuildMessageChainForExpression(expression)
+	if err != nil {
+		return nil, err
+	}
+
+	env := map[string]any{"$": messageChain}
+
+	if strings.Contains(expression, "root(") {
+		rootPayload, err := b.resolveRootPayload()
+		if err != nil {
+			return nil, err
+		}
+		env["__root"] = rootPayload
+	}
+
+	depths, err := parsePreviousDepths(expression)
+	if err != nil {
+		return nil, err
+	}
+	if len(depths) > 0 {
+		previousByDepth := make(map[string]any, len(depths))
+		for _, depth := range depths {
+			payload, err := b.resolvePreviousPayload(depth)
+			if err != nil {
+				return nil, err
+			}
+			previousByDepth[strconv.Itoa(depth)] = payload
+		}
+		env["__previousByDepth"] = previousByDepth
+	}
+
+	return env, nil
+}
+
 func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, error) {
 	referencedNodes, err := parseReferencedNodes(expression)
 	if err != nil {
@@ -265,6 +304,28 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 		expr.AsAny(),
 		expr.WithContext("ctx"),
 		expr.Timezone(time.UTC.String()),
+		expr.Function("root", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("root() takes no arguments")
+			}
+
+			return b.resolveRootPayload()
+		}),
+		expr.Function("previous", func(params ...any) (any, error) {
+			depth := 1
+			if len(params) > 1 {
+				return nil, fmt.Errorf("previous() accepts zero or one argument")
+			}
+			if len(params) == 1 {
+				parsedDepth, err := parseDepth(params[0])
+				if err != nil {
+					return nil, err
+				}
+				depth = parsedDepth
+			}
+
+			return b.resolvePreviousPayload(depth)
+		}),
 	}
 
 	vm, err := expr.Compile(expression, exprOptions...)
@@ -291,17 +352,30 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 		return messageChain, nil
 	}
 
-	unresolved := unresolvedNodeRefs(referencedNodes, messageChain)
-	if len(unresolved) == 0 {
-		return messageChain, nil
-	}
-
-	refToNodeID, err := b.resolveNodeRefs(unresolved)
+	// Fetch root event early - needed for both chain resolution and data population
+	rootEvent, err := b.fetchRootEvent()
 	if err != nil {
 		return nil, err
 	}
 
-	rootEvent, err := b.fetchRootEvent()
+	// Get execution chain first to help resolve ambiguous names
+	var executionChainNodeIDs []string
+	if b.previousExecutionID != nil {
+		executionsInChain, err := b.listExecutionsInChain()
+		if err != nil {
+			return nil, err
+		}
+		for _, execution := range executionsInChain {
+			executionChainNodeIDs = append(executionChainNodeIDs, execution.NodeID)
+		}
+	}
+
+	// Also include the root event's node (triggers don't create executions)
+	if rootEvent != nil && rootEvent.NodeID != "" {
+		executionChainNodeIDs = append(executionChainNodeIDs, rootEvent.NodeID)
+	}
+
+	refToNodeID, err := b.resolveNodeRefs(referencedNodes, executionChainNodeIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -313,7 +387,7 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 	}
 
 	if b.previousExecutionID == nil {
-		return nil, fmt.Errorf("node %s not found in execution chain", unresolved[0])
+		return nil, fmt.Errorf("node name %s not found in execution chain", firstChainRef(chainRefs))
 	}
 
 	err = b.populateFromExecutions(messageChain, chainRefs)
@@ -322,6 +396,13 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 	}
 
 	return messageChain, nil
+}
+
+func firstChainRef(chainRefs map[string]string) string {
+	for nodeRef := range chainRefs {
+		return nodeRef
+	}
+	return ""
 }
 
 func extractInputMap(input any) map[string]any {
@@ -333,36 +414,70 @@ func extractInputMap(input any) map[string]any {
 	return inputMap
 }
 
-func unresolvedNodeRefs(referencedNodes []string, messageChain map[string]any) []string {
-	unresolved := make([]string, 0, len(referencedNodes))
-	for _, nodeRef := range referencedNodes {
-		if _, ok := messageChain[nodeRef]; !ok {
-			unresolved = append(unresolved, nodeRef)
-		}
-	}
-
-	return unresolved
-}
-
-func (b *NodeConfigurationBuilder) resolveNodeRefs(nodeRefs []string) (map[string]string, error) {
+func (b *NodeConfigurationBuilder) resolveNodeRefs(nodeRefs []string, executionChainNodeIDs []string) (map[string]string, error) {
 	nodes, err := models.FindWorkflowNodesInTransaction(b.tx, b.workflowID)
 	if err != nil {
 		return nil, err
 	}
 
-	nodeIDs := make(map[string]struct{}, len(nodes))
+	nameToNodeID := make(map[string]string, len(nodes))
+	ambiguousNames := make(map[string][]string) // name -> list of node IDs with that name
 	for _, node := range nodes {
-		nodeIDs[node.NodeID] = struct{}{}
+		if node.Name == "" {
+			continue
+		}
+
+		if nodeIDs, ok := ambiguousNames[node.Name]; ok {
+			ambiguousNames[node.Name] = append(nodeIDs, node.NodeID)
+			continue
+		}
+
+		if existing, ok := nameToNodeID[node.Name]; ok {
+			if existing != node.NodeID {
+				delete(nameToNodeID, node.Name)
+				ambiguousNames[node.Name] = []string{existing, node.NodeID}
+			}
+			continue
+		}
+
+		nameToNodeID[node.Name] = node.NodeID
+	}
+
+	// Build a map of node ID to its position in the execution chain (lower = closer)
+	executionChainOrder := make(map[string]int, len(executionChainNodeIDs))
+	for i, nodeID := range executionChainNodeIDs {
+		executionChainOrder[nodeID] = i
 	}
 
 	refToNodeID := make(map[string]string, len(nodeRefs))
 	for _, nodeRef := range nodeRefs {
-		if _, ok := nodeIDs[nodeRef]; ok {
-			refToNodeID[nodeRef] = nodeRef
+		if nodeID, ok := nameToNodeID[nodeRef]; ok {
+			refToNodeID[nodeRef] = nodeID
 			continue
 		}
 
-		return nil, fmt.Errorf("node %s not found in execution chain", nodeRef)
+		if nodeIDs, ok := ambiguousNames[nodeRef]; ok {
+			// Find the closest node in the execution chain
+			closestNodeID := ""
+			closestOrder := -1
+			for _, nodeID := range nodeIDs {
+				if order, inChain := executionChainOrder[nodeID]; inChain {
+					if closestOrder == -1 || order < closestOrder {
+						closestOrder = order
+						closestNodeID = nodeID
+					}
+				}
+			}
+
+			if closestNodeID != "" {
+				refToNodeID[nodeRef] = closestNodeID
+				continue
+			}
+
+			return nil, fmt.Errorf("node name %s is not unique and none of the matching nodes are in the execution chain", nodeRef)
+		}
+
+		return nil, fmt.Errorf("node name %s not found in execution chain", nodeRef)
 	}
 
 	return refToNodeID, nil
@@ -379,6 +494,18 @@ func (b *NodeConfigurationBuilder) fetchRootEvent() (*models.WorkflowEvent, erro
 	}
 
 	return rootEvent, nil
+}
+
+func (b *NodeConfigurationBuilder) resolveRootPayload() (any, error) {
+	rootEvent, err := b.fetchRootEvent()
+	if err != nil {
+		return nil, err
+	}
+	if rootEvent == nil {
+		return nil, fmt.Errorf("no root event found")
+	}
+
+	return rootEvent.Data.Data(), nil
 }
 
 func populateFromInputOrRoot(messageChain map[string]any, inputMap map[string]any, rootEvent *models.WorkflowEvent, refToNodeID map[string]string) map[string]string {
@@ -463,6 +590,177 @@ func latestEventByExecution(events []models.WorkflowEvent, executionIDs []uuid.U
 	}
 
 	return latestByExecution
+}
+
+func parsePreviousDepths(expression string) ([]int, error) {
+	matches := previousDepthRegex.FindAllStringSubmatch(expression, -1)
+	if len(matches) == 0 {
+		return nil, nil
+	}
+
+	seen := map[int]struct{}{}
+	for _, match := range matches {
+		raw := strings.TrimSpace(match[1])
+		if raw == "" {
+			seen[1] = struct{}{}
+			continue
+		}
+
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			return nil, fmt.Errorf("depth must be an integer")
+		}
+		if parsed < 1 {
+			return nil, fmt.Errorf("depth must be >= 1")
+		}
+		seen[parsed] = struct{}{}
+	}
+
+	depths := make([]int, 0, len(seen))
+	for depth := range seen {
+		depths = append(depths, depth)
+	}
+	sort.Ints(depths)
+	return depths, nil
+}
+
+func parseDepth(param any) (int, error) {
+	switch value := param.(type) {
+	case int:
+		if value < 1 {
+			return 0, fmt.Errorf("depth must be >= 1")
+		}
+		return value, nil
+	case int64:
+		if value < 1 {
+			return 0, fmt.Errorf("depth must be >= 1")
+		}
+		return int(value), nil
+	case float64:
+		parsed := int(value)
+		if value != float64(parsed) {
+			return 0, fmt.Errorf("depth must be an integer")
+		}
+		if parsed < 1 {
+			return 0, fmt.Errorf("depth must be >= 1")
+		}
+		return parsed, nil
+	default:
+		return 0, fmt.Errorf("depth must be an integer")
+	}
+}
+
+func (b *NodeConfigurationBuilder) resolvePreviousPayload(depth int) (any, error) {
+	if depth < 1 {
+		return nil, fmt.Errorf("depth must be >= 1")
+	}
+
+	inputPayload, hasInput, err := b.singleInputPayload()
+	if err != nil {
+		return nil, err
+	}
+	step := 0
+	if hasInput {
+		step++
+		if step >= depth && inputPayload != nil {
+			return inputPayload, nil
+		}
+	}
+
+	step, payload, err := b.resolveFromExecutions(depth, step, hasInput)
+	if err != nil {
+		return nil, err
+	}
+	if payload != nil {
+		return payload, nil
+	}
+
+	return b.resolveFromRoot(depth, step)
+}
+
+func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, hasInput bool) (int, any, error) {
+	if b.previousExecutionID == nil {
+		return step, nil, nil
+	}
+
+	executionsInChain, err := b.listExecutionsInChain()
+	if err != nil {
+		return step, nil, err
+	}
+	if len(executionsInChain) == 0 {
+		return step, nil, nil
+	}
+
+	startIndex := 0
+	if hasInput {
+		startIndex = 1
+	}
+
+	executionIDs := make([]uuid.UUID, 0, len(executionsInChain))
+	for _, execution := range executionsInChain {
+		executionIDs = append(executionIDs, execution.ID)
+	}
+
+	events, err := models.ListWorkflowEventsForExecutionsInTransaction(b.tx, executionIDs)
+	if err != nil {
+		return step, nil, err
+	}
+
+	latestByExecution := latestEventByExecution(events, executionIDs)
+	for _, execution := range executionsInChain[startIndex:] {
+		step++
+		if step < depth {
+			continue
+		}
+
+		event, exists := latestByExecution[execution.ID]
+		if !exists {
+			continue
+		}
+
+		if payload := event.Data.Data(); payload != nil {
+			return step, payload, nil
+		}
+	}
+
+	return step, nil, nil
+}
+
+func (b *NodeConfigurationBuilder) resolveFromRoot(depth int, step int) (any, error) {
+	rootEvent, err := b.fetchRootEvent()
+	if err != nil {
+		return nil, err
+	}
+	if rootEvent == nil {
+		return nil, nil
+	}
+
+	step++
+	if step < depth {
+		return nil, nil
+	}
+
+	if payload := rootEvent.Data.Data(); payload != nil {
+		return payload, nil
+	}
+
+	return nil, nil
+}
+
+func (b *NodeConfigurationBuilder) singleInputPayload() (any, bool, error) {
+	inputMap := extractInputMap(b.input)
+	if len(inputMap) == 0 {
+		return nil, false, nil
+	}
+	if len(inputMap) > 1 {
+		return nil, false, fmt.Errorf("previous() is not available when multiple inputs are present")
+	}
+
+	for _, value := range inputMap {
+		return value, true, nil
+	}
+
+	return nil, false, nil
 }
 
 func (b *NodeConfigurationBuilder) listExecutionsInChain() ([]models.WorkflowNodeExecution, error) {

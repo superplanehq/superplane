@@ -822,6 +822,22 @@ function evaluate(node: ASTNode, context: Record<string, unknown>): unknown {
       if (node.name === "$") {
         return context;
       }
+      if (node.name === "root") {
+        return () => (context.__root as unknown) ?? null;
+      }
+      if (node.name === "previous") {
+        return (depth?: unknown) => {
+          const parsedDepth = depth === undefined ? 1 : Number(depth);
+          if (!Number.isInteger(parsedDepth) || parsedDepth < 1) {
+            return null;
+          }
+          const previousMap = context.__previousByDepth;
+          if (previousMap && typeof previousMap === "object") {
+            return (previousMap as Record<string, unknown>)[String(parsedDepth)] ?? null;
+          }
+          return null;
+        };
+      }
       if (node.name in BUILTIN_FUNCTIONS) {
         return BUILTIN_FUNCTIONS[node.name];
       }

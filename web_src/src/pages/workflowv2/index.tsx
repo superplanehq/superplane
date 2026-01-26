@@ -66,6 +66,7 @@ import {
   getState,
   getStateMap,
 } from "./mappers";
+import { resolveExecutionErrors } from "./mappers/dash0";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
@@ -77,6 +78,7 @@ import {
   buildCanvasStatusLogEntry,
   buildTabData,
   generateNodeId,
+  generateUniqueNodeName,
   getNextInQueueInfo,
   mapCanvasNodesToLogEntries,
   mapExecutionsToSidebarEvents,
@@ -364,7 +366,7 @@ export function WorkflowPageV2() {
 
   /**
    * Debounced auto-save function for node position changes.
-   * Waits 1 second after the last position change before saving.
+   * Waits 100ms after the last position change before saving.
    * Only saves position changes, not structural modifications (deletions, additions, etc).
    * If there are unsaved structural changes, position auto-save is skipped.
    */
@@ -503,7 +505,7 @@ export function WorkflowPageV2() {
             });
           }
         }
-      }, 300),
+      }, 100),
     [
       organizationId,
       workflowId,
@@ -709,6 +711,7 @@ export function WorkflowPageV2() {
   } | null>(null);
   const [liveRunEntries, setLiveRunEntries] = useState<LogEntry[]>([]);
   const [liveCanvasEntries, setLiveCanvasEntries] = useState<LogEntry[]>([]);
+  const [resolvedExecutionIds, setResolvedExecutionIds] = useState<Set<string>>(new Set());
   const handleExecutionChainHandled = useCallback(() => setFocusRequest(null), []);
 
   const handleSidebarChange = useCallback(
@@ -870,9 +873,31 @@ export function WorkflowPageV2() {
       workflowUpdatedAt: workflow?.metadata?.updatedAt || "",
       onNodeSelect: handleLogNodeSelect,
     });
+
     const allCanvasEntries = [...liveCanvasEntries, ...canvasEntries];
 
-    return [...allRunEntries, ...allCanvasEntries].sort((a, b) => {
+    const resolvedEntries = [...allRunEntries, ...allCanvasEntries].map((entry) => {
+      if (!entry.runItems?.length || resolvedExecutionIds.size === 0) {
+        return entry;
+      }
+
+      const runItems = entry.runItems.map((item) => {
+        if (!resolvedExecutionIds.has(item.id)) {
+          return item;
+        }
+        return {
+          ...item,
+          type: "resolved-error" as const,
+        };
+      });
+
+      return {
+        ...entry,
+        runItems,
+      };
+    });
+
+    return resolvedEntries.sort((a, b) => {
       const aTime = Date.parse(a.timestamp || "") || 0;
       const bTime = Date.parse(b.timestamp || "") || 0;
       return aTime - bTime;
@@ -883,6 +908,7 @@ export function WorkflowPageV2() {
     handleLogRunExecutionSelect,
     liveCanvasEntries,
     liveRunEntries,
+    resolvedExecutionIds,
     workflow?.metadata?.updatedAt,
     workflow?.spec?.nodes,
     workflowEventsResponse?.events,
@@ -1041,26 +1067,30 @@ export function WorkflowPageV2() {
       }
 
       const exampleObj: Record<string, unknown> = {};
-      const nodeMetadata: Record<string, { name: string; componentType: string; description?: string }> = {};
+      const nodeMetadata: Record<string, { name?: string; componentType: string; description?: string }> = {};
+      const nodeNamesById: Record<string, string> = {};
 
       chainNodeIds.forEach((chainNodeId) => {
         const chainNode = workflowNodes.find((node) => node.id === chainNodeId);
         if (!chainNode) return;
 
+        const nodeName = (chainNode.name || "").trim();
+        if (nodeName) {
+          nodeNamesById[chainNodeId] = nodeName;
+        }
+
         if (chainNode.type === "TYPE_TRIGGER") {
           const triggerMetadata = allTriggers.find((trigger) => trigger.name === chainNode.trigger?.name);
 
           // Store node metadata with trigger info
-          if (chainNode.name || triggerMetadata) {
-            nodeMetadata[chainNodeId] = {
-              name: chainNode.name || chainNodeId,
-              componentType: triggerMetadata?.label || "Trigger",
-              description: triggerMetadata?.description,
-            };
-          }
+          nodeMetadata[chainNodeId] = {
+            name: nodeName || undefined,
+            componentType: triggerMetadata?.label || "Trigger",
+            description: triggerMetadata?.description,
+          };
 
           const latestEvent = nodeEventsMap[chainNodeId]?.[0];
-          if (latestEvent?.data && Object.keys(latestEvent.data).length > 0) {
+          if (latestEvent?.data) {
             exampleObj[chainNodeId] = { ...(latestEvent.data || {}) } as Record<string, unknown>;
           }
           if (exampleObj[chainNodeId]) {
@@ -1068,7 +1098,7 @@ export function WorkflowPageV2() {
           }
 
           const exampleData = triggerMetadata?.exampleData;
-          if (exampleData && typeof exampleData === "object" && Object.keys(exampleData).length > 0) {
+          if (exampleData && typeof exampleData === "object") {
             exampleObj[chainNodeId] = exampleData as Record<string, unknown>;
           }
           return;
@@ -1078,20 +1108,18 @@ export function WorkflowPageV2() {
         const componentMetadata = allComponents.find((component) => component.name === chainNode.component?.name);
 
         // Store node metadata with component info
-        if (chainNode.name || componentMetadata) {
-          nodeMetadata[chainNodeId] = {
-            name: chainNode.name || chainNodeId,
-            componentType: componentMetadata?.label || "Component",
-            description: componentMetadata?.description,
-          };
-        }
+        nodeMetadata[chainNodeId] = {
+          name: nodeName || undefined,
+          componentType: componentMetadata?.label || "Component",
+          description: componentMetadata?.description,
+        };
 
         const latestExecution = nodeExecutionsMap[chainNodeId]?.find(
           (execution) => execution.state === "STATE_FINISHED" && execution.resultReason !== "RESULT_REASON_ERROR",
         );
         if (!latestExecution?.outputs) {
           const exampleOutput = componentMetadata?.exampleOutput;
-          if (exampleOutput && typeof exampleOutput === "object" && Object.keys(exampleOutput).length > 0) {
+          if (exampleOutput && typeof exampleOutput === "object") {
             exampleObj[chainNodeId] = exampleOutput as Record<string, unknown>;
           }
           return;
@@ -1112,21 +1140,122 @@ export function WorkflowPageV2() {
         }
       });
 
-      if (Object.keys(exampleObj).length === 0) {
+      if (!exampleObj) {
         return null;
       }
 
+      const getIncomingNodes = (targetId: string): string[] => {
+        return workflowEdges
+          .filter((edge) => edge.targetId === targetId && edge.sourceId)
+          .map((edge) => edge.sourceId as string);
+      };
+
+      const previousByDepth: Record<string, unknown> = {};
+      let frontier = [nodeId];
+      const visited = new Set<string>([nodeId]);
+      let depth = 0;
+
+      while (frontier.length > 0) {
+        const next: string[] = [];
+        frontier.forEach((current) => {
+          getIncomingNodes(current).forEach((sourceId) => {
+            if (visited.has(sourceId)) return;
+            visited.add(sourceId);
+            next.push(sourceId);
+          });
+        });
+
+        if (next.length === 0) {
+          break;
+        }
+
+        depth += 1;
+        const firstAtDepth = next[0];
+        if (firstAtDepth && exampleObj[firstAtDepth]) {
+          previousByDepth[String(depth)] = exampleObj[firstAtDepth];
+        }
+
+        frontier = next;
+      }
+
+      const rootNodeId = workflowNodes.find((node) => {
+        if (!node.id || !chainNodeIds.has(node.id)) return false;
+        return !workflowEdges.some(
+          (edge) => edge.targetId === node.id && edge.sourceId && chainNodeIds.has(edge.sourceId as string),
+        );
+      })?.id;
+
+      if (rootNodeId && exampleObj[rootNodeId]) {
+        exampleObj.__root = exampleObj[rootNodeId];
+      }
+
+      if (Object.keys(previousByDepth).length > 0) {
+        exampleObj.__previousByDepth = previousByDepth;
+      }
+
+      // Build name -> nodeId map, keeping the FIRST (closest) node when names are duplicated
+      // chainNodeIds is ordered from closest to farthest, so the first occurrence wins
+      const nameToNodeId = new Map<string, string>();
+      for (const [nId, nodeName] of Object.entries(nodeNamesById)) {
+        if (!nodeName || nodeName === "__nodeNames") {
+          continue;
+        }
+
+        // Only add if we haven't seen this name yet (keep the closest one)
+        if (!nameToNodeId.has(nodeName)) {
+          nameToNodeId.set(nodeName, nId);
+        }
+      }
+
+      const namedExampleObj: Record<string, unknown> = {};
+      for (const [nodeName, nodeId] of nameToNodeId.entries()) {
+        if (nodeName === nodeId || namedExampleObj[nodeName] !== undefined) {
+          continue;
+        }
+
+        const value = exampleObj[nodeId];
+        if (value === undefined) {
+          continue;
+        }
+
+        namedExampleObj[nodeName] = value;
+      }
+
+      if (Object.keys(namedExampleObj).length === 0) {
+        return null;
+      }
+
+      if (exampleObj.__root) {
+        namedExampleObj.__root = exampleObj.__root;
+      }
+
+      if (exampleObj.__previousByDepth) {
+        namedExampleObj.__previousByDepth = exampleObj.__previousByDepth;
+      }
+
+      // Remove the current node from suggestions - you can't reference your own output
+      const currentNodeName = currentNode?.name?.trim();
+      const currentNodeId = currentNode?.id;
+      if (currentNodeName) {
+        delete namedExampleObj[currentNodeName];
+      }
+      if (currentNodeId) {
+        delete nodeMetadata[currentNodeId];
+      }
+
       if (Object.keys(nodeMetadata).length > 0) {
-        exampleObj.__nodeNames = nodeMetadata;
-        Object.entries(nodeMetadata).forEach(([nodeId, metadata]) => {
-          const value = exampleObj[nodeId];
+        namedExampleObj.__nodeNames = nodeMetadata;
+        Object.entries(nodeMetadata).forEach(([, metadata]) => {
+          const value = namedExampleObj[metadata.name ?? ""];
           if (value && typeof value === "object" && !Array.isArray(value)) {
-            (value as Record<string, unknown>).__nodeName = metadata.name;
+            if (metadata.name) {
+              (value as Record<string, unknown>).__nodeName = metadata.name;
+            }
           }
         });
       }
 
-      return exampleObj;
+      return namedExampleObj;
     },
     [workflow, nodeExecutionsMap, nodeEventsMap, allComponents, allTriggers],
   );
@@ -1492,18 +1621,24 @@ export function WorkflowPageV2() {
       // Save snapshot before making changes
       saveWorkflowSnapshot(workflow);
 
-      const { buildingBlock, nodeName, configuration, position, sourceConnection, appInstallationRef } = newNodeData;
+      const { buildingBlock, configuration, position, sourceConnection, appInstallationRef } = newNodeData;
 
       // Filter configuration to only include visible fields
       const filteredConfiguration = filterVisibleConfiguration(configuration, buildingBlock.configuration || []);
 
+      // Get existing node names for unique name generation
+      const existingNodeNames = (workflow.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
+
+      // Generate unique node name based on component name + ordinal
+      const uniqueNodeName = generateUniqueNodeName(buildingBlock.name || "node", existingNodeNames);
+
       // Generate a unique node ID
-      const newNodeId = generateNodeId(buildingBlock.name || "node", nodeName.trim());
+      const newNodeId = generateNodeId(buildingBlock.name || "node", uniqueNodeName);
 
       // Create the new node
       const newNode: ComponentsNode = {
         id: newNodeId,
-        name: nodeName.trim(),
+        name: uniqueNodeName,
         type:
           buildingBlock.type === "trigger"
             ? "TYPE_TRIGGER"
@@ -1673,10 +1808,19 @@ export function WorkflowPageV2() {
         data.buildingBlock.configuration || [],
       );
 
+      // Get existing node names for unique name generation (exclude the placeholder being configured)
+      const existingNodeNames = (workflow.spec?.nodes || [])
+        .filter((n) => n.id !== data.placeholderId)
+        .map((n) => n.name || "")
+        .filter(Boolean);
+
+      // Generate unique node name based on component name + ordinal
+      const uniqueNodeName = generateUniqueNodeName(data.buildingBlock.name || "node", existingNodeNames);
+
       // Update placeholder with real component data
       const updatedNode: ComponentsNode = {
         ...workflow.spec!.nodes![nodeIndex],
-        name: data.nodeName.trim(),
+        name: uniqueNodeName,
         type:
           data.buildingBlock.type === "trigger"
             ? "TYPE_TRIGGER"
@@ -2140,7 +2284,13 @@ export function WorkflowPageV2() {
         blockName = blueprintMetadata?.name || "blueprint";
       }
 
-      const newNodeId = generateNodeId(blockName, nodeToDuplicate.name || "node");
+      // Get existing node names for unique name generation
+      const existingNodeNames = (workflow.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
+
+      // Generate unique node name based on component name + ordinal
+      const uniqueNodeName = generateUniqueNodeName(blockName, existingNodeNames);
+
+      const newNodeId = generateNodeId(blockName, uniqueNodeName);
 
       const offsetX = 50;
       const offsetY = 50;
@@ -2148,7 +2298,7 @@ export function WorkflowPageV2() {
       const duplicateNode: ComponentsNode = {
         ...nodeToDuplicate,
         id: newNodeId,
-        name: nodeToDuplicate.name || "node",
+        name: uniqueNodeName,
         position: {
           x: (nodeToDuplicate.position?.x || 0) + offsetX,
           y: (nodeToDuplicate.position?.y || 0) + offsetY,
@@ -2387,6 +2537,35 @@ export function WorkflowPageV2() {
     workflow,
   });
 
+  const [isResolvingErrors, setIsResolvingErrors] = useState(false);
+
+  const handleResolveExecutionErrors = useCallback(
+    async (executionIds: string[]) => {
+      if (!workflowId || executionIds.length === 0 || isResolvingErrors) {
+        return;
+      }
+
+      setIsResolvingErrors(true);
+      try {
+        await resolveExecutionErrors(workflowId, executionIds);
+        setResolvedExecutionIds((prev) => {
+          const next = new Set(prev);
+          executionIds.forEach((id) => next.add(id));
+          return next;
+        });
+        await queryClient.invalidateQueries({ queryKey: workflowKeys.eventList(workflowId, 50) });
+        await queryClient.invalidateQueries({ queryKey: workflowKeys.nodeExecutions() });
+        showSuccessToast("Execution errors resolved");
+      } catch (error) {
+        console.error("Failed to resolve execution errors:", error);
+        showErrorToast("Failed to resolve execution errors");
+      } finally {
+        setIsResolvingErrors(false);
+      }
+    },
+    [workflowId, isResolvingErrors, queryClient],
+  );
+
   // Provide state function based on component type
   const getExecutionState = useCallback(
     (nodeId: string, execution: WorkflowsWorkflowNodeExecution): { map: EventStateMap; state: EventState } => {
@@ -2578,6 +2757,7 @@ export function WorkflowPageV2() {
         triggers={triggers}
         blueprints={blueprints}
         logEntries={logEntries}
+        onResolveExecutionErrors={handleResolveExecutionErrors}
         focusRequest={focusRequest}
         onExecutionChainHandled={handleExecutionChainHandled}
         breadcrumbs={[
@@ -2735,6 +2915,7 @@ function prepareData(
   edges: CanvasEdge[];
 } {
   const edges = workflow?.spec?.edges?.map(prepareEdge) || [];
+  const workflowEdges = workflow?.spec?.edges || [];
   const nodes =
     workflow?.spec?.nodes
       ?.map((node) => {
@@ -2751,6 +2932,7 @@ function prepareData(
           queryClient,
           organizationId,
           currentUser,
+          workflowEdges,
         );
       })
       .map((node) => ({
@@ -2786,6 +2968,7 @@ function prepareTriggerNode(
         ...triggerProps,
         collapsed: node.isCollapsed,
         error: node.errorMessage,
+        warning: node.warningMessage,
       },
     },
   };
@@ -2831,6 +3014,7 @@ function prepareCompositeNode(
         description: blueprintMetadata?.description,
         isMissing: isMissing,
         error: node.errorMessage,
+        warning: node.warningMessage,
         parameters:
           Object.keys(node.configuration!).length > 0
             ? [
@@ -2891,18 +3075,6 @@ function getRunItemState(execution: WorkflowsWorkflowNodeExecution): LastRunStat
   return "failed";
 }
 
-function executionToEventSectionState(execution: WorkflowsWorkflowNodeExecution): EventState {
-  if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
-    return "running";
-  }
-
-  if (execution.state == "STATE_FINISHED" && execution.result == "RESULT_PASSED") {
-    return "success";
-  }
-
-  return "failed";
-}
-
 function prepareNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
@@ -2916,6 +3088,7 @@ function prepareNode(
   queryClient: any,
   organizationId: string,
   currentUser?: { id?: string; email?: string },
+  edges?: ComponentsEdge[],
 ): CanvasNode {
   switch (node.type) {
     case "TYPE_TRIGGER":
@@ -2951,6 +3124,7 @@ function prepareNode(
         queryClient,
         organizationId,
         currentUser,
+        edges,
       );
   }
 }
@@ -2961,7 +3135,7 @@ function prepareAnnotationNode(node: ComponentsNode): CanvasNode {
   return {
     id: node.id!,
     position: { x: node.position?.x!, y: node.position?.y! },
-    selectable: false,
+    selectable: true,
     style: { width, height },
     data: {
       type: "annotation",
@@ -2989,6 +3163,7 @@ function prepareComponentNode(
   queryClient: QueryClient,
   organizationId?: string,
   currentUser?: { id?: string; email?: string },
+  edges?: ComponentsEdge[],
 ): CanvasNode {
   // Detect placeholder nodes (no component reference, name is "New Component")
   const isPlaceholder = !node.component?.name && node.name === "New Component";
@@ -3026,7 +3201,7 @@ function prepareComponentNode(
   const componentName = componentNameParts[0];
 
   if (componentName == "merge") {
-    return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
+    return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap, edges);
   }
 
   return prepareComponentBaseNode(
@@ -3103,6 +3278,7 @@ function prepareComponentBaseNode(
         ...componentBaseProps,
         emptyStateProps,
         error: node.errorMessage,
+        warning: node.warningMessage,
       },
     },
   };
@@ -3114,10 +3290,20 @@ function prepareMergeNode(
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
   nodeQueueItemsMap?: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
+  edges?: ComponentsEdge[],
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
-  const metadata = components.find((c) => c.name === "noop");
+  const componentDef = components.find((c) => c.name === "merge");
+
+  // Calculate incoming sources count from edges
+  const incomingSourcesCount = edges?.filter((edge) => edge.targetId === node.id).length || 0;
+  const additionalData = { incomingSourcesCount };
+
+  // Use the merge state function and mapper for consistent state handling
+  const mergeStateResolver = getState("merge");
+  const mergeStateMap = getStateMap("merge");
+  const mergeMapper = getComponentBaseMapper("merge");
 
   let lastEvent;
   if (execution) {
@@ -3126,15 +3312,19 @@ function prepareMergeNode(
 
     const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
 
+    // Get subtitle from the merge mapper with incoming sources count
+    const eventSubtitle = mergeMapper.subtitle(node, execution, additionalData);
+
     lastEvent = {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventState: executionToEventSectionState(execution),
+      eventSubtitle: eventSubtitle,
+      eventState: mergeStateResolver(execution),
       eventId: execution.rootEvent?.id,
     };
   }
 
-  const displayLabel = node.name || metadata?.label!;
+  const displayLabel = node.name || componentDef?.label || "Merge";
 
   return {
     id: node.id!,
@@ -3143,12 +3333,16 @@ function prepareMergeNode(
       type: "merge",
       label: displayLabel,
       state: "pending" as const,
+      outputChannels: componentDef?.outputChannels?.map((channel) => channel.name!) || ["default"],
       merge: {
         title: displayLabel,
         lastEvent: lastEvent,
         nextInQueue: getNextInQueueInfo(nodeQueueItemsMap, node.id!, nodes),
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
+        eventStateMap: mergeStateMap,
+        error: node.errorMessage,
+        warning: node.warningMessage,
       },
     },
   };

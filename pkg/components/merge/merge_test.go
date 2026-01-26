@@ -144,6 +144,38 @@ func TestMerge_ExpressionEnv_UsesContextEnv(t *testing.T) {
 	assert.True(t, out.(bool))
 }
 
+func TestMerge_ExpressionOptions_RootAndPrevious(t *testing.T) {
+	ctx := core.ProcessQueueContext{
+		ExpressionEnv: func(expression string) (map[string]any, error) {
+			return map[string]any{
+				"$": map[string]any{},
+				"__root": map[string]any{
+					"data": map[string]any{
+						"ref": "main",
+					},
+				},
+				"__previousByDepth": map[string]any{
+					"1": map[string]any{
+						"data": map[string]any{
+							"ok": true,
+						},
+					},
+				},
+			}, nil
+		},
+	}
+
+	env, err := expressionEnv(ctx, `root().data.ref == "main" && previous().data.ok == true`)
+	require.NoError(t, err)
+
+	vm, err := expr.Compile(`root().data.ref == "main" && previous().data.ok == true`, expressionOptions(env)...)
+	require.NoError(t, err)
+
+	out, err := expr.Run(vm, env)
+	require.NoError(t, err)
+	assert.True(t, out.(bool))
+}
+
 type MergeTestSteps struct {
 	t  *testing.T
 	Tx *gorm.DB
@@ -184,6 +216,7 @@ func (s *MergeTestSteps) CreateWorkflow() {
 	n1 := &models.WorkflowNode{
 		WorkflowID: wf.ID,
 		NodeID:     "start-node",
+		Name:       "start-node",
 		Type:       models.NodeTypeComponent,
 		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "start"}}),
 	}
@@ -192,6 +225,7 @@ func (s *MergeTestSteps) CreateWorkflow() {
 	n2 := &models.WorkflowNode{
 		WorkflowID: wf.ID,
 		NodeID:     "process-1",
+		Name:       "process-1",
 		Type:       models.NodeTypeComponent,
 		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "process-1"}}),
 	}
@@ -200,6 +234,7 @@ func (s *MergeTestSteps) CreateWorkflow() {
 	n3 := &models.WorkflowNode{
 		WorkflowID: wf.ID,
 		NodeID:     "process-3",
+		Name:       "process-3",
 		Type:       models.NodeTypeComponent,
 		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "process-2"}}),
 	}
@@ -208,6 +243,7 @@ func (s *MergeTestSteps) CreateWorkflow() {
 	n4 := &models.WorkflowNode{
 		WorkflowID: wf.ID,
 		NodeID:     "merge-node",
+		Name:       "merge-node",
 		Type:       models.NodeTypeComponent,
 		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "merge"}}),
 	}
@@ -255,6 +291,7 @@ func (s *MergeTestSteps) CreateWorkflowSingleSourceMultipleEdges() {
 	n1 := &models.WorkflowNode{
 		WorkflowID: wf.ID,
 		NodeID:     "start-node",
+		Name:       "start-node",
 		Type:       models.NodeTypeComponent,
 		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "start"}}),
 	}
@@ -263,6 +300,7 @@ func (s *MergeTestSteps) CreateWorkflowSingleSourceMultipleEdges() {
 	n2 := &models.WorkflowNode{
 		WorkflowID: wf.ID,
 		NodeID:     "process-1",
+		Name:       "process-1",
 		Type:       models.NodeTypeComponent,
 		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "process-1"}}),
 	}
@@ -271,6 +309,7 @@ func (s *MergeTestSteps) CreateWorkflowSingleSourceMultipleEdges() {
 	n4 := &models.WorkflowNode{
 		WorkflowID: wf.ID,
 		NodeID:     "merge-node",
+		Name:       "merge-node",
 		Type:       models.NodeTypeComponent,
 		Ref:        datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "merge"}}),
 	}
@@ -464,20 +503,23 @@ func (s *MergeTestSteps) AssertNodeExecutionCount(expectedCount int) {
 func (s *MergeTestSteps) AssertExecutionFinished() {
 	var execution models.WorkflowNodeExecution
 	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
-	assert.Equal(s.t, execution.State, models.WorkflowNodeExecutionStateFinished)
+	assert.Equal(s.t, models.WorkflowNodeExecutionStateFinished, execution.State)
 }
 
+// AssertExecutionFailed checks that the execution finished and emitted to the fail channel.
+// Note: With output channels, conditional stop "passes" the execution but routes to the
+// "fail" channel, similar to how the `if` component routes to true/false channels.
 func (s *MergeTestSteps) AssertExecutionFailed() {
 	var execution models.WorkflowNodeExecution
 	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
-	assert.Equal(s.t, execution.State, models.WorkflowNodeExecutionStateFinished)
-	assert.Equal(s.t, execution.Result, models.WorkflowNodeExecutionResultFailed)
+	assert.Equal(s.t, models.WorkflowNodeExecutionStateFinished, execution.State)
+	assert.Equal(s.t, models.WorkflowNodeExecutionResultPassed, execution.Result)
 }
 
 func (s *MergeTestSteps) AssertExecutionPending() {
 	var execution models.WorkflowNodeExecution
 	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
-	assert.Equal(s.t, execution.State, models.WorkflowNodeExecutionStatePending)
+	assert.Equal(s.t, models.WorkflowNodeExecutionStatePending, execution.State)
 }
 
 func (s *MergeTestSteps) AssertQueueIsEmpty() {

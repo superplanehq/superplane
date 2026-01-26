@@ -1,0 +1,90 @@
+---
+title: "Cloudflare"
+sidebar:
+  order: 2
+---
+
+Manage Cloudflare zones, rules, and DNS
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Components
+
+<CardGrid>
+  <LinkCard title="Update Redirect Rule" href="#update-redirect-rule" description="Update a redirect rule in a Cloudflare zone" />
+</CardGrid>
+
+## Installation
+
+## Create a Cloudflare API Token
+
+1. Open the [Cloudflare API Tokens page](https://dash.cloudflare.com/profile/api-tokens)
+2. Click **Create Token**
+3. Click **Get started** next to "Create Custom Token"
+4. Configure the token:
+   - **Token name**: SuperPlane Integration
+   - **Permissions** (click "+ Add more" to add each):
+     - Zone / Zone / Read
+     - Zone / Dynamic Redirect / Edit
+   - **Zone Resources**: Include / All zones _(or select specific zones)_
+5. Click **Continue to summary**, then **Create Token**
+6. Copy the token and paste it below
+
+> **Note**: The token is only shown once. Store it securely if needed elsewhere.
+
+<a id="update-redirect-rule"></a>
+
+## Update Redirect Rule
+
+The Update Redirect Rule component modifies an existing redirect rule in a Cloudflare zone.
+
+### Use Cases
+
+- **URL management**: Update redirect rules dynamically based on workflow events
+- **A/B testing**: Switch redirect targets for testing purposes
+- **Maintenance**: Temporarily redirect traffic during maintenance
+- **Migration**: Update redirects as part of site migration workflows
+
+### Configuration
+
+- **Zone**: Select the Cloudflare zone containing the redirect rule
+- **Rule ID**: The ID of the redirect rule to update
+- **Description**: Optional description for the rule
+- **Match Type**: How to match URLs (exact match or expression-based)
+- **Source URL Pattern**: URL pattern to match (for exact match type)
+- **Expression**: Cloudflare expression for matching (for expression type)
+- **Target URL**: The URL to redirect to (supports expressions)
+- **Status Code**: HTTP status code for redirect (301, 302, 307, 308)
+- **Preserve Query String**: Whether to preserve query parameters in redirect
+- **Enabled**: Whether the rule is active
+
+### Output
+
+Returns the updated redirect rule with all current configuration.
+
+### Example Output
+
+```json
+{
+  "enabled": true,
+  "rule": {
+    "action": "redirect",
+    "action_parameters": {
+      "from_value": {
+        "preserve_query_string": false,
+        "status_code": 301,
+        "target_url": {
+          "value": "https://example.com/new-path"
+        }
+      }
+    },
+    "description": "Redirect old path to new path",
+    "enabled": true,
+    "expression": "http.request.uri.path eq \"/old-path\"",
+    "id": "rule_abc123"
+  },
+  "ruleId": "rule_abc123",
+  "zoneId": "zone_xyz789"
+}
+```
+

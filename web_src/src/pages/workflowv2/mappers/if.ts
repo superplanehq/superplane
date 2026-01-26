@@ -39,7 +39,8 @@ export const ifStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeE
 
   if (
     execution.resultMessage &&
-    (execution.resultReason === "RESULT_REASON_ERROR" || execution.result === "RESULT_FAILED")
+    (execution.resultReason === "RESULT_REASON_ERROR" ||
+      (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
   ) {
     return "error";
   }
@@ -158,7 +159,10 @@ export const ifMapper: ComponentBaseMapper = {
 
       // Substitute values in the expression
       if (inputData) {
-        const substitutedExpression = substituteExpressionValues(expression, inputData);
+        const substitutedExpression = substituteExpressionValues(expression, inputData, {
+          root: execution.rootEvent?.data,
+          previousByDepth: { "1": inputData },
+        });
         const parsedEvaluation = parseExpression(substitutedExpression);
 
         // Determine if the if condition evaluated to true (has outputs on "true" channel)
@@ -197,7 +201,8 @@ export const ifMapper: ComponentBaseMapper = {
     // Error (if present) - placed at the end, after Evaluation
     if (
       execution.resultMessage &&
-      (execution.resultReason === "RESULT_REASON_ERROR" || execution.result === "RESULT_FAILED")
+      (execution.resultReason === "RESULT_REASON_ERROR" ||
+        (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
     ) {
       details["Error"] = {
         __type: "error",

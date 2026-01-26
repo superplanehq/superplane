@@ -21,14 +21,16 @@ type WorkflowNodeExecutionResultReason string
 
 // List of WorkflowNodeExecutionResultReason
 const (
-	WORKFLOWNODEEXECUTIONRESULTREASON_RESULT_REASON_OK    WorkflowNodeExecutionResultReason = "RESULT_REASON_OK"
-	WORKFLOWNODEEXECUTIONRESULTREASON_RESULT_REASON_ERROR WorkflowNodeExecutionResultReason = "RESULT_REASON_ERROR"
+	WORKFLOWNODEEXECUTIONRESULTREASON_RESULT_REASON_OK             WorkflowNodeExecutionResultReason = "RESULT_REASON_OK"
+	WORKFLOWNODEEXECUTIONRESULTREASON_RESULT_REASON_ERROR          WorkflowNodeExecutionResultReason = "RESULT_REASON_ERROR"
+	WORKFLOWNODEEXECUTIONRESULTREASON_RESULT_REASON_ERROR_RESOLVED WorkflowNodeExecutionResultReason = "RESULT_REASON_ERROR_RESOLVED"
 )
 
 // All allowed values of WorkflowNodeExecutionResultReason enum
 var AllowedWorkflowNodeExecutionResultReasonEnumValues = []WorkflowNodeExecutionResultReason{
 	"RESULT_REASON_OK",
 	"RESULT_REASON_ERROR",
+	"RESULT_REASON_ERROR_RESOLVED",
 }
 
 func (v *WorkflowNodeExecutionResultReason) UnmarshalJSON(src []byte) error {

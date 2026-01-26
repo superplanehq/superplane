@@ -1,15 +1,24 @@
 ---
 title: "GitHub"
 sidebar:
-  label: "GitHub"
-type: "application"
-name: "github"
-label: "GitHub"
+  order: 4
 ---
 
-## Overview
-
 Manage and react to changes in your GitHub repositories
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Branch Created" href="#on-branch-created" description="Listen to GitHub branch creation events" />
+  <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events" />
+  <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to issue comment events" />
+  <LinkCard title="On PR Comment" href="#on-pr-comment" description="Listen to all comment events on pull requests" />
+  <LinkCard title="On Pull Request" href="#on-pull-request" description="Listen to pull request events" />
+  <LinkCard title="On Push" href="#on-push" description="Listen to GitHub push events" />
+  <LinkCard title="On Release" href="#on-release" description="Listen to release events" />
+  <LinkCard title="On Tag Created" href="#on-tag-created" description="Listen to GitHub tag creation events" />
+  <LinkCard title="On Workflow Run" href="#on-workflow-run" description="Listen to workflow run events" />
+</CardGrid>
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
@@ -26,308 +35,35 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Update Release" href="#update-release" description="Update an existing release in a GitHub repository" />
 </CardGrid>
 
-## Triggers
-
-<CardGrid>
-  <LinkCard title="On Branch Created" href="#on-branch-created" description="Listen to GitHub branch creation events" />
-  <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events" />
-  <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to issue comment events" />
-  <LinkCard title="On Pull Request" href="#on-pull-request" description="Listen to pull request events" />
-  <LinkCard title="On PR Review Comment" href="#on-pr-review-comment" description="Listen to pull request review comment events" />
-  <LinkCard title="On Push" href="#on-push" description="Listen to GitHub push events" />
-  <LinkCard title="On Release" href="#on-release" description="Listen to release events" />
-  <LinkCard title="On Tag Created" href="#on-tag-created" description="Listen to GitHub tag creation events" />
-</CardGrid>
-
-<a id="create-issue"></a>
-
-## Create Issue
-
-Create a new issue in a GitHub repository
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | app-installation-resource | yes | - |
-| title | Title | string | yes | - |
-| body | Body | text | no | - |
-| assignees | Assignees | list | no | - |
-| labels | Labels | list | no | - |
-
-### Example Output
-
-```json
-{
-  "data": {
-    "html_url": "https://github.com/acme/widgets/issues/42",
-    "id": 101,
-    "number": 42,
-    "state": "open",
-    "title": "Fix flaky build",
-    "user": {
-      "login": "octocat"
-    }
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.issue"
-}
-```
-
-<a id="create-release"></a>
-
-## Create Release
-
-Create a new release in a GitHub repository
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | string | yes | - |
-| versionStrategy | Version Strategy | select | yes | How to determine the release version |
-| tagName | Tag Name | string | no | The name of the tag to create the release for |
-| name | Release Name | string | no | The title of the release |
-| draft | Draft | boolean | no | Mark this release as a draft |
-| prerelease | Prerelease | boolean | no | Mark this release as a prerelease |
-| generateReleaseNotes | Generate release notes | boolean | no | Automatically generate release notes from commits since the last release |
-| body | Additional notes | text | no | Optional text to append after auto-generated release notes. If auto-generation is off, this becomes the entire release description. |
-
-### Example Output
-
-```json
-{
-  "data": {
-    "draft": false,
-    "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
-    "id": 3001,
-    "name": "Release 1.2.3",
-    "prerelease": false,
-    "tag_name": "v1.2.3"
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.release"
-}
-```
-
-<a id="delete-release"></a>
-
-## Delete Release
-
-Delete a release from a GitHub repository
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | string | yes | - |
-| releaseStrategy | Release to Delete | select | yes | How to identify which release to delete |
-| tagName | Tag Name | string | no | Git tag identifying the release to delete. Supports template variables from previous steps. |
-| deleteTag | Also delete Git tag | boolean | no | When enabled, also deletes the associated Git tag from the repository |
-
-### Example Output
-
-```json
-{
-  "data": {
-    "deleted_at": "2026-01-16T17:55:00Z",
-    "draft": false,
-    "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
-    "id": 3001,
-    "name": "Release 1.2.3",
-    "prerelease": false,
-    "tag_deleted": true,
-    "tag_name": "v1.2.3"
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.release"
-}
-```
-
-<a id="get-issue"></a>
-
-## Get Issue
-
-Get a GitHub issue by number
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | app-installation-resource | yes | - |
-| issueNumber | Issue Number | string | yes | - |
-
-### Example Output
-
-```json
-{
-  "data": {
-    "comments": 3,
-    "html_url": "https://github.com/acme/widgets/issues/42",
-    "id": 101,
-    "number": 42,
-    "state": "open",
-    "title": "Fix flaky build",
-    "user": {
-      "login": "octocat"
-    }
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.issue"
-}
-```
-
-<a id="publish-commit-status"></a>
-
-## Publish Commit Status
-
-Publish a status check to a GitHub commit
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | app-installation-resource | yes | - |
-| sha | Commit SHA | string | yes | The full SHA of the commit to attach the status to |
-| state | State | select | yes | - |
-| context | Context | string | yes | A label to identify this status check |
-| description | Description | text | no | Short description of the status (max ~140 characters) |
-| targetUrl | Target URL | string | no | e.g. Link to build logs, test results, ... |
-
-### Example Output
-
-```json
-{
-  "data": {
-    "context": "ci/build",
-    "created_at": "2026-01-16T17:45:00Z",
-    "description": "All checks passed",
-    "state": "success",
-    "target_url": "https://ci.example.com/builds/123",
-    "updated_at": "2026-01-16T17:45:10Z"
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.commitStatus"
-}
-```
-
-<a id="run-workflow"></a>
-
-## Run Workflow
-
-Run GitHub Actions workflow
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | app-installation-resource | yes | - |
-| workflowFile | Workflow file | string | yes | - |
-| ref | Branch or tag | git-ref | yes | - |
-| inputs | Inputs | list | no | - |
-
-### Example Output
-
-```json
-{
-  "data": {
-    "workflow_run": {
-      "conclusion": "success",
-      "html_url": "https://github.com/acme/widgets/actions/runs/9001",
-      "id": 9001,
-      "status": "completed"
-    }
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.workflow.finished"
-}
-```
-
-<a id="update-issue"></a>
-
-## Update Issue
-
-Update a GitHub issue
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | app-installation-resource | yes | - |
-| issueNumber | Issue Number | number | yes | - |
-| title | Title | string | no | - |
-| body | Body | text | no | - |
-| state | State | select | no | - |
-| assignees | Assignees | list | no | - |
-| labels | Labels | list | no | - |
-
-### Example Output
-
-```json
-{
-  "data": {
-    "html_url": "https://github.com/acme/widgets/issues/42",
-    "id": 101,
-    "number": 42,
-    "state": "closed",
-    "title": "Fix flaky build",
-    "updated_at": "2026-01-16T17:40:00Z"
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.issue"
-}
-```
-
-<a id="update-release"></a>
-
-## Update Release
-
-Update an existing release in a GitHub repository
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | string | yes | - |
-| releaseStrategy | Release Strategy | select | yes | How to identify which release to update |
-| tagName | Tag Name | string | no | Git tag identifying the release to update. Supports template variables from previous steps. |
-| name | Release Name | string | no | Update the release title (leave empty to keep current) |
-| generateReleaseNotes | Generate release notes | boolean | no | Automatically generate release notes from commits since the last release. If body is also provided, custom text is appended. |
-| body | Release Notes | text | no | Update release description (leave empty to keep current) |
-| draft | Draft | boolean | no | Mark release as draft or publish it |
-| prerelease | Prerelease | boolean | no | Mark as prerelease or stable release |
-
-### Example Output
-
-```json
-{
-  "data": {
-    "draft": false,
-    "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
-    "id": 3001,
-    "name": "Release 1.2.3",
-    "prerelease": false,
-    "tag_name": "v1.2.3",
-    "updated_at": "2026-01-16T17:50:00Z"
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.release"
-}
-```
-
 <a id="on-branch-created"></a>
 
 ## On Branch Created
 
-Listen to GitHub branch creation events
+The On Branch Created trigger starts a workflow execution when a new branch is created in a GitHub repository.
+
+### Use Cases
+
+- **Branch automation**: Set up environments or resources for new branches
+- **Branch validation**: Validate branch naming conventions
+- **Notification workflows**: Notify teams when important branches are created
+- **Branch processing**: Process or configure branches automatically
 
 ### Configuration
 
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | app-installation-resource | yes | - |
-| branches | Branches | any-predicate-list | yes | - |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
+- **Repository**: Select the GitHub repository to monitor
+- **Branches**: Configure which branches to listen for using predicates (e.g., equals "main", starts with "feature-")
+
+### Event Data
+
+Each branch event includes:
+- **ref**: The branch reference (e.g., "refs/heads/feature/new-feature")
+- **ref_type**: Type of reference (branch)
+- **repository**: Repository information
+- **sender**: User who created the branch
+
+### Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
 
 ### Example Data
 
@@ -359,15 +95,31 @@ Listen to GitHub branch creation events
 
 ## On Issue
 
-Listen to issue events
+The On Issue trigger starts a workflow execution when issue events occur in a GitHub repository.
+
+### Use Cases
+
+- **Issue automation**: Automate responses to new or updated issues
+- **Notification workflows**: Send notifications when issues are created or closed
+- **Task management**: Sync issues with external task management systems
+- **Label automation**: Automatically label or categorize issues
 
 ### Configuration
 
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | app-installation-resource | yes | - |
-| actions | Actions | multi-select | yes | - |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
+- **Repository**: Select the GitHub repository to monitor
+- **Actions**: Select which issue actions to listen for (opened, closed, reopened, etc.)
+
+### Event Data
+
+Each issue event includes:
+- **action**: The action that triggered the event (opened, closed, reopened, etc.)
+- **issue**: Complete issue information including title, body, state, labels, assignees
+- **repository**: Repository information
+- **sender**: User who triggered the event
+
+### Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
 
 ### Example Data
 
@@ -405,15 +157,31 @@ Listen to issue events
 
 ## On Issue Comment
 
-Listen to issue comment events
+The On Issue Comment trigger starts a workflow execution when comments are added to issues.
+
+### Use Cases
+
+- **Command processing**: Process slash commands in issue comments (e.g., /assign, /close)
+- **Bot interactions**: Respond to comments with automated actions
+- **Issue automation**: Automate issue management based on comment content
+- **Notification systems**: Notify teams when important comments are added
 
 ### Configuration
 
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | app-installation-resource | yes | - |
-| contentFilter | Content Filter | string | no | Optional regex pattern to filter comments by content |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
+- **Repository**: Select the GitHub repository to monitor
+- **Content Filter**: Optional regex pattern to filter comments (e.g., `/solve` to only trigger on comments containing "/solve")
+
+### Event Data
+
+Each comment event includes:
+- **comment**: Comment information including body, author, created timestamp
+- **issue**: Issue information the comment was added to
+- **repository**: Repository information
+- **sender**: User who added the comment
+
+### Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
 
 ### Example Data
 
@@ -447,19 +215,97 @@ Listen to issue comment events
 }
 ```
 
+<a id="on-pr-comment"></a>
+
+## On PR Comment
+
+The On PR Comment trigger starts a workflow execution when comments are added to pull requests.
+
+### Use Cases
+
+- **Command processing**: Process slash commands in PR comments (e.g., /deploy, /test)
+- **Bot interactions**: Respond to comments with automated actions
+- **Review automation**: Trigger workflows based on comment content
+- **Notification systems**: Notify teams when important comments are added
+
+### Configuration
+
+- **Repository**: Select the GitHub repository to monitor
+- **Content Filter**: Optional regex pattern to filter comments (e.g., `/solve` to only trigger on comments containing "/solve")
+
+### Event Data
+
+Each comment event includes:
+- **comment**: Comment information including body, author, created timestamp
+- **pull_request**: PR information the comment was added to
+- **repository**: Repository information
+- **sender**: User who added the comment
+
+### Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "created",
+    "comment": {
+      "body": "Looks good to me",
+      "html_url": "https://github.com/acme/widgets/pull/101#discussion_r7001",
+      "id": 7001
+    },
+    "pull_request": {
+      "html_url": "https://github.com/acme/widgets/pull/101",
+      "number": 101,
+      "title": "Add new endpoint"
+    },
+    "repository": {
+      "full_name": "acme/widgets",
+      "html_url": "https://github.com/acme/widgets",
+      "id": 123456
+    },
+    "sender": {
+      "html_url": "https://github.com/octocat",
+      "id": 101,
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.pullRequestReviewComment"
+}
+```
+
 <a id="on-pull-request"></a>
 
 ## On Pull Request
 
-Listen to pull request events
+The On Pull Request trigger starts a workflow execution when pull request events occur in a GitHub repository.
+
+### Use Cases
+
+- **PR automation**: Automate actions when PRs are opened, merged, or closed
+- **Code review workflows**: Trigger review processes or notifications
+- **CI/CD integration**: Run tests or builds on PR events
+- **Status updates**: Update systems when PR status changes
 
 ### Configuration
 
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | app-installation-resource | yes | - |
-| actions | Actions | multi-select | yes | - |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
+- **Repository**: Select the GitHub repository to monitor
+- **Actions**: Select which PR actions to listen for (opened, closed, synchronize, etc.)
+
+### Event Data
+
+Each PR event includes:
+- **action**: The action that triggered the event (opened, closed, synchronize, etc.)
+- **pull_request**: Complete PR information including title, body, state, labels
+- **repository**: Repository information
+- **sender**: User who triggered the event
+
+### Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
 
 ### Example Data
 
@@ -494,65 +340,36 @@ Listen to pull request events
 }
 ```
 
-<a id="on-pr-review-comment"></a>
-
-## On PR Review Comment
-
-Listen to pull request review comment events
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | app-installation-resource | yes | - |
-| contentFilter | Content Filter | string | no | Optional regex pattern to filter comments by content |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
-
-### Example Data
-
-```json
-{
-  "data": {
-    "action": "created",
-    "comment": {
-      "body": "Looks good to me",
-      "html_url": "https://github.com/acme/widgets/pull/101#discussion_r7001",
-      "id": 7001
-    },
-    "pull_request": {
-      "html_url": "https://github.com/acme/widgets/pull/101",
-      "number": 101,
-      "title": "Add new endpoint"
-    },
-    "repository": {
-      "full_name": "acme/widgets",
-      "html_url": "https://github.com/acme/widgets",
-      "id": 123456
-    },
-    "sender": {
-      "html_url": "https://github.com/octocat",
-      "id": 101,
-      "login": "octocat"
-    }
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.pullRequestReviewComment"
-}
-```
-
 <a id="on-push"></a>
 
 ## On Push
 
-Listen to GitHub push events
+The On Push trigger starts a workflow execution when code is pushed to a GitHub repository.
+
+### Use Cases
+
+- **CI/CD automation**: Trigger builds and deployments on code pushes
+- **Code quality checks**: Run linting and tests on every push
+- **Notification workflows**: Send notifications when code is pushed
+- **Documentation updates**: Automatically update documentation on push
 
 ### Configuration
 
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | app-installation-resource | yes | - |
-| refs | Refs | any-predicate-list | yes | - |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
+- **Repository**: Select the GitHub repository to monitor
+- **Refs**: Configure which branches/tags to monitor (e.g., `refs/heads/main`, `refs/tags/*`)
+
+### Event Data
+
+Each push event includes:
+- **repository**: Repository information
+- **ref**: The branch or tag that was pushed to
+- **commits**: Array of commit information
+- **pusher**: Information about who pushed
+- **before/after**: Commit SHAs before and after the push
+
+### Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
 
 ### Example Data
 
@@ -785,15 +602,31 @@ Listen to GitHub push events
 
 ## On Release
 
-Listen to release events
+The On Release trigger starts a workflow execution when release events occur in a GitHub repository.
+
+### Use Cases
+
+- **Deployment automation**: Trigger deployments when releases are published
+- **Notification workflows**: Send notifications about new releases
+- **Release processing**: Process release artifacts or metadata
+- **Distribution workflows**: Distribute releases to multiple systems
 
 ### Configuration
 
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | app-installation-resource | yes | - |
-| actions | Actions | multi-select | yes | - |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
+- **Repository**: Select the GitHub repository to monitor
+- **Actions**: Select which release actions to listen for (published, created, etc.)
+
+### Event Data
+
+Each release event includes:
+- **action**: The action that triggered the event (published, created, etc.)
+- **release**: Complete release information including tag, name, body, assets
+- **repository**: Repository information
+- **sender**: User who triggered the event
+
+### Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
 
 ### Example Data
 
@@ -827,15 +660,31 @@ Listen to release events
 
 ## On Tag Created
 
-Listen to GitHub tag creation events
+The On Tag Created trigger starts a workflow execution when a new tag is created in a GitHub repository.
+
+### Use Cases
+
+- **Version tagging**: Trigger workflows when version tags are created
+- **Release automation**: Automatically create releases from tags
+- **Deployment triggers**: Deploy specific versions based on tags
+- **Tag processing**: Process or validate tags as they're created
 
 ### Configuration
 
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| repository | Repository | app-installation-resource | yes | - |
-| tags | Tags | any-predicate-list | yes | - |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
+- **Repository**: Select the GitHub repository to monitor
+- **Tags**: Configure which tags to listen for using predicates (e.g., equals "v*", starts with "release-")
+
+### Event Data
+
+Each tag event includes:
+- **ref**: The tag reference (e.g., "refs/tags/v1.0.0")
+- **ref_type**: Type of reference (tag)
+- **repository**: Repository information
+- **sender**: User who created the tag
+
+### Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
 
 ### Example Data
 
@@ -860,6 +709,603 @@ Listen to GitHub tag creation events
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.tagCreated"
+}
+```
+
+<a id="on-workflow-run"></a>
+
+## On Workflow Run
+
+The On Workflow Run trigger starts a workflow execution when GitHub Actions workflow runs complete.
+
+### Use Cases
+
+- **Workflow orchestration**: Chain workflows together based on completion
+- **Status monitoring**: Monitor CI/CD pipeline results
+- **Notification workflows**: Send notifications when workflows succeed or fail
+- **Post-processing**: Process artifacts or results after workflow completion
+
+### Configuration
+
+- **Repository**: Select the GitHub repository to monitor
+- **Conclusions**: Select which workflow conclusions to listen for (success, failure, cancelled, etc.)
+- **Workflow Files**: Optional list of specific workflow files to monitor (leave empty for all workflows)
+
+### Event Data
+
+Each workflow run event includes:
+- **action**: The action that triggered the event (completed, requested, etc.)
+- **workflow_run**: Complete workflow run information including status, conclusion, logs URL
+- **repository**: Repository information
+- **sender**: User who triggered the workflow
+
+### Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "completed",
+    "organization": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+      "description": "Example organization for demo data",
+      "events_url": "https://api.github.com/orgs/example-org/events",
+      "hooks_url": "https://api.github.com/orgs/example-org/hooks",
+      "id": 12345678,
+      "issues_url": "https://api.github.com/orgs/example-org/issues",
+      "login": "example-org",
+      "members_url": "https://api.github.com/orgs/example-org/members{/member}",
+      "node_id": "O_kgDOBb1AaA",
+      "public_members_url": "https://api.github.com/orgs/example-org/public_members{/member}",
+      "repos_url": "https://api.github.com/orgs/example-org/repos",
+      "url": "https://api.github.com/orgs/example-org"
+    },
+    "repository": {
+      "created_at": "2024-05-10T12:00:00Z",
+      "default_branch": "main",
+      "description": "Example repository for webhook payloads",
+      "fork": false,
+      "full_name": "example-org/example-repo",
+      "html_url": "https://github.com/example-org/example-repo",
+      "id": 987654321,
+      "name": "example-repo",
+      "node_id": "R_kgDOAbCdEf",
+      "owner": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+        "gravatar_id": "",
+        "html_url": "https://github.com/example-org",
+        "id": 12345678,
+        "login": "example-org",
+        "node_id": "O_kgDOBb1AaA",
+        "site_admin": false,
+        "type": "Organization",
+        "url": "https://api.github.com/users/example-org"
+      },
+      "private": false,
+      "pushed_at": "2026-03-10T14:22:11Z",
+      "updated_at": "2026-03-10T13:50:00Z",
+      "url": "https://api.github.com/repos/example-org/example-repo"
+    },
+    "sender": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/87654321?v=4",
+      "gravatar_id": "",
+      "html_url": "https://github.com/alexdoe",
+      "id": 87654321,
+      "login": "alexdoe",
+      "node_id": "MDQ6VXNlcjg3NjU0MzIx",
+      "site_admin": false,
+      "type": "User",
+      "url": "https://api.github.com/users/alexdoe"
+    },
+    "workflow": {
+      "badge_url": "https://github.com/example-org/example-repo/workflows/CI/badge.svg",
+      "created_at": "2024-05-10T12:00:00Z",
+      "html_url": "https://github.com/example-org/example-repo/actions/workflows/ci.yml",
+      "id": 9876543,
+      "name": "CI",
+      "node_id": "W_kwDOBb1AaA0123456",
+      "path": ".github/workflows/ci.yml",
+      "state": "active",
+      "updated_at": "2026-03-01T10:00:00Z",
+      "url": "https://api.github.com/repos/example-org/example-repo/actions/workflows/9876543"
+    },
+    "workflow_run": {
+      "actor": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/87654321?v=4",
+        "gravatar_id": "",
+        "html_url": "https://github.com/alexdoe",
+        "id": 87654321,
+        "login": "alexdoe",
+        "node_id": "MDQ6VXNlcjg3NjU0MzIx",
+        "site_admin": false,
+        "type": "User",
+        "url": "https://api.github.com/users/alexdoe"
+      },
+      "artifacts_url": "https://api.github.com/repos/example-org/example-repo/actions/runs/12345678901/artifacts",
+      "cancel_url": "https://api.github.com/repos/example-org/example-repo/actions/runs/12345678901/cancel",
+      "check_suite_id": 11223344556,
+      "check_suite_node_id": "CS_kwDOBb1AaA0000000",
+      "check_suite_url": "https://api.github.com/repos/example-org/example-repo/check-suites/11223344556",
+      "conclusion": "success",
+      "created_at": "2026-03-10T14:22:11Z",
+      "event": "push",
+      "head_branch": "main",
+      "head_commit": {
+        "author": {
+          "email": "alex.doe@example.com",
+          "name": "Alex Doe"
+        },
+        "committer": {
+          "email": "noreply@example.com",
+          "name": "GitHub"
+        },
+        "id": "4f9c2e1a7b3d45c0d1e9f23456789abcdeffed01",
+        "message": "feat: add lightweight metrics endpoint (#42)\n\nAdds a basic /metrics handler with a minimal gauge.",
+        "timestamp": "2026-03-10T14:22:11+01:00",
+        "tree_id": "7a8b9c0d1e2f3a4b5c6d7e8f90123456789abcde"
+      },
+      "head_repository": {
+        "description": "Example repository for webhook payloads",
+        "fork": false,
+        "full_name": "example-org/example-repo",
+        "html_url": "https://github.com/example-org/example-repo",
+        "id": 987654321,
+        "name": "example-repo",
+        "node_id": "R_kgDOAbCdEf",
+        "owner": {
+          "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+          "gravatar_id": "",
+          "html_url": "https://github.com/example-org",
+          "id": 12345678,
+          "login": "example-org",
+          "node_id": "O_kgDOBb1AaA",
+          "site_admin": false,
+          "type": "Organization",
+          "url": "https://api.github.com/users/example-org"
+        },
+        "private": false,
+        "url": "https://api.github.com/repos/example-org/example-repo"
+      },
+      "head_sha": "4f9c2e1a7b3d45c0d1e9f23456789abcdeffed01",
+      "html_url": "https://github.com/example-org/example-repo/actions/runs/12345678901",
+      "id": 12345678901,
+      "jobs_url": "https://api.github.com/repos/example-org/example-repo/actions/runs/12345678901/jobs",
+      "logs_url": "https://api.github.com/repos/example-org/example-repo/actions/runs/12345678901/logs",
+      "name": "CI",
+      "node_id": "WFR_kwLOBb1AaA123456789",
+      "path": ".github/workflows/ci.yml",
+      "pull_requests": [],
+      "referenced_workflows": [],
+      "repository": {
+        "clone_url": "https://github.com/example-org/example-repo.git",
+        "created_at": "2024-05-10T12:00:00Z",
+        "default_branch": "main",
+        "description": "Example repository for webhook payloads",
+        "fork": false,
+        "full_name": "example-org/example-repo",
+        "git_url": "git://github.com/example-org/example-repo.git",
+        "html_url": "https://github.com/example-org/example-repo",
+        "id": 987654321,
+        "name": "example-repo",
+        "node_id": "R_kgDOAbCdEf",
+        "owner": {
+          "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+          "gravatar_id": "",
+          "html_url": "https://github.com/example-org",
+          "id": 12345678,
+          "login": "example-org",
+          "node_id": "O_kgDOBb1AaA",
+          "site_admin": false,
+          "type": "Organization",
+          "url": "https://api.github.com/users/example-org"
+        },
+        "private": false,
+        "pushed_at": "2026-03-10T14:22:11Z",
+        "ssh_url": "git@github.com:example-org/example-repo.git",
+        "updated_at": "2026-03-10T13:50:00Z",
+        "url": "https://api.github.com/repos/example-org/example-repo"
+      },
+      "rerun_url": "https://api.github.com/repos/example-org/example-repo/actions/runs/12345678901/rerun",
+      "run_attempt": 1,
+      "run_number": 42,
+      "run_started_at": "2026-03-10T14:22:11Z",
+      "status": "completed",
+      "triggering_actor": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/87654321?v=4",
+        "gravatar_id": "",
+        "html_url": "https://github.com/alexdoe",
+        "id": 87654321,
+        "login": "alexdoe",
+        "node_id": "MDQ6VXNlcjg3NjU0MzIx",
+        "site_admin": false,
+        "type": "User",
+        "url": "https://api.github.com/users/alexdoe"
+      },
+      "updated_at": "2026-03-10T14:25:30Z",
+      "url": "https://api.github.com/repos/example-org/example-repo/actions/runs/12345678901",
+      "workflow_id": 9876543,
+      "workflow_url": "https://api.github.com/repos/example-org/example-repo/actions/workflows/9876543"
+    }
+  },
+  "timestamp": "2026-03-10T14:25:30.31254162Z",
+  "type": "github.workflowRun"
+}
+```
+
+<a id="create-issue"></a>
+
+## Create Issue
+
+The Create Issue component creates a new issue in a specified GitHub repository.
+
+### Use Cases
+
+- **Automated bug reporting**: Create issues automatically when errors are detected
+- **Task creation**: Generate issues from external systems or workflows
+- **Notification tracking**: Convert notifications into trackable issues
+- **Workflow automation**: Create issues as part of automated processes
+
+### Configuration
+
+- **Repository**: Select the GitHub repository where the issue will be created
+- **Title**: The issue title (supports expressions)
+- **Body**: The issue body/description (supports markdown and expressions)
+- **Assignees**: Optional list of GitHub usernames to assign the issue to
+- **Labels**: Optional list of labels to apply to the issue
+
+### Output
+
+Returns the created issue object with details including:
+- Issue number
+- URL
+- State
+- Created timestamp
+- All issue metadata
+
+### Example Output
+
+```json
+{
+  "data": {
+    "html_url": "https://github.com/acme/widgets/issues/42",
+    "id": 101,
+    "number": 42,
+    "state": "open",
+    "title": "Fix flaky build",
+    "user": {
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.issue"
+}
+```
+
+<a id="create-release"></a>
+
+## Create Release
+
+The Create Release component creates a new release in a GitHub repository.
+
+### Use Cases
+
+- **Automated releases**: Create releases automatically after successful builds
+- **Version management**: Tag and release new versions of software
+- **Deployment automation**: Create releases as part of deployment workflows
+- **Release notes**: Automatically generate and publish release notes
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Version Strategy**: How to determine the version (manual tag, auto-increment)
+- **Tag Name**: Git tag name for the release (supports expressions)
+- **Name**: Release title/name (optional, supports expressions)
+- **Body**: Release notes/description (optional, supports markdown and expressions)
+- **Draft**: Create as draft release (not published)
+- **Prerelease**: Mark as pre-release
+- **Generate Release Notes**: Automatically generate release notes from commits
+
+### Output
+
+Returns the created release object with all release information including tag, assets, and metadata.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "draft": false,
+    "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
+    "id": 3001,
+    "name": "Release 1.2.3",
+    "prerelease": false,
+    "tag_name": "v1.2.3"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.release"
+}
+```
+
+<a id="delete-release"></a>
+
+## Delete Release
+
+The Delete Release component removes a release from a GitHub repository.
+
+### Use Cases
+
+- **Cleanup**: Remove old or incorrect releases
+- **Rollback**: Delete releases that were created in error
+- **Maintenance**: Clean up draft or test releases
+- **Automated cleanup**: Remove releases as part of maintenance workflows
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Release Strategy**: How to find the release (by tag name or latest)
+- **Tag Name**: Git tag name of the release to delete (if using tag strategy)
+- **Delete Tag**: Also delete the associated Git tag (optional)
+
+### Output
+
+Returns confirmation of the deletion.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted_at": "2026-01-16T17:55:00Z",
+    "draft": false,
+    "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
+    "id": 3001,
+    "name": "Release 1.2.3",
+    "prerelease": false,
+    "tag_deleted": true,
+    "tag_name": "v1.2.3"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.release"
+}
+```
+
+<a id="get-issue"></a>
+
+## Get Issue
+
+The Get Issue component retrieves a specific issue from a GitHub repository by its issue number.
+
+### Use Cases
+
+- **Issue lookup**: Fetch issue details for processing or display
+- **Workflow automation**: Get issue information to make decisions in workflows
+- **Data enrichment**: Retrieve issue data to combine with other information
+- **Status checking**: Check issue status before performing actions
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the issue
+- **Issue Number**: The issue number to retrieve (supports expressions)
+
+### Output
+
+Returns the complete issue object including:
+- Issue number, title, and body
+- State (open/closed)
+- Labels and assignees
+- Created and updated timestamps
+- Author information
+- Comments count and other metadata
+
+### Example Output
+
+```json
+{
+  "data": {
+    "comments": 3,
+    "html_url": "https://github.com/acme/widgets/issues/42",
+    "id": 101,
+    "number": 42,
+    "state": "open",
+    "title": "Fix flaky build",
+    "user": {
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.issue"
+}
+```
+
+<a id="publish-commit-status"></a>
+
+## Publish Commit Status
+
+The Publish Commit Status component creates a status check on a GitHub commit, commonly used for CI/CD integrations.
+
+### Use Cases
+
+- **CI/CD integration**: Report build and test results to GitHub
+- **Status reporting**: Update commit status from external systems
+- **Deployment tracking**: Mark commits as deployed or failed
+- **Quality gates**: Report code quality check results
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Commit SHA**: The full 40-character commit SHA (supports expressions)
+- **State**: Status state - pending, success, failure, or error
+- **Context**: A label to identify this status check (e.g., "ci/build", "deploy/production")
+- **Description**: Short description of the status (max ~140 characters, optional)
+- **Target URL**: Link to build logs, test results, or deployment details (optional)
+
+### Output
+
+Returns the created status object with all status information.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "context": "ci/build",
+    "created_at": "2026-01-16T17:45:00Z",
+    "description": "All checks passed",
+    "state": "success",
+    "target_url": "https://ci.example.com/builds/123",
+    "updated_at": "2026-01-16T17:45:10Z"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.commitStatus"
+}
+```
+
+<a id="run-workflow"></a>
+
+## Run Workflow
+
+The Run Workflow component triggers a GitHub Actions workflow and waits for it to complete.
+
+### Use Cases
+
+- **CI/CD orchestration**: Trigger builds and deployments from SuperPlane workflows
+- **Automated testing**: Run test suites as part of workflow automation
+- **Multi-stage pipelines**: Coordinate complex deployment pipelines
+- **Workflow chaining**: Chain multiple GitHub Actions workflows together
+
+### How It Works
+
+1. Dispatches the specified GitHub Actions workflow with optional inputs
+2. Waits for the workflow run to complete (monitored via webhook and polling)
+3. Routes execution based on workflow conclusion:
+   - **Passed channel**: Workflow completed successfully
+   - **Failed channel**: Workflow failed or was cancelled
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the workflow
+- **Workflow File**: Path to the workflow file (e.g., `.github/workflows/ci.yml`)
+- **Branch or Tag**: Git reference to run the workflow on (default: main)
+- **Inputs**: Optional workflow inputs as key-value pairs (supports expressions)
+
+### Output Channels
+
+- **Passed**: Emitted when workflow completes successfully
+- **Failed**: Emitted when workflow fails or is cancelled
+
+### Notes
+
+- The component automatically sets up webhook monitoring for workflow completion
+- Falls back to polling if webhook doesn't arrive
+- Can be cancelled, which will cancel the running GitHub Actions workflow
+
+### Example Output
+
+```json
+{
+  "data": {
+    "workflow_run": {
+      "conclusion": "success",
+      "html_url": "https://github.com/acme/widgets/actions/runs/9001",
+      "id": 9001,
+      "status": "completed"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.workflow.finished"
+}
+```
+
+<a id="update-issue"></a>
+
+## Update Issue
+
+The Update Issue component modifies an existing GitHub issue with new information.
+
+### Use Cases
+
+- **Status updates**: Change issue state (open/closed) based on workflow results
+- **Label management**: Add or update labels on issues
+- **Assignee updates**: Assign issues to team members automatically
+- **Content updates**: Update issue title or body with new information
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the issue
+- **Issue Number**: The issue number to update
+- **Title**: New title for the issue (optional, supports expressions)
+- **Body**: New body/description for the issue (optional, supports expressions)
+- **State**: Change issue state to "open" or "closed" (optional)
+- **Assignees**: List of GitHub usernames to assign the issue to (optional)
+- **Labels**: List of labels to apply to the issue (optional)
+
+### Output
+
+Returns the updated issue object with all current information.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "html_url": "https://github.com/acme/widgets/issues/42",
+    "id": 101,
+    "number": 42,
+    "state": "closed",
+    "title": "Fix flaky build",
+    "updated_at": "2026-01-16T17:40:00Z"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.issue"
+}
+```
+
+<a id="update-release"></a>
+
+## Update Release
+
+The Update Release component modifies an existing GitHub release.
+
+### Use Cases
+
+- **Release updates**: Update release notes or metadata after creation
+- **Draft to published**: Convert draft releases to published releases
+- **Metadata updates**: Update release name, description, or tags
+- **Prerelease management**: Change prerelease status
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Release Strategy**: How to find the release (by tag name or latest)
+- **Tag Name**: Git tag name of the release to update (if using tag strategy)
+- **Name**: New release title/name (optional, supports expressions)
+- **Body**: New release notes/description (optional, supports markdown and expressions)
+- **Draft**: Update draft status
+- **Prerelease**: Update prerelease status
+- **Generate Release Notes**: Regenerate release notes from commits
+
+### Output
+
+Returns the updated release object with all current information.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "draft": false,
+    "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
+    "id": 3001,
+    "name": "Release 1.2.3",
+    "prerelease": false,
+    "tag_name": "v1.2.3",
+    "updated_at": "2026-01-16T17:50:00Z"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.release"
 }
 ```
 

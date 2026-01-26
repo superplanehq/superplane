@@ -35,6 +35,9 @@ cp "${TEMPLATES_DIR}/Caddyfile" "${TARGET_DIR}/Caddyfile"
 echo "* Injecting superplane-logo.txt"
 cp "${TEMPLATES_DIR}/superplane-logo.txt" "${TARGET_DIR}/superplane-logo.txt"
 
+echo "* Generating SBOM"
+release/generate-sbom.sh "${VERSION}"
+
 echo "* Creating superplane-single-host.tar.gz"
 (
   cd "${BUILD_ROOT}"
@@ -44,3 +47,4 @@ echo "* Creating superplane-single-host.tar.gz"
 echo ""
 echo "Done."
 echo "Artifact: ${BUILD_ROOT}/superplane-single-host.tar.gz"
+echo "SBOM: ${BUILD_ROOT}/superplane-sbom.json"

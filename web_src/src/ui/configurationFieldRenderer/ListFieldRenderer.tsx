@@ -2,6 +2,7 @@ import React from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "../button";
 import { Input } from "@/components/ui/input";
+import { DayInYearFieldRenderer } from "./DayInYearFieldRenderer";
 import { FieldRendererProps, ValidationError } from "./types";
 import { ConfigurationFieldRenderer } from "./index";
 import { showErrorToast } from "@/utils/toast";
@@ -25,9 +26,13 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   autocompleteExampleObj,
   allowExpressions = false,
 }) => {
-  const items = Array.isArray(value) ? value : [];
   const listOptions = field.typeOptions?.list;
   const itemDefinition = listOptions?.itemDefinition;
+  const items = Array.isArray(value)
+    ? itemDefinition?.type === "day-in-year"
+      ? value.filter((item) => typeof item === "string" && item.trim().length > 0)
+      : value
+    : [];
   const itemLabel = listOptions?.itemLabel || "Item";
   const isApprovalItemsList =
     itemDefinition?.type === "object" &&
@@ -52,7 +57,14 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   };
 
   const addItem = () => {
-    const newItem = itemDefinition?.type === "object" ? {} : itemDefinition?.type === "number" ? 0 : "";
+    const newItem =
+      itemDefinition?.type === "object"
+        ? {}
+        : itemDefinition?.type === "number"
+          ? 0
+          : itemDefinition?.type === "day-in-year"
+            ? "01/01"
+            : "";
     onChange([...items, newItem]);
   };
 
@@ -134,6 +146,12 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                   );
                 })}
               </div>
+            ) : itemDefinition?.type === "day-in-year" ? (
+              <DayInYearFieldRenderer
+                field={{ name: `${field.name || "item"}-${index}`, label: itemLabel, type: "day-in-year" }}
+                value={item}
+                onChange={(val) => updateItem(index, val)}
+              />
             ) : (
               <Input
                 type={itemDefinition?.type === "number" ? "number" : "text"}

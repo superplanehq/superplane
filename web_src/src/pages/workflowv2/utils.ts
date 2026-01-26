@@ -1,25 +1,65 @@
 import {
   ComponentsEdge,
   ComponentsNode,
+  WorkflowsWorkflow,
   WorkflowsWorkflowEvent,
   WorkflowsWorkflowEventWithExecutions,
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
-  WorkflowsWorkflow,
 } from "@/api-client";
-import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import { flattenObject } from "@/lib/utils";
+import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
+import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
+import { SidebarEvent } from "@/ui/componentSidebar/types";
 import { formatTimeAgo } from "@/utils/date";
 import { createElement, Fragment, type ReactNode } from "react";
 import { getComponentBaseMapper, getState, getTriggerRenderer } from "./mappers";
-import { SidebarEvent } from "@/ui/componentSidebar/types";
-import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 
 export function generateNodeId(blockName: string, nodeName: string): string {
   const randomChars = Math.random().toString(36).substring(2, 8);
   const sanitizedBlock = blockName.toLowerCase().replace(/[^a-z0-9]/g, "-");
   const sanitizedName = nodeName.toLowerCase().replace(/[^a-z0-9]/g, "-");
   return `${sanitizedBlock}-${sanitizedName}-${randomChars}`;
+}
+
+/**
+ * Generates a unique node name based on component name + ordinal number.
+ * First instance: "if", second: "if2", third: "if3", etc.
+ *
+ * @param componentName - The component name (e.g., "semaphore.onPipelineDone")
+ * @param existingNodeNames - Array of existing node names on the canvas
+ * @returns A unique node name (e.g., "semaphore.onPipelineDone" or "semaphore.onPipelineDone2")
+ */
+export function generateUniqueNodeName(componentName: string, existingNodeNames: string[]): string {
+  // Escape special regex characters in the component name
+  const escapedName = componentName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  // Check if the base name (without number) already exists
+  const baseNameExists = existingNodeNames.includes(componentName);
+
+  // Find all existing nodes with this base name pattern (name + number)
+  const pattern = new RegExp(`^${escapedName}(\\d+)$`);
+  const existingOrdinals: number[] = [];
+
+  for (const name of existingNodeNames) {
+    const match = name.match(pattern);
+    if (match) {
+      existingOrdinals.push(parseInt(match[1], 10));
+    }
+  }
+
+  // If no existing nodes with this name, return the base name
+  if (!baseNameExists && existingOrdinals.length === 0) {
+    return componentName;
+  }
+
+  // Find the next available ordinal (starting from 2)
+  let nextOrdinal = 2;
+  if (existingOrdinals.length > 0) {
+    nextOrdinal = Math.max(...existingOrdinals) + 1;
+  }
+
+  return `${componentName}${nextOrdinal}`;
 }
 
 export function mapTriggerEventsToSidebarEvents(
@@ -164,7 +204,13 @@ export function mapQueueItemsToSidebarEvents(
   });
 }
 
-export function mapExecutionStateToLogType(state?: string): "success" | "error" {
+export function mapExecutionStateToLogType(
+  execution: WorkflowsWorkflowNodeExecution,
+  state?: string,
+): "success" | "error" | "resolved-error" {
+  if (execution.resultReason === "RESULT_REASON_ERROR_RESOLVED") {
+    return "resolved-error";
+  }
   return state === "error" ? "error" : "success";
 }
 
@@ -187,7 +233,7 @@ export function buildRunItemFromExecution(options: {
   const componentName = componentNode?.component?.name || "";
   const stateResolver = getState(componentName);
   const state = stateResolver(execution);
-  const executionState = state || "unknown";
+  const executionState = execution.resultReason === "RESULT_REASON_ERROR_RESOLVED" ? "error" : state || "unknown";
   const nodeId = componentNode?.id || execution.nodeId || "";
   const detail = execution.resultMessage;
   const triggerNode = event ? nodes.find((node) => node.id === event.nodeId) : undefined;
@@ -231,7 +277,7 @@ export function buildRunItemFromExecution(options: {
 
   return {
     id: execution.id || `${execution.nodeId}-execution`,
-    type: mapExecutionStateToLogType(state),
+    type: mapExecutionStateToLogType(execution, state),
     title,
     timestamp: timestampOverride || execution.updatedAt || execution.createdAt || execution.rootEvent?.createdAt || "",
     isRunning: execution.state === "STATE_STARTED" || execution.state === "STATE_PENDING",
@@ -314,37 +360,70 @@ export function mapCanvasNodesToLogEntries(options: {
 }): LogEntry[] {
   const { nodes, workflowUpdatedAt, onNodeSelect } = options;
 
-  return (
-    nodes
-      .filter((node: ComponentsNode) => node.errorMessage)
-      .map((node, index) => {
-        const title = createElement(
-          Fragment,
-          null,
-          "Component not configured - ",
-          createElement(
-            "button",
-            {
-              type: "button",
-              className: "text-blue-600 underline hover:text-blue-700",
-              onClick: () => onNodeSelect(node.id || ""),
-            },
-            node.id,
-          ),
-          " - ",
-          node.errorMessage,
-        );
+  const entries: LogEntry[] = [];
 
-        return {
-          id: `log-${index + 1}`,
-          source: "canvas",
-          timestamp: workflowUpdatedAt,
-          title,
-          type: "warning",
-          searchText: `component not configured ${node.id} ${node.errorMessage}`,
-        } as LogEntry;
-      }) || []
-  );
+  // Add error entries for nodes with configuration errors
+  nodes
+    .filter((node: ComponentsNode) => node.errorMessage)
+    .forEach((node, index) => {
+      const title = createElement(
+        Fragment,
+        null,
+        "Component not configured - ",
+        createElement(
+          "button",
+          {
+            type: "button",
+            className: "text-blue-600 underline hover:text-blue-700",
+            onClick: () => onNodeSelect(node.id || ""),
+          },
+          node.id,
+        ),
+        " - ",
+        node.errorMessage,
+      );
+
+      entries.push({
+        id: `error-${index + 1}`,
+        source: "canvas",
+        timestamp: workflowUpdatedAt,
+        title,
+        type: "warning",
+        searchText: `component not configured ${node.id} ${node.errorMessage}`,
+      } as LogEntry);
+    });
+
+  // Add warning entries for nodes with warnings (like shadowed names)
+  nodes
+    .filter((node: ComponentsNode) => node.warningMessage)
+    .forEach((node, index) => {
+      const title = createElement(
+        Fragment,
+        null,
+        createElement(
+          "button",
+          {
+            type: "button",
+            className: "text-blue-600 underline hover:text-blue-700",
+            onClick: () => onNodeSelect(node.id || ""),
+          },
+          node.name || node.id,
+        ),
+        " - ",
+        node.warningMessage,
+      );
+
+      entries.push({
+        id: `warning-${index + 1}`,
+        source: "canvas",
+        timestamp: workflowUpdatedAt,
+        title,
+        type: "warning",
+        searchText: `${node.name} ${node.id} ${node.warningMessage}`,
+      } as LogEntry);
+    });
+
+  return entries;
 }
 
 export function buildCanvasStatusLogEntry(options: {

@@ -36,6 +36,32 @@ func (c *UpdateRelease) Description() string {
 	return "Update an existing release in a GitHub repository"
 }
 
+func (c *UpdateRelease) Documentation() string {
+	return `The Update Release component modifies an existing GitHub release.
+
+## Use Cases
+
+- **Release updates**: Update release notes or metadata after creation
+- **Draft to published**: Convert draft releases to published releases
+- **Metadata updates**: Update release name, description, or tags
+- **Prerelease management**: Change prerelease status
+
+## Configuration
+
+- **Repository**: Select the GitHub repository
+- **Release Strategy**: How to find the release (by tag name or latest)
+- **Tag Name**: Git tag name of the release to update (if using tag strategy)
+- **Name**: New release title/name (optional, supports expressions)
+- **Body**: New release notes/description (optional, supports markdown and expressions)
+- **Draft**: Update draft status
+- **Prerelease**: Update prerelease status
+- **Generate Release Notes**: Regenerate release notes from commits
+
+## Output
+
+Returns the updated release object with all current information.`
+}
+
 func (c *UpdateRelease) Icon() string {
 	return "github"
 }

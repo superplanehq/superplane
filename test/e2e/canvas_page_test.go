@@ -23,6 +23,27 @@ func TestCanvasPage(t *testing.T) {
 		steps.assertNodeIsAdded("Hello")
 	})
 
+	t.Run("adding multiple nodes generates unique names", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
+		steps.start()
+		steps.givenACanvasExists()
+
+		// Add three noop nodes with auto-generated names
+		name1 := steps.addNoopWithDefaultName(models.Position{X: 500, Y: 200})
+		name2 := steps.addNoopWithDefaultName(models.Position{X: 500, Y: 400})
+		name3 := steps.addNoopWithDefaultName(models.Position{X: 500, Y: 600})
+
+		// First should be "noop", second "noop2", third "noop3"
+		require.Equal(t, "noop", name1, "first node should be named 'noop'")
+		require.Equal(t, "noop2", name2, "second node should be named 'noop2'")
+		require.Equal(t, "noop3", name3, "third node should be named 'noop3'")
+
+		// Verify all nodes exist on canvas
+		steps.assertNodeIsAdded("noop")
+		steps.assertNodeIsAdded("noop2")
+		steps.assertNodeIsAdded("noop3")
+	})
+
 	// Note: "duplicating a node on canvas" test removed - duplicate action no longer available in UI
 
 	t.Run("collapsing and expanding a node on canvas", func(t *testing.T) {
@@ -89,6 +110,19 @@ func TestCanvasPage(t *testing.T) {
 		steps.deleteConnectionBetweenNodes("First", "Second")
 		steps.assertNodesAreNotConnectedInDB("First", "Second")
 	})
+
+	t.Run("autocomplete suggests node data in filter expression", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
+		steps.start()
+		steps.givenACanvasExists()
+		steps.addManualTrigger("Start")
+		steps.addFilter("Filter")
+		steps.connectNodes("Start", "Filter")
+		steps.saveCanvas()
+		steps.openNodeSettings("Filter")
+		steps.typeExpression("$")
+		steps.assertAutocompleteNodeSuggestionVisible()
+	})
 }
 
 type CanvasPageSteps struct {
@@ -112,10 +146,30 @@ func (s *CanvasPageSteps) addNoop(name string) {
 	s.canvas.AddNoop(name, models.Position{X: 500, Y: 200})
 }
 
+func (s *CanvasPageSteps) addManualTrigger(name string) {
+	s.canvas.AddManualTrigger(name, models.Position{X: 500, Y: 200})
+}
+
+func (s *CanvasPageSteps) addFilter(name string) {
+	s.canvas.AddFilter(name, models.Position{X: 900, Y: 200})
+}
+
+func (s *CanvasPageSteps) addNoopWithDefaultName(pos models.Position) string {
+	return s.canvas.AddNoopWithDefaultName(pos)
+}
+
 func (s *CanvasPageSteps) addTwoNodesAndConnect() {
 	s.canvas.AddManualTrigger("First", models.Position{X: 500, Y: 200})
 	s.canvas.AddNoop("Second", models.Position{X: 900, Y: 200})
 	s.canvas.Connect("First", "Second")
+}
+
+func (s *CanvasPageSteps) connectNodes(sourceName, targetName string) {
+	s.canvas.Connect(sourceName, targetName)
+}
+
+func (s *CanvasPageSteps) saveCanvas() {
+	s.canvas.Save()
 }
 
 func (s *CanvasPageSteps) deleteConnectionBetweenNodes(sourceName, targetName string) {
@@ -222,6 +276,21 @@ func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems
 func (s *CanvasPageSteps) openSidebarForNode(node string) {
 	s.session.Click(q.TestID("node", node, "header"))
 	s.session.TakeScreenshot()
+}
+
+func (s *CanvasPageSteps) openNodeSettings(node string) {
+	s.canvas.StartEditingNode(node)
+	s.session.Click(q.Text("Configuration"))
+	s.session.Sleep(200)
+}
+
+func (s *CanvasPageSteps) typeExpression(value string) {
+	s.session.FillIn(q.TestID("expression-field-expression"), value)
+}
+
+func (s *CanvasPageSteps) assertAutocompleteNodeSuggestionVisible() {
+	s.session.AssertVisible(q.Locator(`div[data-suggestion-index="0"]`))
+	s.session.AssertVisible(q.Locator(`div[data-suggestion-index="0"] span:has-text("node")`))
 }
 
 func (s *CanvasPageSteps) assertQueuedItemsCount(nodeName string, expected int) {

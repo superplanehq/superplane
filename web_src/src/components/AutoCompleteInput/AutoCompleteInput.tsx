@@ -22,6 +22,12 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   expressionMode?: "wrapped" | "raw";
 }
 
+const suggestionSortPriority = {
+  $: 1,
+  root: 2,
+  previous: 3,
+} as const;
+
 export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInputProps>(
   function AutoCompleteInputRender(props, forwardedRef) {
     const {
@@ -98,6 +104,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const backdropRef = useRef<HTMLDivElement>(null);
     const mirrorRef = useRef<HTMLSpanElement>(null);
+    const isInteractingWithSuggestionsRef = useRef(false);
+    const suppressSuggestionsRef = useRef(false);
     useImperativeHandle(forwardedRef, () => inputRef.current as HTMLTextAreaElement);
 
     // Auto-resize textarea based on content (and backdrop in preview mode)
@@ -470,6 +478,9 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
 
     const getSuggestionInsertText = (suggestion: ReturnType<typeof getSuggestions>[number]) => {
       if (suggestion.kind === "function") {
+        if (suggestion.label === "root" || suggestion.label === "previous") {
+          return suggestion.insertText ?? `${suggestion.label}().`;
+        }
         return `${suggestion.label}()`;
       }
       return suggestion.insertText ?? suggestion.label;
@@ -538,101 +549,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       return { start: left.length, end: left.length };
     };
 
-    const extractTailPathExpression = (expr: string) => {
-      const s = expr.trim();
-      let bracketDepth = 0;
-      let inSingle = false;
-      let inDouble = false;
-
-      const isEscaped = (idx: number) => {
-        let backslashes = 0;
-        for (let j = idx - 1; j >= 0 && s[j] === "\\"; j--) {
-          backslashes++;
-        }
-        return backslashes % 2 === 1;
-      };
-
-      const isStopChar = (ch: string) =>
-        ch === "(" ||
-        ch === ")" ||
-        ch === "," ||
-        ch === ";" ||
-        ch === ":" ||
-        ch === "?" ||
-        ch === "+" ||
-        ch === "-" ||
-        ch === "*" ||
-        ch === "/" ||
-        ch === "%" ||
-        ch === "|" ||
-        ch === "&" ||
-        ch === "!" ||
-        ch === "=" ||
-        ch === "<" ||
-        ch === ">" ||
-        ch === "\n" ||
-        ch === "\r" ||
-        ch === "\t" ||
-        ch === " ";
-
-      let start = -1;
-      for (let i = 0; i < s.length; i++) {
-        const ch = s[i];
-
-        if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
-        else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
-
-        if (inSingle || inDouble) continue;
-
-        if (ch === "[") {
-          bracketDepth++;
-          continue;
-        }
-        if (ch === "]") {
-          bracketDepth = Math.max(0, bracketDepth - 1);
-          continue;
-        }
-
-        if (bracketDepth === 0 && ch === "$") {
-          start = i;
-        }
-      }
-
-      if (start === -1) return "";
-
-      bracketDepth = 0;
-      inSingle = false;
-      inDouble = false;
-      let end = s.length;
-
-      for (let i = start; i < s.length; i++) {
-        const ch = s[i];
-
-        if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
-        else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
-
-        if (inSingle || inDouble) continue;
-
-        if (ch === "[") {
-          bracketDepth++;
-          continue;
-        }
-        if (ch === "]") {
-          bracketDepth = Math.max(0, bracketDepth - 1);
-          continue;
-        }
-
-        if (bracketDepth === 0 && i > start && isStopChar(ch)) {
-          end = i;
-          break;
-        }
-      }
-
-      return s.slice(start, end).trim();
-    };
-
     const resolveExpressionValue = (expression: string, globals: Record<string, unknown>) => {
-      const tailExpr = extractTailPathExpression(expression);
+      const tailExpr = extractTailExpressionWithParens(expression);
       if (!tailExpr) return undefined;
 
       const stripWhitespaceOutsideStrings = (input: string) => {
@@ -663,6 +581,11 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       };
 
       let expr = stripWhitespaceOutsideStrings(tailExpr);
+      const normalized = normalizeSpecialFunctionExpr(expr);
+      if (normalized === null) {
+        return undefined;
+      }
+      expr = normalized;
       if (expr.startsWith("$[")) {
         expr = "$" + expr.slice(1);
       }
@@ -753,6 +676,101 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       return cur;
     };
 
+    const extractTailExpressionWithParens = (expr: string) => {
+      const s = expr.trim();
+      let i = s.length - 1;
+      let bracketDepth = 0;
+      let parenDepth = 0;
+      let inSingle = false;
+      let inDouble = false;
+
+      const isEscaped = (idx: number): boolean => {
+        let bs = 0;
+        for (let j = idx - 1; j >= 0 && s[j] === "\\"; j--) bs++;
+        return bs % 2 === 1;
+      };
+
+      const isStopChar = (ch: string): boolean =>
+        ch === "(" ||
+        ch === ")" ||
+        ch === "," ||
+        ch === ";" ||
+        ch === ":" ||
+        ch === "?" ||
+        ch === "+" ||
+        ch === "-" ||
+        ch === "*" ||
+        ch === "/" ||
+        ch === "%" ||
+        ch === "|" ||
+        ch === "&" ||
+        ch === "!" ||
+        ch === "=" ||
+        ch === "<" ||
+        ch === ">" ||
+        ch === "\n" ||
+        ch === "\r" ||
+        ch === "\t" ||
+        ch === " ";
+
+      for (; i >= 0; i--) {
+        const ch = s[i];
+
+        if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
+        else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
+
+        if (inSingle || inDouble) continue;
+
+        if (ch === "]") {
+          bracketDepth++;
+          continue;
+        }
+        if (ch === "[") {
+          bracketDepth = Math.max(0, bracketDepth - 1);
+          continue;
+        }
+        if (ch === ")") {
+          parenDepth++;
+          continue;
+        }
+        if (ch === "(") {
+          if (parenDepth == 0) {
+            return s.slice(i + 1).trim();
+          }
+          parenDepth = Math.max(0, parenDepth - 1);
+          continue;
+        }
+
+        if (bracketDepth > 0 || parenDepth > 0) continue;
+
+        if (isStopChar(ch)) {
+          return s.slice(i + 1).trim();
+        }
+      }
+
+      return s;
+    };
+
+    const normalizeSpecialFunctionExpr = (expr: string): string | null => {
+      const rootMatch = expr.match(/^root\(\)/);
+      if (rootMatch) {
+        return `__root${expr.slice(rootMatch[0].length)}`;
+      }
+
+      const previousMatch = expr.match(/^previous\(([^)]*)\)/);
+      if (previousMatch) {
+        const raw = (previousMatch[1] ?? "").trim();
+        const depth = raw === "" ? 1 : Number(raw);
+        if (!Number.isInteger(depth) || depth < 1) {
+          return null;
+        }
+
+        return `__previousByDepth["${depth}"]${expr.slice(previousMatch[0].length)}`;
+      }
+
+      return expr;
+    };
+
     const computeHighlightedValue = React.useCallback(
       (suggestion: ReturnType<typeof getSuggestions>[number], context: ReturnType<typeof getExpressionContext>) => {
         if (!exampleObj || !context) return undefined;
@@ -761,9 +779,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         const insertText = getSuggestionInsertText(suggestion);
         const left = context.expressionText.slice(0, context.expressionCursor);
         const range = getReplacementRange(left, insertText);
-        const nextExpression =
-          context.expressionText.slice(0, range.start) + insertText + context.expressionText.slice(range.end);
-        const value = resolveExpressionValue(nextExpression, exampleObj);
+        const nextExpressionLeft = context.expressionText.slice(0, range.start) + insertText;
+        const value = resolveExpressionValue(nextExpressionLeft, exampleObj);
         if (typeof value === "function") return undefined;
         return value;
       },
@@ -876,6 +893,11 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         return;
       }
 
+      if (suppressSuggestionsRef.current) {
+        suppressSuggestionsRef.current = false;
+        return;
+      }
+
       const context = getExpressionContext(inputValue, cursorPosition);
       if (!context || !isAllowedToSuggest(inputValue, cursorPosition)) {
         setSuggestions([]);
@@ -884,7 +906,23 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         return;
       }
 
-      const newSuggestions = getSuggestions(context.expressionText, context.expressionCursor, exampleObj ?? {});
+      const newSuggestions = getSuggestions(context.expressionText, context.expressionCursor, exampleObj ?? {}, {
+        limit: 150,
+      }).sort((a, b) => {
+        const aPriority = suggestionSortPriority[a.label as keyof typeof suggestionSortPriority];
+        const bPriority = suggestionSortPriority[b.label as keyof typeof suggestionSortPriority];
+
+        if (aPriority !== undefined && bPriority !== undefined) {
+          return aPriority - bPriority;
+        }
+        if (aPriority !== undefined) {
+          return -1;
+        }
+        if (bPriority !== undefined) {
+          return 1;
+        }
+        return a.label.localeCompare(b.label);
+      });
       setSuggestions(newSuggestions);
       setIsOpen(newSuggestions.length > 0);
       const nextHighlightedIndex = showValuePreview && newSuggestions.length > 0 ? 0 : -1;
@@ -913,6 +951,9 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     // Handle clicking outside to close suggestions
     useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
+        if (suggestionsRef.current?.contains(event.target as Node)) {
+          return;
+        }
         if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
           setIsOpen(false);
           setIsFocused(false);
@@ -973,9 +1014,12 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     };
 
     const handleSuggestionClick = (suggestionItem: ReturnType<typeof getSuggestions>[number]) => {
+      suppressSuggestionsRef.current = true;
       const cursorPosition = inputRef.current?.selectionStart || 0;
       const context = getExpressionContext(inputValue, cursorPosition);
       if (!context) {
+        suppressSuggestionsRef.current = false;
+        isInteractingWithSuggestionsRef.current = false;
         setIsOpen(false);
         return;
       }
@@ -994,6 +1038,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         inputRef.current?.focus();
         const cursorTarget = context.startOffset + range.start + insertText.length;
         inputRef.current?.setSelectionRange(cursorTarget, cursorTarget);
+        isInteractingWithSuggestionsRef.current = false;
+        suppressSuggestionsRef.current = false;
       });
 
       setIsOpen(false);
@@ -1132,6 +1178,13 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
               }
             }}
             onBlur={() => {
+              if (isInteractingWithSuggestionsRef.current) {
+                requestAnimationFrame(() => {
+                  inputRef.current?.focus();
+                  isInteractingWithSuggestionsRef.current = false;
+                });
+                return;
+              }
               // Small delay to allow click on suggestions
               setTimeout(() => {
                 setIsFocused(false);
@@ -1261,12 +1314,15 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                               {highlightedSuggestion.nodeName}
                             </span>
                           </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-500">ID</span>
-                            <span className="text-gray-400 truncate ml-2 max-w-[120px]">
-                              {highlightedSuggestion.nodeId}
-                            </span>
-                          </div>
+                          {highlightedSuggestion.nodeId &&
+                            highlightedSuggestion.nodeId !== highlightedSuggestion.nodeName && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">ID</span>
+                                <span className="text-gray-400 truncate ml-2 max-w-[120px]">
+                                  {highlightedSuggestion.nodeId}
+                                </span>
+                              </div>
+                            )}
                         </div>
                       </>
                     ) : /* Function suggestions */
@@ -1397,9 +1453,14 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                 >
                   {(() => {
                     const nodeDataSuggestions = suggestions.filter(
-                      (s) => s.label === "$" || s.nodeName || (s.kind !== "function" && s.kind !== "keyword"),
+                      (s) =>
+                        ["$", "root", "previous"].includes(s.label) ||
+                        s.nodeName ||
+                        (s.kind !== "function" && s.kind !== "keyword"),
                     );
-                    const functionSuggestions = suggestions.filter((s) => s.kind === "function");
+                    const functionSuggestions = suggestions.filter(
+                      (s) => s.kind === "function" && !["root", "previous"].includes(s.label),
+                    );
 
                     const renderSuggestionItem = (suggestionItem: Suggestion, index: number) => (
                       <div
@@ -1412,10 +1473,13 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                           highlightedIndex === index && "bg-gray-100 dark:bg-gray-700",
                         ])}
                         onMouseDown={(e) => {
+                          isInteractingWithSuggestionsRef.current = true;
                           e.preventDefault(); // Prevent blur on the input
+                          e.stopPropagation();
                           handleSuggestionClick(suggestionItem);
                         }}
-                        onMouseEnter={() => {
+                        onMouseEnter={(e) => {
+                          e.stopPropagation();
                           setHighlightedIndex(index);
                           setHighlightedSuggestion(suggestionItem);
                           if (exampleObj) {
@@ -1432,7 +1496,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                             {formatFunctionSignature(suggestionItem)}
                           </span>
                         )}
-                        {suggestionItem.label === "$" && (
+                        {["$", "root", "previous"].includes(suggestionItem.label) && (
                           <span className="flex-shrink-0 px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded">
                             event data
                           </span>

@@ -1,15 +1,16 @@
 ---
 title: "Semaphore"
 sidebar:
-  label: "Semaphore"
-type: "application"
-name: "semaphore"
-label: "Semaphore"
+  order: 8
 ---
 
-## Overview
-
 Run and react to your Semaphore workflows
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Pipeline Done" href="#on-pipeline-done" description="Listen to Semaphore pipeline done events" />
+</CardGrid>
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
@@ -19,63 +20,35 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run Semaphore workflow" />
 </CardGrid>
 
-## Triggers
-
-<CardGrid>
-  <LinkCard title="On Pipeline Done" href="#on-pipeline-done" description="Listen to Semaphore pipeline done events" />
-</CardGrid>
-
-<a id="run-workflow"></a>
-
-## Run Workflow
-
-Run Semaphore workflow
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| project | Project | app-installation-resource | yes | - |
-| pipelineFile | Pipeline file | string | yes | - |
-| ref | Pipeline file location | git-ref | yes | - |
-| commitSha | Commit SHA | string | no | - |
-| parameters | Parameters | list | no | - |
-
-### Example Output
-
-```json
-{
-  "data": {
-    "extra": {
-      "triggeredBy": "SuperPlane"
-    },
-    "pipeline": {
-      "id": "ppl_456",
-      "result": "passed",
-      "state": "done"
-    },
-    "workflow": {
-      "id": "wf_123",
-      "url": "https://semaphore.example.com/workflows/wf_123"
-    }
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "semaphore.workflow.finished"
-}
-```
-
 <a id="on-pipeline-done"></a>
 
 ## On Pipeline Done
 
-Listen to Semaphore pipeline done events
+The On Pipeline Done trigger starts a workflow execution when a Semaphore pipeline completes.
+
+### Use Cases
+
+- **Pipeline orchestration**: Chain workflows together based on pipeline completion
+- **Status monitoring**: Monitor CI/CD pipeline results
+- **Notification workflows**: Send notifications when pipelines succeed or fail
+- **Post-processing**: Process artifacts or results after pipeline completion
 
 ### Configuration
 
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| project | Project | app-installation-resource | yes | - |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
+- **Project**: Select the Semaphore project to monitor
+
+### Event Data
+
+Each pipeline done event includes:
+- **pipeline**: Pipeline information including ID, state, and result
+- **workflow**: Workflow information including ID and URL
+- **project**: Project information
+- **result**: Pipeline result (passed, failed, stopped, etc.)
+- **state**: Pipeline state (done)
+
+### Webhook Setup
+
+This trigger automatically sets up a Semaphore webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
 
 ### Example Data
 
@@ -153,6 +126,125 @@ Listen to Semaphore pipeline done events
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "semaphore.pipeline.done"
+}
+```
+
+<a id="run-workflow"></a>
+
+## Run Workflow
+
+The Run Workflow component triggers a Semaphore CI/CD workflow and waits for it to complete.
+
+### Use Cases
+
+- **CI/CD orchestration**: Trigger builds and deployments from SuperPlane workflows
+- **Pipeline automation**: Run Semaphore pipelines as part of workflow automation
+- **Multi-stage deployments**: Coordinate complex deployment pipelines
+- **Workflow chaining**: Chain multiple Semaphore workflows together
+
+### How It Works
+
+1. Creates and starts a Semaphore workflow with the specified pipeline file and parameters
+2. Waits for the pipeline to complete (monitored via webhook and polling)
+3. Routes execution based on pipeline result:
+   - **Passed channel**: Pipeline completed successfully
+   - **Failed channel**: Pipeline failed or was cancelled
+
+### Configuration
+
+- **Project**: Select the Semaphore project containing the workflow
+- **Pipeline File**: Path to the pipeline YAML file (e.g., `.semaphore/pipeline.yml`)
+- **Ref**: Git reference to run the workflow on (branch, tag, or commit SHA)
+- **Commit SHA**: Optional specific commit SHA to run (if not provided, uses latest from ref)
+- **Parameters**: Optional workflow parameters as key-value pairs (supports expressions)
+
+### Output Channels
+
+- **Passed**: Emitted when pipeline completes successfully
+- **Failed**: Emitted when pipeline fails or is cancelled
+
+### Notes
+
+- The component automatically sets up webhook monitoring for pipeline completion
+- Falls back to polling if webhook doesn't arrive
+- Can be cancelled, which will stop the running Semaphore workflow
+
+### Example Output
+
+```json
+{
+  "data": {
+    "blocks": [
+      {
+        "jobs": [
+          {
+            "id": "00000-00000-00000-00000-00000",
+            "index": 0,
+            "name": "Job #1",
+            "result": "passed",
+            "status": "finished"
+          }
+        ],
+        "name": "Block #1",
+        "result": "passed",
+        "result_reason": "test",
+        "state": "done"
+      }
+    ],
+    "organization": {
+      "id": "00000000-0000-0000-0000-000000000000",
+      "name": "test"
+    },
+    "pipeline": {
+      "created_at": "2026-01-22T15:32:47Z",
+      "done_at": "2026-01-22T15:32:55Z",
+      "error_description": "",
+      "id": "00000000-0000-0000-0000-000000000000",
+      "name": "Initial Pipeline",
+      "pending_at": "2026-01-22T15:32:48Z",
+      "queuing_at": "2026-01-22T15:32:48Z",
+      "result": "passed",
+      "result_reason": "test",
+      "running_at": "2026-01-22T15:32:48Z",
+      "state": "done",
+      "stopping_at": "1970-01-01T00:00:00Z",
+      "working_directory": ".semaphore",
+      "yaml_file_name": "semaphore.yml"
+    },
+    "project": {
+      "id": "00000000-0000-0000-0000-000000000000",
+      "name": "test"
+    },
+    "repository": {
+      "slug": "test/test",
+      "url": "https://github.com/test/test"
+    },
+    "revision": {
+      "branch": {
+        "commit_range": "0000000000000000000000000000000000000000^...0000000000000000000000000000000000000000",
+        "name": "test"
+      },
+      "commit_message": "test",
+      "commit_sha": "0000000000000000000000000000000000000000",
+      "pull_request": null,
+      "reference": "refs/heads/test",
+      "reference_type": "branch",
+      "sender": {
+        "avatar_url": "https://example.com/avatar.png",
+        "email": "test@test.com",
+        "login": "test"
+      },
+      "tag": null
+    },
+    "version": "1.0.0",
+    "workflow": {
+      "created_at": "2026-01-22T15:32:47Z",
+      "id": "00000000-0000-0000-0000-000000000000",
+      "initial_pipeline_id": "00000000-0000-0000-0000-000000000000"
+    }
+  },
+  "timestamp": "2026-01-22T15:32:56.061430218Z",
+  "type": "semaphore.workflow.finished"
 }
 ```
 

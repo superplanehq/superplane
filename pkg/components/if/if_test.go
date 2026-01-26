@@ -217,3 +217,41 @@ func TestIf_Execute_NodeReferenceExpression(t *testing.T) {
 	assert.True(t, stateCtx.Finished)
 	assert.Equal(t, ChannelNameTrue, stateCtx.Channel)
 }
+
+func TestIf_Execute_RootAndPreviousExpressions(t *testing.T) {
+	ifComponent := &If{}
+
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
+
+	ctx := core.ExecutionContext{
+		Configuration: map[string]any{
+			"expression": "root().data.ref == 'main' && previous(2).data.ok == true",
+		},
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
+		ExpressionEnv: func(expression string) (map[string]any, error) {
+			return map[string]any{
+				"$": map[string]any{},
+				"__root": map[string]any{
+					"data": map[string]any{
+						"ref": "main",
+					},
+				},
+				"__previousByDepth": map[string]any{
+					"2": map[string]any{
+						"data": map[string]any{
+							"ok": true,
+						},
+					},
+				},
+			}, nil
+		},
+	}
+
+	err := ifComponent.Execute(ctx)
+	assert.NoError(t, err)
+	assert.True(t, stateCtx.Passed)
+	assert.True(t, stateCtx.Finished)
+	assert.Equal(t, ChannelNameTrue, stateCtx.Channel)
+}

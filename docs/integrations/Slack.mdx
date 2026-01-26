@@ -1,15 +1,16 @@
 ---
 title: "Slack"
 sidebar:
-  label: "Slack"
-type: "application"
-name: "slack"
-label: "Slack"
+  order: 9
 ---
 
-## Overview
-
 Send and react to Slack messages and interactions
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On App Mention" href="#on-app-mention" description="Listen to messages mentioning the Slack App" />
+</CardGrid>
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
@@ -19,57 +20,39 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Send Text Message" href="#send-text-message" description="Send a text message to a Slack channel" />
 </CardGrid>
 
-## Triggers
-
-<CardGrid>
-  <LinkCard title="On App Mention" href="#on-app-mention" description="Listen to messages mentioning the Slack App" />
-</CardGrid>
-
 ## Installation
 
 You can install the Slack app without the **Bot Token** and **Signing Secret**.
 After installation, follow the setup prompt to create the Slack app and add those values.
 
-<a id="send-text-message"></a>
-
-## Send Text Message
-
-Send a text message to a Slack channel
-
-### Configuration
-
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| channel | Channel | app-installation-resource | yes | - |
-| text | Text | text | yes | - |
-
-### Example Output
-
-```json
-{
-  "data": {
-    "channel": "C123456",
-    "text": "Hello from SuperPlane",
-    "ts": "1700000000.000100",
-    "user": "U123456"
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "slack.message.sent"
-}
-```
-
 <a id="on-app-mention"></a>
 
 ## On App Mention
 
-Listen to messages mentioning the Slack App
+The On App Mention trigger starts a workflow execution when the Slack app is mentioned in a message.
+
+### Use Cases
+
+- **Slash commands**: Process commands from Slack messages
+- **Bot interactions**: Create interactive Slack bots
+- **Team workflows**: Trigger workflows from Slack conversations
+- **Notification processing**: Process and respond to mentions
 
 ### Configuration
 
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| channel | Channel | app-installation-resource | no | - |
-| customName | Run title (optional) | string | no | Optional run title template. Supports expressions like &#123;&#123; $.data &#125;&#125;. |
+- **Channel**: Optional channel filter - if specified, only mentions in this channel will trigger (leave empty to listen to all channels)
+
+### Event Data
+
+Each mention event includes:
+- **event**: Event information including message text, channel, and timestamp
+- **user**: User who mentioned the app
+- **channel**: Channel where the mention occurred
+- **text**: The message text containing the mention
+
+### Setup
+
+This trigger automatically sets up a Slack event subscription when configured. The subscription is managed by SuperPlane and will be cleaned up when the trigger is removed.
 
 ### Example Data
 
@@ -97,6 +80,49 @@ Listen to messages mentioning the Slack App
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "slack.app.mention"
+}
+```
+
+<a id="send-text-message"></a>
+
+## Send Text Message
+
+The Send Text Message component sends a text message to a Slack channel.
+
+### Use Cases
+
+- **Notifications**: Send notifications about workflow events or system status
+- **Alerts**: Alert teams about important events or errors
+- **Updates**: Provide status updates on long-running processes
+- **Team communication**: Automate team communications from workflows
+
+### Configuration
+
+- **Channel**: Select the Slack channel to send the message to
+- **Text**: The message text to send (supports expressions and Slack markdown formatting)
+
+### Output
+
+Returns metadata about the sent message including channel information.
+
+### Notes
+
+- The Slack app must be installed and have permission to post to the selected channel
+- Supports Slack markdown formatting in message text
+- Messages are sent as the configured Slack bot user
+
+### Example Output
+
+```json
+{
+  "data": {
+    "channel": "C123456",
+    "text": "Hello from SuperPlane",
+    "ts": "1700000000.000100",
+    "user": "U123456"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "slack.message.sent"
 }
 ```
 

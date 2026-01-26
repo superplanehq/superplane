@@ -80,11 +80,7 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 		if event.ExecutionID != nil {
 			builder = builder.WithPreviousExecution(event.ExecutionID)
 		}
-		chain, err := builder.BuildMessageChainForExpression(expression)
-		if err != nil {
-			return nil, err
-		}
-		return map[string]any{"$": chain}, nil
+		return builder.BuildExpressionEnv(expression)
 	}
 
 	ctx.CreateExecution = func() (*core.ExecutionContext, error) {

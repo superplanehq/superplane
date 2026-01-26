@@ -55,6 +55,9 @@ var exampleDataOnTagCreatedBytes []byte
 //go:embed example_data_on_branch_created.json
 var exampleDataOnBranchCreatedBytes []byte
 
+//go:embed example_data_on_workflow_run.json
+var exampleDataOnWorkflowRunBytes []byte
+
 var exampleOutputCreateIssueOnce sync.Once
 var exampleOutputCreateIssue map[string]any
 
@@ -102,6 +105,9 @@ var exampleDataOnTagCreated map[string]any
 
 var exampleDataOnBranchCreatedOnce sync.Once
 var exampleDataOnBranchCreated map[string]any
+
+var exampleDataOnWorkflowRunOnce sync.Once
+var exampleDataOnWorkflowRun map[string]any
 
 func (c *CreateIssue) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateIssueOnce, exampleOutputCreateIssueBytes, &exampleOutputCreateIssue)
@@ -173,4 +179,8 @@ func (t *OnTagCreated) ExampleData() map[string]any {
 
 func (t *OnBranchCreated) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnBranchCreatedOnce, exampleDataOnBranchCreatedBytes, &exampleDataOnBranchCreated)
+}
+
+func (t *OnWorkflowRun) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnWorkflowRunOnce, exampleDataOnWorkflowRunBytes, &exampleDataOnWorkflowRun)
 }

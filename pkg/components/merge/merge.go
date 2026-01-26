@@ -3,6 +3,7 @@ package merge
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/expr-lang/expr"
@@ -15,8 +16,15 @@ import (
 )
 
 // Merge is a component that passes its input downstream on
-// the default channel. The queue/worker layer is responsible
-// for aggregating inputs from multiple parents.
+// different channels based on execution outcome. The queue/worker
+// layer is responsible for aggregating inputs from multiple parents.
+
+// Output channel names for Merge component
+const (
+	ChannelNameSuccess = "success"
+	ChannelNameTimeout = "timeout"
+	ChannelNameFail    = "fail"
+)
 
 func init() {
 	registry.RegisterComponent("merge", &Merge{})
@@ -27,18 +35,62 @@ type Merge struct{}
 func (m *Merge) Name() string        { return "merge" }
 func (m *Merge) Label() string       { return "Merge" }
 func (m *Merge) Description() string { return "Merge multiple upstream inputs and forward" }
-func (m *Merge) Icon() string        { return "arrow-right-from-line" }
-func (m *Merge) Color() string       { return "gray" }
+func (m *Merge) Documentation() string {
+	return `The Merge component waits for events from all upstream nodes before forwarding a combined result downstream.
+
+## Use Cases
+
+- **Parallel processing**: Wait for multiple parallel operations to complete
+- **Data aggregation**: Combine results from multiple sources
+- **Synchronization**: Synchronize multiple workflow branches
+- **Fan-in patterns**: Collect outputs from multiple upstream nodes
+
+## How It Works
+
+1. The Merge component waits for events from all distinct upstream source nodes
+2. Once all inputs are received, it emits the combined data to the Success channel
+3. Optional timeout and conditional stop features allow early completion
+
+## Configuration Options
+
+- **Enable Timeout**: Cancel merge after a specified time if not all inputs are received
+- **Enable Conditional Stop**: Stop waiting early when a condition is met (e.g., if one branch fails)
+
+## Output Channels
+
+- **Success**: Emitted when all upstream inputs are received
+- **Timeout**: Emitted if the timeout is reached before all inputs are received
+- **Fail**: Emitted if the conditional stop expression evaluates to true
+
+## Behavior
+
+- Tracks distinct source nodes (ignoring multiple channels from the same source)
+- Combines all received event data into the output
+- Supports timeout to prevent indefinite waiting
+- Supports conditional early stop based on expression evaluation`
+}
+func (m *Merge) Icon() string  { return "arrow-right-from-line" }
+func (m *Merge) Color() string { return "gray" }
 
 func (m *Merge) OutputChannels(configuration any) []core.OutputChannel {
-	return []core.OutputChannel{core.DefaultOutputChannel}
+	return []core.OutputChannel{
+		{Name: ChannelNameSuccess, Label: "Success", Description: "All inputs received successfully"},
+		{Name: ChannelNameTimeout, Label: "Timeout", Description: "Timed out waiting for inputs"},
+		{Name: ChannelNameFail, Label: "Fail", Description: "Stopped early by condition"},
+	}
 }
 
 type Spec struct {
+	// EnableTimeout toggles the execution timeout feature
+	EnableTimeout bool `json:"enableTimeout" mapstructure:"enableTimeout"`
+
 	ExecutionTimeout struct {
 		Value int    `json:"value"`
 		Unit  string `json:"unit"`
 	} `json:"executionTimeout"`
+
+	// EnableStopIf toggles the conditional stop feature
+	EnableStopIf bool `json:"enableStopIf" mapstructure:"enableStopIf"`
 
 	// Optional expression to short-circuit waiting for all inputs.
 	// The expression is evaluated against the incoming event input using
@@ -50,10 +102,24 @@ type Spec struct {
 func (m *Merge) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:        "enableTimeout",
+			Label:       "Enable Timeout",
+			Type:        configuration.FieldTypeBool,
+			Description: "Cancel merge after a specified time if not all inputs are received.",
+			Required:    false,
+			Default:     false,
+		},
+		{
 			Name:     "executionTimeout",
 			Label:    "Execution Timeout",
 			Type:     configuration.FieldTypeObject,
 			Required: false,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "enableTimeout",
+					Values: []string{"true"},
+				},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				Object: &configuration.ObjectTypeOptions{
 					Schema: []configuration.Field{
@@ -62,16 +128,17 @@ func (m *Merge) Configuration() []configuration.Field {
 							Label:    "Timeout",
 							Type:     configuration.FieldTypeNumber,
 							Required: true,
+							Default:  2,
 						},
 						{
 							Name:     "unit",
 							Label:    "Unit",
 							Type:     configuration.FieldTypeSelect,
 							Required: true,
+							Default:  "minutes",
 							TypeOptions: &configuration.TypeOptions{
 								Select: &configuration.SelectTypeOptions{
 									Options: []configuration.FieldOption{
-										{Label: "Seconds", Value: "seconds"},
 										{Label: "Minutes", Value: "minutes"},
 										{Label: "Hours", Value: "hours"},
 									},
@@ -83,12 +150,26 @@ func (m *Merge) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "enableStopIf",
+			Label:       "Enable Conditional Stop",
+			Type:        configuration.FieldTypeBool,
+			Description: "Stop waiting early when a condition is met.",
+			Required:    false,
+			Default:     false,
+		},
+		{
 			Name:        "stopIfExpression",
 			Label:       "Stop if",
 			Type:        configuration.FieldTypeExpression,
 			Description: "When true, stop waiting and finish immediately.",
 			Placeholder: "e.g. $.result == 'fail'",
 			Required:    false,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "enableStopIf",
+					Values: []string{"true"},
+				},
+			},
 		},
 	}
 }
@@ -113,6 +194,15 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 	executionCtx, err := m.findOrCreateExecution(ctx, ctx.RootEventID)
 	if err != nil {
 		return nil, fmt.Errorf("error finding or creating execution: %v", err)
+	}
+
+	// If the execution is already finished (e.g., timed out or stopped early),
+	// dequeue the item but don't process it further
+	if executionCtx.ExecutionState.IsFinished() {
+		if err := ctx.DequeueItem(); err != nil {
+			return nil, fmt.Errorf("error dequeuing item: %v", err)
+		}
+		return nil, nil
 	}
 
 	if err := ctx.DequeueItem(); err != nil {
@@ -142,7 +232,10 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 	}
 
 	//
-	// Evaluate stop expression if provided
+	// Evaluate stop expression if provided.
+	// The EnableStopIf toggle controls visibility in the UI - when disabled,
+	// the field is hidden and won't have a value. For backward compatibility,
+	// configs created before the toggle will still work if they have an expression.
 	//
 	if spec.StopIfExpression != "" {
 		env, err := expressionEnv(ctx, spec.StopIfExpression)
@@ -150,7 +243,7 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 			return nil, err
 		}
 
-		vm, err := expr.Compile(spec.StopIfExpression, expr.Env(env), expr.AsBool())
+		vm, err := expr.Compile(spec.StopIfExpression, expressionOptions(env)...)
 		if err != nil {
 			return nil, fmt.Errorf("stopIfExpression compilation failed: %w", err)
 		}
@@ -162,7 +255,7 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 
 		//
 		// If stopExpression is truthy,
-		// we mark metadata and fail immediately
+		// we mark metadata and emit to fail channel
 		//
 		if b, ok := out.(bool); ok && b {
 			md.StopEarly = true
@@ -171,13 +264,17 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 				return nil, err
 			}
 
-			return &executionCtx.ID, executionCtx.ExecutionState.Fail(models.WorkflowNodeExecutionResultReasonError, "Stopped by stopIfExpression")
+			return &executionCtx.ID, executionCtx.ExecutionState.Emit(
+				ChannelNameFail,
+				"merge.stopped",
+				[]any{md},
+			)
 		}
 	}
 
 	if len(md.Sources) >= incoming {
 		return &executionCtx.ID, executionCtx.ExecutionState.Emit(
-			core.DefaultOutputChannel.Name,
+			ChannelNameSuccess,
 			"merge.finished",
 			[]any{md},
 		)
@@ -222,6 +319,78 @@ func buildExpressionEnv(input any, sourceNodeID string) map[string]any {
 	}
 
 	return map[string]any{"$": map[string]any{sourceNodeID: input}}
+}
+
+func expressionOptions(env map[string]any) []expr.Option {
+	return []expr.Option{
+		expr.Env(env),
+		expr.AsBool(),
+		expr.WithContext("ctx"),
+		expr.Timezone(time.UTC.String()),
+		expr.Function("root", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("root() takes no arguments")
+			}
+
+			rootPayload, ok := env["__root"]
+			if !ok {
+				return nil, fmt.Errorf("no root event found")
+			}
+			return rootPayload, nil
+		}),
+		expr.Function("previous", func(params ...any) (any, error) {
+			depth := 1
+			if len(params) > 1 {
+				return nil, fmt.Errorf("previous() accepts zero or one argument")
+			}
+			if len(params) == 1 {
+				parsedDepth, err := parseDepthValue(params[0])
+				if err != nil {
+					return nil, err
+				}
+				depth = parsedDepth
+			}
+
+			previousByDepth, ok := env["__previousByDepth"]
+			if !ok {
+				return nil, nil
+			}
+			if values, ok := previousByDepth.(map[string]any); ok {
+				return values[strconv.Itoa(depth)], nil
+			}
+			if values, ok := previousByDepth.(map[int]any); ok {
+				return values[depth], nil
+			}
+
+			return nil, nil
+		}),
+	}
+}
+
+func parseDepthValue(param any) (int, error) {
+	switch value := param.(type) {
+	case int:
+		if value < 1 {
+			return 0, fmt.Errorf("depth must be >= 1")
+		}
+		return value, nil
+	case int64:
+		if value < 1 {
+			return 0, fmt.Errorf("depth must be >= 1")
+		}
+		return int(value), nil
+	case float64:
+		parsed := int(value)
+		if value != float64(parsed) {
+			return 0, fmt.Errorf("depth must be an integer")
+		}
+		if parsed < 1 {
+			return 0, fmt.Errorf("depth must be >= 1")
+		}
+		return parsed, nil
+	default:
+		return 0, fmt.Errorf("depth must be an integer")
+	}
 }
 
 func (m *Merge) findOrCreateExecution(ctx core.ProcessQueueContext, mergeGroup string) (*core.ExecutionContext, error) {
@@ -311,7 +480,22 @@ func (m *Merge) HandleTimeout(ctx core.ActionContext) error {
 		return nil
 	}
 
-	return ctx.ExecutionState.Fail(models.WorkflowNodeExecutionResultReasonError, "Execution timed out waiting for other inputs")
+	// Get current metadata to include in the timeout output
+	md := &ExecutionMetadata{}
+	if err := mapstructure.Decode(ctx.Metadata.Get(), md); err != nil {
+		// If we can't decode metadata, emit with empty object
+		return ctx.ExecutionState.Emit(
+			ChannelNameTimeout,
+			"merge.timeout",
+			[]any{map[string]any{}},
+		)
+	}
+
+	return ctx.ExecutionState.Emit(
+		ChannelNameTimeout,
+		"merge.timeout",
+		[]any{md},
+	)
 }
 
 func (m *Merge) Execute(ctx core.ExecutionContext) error {
@@ -321,6 +505,11 @@ func (m *Merge) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	// Schedule timeout if executionTimeout has valid values.
+	// The EnableTimeout toggle controls visibility in the UI - when disabled,
+	// the timeout fields are hidden and won't have values.
+	// For backward compatibility, configs created before the toggle was added
+	// will still work because they have timeout values configured.
 	interval := durationFrom(spec.ExecutionTimeout.Value, spec.ExecutionTimeout.Unit)
 	if interval > 0 {
 		return ctx.Requests.ScheduleActionCall("timeoutReached", map[string]any{}, interval)

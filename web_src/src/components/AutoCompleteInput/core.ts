@@ -61,6 +61,19 @@ type ExprFunction = {
 
 /** Built-in functions (from expr-lang docs categories). */
 export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
+  {
+    name: "root",
+    snippet: "root().",
+    description: "Returns the root payload that started the run.",
+    example: "root().github.ref",
+  },
+  {
+    name: "previous",
+    snippet: "previous().",
+    description:
+      "Returns the payload from the immediate predecessor that emitted this event. Provide depth to walk upstream.",
+    example: "previous(2).data.image.version",
+  },
   // String
   {
     name: "trim",
@@ -531,13 +544,13 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
       const v = (globals as Record<string, unknown>)[k];
       const tailDot = isExpandableValue(v) ? "." : "";
       const metadata = getNodeMetadata(globals, k, v);
+      const labelDetail = metadata.nodeName ? formatNodeNameLabel(metadata.nodeName) : undefined;
       return {
         label: `["${k}"]`,
         kind: "variable",
         insertText: `$[${quoteKey(k, envTrigger.quote)}]${tailDot}`,
         detail: getValueTypeLabel(v),
-        labelDetail: formatNodeNameLabel(metadata.nodeName),
-        nodeId: metadata.nodeName ? k : undefined,
+        labelDetail,
         nodeName: metadata.nodeName,
         componentType: metadata.componentType,
         description: metadata.description,
@@ -557,13 +570,13 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
       .map((k) => {
         const v = (globals as Record<string, unknown>)[k];
         const metadata = getNodeMetadata(globals, k, v);
+        const labelDetail = metadata.nodeName ? formatNodeNameLabel(metadata.nodeName) : undefined;
         return {
           label: `["${k}"]`,
           kind: "variable",
           insertText: quoteKey(k, bracketCtx.quote), // only the key token
           detail: getValueTypeLabel(v),
-          labelDetail: formatNodeNameLabel(metadata.nodeName),
-          nodeId: metadata.nodeName ? k : undefined,
+          labelDetail,
           nodeName: metadata.nodeName,
           componentType: metadata.componentType,
           description: metadata.description,
@@ -597,7 +610,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
       }
     }
 
-    const resolvableBase = extractTailPathExpression(baseExpr);
+    const resolvableBase = isFunctionCall ? baseExpr : extractTailPathExpression(baseExpr);
     const target = resolveExprToValue(resolvableBase, globals);
 
     const keys = listKeys(target);
@@ -799,8 +812,25 @@ function detectEnvKeyTrigger(left: string): EnvKeyTrigger | null {
 }
 
 function listGlobalKeys(globals: Record<string, unknown>): string[] {
-  const keys = Object.keys(globals ?? {});
-  return keys.filter((key) => key !== "__nodeNames");
+  const keys = Object.keys(globals ?? {}).filter((key) => !key.startsWith("__"));
+  const nodeNames = isRecord(globals) ? (globals as Record<string, unknown>).__nodeNames : undefined;
+
+  if (!isRecord(nodeNames)) {
+    return keys;
+  }
+
+  const nodeIds = new Set(Object.keys(nodeNames));
+  const nameKeys = new Set<string>();
+
+  for (const entry of Object.values(nodeNames)) {
+    const name = extractNodeName(entry);
+    if (name && !name.startsWith("__")) {
+      nameKeys.add(name);
+    }
+  }
+
+  const nonNodeKeys = keys.filter((key) => !nodeIds.has(key));
+  return Array.from(new Set([...nonNodeKeys, ...nameKeys]));
 }
 
 function isExpandableValue(v: unknown): boolean {
@@ -833,19 +863,19 @@ function getNodeMetadata(globals: Record<string, unknown>, key: string, value: u
   const nodeNames = isRecord(globals) ? (globals as Record<string, unknown>).__nodeNames : undefined;
   if (isRecord(nodeNames)) {
     const entry = nodeNames[key];
-    if (typeof entry === "string" && entry.trim()) {
-      metadata.nodeName = metadata.nodeName || entry;
-    } else if (isRecord(entry)) {
-      // New format: { name, componentType, description }
-      const name = entry.name ?? entry.nodeName ?? entry.label;
-      if (typeof name === "string" && name.trim()) {
-        metadata.nodeName = metadata.nodeName || name;
-      }
-      if (typeof entry.componentType === "string" && entry.componentType.trim()) {
-        metadata.componentType = entry.componentType;
-      }
-      if (typeof entry.description === "string" && entry.description.trim()) {
-        metadata.description = entry.description;
+    applyNodeEntryMetadata(metadata, entry);
+
+    if (!metadata.nodeName) {
+      for (const entryValue of Object.values(nodeNames)) {
+        const entryName = extractNodeName(entryValue);
+        if (!entryName || entryName !== key) {
+          continue;
+        }
+
+        applyNodeEntryMetadata(metadata, entryValue);
+        if (metadata.nodeName) {
+          break;
+        }
       }
     }
   }
@@ -856,6 +886,40 @@ function getNodeMetadata(globals: Record<string, unknown>, key: string, value: u
 function formatNodeNameLabel(nodeName?: string): string | undefined {
   if (!nodeName) return undefined;
   return `- (${nodeName})`;
+}
+
+function extractNodeName(entry: unknown): string | undefined {
+  if (typeof entry === "string") {
+    return entry.trim() ? entry : undefined;
+  }
+  if (isRecord(entry)) {
+    const name = entry.name ?? entry.nodeName ?? entry.label;
+    if (typeof name === "string" && name.trim()) {
+      return name;
+    }
+  }
+  return undefined;
+}
+
+function applyNodeEntryMetadata(metadata: NodeMetadata, entry: unknown): void {
+  if (typeof entry === "string" && entry.trim()) {
+    metadata.nodeName = metadata.nodeName || entry;
+    return;
+  }
+  if (!isRecord(entry)) {
+    return;
+  }
+
+  const name = extractNodeName(entry);
+  if (name) {
+    metadata.nodeName = metadata.nodeName || name;
+  }
+  if (typeof entry.componentType === "string" && entry.componentType.trim()) {
+    metadata.componentType = entry.componentType;
+  }
+  if (typeof entry.description === "string" && entry.description.trim()) {
+    metadata.description = entry.description;
+  }
 }
 
 function getValueTypeLabel(value: unknown): string {
@@ -902,8 +966,12 @@ function detectDotContext(left: string): DotContext | null {
     return null;
   }
 
+  const tail = extractTailExpressionWithParens(left);
+  const expr = tail.trim();
+  if (!expr) return null;
+
   // Match expressions starting with $ (e.g., $["key"].prop)
-  const dollarMatch = left.match(/(\$.+?)(\?\.|\.)\s*([$A-Za-z_][$A-Za-z0-9_]*)?$/);
+  const dollarMatch = expr.match(/(\$.+?)(\?\.|\.)\s*([$A-Za-z_][$A-Za-z0-9_]*)?$/);
   if (dollarMatch) {
     let baseExpr = (dollarMatch[1] ?? "").trim();
     const operator = (dollarMatch[2] === "?." ? "?." : ".") as "." | "?.";
@@ -919,12 +987,19 @@ function detectDotContext(left: string): DotContext | null {
   }
 
   // Match function calls (e.g., now(), date("2024-01-01"), duration("1h"))
-  const funcMatch = left.match(/([a-zA-Z_][a-zA-Z0-9_]*)\s*\([^)]*\)(\?\.|\.)\s*([$A-Za-z_][$A-Za-z0-9_]*)?$/);
+  const funcMatch = expr.match(/((?:[a-zA-Z_][a-zA-Z0-9_]*)\s*\([^)]*\))(\?\.|\.)\s*([$A-Za-z_][$A-Za-z0-9_]*)?$/);
   if (funcMatch) {
-    const funcName = funcMatch[1];
+    let funcName = extractTailExpressionWithParens(funcMatch[1]);
+    funcName = extractSpecialFunctionCall(funcName);
     const operator = (funcMatch[2] === "?." ? "?." : ".") as "." | "?.";
     const memberPrefix = (funcMatch[3] ?? "").trim();
+    if (!funcName) return null;
     return { baseExpr: funcName, memberPrefix, operator, isFunctionCall: true };
+  }
+
+  const tailCtx = findTailDotContext(expr);
+  if (tailCtx) {
+    return tailCtx;
   }
 
   return null;
@@ -941,7 +1016,8 @@ function detectBracketKeyContext(left: string): BracketKeyContext | null {
   return { quote, partialKey };
 }
 
-function extractTailPathExpression(expr: string): string {
+function extractTailPathExpression(expr: string | undefined | null): string {
+  if (!expr) return "";
   const s = expr.trim();
   let i = s.length - 1;
 
@@ -1003,7 +1079,167 @@ function extractTailPathExpression(expr: string): string {
   return s;
 }
 
+function findTailDotContext(input: string): DotContext | null {
+  const s = input.trim();
+  let i = s.length - 1;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  let inSingle = false;
+  let inDouble = false;
+
+  const isEscaped = (idx: number): boolean => {
+    let bs = 0;
+    for (let j = idx - 1; j >= 0 && s[j] === "\\"; j--) bs++;
+    return bs % 2 === 1;
+  };
+
+  for (; i >= 0; i--) {
+    const ch = s[i];
+
+    if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
+    else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
+
+    if (inSingle || inDouble) continue;
+
+    if (ch === "]") {
+      bracketDepth++;
+      continue;
+    }
+    if (ch === "[") {
+      bracketDepth = Math.max(0, bracketDepth - 1);
+      continue;
+    }
+    if (ch === ")") {
+      parenDepth++;
+      continue;
+    }
+    if (ch === "(") {
+      if (parenDepth == 0) {
+        return null;
+      }
+      parenDepth = Math.max(0, parenDepth - 1);
+      continue;
+    }
+
+    if (bracketDepth > 0 || parenDepth > 0) continue;
+
+    if (ch === "." && i > 0 && /\d/.test(s[i - 1]) && i + 1 < s.length && /\d/.test(s[i + 1])) {
+      continue;
+    }
+
+    if (ch === "." || (ch === "?" && s[i + 1] === ".")) {
+      const operator = ch === "?" ? "?." : ".";
+      const opStart = ch === "?" ? i : i;
+      let baseExpr = s.slice(0, opStart).trim();
+      baseExpr = extractTailExpressionWithParens(baseExpr);
+      baseExpr = extractSpecialFunctionCall(baseExpr);
+      const memberPrefix = s.slice(opStart + operator.length).trim();
+      if (!baseExpr) return null;
+      if (/^\d+(\.\d+)?$/.test(baseExpr)) return null;
+      const isFunctionCall = baseExpr.includes("(");
+      return { baseExpr, memberPrefix, operator: operator as "." | "?.", isFunctionCall };
+    }
+  }
+
+  return null;
+}
+
 type Token = { t: "dot" } | { t: "ident"; v: string } | { t: "key"; v: string };
+
+function extractTailExpressionWithParens(expr: string): string {
+  const s = expr.trim();
+  let i = s.length - 1;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  let inSingle = false;
+  let inDouble = false;
+
+  const isEscaped = (idx: number): boolean => {
+    let bs = 0;
+    for (let j = idx - 1; j >= 0 && s[j] === "\\"; j--) bs++;
+    return bs % 2 === 1;
+  };
+
+  const isStopChar = (ch: string): boolean =>
+    ch === "(" ||
+    ch === ")" ||
+    ch === "," ||
+    ch === ";" ||
+    ch === ":" ||
+    ch === "?" ||
+    ch === "+" ||
+    ch === "-" ||
+    ch === "*" ||
+    ch === "/" ||
+    ch === "%" ||
+    ch === "|" ||
+    ch === "&" ||
+    ch === "!" ||
+    ch === "=" ||
+    ch === "<" ||
+    ch === ">" ||
+    ch === "\n" ||
+    ch === "\r" ||
+    ch === "\t" ||
+    ch === " ";
+
+  for (; i >= 0; i--) {
+    const ch = s[i];
+
+    if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
+    else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
+
+    if (inSingle || inDouble) continue;
+
+    if (ch === "]") {
+      bracketDepth++;
+      continue;
+    }
+    if (ch === "[") {
+      bracketDepth = Math.max(0, bracketDepth - 1);
+      continue;
+    }
+    if (ch === ")") {
+      parenDepth++;
+      continue;
+    }
+    if (ch === "(") {
+      if (parenDepth === 0) {
+        return s.slice(i + 1).trim();
+      }
+      parenDepth = Math.max(0, parenDepth - 1);
+      continue;
+    }
+
+    if (bracketDepth > 0 || parenDepth > 0) continue;
+
+    if (isStopChar(ch)) {
+      return s.slice(i + 1).trim();
+    }
+  }
+
+  return s;
+}
+
+function extractSpecialFunctionCall(expr: string): string {
+  const matches = [...expr.matchAll(/(root\(\)|previous\([^)]*\))/g)];
+  if (matches.length === 0) {
+    return expr;
+  }
+
+  const lastMatch = matches[matches.length - 1];
+  const matchValue = lastMatch?.[0];
+  if (!matchValue || lastMatch?.index === undefined) {
+    return expr;
+  }
+
+  const afterMatch = expr.slice(lastMatch.index + matchValue.length).trimStart();
+  if (afterMatch.startsWith(".") || afterMatch.startsWith("?.")) {
+    return expr;
+  }
+
+  return matchValue;
+}
 
 function resolveExprToValue<TGlobals extends Record<string, unknown>>(baseExpr: string, globals: TGlobals): unknown {
   const stripWhitespaceOutsideStrings = (input: string) => {
@@ -1031,6 +1267,12 @@ function resolveExprToValue<TGlobals extends Record<string, unknown>>(baseExpr: 
   };
 
   let expr = stripWhitespaceOutsideStrings(baseExpr.trim());
+  expr = extractTailExpressionWithParens(expr);
+  const normalized = normalizeSpecialFunctionExpr(expr);
+  if (normalized === null) {
+    return undefined;
+  }
+  expr = normalized;
 
   const tokens: Token[] = [];
   let i = 0;
@@ -1107,6 +1349,26 @@ function resolveExprToValue<TGlobals extends Record<string, unknown>>(baseExpr: 
   }
 
   return cur;
+}
+
+function normalizeSpecialFunctionExpr(expr: string): string | null {
+  const rootMatch = expr.match(/^root\(\)/);
+  if (rootMatch) {
+    return `__root${expr.slice(rootMatch[0].length)}`;
+  }
+
+  const previousMatch = expr.match(/^previous\(([^)]*)\)/);
+  if (previousMatch) {
+    const raw = (previousMatch[1] ?? "").trim();
+    const depth = raw === "" ? 1 : Number(raw);
+    if (!Number.isInteger(depth) || depth < 1) {
+      return null;
+    }
+
+    return `__previousByDepth["${depth}"]${expr.slice(previousMatch[0].length)}`;
+  }
+
+  return expr;
 }
 
 function listKeys(value: unknown): string[] {

@@ -21,8 +21,9 @@ const (
 	WorkflowNodeExecutionResultFailed    = "failed"
 	WorkflowNodeExecutionResultCancelled = "cancelled"
 
-	WorkflowNodeExecutionResultReasonOk    = "ok"
-	WorkflowNodeExecutionResultReasonError = "error"
+	WorkflowNodeExecutionResultReasonOk            = "ok"
+	WorkflowNodeExecutionResultReasonError         = "error"
+	WorkflowNodeExecutionResultReasonErrorResolved = "error_resolved"
 )
 
 type WorkflowNodeExecution struct {
@@ -245,6 +246,24 @@ func FindNodeExecutionWithNodeIDInTransaction(tx *gorm.DB, workflowID, id uuid.U
 	return &execution, nil
 }
 
+func FindNodeExecutionsByIDsInTransaction(tx *gorm.DB, workflowID uuid.UUID, executionIDs []uuid.UUID) ([]WorkflowNodeExecution, error) {
+	var executions []WorkflowNodeExecution
+	err := tx.
+		Where("workflow_id = ?", workflowID).
+		Where("id IN ?", executionIDs).
+		Find(&executions).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return executions, nil
+}
+
+func FindNodeExecutionsByIDs(workflowID uuid.UUID, executionIDs []uuid.UUID) ([]WorkflowNodeExecution, error) {
+	return FindNodeExecutionsByIDsInTransaction(database.Conn(), workflowID, executionIDs)
+}
+
 func FindChildExecutionsForMultiple(parentExecutionIDs []string) ([]WorkflowNodeExecution, error) {
 	var executions []WorkflowNodeExecution
 	err := database.Conn().
@@ -276,6 +295,22 @@ func FindChildExecutionsInTransaction(tx *gorm.DB, parentExecutionID uuid.UUID, 
 	}
 
 	return executions, nil
+}
+
+func ResolveExecutionErrorsInTransaction(tx *gorm.DB, workflowID uuid.UUID, executionIDs []uuid.UUID) error {
+	now := time.Now()
+	return tx.Model(&WorkflowNodeExecution{}).
+		Where("workflow_id = ?", workflowID).
+		Where("id IN ?", executionIDs).
+		Updates(map[string]any{
+			"result_reason": WorkflowNodeExecutionResultReasonErrorResolved,
+			"updated_at":    &now,
+		}).
+		Error
+}
+
+func ResolveExecutionErrors(workflowID uuid.UUID, executionIDs []uuid.UUID) error {
+	return ResolveExecutionErrorsInTransaction(database.Conn(), workflowID, executionIDs)
 }
 
 func (e *WorkflowNodeExecution) GetPreviousExecutionID() string {

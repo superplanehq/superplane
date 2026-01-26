@@ -3,6 +3,7 @@ package filter
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/expr-lang/expr"
@@ -35,6 +36,36 @@ func (f *Filter) Label() string {
 
 func (f *Filter) Description() string {
 	return "Filter events based on their content"
+}
+
+func (f *Filter) Documentation() string {
+	return `The Filter component evaluates a boolean expression against incoming events and only forwards events that match the condition.
+
+## Use Cases
+
+- **Data validation**: Only process events that meet certain criteria
+- **Event filtering**: Filter out unwanted events before processing
+- **Conditional routing**: Stop processing events that don't match requirements
+- **Data quality**: Ensure only valid data continues through the workflow
+
+## How It Works
+
+1. The Filter component evaluates a boolean expression against the incoming event data
+2. If the expression evaluates to ` + "`true`" + `, the event is emitted to the default output channel
+3. If the expression evaluates to ` + "`false`" + `, the execution passes without emitting (effectively filtering out the event)
+
+## Expression Environment
+
+The expression has access to:
+- **$**: The current event data
+- **root()**: Access to the root event data
+- **previous()**: Access to previous node outputs (optionally with depth parameter)
+
+## Examples
+
+- ` + "`$.status == \"active\"`" + `: Only forward events where status is "active"
+- ` + "`$.amount > 1000`" + `: Filter events with amount greater than 1000
+- ` + "`$.user.role == \"admin\" && $.action == \"delete\"`" + `: Complex condition checking multiple fields`
 }
 
 func (f *Filter) OutputChannels(configuration any) []core.OutputChannel {
@@ -83,12 +114,7 @@ func (f *Filter) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	vm, err := expr.Compile(spec.Expression, []expr.Option{
-		expr.Env(env),
-		expr.AsBool(),
-		expr.WithContext("ctx"),
-		expr.Timezone(time.UTC.String()),
-	}...)
+	vm, err := expr.Compile(spec.Expression, expressionOptions(env)...)
 
 	if err != nil {
 		return fmt.Errorf("expression compilation failed: %w", err)
@@ -151,6 +177,78 @@ func buildExpressionEnv(input any, sourceNodeID string) map[string]any {
 	}
 
 	return map[string]any{"$": map[string]any{sourceNodeID: input}}
+}
+
+func expressionOptions(env map[string]any) []expr.Option {
+	return []expr.Option{
+		expr.Env(env),
+		expr.AsBool(),
+		expr.WithContext("ctx"),
+		expr.Timezone(time.UTC.String()),
+		expr.Function("root", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("root() takes no arguments")
+			}
+
+			rootPayload, ok := env["__root"]
+			if !ok {
+				return nil, fmt.Errorf("no root event found")
+			}
+			return rootPayload, nil
+		}),
+		expr.Function("previous", func(params ...any) (any, error) {
+			depth := 1
+			if len(params) > 1 {
+				return nil, fmt.Errorf("previous() accepts zero or one argument")
+			}
+			if len(params) == 1 {
+				parsedDepth, err := parseDepthValue(params[0])
+				if err != nil {
+					return nil, err
+				}
+				depth = parsedDepth
+			}
+
+			previousByDepth, ok := env["__previousByDepth"]
+			if !ok {
+				return nil, nil
+			}
+			if values, ok := previousByDepth.(map[string]any); ok {
+				return values[strconv.Itoa(depth)], nil
+			}
+			if values, ok := previousByDepth.(map[int]any); ok {
+				return values[depth], nil
+			}
+
+			return nil, nil
+		}),
+	}
+}
+
+func parseDepthValue(param any) (int, error) {
+	switch value := param.(type) {
+	case int:
+		if value < 1 {
+			return 0, fmt.Errorf("depth must be >= 1")
+		}
+		return value, nil
+	case int64:
+		if value < 1 {
+			return 0, fmt.Errorf("depth must be >= 1")
+		}
+		return int(value), nil
+	case float64:
+		parsed := int(value)
+		if value != float64(parsed) {
+			return 0, fmt.Errorf("depth must be an integer")
+		}
+		if parsed < 1 {
+			return 0, fmt.Errorf("depth must be >= 1")
+		}
+		return parsed, nil
+	default:
+		return 0, fmt.Errorf("depth must be an integer")
+	}
 }
 
 func (f *Filter) Actions() []core.Action {

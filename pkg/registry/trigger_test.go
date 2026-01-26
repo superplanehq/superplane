@@ -19,6 +19,7 @@ type panickingTrigger struct {
 func (p *panickingTrigger) Name() string                         { return p.name }
 func (p *panickingTrigger) Label() string                        { return "Panicking Trigger" }
 func (p *panickingTrigger) Description() string                  { return "description" }
+func (p *panickingTrigger) Documentation() string                { return "" }
 func (p *panickingTrigger) Icon() string                         { return "icon" }
 func (p *panickingTrigger) Color() string                        { return "blue" }
 func (p *panickingTrigger) ExampleData() map[string]any          { return nil }

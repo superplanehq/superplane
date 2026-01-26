@@ -1,13 +1,8 @@
 ---
 title: "SMTP"
 sidebar:
-  label: "SMTP"
-type: "application"
-name: "smtp"
-label: "SMTP"
+  order: 7
 ---
-
-## Overview
 
 Send emails via any SMTP server
 
@@ -23,21 +18,38 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Send Email
 
-Send an email via SMTP
+The Send Email component sends emails through a configured SMTP server.
+
+### Use Cases
+
+- **Notifications**: Send email notifications for workflow events
+- **Alerts**: Email alerts for errors or important events
+- **Reports**: Send automated reports via email
+- **User communications**: Send emails to users as part of workflows
 
 ### Configuration
 
-| Name | Label | Type | Required | Description |
-| --- | --- | --- | --- | --- |
-| to | To | string | yes | Recipient email addresses (comma-separated for multiple) |
-| cc | CC | string | no | CC recipients (comma-separated) |
-| bcc | BCC | string | no | BCC recipients (comma-separated) |
-| subject | Subject | string | yes | Email subject line |
-| body | Body | text | yes | Email body content |
-| isHTML | HTML Format | boolean | no | Enable if the body contains HTML markup |
-| fromName | From Name (Override) | string | no | Override the default sender display name |
-| fromEmail | From Email (Override) | string | no | Override the default sender email address |
-| replyTo | Reply-To | string | no | Reply-to email address |
+- **To**: Recipient email addresses (comma-separated for multiple recipients, supports expressions)
+- **CC**: Carbon copy recipients (optional, comma-separated)
+- **BCC**: Blind carbon copy recipients (optional, comma-separated)
+- **Subject**: Email subject line (supports expressions)
+- **Body**: Email body content (supports expressions and HTML)
+- **Is HTML**: Toggle to send HTML-formatted emails
+- **From Name**: Sender display name (optional, uses app default if not specified)
+- **From Email**: Sender email address (optional, uses app default if not specified)
+- **Reply To**: Reply-to email address (optional)
+
+### SMTP Configuration
+
+The SMTP server must be configured in the application settings before using this component. Configure:
+- SMTP host and port
+- Authentication credentials
+- TLS/SSL settings
+- Default sender information
+
+### Output
+
+Returns metadata about the sent email including recipients and subject.
 
 ### Example Output
 

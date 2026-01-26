@@ -173,7 +173,12 @@ function formatValueForExpression(value: any): string {
  * Substitutes expression values by replacing $.field patterns with actual values from the data
  * Example: $.status == "active" with data {status: "active"} becomes "active" == "active"
  */
-export function substituteExpressionValues(expression: string, data: any): string {
+type SubstituteContext = {
+  root?: any;
+  previousByDepth?: Record<string, any>;
+};
+
+export function substituteExpressionValues(expression: string, data: any, context?: SubstituteContext): string {
   if (!expression || !data) {
     return expression || "";
   }
@@ -244,9 +249,117 @@ export function substituteExpressionValues(expression: string, data: any): strin
     return { endIndex: i, tokens };
   };
 
+  const parseFunctionReference = (input: string, startIndex: number) => {
+    if (startIndex > 0 && /[$A-Za-z0-9_]/.test(input[startIndex - 1])) {
+      return null;
+    }
+
+    const remaining = input.slice(startIndex);
+    let name = "";
+    let i = startIndex;
+
+    if (remaining.startsWith("root")) {
+      name = "root";
+      i += 4;
+    } else if (remaining.startsWith("previous")) {
+      name = "previous";
+      i += 8;
+    } else {
+      return null;
+    }
+
+    while (i < input.length && /\s/.test(input[i])) i++;
+    if (input[i] !== "(") return null;
+    i++;
+
+    let depthValue = "1";
+    if (name === "previous") {
+      let args = "";
+      let parenDepth = 1;
+      while (i < input.length) {
+        const ch = input[i];
+        if (ch === "(") parenDepth++;
+        if (ch === ")") {
+          parenDepth--;
+          if (parenDepth === 0) {
+            i++;
+            break;
+          }
+        }
+        if (parenDepth > 0) {
+          args += ch;
+        }
+        i++;
+      }
+
+      const trimmed = args.trim();
+      if (trimmed !== "") {
+        depthValue = trimmed;
+      }
+    } else {
+      while (i < input.length && /\s/.test(input[i])) i++;
+      if (input[i] !== ")") return null;
+      i++;
+    }
+
+    const tokens: Array<string | number> = [];
+    while (i < input.length) {
+      const ch = input[i];
+      if (ch === ".") {
+        i++;
+        const identMatch = input.slice(i).match(/^[$A-Za-z_][$A-Za-z0-9_]*/);
+        if (!identMatch) break;
+        tokens.push(identMatch[0]);
+        i += identMatch[0].length;
+        continue;
+      }
+
+      if (ch === "[") {
+        i++;
+        while (i < input.length && /\s/.test(input[i])) i++;
+        if (i >= input.length) break;
+
+        const quote = input[i] === "'" || input[i] === '"' ? input[i] : null;
+        if (quote) {
+          i++;
+          let value = "";
+          while (i < input.length && (input[i] !== quote || isEscaped(input, i))) {
+            value += input[i];
+            i++;
+          }
+          if (input[i] !== quote) break;
+          i++;
+          while (i < input.length && /\s/.test(input[i])) i++;
+          if (input[i] !== "]") break;
+          i++;
+          tokens.push(value.replace(/\\(["'\\])/g, "$1"));
+          continue;
+        }
+
+        const numberMatch = input.slice(i).match(/^\d+/);
+        if (numberMatch) {
+          i += numberMatch[0].length;
+          while (i < input.length && /\s/.test(input[i])) i++;
+          if (input[i] !== "]") break;
+          i++;
+          tokens.push(Number(numberMatch[0]));
+          continue;
+        }
+
+        break;
+      }
+
+      break;
+    }
+
+    return { endIndex: i, tokens, name, depthValue };
+  };
+
   let out = "";
   let inSingle = false;
   let inDouble = false;
+  const rootPayload = context?.root ?? data?.__root;
+  const previousByDepth = context?.previousByDepth ?? data?.__previousByDepth;
 
   for (let i = 0; i < expression.length; i++) {
     const ch = expression[i];
@@ -261,20 +374,37 @@ export function substituteExpressionValues(expression: string, data: any): strin
       continue;
     }
 
-    if (!inSingle && !inDouble && ch === "$" && !isEscaped(expression, i)) {
-      const parsed = parseExpressionReference(expression, i);
-      if (parsed) {
-        let value = parsed.tokens.length === 0 ? data : getNestedValueByTokens(data, parsed.tokens);
-        if (
-          value === undefined &&
-          parsed.tokens.length > 1 &&
-          typeof parsed.tokens[0] === "string" &&
-          !Object.prototype.hasOwnProperty.call(data, parsed.tokens[0])
-        ) {
-          value = getNestedValueByTokens(data, parsed.tokens.slice(1));
+    if (!inSingle && !inDouble && !isEscaped(expression, i)) {
+      if (ch === "$") {
+        const parsed = parseExpressionReference(expression, i);
+        if (parsed) {
+          let value = parsed.tokens.length === 0 ? data : getNestedValueByTokens(data, parsed.tokens);
+          if (
+            value === undefined &&
+            parsed.tokens.length > 1 &&
+            typeof parsed.tokens[0] === "string" &&
+            !Object.prototype.hasOwnProperty.call(data, parsed.tokens[0])
+          ) {
+            value = getNestedValueByTokens(data, parsed.tokens.slice(1));
+          }
+          out += formatValueForExpression(value);
+          i = parsed.endIndex - 1;
+          continue;
         }
+      }
+
+      const parsedFn = parseFunctionReference(expression, i);
+      if (parsedFn) {
+        let baseValue: any = undefined;
+        if (parsedFn.name === "root") {
+          baseValue = rootPayload;
+        } else if (parsedFn.name === "previous") {
+          baseValue = previousByDepth?.[parsedFn.depthValue] ?? undefined;
+        }
+
+        const value = parsedFn.tokens.length === 0 ? baseValue : getNestedValueByTokens(baseValue, parsedFn.tokens);
         out += formatValueForExpression(value);
-        i = parsed.endIndex - 1;
+        i = parsedFn.endIndex - 1;
         continue;
       }
     }

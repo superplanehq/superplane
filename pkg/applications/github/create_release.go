@@ -41,6 +41,32 @@ func (c *CreateRelease) Description() string {
 	return "Create a new release in a GitHub repository"
 }
 
+func (c *CreateRelease) Documentation() string {
+	return `The Create Release component creates a new release in a GitHub repository.
+
+## Use Cases
+
+- **Automated releases**: Create releases automatically after successful builds
+- **Version management**: Tag and release new versions of software
+- **Deployment automation**: Create releases as part of deployment workflows
+- **Release notes**: Automatically generate and publish release notes
+
+## Configuration
+
+- **Repository**: Select the GitHub repository
+- **Version Strategy**: How to determine the version (manual tag, auto-increment)
+- **Tag Name**: Git tag name for the release (supports expressions)
+- **Name**: Release title/name (optional, supports expressions)
+- **Body**: Release notes/description (optional, supports markdown and expressions)
+- **Draft**: Create as draft release (not published)
+- **Prerelease**: Mark as pre-release
+- **Generate Release Notes**: Automatically generate release notes from commits
+
+## Output
+
+Returns the created release object with all release information including tag, assets, and metadata.`
+}
+
 func (c *CreateRelease) Icon() string {
 	return "github"
 }
