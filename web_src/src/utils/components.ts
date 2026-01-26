@@ -534,6 +534,7 @@ export function parseDefaultValues(configurationFields: ConfigurationField[]): R
                 break;
               }
               case "multi-select":
+              case "days-of-week":
               case "list":
               case "any-predicate-list": {
                 try {

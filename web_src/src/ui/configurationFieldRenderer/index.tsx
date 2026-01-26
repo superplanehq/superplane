@@ -25,6 +25,8 @@ import { GroupFieldRenderer } from "./GroupFieldRenderer";
 import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
 import { TimezoneFieldRenderer } from "./TimezoneFieldRenderer";
 import { AnyPredicateListFieldRenderer } from "./AnyPredicateListFieldRenderer";
+import { DaysOfWeekFieldRenderer } from "./DaysOfWeekFieldRenderer";
+import { TimeRangeFieldRenderer } from "./TimeRangeFieldRenderer";
 import {
   isFieldVisible,
   isFieldRequired,
@@ -90,6 +92,7 @@ export const ConfigurationFieldRenderer = ({
         } else if (
           field.type === "list" ||
           field.type === "multi-select" ||
+          field.type === "days-of-week" ||
           field.type === "any-predicate-list" ||
           (field.type === "app-installation-resource" && field.typeOptions?.resource?.multi)
         ) {
@@ -256,6 +259,9 @@ export const ConfigurationFieldRenderer = ({
       case "multi-select":
         return <MultiSelectFieldRenderer {...commonProps} />;
 
+      case "days-of-week":
+        return <DaysOfWeekFieldRenderer {...commonProps} />;
+
       case "date":
         return <DateFieldRenderer {...commonProps} />;
 
@@ -267,6 +273,9 @@ export const ConfigurationFieldRenderer = ({
 
       case "time":
         return <TimeFieldRenderer {...commonProps} />;
+
+      case "time-range":
+        return <TimeRangeFieldRenderer {...commonProps} />;
 
       case "day-in-year":
         return <DayInYearFieldRenderer {...commonProps} />;

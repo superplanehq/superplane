@@ -327,7 +327,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const isQueued = event.state === "queued";
   const isRunning = event.state === "running";
 
-  const showPushThrough = supportsPushThrough && !!event.executionId && isRunning;
+  const showPushThrough = supportsPushThrough && !!event.executionId && (isRunning || isWaiting);
   const showCancel = (event.kind === "queue" && isQueued) || (event.kind === "execution" && (isRunning || isWaiting));
   const showReEmit = (isProcessed || isDiscarded) && event.kind === "trigger";
   const showActionsMenu = showPushThrough || showCancel || showReEmit;
