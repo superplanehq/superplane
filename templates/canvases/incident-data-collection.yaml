@@ -1,0 +1,267 @@
+metadata:
+  name: "Incident Data Collection"
+  description: "Collect data and metrics when new P1/P2 incident is opened and create a GitHub issue"
+  isTemplate: false
+spec:
+  nodes:
+    - id: "pagerduty-onincident-pagerduty-onincident-7ar72t"
+      name: "Listen for new incidents"
+      type: "TYPE_TRIGGER"
+      configuration:
+        events:
+          - "incident.triggered"
+        service: "PQEAM2I"
+        urgencies:
+          - "low"
+          - "high"
+      metadata:
+        service:
+          html_url: "https://superplane-test.eu.pagerduty.com/service-directory/PQEAM2I"
+          id: "PQEAM2I"
+          name: "Default Service"
+      position:
+        x: 408
+        "y": 425
+      component: null
+      blueprint: null
+      trigger:
+        name: "pagerduty.onIncident"
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "component-node-1xyxrf"
+      name: "Is it P1 or P2"
+      type: "TYPE_COMPONENT"
+      configuration:
+        expression: "$[\"Listen for new incidents\"].data.incident.priority.summary == \"P1\" || $[\"Listen for new incidents\"].data.incident.priority.summary == \"P2\""
+      metadata: null
+      position:
+        x: 933
+        "y": 426
+      component:
+        name: "filter"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "component-node-wa0ctm"
+      name: "Get all failing checks"
+      type: "TYPE_COMPONENT"
+      configuration: {}
+      metadata:
+        checkRules:
+          - id: "0310867c-4c22-49dd-8987-9995eda6ba7c"
+            name: "HTTP response time"
+          - id: "7c09c551-88f2-4c9d-b7e3-6fb05655b0fd"
+            name: "5xx check"
+          - id: "acc0f539-efe6-4507-904d-5ab40d0517fb"
+            name: "4xx check"
+      position:
+        x: 1458
+        "y": 427
+      component:
+        name: "dash0.listIssues"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "component-node-4pjwv9"
+      name: "Get DB Memory Usage"
+      type: "TYPE_COMPONENT"
+      configuration:
+        dataset: "default"
+        query: "avg_over_time(\n  {otel_metric_name=\"cloudsql.googleapis.com/database/memory/utilization\", otel_metric_type=\"gauge\", service_name=\"superplane-staging\"}[5m]\n)[60m:5m]\n"
+        type: "instant"
+      metadata: null
+      position:
+        x: 2038
+        "y": 430
+      component:
+        name: "dash0.queryPrometheus"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "component-node-hbriwb"
+      name: "Get DB CPU Usage"
+      type: "TYPE_COMPONENT"
+      configuration:
+        dataset: "default"
+        query: "max_over_time(\n  {otel_metric_name=\"cloudsql.googleapis.com/database/cpu/utilization\", otel_metric_type=\"gauge\", service_name=\"superplane-staging\"}[5m]\n)[60m:5m]\n"
+        type: "instant"
+      metadata: null
+      position:
+        x: 2524
+        "y": 429
+      component:
+        name: "dash0.queryPrometheus"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "component-node-rxe22i"
+      name: "Create a Summary"
+      type: "TYPE_COMPONENT"
+      configuration:
+        input: "You are generating the BODY text for a GitHub issue. Output MUST be valid GitHub-flavored Markdown.\n\nGoal:\n- Review Dash0 failing checks and Prometheus DB CPU and DB Memory metrics (last 60 minutes).\n- Describe what is happening and what is impacted, based strictly on the data.\n\nHard rules:\n- Output Markdown ONLY.\n- Use real line breaks (press Enter). Do NOT output \"\\n\".\n- Be factual and concise. No speculation unless explicitly labeled.\n- DO NOT suggest fixes, mitigations, or next steps.\n- DO NOT include recommendations, advice, or action items.\n- If data is missing or unclear, state \"Unknown\".\n- Do not invent values.\n- Do not mention internal node/component names.\n\nOutput format (use these exact headings):\n\n## Summary\n- 2 to 4 short bullets, high-signal only\n- Describe symptoms and impact, not causes or solutions\n\n## Dash0 failing checks\n- Bullet list\n- Include: check name, severity/state (if present), short description\n\n## Database metrics (last 60 minutes)\n\n### CPU usage\n- Peak:\n- Overall trend:\n- Notable spikes:\n\n### Memory usage\n- Peak:\n- Overall trend:\n- Notable spikes:\n\nData:\n\nDash0 failing checks:\n{{$['Get all failing checks'].data}}\n\nDB CPU usage time series:\n{{ $[\"Get DB CPU Usage\"].data }}\n\nDB Memory usage time series:\n{{ $[\"Get DB Memory Usage\"].data }}\n"
+        model: "gpt-5.2"
+      metadata: null
+      position:
+        x: 3019
+        "y": 428
+      component:
+        name: "openai.textPrompt"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "component-node-n6s8ec"
+      name: "Open an Issue"
+      type: "TYPE_COMPONENT"
+      configuration:
+        body: "{{$['Create a Summary'].data.text}}"
+        repository: "puppy-describer"
+        title: "P1 issue: {{ $[\"Listen for new incidents\"].data.incident.title }}"
+      metadata:
+        repository:
+          id: 1046188046
+          name: "puppy-describer"
+          url: "https://github.com/puppies-inc/puppy-describer"
+      position:
+        x: 3542
+        "y": 428
+      component:
+        name: "github.createIssue"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "annotation-annotation-4a9uck"
+      name: "annotation"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 310
+        text: "## PagerDuty incident trigger\n\nThis node listens for new incidents created in PagerDuty.\n\nWhen an incident is triggered, the event data flows downstream for processing.\n\n\n### To set up\n1. Click the node to open the sidebar configuration.\n2. Follow the instructions to connect your PagerDuty account.\n3. Select the service(s) and urgency levels to monitor."
+        width: 380
+      metadata: null
+      position:
+        x: 415
+        "y": 16
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "annotation-annotation2-mq2ini"
+      name: "annotation2"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 253
+        text: "### Priority filter\n\nThis component filters incoming incidents to continue only if they are flagged as **P1** or **P2** priority.\n\nThe filter uses an **expression** that evaluates data from the event payload.  \nPayloads contain all the information emitted by upstream components.\n\nOpen the node sidebar to see the filter expression and learn how to reference payload fields."
+        width: 392
+      metadata: null
+      position:
+        x: 924
+        "y": 73
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "annotation-annotation3-8mge7o"
+      name: "annotation3"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 176
+        text: "### Data collection from Dash0\n\nThese components query Dash0 for multiple data points:\n\n**List Issues**: Retrieves all currently failing check rules from your Dash0 instance.\n\n**PromQL Queries**: Runs custom queries to fetch database memory and CPU usage metrics over the last 60 minutes.\n\nAll collected data is emitted downstream and becomes available for the AI summary and GitHub issue creation."
+        width: 1398
+      metadata: null
+      position:
+        x: 1470
+        "y": 161
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "annotation-annotation4-fc9g80"
+      name: "annotation4"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 166
+        text: "### AI summary and GitHub issue\n\nWith access to all collected data, the **OpenAI** component generates a structured summary of the incident, including failing checks and database metrics.\n\nThe summary is then used to automatically create a **GitHub issue** for tracking and collaboration.\n\nTo use the OpenAI component, you need to connect your OpenAI account using an API key."
+        width: 878
+      metadata: null
+      position:
+        x: 3020
+        "y": 150
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      appInstallation: null
+      errorMessage: ""
+      warningMessage: ""
+  edges:
+    - sourceId: "pagerduty-onincident-pagerduty-onincident-7ar72t"
+      targetId: "component-node-1xyxrf"
+      channel: "default"
+    - sourceId: "component-node-1xyxrf"
+      targetId: "component-node-wa0ctm"
+      channel: "default"
+    - sourceId: "component-node-wa0ctm"
+      targetId: "component-node-4pjwv9"
+      channel: "clear"
+    - sourceId: "component-node-wa0ctm"
+      targetId: "component-node-4pjwv9"
+      channel: "degraded"
+    - sourceId: "component-node-wa0ctm"
+      targetId: "component-node-4pjwv9"
+      channel: "critical"
+    - sourceId: "component-node-4pjwv9"
+      targetId: "component-node-hbriwb"
+      channel: "default"
+    - sourceId: "component-node-hbriwb"
+      targetId: "component-node-rxe22i"
+      channel: "default"
+    - sourceId: "component-node-rxe22i"
+      targetId: "component-node-n6s8ec"
+      channel: "default"
