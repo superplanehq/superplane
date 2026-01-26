@@ -160,7 +160,7 @@ export function GroupMembersPage() {
         />
       </div>
 
-      <div className="bg-slate-50 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
+      <div className="bg-slate-50 dark:bg-neutral-800 rounded-lg border border-gray-300 dark:border-neutral-700 p-6 space-y-6">
         {/* Group header */}
         <div className="flex items-center justify-between">
           <div className="group">
@@ -170,7 +170,7 @@ export function GroupMembersPage() {
                   type="text"
                   value={editedGroupName}
                   onChange={(e) => setEditedGroupName(e.target.value)}
-                  className="text-sm font-normal bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+                  className="text-sm font-normal bg-white dark:bg-neutral-800 border-gray-300 dark:border-neutral-600"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleSaveGroupName();
                     if (e.key === "Escape") handleCancelGroupName();
@@ -213,7 +213,7 @@ export function GroupMembersPage() {
         />
 
         {/* Group members table */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
+        <div className="bg-white dark:bg-neutral-800 rounded-lg border border-gray-300 dark:border-neutral-700 overflow-hidden">
           <div className="p-6">
             <Table dense>
               <TableBody>
