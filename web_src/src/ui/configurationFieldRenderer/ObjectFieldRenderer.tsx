@@ -19,9 +19,27 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   allowExpressions = false,
 }) => {
   const [jsonError, setJsonError] = React.useState<string | null>(null);
-  const [editorValue, setEditorValue] = React.useState<string>(() =>
-    JSON.stringify(value === undefined ? {} : value, null, 2),
-  );
+  const hasInitialized = React.useRef(false);
+  const serializeValueForEditor = React.useCallback((input: unknown) => {
+    if (typeof input === "string") {
+      return input;
+    }
+    if (input === undefined || input === null) {
+      return "";
+    }
+    return JSON.stringify(input, null, 2);
+  }, []);
+  const coerceDefaultValue = React.useCallback((input: unknown) => {
+    if (typeof input !== "string") {
+      return input;
+    }
+    try {
+      return JSON.parse(input);
+    } catch {
+      return input;
+    }
+  }, []);
+  const [editorValue, setEditorValue] = React.useState<string>(() => serializeValueForEditor(value));
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const { handleEditorMount } = useMonacoExpressionAutocomplete({
@@ -33,6 +51,20 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   const schema = objectOptions?.schema;
   const hasSchema = !!schema && schema.length > 0;
 
+  React.useEffect(() => {
+    if (value !== undefined && value !== null) {
+      hasInitialized.current = true;
+    }
+
+    if (!hasInitialized.current && (value === undefined || value === null) && field.defaultValue !== undefined) {
+      hasInitialized.current = true;
+      const defaultValue = coerceDefaultValue(field.defaultValue);
+      onChange(defaultValue);
+      setEditorValue(serializeValueForEditor(defaultValue));
+      setJsonError(null);
+    }
+  }, [value, field.defaultValue, onChange, coerceDefaultValue, serializeValueForEditor]);
+
   const copyToClipboard = () => {
     navigator.clipboard.writeText(editorValue);
     setCopied(true);
@@ -42,13 +74,33 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   if (!hasSchema) {
     // Fallback to Monaco Editor if no schema defined
     const handleEditorChange = (newValue: string | undefined) => {
-      const valueToUse = newValue || "{}";
+      const valueToUse = newValue ?? "";
       setEditorValue(valueToUse);
+      const trimmedValue = valueToUse.trim();
+      if (trimmedValue.length === 0) {
+        onChange(undefined);
+        setJsonError(null);
+        return;
+      }
+
+      const normalizeExpressionsForValidation = (input: string) => input.replace(/{{[\s\S]*?}}/g, "{}");
+      const hasExpressions = /{{[\s\S]*?}}/.test(valueToUse);
+
       try {
         const parsed = JSON.parse(valueToUse);
         onChange(parsed);
         setJsonError(null);
       } catch (error) {
+        if (allowExpressions && hasExpressions) {
+          try {
+            JSON.parse(normalizeExpressionsForValidation(valueToUse));
+            onChange(valueToUse);
+            setJsonError(null);
+            return;
+          } catch {
+            // fallthrough to error below
+          }
+        }
         setJsonError("Invalid JSON format");
       }
     };
@@ -74,21 +126,43 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
       contextmenu: true,
       selectOnLineNumbers: true,
       suggestOnTriggerCharacters: true,
-      quickSuggestions: {
-        other: true,
-        strings: true,
-        comments: false,
-      },
+      quickSuggestions: false,
       wordBasedSuggestions: "off" as const,
+      suggest: {
+        showWords: false,
+        showSnippets: false,
+        showKeywords: false,
+        showProperties: false,
+        showValues: false,
+        showText: false,
+        showVariables: true,
+        showFunctions: true,
+        showFields: true,
+        showMethods: false,
+        showClasses: false,
+        showModules: false,
+        showInterfaces: false,
+        showStructs: false,
+        showEnums: false,
+        showEnumMembers: false,
+        showConstants: false,
+        showEvents: false,
+        showOperators: false,
+        showFiles: false,
+        showReferences: false,
+        showFolders: false,
+        showTypeParameters: false,
+        showIssues: false,
+        showUsers: false,
+        showColors: false,
+        showUnits: false,
+      },
     };
 
     return (
       <>
         <div className="flex flex-col gap-2 relative">
-          <div
-            className="border rounded-md overflow-hidden border-gray-300 dark:border-gray-700"
-            style={{ height: "200px" }}
-          >
+          <div className="border rounded-md border-gray-300 dark:border-gray-700 p-2" style={{ height: "200px" }}>
             <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1">
               <SimpleTooltip content={copied ? "Copied!" : "Copy"} hideOnClick={false}>
                 <button onClick={copyToClipboard} className="p-1 rounded text-gray-500 hover:text-gray-800">
@@ -132,7 +206,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
                 </button>
               </SimpleTooltip>
             </div>
-            <div className="flex-1 overflow-auto border border-gray-200 dark:border-gray-700 rounded-md">
+            <div className="flex-1 overflow-auto rounded-md p-2 relative border border-gray-300 dark:border-gray-700">
               <Editor
                 height="600px"
                 defaultLanguage="json"
@@ -143,6 +217,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
                 options={{
                   ...editorOptions,
                   automaticLayout: true,
+                  renderValidationDecorations: "off",
                 }}
               />
             </div>
