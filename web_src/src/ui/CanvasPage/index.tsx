@@ -153,6 +153,7 @@ export interface CanvasPageProps {
     nodeId: string,
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
   ) => void;
+  onAnnotationBlur?: () => void;
   getCustomField?: (nodeId: string) => ((configuration: Record<string, unknown>) => React.ReactNode) | null;
   onSave?: (nodes: CanvasNode[]) => void;
   installedApplications?: OrganizationsAppInstallation[];
@@ -291,6 +292,7 @@ const nodeTypes = {
             ? (nodeId, updates) => callbacks.onAnnotationUpdate.current?.(nodeId, updates)
             : undefined
         }
+        onAnnotationBlur={callbacks.onAnnotationBlur.current ? () => callbacks.onAnnotationBlur.current?.() : undefined}
         ai={{
           show: callbacks.aiState.sidebarOpen,
           suggestion: callbacks.aiState.suggestions[nodeProps.id] || null,
@@ -799,6 +801,7 @@ function CanvasPage(props: CanvasPageProps) {
               onConfigure={props.onConfigure}
               onDeactivate={props.onDeactivate}
               onAnnotationUpdate={props.onAnnotationUpdate}
+              onAnnotationBlur={props.onAnnotationBlur}
               runDisabled={props.runDisabled}
               runDisabledTooltip={props.runDisabledTooltip}
               onBuildingBlockDrop={handleBuildingBlockDrop}
@@ -1237,6 +1240,7 @@ function CanvasContent({
   onToggleView,
   onToggleCollapse,
   onAnnotationUpdate,
+  onAnnotationBlur,
   onBuildingBlockDrop,
   onBuildingBlocksSidebarToggle,
   onConnectionDropInEmptySpace,
@@ -1282,6 +1286,7 @@ function CanvasContent({
     nodeId: string,
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
   ) => void;
+  onAnnotationBlur?: () => void;
   onBuildingBlockDrop?: (block: BuildingBlock, position?: { x: number; y: number }) => void;
   onBuildingBlocksSidebarToggle?: (open: boolean) => void;
   onConnectionDropInEmptySpace?: (
@@ -1474,6 +1479,8 @@ function CanvasContent({
 
   const onAnnotationUpdateRef = useRef(onAnnotationUpdate);
   onAnnotationUpdateRef.current = onAnnotationUpdate;
+  const onAnnotationBlurRef = useRef(onAnnotationBlur);
+  onAnnotationBlurRef.current = onAnnotationBlur;
 
   const handleSave = useCallback(() => {
     if (onSave) {
@@ -1700,6 +1707,7 @@ function CanvasContent({
     onDeactivate: onDeactivateRef,
     onToggleView: onToggleViewRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
+    onAnnotationBlur: onAnnotationBlurRef,
     aiState: state.ai,
     runDisabled,
     runDisabledTooltip,
@@ -1715,6 +1723,7 @@ function CanvasContent({
     onDeactivate: onDeactivateRef,
     onToggleView: onToggleViewRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
+    onAnnotationBlur: onAnnotationBlurRef,
     aiState: state.ai,
     runDisabled,
     runDisabledTooltip,

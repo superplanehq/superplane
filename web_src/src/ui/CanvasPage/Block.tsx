@@ -59,6 +59,7 @@ interface BlockProps extends ComponentActionsProps {
     nodeId: string,
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
   ) => void;
+  onAnnotationBlur?: () => void;
 
   onExpand?: (nodeId: string, nodeData: BlockData) => void;
   onClick?: () => void;
@@ -372,6 +373,7 @@ function BlockContent({
   nodeId,
   selected = false,
   onAnnotationUpdate,
+  onAnnotationBlur,
   onRun,
   runDisabled,
   runDisabledTooltip,
@@ -459,6 +461,7 @@ function BlockContent({
           noteId={nodeId}
           selected={selected}
           onAnnotationUpdate={handleAnnotationUpdate}
+          onAnnotationBlur={onAnnotationBlur}
           {...actionProps}
         />
       );
