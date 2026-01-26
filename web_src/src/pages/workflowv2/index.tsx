@@ -200,6 +200,10 @@ export function WorkflowPageV2() {
   // Revert functionality - track initial workflow snapshot
   const [initialWorkflowSnapshot, setInitialWorkflowSnapshot] = useState<WorkflowsWorkflow | null>(null);
   const lastSavedWorkflowRef = useRef<WorkflowsWorkflow | null>(null);
+  const workflowRef = useRef<WorkflowsWorkflow | null>(workflow ?? null);
+  useEffect(() => {
+    workflowRef.current = workflow ?? null;
+  }, [workflow]);
 
   // Use Zustand store for execution data - extract only the methods to avoid recreating callbacks
   // Subscribe to version to ensure React detects all updates
@@ -366,7 +370,8 @@ export function WorkflowPageV2() {
 
   /**
    * Debounced auto-save function for node position changes.
-   * Waits 100ms after the last position change before saving.
+   * Waits 100ms after the last position change when auto-save is enabled,
+   * or 5s when auto-save is disabled to avoid disrupting editing.
    * Only saves position changes, not structural modifications (deletions, additions, etc).
    * If there are unsaved structural changes, position auto-save is skipped.
    */
@@ -380,7 +385,6 @@ export function WorkflowPageV2() {
         const focusedNoteId = getActiveNoteId();
 
         try {
-          // Check if auto-save is disabled
           if (!canAutoSave) {
             return;
           }
@@ -505,7 +509,7 @@ export function WorkflowPageV2() {
             });
           }
         }
-      }, 100),
+      }, canAutoSave ? 100 : 2000),
     [
       organizationId,
       workflowId,
@@ -1262,7 +1266,7 @@ export function WorkflowPageV2() {
 
   const handleSaveWorkflow = useCallback(
     async (workflowToSave?: WorkflowsWorkflow, options?: { showToast?: boolean }) => {
-      const targetWorkflow = workflowToSave || workflow;
+      const targetWorkflow = workflowToSave || workflowRef.current;
       if (!targetWorkflow || !organizationId || !workflowId) return;
       if (isTemplate) {
         if (options?.showToast !== false) {
@@ -1330,7 +1334,7 @@ export function WorkflowPageV2() {
         }
       }
     },
-    [workflow, organizationId, workflowId, updateWorkflowMutation, isTemplate],
+    [organizationId, workflowId, updateWorkflowMutation, isTemplate],
   );
 
   const getNodeEditData = useCallback(
@@ -1485,6 +1489,10 @@ export function WorkflowPageV2() {
           return;
         }
 
+        if (hasNonPositionalUnsavedChanges) {
+          return;
+        }
+
         if (isTemplate) {
           return;
         }
@@ -1521,7 +1529,6 @@ export function WorkflowPageV2() {
             nodes: updatedNodes,
           },
         };
-
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
 
         annotationUpdates.forEach((updates, nodeId) => {
@@ -1529,9 +1536,23 @@ export function WorkflowPageV2() {
             pendingAnnotationUpdatesRef.current.delete(nodeId);
           }
         });
-      }, 600),
-    [organizationId, workflowId, queryClient, handleSaveWorkflow, canAutoSave, isTemplate],
+      }, canAutoSave ? 100 : 2000),
+    [
+      organizationId,
+      workflowId,
+      queryClient,
+      handleSaveWorkflow,
+      hasNonPositionalUnsavedChanges,
+      canAutoSave,
+      isTemplate,
+    ],
   );
+
+  const handleAnnotationBlur = useCallback(() => {
+    if (!canAutoSave) {
+      return;
+    }
+  }, [canAutoSave]);
 
   const handleAnnotationUpdate = useCallback(
     (
@@ -1550,50 +1571,61 @@ export function WorkflowPageV2() {
       const { x, y, ...configurationUpdates } = updates;
       const hasPositionUpdate = x !== undefined || y !== undefined;
       const hasConfigurationUpdate = Object.keys(configurationUpdates).length > 0;
+      const hasOnlyTextUpdate =
+        !hasPositionUpdate &&
+        Object.keys(configurationUpdates).length === 1 &&
+        configurationUpdates.text !== undefined;
 
-      const updatedNodes = latestWorkflow?.spec?.nodes?.map((node) => {
-        if (node.id !== nodeId || node.type !== "TYPE_WIDGET") {
-          return node;
-        }
+      const shouldUpdateCache = !canAutoSave || !hasOnlyTextUpdate;
+      if (shouldUpdateCache) {
+        const updatedNodes = latestWorkflow?.spec?.nodes?.map((node) => {
+          if (node.id !== nodeId || node.type !== "TYPE_WIDGET") {
+            return node;
+          }
 
-        const updatedNode = { ...node };
+          const updatedNode = { ...node };
 
-        // Update position if provided
-        if (hasPositionUpdate) {
-          updatedNode.position = {
-            x: x !== undefined ? x : node.position?.x || 0,
-            y: y !== undefined ? y : node.position?.y || 0,
-          };
-        }
+          // Update position if provided
+          if (hasPositionUpdate) {
+            updatedNode.position = {
+              x: x !== undefined ? x : node.position?.x || 0,
+              y: y !== undefined ? y : node.position?.y || 0,
+            };
+          }
 
-        // Update configuration if provided
-        if (hasConfigurationUpdate) {
-          updatedNode.configuration = {
-            ...node.configuration,
-            ...configurationUpdates,
-          };
-        }
+          // Update configuration if provided
+          if (hasConfigurationUpdate) {
+            updatedNode.configuration = {
+              ...node.configuration,
+              ...configurationUpdates,
+            };
+          }
 
-        return updatedNode;
-      });
+          return updatedNode;
+        });
 
-      const updatedWorkflow = {
-        ...latestWorkflow,
-        spec: {
-          ...latestWorkflow.spec,
-          nodes: updatedNodes,
-        },
-      };
+        const updatedWorkflow = {
+          ...latestWorkflow,
+          spec: {
+            ...latestWorkflow.spec,
+            nodes: updatedNodes,
+          },
+        };
 
-      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+        queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      }
 
-      if (canAutoSave) {
-        // Queue configuration updates for auto-save
-        if (hasConfigurationUpdate) {
+      if (hasConfigurationUpdate) {
+        if (canAutoSave) {
           const existing = pendingAnnotationUpdatesRef.current.get(nodeId) || {};
           pendingAnnotationUpdatesRef.current.set(nodeId, { ...existing, ...configurationUpdates });
           debouncedAnnotationAutoSave();
+        } else {
+          markUnsavedChange("structural");
         }
+      }
+
+      if (canAutoSave) {
         // Queue position updates for auto-save
         if (hasPositionUpdate) {
           pendingPositionUpdatesRef.current.set(nodeId, {
@@ -1602,7 +1634,7 @@ export function WorkflowPageV2() {
           });
           debouncedAutoSave();
         }
-      } else {
+      } else if (hasPositionUpdate) {
         markUnsavedChange("position");
       }
     },
@@ -2704,6 +2736,7 @@ export function WorkflowPageV2() {
         getCustomField={getCustomField}
         onNodeConfigurationSave={handleNodeConfigurationSave}
         onAnnotationUpdate={handleAnnotationUpdate}
+        onAnnotationBlur={handleAnnotationBlur}
         onSave={isTemplate ? undefined : handleSave}
         onEdgeCreate={handleEdgeCreate}
         onNodeDelete={handleNodeDelete}
