@@ -19,7 +19,7 @@ func DescribeIntegration(ctx context.Context, registry *registry.Registry, orgID
 
 	integration, err := uuid.Parse(integrationID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid installation ID")
+		return nil, status.Error(codes.InvalidArgument, "invalid integration ID")
 	}
 
 	appInstallation, err := models.FindAppInstallation(org, integration)

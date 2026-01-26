@@ -68,13 +68,13 @@ func (s *PanicableIntegration) Triggers() []core.Trigger {
 
 /*
  * Panicking methods.
- * These are where the application logic is implemented,
+ * These are where the integration logic is implemented,
  * so they could panic, and if they do, the system shouldn't crash.
  */
 func (s *PanicableIntegration) Sync(ctx core.SyncContext) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("application %s panicked in Sync(): %v",
+			err = fmt.Errorf("integration %s panicked in Sync(): %v",
 				s.underlying.Name(), r)
 		}
 	}()
@@ -85,7 +85,7 @@ func (s *PanicableIntegration) ListResources(resourceType string, ctx core.ListR
 	defer func() {
 		if r := recover(); r != nil {
 			resources = nil
-			err = fmt.Errorf("application %s panicked in ListResources(): %v",
+			err = fmt.Errorf("integration %s panicked in ListResources(): %v",
 				s.underlying.Name(), r)
 		}
 	}()
@@ -95,7 +95,7 @@ func (s *PanicableIntegration) ListResources(resourceType string, ctx core.ListR
 func (s *PanicableIntegration) HandleRequest(ctx core.HTTPRequestContext) {
 	defer func() {
 		if r := recover(); r != nil {
-			ctx.Logger.Errorf("Application %s panicked in HandleRequest(): %v\nStack: %s",
+			ctx.Logger.Errorf("Integration %s panicked in HandleRequest(): %v\nStack: %s",
 				s.underlying.Name(), r, debug.Stack())
 			ctx.Response.WriteHeader(500)
 		}
@@ -107,7 +107,7 @@ func (s *PanicableIntegration) CompareWebhookConfig(a, b any) (result bool, err 
 	defer func() {
 		if r := recover(); r != nil {
 			result = false
-			err = fmt.Errorf("application %s panicked in CompareWebhookConfig(): %v",
+			err = fmt.Errorf("integration %s panicked in CompareWebhookConfig(): %v",
 				s.underlying.Name(), r)
 		}
 	}()
@@ -117,7 +117,7 @@ func (s *PanicableIntegration) CompareWebhookConfig(a, b any) (result bool, err 
 func (s *PanicableIntegration) SetupWebhook(ctx core.SetupWebhookContext) (metadata any, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("application %s panicked in SetupWebhook(): %v",
+			err = fmt.Errorf("integration %s panicked in SetupWebhook(): %v",
 				s.underlying.Name(), r)
 		}
 	}()
@@ -127,7 +127,7 @@ func (s *PanicableIntegration) SetupWebhook(ctx core.SetupWebhookContext) (metad
 func (s *PanicableIntegration) CleanupWebhook(ctx core.CleanupWebhookContext) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("application %s panicked in CleanupWebhook(): %v",
+			err = fmt.Errorf("integration %s panicked in CleanupWebhook(): %v",
 				s.underlying.Name(), r)
 		}
 	}()
