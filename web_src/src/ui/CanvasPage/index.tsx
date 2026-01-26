@@ -2016,7 +2016,7 @@ function CanvasContent({
             <Panel
               position="bottom-left"
               className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8"
-              style={{ marginLeft: 300 }}
+              style={{ marginLeft: 340 }}
             >
               <Tooltip>
                 <TooltipTrigger asChild>
