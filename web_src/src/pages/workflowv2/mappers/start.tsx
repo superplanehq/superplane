@@ -116,7 +116,11 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
             </div>
             <Button
               size="sm"
-              onClick={() => handleRun(template)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleRun(template);
+              }}
               disabled={!context?.onRun}
               className="flex-shrink-0 h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
             >
