@@ -206,6 +206,9 @@ import type {
   WorkflowsListNodeExecutionsData,
   WorkflowsListNodeExecutionsResponse2,
   WorkflowsListNodeExecutionsError,
+  WorkflowsUpdateNodePauseData,
+  WorkflowsUpdateNodePauseResponse2,
+  WorkflowsUpdateNodePauseError,
   WorkflowsListNodeQueueItemsData,
   WorkflowsListNodeQueueItemsResponse2,
   WorkflowsListNodeQueueItemsError,
@@ -1392,6 +1395,27 @@ export const workflowsListNodeExecutions = <ThrowOnError extends boolean = true>
   >({
     url: "/api/v1/workflows/{workflowId}/nodes/{nodeId}/executions",
     ...options,
+  });
+};
+
+/**
+ * Pause or resume node processing
+ * Pauses or resumes processing for a workflow node while continuing to queue incoming items
+ */
+export const workflowsUpdateNodePause = <ThrowOnError extends boolean = true>(
+  options: Options<WorkflowsUpdateNodePauseData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).patch<
+    WorkflowsUpdateNodePauseResponse2,
+    WorkflowsUpdateNodePauseError,
+    ThrowOnError
+  >({
+    url: "/api/v1/workflows/{workflowId}/nodes/{nodeId}/pause",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
   });
 };
 

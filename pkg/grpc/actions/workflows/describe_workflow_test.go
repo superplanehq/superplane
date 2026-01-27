@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	compb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -67,6 +68,12 @@ func Test__DescribeWorkflow(t *testing.T) {
 			},
 		)
 
+		require.NoError(t, database.Conn().
+			Model(&models.WorkflowNode{}).
+			Where("workflow_id = ? AND node_id = ?", workflow.ID, "node-1").
+			Update("state", models.WorkflowNodeStatePaused).
+			Error)
+
 		//
 		// Describe the workflow
 		//
@@ -96,6 +103,16 @@ func Test__DescribeWorkflow(t *testing.T) {
 		assert.Equal(t, "First Node", response.Workflow.Spec.Nodes[0].Name)
 		assert.Equal(t, "node-2", response.Workflow.Spec.Nodes[1].Id)
 		assert.Equal(t, "Second Node", response.Workflow.Spec.Nodes[1].Name)
+
+		var pausedNode *compb.Node
+		for _, node := range response.Workflow.Spec.Nodes {
+			if node.Id == "node-1" {
+				pausedNode = node
+				break
+			}
+		}
+		require.NotNil(t, pausedNode)
+		assert.True(t, pausedNode.Paused)
 
 		assert.Len(t, response.Workflow.Spec.Edges, 1)
 		assert.Equal(t, "node-1", response.Workflow.Spec.Edges[0].SourceId)

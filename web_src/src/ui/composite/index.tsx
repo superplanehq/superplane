@@ -62,6 +62,7 @@ export interface CompositeProps extends ComponentActionsProps {
   isMissing?: boolean;
   error?: string;
   warning?: string;
+  paused?: boolean;
 
   onExpandChildEvents?: () => void;
   onReRunChildEvents?: () => void;
@@ -90,6 +91,7 @@ export const Composite: React.FC<CompositeProps> = ({
   isMissing = false,
   error,
   warning,
+  paused,
   onRun,
   runDisabled,
   runDisabledTooltip,
@@ -97,6 +99,7 @@ export const Composite: React.FC<CompositeProps> = ({
   onConfigure,
   onDuplicate,
   onDeactivate,
+  onTogglePause,
   onToggleView,
   onDelete,
   isCompactView,
@@ -216,6 +219,7 @@ export const Composite: React.FC<CompositeProps> = ({
       onConfigure={onConfigure}
       onDuplicate={onDuplicate}
       onDeactivate={onDeactivate}
+      onTogglePause={onTogglePause}
       onToggleView={onToggleView}
       onDelete={onDelete}
       isCompactView={isCompactView}
@@ -224,6 +228,7 @@ export const Composite: React.FC<CompositeProps> = ({
       customField={customField}
       error={error}
       warning={warning}
+      paused={paused}
     />
   );
 };
