@@ -36,3 +36,7 @@ button {
   --xy-background-color-default: #f4f5f8;
 }
 
+div.monaco-editor {
+  --vscode-focusBorder: transparent;
+}
+
