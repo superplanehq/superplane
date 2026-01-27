@@ -70,7 +70,7 @@ func NewRegistry(encryptor crypto.Encryptor) *Registry {
 
 func (r *Registry) Init() {
 	//
-	// Copy registered components, triggers, and applications with safe wrappers
+	// Copy registered components, triggers, and integrations with safe wrappers
 	//
 	mu.RLock()
 	defer mu.RUnlock()
@@ -200,11 +200,15 @@ func (r *Registry) ListIntegrations() []core.Integration {
 		integrations = append(integrations, integration)
 	}
 
+	sort.Slice(integrations, func(i, j int) bool {
+		return integrations[i].Name() < integrations[j].Name()
+	})
+
 	return integrations
 }
 
-func (r *Registry) GetIntegrationTrigger(integrationName, triggerName string) (core.Trigger, error) {
-	integration, err := r.GetIntegration(integrationName)
+func (r *Registry) GetIntegrationTrigger(appName, triggerName string) (core.Trigger, error) {
+	integration, err := r.GetIntegration(appName)
 	if err != nil {
 		return nil, err
 	}
@@ -215,11 +219,11 @@ func (r *Registry) GetIntegrationTrigger(integrationName, triggerName string) (c
 		}
 	}
 
-	return nil, fmt.Errorf("trigger %s not found for integration %s", triggerName, integrationName)
+	return nil, fmt.Errorf("trigger %s not found for integration %s", triggerName, appName)
 }
 
-func (r *Registry) GetIntegrationComponent(integrationName, componentName string) (core.Component, error) {
-	integration, err := r.GetIntegration(integrationName)
+func (r *Registry) GetIntegrationComponent(appName, componentName string) (core.Component, error) {
+	integration, err := r.GetIntegration(appName)
 	if err != nil {
 		return nil, err
 	}
@@ -230,5 +234,5 @@ func (r *Registry) GetIntegrationComponent(integrationName, componentName string
 		}
 	}
 
-	return nil, fmt.Errorf("component %s not found for integration %s", componentName, integrationName)
+	return nil, fmt.Errorf("component %s not found for integration %s", componentName, appName)
 }

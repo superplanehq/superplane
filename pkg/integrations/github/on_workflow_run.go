@@ -125,7 +125,7 @@ func (w *OnWorkflowRun) Configuration() []configuration.Field {
 func (w *OnWorkflowRun) Setup(ctx core.TriggerContext) error {
 	err := ensureRepoInMetadata(
 		ctx.Metadata,
-		ctx.AppInstallation,
+		ctx.Integration,
 		ctx.Configuration,
 	)
 
@@ -138,7 +138,7 @@ func (w *OnWorkflowRun) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	return ctx.AppInstallation.RequestWebhook(WebhookConfiguration{
+	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		EventType:  "workflow_run",
 		Repository: config.Repository,
 	})

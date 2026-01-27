@@ -41,8 +41,8 @@ export function Integrations({ organizationId }: IntegrationsProps) {
 
   const isLoading = loadingAvailable || loadingInstalled;
   const selectedInstructions = useMemo(() => {
-    return selectedIntegration?.installationInstructions?.trim();
-  }, [selectedIntegration?.installationInstructions]);
+    return selectedIntegration?.instructions?.trim();
+  }, [selectedIntegration?.instructions]);
   const appLogoMap: Record<string, string> = {
     aws: awsIcon,
     dash0: dash0Icon,

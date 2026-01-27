@@ -502,7 +502,7 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		WebhooksBaseURL: s.WebhooksBaseURL,
 		OrganizationID:  integrationInstance.OrganizationID.String(),
 		HTTP:            contexts.NewHTTPContext(s.registry.GetHTTPClient()),
-		AppInstallation: contexts.NewAppInstallationContext(
+		Integration: contexts.NewAppInstallationContext(
 			database.Conn(),
 			nil,
 			integrationInstance,

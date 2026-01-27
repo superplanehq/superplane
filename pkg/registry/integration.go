@@ -40,8 +40,8 @@ func (s *PanicableIntegration) Description() string {
 	return s.underlying.Description()
 }
 
-func (s *PanicableIntegration) InstallationInstructions() string {
-	return s.underlying.InstallationInstructions()
+func (s *PanicableIntegration) Instructions() string {
+	return s.underlying.Instructions()
 }
 
 func (s *PanicableIntegration) Configuration() []configuration.Field {
@@ -81,7 +81,7 @@ func (s *PanicableIntegration) Sync(ctx core.SyncContext) (err error) {
 	return s.underlying.Sync(ctx)
 }
 
-func (s *PanicableIntegration) ListResources(resourceType string, ctx core.ListResourcesContext) (resources []core.ApplicationResource, err error) {
+func (s *PanicableIntegration) ListResources(resourceType string, ctx core.ListResourcesContext) (resources []core.IntegrationResource, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			resources = nil

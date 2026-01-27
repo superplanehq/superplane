@@ -148,9 +148,9 @@ func Test__OnIncidentStatusUpdate__Setup(t *testing.T) {
 	t.Run("invalid configuration -> decode error", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallation: appCtx,
-			Metadata:        &contexts.MetadataContext{},
-			Configuration:   "invalid-config",
+			Integration:   appCtx,
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: "invalid-config",
 		})
 
 		require.ErrorContains(t, err, "failed to decode configuration")
@@ -159,9 +159,9 @@ func Test__OnIncidentStatusUpdate__Setup(t *testing.T) {
 	t.Run("service is required", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallation: appCtx,
-			Metadata:        &contexts.MetadataContext{},
-			Configuration:   OnIncidentStatusUpdateConfiguration{},
+			Integration:   appCtx,
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: OnIncidentStatusUpdateConfiguration{},
 		})
 
 		require.ErrorContains(t, err, "service is required")
@@ -175,9 +175,9 @@ func Test__OnIncidentStatusUpdate__Setup(t *testing.T) {
 		}
 
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallation: appCtx,
-			Metadata:        metadataCtx,
-			Configuration:   OnIncidentStatusUpdateConfiguration{Service: "svc-1"},
+			Integration:   appCtx,
+			Metadata:      metadataCtx,
+			Configuration: OnIncidentStatusUpdateConfiguration{Service: "svc-1"},
 		})
 
 		require.NoError(t, err)

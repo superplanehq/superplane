@@ -62,7 +62,7 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 
 	syncErr := integration.Sync(core.SyncContext{
 		HTTP:            contexts.NewHTTPContext(registry.GetHTTPClient()),
-		AppInstallation: appCtx,
+		Integration:     appCtx,
 		Configuration:   appInstallation.Configuration.Data(),
 		BaseURL:         baseURL,
 		WebhooksBaseURL: webhooksBaseURL,

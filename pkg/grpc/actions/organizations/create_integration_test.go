@@ -210,7 +210,7 @@ func Test__CreateIntegration(t *testing.T) {
 		// Register a test integration that succeeds on Sync
 		//
 		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			ctx.AppInstallation.SetState("ready", "")
+			ctx.Integration.SetState("ready", "")
 			return nil
 		})
 

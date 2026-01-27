@@ -186,7 +186,7 @@ func (r *RunWorkflow) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 	err := ensureRepoInMetadata(
 		ctx.Metadata,
-		ctx.AppInstallation,
+		ctx.Integration,
 		ctx.Configuration,
 	)
 	if err != nil {
@@ -200,7 +200,7 @@ func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 	}
 
 	// Request webhook for workflow_run events
-	ctx.AppInstallation.RequestWebhook(WebhookConfiguration{
+	ctx.Integration.RequestWebhook(WebhookConfiguration{
 		EventType:  "workflow_run",
 		Repository: spec.Repository,
 	})
@@ -216,11 +216,11 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 	}
 
 	var appMetadata Metadata
-	if err := mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode application metadata: %w", err)
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
+		return fmt.Errorf("failed to decode integration metadata: %w", err)
 	}
 
-	client, err := NewClient(ctx.AppInstallation, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -312,8 +312,8 @@ func (r *RunWorkflow) Cancel(ctx core.ExecutionContext) error {
 	}
 
 	var appMetadata Metadata
-	if err := mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode application metadata: %w", err)
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
+		return fmt.Errorf("failed to decode integration metadata: %w", err)
 	}
 
 	// If no workflow run ID, nothing to cancel
@@ -331,7 +331,7 @@ func (r *RunWorkflow) Cancel(ctx core.ExecutionContext) error {
 	//
 	// Create GitHub client, and cancel workflow run
 	//
-	client, err := NewClient(ctx.AppInstallation, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -520,11 +520,11 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 	}
 
 	var appMetadata Metadata
-	if err := mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &appMetadata); err != nil {
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
 		return fmt.Errorf("failed to decode application metadata: %w", err)
 	}
 
-	client, err := NewClient(ctx.AppInstallation, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
 	if err != nil {
 		return err
 	}

@@ -31,10 +31,6 @@ To complete the Slack app setup:
 5.  **Get Bot Token**: In "OAuth & Permissions", copy the "**Bot User OAuth Token**"
 6.  **Update Configuration**: Paste the "Bot User OAuth Token" and "Signing Secret" into the app installation configuration fields in SuperPlane and save
 `
-	installationInstructions = `
-You can install the Slack app without the **Bot Token** and **Signing Secret**.
-After installation, follow the setup prompt to create the Slack app and add those values.
-`
 )
 
 func init() {
@@ -68,8 +64,11 @@ func (s *Slack) Description() string {
 	return "Send and react to Slack messages and interactions"
 }
 
-func (s *Slack) InstallationInstructions() string {
-	return installationInstructions
+func (s *Slack) Instructions() string {
+	return `
+You can install the Slack app without the **Bot Token** and **Signing Secret**.
+After installation, follow the setup prompt to create the Slack app and add those values.
+`
 }
 
 func (s *Slack) Configuration() []configuration.Field {
@@ -110,7 +109,7 @@ func (s *Slack) Triggers() []core.Trigger {
 
 func (s *Slack) Sync(ctx core.SyncContext) error {
 	metadata := Metadata{}
-	err := mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &metadata)
+	err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to decode metadata: %v", err)
 	}
@@ -122,15 +121,15 @@ func (s *Slack) Sync(ctx core.SyncContext) error {
 		return nil
 	}
 
-	botToken, _ := ctx.AppInstallation.GetConfig("botToken")
-	signingSecret, _ := ctx.AppInstallation.GetConfig("signingSecret")
+	botToken, _ := ctx.Integration.GetConfig("botToken")
+	signingSecret, _ := ctx.Integration.GetConfig("signingSecret")
 
 	//
 	// If tokens are configured, verify if the auth is working,
 	// by using the bot token to send a message to the channel.
 	//
 	if botToken != nil && signingSecret != nil {
-		client, err := NewClient(ctx.AppInstallation)
+		client, err := NewClient(ctx.Integration)
 		if err != nil {
 			return err
 		}
@@ -140,7 +139,7 @@ func (s *Slack) Sync(ctx core.SyncContext) error {
 			return fmt.Errorf("error verifying slack auth: %v", err)
 		}
 
-		ctx.AppInstallation.SetMetadata(Metadata{
+		ctx.Integration.SetMetadata(Metadata{
 			URL:    result.URL,
 			TeamID: result.TeamID,
 			Team:   result.Team,
@@ -149,8 +148,8 @@ func (s *Slack) Sync(ctx core.SyncContext) error {
 			BotID:  result.BotID,
 		})
 
-		ctx.AppInstallation.RemoveBrowserAction()
-		ctx.AppInstallation.SetState("ready", "")
+		ctx.Integration.RemoveBrowserAction()
+		ctx.Integration.SetState("ready", "")
 		return nil
 	}
 
@@ -166,7 +165,7 @@ func (s *Slack) createAppCreationPrompt(ctx core.SyncContext) error {
 	encodedManifest := url.QueryEscape(string(manifestJSON))
 	manifestURL := fmt.Sprintf("https://api.slack.com/apps?new_app=1&manifest_json=%s", encodedManifest)
 
-	ctx.AppInstallation.NewBrowserAction(core.BrowserAction{
+	ctx.Integration.NewBrowserAction(core.BrowserAction{
 		Description: appBootstrapDescription,
 		URL:         manifestURL,
 		Method:      "GET",
@@ -311,7 +310,7 @@ func (s *Slack) handleEvent(ctx core.HTTPRequestContext, body []byte) {
 		return
 	}
 
-	subscriptions, err := ctx.AppInstallation.ListSubscriptions()
+	subscriptions, err := ctx.Integration.ListSubscriptions()
 	if err != nil {
 		ctx.Logger.Errorf("error listing subscriptions: %v", err)
 		ctx.Response.WriteHeader(500)
@@ -367,7 +366,7 @@ type SubscriptionConfiguration struct {
 	EventTypes []string `json:"eventTypes"`
 }
 
-func (s *Slack) subscriptionApplies(ctx core.HTTPRequestContext, subscription core.AppSubscriptionContext, eventType string) bool {
+func (s *Slack) subscriptionApplies(ctx core.HTTPRequestContext, subscription core.IntegrationSubscriptionContext, eventType string) bool {
 	c := SubscriptionConfiguration{}
 	err := mapstructure.Decode(subscription.Configuration(), &c)
 	if err != nil {
@@ -381,7 +380,7 @@ func (s *Slack) subscriptionApplies(ctx core.HTTPRequestContext, subscription co
 }
 
 func (s *Slack) readAndVerify(ctx core.HTTPRequestContext) ([]byte, error) {
-	signingSecret, err := ctx.AppInstallation.GetConfig("signingSecret")
+	signingSecret, err := ctx.Integration.GetConfig("signingSecret")
 	if err != nil {
 		return nil, fmt.Errorf("error finding signing secret: %v", err)
 	}

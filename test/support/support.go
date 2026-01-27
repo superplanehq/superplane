@@ -20,7 +20,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	// Import components, triggers, and applications to register them via init()
+	// Import components, triggers, and integrations to register them via init()
 	_ "github.com/superplanehq/superplane/pkg/components/approval"
 	_ "github.com/superplanehq/superplane/pkg/components/filter"
 	_ "github.com/superplanehq/superplane/pkg/components/http"

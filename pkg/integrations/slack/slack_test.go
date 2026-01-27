@@ -28,7 +28,7 @@ func Test__Slack__Sync(t *testing.T) {
 			Metadata: Metadata{URL: "https://slack.example.com"},
 		}
 
-		err := s.Sync(core.SyncContext{AppInstallation: appCtx})
+		err := s.Sync(core.SyncContext{Integration: appCtx})
 
 		require.NoError(t, err)
 		assert.Nil(t, appCtx.BrowserAction)
@@ -58,7 +58,7 @@ func Test__Slack__Sync(t *testing.T) {
 			BrowserAction: &core.BrowserAction{URL: "https://example.com"},
 		}
 
-		err := s.Sync(core.SyncContext{AppInstallation: appCtx})
+		err := s.Sync(core.SyncContext{Integration: appCtx})
 
 		require.NoError(t, err)
 		assert.Equal(t, "ready", appCtx.State)
@@ -78,9 +78,9 @@ func Test__Slack__Sync(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 
 		err := s.Sync(core.SyncContext{
-			AppInstallation: appCtx,
-			BaseURL:         "https://app.example.com",
-			InstallationID:  "install-123",
+			Integration:    appCtx,
+			BaseURL:        "https://app.example.com",
+			InstallationID: "install-123",
 		})
 
 		require.NoError(t, err)
@@ -113,7 +113,7 @@ func Test__Slack__ReadAndVerify(t *testing.T) {
 
 		_, err := s.readAndVerify(core.HTTPRequestContext{
 			Request: req,
-			AppInstallation: &contexts.AppInstallationContext{
+			Integration: &contexts.AppInstallationContext{
 				Configuration: map[string]any{"signingSecret": "secret"},
 			},
 		})
@@ -129,7 +129,7 @@ func Test__Slack__ReadAndVerify(t *testing.T) {
 
 		_, err := s.readAndVerify(core.HTTPRequestContext{
 			Request: req,
-			AppInstallation: &contexts.AppInstallationContext{
+			Integration: &contexts.AppInstallationContext{
 				Configuration: map[string]any{"signingSecret": "secret"},
 			},
 		})
@@ -152,7 +152,7 @@ func Test__Slack__ReadAndVerify(t *testing.T) {
 
 		got, err := s.readAndVerify(core.HTTPRequestContext{
 			Request: req,
-			AppInstallation: &contexts.AppInstallationContext{
+			Integration: &contexts.AppInstallationContext{
 				Configuration: map[string]any{"signingSecret": secret},
 			},
 		})

@@ -20,14 +20,14 @@ var _ MappedNullable = &IntegrationsIntegrationDefinition{}
 
 // IntegrationsIntegrationDefinition struct for IntegrationsIntegrationDefinition
 type IntegrationsIntegrationDefinition struct {
-	Name                     *string               `json:"name,omitempty"`
-	Label                    *string               `json:"label,omitempty"`
-	Icon                     *string               `json:"icon,omitempty"`
-	Description              *string               `json:"description,omitempty"`
-	Configuration            []ConfigurationField  `json:"configuration,omitempty"`
-	Components               []ComponentsComponent `json:"components,omitempty"`
-	Triggers                 []TriggersTrigger     `json:"triggers,omitempty"`
-	InstallationInstructions *string               `json:"installationInstructions,omitempty"`
+	Name          *string               `json:"name,omitempty"`
+	Label         *string               `json:"label,omitempty"`
+	Icon          *string               `json:"icon,omitempty"`
+	Description   *string               `json:"description,omitempty"`
+	Configuration []ConfigurationField  `json:"configuration,omitempty"`
+	Components    []ComponentsComponent `json:"components,omitempty"`
+	Triggers      []TriggersTrigger     `json:"triggers,omitempty"`
+	Instructions  *string               `json:"instructions,omitempty"`
 }
 
 // NewIntegrationsIntegrationDefinition instantiates a new IntegrationsIntegrationDefinition object
@@ -271,36 +271,36 @@ func (o *IntegrationsIntegrationDefinition) SetTriggers(v []TriggersTrigger) {
 	o.Triggers = v
 }
 
-// GetInstallationInstructions returns the InstallationInstructions field value if set, zero value otherwise.
-func (o *IntegrationsIntegrationDefinition) GetInstallationInstructions() string {
-	if o == nil || IsNil(o.InstallationInstructions) {
+// GetInstructions returns the Instructions field value if set, zero value otherwise.
+func (o *IntegrationsIntegrationDefinition) GetInstructions() string {
+	if o == nil || IsNil(o.Instructions) {
 		var ret string
 		return ret
 	}
-	return *o.InstallationInstructions
+	return *o.Instructions
 }
 
-// GetInstallationInstructionsOk returns a tuple with the InstallationInstructions field value if set, nil otherwise
+// GetInstructionsOk returns a tuple with the Instructions field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *IntegrationsIntegrationDefinition) GetInstallationInstructionsOk() (*string, bool) {
-	if o == nil || IsNil(o.InstallationInstructions) {
+func (o *IntegrationsIntegrationDefinition) GetInstructionsOk() (*string, bool) {
+	if o == nil || IsNil(o.Instructions) {
 		return nil, false
 	}
-	return o.InstallationInstructions, true
+	return o.Instructions, true
 }
 
-// HasInstallationInstructions returns a boolean if a field has been set.
-func (o *IntegrationsIntegrationDefinition) HasInstallationInstructions() bool {
-	if o != nil && !IsNil(o.InstallationInstructions) {
+// HasInstructions returns a boolean if a field has been set.
+func (o *IntegrationsIntegrationDefinition) HasInstructions() bool {
+	if o != nil && !IsNil(o.Instructions) {
 		return true
 	}
 
 	return false
 }
 
-// SetInstallationInstructions gets a reference to the given string and assigns it to the InstallationInstructions field.
-func (o *IntegrationsIntegrationDefinition) SetInstallationInstructions(v string) {
-	o.InstallationInstructions = &v
+// SetInstructions gets a reference to the given string and assigns it to the Instructions field.
+func (o *IntegrationsIntegrationDefinition) SetInstructions(v string) {
+	o.Instructions = &v
 }
 
 func (o IntegrationsIntegrationDefinition) MarshalJSON() ([]byte, error) {
@@ -334,8 +334,8 @@ func (o IntegrationsIntegrationDefinition) ToMap() (map[string]interface{}, erro
 	if !IsNil(o.Triggers) {
 		toSerialize["triggers"] = o.Triggers
 	}
-	if !IsNil(o.InstallationInstructions) {
-		toSerialize["installationInstructions"] = o.InstallationInstructions
+	if !IsNil(o.Instructions) {
+		toSerialize["instructions"] = o.Instructions
 	}
 	return toSerialize, nil
 }

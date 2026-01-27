@@ -40,7 +40,7 @@ func (t *DummyIntegration) Icon() string {
 	return "test"
 }
 
-func (t *DummyIntegration) InstallationInstructions() string {
+func (t *DummyIntegration) Instructions() string {
 	return "Just a dummy application used in unit tests"
 }
 
@@ -67,8 +67,8 @@ func (t *DummyIntegration) Sync(ctx core.SyncContext) error {
 	return t.onSync(ctx)
 }
 
-func (t *DummyIntegration) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.ApplicationResource, error) {
-	return []core.ApplicationResource{}, nil
+func (t *DummyIntegration) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	return []core.IntegrationResource{}, nil
 }
 
 func (t *DummyIntegration) HandleRequest(ctx core.HTTPRequestContext) {

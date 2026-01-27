@@ -91,15 +91,15 @@ func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, webhoo
 		return err
 	}
 
-	app, err := w.registry.GetIntegration(appInstallation.AppName)
+	integration, err := w.registry.GetIntegration(appInstallation.AppName)
 	if err != nil {
 		return err
 	}
 
-	err = app.CleanupWebhook(core.CleanupWebhookContext{
-		HTTP:            contexts.NewHTTPContext(w.registry.GetHTTPClient()),
-		Webhook:         contexts.NewWebhookContext(tx, webhook, w.encryptor, w.baseURL),
-		AppInstallation: contexts.NewAppInstallationContext(tx, nil, appInstallation, w.encryptor, w.registry),
+	err = integration.CleanupWebhook(core.CleanupWebhookContext{
+		HTTP:        contexts.NewHTTPContext(w.registry.GetHTTPClient()),
+		Webhook:     contexts.NewWebhookContext(tx, webhook, w.encryptor, w.baseURL),
+		Integration: contexts.NewAppInstallationContext(tx, nil, appInstallation, w.encryptor, w.registry),
 	})
 
 	if err != nil {

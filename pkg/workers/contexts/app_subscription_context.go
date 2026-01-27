@@ -26,7 +26,7 @@ func NewAppSubscriptionContext(
 	node *models.WorkflowNode,
 	installation *models.AppInstallation,
 	appCtx *AppInstallationContext,
-) core.AppSubscriptionContext {
+) core.IntegrationSubscriptionContext {
 	return &AppSubscriptionContext{
 		tx:           tx,
 		registry:     registry,
@@ -65,17 +65,17 @@ func (c *AppSubscriptionContext) sendMessageToComponent(message any) error {
 		return fmt.Errorf("component %s not found", componentName)
 	}
 
-	appComponent, ok := component.(core.AppComponent)
+	integrationComponent, ok := component.(core.IntegrationComponent)
 	if !ok {
 		return fmt.Errorf("component %s is not an app component", componentName)
 	}
 
-	return appComponent.OnAppMessage(core.AppMessageContext{
-		Configuration:   c.node.Configuration.Data(),
-		AppInstallation: c.appCtx,
-		Events:          NewEventContext(c.tx, c.node),
-		Message:         message,
-		Logger:          logging.WithAppInstallation(logging.ForNode(*c.node), *c.installation),
+	return integrationComponent.OnIntegrationMessage(core.IntegrationMessageContext{
+		Configuration: c.node.Configuration.Data(),
+		Integration:   c.appCtx,
+		Events:        NewEventContext(c.tx, c.node),
+		Message:       message,
+		Logger:        logging.WithAppInstallation(logging.ForNode(*c.node), *c.installation),
 	})
 }
 
@@ -91,16 +91,16 @@ func (c *AppSubscriptionContext) sendMessageToTrigger(message any) error {
 		return fmt.Errorf("trigger %s not found", triggerName)
 	}
 
-	appTrigger, ok := trigger.(core.AppTrigger)
+	integrationTrigger, ok := trigger.(core.IntegrationTrigger)
 	if !ok {
 		return fmt.Errorf("trigger %s is not an app trigger", trigger.Name())
 	}
 
-	return appTrigger.OnAppMessage(core.AppMessageContext{
-		Configuration:   c.node.Configuration.Data(),
-		AppInstallation: c.appCtx,
-		Message:         message,
-		Events:          NewEventContext(c.tx, c.node),
-		Logger:          logging.WithAppInstallation(logging.ForNode(*c.node), *c.installation),
+	return integrationTrigger.OnIntegrationMessage(core.IntegrationMessageContext{
+		Configuration: c.node.Configuration.Data(),
+		Integration:   c.appCtx,
+		Message:       message,
+		Events:        NewEventContext(c.tx, c.node),
+		Logger:        logging.WithAppInstallation(logging.ForNode(*c.node), *c.installation),
 	})
 }

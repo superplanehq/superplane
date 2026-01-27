@@ -39,7 +39,7 @@ func (c *Cloudflare) Description() string {
 	return "Manage Cloudflare zones, rules, and DNS"
 }
 
-func (c *Cloudflare) InstallationInstructions() string {
+func (c *Cloudflare) Instructions() string {
 	return `## Create a Cloudflare API Token
 
 1. Open the [Cloudflare API Tokens page](https://dash.cloudflare.com/profile/api-tokens)
@@ -91,7 +91,7 @@ func (c *Cloudflare) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("apiToken is required")
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}
@@ -101,22 +101,22 @@ func (c *Cloudflare) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("error listing zones: %v", err)
 	}
 
-	ctx.AppInstallation.SetMetadata(Metadata{Zones: zones})
-	ctx.AppInstallation.SetState("ready", "")
+	ctx.Integration.SetMetadata(Metadata{Zones: zones})
+	ctx.Integration.SetState("ready", "")
 	return nil
 }
 
-func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.ApplicationResource, error) {
+func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
 	case "zone":
 		metadata := Metadata{}
-		if err := mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &metadata); err != nil {
+		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
 			return nil, fmt.Errorf("failed to decode application metadata: %w", err)
 		}
 
-		resources := make([]core.ApplicationResource, 0, len(metadata.Zones))
+		resources := make([]core.IntegrationResource, 0, len(metadata.Zones))
 		for _, zone := range metadata.Zones {
-			resources = append(resources, core.ApplicationResource{
+			resources = append(resources, core.IntegrationResource{
 				Type: resourceType,
 				Name: zone.Name,
 				ID:   zone.ID,
@@ -125,17 +125,17 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 		return resources, nil
 
 	case "redirect_rule":
-		client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create client: %w", err)
 		}
 
 		metadata := Metadata{}
-		if err := mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &metadata); err != nil {
+		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
 			return nil, fmt.Errorf("failed to decode application metadata: %w", err)
 		}
 
-		var resources []core.ApplicationResource
+		var resources []core.IntegrationResource
 		for _, zone := range metadata.Zones {
 			rules, err := client.ListRedirectRules(zone.ID)
 			if err != nil {
@@ -143,7 +143,7 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 			}
 
 			for _, rule := range rules {
-				resources = append(resources, core.ApplicationResource{
+				resources = append(resources, core.IntegrationResource{
 					Type: resourceType,
 					Name: fmt.Sprintf("%s - %s", zone.Name, rule.Description),
 					ID:   fmt.Sprintf("%s/%s", zone.ID, rule.ID),
@@ -153,7 +153,7 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 		return resources, nil
 
 	default:
-		return []core.ApplicationResource{}, nil
+		return []core.IntegrationResource{}, nil
 	}
 }
 

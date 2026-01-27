@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import debounce from "lodash.debounce";
 import { Trash2 } from "lucide-react";
 import { NodeResizer, type ResizeParams } from "@xyflow/react";
 import ReactMarkdown from "react-markdown";
@@ -60,6 +61,7 @@ export interface AnnotationComponentProps extends ComponentActionsProps {
     x?: number;
     y?: number;
   }) => void;
+  onAnnotationBlur?: () => void;
 }
 
 const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
@@ -73,6 +75,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
   width: propWidth = DEFAULT_WIDTH,
   height: propHeight = DEFAULT_HEIGHT,
   onAnnotationUpdate,
+  onAnnotationBlur,
 }) => {
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -132,11 +135,26 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
   const activeColor = annotationColor && NOTE_COLORS[annotationColor] ? annotationColor : "yellow";
   const colorStyles = NOTE_COLORS[activeColor];
 
+  const debouncedTextUpdate = useMemo(
+    () =>
+      debounce((nextText: string) => {
+        if (nextText !== (annotationText || "")) {
+          onAnnotationUpdate?.({ text: nextText });
+        }
+      }, 400),
+    [annotationText, onAnnotationUpdate],
+  );
+
+  useEffect(() => {
+    return () => {
+      debouncedTextUpdate.cancel();
+    };
+  }, [debouncedTextUpdate]);
+
   const handleTextCommit = () => {
     const nextText = textareaRef.current?.value ?? "";
-    if (nextText !== (annotationText || "")) {
-      onAnnotationUpdate?.({ text: nextText });
-    }
+    debouncedTextUpdate(nextText);
+    debouncedTextUpdate.flush();
   };
 
   const colorOptions = useMemo(
@@ -280,12 +298,11 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                       noteDrafts.set(noteId, value);
                       setActiveNoteId(noteId);
                     }
-                    if (onAnnotationUpdate) {
-                      onAnnotationUpdate({ text: value });
-                    }
+                    debouncedTextUpdate(value);
                   }}
                   onBlur={() => {
                     handleTextCommit();
+                    onAnnotationBlur?.();
                     // Only exit edit mode if the blur was caused by clicking outside the container
                     // This prevents exiting edit mode when component re-renders during auto-save
                     if (lastPointerDownOutsideRef.current) {

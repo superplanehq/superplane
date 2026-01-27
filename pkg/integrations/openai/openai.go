@@ -58,7 +58,7 @@ func (o *OpenAI) Triggers() []core.Trigger {
 	return []core.Trigger{}
 }
 
-func (o *OpenAI) InstallationInstructions() string {
+func (o *OpenAI) Instructions() string {
 	return ""
 }
 
@@ -72,7 +72,7 @@ func (o *OpenAI) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("apiKey is required")
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func (o *OpenAI) Sync(ctx core.SyncContext) error {
 		return err
 	}
 
-	ctx.AppInstallation.SetState("ready", "")
+	ctx.Integration.SetState("ready", "")
 	return nil
 }
 
@@ -93,12 +93,12 @@ func (o *OpenAI) CompareWebhookConfig(a, b any) (bool, error) {
 	return true, nil
 }
 
-func (o *OpenAI) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.ApplicationResource, error) {
+func (o *OpenAI) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	if resourceType != "model" {
-		return []core.ApplicationResource{}, nil
+		return []core.IntegrationResource{}, nil
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
@@ -108,13 +108,13 @@ func (o *OpenAI) ListResources(resourceType string, ctx core.ListResourcesContex
 		return nil, err
 	}
 
-	resources := make([]core.ApplicationResource, 0, len(models))
+	resources := make([]core.IntegrationResource, 0, len(models))
 	for _, model := range models {
 		if model.ID == "" {
 			continue
 		}
 
-		resources = append(resources, core.ApplicationResource{
+		resources = append(resources, core.IntegrationResource{
 			Type: resourceType,
 			Name: model.ID,
 			ID:   model.ID,

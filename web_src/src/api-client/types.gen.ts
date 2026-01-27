@@ -338,7 +338,7 @@ export type IntegrationsIntegrationDefinition = {
   configuration?: Array<ConfigurationField>;
   components?: Array<ComponentsComponent>;
   triggers?: Array<TriggersTrigger>;
-  installationInstructions?: string;
+  instructions?: string;
 };
 
 export type MeRegenerateTokenResponse = {

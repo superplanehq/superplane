@@ -23,8 +23,8 @@ func Test__Cloudflare__Sync(t *testing.T) {
 		}
 
 		err := c.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			Integration:   appCtx,
 		})
 
 		require.ErrorContains(t, err, "apiToken is required")
@@ -54,9 +54,9 @@ func Test__Cloudflare__Sync(t *testing.T) {
 		}
 
 		err := c.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   appCtx,
 		})
 
 		require.NoError(t, err)
@@ -87,9 +87,9 @@ func Test__Cloudflare__Sync(t *testing.T) {
 		}
 
 		err := c.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   appCtx,
 		})
 
 		require.Error(t, err)
@@ -118,8 +118,8 @@ func Test__Cloudflare__ListResources(t *testing.T) {
 		}
 
 		resources, err := c.ListResources("zone", core.ListResourcesContext{
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
+			HTTP:        httpContext,
+			Integration: appCtx,
 		})
 
 		require.NoError(t, err)
@@ -138,8 +138,8 @@ func Test__Cloudflare__ListResources(t *testing.T) {
 		}
 
 		resources, err := c.ListResources("unknown", core.ListResourcesContext{
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
+			HTTP:        httpContext,
+			Integration: appCtx,
 		})
 
 		require.NoError(t, err)

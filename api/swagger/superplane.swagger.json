@@ -3704,7 +3704,7 @@
             "$ref": "#/definitions/TriggersTrigger"
           }
         },
-        "installationInstructions": {
+        "instructions": {
           "type": "string"
         }
       }

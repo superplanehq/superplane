@@ -50,8 +50,8 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 			"app_name":            i.AppName,
 			"resource_type":       resourceType,
 		}),
-		HTTP:            contexts.NewHTTPContext(registry.GetHTTPClient()),
-		AppInstallation: appCtx,
+		HTTP:        contexts.NewHTTPContext(registry.GetHTTPClient()),
+		Integration: appCtx,
 	}
 
 	resources, err := integration.ListResources(resourceType, listCtx)
@@ -65,7 +65,7 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 	}, nil
 }
 
-func serializeIntegrationResources(resources []core.ApplicationResource) []*pb.IntegrationResourceRef {
+func serializeIntegrationResources(resources []core.IntegrationResource) []*pb.IntegrationResourceRef {
 	out := make([]*pb.IntegrationResourceRef, 0, len(resources))
 	for _, resource := range resources {
 		out = append(out, &pb.IntegrationResourceRef{

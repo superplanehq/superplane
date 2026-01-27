@@ -25,7 +25,7 @@ func Test__AppInstallationRequestWorker_Sync(t *testing.T) {
 	//
 	var syncCalled bool
 	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-		ctx.AppInstallation.SetState("ready", "")
+		ctx.Integration.SetState("ready", "")
 		syncCalled = true
 		return nil
 	})

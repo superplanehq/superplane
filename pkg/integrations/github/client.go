@@ -10,7 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-func NewClient(ctx core.AppInstallationContext, ghAppID int64, installationID string) (*github.Client, error) {
+func NewClient(ctx core.IntegrationContext, ghAppID int64, installationID string) (*github.Client, error) {
 	ID, err := strconv.Atoi(installationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse installation ID: %v", err)
@@ -35,7 +35,7 @@ func NewClient(ctx core.AppInstallationContext, ghAppID int64, installationID st
 	return github.NewClient(&http.Client{Transport: itr}), nil
 }
 
-func findSecret(ctx core.AppInstallationContext, secretName string) (string, error) {
+func findSecret(ctx core.IntegrationContext, secretName string) (string, error) {
 	secrets, err := ctx.GetSecrets()
 	if err != nil {
 		return "", err

@@ -1,7 +1,9 @@
 package configuration
 
 import (
+	"encoding/json"
 	"fmt"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -10,6 +12,8 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/robfig/cron/v3"
 )
+
+var expressionPlaceholderRegex = regexp.MustCompile(`(?s)\{\{.*?\}\}`)
 
 func ValidateConfiguration(fields []Field, config map[string]any) error {
 	for _, field := range fields {
@@ -253,6 +257,39 @@ func validateDaysOfWeek(_ Field, value any) error {
 }
 
 func validateObject(field Field, value any) error {
+	if text, ok := value.(string); ok {
+		normalized := text
+		hasExpressions := expressionPlaceholderRegex.MatchString(text)
+		if hasExpressions {
+			normalized = expressionPlaceholderRegex.ReplaceAllString(text, "{}")
+		}
+
+		var parsed any
+		if err := json.Unmarshal([]byte(normalized), &parsed); err != nil {
+			return fmt.Errorf("must be valid JSON")
+		}
+
+		if field.TypeOptions != nil && field.TypeOptions.Object != nil && len(field.TypeOptions.Object.Schema) > 0 {
+			obj, ok := parsed.(map[string]any)
+			if !ok {
+				return fmt.Errorf("must be an object")
+			}
+			if hasExpressions {
+				return nil
+			}
+			return ValidateConfiguration(field.TypeOptions.Object.Schema, obj)
+		}
+
+		switch parsed.(type) {
+		case map[string]any:
+			return nil
+		case []any:
+			return nil
+		default:
+			return fmt.Errorf("must be an object or array")
+		}
+	}
+
 	if field.TypeOptions != nil && field.TypeOptions.Object != nil && len(field.TypeOptions.Object.Schema) > 0 {
 		obj, ok := value.(map[string]any)
 		if !ok {

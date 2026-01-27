@@ -51,7 +51,7 @@ func (a *AWS) Description() string {
 	return "Manage resources and execute AWS commands in workflows"
 }
 
-func (a *AWS) InstallationInstructions() string {
+func (a *AWS) Instructions() string {
 	return "Initially, you can leave the **\"IAM Role ARN\"** field empty, as you will be guided through the identity provider and IAM role creation process."
 }
 
@@ -113,7 +113,7 @@ func (a *AWS) Sync(ctx core.SyncContext) error {
 }
 
 func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
-	ctx.AppInstallation.NewBrowserAction(core.BrowserAction{
+	ctx.Integration.NewBrowserAction(core.BrowserAction{
 		Description: fmt.Sprintf(`
 **1. Create Identity Provider**
 
@@ -134,7 +134,7 @@ func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 
 - Copy the ARN of the IAM role created in step 2
 - Paste it into the "Role ARN" field in the installation configuration
-`, ctx.BaseURL, ctx.AppInstallation.ID().String()),
+`, ctx.BaseURL, ctx.Integration.ID().String()),
 	})
 
 	return nil
@@ -148,45 +148,45 @@ func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration) er
 
 	subject := fmt.Sprintf("app-installation:%s", ctx.InstallationID)
 	if strings.TrimSpace(ctx.InstallationID) == "" {
-		subject = fmt.Sprintf("app-installation:%s", ctx.AppInstallation.ID())
+		subject = fmt.Sprintf("app-installation:%s", ctx.Integration.ID())
 	}
 
-	oidcToken, err := ctx.OIDC.Sign(subject, 5*time.Minute, ctx.AppInstallation.ID().String(), nil)
+	oidcToken, err := ctx.OIDC.Sign(subject, 5*time.Minute, ctx.Integration.ID().String(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to generate OIDC token: %w", err)
 	}
 
-	sessionName := fmt.Sprintf("SuperPlane-%s", ctx.AppInstallation.ID())
+	sessionName := fmt.Sprintf("SuperPlane-%s", ctx.Integration.ID())
 	credentials, err := assumeRoleWithWebIdentity(ctx.HTTP, config.Region, config.RoleArn, sessionName, oidcToken, durationSeconds)
 	if err != nil {
 		return err
 	}
 
-	if err := ctx.AppInstallation.SetSecret("accessKeyId", []byte(credentials.AccessKeyID)); err != nil {
+	if err := ctx.Integration.SetSecret("accessKeyId", []byte(credentials.AccessKeyID)); err != nil {
 		return err
 	}
-	if err := ctx.AppInstallation.SetSecret("secretAccessKey", []byte(credentials.SecretAccessKey)); err != nil {
+	if err := ctx.Integration.SetSecret("secretAccessKey", []byte(credentials.SecretAccessKey)); err != nil {
 		return err
 	}
-	if err := ctx.AppInstallation.SetSecret("sessionToken", []byte(credentials.SessionToken)); err != nil {
+	if err := ctx.Integration.SetSecret("sessionToken", []byte(credentials.SessionToken)); err != nil {
 		return err
 	}
 
-	ctx.AppInstallation.SetMetadata(SessionMetadata{
+	ctx.Integration.SetMetadata(SessionMetadata{
 		RoleArn:   config.RoleArn,
 		Region:    strings.TrimSpace(config.Region),
 		ExpiresAt: credentials.Expiration.Format(time.RFC3339),
 	})
 
-	ctx.AppInstallation.SetState("ready", "")
-	ctx.AppInstallation.RemoveBrowserAction()
+	ctx.Integration.SetState("ready", "")
+	ctx.Integration.RemoveBrowserAction()
 
 	refreshAfter := time.Until(credentials.Expiration) / 2
 	if refreshAfter < time.Minute {
 		refreshAfter = time.Minute
 	}
 
-	return ctx.AppInstallation.ScheduleResync(refreshAfter)
+	return ctx.Integration.ScheduleResync(refreshAfter)
 }
 
 func (a *AWS) HandleRequest(ctx core.HTTPRequestContext) {
@@ -197,15 +197,15 @@ func (a *AWS) CompareWebhookConfig(aConfig, bConfig any) (bool, error) {
 	return true, nil
 }
 
-func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.ApplicationResource, error) {
+func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
 	case "lambda.function":
-		creds, err := common.CredentialsFromInstallation(ctx.AppInstallation)
+		creds, err := common.CredentialsFromInstallation(ctx.Integration)
 		if err != nil {
 			return nil, err
 		}
 
-		region := common.RegionFromInstallation(ctx.AppInstallation)
+		region := common.RegionFromInstallation(ctx.Integration)
 		if strings.TrimSpace(region) == "" {
 			return nil, fmt.Errorf("region is required")
 		}
@@ -216,9 +216,9 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 			return nil, fmt.Errorf("failed to list lambda functions: %w", err)
 		}
 
-		resources := make([]core.ApplicationResource, 0, len(functions))
+		resources := make([]core.IntegrationResource, 0, len(functions))
 		for _, function := range functions {
-			resources = append(resources, core.ApplicationResource{
+			resources = append(resources, core.IntegrationResource{
 				Type: resourceType,
 				Name: function.FunctionName,
 				ID:   function.FunctionArn,
@@ -228,7 +228,7 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return resources, nil
 
 	default:
-		return []core.ApplicationResource{}, nil
+		return []core.IntegrationResource{}, nil
 	}
 }
 

@@ -138,7 +138,7 @@ func (c *CreateResponse) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("input is required")
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}

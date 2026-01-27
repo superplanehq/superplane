@@ -28,14 +28,14 @@ func serializeIntegrations(in []core.Integration) []*pb.IntegrationDefinition {
 		}
 
 		out[i] = &pb.IntegrationDefinition{
-			Name:                     integration.Name(),
-			Label:                    integration.Label(),
-			Icon:                     integration.Icon(),
-			Description:              integration.Description(),
-			InstallationInstructions: integration.InstallationInstructions(),
-			Configuration:            configuration,
-			Components:               actions.SerializeComponents(integration.Components()),
-			Triggers:                 actions.SerializeTriggers(integration.Triggers()),
+			Name:          integration.Name(),
+			Label:         integration.Label(),
+			Icon:          integration.Icon(),
+			Description:   integration.Description(),
+			Instructions:  integration.Instructions(),
+			Configuration: configuration,
+			Components:    actions.SerializeComponents(integration.Components()),
+			Triggers:      actions.SerializeTriggers(integration.Triggers()),
 		}
 	}
 	return out

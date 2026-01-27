@@ -107,17 +107,17 @@ func (x *ListIntegrationsResponse) GetIntegrations() []*IntegrationDefinition {
 }
 
 type IntegrationDefinition struct {
-	state                    protoimpl.MessageState  `protogen:"open.v1"`
-	Name                     string                  `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Label                    string                  `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
-	Icon                     string                  `protobuf:"bytes,3,opt,name=icon,proto3" json:"icon,omitempty"`
-	Description              string                  `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
-	Configuration            []*configuration.Field  `protobuf:"bytes,5,rep,name=configuration,proto3" json:"configuration,omitempty"`
-	Components               []*components.Component `protobuf:"bytes,6,rep,name=components,proto3" json:"components,omitempty"`
-	Triggers                 []*triggers.Trigger     `protobuf:"bytes,7,rep,name=triggers,proto3" json:"triggers,omitempty"`
-	InstallationInstructions string                  `protobuf:"bytes,8,opt,name=installation_instructions,json=installationInstructions,proto3" json:"installation_instructions,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Name          string                  `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Label         string                  `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	Icon          string                  `protobuf:"bytes,3,opt,name=icon,proto3" json:"icon,omitempty"`
+	Description   string                  `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	Configuration []*configuration.Field  `protobuf:"bytes,5,rep,name=configuration,proto3" json:"configuration,omitempty"`
+	Components    []*components.Component `protobuf:"bytes,6,rep,name=components,proto3" json:"components,omitempty"`
+	Triggers      []*triggers.Trigger     `protobuf:"bytes,7,rep,name=triggers,proto3" json:"triggers,omitempty"`
+	Instructions  string                  `protobuf:"bytes,8,opt,name=instructions,proto3" json:"instructions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *IntegrationDefinition) Reset() {
@@ -199,9 +199,9 @@ func (x *IntegrationDefinition) GetTriggers() []*triggers.Trigger {
 	return nil
 }
 
-func (x *IntegrationDefinition) GetInstallationInstructions() string {
+func (x *IntegrationDefinition) GetInstructions() string {
 	if x != nil {
-		return x.InstallationInstructions
+		return x.Instructions
 	}
 	return ""
 }
@@ -213,7 +213,7 @@ const file_integrations_proto_rawDesc = "" +
 	"\x12integrations.proto\x12\x17Superplane.Integrations\x1a\x13configuration.proto\x1a\x10components.proto\x1a\x0etriggers.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x19\n" +
 	"\x17ListIntegrationsRequest\"n\n" +
 	"\x18ListIntegrationsResponse\x12R\n" +
-	"\fintegrations\x18\x01 \x03(\v2..Superplane.Integrations.IntegrationDefinitionR\fintegrations\"\xf7\x02\n" +
+	"\fintegrations\x18\x01 \x03(\v2..Superplane.Integrations.IntegrationDefinitionR\fintegrations\"\xde\x02\n" +
 	"\x15IntegrationDefinition\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12\x12\n" +
@@ -223,8 +223,8 @@ const file_integrations_proto_rawDesc = "" +
 	"\n" +
 	"components\x18\x06 \x03(\v2 .Superplane.Components.ComponentR\n" +
 	"components\x128\n" +
-	"\btriggers\x18\a \x03(\v2\x1c.Superplane.Triggers.TriggerR\btriggers\x12;\n" +
-	"\x19installation_instructions\x18\b \x01(\tR\x18installationInstructions2\xf0\x01\n" +
+	"\btriggers\x18\a \x03(\v2\x1c.Superplane.Triggers.TriggerR\btriggers\x12\"\n" +
+	"\finstructions\x18\b \x01(\tR\finstructions2\xf0\x01\n" +
 	"\fIntegrations\x12\xdf\x01\n" +
 	"\x10ListIntegrations\x120.Superplane.Integrations.ListIntegrationsRequest\x1a1.Superplane.Integrations.ListIntegrationsResponse\"f\x92AG\n" +
 	"\vIntegration\x12\x1bList available integrations\x1a\x1bList available integrations\x82\xd3\xe4\x93\x02\x16\x12\x14/api/v1/integrationsB\xd4\x01\x92A\x94\x01\x12j\n" +

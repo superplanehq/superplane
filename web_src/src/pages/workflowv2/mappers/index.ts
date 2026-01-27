@@ -50,6 +50,7 @@ import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait
 import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
 import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
+import { startTriggerRenderer } from "./start";
 
 /**
  * Registry mapping trigger names to their renderers.
@@ -58,6 +59,7 @@ import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 const triggerRenderers: Record<string, TriggerRenderer> = {
   schedule: scheduleTriggerRenderer,
   webhook: webhookTriggerRenderer,
+  start: startTriggerRenderer,
 };
 
 const componentBaseMappers: Record<string, ComponentBaseMapper> = {

@@ -109,7 +109,7 @@ func (s *SMTP) Triggers() []core.Trigger {
 	return []core.Trigger{}
 }
 
-func (s *SMTP) InstallationInstructions() string {
+func (s *SMTP) Instructions() string {
 	return ""
 }
 
@@ -132,7 +132,7 @@ func (s *SMTP) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("fromEmail is required")
 	}
 
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create SMTP client: %w", err)
 	}
@@ -141,7 +141,7 @@ func (s *SMTP) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("SMTP connection test failed: %w", err)
 	}
 
-	ctx.AppInstallation.SetState("ready", "")
+	ctx.Integration.SetState("ready", "")
 	return nil
 }
 
@@ -153,9 +153,9 @@ func (s *SMTP) CompareWebhookConfig(a, b any) (bool, error) {
 	return true, nil
 }
 
-func (s *SMTP) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.ApplicationResource, error) {
+func (s *SMTP) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	// SMTP doesn't have resources to list
-	return []core.ApplicationResource{}, nil
+	return []core.IntegrationResource{}, nil
 }
 
 func (s *SMTP) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {

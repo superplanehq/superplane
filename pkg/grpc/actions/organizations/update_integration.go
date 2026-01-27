@@ -65,7 +65,7 @@ func UpdateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 		WebhooksBaseURL: webhooksBaseURL,
 		OrganizationID:  orgID,
 		InstallationID:  i.ID.String(),
-		AppInstallation: appCtx,
+		Integration:     appCtx,
 		OIDC:            oidcProvider,
 	})
 

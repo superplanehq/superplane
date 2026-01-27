@@ -94,7 +94,7 @@ func (p *OnPRComment) Configuration() []configuration.Field {
 func (p *OnPRComment) Setup(ctx core.TriggerContext) error {
 	err := ensureRepoInMetadata(
 		ctx.Metadata,
-		ctx.AppInstallation,
+		ctx.Integration,
 		ctx.Configuration,
 	)
 
@@ -111,7 +111,7 @@ func (p *OnPRComment) Setup(ctx core.TriggerContext) error {
 	// - pull_request_review_comment: line-level code review comments
 	// - issue_comment: PR conversation comments (GitHub sends these for comments on PR's main tab)
 	// - pull_request_review: review submission comments (the main comment when clicking "Submit review")
-	return ctx.AppInstallation.RequestWebhook(WebhookConfiguration{
+	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		EventTypes: []string{"pull_request_review_comment", "issue_comment", "pull_request_review"},
 		Repository: config.Repository,
 	})

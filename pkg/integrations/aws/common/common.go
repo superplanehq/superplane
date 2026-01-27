@@ -14,7 +14,7 @@ const (
 	sessionTokenSecret    = "sessionToken"
 )
 
-func CredentialsFromInstallation(ctx core.AppInstallationContext) (aws.Credentials, error) {
+func CredentialsFromInstallation(ctx core.IntegrationContext) (aws.Credentials, error) {
 	secrets, err := ctx.GetSecrets()
 	if err != nil {
 		return aws.Credentials{}, fmt.Errorf("failed to get AWS session secrets: %w", err)
@@ -47,7 +47,7 @@ func CredentialsFromInstallation(ctx core.AppInstallationContext) (aws.Credentia
 	}, nil
 }
 
-func RegionFromInstallation(ctx core.AppInstallationContext) string {
+func RegionFromInstallation(ctx core.IntegrationContext) string {
 	regionBytes, err := ctx.GetConfig("region")
 	if err != nil {
 		return ""

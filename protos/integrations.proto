@@ -55,5 +55,5 @@ message IntegrationDefinition {
   repeated Configuration.Field configuration = 5;
   repeated Components.Component components = 6;
   repeated Triggers.Trigger triggers = 7;
-  string installation_instructions = 8;
+  string instructions = 8;
 }

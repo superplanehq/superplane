@@ -60,7 +60,41 @@ func (s *Start) Color() string {
 }
 
 func (s *Start) Configuration() []configuration.Field {
-	return []configuration.Field{}
+	return []configuration.Field{
+		{
+			Name:  "templates",
+			Label: "Templates",
+			Type:  configuration.FieldTypeList,
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Template",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:     "name",
+								Label:    "Template Name",
+								Type:     configuration.FieldTypeString,
+								Required: true,
+							},
+							{
+								Name:     "payload",
+								Label:    "Payload",
+								Type:     configuration.FieldTypeObject,
+								Required: true,
+							},
+						},
+					},
+				},
+			},
+			Default: []map[string]any{
+				{
+					"name":    "Hello World",
+					"payload": map[string]any{"message": "Hello, World!"},
+				},
+			},
+		},
+	}
 }
 
 func (s *Start) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
