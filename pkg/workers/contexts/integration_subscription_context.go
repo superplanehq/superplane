@@ -10,38 +10,38 @@ import (
 	"gorm.io/gorm"
 )
 
-type AppSubscriptionContext struct {
-	tx           *gorm.DB
-	registry     *registry.Registry
-	node         *models.WorkflowNode
-	installation *models.AppInstallation
-	subscription *models.NodeSubscription
-	appCtx       *AppInstallationContext
+type IntegrationSubscriptionContext struct {
+	tx             *gorm.DB
+	registry       *registry.Registry
+	node           *models.WorkflowNode
+	installation   *models.AppInstallation
+	subscription   *models.NodeSubscription
+	integrationCtx *IntegrationContext
 }
 
-func NewAppSubscriptionContext(
+func NewIntegrationSubscriptionContext(
 	tx *gorm.DB,
 	registry *registry.Registry,
 	subscription *models.NodeSubscription,
 	node *models.WorkflowNode,
 	installation *models.AppInstallation,
-	appCtx *AppInstallationContext,
+	integrationCtx *IntegrationContext,
 ) core.IntegrationSubscriptionContext {
-	return &AppSubscriptionContext{
-		tx:           tx,
-		registry:     registry,
-		subscription: subscription,
-		node:         node,
-		installation: installation,
-		appCtx:       appCtx,
+	return &IntegrationSubscriptionContext{
+		tx:             tx,
+		registry:       registry,
+		subscription:   subscription,
+		node:           node,
+		installation:   installation,
+		integrationCtx: integrationCtx,
 	}
 }
 
-func (c *AppSubscriptionContext) Configuration() any {
+func (c *IntegrationSubscriptionContext) Configuration() any {
 	return c.subscription.Configuration.Data()
 }
 
-func (c *AppSubscriptionContext) SendMessage(message any) error {
+func (c *IntegrationSubscriptionContext) SendMessage(message any) error {
 	switch c.subscription.NodeType {
 	case models.NodeTypeComponent:
 		return c.sendMessageToComponent(message)
@@ -53,7 +53,7 @@ func (c *AppSubscriptionContext) SendMessage(message any) error {
 	return fmt.Errorf("node type %s does not support messages", c.subscription.NodeType)
 }
 
-func (c *AppSubscriptionContext) sendMessageToComponent(message any) error {
+func (c *IntegrationSubscriptionContext) sendMessageToComponent(message any) error {
 	nodeRef := c.subscription.NodeRef.Data()
 	if nodeRef.Component == nil {
 		return fmt.Errorf("invalid component ref")
@@ -72,14 +72,14 @@ func (c *AppSubscriptionContext) sendMessageToComponent(message any) error {
 
 	return integrationComponent.OnIntegrationMessage(core.IntegrationMessageContext{
 		Configuration: c.node.Configuration.Data(),
-		Integration:   c.appCtx,
+		Integration:   c.integrationCtx,
 		Events:        NewEventContext(c.tx, c.node),
 		Message:       message,
 		Logger:        logging.WithAppInstallation(logging.ForNode(*c.node), *c.installation),
 	})
 }
 
-func (c *AppSubscriptionContext) sendMessageToTrigger(message any) error {
+func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error {
 	nodeRef := c.subscription.NodeRef.Data()
 	if nodeRef.Trigger == nil {
 		return fmt.Errorf("invalid trigger ref")
@@ -98,7 +98,7 @@ func (c *AppSubscriptionContext) sendMessageToTrigger(message any) error {
 
 	return integrationTrigger.OnIntegrationMessage(core.IntegrationMessageContext{
 		Configuration: c.node.Configuration.Data(),
-		Integration:   c.appCtx,
+		Integration:   c.integrationCtx,
 		Message:       message,
 		Events:        NewEventContext(c.tx, c.node),
 		Logger:        logging.WithAppInstallation(logging.ForNode(*c.node), *c.installation),

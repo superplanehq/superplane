@@ -13,7 +13,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
-func Test__AppInstallationContext_ScheduleResync(t *testing.T) {
+func Test__IntegrationContext_ScheduleResync(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -29,7 +29,7 @@ func Test__AppInstallationContext_ScheduleResync(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx := NewAppInstallationContext(database.Conn(), nil, installation, r.Encryptor, r.Registry)
+	ctx := NewIntegrationContext(database.Conn(), nil, installation, r.Encryptor, r.Registry)
 
 	t.Run("rejects short interval", func(t *testing.T) {
 		err = ctx.ScheduleResync(500 * time.Millisecond)

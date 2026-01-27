@@ -356,9 +356,9 @@ func Test__OnPRComment__Setup(t *testing.T) {
 	trigger := OnPRComment{}
 
 	t.Run("repository is required", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
+		integrationCtx := &contexts.IntegrationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: map[string]any{"repository": ""},
 		})
@@ -367,13 +367,13 @@ func Test__OnPRComment__Setup(t *testing.T) {
 	})
 
 	t.Run("repository is not accessible", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Metadata: Metadata{
 				Repositories: []Repository{helloRepo},
 			},
 		}
 		err := trigger.Setup(core.TriggerContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: map[string]any{"repository": "world"},
 		})
@@ -382,7 +382,7 @@ func Test__OnPRComment__Setup(t *testing.T) {
 	})
 
 	t.Run("metadata is set and webhook is requested with all event types", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Metadata: Metadata{
 				Repositories: []Repository{helloRepo},
 			},
@@ -390,16 +390,16 @@ func Test__OnPRComment__Setup(t *testing.T) {
 
 		nodeMetadataCtx := contexts.MetadataContext{}
 		require.NoError(t, trigger.Setup(core.TriggerContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      &nodeMetadataCtx,
 			Configuration: map[string]any{"repository": "hello"},
 		}))
 
 		require.Equal(t, nodeMetadataCtx.Get(), NodeMetadata{Repository: &helloRepo})
-		require.Len(t, appCtx.WebhookRequests, 1)
+		require.Len(t, integrationCtx.WebhookRequests, 1)
 
 		// Single webhook listening to all PR comment event types
-		webhookRequest := appCtx.WebhookRequests[0].(WebhookConfiguration)
+		webhookRequest := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
 		assert.Equal(t, "hello", webhookRequest.Repository)
 		assert.ElementsMatch(t, []string{"pull_request_review_comment", "issue_comment", "pull_request_review"}, webhookRequest.EventTypes)
 	})

@@ -16,7 +16,7 @@ func Test__ListIncidents__Setup(t *testing.T) {
 	component := &ListIncidents{}
 
 	t.Run("valid setup without services", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"authType": AuthTypeAPIToken,
 				"apiToken": "test-token",
@@ -28,7 +28,7 @@ func Test__ListIncidents__Setup(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{},
 			HTTP:          &contexts.HTTPContext{},
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      metadataCtx,
 		})
 
@@ -53,7 +53,7 @@ func Test__ListIncidents__Setup(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"authType": AuthTypeAPIToken,
 				"apiToken": "test-token",
@@ -67,7 +67,7 @@ func Test__ListIncidents__Setup(t *testing.T) {
 				"services": []string{"PX123456"},
 			},
 			HTTP:        httpContext,
-			Integration: appCtx,
+			Integration: integrationCtx,
 			Metadata:    metadataCtx,
 		})
 
@@ -91,7 +91,7 @@ func Test__ListIncidents__Setup(t *testing.T) {
 		require.NoError(t, err)
 
 		httpContext := &contexts.HTTPContext{}
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"authType": AuthTypeAPIToken,
 				"apiToken": "test-token",
@@ -103,7 +103,7 @@ func Test__ListIncidents__Setup(t *testing.T) {
 				"services": []string{"PX123456"},
 			},
 			HTTP:        httpContext,
-			Integration: appCtx,
+			Integration: integrationCtx,
 			Metadata:    metadataCtx,
 		})
 
@@ -122,7 +122,7 @@ func Test__ListIncidents__Setup(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"authType": AuthTypeAPIToken,
 				"apiToken": "test-token",
@@ -134,7 +134,7 @@ func Test__ListIncidents__Setup(t *testing.T) {
 				"services": []string{"INVALID"},
 			},
 			HTTP:        httpContext,
-			Integration: appCtx,
+			Integration: integrationCtx,
 			Metadata:    &contexts.MetadataContext{},
 		})
 
@@ -191,7 +191,7 @@ func Test__ListIncidents__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"authType": AuthTypeAPIToken,
 				"apiToken": "test-token",
@@ -203,7 +203,7 @@ func Test__ListIncidents__Execute(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Configuration:  map[string]any{},
 			HTTP:           httpContext,
-			Integration:    appCtx,
+			Integration:    integrationCtx,
 			ExecutionState: execCtx,
 			NodeMetadata:   nodeMetadataCtx,
 		})
@@ -252,7 +252,7 @@ func Test__ListIncidents__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"authType": AuthTypeAPIToken,
 				"apiToken": "test-token",
@@ -264,7 +264,7 @@ func Test__ListIncidents__Execute(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Configuration:  map[string]any{},
 			HTTP:           httpContext,
-			Integration:    appCtx,
+			Integration:    integrationCtx,
 			ExecutionState: execCtx,
 			NodeMetadata:   nodeMetadataCtx,
 		})
@@ -289,7 +289,7 @@ func Test__ListIncidents__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"authType": AuthTypeAPIToken,
 				"apiToken": "test-token",
@@ -301,7 +301,7 @@ func Test__ListIncidents__Execute(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Configuration:  map[string]any{},
 			HTTP:           httpContext,
-			Integration:    appCtx,
+			Integration:    integrationCtx,
 			ExecutionState: execCtx,
 			NodeMetadata:   nodeMetadataCtx,
 		})
@@ -357,7 +357,7 @@ func Test__ListIncidents__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"authType": AuthTypeAPIToken,
 				"apiToken": "test-token",
@@ -369,7 +369,7 @@ func Test__ListIncidents__Execute(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Configuration:  map[string]any{},
 			HTTP:           httpContext,
-			Integration:    appCtx,
+			Integration:    integrationCtx,
 			ExecutionState: execCtx,
 			NodeMetadata:   nodeMetadataCtx,
 		})
@@ -410,7 +410,7 @@ func Test__ListIncidents__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"authType": AuthTypeAPIToken,
 				"apiToken": "test-token",
@@ -424,7 +424,7 @@ func Test__ListIncidents__Execute(t *testing.T) {
 				"services": []string{"PX123456", "PX789012"},
 			},
 			HTTP:           httpContext,
-			Integration:    appCtx,
+			Integration:    integrationCtx,
 			ExecutionState: execCtx,
 			NodeMetadata:   nodeMetadataCtx,
 		})
@@ -451,7 +451,7 @@ func Test__ListIncidents__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"authType": AuthTypeAPIToken,
 				"apiToken": "invalid-token",
@@ -463,7 +463,7 @@ func Test__ListIncidents__Execute(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Configuration:  map[string]any{},
 			HTTP:           httpContext,
-			Integration:    appCtx,
+			Integration:    integrationCtx,
 			ExecutionState: execCtx,
 			NodeMetadata:   nodeMetadataCtx,
 		})

@@ -24,14 +24,14 @@ func Test__Slack__Sync(t *testing.T) {
 	s := &Slack{}
 
 	t.Run("metadata already set -> no prompt", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Metadata: Metadata{URL: "https://slack.example.com"},
 		}
 
-		err := s.Sync(core.SyncContext{Integration: appCtx})
+		err := s.Sync(core.SyncContext{Integration: integrationCtx})
 
 		require.NoError(t, err)
-		assert.Nil(t, appCtx.BrowserAction)
+		assert.Nil(t, integrationCtx.BrowserAction)
 	})
 
 	t.Run("tokens configured -> auth ok -> ready", func(t *testing.T) {
@@ -50,7 +50,7 @@ func Test__Slack__Sync(t *testing.T) {
 			}`), nil
 		})
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"botToken":      "token-123",
 				"signingSecret": "secret-123",
@@ -58,13 +58,13 @@ func Test__Slack__Sync(t *testing.T) {
 			BrowserAction: &core.BrowserAction{URL: "https://example.com"},
 		}
 
-		err := s.Sync(core.SyncContext{Integration: appCtx})
+		err := s.Sync(core.SyncContext{Integration: integrationCtx})
 
 		require.NoError(t, err)
-		assert.Equal(t, "ready", appCtx.State)
-		assert.Nil(t, appCtx.BrowserAction)
+		assert.Equal(t, "ready", integrationCtx.State)
+		assert.Nil(t, integrationCtx.BrowserAction)
 
-		metadata, ok := appCtx.Metadata.(Metadata)
+		metadata, ok := integrationCtx.Metadata.(Metadata)
 		require.True(t, ok)
 		assert.Equal(t, "https://workspace.slack.com", metadata.URL)
 		assert.Equal(t, "T123", metadata.TeamID)
@@ -75,19 +75,19 @@ func Test__Slack__Sync(t *testing.T) {
 	})
 
 	t.Run("no tokens -> browser action includes manifest", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
+		integrationCtx := &contexts.IntegrationContext{}
 
 		err := s.Sync(core.SyncContext{
-			Integration:    appCtx,
+			Integration:    integrationCtx,
 			BaseURL:        "https://app.example.com",
 			InstallationID: "install-123",
 		})
 
 		require.NoError(t, err)
-		require.NotNil(t, appCtx.BrowserAction)
-		require.NotEmpty(t, appCtx.BrowserAction.URL)
+		require.NotNil(t, integrationCtx.BrowserAction)
+		require.NotEmpty(t, integrationCtx.BrowserAction.URL)
 
-		manifestURL, err := url.Parse(appCtx.BrowserAction.URL)
+		manifestURL, err := url.Parse(integrationCtx.BrowserAction.URL)
 		require.NoError(t, err)
 		manifestParam := manifestURL.Query().Get("manifest_json")
 		require.NotEmpty(t, manifestParam)
@@ -113,7 +113,7 @@ func Test__Slack__ReadAndVerify(t *testing.T) {
 
 		_, err := s.readAndVerify(core.HTTPRequestContext{
 			Request: req,
-			Integration: &contexts.AppInstallationContext{
+			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{"signingSecret": "secret"},
 			},
 		})
@@ -129,7 +129,7 @@ func Test__Slack__ReadAndVerify(t *testing.T) {
 
 		_, err := s.readAndVerify(core.HTTPRequestContext{
 			Request: req,
-			Integration: &contexts.AppInstallationContext{
+			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{"signingSecret": "secret"},
 			},
 		})
@@ -152,7 +152,7 @@ func Test__Slack__ReadAndVerify(t *testing.T) {
 
 		got, err := s.readAndVerify(core.HTTPRequestContext{
 			Request: req,
-			Integration: &contexts.AppInstallationContext{
+			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{"signingSecret": secret},
 			},
 		})

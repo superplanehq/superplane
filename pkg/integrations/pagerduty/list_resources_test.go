@@ -13,10 +13,8 @@ func Test__PagerDuty__ListResources(t *testing.T) {
 	p := &PagerDuty{}
 
 	t.Run("unknown resource type returns empty list", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
-
 		resources, err := p.ListResources("unknown", core.ListResourcesContext{
-			Integration: appCtx,
+			Integration: &contexts.IntegrationContext{},
 		})
 
 		require.NoError(t, err)
@@ -24,7 +22,7 @@ func Test__PagerDuty__ListResources(t *testing.T) {
 	})
 
 	t.Run("service resource type returns services from metadata", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Metadata: Metadata{
 				Services: []Service{
 					{ID: "PX123", Name: "Production API"},
@@ -35,7 +33,7 @@ func Test__PagerDuty__ListResources(t *testing.T) {
 		}
 
 		resources, err := p.ListResources("service", core.ListResourcesContext{
-			Integration: appCtx,
+			Integration: integrationCtx,
 		})
 
 		require.NoError(t, err)
@@ -55,14 +53,12 @@ func Test__PagerDuty__ListResources(t *testing.T) {
 	})
 
 	t.Run("empty services metadata returns empty list", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
-			Metadata: Metadata{
-				Services: []Service{},
-			},
-		}
-
 		resources, err := p.ListResources("service", core.ListResourcesContext{
-			Integration: appCtx,
+			Integration: &contexts.IntegrationContext{
+				Metadata: Metadata{
+					Services: []Service{},
+				},
+			},
 		})
 
 		require.NoError(t, err)
@@ -70,10 +66,8 @@ func Test__PagerDuty__ListResources(t *testing.T) {
 	})
 
 	t.Run("nil metadata returns empty list", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
-
 		resources, err := p.ListResources("service", core.ListResourcesContext{
-			Integration: appCtx,
+			Integration: &contexts.IntegrationContext{},
 		})
 
 		require.NoError(t, err)

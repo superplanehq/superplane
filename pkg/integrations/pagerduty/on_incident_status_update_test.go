@@ -146,9 +146,9 @@ func Test__OnIncidentStatusUpdate__Setup(t *testing.T) {
 	trigger := OnIncidentStatusUpdate{}
 
 	t.Run("invalid configuration -> decode error", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
+		integrationCtx := &contexts.IntegrationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: "invalid-config",
 		})
@@ -157,9 +157,9 @@ func Test__OnIncidentStatusUpdate__Setup(t *testing.T) {
 	})
 
 	t.Run("service is required", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
+		integrationCtx := &contexts.IntegrationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: OnIncidentStatusUpdateConfiguration{},
 		})
@@ -169,18 +169,18 @@ func Test__OnIncidentStatusUpdate__Setup(t *testing.T) {
 
 	t.Run("metadata already set -> no webhook request is made", func(t *testing.T) {
 		service := &Service{ID: "svc-1", Name: "test-service"}
-		appCtx := &contexts.AppInstallationContext{}
+		integrationCtx := &contexts.IntegrationContext{}
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: NodeMetadata{Service: service},
 		}
 
 		err := trigger.Setup(core.TriggerContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      metadataCtx,
 			Configuration: OnIncidentStatusUpdateConfiguration{Service: "svc-1"},
 		})
 
 		require.NoError(t, err)
-		assert.Len(t, appCtx.WebhookRequests, 0)
+		assert.Len(t, integrationCtx.WebhookRequests, 0)
 	})
 }
