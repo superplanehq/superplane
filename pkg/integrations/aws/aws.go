@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/ecr"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/lambda"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -96,7 +97,9 @@ func (a *AWS) Components() []core.Component {
 }
 
 func (a *AWS) Triggers() []core.Trigger {
-	return []core.Trigger{}
+	return []core.Trigger{
+		&ecr.OnImagePush{},
+	}
 }
 
 func (a *AWS) Sync(ctx core.SyncContext) error {
@@ -194,7 +197,7 @@ func (a *AWS) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (a *AWS) CompareWebhookConfig(aConfig, bConfig any) (bool, error) {
-	return true, nil
+	return ecr.CompareWebhookConfig(aConfig, bConfig)
 }
 
 func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -233,9 +236,14 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 }
 
 func (a *AWS) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	return nil, nil
+	config := ecr.WebhookConfiguration{}
+	if err := mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config); err != nil {
+		return nil, fmt.Errorf("failed to decode webhook configuration: %w", err)
+	}
+
+	return ecr.SetupWebhook(ctx, config)
 }
 
 func (a *AWS) CleanupWebhook(ctx core.CleanupWebhookContext) error {
-	return nil
+	return ecr.CleanupWebhook(ctx)
 }
