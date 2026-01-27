@@ -139,7 +139,7 @@ function sendTextMessageEventSections(
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent?.id,
+      eventId: execution.rootEvent?.id || "",
     },
   ];
 }
