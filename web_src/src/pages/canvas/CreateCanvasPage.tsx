@@ -72,8 +72,8 @@ export function CreateCanvasPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-gray-900">
-      <header className="bg-white border-b border-slate-950/15 px-4 h-12 flex items-center">
+    <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-neutral-900">
+      <header className="bg-white dark:bg-neutral-900 border-b border-slate-950/15 dark:border-neutral-700 px-4 h-12 flex items-center">
         <OrganizationMenuButton organizationId={organizationId || ""} />
       </header>
       <main className="w-full h-full flex flex-column flex-grow-1">
@@ -88,7 +88,7 @@ export function CreateCanvasPage() {
               </Text>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
+            <div className="bg-white dark:bg-neutral-800 rounded-lg border border-gray-300 dark:border-neutral-700 p-6 space-y-6">
               <Field>
                 <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Canvas name *</Label>
                 <Input
@@ -164,7 +164,7 @@ export function CreateCanvasPage() {
                 />
                 <Heading
                   level={3}
-                  className="relative !text-sm pr-4 bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-white"
+                  className="relative !text-sm pr-4 bg-gray-100 dark:bg-neutral-900 text-gray-800 dark:text-white"
                 >
                   Or start with an example
                 </Heading>
@@ -215,7 +215,7 @@ function TemplateCard({ template, organizationId, navigate }: TemplateCardProps)
           handleNavigate();
         }
       }}
-      className="min-h-48 bg-white dark:bg-gray-800 rounded-md outline outline-slate-950/10 hover:shadow-md transition-shadow cursor-pointer group"
+      className="min-h-48 bg-white dark:bg-neutral-800 rounded-md outline outline-slate-950/10 hover:shadow-md transition-shadow cursor-pointer group"
     >
       <div className="flex flex-col h-full">
         <div className="relative">

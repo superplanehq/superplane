@@ -47,7 +47,7 @@ export const getColorClass = (color?: string): string => {
     case "white":
       return "text-white dark:text-white";
     case "black":
-      return "text-black dark:text-black";
+      return "text-black dark:text-white";
     default:
       return "text-gray-500 dark:text-gray-400";
   }

@@ -375,7 +375,7 @@ export const ConfigurationFieldRenderer = ({
           {isEnabled && renderField()}
           <Label className="text-left cursor-pointer">
             {field.label || field.name}
-            {isRequired && <span className="text-gray-800 ml-1">*</span>}
+            {isRequired && <span className="text-gray-800 dark:text-gray-300 ml-1">*</span>}
             {hasFieldError &&
               ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
                 (!enableRealtimeValidation &&
@@ -416,7 +416,7 @@ export const ConfigurationFieldRenderer = ({
         {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
         <Label className="block text-left">
           {field.label || field.name}
-          {isRequired && <span className="text-gray-800 ml-1">*</span>}
+          {isRequired && <span className="text-gray-800 dark:text-gray-300 ml-1">*</span>}
           {hasFieldError &&
             ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
               (!enableRealtimeValidation &&
