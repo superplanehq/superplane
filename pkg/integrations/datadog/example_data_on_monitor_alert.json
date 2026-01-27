@@ -1,5 +1,5 @@
 {
-    "type": "datadog.onMonitorAlert",
+    "type": "datadog.monitor.alert",
     "data": {
         "id": "1234567890",
         "event_type": "query_alert_monitor",
