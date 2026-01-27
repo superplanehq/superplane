@@ -20,20 +20,20 @@ var _ MappedNullable = &ComponentsNode{}
 
 // ComponentsNode struct for ComponentsNode
 type ComponentsNode struct {
-	Id              *string                       `json:"id,omitempty"`
-	Name            *string                       `json:"name,omitempty"`
-	Type            *ComponentsNodeType           `json:"type,omitempty"`
-	Configuration   map[string]interface{}        `json:"configuration,omitempty"`
-	Metadata        map[string]interface{}        `json:"metadata,omitempty"`
-	Position        *ComponentsPosition           `json:"position,omitempty"`
-	Component       *NodeComponentRef             `json:"component,omitempty"`
-	Blueprint       *NodeBlueprintRef             `json:"blueprint,omitempty"`
-	Trigger         *NodeTriggerRef               `json:"trigger,omitempty"`
-	Widget          *NodeWidgetRef                `json:"widget,omitempty"`
-	IsCollapsed     *bool                         `json:"isCollapsed,omitempty"`
-	AppInstallation *ComponentsAppInstallationRef `json:"appInstallation,omitempty"`
-	ErrorMessage    *string                       `json:"errorMessage,omitempty"`
-	WarningMessage  *string                       `json:"warningMessage,omitempty"`
+	Id             *string                   `json:"id,omitempty"`
+	Name           *string                   `json:"name,omitempty"`
+	Type           *ComponentsNodeType       `json:"type,omitempty"`
+	Configuration  map[string]interface{}    `json:"configuration,omitempty"`
+	Metadata       map[string]interface{}    `json:"metadata,omitempty"`
+	Position       *ComponentsPosition       `json:"position,omitempty"`
+	Component      *NodeComponentRef         `json:"component,omitempty"`
+	Blueprint      *NodeBlueprintRef         `json:"blueprint,omitempty"`
+	Trigger        *NodeTriggerRef           `json:"trigger,omitempty"`
+	Widget         *NodeWidgetRef            `json:"widget,omitempty"`
+	IsCollapsed    *bool                     `json:"isCollapsed,omitempty"`
+	Integration    *ComponentsIntegrationRef `json:"integration,omitempty"`
+	ErrorMessage   *string                   `json:"errorMessage,omitempty"`
+	WarningMessage *string                   `json:"warningMessage,omitempty"`
 }
 
 // NewComponentsNode instantiates a new ComponentsNode object
@@ -409,36 +409,36 @@ func (o *ComponentsNode) SetIsCollapsed(v bool) {
 	o.IsCollapsed = &v
 }
 
-// GetAppInstallation returns the AppInstallation field value if set, zero value otherwise.
-func (o *ComponentsNode) GetAppInstallation() ComponentsAppInstallationRef {
-	if o == nil || IsNil(o.AppInstallation) {
-		var ret ComponentsAppInstallationRef
+// GetIntegration returns the Integration field value if set, zero value otherwise.
+func (o *ComponentsNode) GetIntegration() ComponentsIntegrationRef {
+	if o == nil || IsNil(o.Integration) {
+		var ret ComponentsIntegrationRef
 		return ret
 	}
-	return *o.AppInstallation
+	return *o.Integration
 }
 
-// GetAppInstallationOk returns a tuple with the AppInstallation field value if set, nil otherwise
+// GetIntegrationOk returns a tuple with the Integration field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsNode) GetAppInstallationOk() (*ComponentsAppInstallationRef, bool) {
-	if o == nil || IsNil(o.AppInstallation) {
+func (o *ComponentsNode) GetIntegrationOk() (*ComponentsIntegrationRef, bool) {
+	if o == nil || IsNil(o.Integration) {
 		return nil, false
 	}
-	return o.AppInstallation, true
+	return o.Integration, true
 }
 
-// HasAppInstallation returns a boolean if a field has been set.
-func (o *ComponentsNode) HasAppInstallation() bool {
-	if o != nil && !IsNil(o.AppInstallation) {
+// HasIntegration returns a boolean if a field has been set.
+func (o *ComponentsNode) HasIntegration() bool {
+	if o != nil && !IsNil(o.Integration) {
 		return true
 	}
 
 	return false
 }
 
-// SetAppInstallation gets a reference to the given ComponentsAppInstallationRef and assigns it to the AppInstallation field.
-func (o *ComponentsNode) SetAppInstallation(v ComponentsAppInstallationRef) {
-	o.AppInstallation = &v
+// SetIntegration gets a reference to the given ComponentsIntegrationRef and assigns it to the Integration field.
+func (o *ComponentsNode) SetIntegration(v ComponentsIntegrationRef) {
+	o.Integration = &v
 }
 
 // GetErrorMessage returns the ErrorMessage field value if set, zero value otherwise.
@@ -548,8 +548,8 @@ func (o ComponentsNode) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.IsCollapsed) {
 		toSerialize["isCollapsed"] = o.IsCollapsed
 	}
-	if !IsNil(o.AppInstallation) {
-		toSerialize["appInstallation"] = o.AppInstallation
+	if !IsNil(o.Integration) {
+		toSerialize["integration"] = o.Integration
 	}
 	if !IsNil(o.ErrorMessage) {
 		toSerialize["errorMessage"] = o.ErrorMessage

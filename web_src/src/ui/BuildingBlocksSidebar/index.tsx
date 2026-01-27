@@ -22,7 +22,7 @@ export interface BuildingBlock {
   color?: string;
   id?: string; // for blueprints
   isLive?: boolean; // marks items that actually work now
-  appName?: string; // for components/triggers from applications
+  integrationName?: string; // for components/triggers from integrations
   deprecated?: boolean; // marks items that are deprecated
 }
 

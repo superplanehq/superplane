@@ -2,9 +2,6 @@
 
 import type { Options as ClientOptions, TDataShape, Client } from "@hey-api/client-fetch";
 import type {
-  ApplicationsListApplicationsData,
-  ApplicationsListApplicationsResponse,
-  ApplicationsListApplicationsError,
   BlueprintsListBlueprintsData,
   BlueprintsListBlueprintsResponse2,
   BlueprintsListBlueprintsError,
@@ -53,6 +50,9 @@ import type {
   GroupsRemoveUserFromGroupData,
   GroupsRemoveUserFromGroupResponse2,
   GroupsRemoveUserFromGroupError,
+  IntegrationsListIntegrationsData,
+  IntegrationsListIntegrationsResponse,
+  IntegrationsListIntegrationsError,
   OrganizationsAcceptInviteLinkData,
   OrganizationsAcceptInviteLinkResponse,
   OrganizationsAcceptInviteLinkError,
@@ -71,24 +71,24 @@ import type {
   OrganizationsUpdateOrganizationData,
   OrganizationsUpdateOrganizationResponse2,
   OrganizationsUpdateOrganizationError,
-  OrganizationsListApplicationsData,
-  OrganizationsListApplicationsResponse,
-  OrganizationsListApplicationsError,
-  OrganizationsInstallApplicationData,
-  OrganizationsInstallApplicationResponse2,
-  OrganizationsInstallApplicationError,
-  OrganizationsUninstallApplicationData,
-  OrganizationsUninstallApplicationResponse2,
-  OrganizationsUninstallApplicationError,
-  OrganizationsDescribeApplicationData,
-  OrganizationsDescribeApplicationResponse2,
-  OrganizationsDescribeApplicationError,
-  OrganizationsUpdateApplicationData,
-  OrganizationsUpdateApplicationResponse2,
-  OrganizationsUpdateApplicationError,
-  OrganizationsListApplicationResourcesData,
-  OrganizationsListApplicationResourcesResponse2,
-  OrganizationsListApplicationResourcesError,
+  OrganizationsListIntegrationsData,
+  OrganizationsListIntegrationsResponse,
+  OrganizationsListIntegrationsError,
+  OrganizationsCreateIntegrationData,
+  OrganizationsCreateIntegrationResponse2,
+  OrganizationsCreateIntegrationError,
+  OrganizationsDeleteIntegrationData,
+  OrganizationsDeleteIntegrationResponse2,
+  OrganizationsDeleteIntegrationError,
+  OrganizationsDescribeIntegrationData,
+  OrganizationsDescribeIntegrationResponse2,
+  OrganizationsDescribeIntegrationError,
+  OrganizationsUpdateIntegrationData,
+  OrganizationsUpdateIntegrationResponse2,
+  OrganizationsUpdateIntegrationError,
+  OrganizationsListIntegrationResourcesData,
+  OrganizationsListIntegrationResourcesResponse2,
+  OrganizationsListIntegrationResourcesError,
   OrganizationsListInvitationsData,
   OrganizationsListInvitationsResponse2,
   OrganizationsListInvitationsError,
@@ -233,23 +233,6 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
    * used to access values that aren't defined as part of the SDK function.
    */
   meta?: Record<string, unknown>;
-};
-
-/**
- * List available applications
- * List available applications
- */
-export const applicationsListApplications = <ThrowOnError extends boolean = true>(
-  options?: Options<ApplicationsListApplicationsData, ThrowOnError>,
-) => {
-  return (options?.client ?? _heyApiClient).get<
-    ApplicationsListApplicationsResponse,
-    ApplicationsListApplicationsError,
-    ThrowOnError
-  >({
-    url: "/api/v1/applications",
-    ...options,
-  });
 };
 
 /**
@@ -523,6 +506,23 @@ export const groupsRemoveUserFromGroup = <ThrowOnError extends boolean = true>(
 };
 
 /**
+ * List available integrations
+ * List available integrations
+ */
+export const integrationsListIntegrations = <ThrowOnError extends boolean = true>(
+  options?: Options<IntegrationsListIntegrationsData, ThrowOnError>,
+) => {
+  return (options?.client ?? _heyApiClient).get<
+    IntegrationsListIntegrationsResponse,
+    IntegrationsListIntegrationsError,
+    ThrowOnError
+  >({
+    url: "/api/v1/integrations",
+    ...options,
+  });
+};
+
+/**
  * Accept an invite link
  * Accepts an organization invite link for the authenticated account
  */
@@ -619,35 +619,35 @@ export const organizationsUpdateOrganization = <ThrowOnError extends boolean = t
 };
 
 /**
- * List applications in an organization
- * Returns a list of applications in an organization
+ * List integrations in an organization
+ * Returns a list of integrations in an organization
  */
-export const organizationsListApplications = <ThrowOnError extends boolean = true>(
-  options: Options<OrganizationsListApplicationsData, ThrowOnError>,
+export const organizationsListIntegrations = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsListIntegrationsData, ThrowOnError>,
 ) => {
   return (options.client ?? _heyApiClient).get<
-    OrganizationsListApplicationsResponse,
-    OrganizationsListApplicationsError,
+    OrganizationsListIntegrationsResponse,
+    OrganizationsListIntegrationsError,
     ThrowOnError
   >({
-    url: "/api/v1/organizations/{id}/applications",
+    url: "/api/v1/organizations/{id}/integrations",
     ...options,
   });
 };
 
 /**
- * Install application on organization
- * Install an application on an organization
+ * Create organization integration
+ * Create an organization integration
  */
-export const organizationsInstallApplication = <ThrowOnError extends boolean = true>(
-  options: Options<OrganizationsInstallApplicationData, ThrowOnError>,
+export const organizationsCreateIntegration = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsCreateIntegrationData, ThrowOnError>,
 ) => {
   return (options.client ?? _heyApiClient).post<
-    OrganizationsInstallApplicationResponse2,
-    OrganizationsInstallApplicationError,
+    OrganizationsCreateIntegrationResponse2,
+    OrganizationsCreateIntegrationError,
     ThrowOnError
   >({
-    url: "/api/v1/organizations/{id}/applications",
+    url: "/api/v1/organizations/{id}/integrations",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -657,52 +657,52 @@ export const organizationsInstallApplication = <ThrowOnError extends boolean = t
 };
 
 /**
- * Uninstall application
- * Uninstalls an application from an organization
+ * Delete organization integration
+ * Deletes an integration from an organization
  */
-export const organizationsUninstallApplication = <ThrowOnError extends boolean = true>(
-  options: Options<OrganizationsUninstallApplicationData, ThrowOnError>,
+export const organizationsDeleteIntegration = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsDeleteIntegrationData, ThrowOnError>,
 ) => {
   return (options.client ?? _heyApiClient).delete<
-    OrganizationsUninstallApplicationResponse2,
-    OrganizationsUninstallApplicationError,
+    OrganizationsDeleteIntegrationResponse2,
+    OrganizationsDeleteIntegrationError,
     ThrowOnError
   >({
-    url: "/api/v1/organizations/{id}/applications/{installationId}",
+    url: "/api/v1/organizations/{id}/integrations/{integrationId}",
     ...options,
   });
 };
 
 /**
- * Describe an application in an organization
- * Returns details of a specific application in an organization
+ * Describe an integration in an organization
+ * Returns details of a specific integration in an organization
  */
-export const organizationsDescribeApplication = <ThrowOnError extends boolean = true>(
-  options: Options<OrganizationsDescribeApplicationData, ThrowOnError>,
+export const organizationsDescribeIntegration = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsDescribeIntegrationData, ThrowOnError>,
 ) => {
   return (options.client ?? _heyApiClient).get<
-    OrganizationsDescribeApplicationResponse2,
-    OrganizationsDescribeApplicationError,
+    OrganizationsDescribeIntegrationResponse2,
+    OrganizationsDescribeIntegrationError,
     ThrowOnError
   >({
-    url: "/api/v1/organizations/{id}/applications/{installationId}",
+    url: "/api/v1/organizations/{id}/integrations/{integrationId}",
     ...options,
   });
 };
 
 /**
- * Update application installation
- * Updates the configuration of an installed application
+ * Update integration
+ * Updates the configuration for an organization integration
  */
-export const organizationsUpdateApplication = <ThrowOnError extends boolean = true>(
-  options: Options<OrganizationsUpdateApplicationData, ThrowOnError>,
+export const organizationsUpdateIntegration = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsUpdateIntegrationData, ThrowOnError>,
 ) => {
   return (options.client ?? _heyApiClient).patch<
-    OrganizationsUpdateApplicationResponse2,
-    OrganizationsUpdateApplicationError,
+    OrganizationsUpdateIntegrationResponse2,
+    OrganizationsUpdateIntegrationError,
     ThrowOnError
   >({
-    url: "/api/v1/organizations/{id}/applications/{installationId}",
+    url: "/api/v1/organizations/{id}/integrations/{integrationId}",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -712,18 +712,18 @@ export const organizationsUpdateApplication = <ThrowOnError extends boolean = tr
 };
 
 /**
- * List application resources
- * Lists resources for an application installation
+ * List integration resources
+ * Lists resources for an integration
  */
-export const organizationsListApplicationResources = <ThrowOnError extends boolean = true>(
-  options: Options<OrganizationsListApplicationResourcesData, ThrowOnError>,
+export const organizationsListIntegrationResources = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsListIntegrationResourcesData, ThrowOnError>,
 ) => {
   return (options.client ?? _heyApiClient).get<
-    OrganizationsListApplicationResourcesResponse2,
-    OrganizationsListApplicationResourcesError,
+    OrganizationsListIntegrationResourcesResponse2,
+    OrganizationsListIntegrationResourcesError,
     ThrowOnError
   >({
-    url: "/api/v1/organizations/{id}/applications/{installationId}/resources",
+    url: "/api/v1/organizations/{id}/integrations/{integrationId}/resources",
     ...options,
   });
 };
