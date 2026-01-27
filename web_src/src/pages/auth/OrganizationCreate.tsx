@@ -51,21 +51,21 @@ const OrganizationCreate: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-slate-100 dark:bg-neutral-900">
       <div className="p-6 flex items-center">
         <button
           type="button"
           onClick={() => navigate("/")}
-          className="text-sm font-medium text-gray-500 px-2 py-1 hover:bg-gray-950/5 rounded"
+          className="text-sm font-medium text-gray-500 dark:text-gray-400 px-2 py-1 hover:bg-gray-950/5 dark:hover:bg-white/5 rounded"
         >
           ← Back to Organizations
         </button>
       </div>
       <div className="flex items-center justify-center p-8">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-sm p-8 outline outline-slate-950/10">
+        <div className="max-w-md w-full bg-white dark:bg-neutral-800 rounded-lg shadow-sm p-8 outline outline-slate-950/10 dark:outline-neutral-700">
           <div className="text-center mb-8">
-            <h4 className="text-xl font-semibold text-gray-800 mb-1">Create Organization</h4>
-            <Text className="text-gray-800">Set up a new SuperPlane organization</Text>
+            <h4 className="text-xl font-semibold text-gray-800 dark:text-white mb-1">Create Organization</h4>
+            <Text className="text-gray-800 dark:text-gray-300">Set up a new SuperPlane organization</Text>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -78,7 +78,7 @@ const OrganizationCreate: React.FC = () => {
             <div>
               <label
                 htmlFor="name"
-                className="block text-sm font-medium text-gray-800 text-left dark:text-gray-300 mb-2"
+                className="block text-sm font-medium text-gray-800 dark:text-gray-200 text-left mb-2"
               >
                 Organization Name
               </label>
@@ -88,7 +88,7 @@ const OrganizationCreate: React.FC = () => {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="w-full px-3 py-2 outline-1 outline-slate-300 rounded-md shadow-md focus:outline-gray-800"
+                className="w-full px-3 py-2 outline-1 outline-slate-300 dark:outline-neutral-600 rounded-md shadow-md focus:outline-gray-800 dark:focus:outline-neutral-400 bg-white dark:bg-neutral-700 text-gray-900 dark:text-white"
                 placeholder="e.g. Super Duper Org"
                 data-1p-ignore
               />
