@@ -89,7 +89,7 @@ func (l *ListIssues) Configuration() []configuration.Field {
 		{
 			Name:      "checkRules",
 			Label:     "Check Rules",
-			Type:      configuration.FieldTypeAppInstallationResource,
+			Type:      configuration.FieldTypeIntegrationResource,
 			Required:  false,
 			Togglable: true,
 			TypeOptions: &configuration.TypeOptions{

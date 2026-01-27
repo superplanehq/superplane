@@ -16,37 +16,37 @@ func Test__Pagerduty__Sync(t *testing.T) {
 	p := &PagerDuty{}
 
 	t.Run("no region -> error", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"region": "",
 			},
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
-			Integration:   appCtx,
+			Configuration: integrationCtx.Configuration,
+			Integration:   integrationCtx,
 		})
 
 		require.ErrorContains(t, err, "region is required")
 	})
 
 	t.Run("no subdomain -> error", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"region": "us",
 			},
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
-			Integration:   appCtx,
+			Configuration: integrationCtx.Configuration,
+			Integration:   integrationCtx,
 		})
 
 		require.ErrorContains(t, err, "subdomain is required")
 	})
 
 	t.Run("no authType -> error", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"region":    "us",
 				"subdomain": "example",
@@ -54,15 +54,15 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
-			Integration:   appCtx,
+			Configuration: integrationCtx.Configuration,
+			Integration:   integrationCtx,
 		})
 
 		require.ErrorContains(t, err, "authType is required")
 	})
 
 	t.Run("invalid authType -> error", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"region":    "us",
 				"subdomain": "example",
@@ -71,8 +71,8 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
-			Integration:   appCtx,
+			Configuration: integrationCtx.Configuration,
+			Integration:   integrationCtx,
 		})
 
 		require.ErrorContains(t, err, "authType nope is not supported")
@@ -94,7 +94,7 @@ func Test__Pagerduty__Sync(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"region":    "us",
 				"subdomain": "example",
@@ -104,17 +104,17 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
+			Configuration: integrationCtx.Configuration,
 			HTTP:          httpContext,
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "ready", appCtx.State)
+		assert.Equal(t, "ready", integrationCtx.State)
 		require.Len(t, httpContext.Requests, 1)
 		assert.Equal(t, "https://api.pagerduty.com/services", httpContext.Requests[0].URL.String())
 
-		metadata := appCtx.Metadata.(Metadata)
+		metadata := integrationCtx.Metadata.(Metadata)
 		assert.Len(t, metadata.Services, 1)
 		assert.Equal(t, "PX1234567890", metadata.Services[0].ID)
 		assert.Equal(t, "Test Service", metadata.Services[0].Name)
@@ -130,7 +130,7 @@ func Test__Pagerduty__Sync(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"region":    "us",
 				"subdomain": "example",
@@ -140,20 +140,20 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
+			Configuration: integrationCtx.Configuration,
 			HTTP:          httpContext,
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 		})
 
 		require.Error(t, err)
-		assert.NotEqual(t, "ready", appCtx.State)
+		assert.NotEqual(t, "ready", integrationCtx.State)
 		require.Len(t, httpContext.Requests, 1)
 		assert.Equal(t, "https://api.pagerduty.com/services", httpContext.Requests[0].URL.String())
-		assert.Nil(t, appCtx.Metadata)
+		assert.Nil(t, integrationCtx.Metadata)
 	})
 
 	t.Run("app oauth -> clientId required", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"region":    "us",
 				"subdomain": "example",
@@ -163,8 +163,8 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
-			Integration:   appCtx,
+			Configuration: integrationCtx.Configuration,
+			Integration:   integrationCtx,
 		})
 
 		require.ErrorContains(t, err, "clientId is required")
@@ -172,7 +172,7 @@ func Test__Pagerduty__Sync(t *testing.T) {
 
 	t.Run("app oauth -> clientSecret required", func(t *testing.T) {
 		clientID := "client-123"
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"region":    "us",
 				"subdomain": "example",
@@ -182,8 +182,8 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
-			Integration:   appCtx,
+			Configuration: integrationCtx.Configuration,
+			Integration:   integrationCtx,
 		})
 
 		require.ErrorContains(t, err, "config not found: clientSecret")
@@ -200,7 +200,7 @@ func Test__Pagerduty__Sync(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"region":       "us",
 				"subdomain":    "example",
@@ -211,9 +211,9 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
+			Configuration: integrationCtx.Configuration,
 			HTTP:          httpContext,
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 		})
 
 		require.ErrorContains(t, err, "error generating access token for app: request got 502")
@@ -243,7 +243,7 @@ func Test__Pagerduty__Sync(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Secrets: map[string]core.IntegrationSecret{},
 			Configuration: map[string]any{
 				"region":       "us",
@@ -255,14 +255,14 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
+			Configuration: integrationCtx.Configuration,
 			HTTP:          httpContext,
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 		})
 
 		require.Error(t, err)
-		assert.NotEqual(t, "ready", appCtx.State)
-		assert.Nil(t, appCtx.Metadata)
+		assert.NotEqual(t, "ready", integrationCtx.State)
+		assert.Nil(t, integrationCtx.Metadata)
 		require.Len(t, httpContext.Requests, 2)
 		assert.Equal(t, "https://identity.pagerduty.com/oauth/token", httpContext.Requests[0].URL.String())
 		assert.Equal(t, "https://api.pagerduty.com/services", httpContext.Requests[1].URL.String())
@@ -296,7 +296,7 @@ func Test__Pagerduty__Sync(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Secrets: map[string]core.IntegrationSecret{},
 			Configuration: map[string]any{
 				"region":       "us",
@@ -308,21 +308,21 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
+			Configuration: integrationCtx.Configuration,
 			HTTP:          httpContext,
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "ready", appCtx.State)
+		assert.Equal(t, "ready", integrationCtx.State)
 		require.Len(t, httpContext.Requests, 2)
 		assert.Equal(t, "https://identity.pagerduty.com/oauth/token", httpContext.Requests[0].URL.String())
 		assert.Equal(t, "https://api.pagerduty.com/services", httpContext.Requests[1].URL.String())
-		secret, ok := appCtx.Secrets[AppAccessToken]
+		secret, ok := integrationCtx.Secrets[AppAccessToken]
 		require.True(t, ok)
 		assert.Equal(t, []byte("access-123"), secret.Value)
 
-		metadata := appCtx.Metadata.(Metadata)
+		metadata := integrationCtx.Metadata.(Metadata)
 		assert.Len(t, metadata.Services, 1)
 		assert.Equal(t, "PX1234567890", metadata.Services[0].ID)
 		assert.Equal(t, "Test Service", metadata.Services[0].Name)

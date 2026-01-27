@@ -92,7 +92,7 @@ func (l *ListIncidents) Configuration() []configuration.Field {
 		{
 			Name:      "services",
 			Label:     "Services",
-			Type:      configuration.FieldTypeAppInstallationResource,
+			Type:      configuration.FieldTypeIntegrationResource,
 			Required:  false,
 			Togglable: true,
 			TypeOptions: &configuration.TypeOptions{

@@ -22,7 +22,7 @@ spec:
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "annotation-note-l5pp1j"
@@ -43,7 +43,7 @@ spec:
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "annotation-note-fids38"
@@ -64,7 +64,7 @@ spec:
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "annotation-note-fhs8t3"
@@ -85,7 +85,7 @@ spec:
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "annotation-note-xw4fhl"
@@ -106,7 +106,7 @@ spec:
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-c4ecox"
@@ -124,7 +124,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "annotation-note-yngiv2"
@@ -145,7 +145,7 @@ spec:
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "github-onworkflowrun-github-onworkflowrun-gavi3b"
@@ -171,7 +171,7 @@ spec:
         name: "github.onWorkflowRun"
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "timegate-timegate-vjyba3"
@@ -196,7 +196,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "approval-approval-pxl5ja"
@@ -215,7 +215,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "github-runworkflow-github-runworkflow-3ywh59"
@@ -239,7 +239,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "openai-textprompt-openai-textprompt-x2hhhi"
@@ -258,7 +258,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "pagerduty-createincident-pagerduty-createincident-vwbqsu"
@@ -283,7 +283,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: true
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "slack-sendtextmessage-slack-sendtextmessage-c2n7es"
@@ -305,7 +305,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: true
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
   edges:

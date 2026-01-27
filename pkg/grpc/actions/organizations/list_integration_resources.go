@@ -36,7 +36,7 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 		return nil, status.Errorf(codes.Internal, "integration %s not found", i.AppName)
 	}
 
-	appCtx := contexts.NewAppInstallationContext(
+	integrationCtx := contexts.NewIntegrationContext(
 		database.Conn(),
 		nil,
 		i,
@@ -51,7 +51,7 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 			"resource_type":       resourceType,
 		}),
 		HTTP:        contexts.NewHTTPContext(registry.GetHTTPClient()),
-		Integration: appCtx,
+		Integration: integrationCtx,
 	}
 
 	resources, err := integration.ListResources(resourceType, listCtx)

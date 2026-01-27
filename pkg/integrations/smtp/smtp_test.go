@@ -19,7 +19,7 @@ func Test__SMTP__Sync(t *testing.T) {
 				"port":      "587",
 				"fromEmail": "sender@example.com",
 			},
-			Integration: &contexts.AppInstallationContext{
+			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{},
 			},
 		})
@@ -34,7 +34,7 @@ func Test__SMTP__Sync(t *testing.T) {
 				"port":      "0",
 				"fromEmail": "sender@example.com",
 			},
-			Integration: &contexts.AppInstallationContext{
+			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{},
 			},
 		})
@@ -48,7 +48,7 @@ func Test__SMTP__Sync(t *testing.T) {
 				"host": "smtp.example.com",
 				"port": "587",
 			},
-			Integration: &contexts.AppInstallationContext{
+			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{},
 			},
 		})
@@ -65,7 +65,7 @@ func Test__SMTP__Sync(t *testing.T) {
 		}
 		defer func() { smtpDial = originalDial }()
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"host":      "smtp.example.com",
 				"port":      "587",
@@ -81,11 +81,11 @@ func Test__SMTP__Sync(t *testing.T) {
 				"fromEmail": "sender@example.com",
 				"useTLS":    false,
 			},
-			Integration: appCtx,
+			Integration: integrationCtx,
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "ready", appCtx.State)
+		assert.Equal(t, "ready", integrationCtx.State)
 	})
 
 	t.Run("SMTP connection failure -> returns error", func(t *testing.T) {
@@ -95,7 +95,7 @@ func Test__SMTP__Sync(t *testing.T) {
 		}
 		defer func() { smtpDial = originalDial }()
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"host":      "smtp.example.com",
 				"port":      "587",
@@ -111,7 +111,7 @@ func Test__SMTP__Sync(t *testing.T) {
 				"fromEmail": "sender@example.com",
 				"useTLS":    false,
 			},
-			Integration: appCtx,
+			Integration: integrationCtx,
 		})
 
 		require.ErrorContains(t, err, "SMTP connection test failed")

@@ -66,7 +66,7 @@ func (m *MetadataContext) Set(metadata any) error {
 	return nil
 }
 
-type AppInstallationContext struct {
+type IntegrationContext struct {
 	Configuration    map[string]any
 	Metadata         any
 	State            string
@@ -83,19 +83,19 @@ type Subscription struct {
 	Configuration any
 }
 
-func (c *AppInstallationContext) ID() uuid.UUID {
+func (c *IntegrationContext) ID() uuid.UUID {
 	return uuid.New()
 }
 
-func (c *AppInstallationContext) GetMetadata() any {
+func (c *IntegrationContext) GetMetadata() any {
 	return c.Metadata
 }
 
-func (c *AppInstallationContext) SetMetadata(metadata any) {
+func (c *IntegrationContext) SetMetadata(metadata any) {
 	c.Metadata = metadata
 }
 
-func (c *AppInstallationContext) GetConfig(name string) ([]byte, error) {
+func (c *IntegrationContext) GetConfig(name string) ([]byte, error) {
 	if c.Configuration == nil {
 		return nil, fmt.Errorf("config not found: %s", name)
 	}
@@ -113,29 +113,29 @@ func (c *AppInstallationContext) GetConfig(name string) ([]byte, error) {
 	return []byte(s), nil
 }
 
-func (c *AppInstallationContext) GetState() string {
+func (c *IntegrationContext) GetState() string {
 	return ""
 }
 
-func (c *AppInstallationContext) SetState(state, stateDescription string) {
+func (c *IntegrationContext) SetState(state, stateDescription string) {
 	c.State = state
 	c.StateDescription = stateDescription
 }
 
-func (c *AppInstallationContext) NewBrowserAction(action core.BrowserAction) {
+func (c *IntegrationContext) NewBrowserAction(action core.BrowserAction) {
 	c.BrowserAction = &action
 }
 
-func (c *AppInstallationContext) RemoveBrowserAction() {
+func (c *IntegrationContext) RemoveBrowserAction() {
 	c.BrowserAction = nil
 }
 
-func (c *AppInstallationContext) SetSecret(name string, value []byte) error {
+func (c *IntegrationContext) SetSecret(name string, value []byte) error {
 	c.Secrets[name] = core.IntegrationSecret{Name: name, Value: value}
 	return nil
 }
 
-func (c *AppInstallationContext) GetSecrets() ([]core.IntegrationSecret, error) {
+func (c *IntegrationContext) GetSecrets() ([]core.IntegrationSecret, error) {
 	secrets := make([]core.IntegrationSecret, 0, len(c.Secrets))
 	for _, secret := range c.Secrets {
 		secrets = append(secrets, secret)
@@ -143,21 +143,21 @@ func (c *AppInstallationContext) GetSecrets() ([]core.IntegrationSecret, error) 
 	return secrets, nil
 }
 
-func (c *AppInstallationContext) RequestWebhook(configuration any) error {
+func (c *IntegrationContext) RequestWebhook(configuration any) error {
 	c.WebhookRequests = append(c.WebhookRequests, configuration)
 	return nil
 }
 
-func (c *AppInstallationContext) ScheduleResync(interval time.Duration) error {
+func (c *IntegrationContext) ScheduleResync(interval time.Duration) error {
 	c.ResyncRequests = append(c.ResyncRequests, interval)
 	return nil
 }
 
-func (c *AppInstallationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
+func (c *IntegrationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
 	return nil, nil
 }
 
-func (c *AppInstallationContext) Subscribe(subscription any) (*uuid.UUID, error) {
+func (c *IntegrationContext) Subscribe(subscription any) (*uuid.UUID, error) {
 	s := Subscription{ID: uuid.New(), Configuration: subscription}
 	c.Subscriptions = append(c.Subscriptions, s)
 	return &s.ID, nil

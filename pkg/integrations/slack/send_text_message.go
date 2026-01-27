@@ -81,7 +81,7 @@ func (c *SendTextMessage) Configuration() []configuration.Field {
 		{
 			Name:     "channel",
 			Label:    "Channel",
-			Type:     configuration.FieldTypeAppInstallationResource,
+			Type:     configuration.FieldTypeIntegrationResource,
 			Required: true,
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{

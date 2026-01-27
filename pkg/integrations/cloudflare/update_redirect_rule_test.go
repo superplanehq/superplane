@@ -191,7 +191,7 @@ func Test__UpdateRedirectRule__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 			},
@@ -214,7 +214,7 @@ func Test__UpdateRedirectRule__Execute(t *testing.T) {
 				"enabled":             true,
 			},
 			HTTP:           httpContext,
-			Integration:    appCtx,
+			Integration:    integrationCtx,
 			ExecutionState: execState,
 		}
 
@@ -283,7 +283,7 @@ func Test__UpdateRedirectRule__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 			},
@@ -306,7 +306,7 @@ func Test__UpdateRedirectRule__Execute(t *testing.T) {
 				"enabled":             true,
 			},
 			HTTP:           httpContext,
-			Integration:    appCtx,
+			Integration:    integrationCtx,
 			ExecutionState: execState,
 		}
 
@@ -330,7 +330,7 @@ func Test__UpdateRedirectRule__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 			},
@@ -351,7 +351,7 @@ func Test__UpdateRedirectRule__Execute(t *testing.T) {
 				"enabled":          true,
 			},
 			HTTP:           httpContext,
-			Integration:    appCtx,
+			Integration:    integrationCtx,
 			ExecutionState: execState,
 		}
 
