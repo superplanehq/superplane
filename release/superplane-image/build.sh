@@ -18,7 +18,11 @@ ARCH="$2"
 
 echo "Building SuperPlane image"
 
-docker build \
+docker buildx build \
+  --platform "linux/${ARCH}" \
+  --progress=plain \
+  --provenance=false \
   --push \
   -t "ghcr.io/superplanehq/superplane:${VERSION}-${ARCH}" \
-  -f Dockerfile .
+  -f Dockerfile \
+  .
