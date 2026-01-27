@@ -507,7 +507,7 @@ export const ComponentSidebar = ({
                     <img
                       src={headerIconSrc}
                       alt={nodeName}
-                      className={`w-4 h-4 object-contain ${appName && DARK_ICONS_NEEDING_INVERT.includes(appName) ? "dark:invert" : ""}`}
+                      className={`w-4 h-4 object-contain ${integrationName && DARK_ICONS_NEEDING_INVERT.includes(integrationName) ? "dark:invert" : ""}`}
                     />
                   ) : (
                     <Icon size={16} />

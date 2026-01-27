@@ -303,9 +303,9 @@ function CategorySection({
         {allBlocks.map((block) => {
           const iconSlug = block.type === "blueprint" ? "component" : block.icon || "zap";
 
-          // Use SVG icons for application components/triggers
-          const appIconSrc = block.appName ? APP_LOGO_MAP[block.appName] : undefined;
-          const needsInvert = block.appName && DARK_ICONS_NEEDING_INVERT.includes(block.appName);
+          // Use SVG icons for integration components/triggers
+          const appIconSrc = block.integrationName ? APP_LOGO_MAP[block.integrationName] : undefined;
+          const needsInvert = block.integrationName && DARK_ICONS_NEEDING_INVERT.includes(block.integrationName);
           const IconComponent = resolveIcon(iconSlug);
 
           const isLive = !!block.isLive;
