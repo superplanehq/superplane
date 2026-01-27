@@ -105,7 +105,7 @@ func (r *OnRelease) Configuration() []configuration.Field {
 func (r *OnRelease) Setup(ctx core.TriggerContext) error {
 	err := ensureRepoInMetadata(
 		ctx.Metadata,
-		ctx.AppInstallation,
+		ctx.Integration,
 		ctx.Configuration,
 	)
 
@@ -118,7 +118,7 @@ func (r *OnRelease) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	return ctx.AppInstallation.RequestWebhook(WebhookConfiguration{
+	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		EventType:  "release",
 		Repository: config.Repository,
 	})

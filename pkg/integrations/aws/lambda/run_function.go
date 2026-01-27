@@ -123,12 +123,12 @@ func (c *RunFunction) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	creds, err := common.CredentialsFromInstallation(ctx.AppInstallation)
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {
 		return err
 	}
 
-	appRegion := common.RegionFromInstallation(ctx.AppInstallation)
+	appRegion := common.RegionFromInstallation(ctx.Integration)
 	region, err := resolveLambdaRegion(appRegion, metadata.FunctionArn)
 	if err != nil {
 		return err

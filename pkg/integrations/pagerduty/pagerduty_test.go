@@ -23,8 +23,8 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			Integration:   appCtx,
 		})
 
 		require.ErrorContains(t, err, "region is required")
@@ -38,8 +38,8 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			Integration:   appCtx,
 		})
 
 		require.ErrorContains(t, err, "subdomain is required")
@@ -54,8 +54,8 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			Integration:   appCtx,
 		})
 
 		require.ErrorContains(t, err, "authType is required")
@@ -71,8 +71,8 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			Integration:   appCtx,
 		})
 
 		require.ErrorContains(t, err, "authType nope is not supported")
@@ -104,9 +104,9 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   appCtx,
 		})
 
 		require.NoError(t, err)
@@ -140,9 +140,9 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   appCtx,
 		})
 
 		require.Error(t, err)
@@ -159,12 +159,12 @@ func Test__Pagerduty__Sync(t *testing.T) {
 				"subdomain": "example",
 				"authType":  AuthTypeAppOAuth,
 			},
-			Secrets: map[string]core.InstallationSecret{},
+			Secrets: map[string]core.IntegrationSecret{},
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			Integration:   appCtx,
 		})
 
 		require.ErrorContains(t, err, "clientId is required")
@@ -182,8 +182,8 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			Integration:   appCtx,
 		})
 
 		require.ErrorContains(t, err, "config not found: clientSecret")
@@ -211,9 +211,9 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   appCtx,
 		})
 
 		require.ErrorContains(t, err, "error generating access token for app: request got 502")
@@ -244,7 +244,7 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		appCtx := &contexts.AppInstallationContext{
-			Secrets: map[string]core.InstallationSecret{},
+			Secrets: map[string]core.IntegrationSecret{},
 			Configuration: map[string]any{
 				"region":       "us",
 				"subdomain":    "example",
@@ -255,9 +255,9 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   appCtx,
 		})
 
 		require.Error(t, err)
@@ -297,7 +297,7 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		appCtx := &contexts.AppInstallationContext{
-			Secrets: map[string]core.InstallationSecret{},
+			Secrets: map[string]core.IntegrationSecret{},
 			Configuration: map[string]any{
 				"region":       "us",
 				"subdomain":    "example",
@@ -308,9 +308,9 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		}
 
 		err := p.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   appCtx,
 		})
 
 		require.NoError(t, err)

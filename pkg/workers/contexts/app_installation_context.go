@@ -41,7 +41,7 @@ func (c *AppInstallationContext) ID() uuid.UUID {
 }
 
 func (c *AppInstallationContext) RequestWebhook(configuration any) error {
-	app, err := c.registry.GetApplication(c.appInstallation.AppName)
+	integration, err := c.registry.GetIntegration(c.appInstallation.AppName)
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func (c *AppInstallationContext) RequestWebhook(configuration any) error {
 	}
 
 	for _, hook := range webhooks {
-		ok, err := app.CompareWebhookConfig(hook.Configuration.Data(), configuration)
+		ok, err := integration.CompareWebhookConfig(hook.Configuration.Data(), configuration)
 		if err != nil {
 			return err
 		}
@@ -126,12 +126,12 @@ func (c *AppInstallationContext) GetConfig(name string) ([]byte, error) {
 		return nil, fmt.Errorf("config %s not found", name)
 	}
 
-	app, err := c.registry.GetApplication(c.appInstallation.AppName)
+	integration, err := c.registry.GetIntegration(c.appInstallation.AppName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get app %s: %w", c.appInstallation.AppName, err)
 	}
 
-	configDef, err := findConfigDef(app.Configuration(), name)
+	configDef, err := findConfigDef(integration.Configuration(), name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find config %s: %w", name, err)
 	}
@@ -238,7 +238,7 @@ func (c *AppInstallationContext) SetSecret(name string, value []byte) error {
 	return c.tx.Save(&secret).Error
 }
 
-func (c *AppInstallationContext) GetSecrets() ([]core.InstallationSecret, error) {
+func (c *AppInstallationContext) GetSecrets() ([]core.IntegrationSecret, error) {
 	var fromDB []models.AppInstallationSecret
 	err := c.tx.
 		Where("installation_id = ?", c.appInstallation.ID).
@@ -249,7 +249,7 @@ func (c *AppInstallationContext) GetSecrets() ([]core.InstallationSecret, error)
 		return nil, err
 	}
 
-	var secrets []core.InstallationSecret
+	var secrets []core.IntegrationSecret
 	for _, secret := range fromDB {
 		decryptedValue, err := c.encryptor.Decrypt(
 			context.Background(),
@@ -261,7 +261,7 @@ func (c *AppInstallationContext) GetSecrets() ([]core.InstallationSecret, error)
 			return nil, err
 		}
 
-		secrets = append(secrets, core.InstallationSecret{
+		secrets = append(secrets, core.IntegrationSecret{
 			Name:  secret.Name,
 			Value: decryptedValue,
 		})
@@ -294,13 +294,13 @@ func (c *AppInstallationContext) Subscribe(configuration any) (*uuid.UUID, error
 	return &subscription.ID, nil
 }
 
-func (c *AppInstallationContext) ListSubscriptions() ([]core.AppSubscriptionContext, error) {
+func (c *AppInstallationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
 	subscriptions, err := models.ListAppSubscriptions(c.tx, c.appInstallation.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	contexts := []core.AppSubscriptionContext{}
+	contexts := []core.IntegrationSubscriptionContext{}
 	for _, subscription := range subscriptions {
 		node, err := models.FindWorkflowNode(c.tx, subscription.WorkflowID, subscription.NodeID)
 		if err != nil {

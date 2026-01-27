@@ -23,8 +23,8 @@ func Test__Dash0__Sync(t *testing.T) {
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			Integration:   appCtx,
 		})
 
 		require.ErrorContains(t, err, "apiToken is required")
@@ -39,8 +39,8 @@ func Test__Dash0__Sync(t *testing.T) {
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			Integration:   appCtx,
 		})
 
 		require.ErrorContains(t, err, "baseURL is required")
@@ -72,9 +72,9 @@ func Test__Dash0__Sync(t *testing.T) {
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   appCtx,
 		})
 
 		require.NoError(t, err)
@@ -102,9 +102,9 @@ func Test__Dash0__Sync(t *testing.T) {
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   appCtx,
 		})
 
 		require.Error(t, err)
@@ -138,9 +138,9 @@ func Test__Dash0__Sync(t *testing.T) {
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   appCtx,
 		})
 
 		require.NoError(t, err)

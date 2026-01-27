@@ -27,9 +27,9 @@ func Test__ListIssues__Setup(t *testing.T) {
 
 		appCtx := &contexts.AppInstallationContext{}
 		err = component.Setup(core.SetupContext{
-			AppInstallation: appCtx,
-			Metadata:        nodeMetadataCtx,
-			Configuration:   map[string]any{},
+			Integration:   appCtx,
+			Metadata:      nodeMetadataCtx,
+			Configuration: map[string]any{},
 		})
 
 		require.NoError(t, err)
@@ -59,10 +59,10 @@ func Test__ListIssues__Setup(t *testing.T) {
 
 		nodeMetadataCtx := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{
-			AppInstallation: appCtx,
-			HTTP:            httpContext,
-			Metadata:        nodeMetadataCtx,
-			Configuration:   map[string]any{},
+			Integration:   appCtx,
+			HTTP:          httpContext,
+			Metadata:      nodeMetadataCtx,
+			Configuration: map[string]any{},
 		})
 
 		require.NoError(t, err)
@@ -119,11 +119,11 @@ func Test__ListIssues__Execute(t *testing.T) {
 		nodeMetadataCtx := &contexts.MetadataContext{}
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
-			Configuration:   map[string]any{},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  execCtx,
-			NodeMetadata:    nodeMetadataCtx,
+			Configuration:  map[string]any{},
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: execCtx,
+			NodeMetadata:   nodeMetadataCtx,
 		})
 
 		require.NoError(t, err)
@@ -174,11 +174,11 @@ func Test__ListIssues__Execute(t *testing.T) {
 		nodeMetadataCtx := &contexts.MetadataContext{}
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
-			Configuration:   map[string]any{},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  execCtx,
-			NodeMetadata:    nodeMetadataCtx,
+			Configuration:  map[string]any{},
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: execCtx,
+			NodeMetadata:   nodeMetadataCtx,
 		})
 
 		require.NoError(t, err)
@@ -223,11 +223,11 @@ func Test__ListIssues__Execute(t *testing.T) {
 		nodeMetadataCtx := &contexts.MetadataContext{}
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
-			Configuration:   map[string]any{},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  execCtx,
-			NodeMetadata:    nodeMetadataCtx,
+			Configuration:  map[string]any{},
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: execCtx,
+			NodeMetadata:   nodeMetadataCtx,
 		})
 
 		require.NoError(t, err)
@@ -286,11 +286,11 @@ func Test__ListIssues__Execute(t *testing.T) {
 		nodeMetadataCtx := &contexts.MetadataContext{}
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
-			Configuration:   map[string]any{},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  execCtx,
-			NodeMetadata:    nodeMetadataCtx,
+			Configuration:  map[string]any{},
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: execCtx,
+			NodeMetadata:   nodeMetadataCtx,
 		})
 
 		require.NoError(t, err)
@@ -319,11 +319,11 @@ func Test__ListIssues__Execute(t *testing.T) {
 		nodeMetadataCtx := &contexts.MetadataContext{}
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
-			Configuration:   map[string]any{},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  execCtx,
-			NodeMetadata:    nodeMetadataCtx,
+			Configuration:  map[string]any{},
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: execCtx,
+			NodeMetadata:   nodeMetadataCtx,
 		})
 
 		require.Error(t, err)
@@ -406,10 +406,10 @@ func Test__ListIssues__Execute(t *testing.T) {
 			Configuration: map[string]any{
 				"checkRules": []string{"rule-1"},
 			},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  execCtx,
-			NodeMetadata:    nodeMetadataCtx,
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: execCtx,
+			NodeMetadata:   nodeMetadataCtx,
 		})
 
 		require.NoError(t, err)
@@ -487,10 +487,10 @@ func Test__ListIssues__Execute(t *testing.T) {
 			Configuration: map[string]any{
 				"checkRules": []string{},
 			},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  execCtx,
-			NodeMetadata:    nodeMetadataCtx,
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: execCtx,
+			NodeMetadata:   nodeMetadataCtx,
 		})
 
 		require.NoError(t, err)

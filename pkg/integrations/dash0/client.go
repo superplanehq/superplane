@@ -23,7 +23,7 @@ type Client struct {
 	http    core.HTTPContext
 }
 
-func NewClient(http core.HTTPContext, ctx core.AppInstallationContext) (*Client, error) {
+func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
 	apiToken, err := ctx.GetConfig("apiToken")
 	if err != nil {
 		return nil, fmt.Errorf("error getting api token: %v", err)

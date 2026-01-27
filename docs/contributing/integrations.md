@@ -1,12 +1,12 @@
-# Application Development Guide
+# Integration Development Guide
 
-This guide explains how to add new applications and extend existing applications with new triggers and components in SuperPlane.
+This guide explains how to add new integration and extend existing integration with new triggers and components in SuperPlane.
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [Application Structure](#application-structure)
-- [Creating a New Application](#creating-a-new-application)
+- [Integration Structure](#integration-structure)
+- [Creating a New Integration](#creating-a-new-integration)
 - [Adding Triggers](#adding-triggers)
 - [Adding Components](#adding-components)
 - [Adding Frontend Mappers](#adding-frontend-mappers)
@@ -14,25 +14,25 @@ This guide explains how to add new applications and extend existing applications
 
 ## Overview
 
-Applications in SuperPlane are integrations with external services that allow users to trigger workflows and interact with those services. Applications consist of:
+Integrations in SuperPlane are connections with external services that allow users to trigger workflows and interact with those services. Integrations consist of:
 
-- **Backend implementation** (Go): Located in `pkg/applications/<app-name>/`
-- **Frontend mappers** (TypeScript): Located in `web_src/src/pages/workflowv2/mappers/<app-name>/`
+- **Backend implementation** (Go): Located in `pkg/integrations/<app-name>/`
+- **Frontend mappers** (TypeScript): Located in `web_src/src/pages/workflowv2/mappers/<integration-name>/`
 
-Each application can have:
+Each integration can have:
 - **Triggers**: Event sources that start workflow executions (e.g., "On Pull Request", "On Pipeline Done")
 - **Components**: Actions that can be executed as part of workflows (e.g., "Run Workflow")
 
-## Application Structure
+## Integration Structure
 
 ### Backend Structure
 
-Applications are organized in `pkg/applications/` with the following structure:
+Integrations are organized in `pkg/integrations/` with the following structure:
 
 ```
-pkg/applications/
+pkg/integrations/
 ├── github/
-│   ├── github.go           # Main application implementation
+│   ├── github.go           # Main integration implementation
 │   ├── client.go           # API client (if needed)
 │   ├── on_pull_request.go  # Trigger implementation
 │   ├── on_push.go          # Another trigger
@@ -58,16 +58,16 @@ web_src/src/pages/workflowv2/mappers/
     └── ...
 ```
 
-## Creating a New Application
+## Creating a New Integration
 
-To create a new application, you need to:
+To create a new integration, you need to:
 
-1. **Create the application package** in `pkg/applications/<app-name>/`
+1. **Create the integration package** in `pkg/integrations/<integration-name>/`
 
-2. **Implement the main application file** (`<app-name>.go`):
+2. **Implement the main integration file** (`<integration-name>.go`):
 
 ```go
-package myapp
+package myintegration
 
 import (
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -76,36 +76,36 @@ import (
 )
 
 func init() {
-	registry.RegisterApplication("myapp", &MyApp{})
+	registry.RegisterIntegration("myintegration", &MyIntegration{})
 }
 
-type MyApp struct{}
+type MyIntegration struct{}
 
 type Configuration struct {
 	APIKey string `json:"apiKey"`
 }
 
 type Metadata struct {
-	// Store application-level metadata
+	// Store integration-level metadata
 }
 
-func (a *MyApp) Name() string {
-	return "myapp"
+func (i *MyIntegration) Name() string {
+	return "myintegration"
 }
 
-func (a *MyApp) Label() string {
-	return "My Application"
+func (i *MyIntegration) Label() string {
+	return "My Integration"
 }
 
-func (a *MyApp) Icon() string {
+func (i *MyIntegration) Icon() string {
 	return "icon-name"
 }
 
-func (a *MyApp) Description() string {
-	return "Description of what this application does"
+func (i *MyIntegration) Description() string {
+	return "Description of what this integration does"
 }
 
-func (a *MyApp) Configuration() []configuration.Field {
+func (i *MyIntegration) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "apiKey",
@@ -118,30 +118,30 @@ func (a *MyApp) Configuration() []configuration.Field {
 	}
 }
 
-func (a *MyApp) Components() []core.Component {
+func (i *MyIntegration) Components() []core.Component {
 	return []core.Component{
 		// Add your components here
 	}
 }
 
-func (a *MyApp) Triggers() []core.Trigger {
+func (i *MyIntegration) Triggers() []core.Trigger {
 	return []core.Trigger{
 		// Add your triggers here
 	}
 }
 
-func (a *MyApp) Sync(ctx core.SyncContext) error {
-	// Validate configuration and set up the application
-	// Set state to "ready" when done: ctx.AppInstallation.SetState("ready", "")
+func (i *MyIntegration) Sync(ctx core.SyncContext) error {
+	// Validate configuration and set up the integration
+	// Set state to "ready" when done: ctx.Integration.SetState("ready", "")
 	return nil
 }
 
-func (a *MyApp) HandleRequest(ctx core.HTTPRequestContext) {
+func (i *MyIntegration) HandleRequest(ctx core.HTTPRequestContext) {
 	// Handle incoming HTTP requests (e.g., OAuth callbacks, webhooks)
 }
 ```
 
-3. **Register the application** in the `init()` function (shown above)
+3. **Register the integration** in the `init()` function (shown above)
 
 ## Adding Triggers
 
@@ -149,10 +149,10 @@ Triggers listen to external events and start workflow executions. Here's how to 
 
 ### 1. Create the Trigger File
 
-Create a new file in your application package (e.g., `on_event.go`):
+Create a new file in your integration package (e.g., `on_event.go`):
 
 ```go
-package myapp
+package myintegration
 
 import (
 	"encoding/json"
@@ -257,7 +257,7 @@ func (t *OnEvent) Setup(ctx core.TriggerContext) error {
 	}
 
 	// Request webhook if needed
-	return ctx.AppInstallation.RequestWebhook(WebhookConfiguration{
+	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		EventType: "event",
 		Resource:  config.Resource,
 	})
@@ -323,7 +323,7 @@ func (t *OnEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 
 ### 2. Register the Trigger
 
-Add the trigger to your application's `Triggers()` method:
+Add the trigger to your integration's `Triggers()` method:
 
 ```go
 func (a *MyApp) Triggers() []core.Trigger {
@@ -335,7 +335,7 @@ func (a *MyApp) Triggers() []core.Trigger {
 
 ### 3. Implement Webhook Setup (if needed)
 
-If your triggers or components require webhooks, implement the webhook setup methods in your main application file:
+If your triggers or components require webhooks, implement the webhook setup methods in your main integration file:
 
 ```go
 type WebhookConfiguration struct {
@@ -345,7 +345,7 @@ type WebhookConfiguration struct {
 
 // CompareWebhookConfig defines when two webhook configurations are equal.
 // This is used to determine if an existing webhook can be reused.
-func (a *MyApp) CompareWebhookConfig(a, b any) (bool, error) {
+func (i *MyIntegration) CompareWebhookConfig(a, b any) (bool, error) {
 	configA := WebhookConfiguration{}
 	if err := mapstructure.Decode(a, &configA); err != nil {
 		return false, err
@@ -356,14 +356,14 @@ func (a *MyApp) CompareWebhookConfig(a, b any) (bool, error) {
 		return false, err
 	}
 
-	// Define equality based on your application's webhook configuration.
+	// Define equality based on your integration's webhook configuration.
 	// Webhooks with matching configurations can be shared across multiple triggers/components.
 	return configA.Resource == configB.Resource && configA.EventType == configB.EventType, nil
 }
 
 // SetupWebhook creates a webhook in the external service.
 // This is called by the webhook provisioner for pending webhook records.
-func (a *MyApp) SetupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) (any, error) {
+func (i *MyIntegration) SetupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) (any, error) {
 	// Create webhook in the external service
 	// Return metadata about the created webhook (e.g., webhook ID)
 	return nil, nil
@@ -371,7 +371,7 @@ func (a *MyApp) SetupWebhook(ctx core.AppInstallationContext, options core.Webho
 
 // CleanupWebhook deletes a webhook from the external service.
 // This is called by the webhook cleanup worker for deleted webhook records.
-func (a *MyApp) CleanupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) error {
+func (i *MyIntegration) CleanupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) error {
 	// Delete webhook from the external service using the metadata
 	return nil
 }
@@ -379,10 +379,10 @@ func (a *MyApp) CleanupWebhook(ctx core.AppInstallationContext, options core.Web
 
 **Webhook Logic Overview:**
 
-The webhook management logic is centralized in `AppInstallationContext.RequestWebhook()`. When a trigger or component requests a webhook:
+The webhook management logic is centralized in `Integration.RequestWebhook()`. When a trigger or component requests a webhook:
 
-1. The context lists all existing webhooks for the app installation
-2. For each existing webhook, it calls your application's `CompareWebhookConfig()` to check if configurations match
+1. The context lists all existing webhooks for the integration
+2. For each existing webhook, it calls your integration's `CompareWebhookConfig()` to check if configurations match
 3. If a match is found, the node is associated with the existing webhook
 4. If no match is found, a new webhook is created
 
@@ -394,7 +394,7 @@ Components are actions that can be executed as part of workflows. The process is
 
 1. Create a new file for your component (e.g., `do_action.go`)
 2. Implement the `core.Component` interface
-3. Register it in your application's `Components()` method
+3. Register it in your integration's `Components()` method
 
 ## Adding Frontend Mappers
 
@@ -494,7 +494,7 @@ export const onEventTriggerRenderer: TriggerRenderer = {
 
 ### 2. Register the Mapper
 
-Update or create `index.ts` in your application's mapper directory:
+Update or create `index.ts` in your integration's mapper directory:
 
 ```typescript
 import { ComponentBaseMapper, TriggerRenderer } from "../types";
@@ -511,7 +511,7 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 
 Here's a complete example of the GitHub Issues trigger that was recently added:
 
-### Backend (`pkg/applications/github/on_issue.go`)
+### Backend (`pkg/integrations/github/on_issue.go`)
 
 The trigger implements:
 - Configuration fields for repository and action filtering
@@ -533,7 +533,7 @@ The mapper provides:
 
 ## Testing
 
-After implementing your application:
+After implementing your integration:
 
 1. **Build and format**: Run `make format.go && make lint && make check.build.app`
 2. **Test the backend**: Run `make test`
@@ -554,7 +554,7 @@ After implementing your application:
 
 ## References
 
-- GitHub application: `pkg/applications/github/`
-- Semaphore application: `pkg/applications/semaphore/`
+- GitHub integration: `pkg/integrations/github/`
+- Semaphore integration: `pkg/integrations/semaphore/`
 - Core interfaces: `pkg/core/`
 - Frontend mappers: `web_src/src/pages/workflowv2/mappers/`

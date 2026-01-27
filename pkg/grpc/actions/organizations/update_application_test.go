@@ -26,8 +26,8 @@ func Test__UpdateApplication(t *testing.T) {
 		//
 		// Register a test application that succeeds on Sync
 		//
-		r.Registry.Applications["dummy"] = support.NewDummyApplication(func(ctx core.SyncContext) error {
-			ctx.AppInstallation.SetState("ready", "")
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
+			ctx.Integration.SetState("ready", "")
 			return nil
 		})
 
@@ -78,10 +78,10 @@ func Test__UpdateApplication(t *testing.T) {
 		// Register a test application that succeeds initially but fails on update
 		//
 		syncCount := 0
-		r.Registry.Applications["dummy"] = support.NewDummyApplication(func(ctx core.SyncContext) error {
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
 			syncCount++
 			if syncCount == 1 {
-				ctx.AppInstallation.SetState("ready", "")
+				ctx.Integration.SetState("ready", "")
 				return nil
 			}
 			return errors.New("sync failed on update")
@@ -148,8 +148,8 @@ func Test__UpdateApplication(t *testing.T) {
 		//
 		// Register a test application that succeeds on Sync
 		//
-		r.Registry.Applications["dummy"] = support.NewDummyApplication(func(ctx core.SyncContext) error {
-			ctx.AppInstallation.SetState("ready", "")
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
+			ctx.Integration.SetState("ready", "")
 			return nil
 		})
 

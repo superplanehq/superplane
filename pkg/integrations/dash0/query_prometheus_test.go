@@ -18,9 +18,9 @@ func Test__QueryPrometheus__Setup(t *testing.T) {
 	t.Run("query is required", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := component.Setup(core.SetupContext{
-			AppInstallation: appCtx,
-			Metadata:        &contexts.MetadataContext{},
-			Configuration:   map[string]any{"query": ""},
+			Integration:   appCtx,
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"query": ""},
 		})
 
 		require.ErrorContains(t, err, "query is required")
@@ -29,9 +29,9 @@ func Test__QueryPrometheus__Setup(t *testing.T) {
 	t.Run("query cannot be empty", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := component.Setup(core.SetupContext{
-			AppInstallation: appCtx,
-			Metadata:        &contexts.MetadataContext{},
-			Configuration:   map[string]any{"query": "   "},
+			Integration:   appCtx,
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"query": "   "},
 		})
 
 		require.ErrorContains(t, err, "query cannot be empty")
@@ -40,9 +40,9 @@ func Test__QueryPrometheus__Setup(t *testing.T) {
 	t.Run("dataset is required", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := component.Setup(core.SetupContext{
-			AppInstallation: appCtx,
-			Metadata:        &contexts.MetadataContext{},
-			Configuration:   map[string]any{"query": "up", "dataset": ""},
+			Integration:   appCtx,
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"query": "up", "dataset": ""},
 		})
 
 		require.ErrorContains(t, err, "dataset is required")
@@ -51,8 +51,8 @@ func Test__QueryPrometheus__Setup(t *testing.T) {
 	t.Run("range query requires start", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := component.Setup(core.SetupContext{
-			AppInstallation: appCtx,
-			Metadata:        &contexts.MetadataContext{},
+			Integration: appCtx,
+			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"query":   "up",
 				"dataset": "default",
@@ -66,8 +66,8 @@ func Test__QueryPrometheus__Setup(t *testing.T) {
 	t.Run("range query requires end", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := component.Setup(core.SetupContext{
-			AppInstallation: appCtx,
-			Metadata:        &contexts.MetadataContext{},
+			Integration: appCtx,
+			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"query":   "up",
 				"dataset": "default",
@@ -82,8 +82,8 @@ func Test__QueryPrometheus__Setup(t *testing.T) {
 	t.Run("range query requires step", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := component.Setup(core.SetupContext{
-			AppInstallation: appCtx,
-			Metadata:        &contexts.MetadataContext{},
+			Integration: appCtx,
+			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"query":   "up",
 				"dataset": "default",
@@ -99,8 +99,8 @@ func Test__QueryPrometheus__Setup(t *testing.T) {
 	t.Run("valid instant query setup", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := component.Setup(core.SetupContext{
-			AppInstallation: appCtx,
-			Metadata:        &contexts.MetadataContext{},
+			Integration: appCtx,
+			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"query":   "up",
 				"dataset": "default",
@@ -114,8 +114,8 @@ func Test__QueryPrometheus__Setup(t *testing.T) {
 	t.Run("valid range query setup", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := component.Setup(core.SetupContext{
-			AppInstallation: appCtx,
-			Metadata:        &contexts.MetadataContext{},
+			Integration: appCtx,
+			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"query":   "up",
 				"dataset": "default",
@@ -170,9 +170,9 @@ func Test__QueryPrometheus__Execute(t *testing.T) {
 				"dataset": "default",
 				"type":    "instant",
 			},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  execCtx,
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: execCtx,
 		})
 
 		require.NoError(t, err)
@@ -222,9 +222,9 @@ func Test__QueryPrometheus__Execute(t *testing.T) {
 				"end":     "now",
 				"step":    "15s",
 			},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  execCtx,
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: execCtx,
 		})
 
 		require.NoError(t, err)
@@ -258,9 +258,9 @@ func Test__QueryPrometheus__Execute(t *testing.T) {
 				"dataset": "default",
 				"type":    "instant",
 			},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  execCtx,
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: execCtx,
 		})
 
 		require.Error(t, err)

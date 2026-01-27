@@ -7,19 +7,19 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.ApplicationResource, error) {
+func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	if resourceType != "repository" {
-		return []core.ApplicationResource{}, nil
+		return []core.IntegrationResource{}, nil
 	}
 
 	metadata := Metadata{}
-	if err := mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &metadata); err != nil {
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
 		return nil, fmt.Errorf("failed to decode application metadata: %w", err)
 	}
 
-	resources := make([]core.ApplicationResource, 0, len(metadata.Repositories))
+	resources := make([]core.IntegrationResource, 0, len(metadata.Repositories))
 	for _, repo := range metadata.Repositories {
-		resources = append(resources, core.ApplicationResource{
+		resources = append(resources, core.IntegrationResource{
 			Type: resourceType,
 			Name: repo.Name,
 			ID:   fmt.Sprintf("%d", repo.ID),

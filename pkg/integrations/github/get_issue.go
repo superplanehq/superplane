@@ -104,7 +104,7 @@ func (c *GetIssue) Setup(ctx core.SetupContext) error {
 
 	return ensureRepoInMetadata(
 		ctx.Metadata,
-		ctx.AppInstallation,
+		ctx.Integration,
 		ctx.Configuration,
 	)
 }
@@ -121,12 +121,12 @@ func (c *GetIssue) Execute(ctx core.ExecutionContext) error {
 	}
 
 	var appMetadata Metadata
-	if err := mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &appMetadata); err != nil {
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
 		return fmt.Errorf("failed to decode application metadata: %w", err)
 	}
 
 	// Initialize GitHub client
-	client, err := NewClient(ctx.AppInstallation, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
