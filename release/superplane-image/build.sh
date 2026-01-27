@@ -15,21 +15,14 @@ fi
 
 VERSION="$1"
 ARCH="$2"
-APT_MIRROR="${APT_MIRROR-}"
-APT_SECURITY_MIRROR="${APT_SECURITY_MIRROR-}"
 
 echo "Building SuperPlane image"
 
-BUILD_ARGS=()
-if [ -n "${APT_MIRROR}" ]; then
-  BUILD_ARGS+=(--build-arg "APT_MIRROR=${APT_MIRROR}")
-fi
-if [ -n "${APT_SECURITY_MIRROR}" ]; then
-  BUILD_ARGS+=(--build-arg "APT_SECURITY_MIRROR=${APT_SECURITY_MIRROR}")
-fi
-
-docker build \
+docker buildx build \
+  --platform "linux/${ARCH}" \
+  --progress=plain \
+  --provenance=false \
   --push \
   -t "ghcr.io/superplanehq/superplane:${VERSION}-${ARCH}" \
-  "${BUILD_ARGS[@]}" \
-  -f Dockerfile .
+  -f Dockerfile \
+  .
