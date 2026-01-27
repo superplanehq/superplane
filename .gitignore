@@ -13,3 +13,4 @@ wget-log*
 vendor/bundle
 .claude/settings.local.json
 .env
+.idea/
