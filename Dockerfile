@@ -2,6 +2,8 @@ ARG GO_VERSION=1.25.3
 ARG UBUNTU_VERSION=22.04
 ARG BUILDER_IMAGE="ubuntu:${UBUNTU_VERSION}"
 ARG RUNNER_IMAGE="ubuntu:${UBUNTU_VERSION}"
+ARG APT_MIRROR="http://archive.ubuntu.com/ubuntu"
+ARG APT_SECURITY_MIRROR="http://security.ubuntu.com/ubuntu"
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Base stage with common dependencies.
@@ -13,6 +15,14 @@ FROM ${BUILDER_IMAGE} AS base
 WORKDIR /tmp
 
 COPY scripts/docker scripts
+ARG APT_MIRROR
+ARG APT_SECURITY_MIRROR
+RUN if [ -n "${APT_MIRROR}" ]; then \
+  sed -i "s|http://archive.ubuntu.com/ubuntu|${APT_MIRROR}|g" /etc/apt/sources.list; \
+fi && \
+if [ -n "${APT_SECURITY_MIRROR}" ]; then \
+  sed -i "s|http://security.ubuntu.com/ubuntu|${APT_SECURITY_MIRROR}|g" /etc/apt/sources.list; \
+fi
 
 ENV GO_VERSION=1.25.3
 ENV PATH="/usr/local/go/bin:${PATH}"
@@ -100,6 +110,15 @@ LABEL org.opencontainers.image.title="superplane" \
   org.opencontainers.image.source="https://github.com/superplanehq/superplane" \
   org.opencontainers.image.url="https://superplane.com" \
   org.opencontainers.image.documentation="https://docs.superplane.com"
+
+ARG APT_MIRROR
+ARG APT_SECURITY_MIRROR
+RUN if [ -n "${APT_MIRROR}" ]; then \
+  sed -i "s|http://archive.ubuntu.com/ubuntu|${APT_MIRROR}|g" /etc/apt/sources.list; \
+fi && \
+if [ -n "${APT_SECURITY_MIRROR}" ]; then \
+  sed -i "s|http://security.ubuntu.com/ubuntu|${APT_SECURITY_MIRROR}|g" /etc/apt/sources.list; \
+fi
 
 # postgresql-client needs to be installed here too,
 # otherwise the createdb command won't work.
