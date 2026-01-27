@@ -2,13 +2,13 @@ package ecr
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/eventbridge"
 )
 
 const (
@@ -68,8 +68,7 @@ func SetupWebhook(ctx core.SetupWebhookContext, config WebhookConfiguration) (an
 		return nil, fmt.Errorf("region is required")
 	}
 
-	client := NewEventBridgeClient(ctx.HTTP, creds, region)
-
+	client := eventbridge.NewClient(ctx.HTTP, creds, region)
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
 		return nil, fmt.Errorf("error getting webhook secret: %w", err)
@@ -102,7 +101,7 @@ func SetupWebhook(ctx core.SetupWebhookContext, config WebhookConfiguration) (an
 		return nil, err
 	}
 
-	if err := client.PutTargets(names.RuleName, []Target{
+	if err := client.PutTargets(names.RuleName, []eventbridge.Target{
 		{
 			ID:  names.TargetID,
 			Arn: apiDestinationArn,
@@ -140,28 +139,32 @@ func CleanupWebhook(ctx core.CleanupWebhookContext) error {
 		return fmt.Errorf("region is required")
 	}
 
-	client := NewEventBridgeClient(ctx.HTTP, creds, region)
+	client := eventbridge.NewClient(ctx.HTTP, creds, region)
 
 	if metadata.RuleName != "" && metadata.TargetID != "" {
-		if err := client.RemoveTargets(metadata.RuleName, []string{metadata.TargetID}); err != nil && !isNotFoundError(err) {
+		err := client.RemoveTargets(metadata.RuleName, []string{metadata.TargetID})
+		if err != nil && !common.IsNotFoundErr(err) {
 			return err
 		}
 	}
 
 	if metadata.RuleName != "" {
-		if err := client.DeleteRule(metadata.RuleName); err != nil && !isNotFoundError(err) {
+		err := client.DeleteRule(metadata.RuleName)
+		if err != nil && !common.IsNotFoundErr(err) {
 			return err
 		}
 	}
 
 	if metadata.ApiDestinationName != "" {
-		if err := client.DeleteApiDestination(metadata.ApiDestinationName); err != nil && !isNotFoundError(err) {
+		err := client.DeleteApiDestination(metadata.ApiDestinationName)
+		if err != nil && !common.IsNotFoundErr(err) {
 			return err
 		}
 	}
 
 	if metadata.ConnectionName != "" {
-		if err := client.DeleteConnection(metadata.ConnectionName); err != nil && !isNotFoundError(err) {
+		err := client.DeleteConnection(metadata.ConnectionName)
+		if err != nil && !common.IsNotFoundErr(err) {
 			return err
 		}
 	}
@@ -169,26 +172,26 @@ func CleanupWebhook(ctx core.CleanupWebhookContext) error {
 	return nil
 }
 
-func ensureConnection(client *EventBridgeClient, name string, secret []byte) (string, error) {
+func ensureConnection(client *eventbridge.Client, name string, secret []byte) (string, error) {
 	connectionArn, err := client.CreateConnection(name, apiKeyHeaderName, string(secret))
 	if err == nil {
 		return connectionArn, nil
 	}
 
-	if !isAlreadyExistsError(err) {
+	if !common.IsAlreadyExistsErr(err) {
 		return "", err
 	}
 
 	return client.DescribeConnection(name)
 }
 
-func ensureApiDestination(client *EventBridgeClient, name, connectionArn, url string) (string, error) {
+func ensureApiDestination(client *eventbridge.Client, name, connectionArn, url string) (string, error) {
 	apiDestinationArn, err := client.CreateApiDestination(name, connectionArn, url)
 	if err == nil {
 		return apiDestinationArn, nil
 	}
 
-	if !isAlreadyExistsError(err) {
+	if !common.IsAlreadyExistsErr(err) {
 		return "", err
 	}
 
@@ -234,22 +237,4 @@ func eventPatternForType(eventType string) (map[string]any, error) {
 	default:
 		return nil, fmt.Errorf("unsupported event type: %s", eventType)
 	}
-}
-
-func isAlreadyExistsError(err error) bool {
-	var awsErr *awsError
-	if errors.As(err, &awsErr) {
-		return strings.Contains(awsErr.Code, "ResourceAlreadyExists")
-	}
-
-	return false
-}
-
-func isNotFoundError(err error) bool {
-	var awsErr *awsError
-	if errors.As(err, &awsErr) {
-		return strings.Contains(awsErr.Code, "ResourceNotFound")
-	}
-
-	return false
 }

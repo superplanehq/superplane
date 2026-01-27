@@ -1,4 +1,4 @@
-package ecr
+package eventbridge
 
 import (
 	"bytes"
@@ -9,19 +9,19 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 )
 
 const (
-	eventBridgeTargetPrefix = "AWSEvents."
+	TargetPrefix = "AWSEvents."
 )
 
-type EventBridgeClient struct {
+type Client struct {
 	http   core.HTTPContext
 	region string
 	creds  aws.Credentials
@@ -33,20 +33,8 @@ type Target struct {
 	Arn string `json:"Arn"`
 }
 
-type awsError struct {
-	Code    string
-	Message string
-}
-
-func (e *awsError) Error() string {
-	if e.Message != "" {
-		return fmt.Sprintf("%s: %s", e.Code, e.Message)
-	}
-	return e.Code
-}
-
-func NewEventBridgeClient(httpCtx core.HTTPContext, creds aws.Credentials, region string) *EventBridgeClient {
-	return &EventBridgeClient{
+func NewClient(httpCtx core.HTTPContext, creds aws.Credentials, region string) *Client {
+	return &Client{
 		http:   httpCtx,
 		region: region,
 		creds:  creds,
@@ -54,7 +42,7 @@ func NewEventBridgeClient(httpCtx core.HTTPContext, creds aws.Credentials, regio
 	}
 }
 
-func (c *EventBridgeClient) CreateConnection(name, apiKeyHeader, apiKeyValue string) (string, error) {
+func (c *Client) CreateConnection(name, apiKeyHeader, apiKeyValue string) (string, error) {
 	payload := map[string]any{
 		"Name":              name,
 		"AuthorizationType": "API_KEY",
@@ -70,14 +58,15 @@ func (c *EventBridgeClient) CreateConnection(name, apiKeyHeader, apiKeyValue str
 		ConnectionArn string `json:"ConnectionArn"`
 	}
 
-	if err := c.postJSON("CreateConnection", payload, &response); err != nil {
+	err := c.postJSON("CreateConnection", payload, &response)
+	if err != nil {
 		return "", err
 	}
 
 	return response.ConnectionArn, nil
 }
 
-func (c *EventBridgeClient) DescribeConnection(name string) (string, error) {
+func (c *Client) DescribeConnection(name string) (string, error) {
 	payload := map[string]any{"Name": name}
 	var response struct {
 		ConnectionArn string `json:"ConnectionArn"`
@@ -90,12 +79,12 @@ func (c *EventBridgeClient) DescribeConnection(name string) (string, error) {
 	return response.ConnectionArn, nil
 }
 
-func (c *EventBridgeClient) DeleteConnection(name string) error {
+func (c *Client) DeleteConnection(name string) error {
 	payload := map[string]any{"Name": name}
 	return c.postJSON("DeleteConnection", payload, nil)
 }
 
-func (c *EventBridgeClient) CreateApiDestination(name, connectionArn, url string) (string, error) {
+func (c *Client) CreateApiDestination(name, connectionArn, url string) (string, error) {
 	payload := map[string]any{
 		"Name":                         name,
 		"ConnectionArn":                connectionArn,
@@ -115,7 +104,7 @@ func (c *EventBridgeClient) CreateApiDestination(name, connectionArn, url string
 	return response.ApiDestinationArn, nil
 }
 
-func (c *EventBridgeClient) DescribeApiDestination(name string) (string, error) {
+func (c *Client) DescribeApiDestination(name string) (string, error) {
 	payload := map[string]any{"Name": name}
 	var response struct {
 		ApiDestinationArn string `json:"ApiDestinationArn"`
@@ -128,12 +117,12 @@ func (c *EventBridgeClient) DescribeApiDestination(name string) (string, error) 
 	return response.ApiDestinationArn, nil
 }
 
-func (c *EventBridgeClient) DeleteApiDestination(name string) error {
+func (c *Client) DeleteApiDestination(name string) error {
 	payload := map[string]any{"Name": name}
 	return c.postJSON("DeleteApiDestination", payload, nil)
 }
 
-func (c *EventBridgeClient) PutRule(name, pattern, description string) (string, error) {
+func (c *Client) PutRule(name, pattern, description string) (string, error) {
 	payload := map[string]any{
 		"Name":         name,
 		"EventPattern": pattern,
@@ -152,7 +141,7 @@ func (c *EventBridgeClient) PutRule(name, pattern, description string) (string, 
 	return response.RuleArn, nil
 }
 
-func (c *EventBridgeClient) PutTargets(rule string, targets []Target) error {
+func (c *Client) PutTargets(rule string, targets []Target) error {
 	payload := map[string]any{
 		"Rule":    rule,
 		"Targets": targets,
@@ -161,7 +150,7 @@ func (c *EventBridgeClient) PutTargets(rule string, targets []Target) error {
 	return c.postJSON("PutTargets", payload, nil)
 }
 
-func (c *EventBridgeClient) RemoveTargets(rule string, targetIDs []string) error {
+func (c *Client) RemoveTargets(rule string, targetIDs []string) error {
 	payload := map[string]any{
 		"Rule": rule,
 		"Ids":  targetIDs,
@@ -170,7 +159,7 @@ func (c *EventBridgeClient) RemoveTargets(rule string, targetIDs []string) error
 	return c.postJSON("RemoveTargets", payload, nil)
 }
 
-func (c *EventBridgeClient) DeleteRule(rule string) error {
+func (c *Client) DeleteRule(rule string) error {
 	payload := map[string]any{
 		"Name": rule,
 	}
@@ -178,7 +167,7 @@ func (c *EventBridgeClient) DeleteRule(rule string) error {
 	return c.postJSON("DeleteRule", payload, nil)
 }
 
-func (c *EventBridgeClient) postJSON(action string, payload any, out any) error {
+func (c *Client) postJSON(action string, payload any, out any) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal request: %w", err)
@@ -191,9 +180,10 @@ func (c *EventBridgeClient) postJSON(action string, payload any, out any) error 
 	}
 
 	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
-	req.Header.Set("X-Amz-Target", eventBridgeTargetPrefix+action)
+	req.Header.Set("X-Amz-Target", TargetPrefix+action)
 
-	if err := c.signRequest(req, body); err != nil {
+	err = c.signRequest(req, body)
+	if err != nil {
 		return err
 	}
 
@@ -201,6 +191,7 @@ func (c *EventBridgeClient) postJSON(action string, payload any, out any) error 
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
+
 	defer res.Body.Close()
 
 	responseBody, err := io.ReadAll(res.Body)
@@ -209,96 +200,26 @@ func (c *EventBridgeClient) postJSON(action string, payload any, out any) error 
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		if awsErr := parseAwsError(responseBody); awsErr != nil {
+		if awsErr := common.ParseError(responseBody); awsErr != nil {
 			return awsErr
 		}
-		return fmt.Errorf("eventbridge request failed with %d: %s", res.StatusCode, string(responseBody))
+		return fmt.Errorf("EventBridge API request failed with %d: %s", res.StatusCode, string(responseBody))
 	}
 
 	if out == nil {
 		return nil
 	}
 
-	if err := json.Unmarshal(responseBody, out); err != nil {
+	err = json.Unmarshal(responseBody, out)
+	if err != nil {
 		return fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	return nil
 }
 
-func (c *EventBridgeClient) signRequest(req *http.Request, payload []byte) error {
+func (c *Client) signRequest(req *http.Request, payload []byte) error {
 	hash := sha256.Sum256(payload)
 	payloadHash := hex.EncodeToString(hash[:])
 	return c.signer.SignHTTP(context.Background(), c.creds, req, payloadHash, "events", c.region, time.Now())
-}
-
-func parseAwsError(body []byte) *awsError {
-	var payload map[string]any
-	if err := json.Unmarshal(body, &payload); err != nil {
-		return nil
-	}
-
-	code := extractString(payload["__type"])
-	if code == "" {
-		code = extractString(payload["code"])
-	}
-	if code == "" {
-		code = extractString(payload["Code"])
-	}
-
-	message := extractString(payload["message"])
-	if message == "" {
-		message = extractString(payload["Message"])
-	}
-
-	if errPayload, ok := payload["Error"].(map[string]any); ok {
-		if code == "" {
-			code = extractString(errPayload["code"])
-		}
-		if code == "" {
-			code = extractString(errPayload["Code"])
-		}
-		if code == "" {
-			code = extractString(errPayload["type"])
-		}
-		if message == "" {
-			message = extractString(errPayload["message"])
-		}
-		if message == "" {
-			message = extractString(errPayload["Message"])
-		}
-	}
-
-	code = normalizeAWSCode(code)
-	if code == "" && message == "" {
-		return nil
-	}
-
-	return &awsError{Code: code, Message: message}
-}
-
-func extractString(value any) string {
-	if value == nil {
-		return ""
-	}
-
-	switch typed := value.(type) {
-	case string:
-		return typed
-	default:
-		return ""
-	}
-}
-
-func normalizeAWSCode(code string) string {
-	if code == "" {
-		return ""
-	}
-
-	parts := strings.Split(code, "#")
-	if len(parts) > 1 {
-		return parts[len(parts)-1]
-	}
-
-	return code
 }
