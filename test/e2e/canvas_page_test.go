@@ -33,15 +33,15 @@ func TestCanvasPage(t *testing.T) {
 		name2 := steps.addNoopWithDefaultName(models.Position{X: 500, Y: 400})
 		name3 := steps.addNoopWithDefaultName(models.Position{X: 500, Y: 600})
 
-		// First should be "noop", second "noop2", third "noop3"
+		// First should be "noop", second "noop 2", third "noop 3"
 		require.Equal(t, "noop", name1, "first node should be named 'noop'")
-		require.Equal(t, "noop2", name2, "second node should be named 'noop2'")
-		require.Equal(t, "noop3", name3, "third node should be named 'noop3'")
+		require.Equal(t, "noop 2", name2, "second node should be named 'noop2'")
+		require.Equal(t, "noop 3", name3, "third node should be named 'noop3'")
 
 		// Verify all nodes exist on canvas
 		steps.assertNodeIsAdded("noop")
-		steps.assertNodeIsAdded("noop2")
-		steps.assertNodeIsAdded("noop3")
+		steps.assertNodeIsAdded("noop 2")
+		steps.assertNodeIsAdded("noop 3")
 	})
 
 	// Note: "duplicating a node on canvas" test removed - duplicate action no longer available in UI
