@@ -13,10 +13,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/oidc"
-	apppb "github.com/superplanehq/superplane/pkg/protos/applications"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
+	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	mepb "github.com/superplanehq/superplane/pkg/protos/me"
 	organizationPb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
@@ -121,8 +121,8 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 	workflowService := NewWorkflowService(authService, registry, encryptor, webhooksBaseURL+basePath)
 	pbWorkflows.RegisterWorkflowsServer(grpcServer, workflowService)
 
-	applicationService := NewApplicationService(encryptor, registry)
-	apppb.RegisterApplicationsServer(grpcServer, applicationService)
+	integrationService := NewIntegrationService(encryptor, registry)
+	integrationpb.RegisterIntegrationsServer(grpcServer, integrationService)
 
 	reflection.Register(grpcServer)
 

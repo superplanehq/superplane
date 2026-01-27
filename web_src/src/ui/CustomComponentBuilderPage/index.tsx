@@ -19,9 +19,9 @@ import {
   ConfigurationField,
   SuperplaneBlueprintsOutputChannel,
   AuthorizationDomainType,
-  ApplicationsApplicationDefinition,
-  OrganizationsAppInstallation,
-  ComponentsAppInstallationRef,
+  IntegrationsIntegrationDefinition,
+  OrganizationsIntegration,
+  ComponentsIntegrationRef,
 } from "@/api-client";
 import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { Block, BlockData } from "../CanvasPage/Block";
@@ -44,9 +44,9 @@ export interface NodeEditData {
   icon?: string;
   configuration: Record<string, any>;
   configurationFields: ConfigurationField[];
-  appName?: string;
+  integrationName?: string;
   blockName?: string;
-  appInstallationRef?: any;
+  integrationRef?: ComponentsIntegrationRef;
 }
 
 export interface NewNodeData {
@@ -57,8 +57,8 @@ export interface NewNodeData {
   configuration: Record<string, any>;
   position?: { x: number; y: number };
   sourceConnection?: { nodeId: string; handleId: string | null };
-  appName?: string;
-  appInstallationRef?: ComponentsAppInstallationRef;
+  integrationName?: string;
+  integrationRef?: ComponentsIntegrationRef;
 }
 
 export interface CustomComponentBuilderPageProps {
@@ -94,15 +94,15 @@ export interface CustomComponentBuilderPageProps {
     nodeId: string,
     configuration: Record<string, any>,
     nodeName: string,
-    appInstallationRef?: ComponentsAppInstallationRef,
+    integrationRef?: ComponentsIntegrationRef,
   ) => void;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string | undefined> | string | undefined | void;
   organizationId?: string;
 
   // Building blocks
   components: ComponentsComponent[];
-  availableApplications?: ApplicationsApplicationDefinition[];
-  installedApplications?: OrganizationsAppInstallation[];
+  availableIntegrations?: IntegrationsIntegrationDefinition[];
+  integrations?: OrganizationsIntegration[];
 
   // Template node helpers
   onAddTemplateNode?: (node: Node) => void;
@@ -526,7 +526,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           nodeName: block.name || "",
           configuration: defaultConfiguration,
           position,
-          appName: block.appName,
+          integrationName: block.integrationName,
         });
 
         // After the node is added, open the sidebar for configuration
@@ -561,7 +561,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
   );
 
   const handleSaveNewNode = useCallback(
-    (configuration: Record<string, any>, nodeName: string, appInstallationRef?: any) => {
+    (configuration: Record<string, any>, nodeName: string, integrationRef?: any) => {
       if (newNodeData && props.onNodeAdd && templateNodeId) {
         // Remove the template node first
         if (props.onRemoveTemplateNode) {
@@ -573,7 +573,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           buildingBlock: newNodeData.buildingBlock,
           nodeName,
           configuration,
-          appInstallationRef,
+          integrationRef,
           position: newNodeData.position,
           sourceConnection: newNodeData.sourceConnection,
         });
@@ -603,16 +603,16 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
 
   // Use shared builder (merge mocks + live components)
   // Filter out triggers from applications since triggers can't be used in custom components
-  const availableApplicationsWithoutTriggers = useMemo(() => {
-    return (props.availableApplications || []).map((app) => ({
-      ...app,
+  const availableIntegrationsWithoutTriggers = useMemo(() => {
+    return (props.availableIntegrations || []).map((i) => ({
+      ...i,
       triggers: undefined, // Remove triggers from applications
     }));
-  }, [props.availableApplications]);
+  }, [props.availableIntegrations]);
 
   const buildingBlockCategories = useMemo<BuildingBlockCategory[]>(
-    () => buildBuildingBlockCategories([], props.components, [], availableApplicationsWithoutTriggers),
-    [props.components, availableApplicationsWithoutTriggers],
+    () => buildBuildingBlockCategories([], props.components, [], availableIntegrationsWithoutTriggers),
+    [props.components, availableIntegrationsWithoutTriggers],
   );
 
   const handleNodeClick = useCallback(
@@ -894,9 +894,9 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
             domainId={props.organizationId}
             domainType={"DOMAIN_TYPE_ORGANIZATION" as AuthorizationDomainType}
             customField={undefined}
-            appName={editingNodeData?.appName}
-            appInstallationRef={editingNodeData?.appInstallationRef}
-            installedApplications={props.installedApplications}
+            integrationName={editingNodeData?.integrationName}
+            integrationRef={editingNodeData?.integrationRef}
+            integrations={props.integrations}
             workflowNodes={props.blueprintNodes}
           />
         )}
