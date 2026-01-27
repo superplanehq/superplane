@@ -2314,24 +2314,27 @@ export function WorkflowPageV2() {
 
       saveWorkflowSnapshot(workflow);
 
-      let blockName = "node";
-      if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.trigger?.name) {
-        blockName = nodeToDuplicate.trigger.name;
-      } else if (nodeToDuplicate.type === "TYPE_COMPONENT" && nodeToDuplicate.component?.name) {
-        blockName = nodeToDuplicate.component.name;
-      } else if (nodeToDuplicate.type === "TYPE_BLUEPRINT" && nodeToDuplicate.blueprint?.id) {
-        // For blueprints, we need to find the blueprint metadata to get the name
-        const blueprintMetadata = blueprints.find((b) => b.id === nodeToDuplicate.blueprint?.id);
-        blockName = blueprintMetadata?.name || "blueprint";
-      }
-
-      // Get existing node names for unique name generation
       const existingNodeNames = (workflow.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
 
-      // Generate unique node name based on component name + ordinal
-      const uniqueNodeName = generateUniqueNodeName(blockName, existingNodeNames);
+      let baseName = nodeToDuplicate.name?.trim() || "";
+      if (!baseName) {
+        if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.trigger?.name) {
+          baseName = nodeToDuplicate.trigger.name;
+        } else if (nodeToDuplicate.type === "TYPE_COMPONENT" && nodeToDuplicate.component?.name) {
+          baseName = nodeToDuplicate.component.name;
+        } else if (nodeToDuplicate.type === "TYPE_BLUEPRINT" && nodeToDuplicate.blueprint?.id) {
+          // For blueprints, we need to find the blueprint metadata to get the name
+          const blueprintMetadata = blueprints.find((b) => b.id === nodeToDuplicate.blueprint?.id);
+          baseName = blueprintMetadata?.name || "blueprint";
+        } else {
+          baseName = "node";
+        }
+      }
 
-      const newNodeId = generateNodeId(blockName, uniqueNodeName);
+      // Generate unique node name based on the existing node name + ordinal
+      const uniqueNodeName = generateUniqueNodeName(baseName, existingNodeNames);
+
+      const newNodeId = generateNodeId(baseName, uniqueNodeName);
 
       const offsetX = 50;
       const offsetY = 50;
