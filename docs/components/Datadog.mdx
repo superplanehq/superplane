@@ -1,0 +1,141 @@
+---
+title: "Datadog"
+sidebar:
+  order: 5
+---
+
+Monitor alerts and create events in Datadog
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Monitor Alert" href="#on-monitor-alert" description="Listen to Datadog monitor alert webhooks" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Event" href="#create-event" description="Create a new event in Datadog" />
+</CardGrid>
+
+## Installation
+
+To configure Datadog webhooks to work with SuperPlane:
+
+1. **Create a Webhook in Datadog**: Go to Integrations > Webhooks in Datadog
+2. **Configure the Webhook**:
+   - **Name**: Give it a descriptive name (e.g., "SuperPlane Integration")
+   - **URL**: Use the webhook URL provided by SuperPlane for your trigger
+   - **Custom Headers**: Add "X-Superplane-Signature-256" header with the HMAC-SHA256 signature of the request body using the webhook secret
+3. **Configure Monitor Notifications**: In your Datadog monitors, add @webhook-<webhook-name> to the notification message
+4. **Test**: Trigger a test alert to verify the integration is working
+
+Note: The signature should be in the format "sha256=<hex-encoded-hmac>". See Datadog webhook documentation for details on custom headers.
+
+<a id="on-monitor-alert"></a>
+
+## On Monitor Alert
+
+The On Monitor Alert trigger starts a workflow execution when Datadog monitor alerts fire.
+
+### Use Cases
+
+- **Automated incident response**: Trigger runbooks when alerts fire
+- **Alert routing**: Route alerts to different workflows based on tags or severity
+- **Metric-based automation**: Execute actions when thresholds are breached
+
+### Webhook Configuration
+
+Configure a webhook in Datadog to send alerts to the SuperPlane webhook URL. Include the X-Superplane-Signature-256 header with an HMAC-SHA256 signature.
+
+### Event Payload
+
+The trigger emits an event containing:
+- `id`: The alert event ID
+- `event_type`: Type of event
+- `alert_type`: Alert severity
+- `alert_transition`: State change (Triggered, Recovered, etc.)
+- `monitor_id`: The monitor's numeric ID
+- `monitor_name`: Human-readable monitor name
+- `title`: Alert title
+- `body`: Alert message body
+- `date`: Unix timestamp of the alert
+- `tags`: Array of tags from the monitor
+
+### Example Data
+
+```json
+{
+  "data": {
+    "alert_transition": "Triggered",
+    "alert_type": "error",
+    "body": "CPU usage exceeded 90% threshold",
+    "date": 1704067200,
+    "event_type": "query_alert_monitor",
+    "hostname": "host.example.com",
+    "id": "1234567890",
+    "monitor_id": 12345,
+    "monitor_name": "CPU Usage High",
+    "org": {
+      "id": 123,
+      "name": "MyOrg"
+    },
+    "priority": "P1",
+    "tags": [
+      "env:prod",
+      "service:web"
+    ],
+    "title": "[Triggered] CPU Usage High"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "datadog.onMonitorAlert"
+}
+```
+
+<a id="create-event"></a>
+
+## Create Event
+
+The Create Event component creates a new event in Datadog.
+
+### Use Cases
+
+- **Deployment tracking**: Log deployment events to correlate with metrics
+- **Incident annotation**: Add context to incidents with custom events
+- **Workflow notifications**: Create events to track workflow execution milestones
+
+### Outputs
+
+The component emits an event containing:
+- `id`: The unique identifier of the created event
+- `title`: The event title
+- `text`: The event body
+- `date_happened`: Unix timestamp when the event occurred
+- `alert_type`: The severity level (info, warning, error, success)
+- `priority`: Event priority (normal, low)
+- `tags`: Array of tags attached to the event
+- `url`: Link to view the event in Datadog
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alert_type": "info",
+    "date_happened": 1704067200,
+    "id": 1234567890,
+    "priority": "normal",
+    "tags": [
+      "env:prod",
+      "service:web"
+    ],
+    "text": "Application v1.2.3 has been deployed successfully",
+    "title": "Deployment completed",
+    "url": "https://app.datadoghq.com/event/event?id=1234567890"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "datadog.event"
+}
+```
