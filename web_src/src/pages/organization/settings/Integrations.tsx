@@ -1,4 +1,4 @@
-import { AppWindow, Loader2 } from "lucide-react";
+import { AppWindow, Loader2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
@@ -12,17 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfigurationFieldRenderer } from "../../../ui/configurationFieldRenderer";
 import type { IntegrationsIntegrationDefinition } from "../../../api-client/types.gen";
-import { resolveIcon } from "@/lib/utils";
+import { resolveIcon, APP_LOGO_MAP, DARK_ICONS_NEEDING_INVERT } from "@/lib/utils";
 import { getApiErrorMessage } from "@/utils/errors";
-import { Icon } from "@/components/Icon";
-import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import githubIcon from "@/assets/icons/integrations/github.svg";
-import openAiIcon from "@/assets/icons/integrations/openai.svg";
-import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
-import slackIcon from "@/assets/icons/integrations/slack.svg";
-import smtpIcon from "@/assets/icons/integrations/smtp.svg";
-import awsIcon from "@/assets/icons/integrations/aws.svg";
-import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 interface IntegrationsProps {
   organizationId: string;
@@ -43,24 +34,14 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   const selectedInstructions = useMemo(() => {
     return selectedIntegration?.instructions?.trim();
   }, [selectedIntegration?.instructions]);
-  const appLogoMap: Record<string, string> = {
-    aws: awsIcon,
-    dash0: dash0Icon,
-    github: githubIcon,
-    openai: openAiIcon,
-    "open-ai": openAiIcon,
-    pagerduty: pagerDutyIcon,
-    semaphore: SemaphoreLogo,
-    slack: slackIcon,
-    smtp: smtpIcon,
-  };
 
   const renderAppIcon = (slug: string | undefined, appName: string | undefined, className: string) => {
-    const logo = appName ? appLogoMap[appName] : undefined;
+    const logo = appName ? APP_LOGO_MAP[appName] : undefined;
     if (logo) {
+      const needsInvert = appName && DARK_ICONS_NEEDING_INVERT.includes(appName);
       return (
         <span className={className}>
-          <img src={logo} alt="" className="h-full w-full object-contain" />
+          <img src={logo} alt="" className={`h-full w-full object-contain ${needsInvert ? "dark:invert" : ""}`} />
         </span>
       );
     }
@@ -137,7 +118,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                 return (
                   <div
                     key={integration.metadata?.id}
-                    className="bg-white border border-gray-300 dark:border-gray-700 rounded-md p-4 flex items-start justify-between gap-4"
+                    className="bg-white dark:bg-neutral-800 border border-gray-300 dark:border-neutral-700 rounded-md p-4 flex items-start justify-between gap-4"
                   >
                     <div className="flex items-start gap-3">
                       <div className="mt-0.5 flex h-4 w-4 items-center justify-center">
@@ -148,7 +129,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                         )}
                       </div>
                       <div>
-                        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                        <h3 className="text-sm font-semibold text-gray-800 dark:text-white">
                           {integrationLabel || integration.metadata?.name || integration.spec?.integrationName}
                         </h3>
                         {integrationDefinition?.description ? (
@@ -212,14 +193,14 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                   return (
                     <div
                       key={app.name}
-                      className="bg-white border border-gray-300 dark:border-gray-700 rounded-md p-4 flex items-start justify-between gap-4"
+                      className="bg-white dark:bg-neutral-800 border border-gray-300 dark:border-neutral-700 rounded-md p-4 flex items-start justify-between gap-4"
                     >
                       <div className="flex items-start gap-3">
                         <div className="mt-0.5 flex h-4 w-4 items-center justify-center">
                           {renderAppIcon(app.icon, appName, "w-4 h-4 text-gray-500 dark:text-gray-400")}
                         </div>
                         <div>
-                          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                          <h3 className="text-sm font-semibold text-gray-800 dark:text-white">
                             {app.label || app.name}
                           </h3>
                           {app.description ? (
@@ -247,19 +228,19 @@ export function Integrations({ organizationId }: IntegrationsProps) {
       {isModalOpen &&
         selectedIntegration &&
         (() => {
-          const integrationName = selectedIntegration.name;
+          const localIntegrationName = selectedIntegration.name;
           return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-              <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+              <div className="bg-white dark:bg-neutral-900 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
                       {renderAppIcon(
                         selectedIntegration.icon,
-                        integrationName,
+                        localIntegrationName,
                         "w-6 h-6 text-gray-500 dark:text-gray-400",
                       )}
-                      <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">
+                      <h3 className="text-base font-semibold text-gray-800 dark:text-white">
                         Connect {selectedIntegration.label || selectedIntegration.name}
                       </h3>
                     </div>
@@ -268,7 +249,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                       className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
                       disabled={createIntegrationMutation.isPending}
                     >
-                      <Icon name="x" size="sm" />
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
 
@@ -298,7 +279,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
 
                     {/* Configuration Fields */}
                     {selectedIntegration.configuration && selectedIntegration.configuration.length > 0 && (
-                      <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
+                      <div className="border-t border-gray-200 dark:border-neutral-700 pt-6 space-y-4">
                         {selectedIntegration.configuration.map((field) => {
                           if (!field.name) return null;
                           return (

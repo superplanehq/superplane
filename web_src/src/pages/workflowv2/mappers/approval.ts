@@ -46,32 +46,32 @@ export const APPROVAL_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   waiting: {
     icon: "clock",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-orange-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-orange-100 dark:bg-orange-900/50",
     badgeColor: "bg-yellow-600",
   },
   approved: {
     icon: "circle-check",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-green-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-green-100 dark:bg-green-900/50",
     badgeColor: "bg-emerald-500",
   },
   rejected: {
     icon: "circle-x",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-red-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-red-100 dark:bg-red-900/50",
     badgeColor: "bg-red-400",
   },
   error: {
     icon: "triangle-alert",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-red-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-red-100 dark:bg-red-900/50",
     badgeColor: "bg-red-400",
   },
   running: {
     icon: "clock",
-    textColor: "text-gray-800",
-    backgroundColor: "bg-amber-100",
+    textColor: "text-gray-800 dark:text-gray-200",
+    backgroundColor: "bg-amber-100 dark:bg-amber-900/50",
     badgeColor: "bg-orange-500",
   },
 };
@@ -226,8 +226,16 @@ function getApprovalSpecs(items: ApprovalItem[], additionalData?: unknown): Comp
         }
         return {
           badges: [
-            { label: `${label}:`, bgColor: "bg-gray-100", textColor: "text-gray-700" },
-            { label: value || "—", bgColor: "bg-emerald-100", textColor: "text-emerald-800" },
+            {
+              label: `${label}:`,
+              bgColor: "bg-gray-100 dark:bg-gray-700",
+              textColor: "text-gray-700 dark:text-gray-300",
+            },
+            {
+              label: value || "—",
+              bgColor: "bg-emerald-100 dark:bg-emerald-900/50",
+              textColor: "text-emerald-800 dark:text-emerald-300",
+            },
           ],
         };
       }),
