@@ -114,7 +114,7 @@ func (i *OnIssue) Configuration() []configuration.Field {
 func (i *OnIssue) Setup(ctx core.TriggerContext) error {
 	err := ensureRepoInMetadata(
 		ctx.Metadata,
-		ctx.AppInstallation,
+		ctx.Integration,
 		ctx.Configuration,
 	)
 
@@ -127,7 +127,7 @@ func (i *OnIssue) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	return ctx.AppInstallation.RequestWebhook(WebhookConfiguration{
+	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		EventType:  "issues",
 		Repository: config.Repository,
 	})

@@ -19,7 +19,7 @@ func Test__SMTP__Sync(t *testing.T) {
 				"port":      "587",
 				"fromEmail": "sender@example.com",
 			},
-			AppInstallation: &contexts.AppInstallationContext{
+			Integration: &contexts.AppInstallationContext{
 				Configuration: map[string]any{},
 			},
 		})
@@ -34,7 +34,7 @@ func Test__SMTP__Sync(t *testing.T) {
 				"port":      "0",
 				"fromEmail": "sender@example.com",
 			},
-			AppInstallation: &contexts.AppInstallationContext{
+			Integration: &contexts.AppInstallationContext{
 				Configuration: map[string]any{},
 			},
 		})
@@ -48,7 +48,7 @@ func Test__SMTP__Sync(t *testing.T) {
 				"host": "smtp.example.com",
 				"port": "587",
 			},
-			AppInstallation: &contexts.AppInstallationContext{
+			Integration: &contexts.AppInstallationContext{
 				Configuration: map[string]any{},
 			},
 		})
@@ -81,7 +81,7 @@ func Test__SMTP__Sync(t *testing.T) {
 				"fromEmail": "sender@example.com",
 				"useTLS":    false,
 			},
-			AppInstallation: appCtx,
+			Integration: appCtx,
 		})
 
 		require.NoError(t, err)
@@ -111,7 +111,7 @@ func Test__SMTP__Sync(t *testing.T) {
 				"fromEmail": "sender@example.com",
 				"useTLS":    false,
 			},
-			AppInstallation: appCtx,
+			Integration: appCtx,
 		})
 
 		require.ErrorContains(t, err, "SMTP connection test failed")

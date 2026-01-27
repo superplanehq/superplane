@@ -17,9 +17,9 @@ type Client struct {
 	http     core.HTTPContext
 }
 
-func NewClient(http core.HTTPContext, ctx core.AppInstallationContext) (*Client, error) {
+func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
 	if ctx == nil {
-		return nil, fmt.Errorf("no app installation context")
+		return nil, fmt.Errorf("no integration context")
 	}
 
 	orgURL, err := ctx.GetConfig("organizationUrl")

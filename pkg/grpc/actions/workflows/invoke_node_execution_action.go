@@ -101,7 +101,7 @@ func InvokeNodeExecutionAction(
 		}
 
 		logger = logging.WithAppInstallation(logger, *appInstallation)
-		actionCtx.AppInstallation = contexts.NewAppInstallationContext(tx, node, appInstallation, encryptor, registry)
+		actionCtx.Integration = contexts.NewAppInstallationContext(tx, node, appInstallation, encryptor, registry)
 	}
 
 	actionCtx.Logger = logger

@@ -16,7 +16,7 @@ func Test__PagerDuty__ListResources(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 
 		resources, err := p.ListResources("unknown", core.ListResourcesContext{
-			AppInstallation: appCtx,
+			Integration: appCtx,
 		})
 
 		require.NoError(t, err)
@@ -35,7 +35,7 @@ func Test__PagerDuty__ListResources(t *testing.T) {
 		}
 
 		resources, err := p.ListResources("service", core.ListResourcesContext{
-			AppInstallation: appCtx,
+			Integration: appCtx,
 		})
 
 		require.NoError(t, err)
@@ -62,7 +62,7 @@ func Test__PagerDuty__ListResources(t *testing.T) {
 		}
 
 		resources, err := p.ListResources("service", core.ListResourcesContext{
-			AppInstallation: appCtx,
+			Integration: appCtx,
 		})
 
 		require.NoError(t, err)
@@ -73,7 +73,7 @@ func Test__PagerDuty__ListResources(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 
 		resources, err := p.ListResources("service", core.ListResourcesContext{
-			AppInstallation: appCtx,
+			Integration: appCtx,
 		})
 
 		require.NoError(t, err)

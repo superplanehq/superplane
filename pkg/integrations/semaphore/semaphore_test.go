@@ -34,9 +34,9 @@ func Test__Semaphore__Sync(t *testing.T) {
 		}
 
 		err := s.Sync(core.SyncContext{
-			Configuration:   appInstallation.Configuration,
-			HTTP:            httpContext,
-			AppInstallation: appInstallation,
+			Configuration: appInstallation.Configuration,
+			HTTP:          httpContext,
+			Integration:   appInstallation,
 		})
 
 		require.NoError(t, err)
@@ -64,9 +64,9 @@ func Test__Semaphore__Sync(t *testing.T) {
 		}
 
 		err := s.Sync(core.SyncContext{
-			Configuration:   appInstallation.Configuration,
-			HTTP:            httpContext,
-			AppInstallation: appInstallation,
+			Configuration: appInstallation.Configuration,
+			HTTP:          httpContext,
+			Integration:   appInstallation,
 		})
 
 		require.Error(t, err)

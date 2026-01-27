@@ -30,13 +30,13 @@ func UpdateApplication(ctx context.Context, registry *registry.Registry, oidcPro
 		return nil, status.Errorf(codes.NotFound, "application installation not found: %v", err)
 	}
 
-	app, err := registry.GetApplication(appInstallation.AppName)
+	integration, err := registry.GetIntegration(appInstallation.AppName)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "application %s not found", appInstallation.AppName)
+		return nil, status.Errorf(codes.Internal, "integration %s not found", appInstallation.AppName)
 	}
 
 	existingConfig := appInstallation.Configuration.Data()
-	configuration, err = encryptConfigurationIfNeeded(ctx, registry, app, configuration, appInstallation.ID, existingConfig)
+	configuration, err = encryptConfigurationIfNeeded(ctx, registry, integration, configuration, appInstallation.ID, existingConfig)
 	if err != nil {
 		log.Errorf("failed to encrypt sensitive configuration for app installation %s: %v", appInstallation.ID, err)
 		return nil, status.Error(codes.Internal, "failed to encrypt sensitive configuration")
@@ -53,14 +53,14 @@ func UpdateApplication(ctx context.Context, registry *registry.Registry, oidcPro
 		registry,
 	)
 
-	syncErr := app.Sync(core.SyncContext{
+	syncErr := integration.Sync(core.SyncContext{
 		HTTP:            contexts.NewHTTPContext(registry.GetHTTPClient()),
 		Configuration:   appInstallation.Configuration.Data(),
 		BaseURL:         baseURL,
 		WebhooksBaseURL: webhooksBaseURL,
 		OrganizationID:  orgID,
 		InstallationID:  installationID,
-		AppInstallation: appCtx,
+		Integration:     appCtx,
 		OIDC:            oidcProvider,
 	})
 

@@ -166,9 +166,9 @@ func Test__OnIncident__Setup(t *testing.T) {
 	t.Run("invalid configuration -> decode error", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallation: appCtx,
-			Metadata:        &contexts.MetadataContext{},
-			Configuration:   "invalid-config",
+			Integration:   appCtx,
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: "invalid-config",
 		})
 
 		require.ErrorContains(t, err, "failed to decode configuration")
@@ -177,9 +177,9 @@ func Test__OnIncident__Setup(t *testing.T) {
 	t.Run("at least one event required", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallation: appCtx,
-			Metadata:        &contexts.MetadataContext{},
-			Configuration:   OnIncidentConfiguration{Events: []string{}, Service: "svc-1"},
+			Integration:   appCtx,
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: OnIncidentConfiguration{Events: []string{}, Service: "svc-1"},
 		})
 
 		require.ErrorContains(t, err, "at least one event type must be chosen")
@@ -188,9 +188,9 @@ func Test__OnIncident__Setup(t *testing.T) {
 	t.Run("service is required", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallation: appCtx,
-			Metadata:        &contexts.MetadataContext{},
-			Configuration:   OnIncidentConfiguration{Events: []string{"incident.triggered"}},
+			Integration:   appCtx,
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: OnIncidentConfiguration{Events: []string{"incident.triggered"}},
 		})
 
 		require.ErrorContains(t, err, "service is required")
@@ -204,9 +204,9 @@ func Test__OnIncident__Setup(t *testing.T) {
 		}
 
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallation: appCtx,
-			Metadata:        metadataCtx,
-			Configuration:   OnIncidentConfiguration{Events: []string{"incident.triggered"}, Service: "svc-1"},
+			Integration:   appCtx,
+			Metadata:      metadataCtx,
+			Configuration: OnIncidentConfiguration{Events: []string{"incident.triggered"}, Service: "svc-1"},
 		})
 
 		require.NoError(t, err)

@@ -213,9 +213,9 @@ func Test__UpdateRedirectRule__Execute(t *testing.T) {
 				"preserveQueryString": false,
 				"enabled":             true,
 			},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  execState,
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: execState,
 		}
 
 		err := component.Execute(ctx)
@@ -305,9 +305,9 @@ func Test__UpdateRedirectRule__Execute(t *testing.T) {
 				"preserveQueryString": false,
 				"enabled":             true,
 			},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  execState,
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: execState,
 		}
 
 		err := component.Execute(ctx)
@@ -350,9 +350,9 @@ func Test__UpdateRedirectRule__Execute(t *testing.T) {
 				"statusCode":       "301",
 				"enabled":          true,
 			},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  execState,
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: execState,
 		}
 
 		err := component.Execute(ctx)

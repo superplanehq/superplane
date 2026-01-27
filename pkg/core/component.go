@@ -125,24 +125,24 @@ type OutputChannel struct {
  * to control the state and metadata of each execution of it.
  */
 type ExecutionContext struct {
-	ID              uuid.UUID
-	WorkflowID      string
-	OrganizationID  string
-	NodeID          string
-	SourceNodeID    string
-	BaseURL         string
-	Data            any
-	Configuration   any
-	ExpressionEnv   func(expression string) (map[string]any, error)
-	Logger          *log.Entry
-	HTTP            HTTPContext
-	Metadata        MetadataContext
-	NodeMetadata    MetadataContext
-	ExecutionState  ExecutionStateContext
-	Requests        RequestContext
-	Auth            AuthContext
-	AppInstallation AppInstallationContext
-	Notifications   NotificationContext
+	ID             uuid.UUID
+	WorkflowID     string
+	OrganizationID string
+	NodeID         string
+	SourceNodeID   string
+	BaseURL        string
+	Data           any
+	Configuration  any
+	ExpressionEnv  func(expression string) (map[string]any, error)
+	Logger         *log.Entry
+	HTTP           HTTPContext
+	Metadata       MetadataContext
+	NodeMetadata   MetadataContext
+	ExecutionState ExecutionStateContext
+	Requests       RequestContext
+	Auth           AuthContext
+	Integration    IntegrationContext
+	Notifications  NotificationContext
 }
 
 /*
@@ -161,13 +161,13 @@ type HTTPContext interface {
  * to control the state and metadata of each execution of it.
  */
 type SetupContext struct {
-	Logger          *log.Entry
-	Configuration   any
-	HTTP            HTTPContext
-	Metadata        MetadataContext
-	Requests        RequestContext
-	Auth            AuthContext
-	AppInstallation AppInstallationContext
+	Logger        *log.Entry
+	Configuration any
+	HTTP          HTTPContext
+	Metadata      MetadataContext
+	Requests      RequestContext
+	Auth          AuthContext
+	Integration   IntegrationContext
 }
 
 /*
@@ -230,17 +230,17 @@ type Action struct {
  * and control the state and metadata of each execution of it.
  */
 type ActionContext struct {
-	Name            string
-	Configuration   any
-	Parameters      map[string]any
-	Logger          *log.Entry
-	HTTP            HTTPContext
-	Metadata        MetadataContext
-	ExecutionState  ExecutionStateContext
-	Auth            AuthContext
-	Requests        RequestContext
-	AppInstallation AppInstallationContext
-	Notifications   NotificationContext
+	Name           string
+	Configuration  any
+	Parameters     map[string]any
+	Logger         *log.Entry
+	HTTP           HTTPContext
+	Metadata       MetadataContext
+	ExecutionState ExecutionStateContext
+	Auth           AuthContext
+	Requests       RequestContext
+	Integration    IntegrationContext
+	Notifications  NotificationContext
 }
 
 /*

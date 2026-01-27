@@ -11,14 +11,14 @@ import (
 )
 
 func ListApplications(ctx context.Context, registry *registry.Registry) (*pb.ListApplicationsResponse, error) {
-	applications := registry.ListApplications()
+	integrations := registry.ListIntegrations()
 
 	return &pb.ListApplicationsResponse{
-		Applications: serializeApplications(applications),
+		Applications: serializeApplications(integrations),
 	}, nil
 }
 
-func serializeApplications(in []core.Application) []*pb.ApplicationDefinition {
+func serializeApplications(in []core.Integration) []*pb.ApplicationDefinition {
 	out := make([]*pb.ApplicationDefinition, len(in))
 	for i, application := range in {
 		configFields := application.Configuration()
@@ -32,7 +32,7 @@ func serializeApplications(in []core.Application) []*pb.ApplicationDefinition {
 			Label:                    application.Label(),
 			Icon:                     application.Icon(),
 			Description:              application.Description(),
-			InstallationInstructions: application.InstallationInstructions(),
+			InstallationInstructions: application.Instructions(),
 			Configuration:            configuration,
 			Components:               actions.SerializeComponents(application.Components()),
 			Triggers:                 actions.SerializeTriggers(application.Triggers()),
