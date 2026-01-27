@@ -60,10 +60,7 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
   return (
     <>
       <div className="flex flex-col gap-2 relative">
-        <div
-          className="border rounded-md overflow-hidden border-gray-300 dark:border-gray-700"
-          style={{ height: "200px" }}
-        >
+        <div className="border rounded-md border-gray-300 dark:border-gray-700 p-1" style={{ height: "200px" }}>
           <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1">
             <SimpleTooltip content={copied ? "Copied!" : "Copy"} hideOnClick={false}>
               <button onClick={copyToClipboard} className="p-1 rounded text-gray-500 hover:text-gray-800">
@@ -106,7 +103,7 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
               </button>
             </SimpleTooltip>
           </div>
-          <div className="flex-1 overflow-auto border border-gray-200 dark:border-gray-700 rounded-md">
+          <div className="flex-1 border border-gray-200 dark:border-gray-700 rounded-md">
             <Editor
               height="600px"
               defaultLanguage="plaintext"

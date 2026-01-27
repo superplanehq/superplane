@@ -49,7 +49,10 @@ function buildExecutionTabData(
     (execution.resultReason === "RESULT_REASON_ERROR" || execution.result === "RESULT_FAILED") &&
     !("Error" in currentData)
   ) {
-    currentData["Error"] = execution.resultMessage;
+    currentData["Error"] = {
+      __type: "error",
+      message: execution.resultMessage,
+    };
   }
 
   if (execution.result === "RESULT_CANCELLED" && !("Cancelled by" in currentData)) {

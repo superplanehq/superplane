@@ -304,6 +304,7 @@ func (e *HTTP) Configuration() []configuration.Field {
 				{Field: "method", Values: []string{"POST", "PUT", "PATCH"}},
 				{Field: "contentType", Values: []string{"application/json"}},
 			},
+			Default: "{\"foo\": \"bar\"}",
 		},
 		{
 			Name:     "formData",

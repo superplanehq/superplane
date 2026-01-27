@@ -54,6 +54,27 @@ You can deploy SuperPlane on a single host or on Kubernetes:
 - **[Single Host Installation](https://docs.superplane.com/installation/overview/#single-host-installation)** - Deploy on AWS EC2, GCP Compute Engine, or other cloud providers
 - **[Kubernetes Installation](https://docs.superplane.com/installation/overview/#kubernetes)** - Deploy on GKE, EKS, or any Kubernetes cluster
 
+## Roadmap Overview
+
+This section gives a quick snapshot of what SuperPlane already supports and what’s coming next.
+
+**Available now**
+
+✓ 40+ starter components (10+ core, 30+ integrations)  
+✓ Event-driven workflow engine  
+✓ Visual Canvas builder  
+✓ Run history, event chain view, debug console  
+✓ Starter CLI and example workflows  
+
+**In progress / upcoming**
+
+→ 200+ new components (AWS, Grafana, Datadog, Azure, GitLab, Jira, and more)  
+→ [Canvas version control](https://github.com/superplanehq/superplane/issues/1380)  
+→ [SAML/SCIM](https://github.com/superplanehq/superplane/issues/1377) with [extended RBAC and permissions](https://github.com/superplanehq/superplane/issues/1378)  
+→ [Artifact version tracking](https://github.com/superplanehq/superplane/issues/1382)  
+→ [Public API](https://github.com/superplanehq/superplane/issues/1854)
+
+
 ## Contributing
 
 We welcome your bug reports, ideas for improvement, and focused PRs.
