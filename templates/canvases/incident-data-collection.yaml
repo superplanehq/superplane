@@ -28,7 +28,7 @@ spec:
         name: "pagerduty.onIncident"
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-1xyxrf"
@@ -46,7 +46,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-wa0ctm"
@@ -70,7 +70,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-4pjwv9"
@@ -82,15 +82,15 @@ spec:
         type: "instant"
       metadata: null
       position:
-        x: 2038
-        "y": 430
+        x: 1458
+        "y": 683
       component:
         name: "dash0.queryPrometheus"
       blueprint: null
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-hbriwb"
@@ -102,15 +102,15 @@ spec:
         type: "instant"
       metadata: null
       position:
-        x: 2524
-        "y": 429
+        x: 1458
+        "y": 983
       component:
         name: "dash0.queryPrometheus"
       blueprint: null
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-rxe22i"
@@ -121,15 +121,15 @@ spec:
         model: "gpt-5.2"
       metadata: null
       position:
-        x: 3019
-        "y": 428
+        x: 2687
+        "y": 435
       component:
         name: "openai.textPrompt"
       blueprint: null
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-n6s8ec"
@@ -145,15 +145,15 @@ spec:
           name: "puppy-describer"
           url: "https://github.com/puppies-inc/puppy-describer"
       position:
-        x: 3542
-        "y": 428
+        x: 3206
+        "y": 435
       component:
         name: "github.createIssue"
       blueprint: null
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "annotation-annotation-4a9uck"
@@ -161,83 +161,105 @@ spec:
       type: "TYPE_WIDGET"
       configuration:
         color: "yellow"
-        height: 310
-        text: "## PagerDuty incident trigger\n\nThis node listens for new incidents created in PagerDuty.\n\nWhen an incident is triggered, the event data flows downstream for processing.\n\n\n### To set up\n1. Click the node to open the sidebar configuration.\n2. Follow the instructions to connect your PagerDuty account.\n3. Select the service(s) and urgency levels to monitor."
-        width: 380
+        height: 282
+        text: "### 1. Listen to external resources\n\nTrigger components listen for events from external systems, in this case, we are listening to new triggered incidents on PagerDuty\n___\nTo use this example, connect your Pager Duty accounts:\n\n- Click each node\n- Follow the connection instructions for connecting PagerDuty\n- Go back to the node settings to configure Services you want to listen to, and set up other filters\n"
+        width: 460
       metadata: null
       position:
-        x: 415
-        "y": 16
+        x: 353
+        "y": 78
       component: null
       blueprint: null
       trigger: null
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
-    - id: "annotation-annotation2-mq2ini"
+    - id: "merge-merge-1fzi6q"
+      name: "merge"
+      type: "TYPE_COMPONENT"
+      configuration:
+        enableStopIf: false
+        enableTimeout: true
+        executionTimeout:
+          unit: "minutes"
+          value: 2
+      metadata: null
+      position:
+        x: 2079
+        "y": 430
+      component:
+        name: "merge"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "annotation-annotation2-hrxq4u"
       name: "annotation2"
       type: "TYPE_WIDGET"
       configuration:
         color: "yellow"
-        height: 253
-        text: "### Priority filter\n\nThis component filters incoming incidents to continue only if they are flagged as **P1** or **P2** priority.\n\nThe filter uses an **expression** that evaluates data from the event payload.  \nPayloads contain all the information emitted by upstream components.\n\nOpen the node sidebar to see the filter expression and learn how to reference payload fields."
-        width: 392
+        height: 279
+        text: "### 2. Filter out incidents based on priority\n\nThe Filter component subscribes to events from external resources and forwards only those that contain \"P1\" or \"P2\" as the priority.\n\n___\nSuperPlane is an event-driven workflow engine that supports expressive, flexible conditions.\n\n- Click the Filter node to see how expressions are defined\n- Explore the [Data Flow](https://docs.superplane.com/concepts/data-flow/) documentation for more details\n"
+        width: 429
       metadata: null
       position:
-        x: 924
-        "y": 73
+        x: 894
+        "y": 79
       component: null
       blueprint: null
       trigger: null
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
-    - id: "annotation-annotation3-8mge7o"
+    - id: "annotation-annotation3-7m2g95"
       name: "annotation3"
       type: "TYPE_WIDGET"
       configuration:
         color: "yellow"
-        height: 176
-        text: "### Data collection from Dash0\n\nThese components query Dash0 for multiple data points:\n\n**List Issues**: Retrieves all currently failing check rules from your Dash0 instance.\n\n**PromQL Queries**: Runs custom queries to fetch database memory and CPU usage metrics over the last 60 minutes.\n\nAll collected data is emitted downstream and becomes available for the AI summary and GitHub issue creation."
-        width: 1398
+        height: 265
+        text: "### 3. Collect metrics and health data\n\nThis step uses Dash0 to collect health signals from multiple sources and prepare data for a summary. The Dash0 List Issues component retrieves all failing checks, while Prometheus Query components fetch database memory and CPU usage metrics.\n\nA Merge component waits for all three data collection nodes to complete before the workflow continues.\n\n___\n\n**To use this with your dash0 instance:**   \n- Ensure check rules are configured in Dash0\n- Review the queries used for database memory and CPU usage\n- Update the queries to match your environment\n"
+        width: 977
       metadata: null
       position:
-        x: 1470
-        "y": 161
+        x: 1459
+        "y": 80
       component: null
       blueprint: null
       trigger: null
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
-    - id: "annotation-annotation4-fc9g80"
+    - id: "annotation-annotation4-31cjr5"
       name: "annotation4"
       type: "TYPE_WIDGET"
       configuration:
         color: "yellow"
-        height: 166
-        text: "### AI summary and GitHub issue\n\nWith access to all collected data, the **OpenAI** component generates a structured summary of the incident, including failing checks and database metrics.\n\nThe summary is then used to automatically create a **GitHub issue** for tracking and collaboration.\n\nTo use the OpenAI component, you need to connect your OpenAI account using an API key."
-        width: 878
+        height: 256
+        text: "### 4. Use AI to summarize data and create a GitHub issue\n\nRaw data emitted by upstream nodes is passed to the OpenAI component. The agent reviews this data and generates a summary in `markdown`, which is then used to create a GitHub issue with all relevant details.\n\n___\n- Connect your OpenAI account\n- Review how the prompt is configured and how upstream data is shared with the agent\n- After the issue is created, explore the payloads to see how data flows through the workflow\n- Learn how to select and manipulate payload data in the [Expressions](https://docs.superplane.com/concepts/expressions/) documentation\n"
+        width: 750
       metadata: null
       position:
-        x: 3020
-        "y": 150
+        x: 2719
+        "y": 81
       component: null
       blueprint: null
       trigger: null
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
   edges:
@@ -247,21 +269,30 @@ spec:
     - sourceId: "component-node-1xyxrf"
       targetId: "component-node-wa0ctm"
       channel: "default"
-    - sourceId: "component-node-wa0ctm"
-      targetId: "component-node-4pjwv9"
-      channel: "clear"
-    - sourceId: "component-node-wa0ctm"
-      targetId: "component-node-4pjwv9"
-      channel: "degraded"
-    - sourceId: "component-node-wa0ctm"
-      targetId: "component-node-4pjwv9"
-      channel: "critical"
-    - sourceId: "component-node-4pjwv9"
-      targetId: "component-node-hbriwb"
-      channel: "default"
-    - sourceId: "component-node-hbriwb"
-      targetId: "component-node-rxe22i"
-      channel: "default"
     - sourceId: "component-node-rxe22i"
       targetId: "component-node-n6s8ec"
+      channel: "default"
+    - sourceId: "component-node-wa0ctm"
+      targetId: "merge-merge-1fzi6q"
+      channel: "clear"
+    - sourceId: "component-node-wa0ctm"
+      targetId: "merge-merge-1fzi6q"
+      channel: "degraded"
+    - sourceId: "component-node-wa0ctm"
+      targetId: "merge-merge-1fzi6q"
+      channel: "critical"
+    - sourceId: "component-node-4pjwv9"
+      targetId: "merge-merge-1fzi6q"
+      channel: "default"
+    - sourceId: "component-node-hbriwb"
+      targetId: "merge-merge-1fzi6q"
+      channel: "default"
+    - sourceId: "merge-merge-1fzi6q"
+      targetId: "component-node-rxe22i"
+      channel: "success"
+    - sourceId: "component-node-1xyxrf"
+      targetId: "component-node-4pjwv9"
+      channel: "default"
+    - sourceId: "component-node-1xyxrf"
+      targetId: "component-node-hbriwb"
       channel: "default"

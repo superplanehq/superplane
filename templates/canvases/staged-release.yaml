@@ -26,7 +26,7 @@ spec:
         name: "github.onRelease"
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-70p83y"
@@ -46,7 +46,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-7z3mea"
@@ -68,7 +68,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: true
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-1krig8"
@@ -92,7 +92,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-3c9afc"
@@ -114,7 +114,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "merge-merge-vckyv1"
@@ -137,7 +137,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "dash0-listissues-check-if-there-are-any-alerts-pbjufl"
@@ -161,7 +161,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: true
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "http-health-check--ping-server-spb8ma"
@@ -183,7 +183,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: true
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "wait-wait-for-the-changes-to-propagate-9f6hct"
@@ -203,7 +203,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "merge-merge-as9s0i"
@@ -226,7 +226,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: true
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "pagerduty-listincidents-pagerduty-listincidents-kcozn1"
@@ -244,7 +244,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "github-runworkflow-github-runworkflow-t0ed50"
@@ -273,7 +273,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "github-runworkflow-deploy-10--w3pcg4"
@@ -302,7 +302,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "pagerduty-listincidents-check-if-there-are-open-issues-jl7aze"
@@ -320,7 +320,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: true
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "annotation-annotation-dsxtwd"
@@ -341,7 +341,7 @@ spec:
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "annotation-annotation2-xt7sds"
@@ -362,7 +362,7 @@ spec:
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "annotation-annotation3-e3jalx"
@@ -383,7 +383,7 @@ spec:
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "annotation-annotation4-55btsm"
@@ -404,7 +404,7 @@ spec:
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "github-runworkflow-github-runworkflow-0ae6uu"
@@ -433,7 +433,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "annotation-annotation5-0fn8v7"
@@ -454,7 +454,7 @@ spec:
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
   edges:

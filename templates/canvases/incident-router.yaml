@@ -15,15 +15,15 @@ spec:
           id: "C09AJT3BF1Q"
           name: "all-efod-test-org"
       position:
-        x: 384
-        "y": 501
+        x: 320
+        "y": 500
       component: null
       blueprint: null
       trigger:
         name: "slack.onAppMention"
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-micxb6"
@@ -41,7 +41,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-683h8w"
@@ -60,7 +60,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-hw4ezb"
@@ -71,15 +71,15 @@ spec:
         model: "gpt-5.2"
       metadata: null
       position:
-        x: 1836
-        "y": 499
+        x: 1421
+        "y": 680
       component:
         name: "openai.textPrompt"
       blueprint: null
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-rcby5g"
@@ -104,7 +104,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-c9hql3"
@@ -128,7 +128,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "annotation-annotation-nz01hz"
@@ -149,7 +149,7 @@ spec:
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "annotation-annotation2-88tc68"
@@ -170,7 +170,7 @@ spec:
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "annotation-annotation3-q7feag"
@@ -191,7 +191,7 @@ spec:
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "annotation-annotation4-l5nxvh"
@@ -212,7 +212,114 @@ spec:
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "github-onissuecomment-github-onissuecomment-fyflwt"
+      name: "Listen to issue Comments"
+      type: "TYPE_TRIGGER"
+      configuration:
+        repository: "terraform"
+      metadata:
+        repository:
+          id: 1046227550
+          name: "terraform"
+          url: "https://github.com/puppies-inc/terraform"
+      position:
+        x: 320
+        "y": 910
+      component: null
+      blueprint: null
+      trigger:
+        name: "github.onIssueComment"
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "merge-merge-jjlkwm"
+      name: "Wait for both Title and Description"
+      type: "TYPE_COMPONENT"
+      configuration:
+        enableStopIf: false
+        enableTimeout: true
+        executionTimeout:
+          unit: "minutes"
+          value: 2
+      metadata: null
+      position:
+        x: 1922
+        "y": 500
+      component:
+        name: "merge"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: true
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "component-node-doptqx"
+      name: "Send Slack Notification"
+      type: "TYPE_COMPONENT"
+      configuration:
+        text: "New P1 incident!\n\nLink to the incident: {{$['Create PD incident'].data.incident.html_url}}\n\nLink to the issue: {{$['Create issue on GitHub'].data.url}}"
+      metadata: null
+      position:
+        x: 3011
+        "y": 464
+      component:
+        name: "slack.sendTextMessage"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: true
+      integration: null
+      errorMessage: "field 'channel' is required"
+      warningMessage: ""
+    - id: "github-onissue-github-onissue-aq6dfc"
+      name: "Listen to new Issues"
+      type: "TYPE_TRIGGER"
+      configuration:
+        actions:
+          - "opened"
+        repository: "terraform"
+      metadata:
+        repository:
+          id: 1046227550
+          name: "terraform"
+          url: "https://github.com/puppies-inc/terraform"
+      position:
+        x: 320
+        "y": 700
+      component: null
+      blueprint: null
+      trigger:
+        name: "github.onIssue"
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "annotation-annotation5-601278"
+      name: "annotation5"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 251
+        text: "### 1. Listen to external resources\n\nTrigger components listen for events from external systems, such as new GitHub issues, issue comments, or mentions of the SuperPlane Slack app.\n\n___\nTo use this example, connect your GitHub and Slack accounts:\n\n- Click each node\n- Follow the connection instructions for GitHub and Slack\n- Configure the required settings (GitHub repository, Slack channel)\n"
+        width: 491
+      metadata: null
+      position:
+        x: 246
+        "y": 175
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      integration: null
       errorMessage: ""
       warningMessage: ""
   edges:
