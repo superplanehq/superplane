@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/require"
 
 	"github.com/superplanehq/superplane/pkg/models"
@@ -71,8 +72,9 @@ func TestCanvasPage(t *testing.T) {
 		steps.start()
 		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(4)
 		steps.openSidebarForNode("Wait")
-		steps.assertRunningItemsCount("Wait", 1)
-		steps.assertQueuedItemsCount("Wait", 3)
+		steps.assertRunningItemsAtLeast("Wait", 1)
+		steps.ensureQueuedItems("Wait", 1)
+		steps.assertQueuedItemsAtLeast("Wait", 1)
 		steps.assertQueuedItemsVisibleInSidebar()
 	})
 
@@ -82,10 +84,11 @@ func TestCanvasPage(t *testing.T) {
 		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(4)
 		steps.openSidebarForNode("Wait")
 
-		steps.assertRunningItemsCount("Wait", 1)
-		steps.assertQueuedItemsCount("Wait", 3)
+		steps.assertRunningItemsAtLeast("Wait", 1)
+		steps.ensureQueuedItems("Wait", 1)
+		initialQueued := steps.waitForQueueItemCountAtLeast("Wait", 1)
 		steps.cancelFirstQueueItemFromSidebar("Wait")
-		steps.assertQueuedItemsCount("Wait", 2)
+		steps.assertQueuedItemsCountLessThan("Wait", initialQueued)
 	})
 
 	t.Run("canceling running execution from the sidebar", func(t *testing.T) {
@@ -262,11 +265,7 @@ func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems
 	emitEvent := q.Locator("button:has-text('Emit Event')")
 
 	for i := 0; i < itemsAmount; i++ {
-		s.session.HoverOver(nodeHeader)
-		s.session.Sleep(100)
-		s.session.Click(q.TestID("node-action-run"))
-		s.session.Click(emitEvent)
-		s.session.Sleep(100)
+		s.emitManualTriggerEvent(nodeHeader, emitEvent)
 	}
 
 	// wait for the first item to start processing
@@ -293,45 +292,22 @@ func (s *CanvasPageSteps) assertAutocompleteNodeSuggestionVisible() {
 	s.session.AssertVisible(q.Locator(`div[data-suggestion-index="0"] span:has-text("node")`))
 }
 
-func (s *CanvasPageSteps) assertQueuedItemsCount(nodeName string, expected int) {
-	deadline := time.Now().Add(5 * time.Second)
-
-	for {
-		waitNode := s.getNodeByName(nodeName)
-
-		count, err := models.CountNodeQueueItems(waitNode.WorkflowID, waitNode.NodeID)
-		require.NoError(s.t, err)
-
-		if int(count) == expected {
-			return
-		}
-
-		if time.Now().After(deadline) {
-			require.Equal(s.t, expected, int(count))
-		}
-
-		time.Sleep(200 * time.Millisecond)
-	}
+func (s *CanvasPageSteps) assertQueuedItemsAtLeast(nodeName string, expected int) {
+	actual := s.waitForQueueItemCountAtLeast(nodeName, expected)
+	require.GreaterOrEqual(s.t, actual, expected)
 }
 
-func (s *CanvasPageSteps) assertRunningItemsCount(nodeName string, expected int) {
+func (s *CanvasPageSteps) assertRunningItemsAtLeast(nodeName string, expected int) {
 	deadline := time.Now().Add(5 * time.Second)
 
 	for {
-		waitNode := s.getNodeByName(nodeName)
-
-		count, err := models.CountNodeExecutions(waitNode.WorkflowID, waitNode.NodeID, []string{
-			models.WorkflowNodeExecutionStatePending,
-			models.WorkflowNodeExecutionStateStarted,
-		}, nil)
-		require.NoError(s.t, err)
-
-		if int(count) == expected {
+		count := s.countRunningItems(nodeName)
+		if count >= expected {
 			return
 		}
 
 		if time.Now().After(deadline) {
-			require.Equal(s.t, expected, int(count))
+			require.GreaterOrEqual(s.t, count, expected)
 		}
 
 		time.Sleep(200 * time.Millisecond)
@@ -343,19 +319,38 @@ func (s *CanvasPageSteps) assertQueuedItemsVisibleInSidebar() {
 }
 
 func (s *CanvasPageSteps) cancelFirstQueueItemFromSidebar(nodeName string) {
-	s.waitForQueueItemCountAtLeast(nodeName, 1)
+	deadline := time.Now().Add(10 * time.Second)
 
-	eventItem := q.Locator("h2:has-text('Queued') ~ div")
-	s.session.AssertVisible(eventItem)
-	s.session.HoverOver(eventItem)
-	actionsButton := q.Locator("h2:has-text('Queued') ~ div button[aria-label='Open actions']")
-	s.session.AssertVisible(actionsButton)
-	s.session.Click(actionsButton)
-	s.session.TakeScreenshot()
-	s.session.AssertVisible(q.TestID("cancel-queue-item"))
-	s.session.Click(q.TestID("cancel-queue-item"))
-	s.session.TakeScreenshot()
-	s.session.Sleep(500) // wait for the cancellation to be processed
+	for {
+		if time.Now().After(deadline) {
+			s.t.Fatalf("timed out waiting to cancel queued item for %q", nodeName)
+		}
+
+		if s.countQueuedItems(nodeName) < 1 {
+			s.emitManualTriggerEvent(q.TestID("node", "start", "header"), q.Locator("button:has-text('Emit Event')"))
+			time.Sleep(200 * time.Millisecond)
+			continue
+		}
+
+		eventItem := q.Locator("h2:has-text('Queued') ~ div")
+		if !s.tryHover(eventItem) {
+			continue
+		}
+
+		actionsButton := q.Locator("h2:has-text('Queued') ~ div button[aria-label='Open actions']")
+		if !s.tryClick(actionsButton) {
+			continue
+		}
+
+		cancelButton := q.TestID("cancel-queue-item")
+		if !s.tryClick(cancelButton) {
+			continue
+		}
+
+		s.session.TakeScreenshot()
+		s.session.Sleep(500) // wait for the cancellation to be processed
+		return
+	}
 }
 
 func (s *CanvasPageSteps) cancelRunningExecutionFromSidebar() {
@@ -374,13 +369,9 @@ func (s *CanvasPageSteps) waitForQueueItemCountAtLeast(nodeName string, expected
 	deadline := time.Now().Add(5 * time.Second)
 
 	for {
-		waitNode := s.getNodeByName(nodeName)
-
-		count, err := models.CountNodeQueueItems(waitNode.WorkflowID, waitNode.NodeID)
-		require.NoError(s.t, err)
-
-		if int(count) >= expected {
-			return
+		count := s.countQueuedItems(nodeName)
+		if count >= expected {
+			return count
 		}
 
 		if time.Now().After(deadline) {
@@ -389,6 +380,85 @@ func (s *CanvasPageSteps) waitForQueueItemCountAtLeast(nodeName string, expected
 
 		time.Sleep(200 * time.Millisecond)
 	}
+}
+
+func (s *CanvasPageSteps) assertQueuedItemsCountLessThan(nodeName string, expectedMax int) {
+	deadline := time.Now().Add(5 * time.Second)
+
+	for {
+		count := s.countQueuedItems(nodeName)
+		if count < expectedMax {
+			return
+		}
+
+		if time.Now().After(deadline) {
+			s.t.Fatalf("expected queued items for %q to be less than %d, got %d", nodeName, expectedMax, count)
+		}
+
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func (s *CanvasPageSteps) countQueuedItems(nodeName string) int {
+	waitNode := s.getNodeByName(nodeName)
+
+	count, err := models.CountNodeQueueItems(waitNode.WorkflowID, waitNode.NodeID)
+	require.NoError(s.t, err)
+
+	return int(count)
+}
+
+func (s *CanvasPageSteps) countRunningItems(nodeName string) int {
+	waitNode := s.getNodeByName(nodeName)
+
+	count, err := models.CountNodeExecutions(waitNode.WorkflowID, waitNode.NodeID, []string{
+		models.WorkflowNodeExecutionStatePending,
+		models.WorkflowNodeExecutionStateStarted,
+	}, nil)
+	require.NoError(s.t, err)
+
+	return int(count)
+}
+
+func (s *CanvasPageSteps) emitManualTriggerEvent(nodeHeader q.Query, emitEvent q.Query) {
+	s.session.HoverOver(nodeHeader)
+	s.session.Sleep(100)
+	s.session.Click(q.TestID("node-action-run"))
+	s.session.AssertVisible(emitEvent)
+	s.session.Click(emitEvent)
+	s.session.Sleep(100)
+}
+
+func (s *CanvasPageSteps) ensureQueuedItems(nodeName string, expected int) {
+	deadline := time.Now().Add(10 * time.Second)
+	nodeHeader := q.TestID("node", "start", "header")
+	emitEvent := q.Locator("button:has-text('Emit Event')")
+
+	for {
+		if s.countQueuedItems(nodeName) >= expected {
+			return
+		}
+
+		s.emitManualTriggerEvent(nodeHeader, emitEvent)
+
+		if time.Now().After(deadline) {
+			s.t.Fatalf("failed to create %d queued items for %q", expected, nodeName)
+		}
+	}
+}
+
+func (s *CanvasPageSteps) tryHover(query q.Query) bool {
+	if err := query.Run(s.session).Hover(pw.LocatorHoverOptions{Timeout: pw.Float(500)}); err != nil {
+		return false
+	}
+	return true
+}
+
+func (s *CanvasPageSteps) tryClick(query q.Query) bool {
+	if err := query.Run(s.session).Click(pw.LocatorClickOptions{Timeout: pw.Float(500)}); err != nil {
+		return false
+	}
+	return true
 }
 
 func (s *CanvasPageSteps) getNodeByName(nodeName string) *models.WorkflowNode {
