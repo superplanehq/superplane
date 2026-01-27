@@ -128,7 +128,7 @@ func (c *AppInstallationContext) GetConfig(name string) ([]byte, error) {
 
 	integration, err := c.registry.GetIntegration(c.appInstallation.AppName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get app %s: %w", c.appInstallation.AppName, err)
+		return nil, fmt.Errorf("failed to get integration %s: %w", c.appInstallation.AppName, err)
 	}
 
 	configDef, err := findConfigDef(integration.Configuration(), name)

@@ -1,8 +1,8 @@
 import {
   AuthorizationDomainType,
-  ComponentsAppInstallationRef,
+  ComponentsIntegrationRef,
   ConfigurationField,
-  OrganizationsAppInstallation,
+  OrganizationsIntegration,
 } from "@/api-client";
 import { useCallback, useEffect, useMemo, useState, ReactNode } from "react";
 
@@ -26,15 +26,15 @@ interface SettingsTabProps {
   onSave: (
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
-    appInstallationRef?: ComponentsAppInstallationRef,
+    integrationRef?: ComponentsIntegrationRef,
   ) => void;
   onCancel?: () => void;
   domainId?: string;
   domainType?: AuthorizationDomainType;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
-  appName?: string;
-  appInstallationRef?: ComponentsAppInstallationRef;
-  installedApplications?: OrganizationsAppInstallation[];
+  integrationName?: string;
+  integrationRef?: ComponentsIntegrationRef;
+  integrations?: OrganizationsIntegration[];
   autocompleteExampleObj?: Record<string, unknown> | null;
 }
 
@@ -49,18 +49,16 @@ export function SettingsTab({
   domainId,
   domainType,
   customField,
-  appName,
-  appInstallationRef,
-  installedApplications = [],
+  integrationName,
+  integrationRef,
+  integrations = [],
   autocompleteExampleObj,
 }: SettingsTabProps) {
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(configuration || {});
   const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [showValidation, setShowValidation] = useState(false);
-  const [selectedAppInstallation, setSelectedAppInstallation] = useState<ComponentsAppInstallationRef | undefined>(
-    appInstallationRef,
-  );
+  const [selectedIntegration, setSelectedIntegration] = useState<ComponentsIntegrationRef | undefined>(integrationRef);
   // Use autocompleteExampleObj directly - current node is already filtered out
   const resolvedAutocompleteExampleObj = autocompleteExampleObj;
 
@@ -78,11 +76,11 @@ export function SettingsTab({
     return filtered;
   }, [configurationFields, defaultValues]);
 
-  // Filter installations by app name
-  const availableInstallations = useMemo(() => {
-    if (!appName) return [];
-    return installedApplications.filter((app) => app.spec?.appName === appName && app.status?.state === "ready");
-  }, [installedApplications, appName]);
+  // Filter integrations by integration type
+  const availableIntegrations = useMemo(() => {
+    if (!integrationName) return [];
+    return integrations.filter((i) => i.spec?.integrationName === integrationName && i.status?.state === "ready");
+  }, [integrations, integrationName]);
   const {
     validationErrors: realtimeValidationErrors,
     validateNow,
@@ -197,40 +195,40 @@ export function SettingsTab({
 
     setNodeConfiguration(filterVisibleFields(newConfig));
     setCurrentNodeName(nodeName);
-    setSelectedAppInstallation(appInstallationRef);
+    setSelectedIntegration(integrationRef);
     setValidationErrors(new Set());
     setShowValidation(false);
-  }, [configuration, nodeName, defaultValuesWithoutToggles, filterVisibleFields, appInstallationRef]);
+  }, [configuration, nodeName, defaultValuesWithoutToggles, filterVisibleFields, integrationRef]);
 
   // Auto-select the first installation if none is selected or selection is invalid
   useEffect(() => {
-    if (availableInstallations.length === 0) {
-      if (selectedAppInstallation) {
-        setSelectedAppInstallation(undefined);
+    if (availableIntegrations.length === 0) {
+      if (selectedIntegration) {
+        setSelectedIntegration(undefined);
       }
       return;
     }
 
-    const selectedId = selectedAppInstallation?.id;
+    const selectedId = selectedIntegration?.id;
     const hasSelected = selectedId
-      ? availableInstallations.some((installation) => installation.metadata?.id === selectedId)
+      ? availableIntegrations.some((integration) => integration.metadata?.id === selectedId)
       : false;
     if (hasSelected) {
       return;
     }
 
-    const firstInstallation = availableInstallations[0];
-    setSelectedAppInstallation({
-      id: firstInstallation.metadata?.id,
-      name: firstInstallation.metadata?.name,
+    const firstIntegration = availableIntegrations[0];
+    setSelectedIntegration({
+      id: firstIntegration.metadata?.id,
+      name: firstIntegration.metadata?.name,
     });
-  }, [availableInstallations, selectedAppInstallation]);
+  }, [availableIntegrations, selectedIntegration]);
 
-  const shouldShowConfiguration = !appName || !!selectedAppInstallation?.id;
+  const shouldShowConfiguration = !integrationName || !!selectedIntegration?.id;
 
   const handleSave = () => {
     validateNow();
-    onSave(nodeConfiguration, currentNodeName, selectedAppInstallation);
+    onSave(nodeConfiguration, currentNodeName, selectedIntegration);
   };
 
   return (
@@ -254,45 +252,45 @@ export function SettingsTab({
           />
         </div>
 
-        {/* App Installation section */}
-        {appName && (
+        {/* Integration section */}
+        {integrationName && (
           <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-            {availableInstallations.length === 0 ? (
-              // Warning when no installations available
+            {availableIntegrations.length === 0 ? (
+              // Warning when no integrations available
               <Alert className="bg-orange-50 dark:bg-amber-950">
                 <AlertTriangle className="h-4 w-4" />
-                <AlertTitle className="text-amber-900 dark:text-amber-100">App Installation Required</AlertTitle>
+                <AlertTitle className="text-amber-900 dark:text-amber-100">Integration Required</AlertTitle>
                 <AlertDescription className="text-amber-900 dark:text-amber-200">
-                  This component requires a {appName} installation.{" "}
+                  This component requires a {integrationName} integration.{" "}
                   <a
-                    href={`/${domainId}/settings/applications`}
+                    href={`/${domainId}/settings/integrations`}
                     className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800 dark:hover:text-blue-300"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    Install {appName}
+                    Create an {integrationName} integration
                   </a>{" "}
                   to configure this component.
                 </AlertDescription>
               </Alert>
             ) : (
-              // Select when installations are available
+              // Select when integrations are available
               <div className="flex flex-col gap-2">
                 <Label className="min-w-[100px] text-left">
-                  App Installation
+                  Integration
                   <span className="text-gray-800 ml-1">*</span>
-                  {showValidation && validationErrors.has("appInstallation") && (
+                  {showValidation && validationErrors.has("integration") && (
                     <span className="text-red-500 text-xs ml-2">Required</span>
                   )}
                 </Label>
                 <Select
-                  value={selectedAppInstallation?.id || ""}
+                  value={selectedIntegration?.id || ""}
                   onValueChange={(value) => {
-                    const installation = availableInstallations.find((app) => app.metadata?.id === value);
-                    if (installation) {
-                      setSelectedAppInstallation({
-                        id: installation.metadata?.id,
-                        name: installation.metadata?.name,
+                    const integration = availableIntegrations.find((i) => i.metadata?.id === value);
+                    if (integration) {
+                      setSelectedIntegration({
+                        id: integration.metadata?.id,
+                        name: integration.metadata?.name,
                       });
                     }
                   }}
@@ -301,9 +299,9 @@ export function SettingsTab({
                     <SelectValue placeholder="Select an installation" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableInstallations.map((installation) => (
-                      <SelectItem key={installation.metadata?.id} value={installation.metadata?.id || ""}>
-                        {installation.metadata?.name || "Unnamed installation"}
+                    {availableIntegrations.map((integration) => (
+                      <SelectItem key={integration.metadata?.id} value={integration.metadata?.id || ""}>
+                        {integration.metadata?.name || "Unnamed integration"}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -336,7 +334,7 @@ export function SettingsTab({
                   domainId={domainId}
                   domainType={domainType}
                   organizationId={domainId}
-                  appInstallationId={selectedAppInstallation?.id}
+                  integrationId={selectedIntegration?.id}
                   hasError={
                     showValidation &&
                     (validationErrors.has(fieldName) ||

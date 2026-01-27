@@ -524,7 +524,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Meta
 			ctx.Response,
 			ctx.Request,
 			fmt.Sprintf(
-				"%s/%s/settings/applications/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
+				"%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
 			),
 			http.StatusSeeOther,
 		)
@@ -596,7 +596,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Meta
 		ctx.Response,
 		ctx.Request,
 		fmt.Sprintf(
-			"%s/%s/settings/applications/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
+			"%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
 		),
 		http.StatusSeeOther,
 	)
@@ -623,10 +623,10 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 			"repository_hooks": "write",
 			"statuses":         "write",
 		},
-		"setup_url":    fmt.Sprintf(`%s/api/v1/apps/%s/setup`, ctx.BaseURL, ctx.InstallationID),
-		"redirect_url": fmt.Sprintf(`%s/api/v1/apps/%s/redirect`, ctx.BaseURL, ctx.InstallationID),
+		"setup_url":    fmt.Sprintf(`%s/api/v1/integrations/%s/setup`, ctx.BaseURL, ctx.InstallationID),
+		"redirect_url": fmt.Sprintf(`%s/api/v1/integrations/%s/redirect`, ctx.BaseURL, ctx.InstallationID),
 		"hook_attributes": map[string]any{
-			"url": fmt.Sprintf(`%s/api/v1/apps/%s/webhook`, ctx.WebhooksBaseURL, ctx.InstallationID),
+			"url": fmt.Sprintf(`%s/api/v1/integrations/%s/webhook`, ctx.WebhooksBaseURL, ctx.InstallationID),
 		},
 	}
 

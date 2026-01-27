@@ -33,10 +33,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
-	pbApplications "github.com/superplanehq/superplane/pkg/protos/applications"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
+	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbMe "github.com/superplanehq/superplane/pkg/protos/me"
 	pbOrg "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
@@ -191,7 +191,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
-	err = pbApplications.RegisterApplicationsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbIntegrations.RegisterIntegrationsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
 	}
@@ -250,7 +250,6 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/organizations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/invite-links").Handler(protectedAccountGRPCHandler)
 	s.Router.PathPrefix("/api/v1/integrations").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/applications").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/secrets").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/me").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/components").Handler(protectedGRPCHandler)
@@ -413,9 +412,9 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 
 	//
 	// HTTP endpoints for app installations
-	// Match all paths under /apps/{installationID}/ including subpaths
+	// Match all paths under /integrations/{integrationID}/ including subpaths
 	//
-	r.PathPrefix(s.BasePath+"/apps/{installationID}").HandlerFunc(s.HandleAppInstallationRequest).
+	r.PathPrefix(s.BasePath+"/integrations/{integrationID}").HandlerFunc(s.HandleIntegrationRequest).
 		Methods("GET", "POST")
 
 	// Account-based endpoints (use account session, not organization context)
@@ -473,48 +472,48 @@ func respondJSON(w http.ResponseWriter, payload any) {
 	}
 }
 
-func (s *Server) HandleAppInstallationRequest(w http.ResponseWriter, r *http.Request) {
+func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 
-	installationIDFromRequest := vars["installationID"]
-	installationID, err := uuid.Parse(installationIDFromRequest)
+	integrationIDFromRequest := vars["integrationID"]
+	integrationID, err := uuid.Parse(integrationIDFromRequest)
+	if err != nil {
+		http.Error(w, "integration not found", http.StatusNotFound)
+		return
+	}
+
+	integrationInstance, err := models.FindUnscopedAppInstallation(integrationID)
 	if err != nil {
 		http.Error(w, "installation not found", http.StatusNotFound)
 		return
 	}
 
-	appInstallation, err := models.FindUnscopedAppInstallation(installationID)
-	if err != nil {
-		http.Error(w, "installation not found", http.StatusNotFound)
-		return
-	}
-
-	integration, err := s.registry.GetIntegration(appInstallation.AppName)
+	integration, err := s.registry.GetIntegration(integrationInstance.AppName)
 	if err != nil {
 		http.Error(w, "app not found", http.StatusNotFound)
 		return
 	}
 
 	integration.HandleRequest(core.HTTPRequestContext{
-		Logger:          logging.ForAppInstallation(*appInstallation),
+		Logger:          logging.ForAppInstallation(*integrationInstance),
 		Request:         r,
 		Response:        w,
 		BaseURL:         s.BaseURL,
 		WebhooksBaseURL: s.WebhooksBaseURL,
-		OrganizationID:  appInstallation.OrganizationID.String(),
+		OrganizationID:  integrationInstance.OrganizationID.String(),
 		HTTP:            contexts.NewHTTPContext(s.registry.GetHTTPClient()),
 		Integration: contexts.NewAppInstallationContext(
 			database.Conn(),
 			nil,
-			appInstallation,
+			integrationInstance,
 			s.encryptor,
 			s.registry,
 		),
 	})
 
-	err = database.Conn().Save(&appInstallation).Error
+	err = database.Conn().Save(&integrationInstance).Error
 	if err != nil {
-		http.Error(w, "installation not found", http.StatusNotFound)
+		http.Error(w, "integration not found", http.StatusNotFound)
 		return
 	}
 }

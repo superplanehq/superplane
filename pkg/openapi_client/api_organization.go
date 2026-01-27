@@ -181,6 +181,129 @@ func (a *OrganizationAPIService) OrganizationsAcceptInviteLinkExecute(r ApiOrgan
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiOrganizationsCreateIntegrationRequest struct {
+	ctx        context.Context
+	ApiService *OrganizationAPIService
+	id         string
+	body       *OrganizationsCreateIntegrationBody
+}
+
+func (r ApiOrganizationsCreateIntegrationRequest) Body(body OrganizationsCreateIntegrationBody) ApiOrganizationsCreateIntegrationRequest {
+	r.body = &body
+	return r
+}
+
+func (r ApiOrganizationsCreateIntegrationRequest) Execute() (*OrganizationsCreateIntegrationResponse, *http.Response, error) {
+	return r.ApiService.OrganizationsCreateIntegrationExecute(r)
+}
+
+/*
+OrganizationsCreateIntegration Create organization integration
+
+Create an organization integration
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id
+	@return ApiOrganizationsCreateIntegrationRequest
+*/
+func (a *OrganizationAPIService) OrganizationsCreateIntegration(ctx context.Context, id string) ApiOrganizationsCreateIntegrationRequest {
+	return ApiOrganizationsCreateIntegrationRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+	}
+}
+
+// Execute executes the request
+//
+//	@return OrganizationsCreateIntegrationResponse
+func (a *OrganizationAPIService) OrganizationsCreateIntegrationExecute(r ApiOrganizationsCreateIntegrationRequest) (*OrganizationsCreateIntegrationResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *OrganizationsCreateIntegrationResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsCreateIntegration")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/organizations/{id}/integrations"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.body == nil {
+		return localVarReturnValue, nil, reportError("body is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.body
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
 type ApiOrganizationsCreateInvitationRequest struct {
 	ctx        context.Context
 	ApiService *OrganizationAPIService
@@ -259,6 +382,122 @@ func (a *OrganizationAPIService) OrganizationsCreateInvitationExecute(r ApiOrgan
 	}
 	// body params
 	localVarPostBody = r.body
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiOrganizationsDeleteIntegrationRequest struct {
+	ctx           context.Context
+	ApiService    *OrganizationAPIService
+	id            string
+	integrationId string
+}
+
+func (r ApiOrganizationsDeleteIntegrationRequest) Execute() (map[string]interface{}, *http.Response, error) {
+	return r.ApiService.OrganizationsDeleteIntegrationExecute(r)
+}
+
+/*
+OrganizationsDeleteIntegration Delete organization integration
+
+Deletes an integration from an organization
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id
+	@param integrationId
+	@return ApiOrganizationsDeleteIntegrationRequest
+*/
+func (a *OrganizationAPIService) OrganizationsDeleteIntegration(ctx context.Context, id string, integrationId string) ApiOrganizationsDeleteIntegrationRequest {
+	return ApiOrganizationsDeleteIntegrationRequest{
+		ApiService:    a,
+		ctx:           ctx,
+		id:            id,
+		integrationId: integrationId,
+	}
+}
+
+// Execute executes the request
+//
+//	@return map[string]interface{}
+func (a *OrganizationAPIService) OrganizationsDeleteIntegrationExecute(r ApiOrganizationsDeleteIntegrationRequest) (map[string]interface{}, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodDelete
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue map[string]interface{}
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsDeleteIntegration")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/organizations/{id}/integrations/{integrationId}"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"integrationId"+"}", url.PathEscape(parameterValueToString(r.integrationId, "integrationId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -416,55 +655,55 @@ func (a *OrganizationAPIService) OrganizationsDeleteOrganizationExecute(r ApiOrg
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiOrganizationsDescribeApplicationRequest struct {
-	ctx            context.Context
-	ApiService     *OrganizationAPIService
-	id             string
-	installationId string
+type ApiOrganizationsDescribeIntegrationRequest struct {
+	ctx           context.Context
+	ApiService    *OrganizationAPIService
+	id            string
+	integrationId string
 }
 
-func (r ApiOrganizationsDescribeApplicationRequest) Execute() (*OrganizationsDescribeApplicationResponse, *http.Response, error) {
-	return r.ApiService.OrganizationsDescribeApplicationExecute(r)
+func (r ApiOrganizationsDescribeIntegrationRequest) Execute() (*OrganizationsDescribeIntegrationResponse, *http.Response, error) {
+	return r.ApiService.OrganizationsDescribeIntegrationExecute(r)
 }
 
 /*
-OrganizationsDescribeApplication Describe an application in an organization
+OrganizationsDescribeIntegration Describe an integration in an organization
 
-Returns details of a specific application in an organization
+Returns details of a specific integration in an organization
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id
-	@param installationId
-	@return ApiOrganizationsDescribeApplicationRequest
+	@param integrationId
+	@return ApiOrganizationsDescribeIntegrationRequest
 */
-func (a *OrganizationAPIService) OrganizationsDescribeApplication(ctx context.Context, id string, installationId string) ApiOrganizationsDescribeApplicationRequest {
-	return ApiOrganizationsDescribeApplicationRequest{
-		ApiService:     a,
-		ctx:            ctx,
-		id:             id,
-		installationId: installationId,
+func (a *OrganizationAPIService) OrganizationsDescribeIntegration(ctx context.Context, id string, integrationId string) ApiOrganizationsDescribeIntegrationRequest {
+	return ApiOrganizationsDescribeIntegrationRequest{
+		ApiService:    a,
+		ctx:           ctx,
+		id:            id,
+		integrationId: integrationId,
 	}
 }
 
 // Execute executes the request
 //
-//	@return OrganizationsDescribeApplicationResponse
-func (a *OrganizationAPIService) OrganizationsDescribeApplicationExecute(r ApiOrganizationsDescribeApplicationRequest) (*OrganizationsDescribeApplicationResponse, *http.Response, error) {
+//	@return OrganizationsDescribeIntegrationResponse
+func (a *OrganizationAPIService) OrganizationsDescribeIntegrationExecute(r ApiOrganizationsDescribeIntegrationRequest) (*OrganizationsDescribeIntegrationResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodGet
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *OrganizationsDescribeApplicationResponse
+		localVarReturnValue *OrganizationsDescribeIntegrationResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsDescribeApplication")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsDescribeIntegration")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/organizations/{id}/applications/{installationId}"
+	localVarPath := localBasePath + "/api/v1/organizations/{id}/integrations/{integrationId}"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"installationId"+"}", url.PathEscape(parameterValueToString(r.installationId, "installationId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"integrationId"+"}", url.PathEscape(parameterValueToString(r.integrationId, "integrationId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -756,184 +995,61 @@ func (a *OrganizationAPIService) OrganizationsGetInviteLinkExecute(r ApiOrganiza
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiOrganizationsInstallApplicationRequest struct {
-	ctx        context.Context
-	ApiService *OrganizationAPIService
-	id         string
-	body       *OrganizationsInstallApplicationBody
+type ApiOrganizationsListIntegrationResourcesRequest struct {
+	ctx           context.Context
+	ApiService    *OrganizationAPIService
+	id            string
+	integrationId string
+	type_         *string
 }
 
-func (r ApiOrganizationsInstallApplicationRequest) Body(body OrganizationsInstallApplicationBody) ApiOrganizationsInstallApplicationRequest {
-	r.body = &body
-	return r
-}
-
-func (r ApiOrganizationsInstallApplicationRequest) Execute() (*OrganizationsInstallApplicationResponse, *http.Response, error) {
-	return r.ApiService.OrganizationsInstallApplicationExecute(r)
-}
-
-/*
-OrganizationsInstallApplication Install application on organization
-
-Install an application on an organization
-
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id
-	@return ApiOrganizationsInstallApplicationRequest
-*/
-func (a *OrganizationAPIService) OrganizationsInstallApplication(ctx context.Context, id string) ApiOrganizationsInstallApplicationRequest {
-	return ApiOrganizationsInstallApplicationRequest{
-		ApiService: a,
-		ctx:        ctx,
-		id:         id,
-	}
-}
-
-// Execute executes the request
-//
-//	@return OrganizationsInstallApplicationResponse
-func (a *OrganizationAPIService) OrganizationsInstallApplicationExecute(r ApiOrganizationsInstallApplicationRequest) (*OrganizationsInstallApplicationResponse, *http.Response, error) {
-	var (
-		localVarHTTPMethod  = http.MethodPost
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *OrganizationsInstallApplicationResponse
-	)
-
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsInstallApplication")
-	if err != nil {
-		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
-	}
-
-	localVarPath := localBasePath + "/api/v1/organizations/{id}/applications"
-	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := url.Values{}
-	localVarFormParams := url.Values{}
-	if r.body == nil {
-		return localVarReturnValue, nil, reportError("body is required and must be specified")
-	}
-
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{"application/json"}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	// body params
-	localVarPostBody = r.body
-	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
-	if err != nil {
-		return localVarReturnValue, nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(req)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
-	if err != nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-	if err != nil {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: err.Error(),
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	return localVarReturnValue, localVarHTTPResponse, nil
-}
-
-type ApiOrganizationsListApplicationResourcesRequest struct {
-	ctx            context.Context
-	ApiService     *OrganizationAPIService
-	id             string
-	installationId string
-	type_          *string
-}
-
-func (r ApiOrganizationsListApplicationResourcesRequest) Type_(type_ string) ApiOrganizationsListApplicationResourcesRequest {
+func (r ApiOrganizationsListIntegrationResourcesRequest) Type_(type_ string) ApiOrganizationsListIntegrationResourcesRequest {
 	r.type_ = &type_
 	return r
 }
 
-func (r ApiOrganizationsListApplicationResourcesRequest) Execute() (*OrganizationsListApplicationResourcesResponse, *http.Response, error) {
-	return r.ApiService.OrganizationsListApplicationResourcesExecute(r)
+func (r ApiOrganizationsListIntegrationResourcesRequest) Execute() (*OrganizationsListIntegrationResourcesResponse, *http.Response, error) {
+	return r.ApiService.OrganizationsListIntegrationResourcesExecute(r)
 }
 
 /*
-OrganizationsListApplicationResources List application resources
+OrganizationsListIntegrationResources List integration resources
 
-Lists resources for an application installation
+Lists resources for an integration
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id
-	@param installationId
-	@return ApiOrganizationsListApplicationResourcesRequest
+	@param integrationId
+	@return ApiOrganizationsListIntegrationResourcesRequest
 */
-func (a *OrganizationAPIService) OrganizationsListApplicationResources(ctx context.Context, id string, installationId string) ApiOrganizationsListApplicationResourcesRequest {
-	return ApiOrganizationsListApplicationResourcesRequest{
-		ApiService:     a,
-		ctx:            ctx,
-		id:             id,
-		installationId: installationId,
+func (a *OrganizationAPIService) OrganizationsListIntegrationResources(ctx context.Context, id string, integrationId string) ApiOrganizationsListIntegrationResourcesRequest {
+	return ApiOrganizationsListIntegrationResourcesRequest{
+		ApiService:    a,
+		ctx:           ctx,
+		id:            id,
+		integrationId: integrationId,
 	}
 }
 
 // Execute executes the request
 //
-//	@return OrganizationsListApplicationResourcesResponse
-func (a *OrganizationAPIService) OrganizationsListApplicationResourcesExecute(r ApiOrganizationsListApplicationResourcesRequest) (*OrganizationsListApplicationResourcesResponse, *http.Response, error) {
+//	@return OrganizationsListIntegrationResourcesResponse
+func (a *OrganizationAPIService) OrganizationsListIntegrationResourcesExecute(r ApiOrganizationsListIntegrationResourcesRequest) (*OrganizationsListIntegrationResourcesResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodGet
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *OrganizationsListApplicationResourcesResponse
+		localVarReturnValue *OrganizationsListIntegrationResourcesResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsListApplicationResources")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsListIntegrationResources")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/organizations/{id}/applications/{installationId}/resources"
+	localVarPath := localBasePath + "/api/v1/organizations/{id}/integrations/{integrationId}/resources"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"installationId"+"}", url.PathEscape(parameterValueToString(r.installationId, "installationId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"integrationId"+"}", url.PathEscape(parameterValueToString(r.integrationId, "integrationId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -1004,27 +1120,27 @@ func (a *OrganizationAPIService) OrganizationsListApplicationResourcesExecute(r 
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiOrganizationsListApplicationsRequest struct {
+type ApiOrganizationsListIntegrationsRequest struct {
 	ctx        context.Context
 	ApiService *OrganizationAPIService
 	id         string
 }
 
-func (r ApiOrganizationsListApplicationsRequest) Execute() (*SuperplaneOrganizationsListApplicationsResponse, *http.Response, error) {
-	return r.ApiService.OrganizationsListApplicationsExecute(r)
+func (r ApiOrganizationsListIntegrationsRequest) Execute() (*SuperplaneOrganizationsListIntegrationsResponse, *http.Response, error) {
+	return r.ApiService.OrganizationsListIntegrationsExecute(r)
 }
 
 /*
-OrganizationsListApplications List applications in an organization
+OrganizationsListIntegrations List integrations in an organization
 
-Returns a list of applications in an organization
+Returns a list of integrations in an organization
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id
-	@return ApiOrganizationsListApplicationsRequest
+	@return ApiOrganizationsListIntegrationsRequest
 */
-func (a *OrganizationAPIService) OrganizationsListApplications(ctx context.Context, id string) ApiOrganizationsListApplicationsRequest {
-	return ApiOrganizationsListApplicationsRequest{
+func (a *OrganizationAPIService) OrganizationsListIntegrations(ctx context.Context, id string) ApiOrganizationsListIntegrationsRequest {
+	return ApiOrganizationsListIntegrationsRequest{
 		ApiService: a,
 		ctx:        ctx,
 		id:         id,
@@ -1033,21 +1149,21 @@ func (a *OrganizationAPIService) OrganizationsListApplications(ctx context.Conte
 
 // Execute executes the request
 //
-//	@return SuperplaneOrganizationsListApplicationsResponse
-func (a *OrganizationAPIService) OrganizationsListApplicationsExecute(r ApiOrganizationsListApplicationsRequest) (*SuperplaneOrganizationsListApplicationsResponse, *http.Response, error) {
+//	@return SuperplaneOrganizationsListIntegrationsResponse
+func (a *OrganizationAPIService) OrganizationsListIntegrationsExecute(r ApiOrganizationsListIntegrationsRequest) (*SuperplaneOrganizationsListIntegrationsResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodGet
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *SuperplaneOrganizationsListApplicationsResponse
+		localVarReturnValue *SuperplaneOrganizationsListIntegrationsResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsListApplications")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsListIntegrations")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/organizations/{id}/applications"
+	localVarPath := localBasePath + "/api/v1/organizations/{id}/integrations"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -1572,177 +1688,61 @@ func (a *OrganizationAPIService) OrganizationsResetInviteLinkExecute(r ApiOrgani
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiOrganizationsUninstallApplicationRequest struct {
-	ctx            context.Context
-	ApiService     *OrganizationAPIService
-	id             string
-	installationId string
+type ApiOrganizationsUpdateIntegrationRequest struct {
+	ctx           context.Context
+	ApiService    *OrganizationAPIService
+	id            string
+	integrationId string
+	body          *OrganizationsUpdateIntegrationBody
 }
 
-func (r ApiOrganizationsUninstallApplicationRequest) Execute() (map[string]interface{}, *http.Response, error) {
-	return r.ApiService.OrganizationsUninstallApplicationExecute(r)
-}
-
-/*
-OrganizationsUninstallApplication Uninstall application
-
-Uninstalls an application from an organization
-
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param id
-	@param installationId
-	@return ApiOrganizationsUninstallApplicationRequest
-*/
-func (a *OrganizationAPIService) OrganizationsUninstallApplication(ctx context.Context, id string, installationId string) ApiOrganizationsUninstallApplicationRequest {
-	return ApiOrganizationsUninstallApplicationRequest{
-		ApiService:     a,
-		ctx:            ctx,
-		id:             id,
-		installationId: installationId,
-	}
-}
-
-// Execute executes the request
-//
-//	@return map[string]interface{}
-func (a *OrganizationAPIService) OrganizationsUninstallApplicationExecute(r ApiOrganizationsUninstallApplicationRequest) (map[string]interface{}, *http.Response, error) {
-	var (
-		localVarHTTPMethod  = http.MethodDelete
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue map[string]interface{}
-	)
-
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsUninstallApplication")
-	if err != nil {
-		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
-	}
-
-	localVarPath := localBasePath + "/api/v1/organizations/{id}/applications/{installationId}"
-	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"installationId"+"}", url.PathEscape(parameterValueToString(r.installationId, "installationId")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := url.Values{}
-	localVarFormParams := url.Values{}
-
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
-	if err != nil {
-		return localVarReturnValue, nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(req)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
-	if err != nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-	if err != nil {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: err.Error(),
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	return localVarReturnValue, localVarHTTPResponse, nil
-}
-
-type ApiOrganizationsUpdateApplicationRequest struct {
-	ctx            context.Context
-	ApiService     *OrganizationAPIService
-	id             string
-	installationId string
-	body           *OrganizationsUpdateApplicationBody
-}
-
-func (r ApiOrganizationsUpdateApplicationRequest) Body(body OrganizationsUpdateApplicationBody) ApiOrganizationsUpdateApplicationRequest {
+func (r ApiOrganizationsUpdateIntegrationRequest) Body(body OrganizationsUpdateIntegrationBody) ApiOrganizationsUpdateIntegrationRequest {
 	r.body = &body
 	return r
 }
 
-func (r ApiOrganizationsUpdateApplicationRequest) Execute() (*OrganizationsUpdateApplicationResponse, *http.Response, error) {
-	return r.ApiService.OrganizationsUpdateApplicationExecute(r)
+func (r ApiOrganizationsUpdateIntegrationRequest) Execute() (*OrganizationsUpdateIntegrationResponse, *http.Response, error) {
+	return r.ApiService.OrganizationsUpdateIntegrationExecute(r)
 }
 
 /*
-OrganizationsUpdateApplication Update application installation
+OrganizationsUpdateIntegration Update integration
 
-Updates the configuration of an installed application
+Updates the configuration for an organization integration
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@param id
-	@param installationId
-	@return ApiOrganizationsUpdateApplicationRequest
+	@param integrationId
+	@return ApiOrganizationsUpdateIntegrationRequest
 */
-func (a *OrganizationAPIService) OrganizationsUpdateApplication(ctx context.Context, id string, installationId string) ApiOrganizationsUpdateApplicationRequest {
-	return ApiOrganizationsUpdateApplicationRequest{
-		ApiService:     a,
-		ctx:            ctx,
-		id:             id,
-		installationId: installationId,
+func (a *OrganizationAPIService) OrganizationsUpdateIntegration(ctx context.Context, id string, integrationId string) ApiOrganizationsUpdateIntegrationRequest {
+	return ApiOrganizationsUpdateIntegrationRequest{
+		ApiService:    a,
+		ctx:           ctx,
+		id:            id,
+		integrationId: integrationId,
 	}
 }
 
 // Execute executes the request
 //
-//	@return OrganizationsUpdateApplicationResponse
-func (a *OrganizationAPIService) OrganizationsUpdateApplicationExecute(r ApiOrganizationsUpdateApplicationRequest) (*OrganizationsUpdateApplicationResponse, *http.Response, error) {
+//	@return OrganizationsUpdateIntegrationResponse
+func (a *OrganizationAPIService) OrganizationsUpdateIntegrationExecute(r ApiOrganizationsUpdateIntegrationRequest) (*OrganizationsUpdateIntegrationResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodPatch
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *OrganizationsUpdateApplicationResponse
+		localVarReturnValue *OrganizationsUpdateIntegrationResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsUpdateApplication")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsUpdateIntegration")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/organizations/{id}/applications/{installationId}"
+	localVarPath := localBasePath + "/api/v1/organizations/{id}/integrations/{integrationId}"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"installationId"+"}", url.PathEscape(parameterValueToString(r.installationId, "installationId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"integrationId"+"}", url.PathEscape(parameterValueToString(r.integrationId, "integrationId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

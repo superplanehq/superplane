@@ -18,14 +18,14 @@ import { SettingsTab } from "./SettingsTab";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import {
   AuthorizationDomainType,
-  ComponentsAppInstallationRef,
-  OrganizationsAppInstallation,
   ConfigurationField,
   WorkflowsWorkflowNodeExecution,
   ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
   BlueprintsBlueprint,
+  OrganizationsIntegration,
+  ComponentsIntegrationRef,
 } from "@/api-client";
 import { EventState, EventStateMap } from "../componentBase";
 import { ReactNode } from "react";
@@ -128,15 +128,15 @@ interface ComponentSidebarProps {
   onNodeConfigSave?: (
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
-    appInstallationRef?: ComponentsAppInstallationRef,
+    integrationRef?: ComponentsIntegrationRef,
   ) => void;
   onNodeConfigCancel?: () => void;
   domainId?: string;
   domainType?: AuthorizationDomainType;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
-  appName?: string;
-  appInstallationRef?: ComponentsAppInstallationRef;
-  installedApplications?: OrganizationsAppInstallation[];
+  integrationName?: string;
+  integrationRef?: ComponentsIntegrationRef;
+  integrations?: OrganizationsIntegration[];
   autocompleteExampleObj?: Record<string, unknown> | null;
 
   // Workflow metadata for ExecutionChainPage
@@ -213,9 +213,9 @@ export const ComponentSidebar = ({
   domainId,
   domainType,
   customField,
-  appName,
-  appInstallationRef,
-  installedApplications,
+  integrationName,
+  integrationRef,
+  integrations,
   autocompleteExampleObj,
   workflowNodes = [],
   components = [],
@@ -640,9 +640,9 @@ export const ComponentSidebar = ({
                   domainId={domainId}
                   domainType={domainType}
                   customField={customField}
-                  appName={appName}
-                  appInstallationRef={appInstallationRef}
-                  installedApplications={installedApplications}
+                  integrationName={integrationName}
+                  integrationRef={integrationRef}
+                  integrations={integrations}
                   autocompleteExampleObj={resolvedAutocompleteExampleObj}
                 />
               </TabsContent>

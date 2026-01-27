@@ -17,14 +17,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
-  ComponentsAppInstallationRef,
-  OrganizationsAppInstallation,
   ConfigurationField,
   WorkflowsWorkflowNodeExecution,
   ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
   BlueprintsBlueprint,
+  ComponentsIntegrationRef,
+  OrganizationsIntegration,
 } from "@/api-client";
 import { parseDefaultValues } from "@/utils/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
@@ -94,9 +94,9 @@ export interface NodeEditData {
   displayLabel?: string;
   configuration: Record<string, any>;
   configurationFields: ConfigurationField[];
-  appName?: string;
+  integrationName?: string;
   blockName?: string;
-  appInstallationRef?: ComponentsAppInstallationRef;
+  integrationRef?: ComponentsIntegrationRef;
 }
 
 export interface NewNodeData {
@@ -106,8 +106,8 @@ export interface NewNodeData {
   displayLabel?: string;
   configuration: Record<string, any>;
   position?: { x: number; y: number };
-  appName?: string;
-  appInstallationRef?: ComponentsAppInstallationRef;
+  integrationName?: string;
+  integrationRef?: ComponentsIntegrationRef;
   sourceConnection?: {
     nodeId: string;
     handleId: string | null;
@@ -147,7 +147,7 @@ export interface CanvasPageProps {
     nodeId: string,
     configuration: Record<string, any>,
     nodeName: string,
-    appInstallationRef?: ComponentsAppInstallationRef,
+    integrationRef?: ComponentsIntegrationRef,
   ) => void;
   onAnnotationUpdate?: (
     nodeId: string,
@@ -156,7 +156,7 @@ export interface CanvasPageProps {
   onAnnotationBlur?: () => void;
   getCustomField?: (nodeId: string) => ((configuration: Record<string, unknown>) => React.ReactNode) | null;
   onSave?: (nodes: CanvasNode[]) => void;
-  installedApplications?: OrganizationsAppInstallation[];
+  integrations?: OrganizationsIntegration[];
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   onNodeDelete?: (nodeId: string) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
@@ -194,7 +194,7 @@ export interface CanvasPageProps {
     buildingBlock: BuildingBlock;
     nodeName: string;
     configuration: Record<string, any>;
-    appName?: string;
+    integrationName?: string;
   }) => Promise<void>;
 
   // Refs to persist state across re-renders
@@ -510,7 +510,7 @@ function CanvasPage(props: CanvasPageProps) {
           buildingBlock: block,
           nodeName: block.name || "",
           configuration: defaultConfiguration,
-          appName: block.appName,
+          integrationName: block.integrationName,
         });
 
         setTemplateNodeId(null);
@@ -534,7 +534,7 @@ function CanvasPage(props: CanvasPageProps) {
             sourceConnection: pendingNode.data.sourceConnection as
               | { nodeId: string; handleId: string | null }
               | undefined,
-            appName: block.appName,
+            integrationName: block.integrationName,
           });
 
           // Remove pending node
@@ -671,7 +671,7 @@ function CanvasPage(props: CanvasPageProps) {
           nodeName: block.name || "",
           configuration: defaultConfiguration,
           position,
-          appName: block.appName,
+          integrationName: block.integrationName,
         });
 
         // Close building blocks sidebar
@@ -698,9 +698,9 @@ function CanvasPage(props: CanvasPageProps) {
   );
 
   const handleSaveConfiguration = useCallback(
-    (configuration: Record<string, any>, nodeName: string, appInstallationRef?: ComponentsAppInstallationRef) => {
+    (configuration: Record<string, any>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
       if (editingNodeData && props.onNodeConfigurationSave) {
-        props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, appInstallationRef);
+        props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef);
         // Close the component sidebar after saving
         state.componentSidebar.close();
       }
@@ -889,7 +889,7 @@ function CanvasPage(props: CanvasPageProps) {
             onTabChange={setCurrentTab}
             organizationId={props.organizationId}
             getCustomField={props.getCustomField}
-            installedApplications={props.installedApplications}
+            integrations={props.integrations}
             workflowNodes={props.workflowNodes}
             components={props.components}
             triggers={props.triggers}
@@ -959,7 +959,7 @@ function Sidebar({
   onTabChange,
   organizationId,
   getCustomField,
-  installedApplications,
+  integrations,
   workflowNodes,
   components,
   triggers,
@@ -1008,7 +1008,7 @@ function Sidebar({
   onTabChange?: (tab: "latest" | "settings") => void;
   organizationId?: string;
   getCustomField?: (nodeId: string) => ((configuration: Record<string, unknown>) => React.ReactNode) | null;
-  installedApplications?: OrganizationsAppInstallation[];
+  integrations?: OrganizationsIntegration[];
   workflowNodes?: ComponentsNode[];
   components?: ComponentsComponent[];
   triggers?: TriggersTrigger[];
@@ -1144,9 +1144,9 @@ function Sidebar({
           ? getCustomField(state.componentSidebar.selectedNodeId) || undefined
           : undefined
       }
-      appName={editingNodeData?.appName}
-      appInstallationRef={editingNodeData?.appInstallationRef}
-      installedApplications={installedApplications}
+      integrationName={editingNodeData?.integrationName}
+      integrationRef={editingNodeData?.integrationRef}
+      integrations={integrations}
       autocompleteExampleObj={autocompleteExampleObj}
       currentTab={isAnnotationNode ? "settings" : currentTab}
       onTabChange={onTabChange}

@@ -2,7 +2,7 @@ import { AutoCompleteSelect, type AutoCompleteOption } from "@/components/AutoCo
 import { MultiCombobox, MultiComboboxLabel } from "@/components/MultiCombobox/multi-combobox";
 import { Select, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfigurationField } from "../../api-client";
-import { useApplicationResources } from "@/hooks/useApplications";
+import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { toTestId } from "@/utils/testID";
 import { useEffect, useMemo } from "react";
 
@@ -11,7 +11,7 @@ interface AppInstallationResourceFieldRendererProps {
   value: string | string[] | undefined;
   onChange: (value: string | string[] | undefined) => void;
   organizationId?: string;
-  appInstallationId?: string;
+  integrationId?: string;
 }
 
 type SelectOption = {
@@ -25,7 +25,7 @@ export const AppInstallationResourceFieldRenderer = ({
   value,
   onChange,
   organizationId,
-  appInstallationId,
+  integrationId,
 }: AppInstallationResourceFieldRendererProps) => {
   const resourceType = field.typeOptions?.resource?.type;
   const useNameAsValue = field.typeOptions?.resource?.useNameAsValue ?? false;
@@ -36,7 +36,7 @@ export const AppInstallationResourceFieldRenderer = ({
     data: resources,
     isLoading: isLoadingResources,
     error: resourcesError,
-  } = useApplicationResources(organizationId ?? "", appInstallationId ?? "", resourceType ?? "");
+  } = useIntegrationResources(organizationId ?? "", integrationId ?? "", resourceType ?? "");
 
   // All hooks must be called before any early returns
   // Multi-select options (always compute, even if not used)
@@ -88,10 +88,10 @@ export const AppInstallationResourceFieldRenderer = ({
   }, [isMulti, value, field.defaultValue, onChange]);
 
   // Now we can do early returns
-  if (!organizationId || !appInstallationId) {
+  if (!organizationId || !integrationId) {
     return (
       <div className="text-sm text-red-500 dark:text-red-400">
-        App installation resource field requires organizationId and appInstallationId props
+        Integration resource field requires organizationId and integrationId props
       </div>
     );
   }

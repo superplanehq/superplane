@@ -3,7 +3,7 @@ import {
   TriggersTrigger,
   ComponentsComponent,
   BlueprintsBlueprint,
-  ApplicationsApplicationDefinition,
+  IntegrationsIntegrationDefinition,
 } from "@/api-client";
 import { mockBuildingBlockCategories } from "@/ui/CanvasPage/storybooks/buildingBlocks";
 
@@ -12,7 +12,7 @@ export function buildBuildingBlockCategories(
   triggers: TriggersTrigger[],
   components: ComponentsComponent[],
   blueprints: BlueprintsBlueprint[],
-  availableApplications: ApplicationsApplicationDefinition[],
+  availableIntegrations: IntegrationsIntegrationDefinition[],
 ): BuildingBlockCategory[] {
   const deprecatedTriggerNames = new Set(["github", "semaphore"]);
   const deprecatedComponentNames = new Set(["semaphore"]);
@@ -70,12 +70,12 @@ export function buildBuildingBlockCategories(
   ];
 
   // Add a category for each available application with its components and triggers
-  availableApplications.forEach((app) => {
+  availableIntegrations.forEach((integration) => {
     const blocks: BuildingBlock[] = [];
 
-    // Add triggers from this application
-    if (app.triggers) {
-      app.triggers.forEach((t) => {
+    // Add triggers from this integration
+    if (integration.triggers) {
+      integration.triggers.forEach((t) => {
         blocks.push({
           name: t.name!,
           label: t.label,
@@ -85,14 +85,14 @@ export function buildBuildingBlockCategories(
           icon: t.icon,
           color: t.color,
           isLive: true,
-          appName: app.name,
+          integrationName: integration.name,
         });
       });
     }
 
     // Add components from this application
-    if (app.components) {
-      app.components.forEach((c) => {
+    if (integration.components) {
+      integration.components.forEach((c) => {
         blocks.push({
           name: c.name!,
           label: c.label,
@@ -103,7 +103,7 @@ export function buildBuildingBlockCategories(
           icon: c.icon,
           color: c.color,
           isLive: true,
-          appName: app.name,
+          integrationName: integration.name,
         });
       });
     }
@@ -111,7 +111,7 @@ export function buildBuildingBlockCategories(
     // Only add the category if there are blocks
     if (blocks.length > 0) {
       liveCategories.push({
-        name: app.label || "Unknown Application",
+        name: integration.label || "Unknown Integration",
         blocks,
       });
     }
