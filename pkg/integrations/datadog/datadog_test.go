@@ -25,8 +25,8 @@ func Test__Datadog__Sync(t *testing.T) {
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			Integration:   appCtx,
 		})
 
 		require.ErrorContains(t, err, "site is required")
@@ -42,8 +42,8 @@ func Test__Datadog__Sync(t *testing.T) {
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			Integration:   appCtx,
 		})
 
 		require.ErrorContains(t, err, "apiKey is required")
@@ -59,8 +59,8 @@ func Test__Datadog__Sync(t *testing.T) {
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			Integration:   appCtx,
 		})
 
 		require.ErrorContains(t, err, "appKey is required")
@@ -85,9 +85,9 @@ func Test__Datadog__Sync(t *testing.T) {
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   appCtx,
 		})
 
 		require.NoError(t, err)
@@ -117,9 +117,9 @@ func Test__Datadog__Sync(t *testing.T) {
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   appCtx,
 		})
 
 		require.NoError(t, err)
@@ -146,9 +146,9 @@ func Test__Datadog__Sync(t *testing.T) {
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
+			Configuration: appCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   appCtx,
 		})
 
 		require.Error(t, err)
@@ -194,9 +194,9 @@ func Test__Datadog__Configuration(t *testing.T) {
 	assert.True(t, appKeyField.Sensitive)
 }
 
-func Test__Datadog__InstallationInstructions(t *testing.T) {
+func Test__Datadog__Instructions(t *testing.T) {
 	d := &Datadog{}
-	instructions := d.InstallationInstructions()
+	instructions := d.Instructions()
 
 	assert.NotEmpty(t, instructions)
 	assert.Contains(t, instructions, "X-Superplane-Signature-256")

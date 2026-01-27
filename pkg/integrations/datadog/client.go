@@ -17,7 +17,7 @@ type Client struct {
 	http    core.HTTPContext
 }
 
-func NewClient(http core.HTTPContext, ctx core.AppInstallationContext) (*Client, error) {
+func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
 	apiKey, err := ctx.GetConfig("apiKey")
 	if err != nil {
 		return nil, fmt.Errorf("error getting apiKey: %v", err)

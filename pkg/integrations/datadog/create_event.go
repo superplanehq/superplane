@@ -152,7 +152,7 @@ func (c *CreateEvent) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}

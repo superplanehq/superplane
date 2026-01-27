@@ -24,7 +24,7 @@ Note: The signature should be in the format "sha256=<hex-encoded-hmac>". See Dat
 `
 
 func init() {
-	registry.RegisterApplication("datadog", &Datadog{})
+	registry.RegisterIntegration("datadog", &Datadog{})
 }
 
 type Datadog struct{}
@@ -51,7 +51,7 @@ func (d *Datadog) Description() string {
 	return "Monitor alerts and create events in Datadog"
 }
 
-func (d *Datadog) InstallationInstructions() string {
+func (d *Datadog) Instructions() string {
 	return installationInstructions
 }
 
@@ -125,7 +125,7 @@ func (d *Datadog) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("appKey is required")
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}
@@ -135,7 +135,7 @@ func (d *Datadog) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("invalid credentials: %v", err)
 	}
 
-	ctx.AppInstallation.SetState("ready", "")
+	ctx.Integration.SetState("ready", "")
 	return nil
 }
 
@@ -153,9 +153,8 @@ func (d *Datadog) CompareWebhookConfig(a, b any) (bool, error) {
 	return true, nil
 }
 
-func (d *Datadog) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.ApplicationResource, error) {
-	// Datadog doesn't expose selectable resources in this integration
-	return []core.ApplicationResource{}, nil
+func (d *Datadog) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	return []core.IntegrationResource{}, nil
 }
 
 func (d *Datadog) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {

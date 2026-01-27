@@ -102,9 +102,9 @@ func Test__CreateEvent__Execute(t *testing.T) {
 				"priority":  "normal",
 				"tags":      "env:prod",
 			},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  executionState,
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: executionState,
 		})
 
 		require.NoError(t, err)
@@ -147,9 +147,9 @@ func Test__CreateEvent__Execute(t *testing.T) {
 				"title": "Test Event",
 				"text":  "Test text",
 			},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  executionState,
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: executionState,
 		})
 
 		require.Error(t, err)
@@ -195,9 +195,9 @@ func Test__CreateEvent__Execute(t *testing.T) {
 				"title": "Test Event",
 				"text":  "Test text",
 			},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  executionState,
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: executionState,
 		})
 
 		require.NoError(t, err)
