@@ -3,6 +3,7 @@ import { twMerge } from "tailwind-merge";
 import { Puzzle, type LucideIcon } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 
+import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
@@ -12,6 +13,7 @@ import smtpIcon from "@/assets/icons/integrations/smtp.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 export const APP_LOGO_MAP: Record<string, string> = {
+  aws: awsLambdaIcon,
   dash0: dash0Icon,
   github: githubIcon,
   openai: openAiIcon,
