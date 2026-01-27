@@ -1,13 +1,13 @@
 package e2e
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
@@ -84,7 +84,7 @@ func TestCanvasPage(t *testing.T) {
 
 		steps.assertRunningItemsCount("Wait", 1)
 		steps.assertQueuedItemsCount("Wait", 3)
-		steps.cancelFirstQueueItemFromSidebar()
+		steps.cancelFirstQueueItemFromSidebar("Wait")
 		steps.assertQueuedItemsCount("Wait", 2)
 	})
 
@@ -294,66 +294,65 @@ func (s *CanvasPageSteps) assertAutocompleteNodeSuggestionVisible() {
 }
 
 func (s *CanvasPageSteps) assertQueuedItemsCount(nodeName string, expected int) {
-	canvas, err := models.FindWorkflow(s.session.OrgID, s.canvas.WorkflowID)
-	require.NoError(s.t, err)
+	deadline := time.Now().Add(5 * time.Second)
 
-	nodes, err := models.FindWorkflowNodes(canvas.ID)
-	require.NoError(s.t, err)
+	for {
+		waitNode := s.getNodeByName(nodeName)
 
-	var waitNode *models.WorkflowNode
-	for _, n := range nodes {
-		if n.Name == nodeName {
-			waitNode = &n
-			break
+		count, err := models.CountNodeQueueItems(waitNode.WorkflowID, waitNode.NodeID)
+		require.NoError(s.t, err)
+
+		if int(count) == expected {
+			return
 		}
+
+		if time.Now().After(deadline) {
+			require.Equal(s.t, expected, int(count))
+		}
+
+		time.Sleep(200 * time.Millisecond)
 	}
-	require.NotNil(s.t, waitNode, nodeName+" node not found")
-
-	queueItems, err := models.ListNodeQueueItems(waitNode.WorkflowID, waitNode.NodeID, 100, nil)
-	require.NoError(s.t, err)
-
-	require.Equal(s.t, expected, len(queueItems))
 }
 
 func (s *CanvasPageSteps) assertRunningItemsCount(nodeName string, expected int) {
-	canvas, err := models.FindWorkflow(s.session.OrgID, s.canvas.WorkflowID)
-	require.NoError(s.t, err)
+	deadline := time.Now().Add(5 * time.Second)
 
-	nodes, err := models.FindWorkflowNodes(canvas.ID)
-	require.NoError(s.t, err)
+	for {
+		waitNode := s.getNodeByName(nodeName)
 
-	var waitNode *models.WorkflowNode
-	for _, n := range nodes {
-		if n.Name == nodeName {
-			waitNode = &n
-			break
+		count, err := models.CountNodeExecutions(waitNode.WorkflowID, waitNode.NodeID, []string{
+			models.WorkflowNodeExecutionStatePending,
+			models.WorkflowNodeExecutionStateStarted,
+		}, nil)
+		require.NoError(s.t, err)
+
+		if int(count) == expected {
+			return
 		}
+
+		if time.Now().After(deadline) {
+			require.Equal(s.t, expected, int(count))
+		}
+
+		time.Sleep(200 * time.Millisecond)
 	}
-	require.NotNil(s.t, waitNode, nodeName+" node not found")
-
-	var executions []models.WorkflowNodeExecution
-	query := database.Conn().
-		Where("workflow_id = ?", waitNode.WorkflowID).
-		Where("node_id = ?", waitNode.NodeID).
-		Order("created_at DESC")
-
-	err = query.Find(&executions).Error
-	require.NoError(s.t, err)
-
-	require.Equal(s.t, expected, len(executions))
 }
 
 func (s *CanvasPageSteps) assertQueuedItemsVisibleInSidebar() {
 	s.session.AssertText("Queued")
 }
 
-func (s *CanvasPageSteps) cancelFirstQueueItemFromSidebar() {
+func (s *CanvasPageSteps) cancelFirstQueueItemFromSidebar(nodeName string) {
+	s.waitForQueueItemCountAtLeast(nodeName, 1)
+
 	eventItem := q.Locator("h2:has-text('Queued') ~ div")
+	s.session.AssertVisible(eventItem)
 	s.session.HoverOver(eventItem)
-	s.session.Sleep(300) // Wait for hover to register and actions button to appear
-	s.session.Click(q.Locator("h2:has-text('Queued') ~ div button[aria-label='Open actions']"))
+	actionsButton := q.Locator("h2:has-text('Queued') ~ div button[aria-label='Open actions']")
+	s.session.AssertVisible(actionsButton)
+	s.session.Click(actionsButton)
 	s.session.TakeScreenshot()
-	s.session.Sleep(300)
+	s.session.AssertVisible(q.TestID("cancel-queue-item"))
 	s.session.Click(q.TestID("cancel-queue-item"))
 	s.session.TakeScreenshot()
 	s.session.Sleep(500) // wait for the cancellation to be processed
@@ -371,6 +370,43 @@ func (s *CanvasPageSteps) cancelRunningExecutionFromSidebar() {
 	s.session.Sleep(500) // wait for the cancellation to be processed
 }
 
+func (s *CanvasPageSteps) waitForQueueItemCountAtLeast(nodeName string, expected int) {
+	deadline := time.Now().Add(5 * time.Second)
+
+	for {
+		waitNode := s.getNodeByName(nodeName)
+
+		count, err := models.CountNodeQueueItems(waitNode.WorkflowID, waitNode.NodeID)
+		require.NoError(s.t, err)
+
+		if int(count) >= expected {
+			return
+		}
+
+		if time.Now().After(deadline) {
+			s.t.Fatalf("expected at least %d queued items for %q, got %d", expected, nodeName, count)
+		}
+
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func (s *CanvasPageSteps) getNodeByName(nodeName string) *models.WorkflowNode {
+	canvas, err := models.FindWorkflow(s.session.OrgID, s.canvas.WorkflowID)
+	require.NoError(s.t, err)
+
+	nodes, err := models.FindWorkflowNodes(canvas.ID)
+	require.NoError(s.t, err)
+
+	index := slices.IndexFunc(nodes, func(node models.WorkflowNode) bool {
+		return node.Name == nodeName
+	})
+	if index == -1 {
+		s.t.Fatalf("%s node not found", nodeName)
+	}
+
+	return &nodes[index]
+}
 func (s *CanvasPageSteps) assertExecutionWasCancelled(nodeName string) {
 	executions := s.canvas.GetExecutionsForNode(nodeName)
 	require.Greater(s.t, len(executions), 0, "expected at least one execution")
