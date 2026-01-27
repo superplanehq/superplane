@@ -17,7 +17,7 @@ func Test__OnAppMention__Setup(t *testing.T) {
 
 	t.Run("invalid configuration -> error", func(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
-			Integration:   &contexts.AppInstallationContext{},
+			Integration:   &contexts.IntegrationContext{},
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: "invalid",
 		})
@@ -27,17 +27,17 @@ func Test__OnAppMention__Setup(t *testing.T) {
 
 	t.Run("empty channel -> subscribes without channel metadata", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
-		appCtx := &contexts.AppInstallationContext{}
+		integrationCtx := &contexts.IntegrationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      metadata,
 			Configuration: map[string]any{"channel": ""},
 		})
 
 		require.NoError(t, err)
-		require.Len(t, appCtx.Subscriptions, 1)
+		require.Len(t, integrationCtx.Subscriptions, 1)
 
-		subConfig, ok := appCtx.Subscriptions[0].Configuration.(SubscriptionConfiguration)
+		subConfig, ok := integrationCtx.Subscriptions[0].Configuration.(SubscriptionConfiguration)
 		require.True(t, ok)
 		assert.Equal(t, []string{"app_mention"}, subConfig.EventTypes)
 
@@ -54,15 +54,15 @@ func Test__OnAppMention__Setup(t *testing.T) {
 			Channel:           &ChannelMetadata{ID: "C123", Name: "general"},
 		}}
 
-		appCtx := &contexts.AppInstallationContext{}
+		integrationCtx := &contexts.IntegrationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      metadata,
 			Configuration: map[string]any{"channel": "C123"},
 		})
 
 		require.NoError(t, err)
-		assert.Empty(t, appCtx.Subscriptions)
+		assert.Empty(t, integrationCtx.Subscriptions)
 	})
 
 	t.Run("different channel -> subscribes and stores channel metadata", func(t *testing.T) {
@@ -80,20 +80,20 @@ func Test__OnAppMention__Setup(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"botToken": "token-123",
 			},
 		}
 
 		err := trigger.Setup(core.TriggerContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      metadata,
 			Configuration: map[string]any{"channel": "C456"},
 		})
 
 		require.NoError(t, err)
-		require.Len(t, appCtx.Subscriptions, 0)
+		require.Len(t, integrationCtx.Subscriptions, 0)
 
 		stored, ok := metadata.Metadata.(AppMentionMetadata)
 		require.True(t, ok)
@@ -111,22 +111,22 @@ func Test__OnAppMention__Setup(t *testing.T) {
 		})
 
 		metadata := &contexts.MetadataContext{}
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"botToken": "token-123",
 			},
 		}
 
 		err := trigger.Setup(core.TriggerContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      metadata,
 			Configuration: map[string]any{"channel": "C123"},
 		})
 
 		require.NoError(t, err)
-		require.Len(t, appCtx.Subscriptions, 1)
+		require.Len(t, integrationCtx.Subscriptions, 1)
 
-		subConfig, ok := appCtx.Subscriptions[0].Configuration.(SubscriptionConfiguration)
+		subConfig, ok := integrationCtx.Subscriptions[0].Configuration.(SubscriptionConfiguration)
 		require.True(t, ok)
 		assert.Equal(t, []string{"app_mention"}, subConfig.EventTypes)
 
@@ -150,14 +150,14 @@ func Test__OnAppMention__Setup(t *testing.T) {
 			AppSubscriptionID: &subscriptionID,
 		}}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"botToken": "token-123",
 			},
 		}
 
 		err := trigger.Setup(core.TriggerContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      metadata,
 			Configuration: map[string]any{"channel": "C123"},
 		})
@@ -167,7 +167,7 @@ func Test__OnAppMention__Setup(t *testing.T) {
 		//
 		// Does not subscribe again
 		//
-		require.Len(t, appCtx.Subscriptions, 0)
+		require.Len(t, integrationCtx.Subscriptions, 0)
 
 		stored, ok := metadata.Metadata.(AppMentionMetadata)
 		require.True(t, ok)

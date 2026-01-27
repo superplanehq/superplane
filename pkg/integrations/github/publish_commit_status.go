@@ -78,7 +78,7 @@ func (c *PublishCommitStatus) Configuration() []configuration.Field {
 		{
 			Name:     "repository",
 			Label:    "Repository",
-			Type:     configuration.FieldTypeAppInstallationResource,
+			Type:     configuration.FieldTypeIntegrationResource,
 			Required: true,
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{

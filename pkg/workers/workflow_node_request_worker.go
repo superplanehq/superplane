@@ -152,7 +152,7 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Wor
 			return fmt.Errorf("failed to find app installation: %v", err)
 		}
 
-		actionCtx.Integration = contexts.NewAppInstallationContext(tx, node, appInstallation, w.encryptor, w.registry)
+		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, appInstallation, w.encryptor, w.registry)
 	}
 
 	_, err = trigger.HandleAction(actionCtx)
@@ -222,7 +222,7 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 		}
 
 		logger = logging.WithAppInstallation(logger, *appInstallation)
-		actionCtx.Integration = contexts.NewAppInstallationContext(tx, node, appInstallation, w.encryptor, w.registry)
+		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, appInstallation, w.encryptor, w.registry)
 	}
 
 	actionCtx.Logger = logger

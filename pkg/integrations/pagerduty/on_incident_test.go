@@ -164,9 +164,9 @@ func Test__OnIncident__Setup(t *testing.T) {
 	trigger := OnIncident{}
 
 	t.Run("invalid configuration -> decode error", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
+		integrationCtx := &contexts.IntegrationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: "invalid-config",
 		})
@@ -175,9 +175,9 @@ func Test__OnIncident__Setup(t *testing.T) {
 	})
 
 	t.Run("at least one event required", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
+		integrationCtx := &contexts.IntegrationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: OnIncidentConfiguration{Events: []string{}, Service: "svc-1"},
 		})
@@ -186,9 +186,9 @@ func Test__OnIncident__Setup(t *testing.T) {
 	})
 
 	t.Run("service is required", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
+		integrationCtx := &contexts.IntegrationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: OnIncidentConfiguration{Events: []string{"incident.triggered"}},
 		})
@@ -198,18 +198,18 @@ func Test__OnIncident__Setup(t *testing.T) {
 
 	t.Run("metadata already set -> no webhook request is made", func(t *testing.T) {
 		service := &Service{ID: "svc-1", Name: "test-service"}
-		appCtx := &contexts.AppInstallationContext{}
+		integrationCtx := &contexts.IntegrationContext{}
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: NodeMetadata{Service: service},
 		}
 
 		err := trigger.Setup(core.TriggerContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      metadataCtx,
 			Configuration: OnIncidentConfiguration{Events: []string{"incident.triggered"}, Service: "svc-1"},
 		})
 
 		require.NoError(t, err)
-		assert.Len(t, appCtx.WebhookRequests, 0)
+		assert.Len(t, integrationCtx.WebhookRequests, 0)
 	})
 }

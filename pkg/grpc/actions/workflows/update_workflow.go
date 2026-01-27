@@ -345,7 +345,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 		}
 
 		logger = logging.WithAppInstallation(logger, *appInstallation)
-		triggerCtx.Integration = contexts.NewAppInstallationContext(
+		triggerCtx.Integration = contexts.NewIntegrationContext(
 			tx,
 			node,
 			appInstallation,
@@ -385,7 +385,7 @@ func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.
 		}
 
 		logger = logging.WithAppInstallation(logger, *appInstallation)
-		setupCtx.Integration = contexts.NewAppInstallationContext(
+		setupCtx.Integration = contexts.NewIntegrationContext(
 			tx,
 			node,
 			appInstallation,

@@ -16,22 +16,22 @@ func Test__Dash0__Sync(t *testing.T) {
 	d := &Dash0{}
 
 	t.Run("no apiToken -> error", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "",
 			},
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
-			Integration:   appCtx,
+			Configuration: integrationCtx.Configuration,
+			Integration:   integrationCtx,
 		})
 
 		require.ErrorContains(t, err, "apiToken is required")
 	})
 
 	t.Run("no baseURL -> error", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 				"baseURL":  "",
@@ -39,8 +39,8 @@ func Test__Dash0__Sync(t *testing.T) {
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
-			Integration:   appCtx,
+			Configuration: integrationCtx.Configuration,
+			Integration:   integrationCtx,
 		})
 
 		require.ErrorContains(t, err, "baseURL is required")
@@ -64,7 +64,7 @@ func Test__Dash0__Sync(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 				"baseURL":  "https://api.us-west-2.aws.dash0.com",
@@ -72,13 +72,13 @@ func Test__Dash0__Sync(t *testing.T) {
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
+			Configuration: integrationCtx.Configuration,
 			HTTP:          httpContext,
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "ready", appCtx.State)
+		assert.Equal(t, "ready", integrationCtx.State)
 		require.Len(t, httpContext.Requests, 1)
 		assert.Contains(t, httpContext.Requests[0].URL.String(), "/api/prometheus/api/v1/query")
 		assert.Equal(t, "Bearer token123", httpContext.Requests[0].Header.Get("Authorization"))
@@ -94,7 +94,7 @@ func Test__Dash0__Sync(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 				"baseURL":  "https://api.us-west-2.aws.dash0.com",
@@ -102,14 +102,14 @@ func Test__Dash0__Sync(t *testing.T) {
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
+			Configuration: integrationCtx.Configuration,
 			HTTP:          httpContext,
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 		})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "error validating connection")
-		assert.NotEqual(t, "ready", appCtx.State)
+		assert.NotEqual(t, "ready", integrationCtx.State)
 	})
 
 	t.Run("baseURL with /api/prometheus suffix -> strips suffix", func(t *testing.T) {
@@ -130,7 +130,7 @@ func Test__Dash0__Sync(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 				"baseURL":  "https://api.us-west-2.aws.dash0.com/api/prometheus",
@@ -138,9 +138,9 @@ func Test__Dash0__Sync(t *testing.T) {
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
+			Configuration: integrationCtx.Configuration,
 			HTTP:          httpContext,
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 		})
 
 		require.NoError(t, err)

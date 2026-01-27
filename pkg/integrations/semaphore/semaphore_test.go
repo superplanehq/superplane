@@ -25,7 +25,7 @@ func Test__Semaphore__Sync(t *testing.T) {
 			},
 		}
 
-		appInstallation := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Metadata: Metadata{Projects: []string{}},
 			Configuration: map[string]any{
 				"organizationUrl": "https://example.semaphoreci.com",
@@ -34,13 +34,13 @@ func Test__Semaphore__Sync(t *testing.T) {
 		}
 
 		err := s.Sync(core.SyncContext{
-			Configuration: appInstallation.Configuration,
+			Configuration: integrationCtx.Configuration,
 			HTTP:          httpContext,
-			Integration:   appInstallation,
+			Integration:   integrationCtx,
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "ready", appInstallation.State)
+		assert.Equal(t, "ready", integrationCtx.State)
 		require.Len(t, httpContext.Requests, 1)
 		assert.Equal(t, "https://example.semaphoreci.com/api/v1alpha/projects", httpContext.Requests[0].URL.String())
 	})
@@ -55,7 +55,7 @@ func Test__Semaphore__Sync(t *testing.T) {
 			},
 		}
 
-		appInstallation := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Metadata: Metadata{Projects: []string{}},
 			Configuration: map[string]any{
 				"organizationUrl": "https://example.semaphoreci.com",
@@ -64,13 +64,13 @@ func Test__Semaphore__Sync(t *testing.T) {
 		}
 
 		err := s.Sync(core.SyncContext{
-			Configuration: appInstallation.Configuration,
+			Configuration: integrationCtx.Configuration,
 			HTTP:          httpContext,
-			Integration:   appInstallation,
+			Integration:   integrationCtx,
 		})
 
 		require.Error(t, err)
-		assert.NotEqual(t, "ready", appInstallation.State)
+		assert.NotEqual(t, "ready", integrationCtx.State)
 		require.Len(t, httpContext.Requests, 1)
 		assert.Equal(t, "https://example.semaphoreci.com/api/v1alpha/projects", httpContext.Requests[0].URL.String())
 	})

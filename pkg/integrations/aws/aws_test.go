@@ -19,18 +19,18 @@ func Test__AWS__Sync(t *testing.T) {
 	a := &AWS{}
 
 	t.Run("missing role arn -> browser action", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
+		integrationCtx := &contexts.IntegrationContext{}
 
 		err := a.Sync(core.SyncContext{
 			Configuration: map[string]any{"region": "us-east-1"},
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			BaseURL:       "http://localhost:8000",
 		})
 
 		require.NoError(t, err)
-		require.NotNil(t, appCtx.BrowserAction)
-		assert.Contains(t, appCtx.BrowserAction.Description, "Create Identity Provider")
-		assert.Contains(t, appCtx.BrowserAction.Description, "IAM Role")
+		require.NotNil(t, integrationCtx.BrowserAction)
+		assert.Contains(t, integrationCtx.BrowserAction.Description, "Create Identity Provider")
+		assert.Contains(t, integrationCtx.BrowserAction.Description, "IAM Role")
 	})
 
 	t.Run("role arn -> sets secrets, metadata, and schedules resync", func(t *testing.T) {
@@ -57,7 +57,7 @@ func Test__AWS__Sync(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"roleArn":                "arn:aws:iam::123456789012:role/test-role",
 				"region":                 "us-east-1",
@@ -68,32 +68,32 @@ func Test__AWS__Sync(t *testing.T) {
 		}
 
 		err := a.Sync(core.SyncContext{
-			Configuration:  appCtx.Configuration,
+			Configuration:  integrationCtx.Configuration,
 			HTTP:           httpContext,
 			OIDC:           support.NewOIDCProvider(),
-			Integration:    appCtx,
+			Integration:    integrationCtx,
 			InstallationID: "installation-123",
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "ready", appCtx.State)
-		assert.Nil(t, appCtx.BrowserAction)
+		assert.Equal(t, "ready", integrationCtx.State)
+		assert.Nil(t, integrationCtx.BrowserAction)
 
-		require.Contains(t, appCtx.Secrets, "accessKeyId")
-		require.Contains(t, appCtx.Secrets, "secretAccessKey")
-		require.Contains(t, appCtx.Secrets, "sessionToken")
-		assert.Equal(t, []byte("AKIA_TEST"), appCtx.Secrets["accessKeyId"].Value)
-		assert.Equal(t, []byte("secret"), appCtx.Secrets["secretAccessKey"].Value)
-		assert.Equal(t, []byte("token"), appCtx.Secrets["sessionToken"].Value)
+		require.Contains(t, integrationCtx.Secrets, "accessKeyId")
+		require.Contains(t, integrationCtx.Secrets, "secretAccessKey")
+		require.Contains(t, integrationCtx.Secrets, "sessionToken")
+		assert.Equal(t, []byte("AKIA_TEST"), integrationCtx.Secrets["accessKeyId"].Value)
+		assert.Equal(t, []byte("secret"), integrationCtx.Secrets["secretAccessKey"].Value)
+		assert.Equal(t, []byte("token"), integrationCtx.Secrets["sessionToken"].Value)
 
-		metadata, ok := appCtx.Metadata.(SessionMetadata)
+		metadata, ok := integrationCtx.Metadata.(SessionMetadata)
 		require.True(t, ok)
 		assert.Equal(t, "arn:aws:iam::123456789012:role/test-role", metadata.RoleArn)
 		assert.Equal(t, "us-east-1", metadata.Region)
 		assert.Equal(t, expiration, metadata.ExpiresAt)
 
-		require.Len(t, appCtx.ResyncRequests, 1)
-		assert.GreaterOrEqual(t, appCtx.ResyncRequests[0], time.Minute)
+		require.Len(t, integrationCtx.ResyncRequests, 1)
+		assert.GreaterOrEqual(t, integrationCtx.ResyncRequests[0], time.Minute)
 
 		require.Len(t, httpContext.Requests, 1)
 		assert.Equal(t, "https://sts.us-east-1.amazonaws.com", httpContext.Requests[0].URL.String())
@@ -104,10 +104,8 @@ func Test__AWS__ListResources(t *testing.T) {
 	a := &AWS{}
 
 	t.Run("unknown resource type returns empty list", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
-
 		resources, err := a.ListResources("unknown", core.ListResourcesContext{
-			Integration: appCtx,
+			Integration: &contexts.IntegrationContext{},
 		})
 
 		require.NoError(t, err)
@@ -115,19 +113,17 @@ func Test__AWS__ListResources(t *testing.T) {
 	})
 
 	t.Run("lambda.function without credentials returns error", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
-			Secrets: map[string]core.IntegrationSecret{},
-		}
-
 		_, err := a.ListResources("lambda.function", core.ListResourcesContext{
-			Integration: appCtx,
+			Integration: &contexts.IntegrationContext{
+				Secrets: map[string]core.IntegrationSecret{},
+			},
 		})
 
 		require.ErrorContains(t, err, "AWS session credentials are missing")
 	})
 
 	t.Run("lambda.function without region returns error", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"region": "   ",
 			},
@@ -139,7 +135,7 @@ func Test__AWS__ListResources(t *testing.T) {
 		}
 
 		_, err := a.ListResources("lambda.function", core.ListResourcesContext{
-			Integration: appCtx,
+			Integration: integrationCtx,
 		})
 
 		require.ErrorContains(t, err, "region is required")
@@ -164,7 +160,7 @@ func Test__AWS__ListResources(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"region": "us-east-1",
 			},
@@ -176,7 +172,7 @@ func Test__AWS__ListResources(t *testing.T) {
 		}
 
 		resources, err := a.ListResources("lambda.function", core.ListResourcesContext{
-			Integration: appCtx,
+			Integration: integrationCtx,
 			HTTP:        httpContext,
 		})
 

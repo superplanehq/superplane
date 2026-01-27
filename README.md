@@ -1,11 +1,10 @@
 # SuperPlane
 
 SuperPlane is an **open source DevOps control plane** for defining and running
-operational workflows across the tools you already use
-(CI/CD, release management, incident response, notifications, etc.).
+event-based workflows. It works across the tools you already use such as
+CI/CD, release management, incident response, infra, notifications, etc.
 
-SuperPlane is currently self-hosted only. A hosted version is not available today.
-You can sign up for updates on our [website](https://superplane.com).
+![SuperPlane screenshot](./screenshot.png)
 
 ## Project status
 
@@ -15,7 +14,7 @@ You can sign up for updates on our [website](https://superplane.com).
   <a href="https://discord.gg/KC78eCNsnw"><img src="https://img.shields.io/discord/1409914582239023200?label=discord" alt="Discord server" /></a>
 </p>
 
-This project is new and moving quickly. Expect rough edges and occasional
+This project is in alpha stage and moving quickly. Expect rough edges and occasional
 breaking changes while we stabilize the core model and integrations.
 If you try it and hit something confusing, please [open an issue](https://github.com/superplanehq/superplane/issues/new).
 Early feedback is extremely valuable.
@@ -26,6 +25,13 @@ Early feedback is extremely valuable.
 - **Event-driven automation**: Trigger workflows from pushes, deploy events, alerts, schedules, and webhooks.
 - **Control plane UI**: Design and manage DevOps processes; inspect runs, status, and history in a single place.
 - **Shared operational context**: Keep workflow definitions and operational intent in one system instead of scattered scripts.
+
+## How it works
+
+- **Canvases**: You model a workflow as a directed graph (a “Canvas”) of steps and dependencies.
+- **Components**: Each step is a reusable component (built-in or integration-backed) that performs an action (for example: call CI/CD, open an incident, post a notification, wait for a condition, require approval).
+- **Events & triggers**: Incoming events (webhooks, schedules, tool events) match triggers and start executions with the event payload as input.
+- **Execution + visibility**: SuperPlane executes the graph, tracks state, and exposes runs/history/debugging in the UI (and via the CLI).
 
 ### Example use cases
 
@@ -45,7 +51,7 @@ docker pull ghcr.io/superplanehq/superplane-demo:stable
 docker run --rm -p 3000:3000 -v spdata:/app/data -ti ghcr.io/superplanehq/superplane-demo:stable
 ```
 
-Then open [http://localhost:3000](http://localhost:3000).
+Then open [http://localhost:3000](http://localhost:3000) and follow the [quick startguide](https://docs.superplane.com/get-started/quickstart/).
 
 ## Production installation
 
@@ -64,7 +70,7 @@ This section gives a quick snapshot of what SuperPlane already supports and what
 ✓ Event-driven workflow engine  
 ✓ Visual Canvas builder  
 ✓ Run history, event chain view, debug console  
-✓ Starter CLI and example workflows  
+✓ Starter CLI and example workflows
 
 **In progress / upcoming**
 
@@ -73,7 +79,6 @@ This section gives a quick snapshot of what SuperPlane already supports and what
 → [SAML/SCIM](https://github.com/superplanehq/superplane/issues/1377) with [extended RBAC and permissions](https://github.com/superplanehq/superplane/issues/1378)  
 → [Artifact version tracking](https://github.com/superplanehq/superplane/issues/1382)  
 → [Public API](https://github.com/superplanehq/superplane/issues/1854)
-
 
 ## Contributing
 
@@ -88,8 +93,5 @@ Apache License 2.0. See `LICENSE`.
 
 ## Community
 
-- **[Discord](https://discord.gg/KC78eCNsnw)** - Join our community for discussions, questions, and collaboration
+- **[Discord](https://discord.superplane.com)** - Join our community for discussions, questions, and collaboration
 - **[X](https://x.com/superplanehq)** - Follow us for updates and announcements
-
----
-![Alt](https://repobeats.axiom.co/api/embed/1cef82bdb688577da6348f45cf13c1d0b01fad37.svg "Repobeats analytics image")

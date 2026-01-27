@@ -1,4 +1,0 @@
-apiVersion: v1
-kind: Canvas
-metadata:
-  name: my-application-canvas

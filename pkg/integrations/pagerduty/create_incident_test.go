@@ -33,7 +33,7 @@ func Test__CreateIncident__Setup(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"authType": AuthTypeAPIToken,
 				"apiToken": "test-token",
@@ -50,7 +50,7 @@ func Test__CreateIncident__Setup(t *testing.T) {
 				"description": "Test description",
 			},
 			HTTP:        httpContext,
-			Integration: appCtx,
+			Integration: integrationCtx,
 			Metadata:    metadataCtx,
 		})
 
@@ -107,7 +107,7 @@ func Test__CreateIncident__Setup(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"authType": AuthTypeAPIToken,
 				"apiToken": "test-token",
@@ -121,7 +121,7 @@ func Test__CreateIncident__Setup(t *testing.T) {
 				"service": "INVALID",
 			},
 			HTTP:        httpContext,
-			Integration: appCtx,
+			Integration: integrationCtx,
 			Metadata:    &contexts.MetadataContext{},
 		})
 

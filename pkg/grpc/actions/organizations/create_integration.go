@@ -52,7 +52,7 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 		return nil, status.Errorf(codes.Internal, "failed to create integration: %v", err)
 	}
 
-	appCtx := contexts.NewAppInstallationContext(
+	integrationCtx := contexts.NewIntegrationContext(
 		database.Conn(),
 		nil,
 		appInstallation,
@@ -62,7 +62,7 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 
 	syncErr := integration.Sync(core.SyncContext{
 		HTTP:            contexts.NewHTTPContext(registry.GetHTTPClient()),
-		Integration:     appCtx,
+		Integration:     integrationCtx,
 		Configuration:   appInstallation.Configuration.Data(),
 		BaseURL:         baseURL,
 		WebhooksBaseURL: webhooksBaseURL,

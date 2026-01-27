@@ -72,7 +72,7 @@ func (t *OnIncidentStatusUpdate) Configuration() []configuration.Field {
 		{
 			Name:        "service",
 			Label:       "Service",
-			Type:        configuration.FieldTypeAppInstallationResource,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "The PagerDuty service to monitor for incident status updates",
 			Placeholder: "Select a service",

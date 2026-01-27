@@ -50,7 +50,7 @@ func UpdateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 	maps.Copy(existingConfig, configuration)
 	i.Configuration = datatypes.NewJSONType(existingConfig)
 
-	appCtx := contexts.NewAppInstallationContext(
+	integrationCtx := contexts.NewIntegrationContext(
 		database.Conn(),
 		nil,
 		i,
@@ -65,7 +65,7 @@ func UpdateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 		WebhooksBaseURL: webhooksBaseURL,
 		OrganizationID:  orgID,
 		InstallationID:  i.ID.String(),
-		Integration:     appCtx,
+		Integration:     integrationCtx,
 		OIDC:            oidcProvider,
 	})
 

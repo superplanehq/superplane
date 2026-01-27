@@ -73,7 +73,7 @@ func (c *RunFunction) Configuration() []configuration.Field {
 		{
 			Name:        "functionArn",
 			Label:       "Lambda Function ARN",
-			Type:        configuration.FieldTypeAppInstallationResource,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Description: "ARN of the Lambda function to invoke",
 			TypeOptions: &configuration.TypeOptions{

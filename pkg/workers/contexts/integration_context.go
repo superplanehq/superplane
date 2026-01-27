@@ -18,7 +18,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type AppInstallationContext struct {
+type IntegrationContext struct {
 	tx              *gorm.DB
 	node            *models.WorkflowNode
 	appInstallation *models.AppInstallation
@@ -26,8 +26,8 @@ type AppInstallationContext struct {
 	registry        *registry.Registry
 }
 
-func NewAppInstallationContext(tx *gorm.DB, node *models.WorkflowNode, installation *models.AppInstallation, encryptor crypto.Encryptor, registry *registry.Registry) *AppInstallationContext {
-	return &AppInstallationContext{
+func NewIntegrationContext(tx *gorm.DB, node *models.WorkflowNode, installation *models.AppInstallation, encryptor crypto.Encryptor, registry *registry.Registry) *IntegrationContext {
+	return &IntegrationContext{
 		tx:              tx,
 		node:            node,
 		appInstallation: installation,
@@ -36,11 +36,11 @@ func NewAppInstallationContext(tx *gorm.DB, node *models.WorkflowNode, installat
 	}
 }
 
-func (c *AppInstallationContext) ID() uuid.UUID {
+func (c *IntegrationContext) ID() uuid.UUID {
 	return c.appInstallation.ID
 }
 
-func (c *AppInstallationContext) RequestWebhook(configuration any) error {
+func (c *IntegrationContext) RequestWebhook(configuration any) error {
 	integration, err := c.registry.GetIntegration(c.appInstallation.AppName)
 	if err != nil {
 		return err
@@ -66,7 +66,7 @@ func (c *AppInstallationContext) RequestWebhook(configuration any) error {
 	return c.createWebhook(configuration)
 }
 
-func (c *AppInstallationContext) createWebhook(configuration any) error {
+func (c *IntegrationContext) createWebhook(configuration any) error {
 	webhookID := uuid.New()
 	_, encryptedKey, err := crypto.NewRandomKey(context.Background(), c.encryptor, webhookID.String())
 	if err != nil {
@@ -92,7 +92,7 @@ func (c *AppInstallationContext) createWebhook(configuration any) error {
 	return nil
 }
 
-func (c *AppInstallationContext) ScheduleResync(interval time.Duration) error {
+func (c *IntegrationContext) ScheduleResync(interval time.Duration) error {
 	if interval < time.Second {
 		return fmt.Errorf("interval must be bigger than 1s")
 	}
@@ -106,7 +106,7 @@ func (c *AppInstallationContext) ScheduleResync(interval time.Duration) error {
 	return c.appInstallation.CreateSyncRequest(c.tx, &runAt)
 }
 
-func (c *AppInstallationContext) completeCurrentRequestForInstallation() error {
+func (c *IntegrationContext) completeCurrentRequestForInstallation() error {
 	request, err := models.FindPendingRequestForAppInstallation(c.tx, c.appInstallation.ID)
 	if err == nil {
 		return request.Complete(c.tx)
@@ -119,7 +119,7 @@ func (c *AppInstallationContext) completeCurrentRequestForInstallation() error {
 	return err
 }
 
-func (c *AppInstallationContext) GetConfig(name string) ([]byte, error) {
+func (c *IntegrationContext) GetConfig(name string) ([]byte, error) {
 	config := c.appInstallation.Configuration.Data()
 	v, ok := config[name]
 	if !ok {
@@ -167,11 +167,11 @@ func findConfigDef(configs []configuration.Field, name string) (configuration.Fi
 	return configuration.Field{}, fmt.Errorf("config %s not found", name)
 }
 
-func (c *AppInstallationContext) GetMetadata() any {
+func (c *IntegrationContext) GetMetadata() any {
 	return c.appInstallation.Metadata.Data()
 }
 
-func (c *AppInstallationContext) SetMetadata(value any) {
+func (c *IntegrationContext) SetMetadata(value any) {
 	b, err := json.Marshal(value)
 	if err != nil {
 		return
@@ -186,16 +186,16 @@ func (c *AppInstallationContext) SetMetadata(value any) {
 	c.appInstallation.Metadata = datatypes.NewJSONType(v)
 }
 
-func (c *AppInstallationContext) GetState() string {
+func (c *IntegrationContext) GetState() string {
 	return c.appInstallation.State
 }
 
-func (c *AppInstallationContext) SetState(state, stateDescription string) {
+func (c *IntegrationContext) SetState(state, stateDescription string) {
 	c.appInstallation.State = state
 	c.appInstallation.StateDescription = stateDescription
 }
 
-func (c *AppInstallationContext) SetSecret(name string, value []byte) error {
+func (c *IntegrationContext) SetSecret(name string, value []byte) error {
 	now := time.Now()
 
 	// Encrypt the secret value using the installation ID as associated data
@@ -238,7 +238,7 @@ func (c *AppInstallationContext) SetSecret(name string, value []byte) error {
 	return c.tx.Save(&secret).Error
 }
 
-func (c *AppInstallationContext) GetSecrets() ([]core.IntegrationSecret, error) {
+func (c *IntegrationContext) GetSecrets() ([]core.IntegrationSecret, error) {
 	var fromDB []models.AppInstallationSecret
 	err := c.tx.
 		Where("installation_id = ?", c.appInstallation.ID).
@@ -270,7 +270,7 @@ func (c *AppInstallationContext) GetSecrets() ([]core.IntegrationSecret, error) 
 	return secrets, nil
 }
 
-func (c *AppInstallationContext) NewBrowserAction(action core.BrowserAction) {
+func (c *IntegrationContext) NewBrowserAction(action core.BrowserAction) {
 	d := datatypes.NewJSONType(models.BrowserAction{
 		URL:         action.URL,
 		Method:      action.Method,
@@ -281,11 +281,11 @@ func (c *AppInstallationContext) NewBrowserAction(action core.BrowserAction) {
 	c.appInstallation.BrowserAction = &d
 }
 
-func (c *AppInstallationContext) RemoveBrowserAction() {
+func (c *IntegrationContext) RemoveBrowserAction() {
 	c.appInstallation.BrowserAction = nil
 }
 
-func (c *AppInstallationContext) Subscribe(configuration any) (*uuid.UUID, error) {
+func (c *IntegrationContext) Subscribe(configuration any) (*uuid.UUID, error) {
 	subscription, err := models.CreateAppSubscriptionInTransaction(c.tx, c.node, c.appInstallation, configuration)
 	if err != nil {
 		return nil, err
@@ -294,7 +294,7 @@ func (c *AppInstallationContext) Subscribe(configuration any) (*uuid.UUID, error
 	return &subscription.ID, nil
 }
 
-func (c *AppInstallationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
+func (c *IntegrationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
 	subscriptions, err := models.ListAppSubscriptions(c.tx, c.appInstallation.ID)
 	if err != nil {
 		return nil, err
@@ -307,7 +307,7 @@ func (c *AppInstallationContext) ListSubscriptions() ([]core.IntegrationSubscrip
 			return nil, err
 		}
 
-		contexts = append(contexts, NewAppSubscriptionContext(
+		contexts = append(contexts, NewIntegrationSubscriptionContext(
 			c.tx,
 			c.registry,
 			&subscription,
