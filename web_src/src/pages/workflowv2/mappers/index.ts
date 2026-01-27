@@ -34,6 +34,11 @@ import {
   eventStateRegistry as dash0EventStateRegistry,
 } from "./dash0/index";
 import {
+  componentMappers as datadogComponentMappers,
+  triggerRenderers as datadogTriggerRenderers,
+  eventStateRegistry as datadogEventStateRegistry,
+} from "./datadog/index";
+import {
   componentMappers as slackComponentMappers,
   triggerRenderers as slackTriggerRenderers,
   eventStateRegistry as slackEventStateRegistry,
@@ -78,6 +83,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   github: githubComponentMappers,
   pagerduty: pagerdutyComponentMappers,
   dash0: dash0ComponentMappers,
+  datadog: datadogComponentMappers,
   slack: slackComponentMappers,
   smtp: smtpComponentMappers,
   aws: awsComponentMappers,
@@ -88,6 +94,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   github: githubTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
   dash0: dash0TriggerRenderers,
+  datadog: datadogTriggerRenderers,
   slack: slackTriggerRenderers,
   smtp: smtpTriggerRenderers,
   aws: awsTriggerRenderers,
@@ -98,6 +105,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   github: githubEventStateRegistry,
   pagerduty: pagerdutyEventStateRegistry,
   dash0: dash0EventStateRegistry,
+  datadog: datadogEventStateRegistry,
   slack: slackEventStateRegistry,
   smtp: smtpEventStateRegistry,
 };
