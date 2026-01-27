@@ -1,0 +1,22 @@
+{
+    "type": "datadog.onMonitorAlert",
+    "data": {
+        "id": "1234567890",
+        "event_type": "query_alert_monitor",
+        "alert_type": "error",
+        "alert_transition": "Triggered",
+        "hostname": "host.example.com",
+        "monitor_id": 12345,
+        "monitor_name": "CPU Usage High",
+        "priority": "P1",
+        "tags": ["env:prod", "service:web"],
+        "title": "[Triggered] CPU Usage High",
+        "date": 1704067200,
+        "body": "CPU usage exceeded 90% threshold",
+        "org": {
+            "id": 123,
+            "name": "MyOrg"
+        }
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}
