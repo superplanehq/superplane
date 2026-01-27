@@ -23,7 +23,6 @@ docker buildx build \
   --progress=plain \
   --provenance=false \
   --push \
-  "${BUILD_ARGS[@]}" \
   -t "ghcr.io/superplanehq/superplane-demo:${VERSION}-${ARCH}" \
   -f release/superplane-demo-image/Dockerfile \
   .
