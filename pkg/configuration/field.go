@@ -24,14 +24,14 @@ const (
 	/*
 	 * Special field types
 	 */
-	FieldTypeDayInYear               = "day-in-year"
-	FieldTypeCron                    = "cron"
-	FieldTypeUser                    = "user"
-	FieldTypeRole                    = "role"
-	FieldTypeGroup                   = "group"
-	FieldTypeAppInstallationResource = "app-installation-resource"
-	FieldTypeAnyPredicateList        = "any-predicate-list"
-	FieldTypeGitRef                  = "git-ref"
+	FieldTypeDayInYear           = "day-in-year"
+	FieldTypeCron                = "cron"
+	FieldTypeUser                = "user"
+	FieldTypeRole                = "role"
+	FieldTypeGroup               = "group"
+	FieldTypeIntegrationResource = "integration-resource"
+	FieldTypeAnyPredicateList    = "any-predicate-list"
+	FieldTypeGitRef              = "git-ref"
 )
 
 type Field struct {

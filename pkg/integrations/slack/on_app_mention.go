@@ -73,7 +73,7 @@ func (t *OnAppMention) Configuration() []configuration.Field {
 		{
 			Name:     "channel",
 			Label:    "Channel",
-			Type:     configuration.FieldTypeAppInstallationResource,
+			Type:     configuration.FieldTypeIntegrationResource,
 			Required: false,
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{

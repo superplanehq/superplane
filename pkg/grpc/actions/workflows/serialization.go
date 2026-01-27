@@ -322,12 +322,12 @@ func findAndValidateComponent(registry *registry.Registry, organizationID string
 
 func validateIntegration(organizationID string, ref *compb.IntegrationRef) error {
 	if ref == nil || ref.Id == "" {
-		return fmt.Errorf("app installation is required")
+		return fmt.Errorf("integration is required")
 	}
 
-	installationID, err := uuid.Parse(ref.Id)
+	integrationID, err := uuid.Parse(ref.Id)
 	if err != nil {
-		return fmt.Errorf("invalid app installation ID: %v", err)
+		return fmt.Errorf("invalid integration ID: %v", err)
 	}
 
 	orgID, err := uuid.Parse(organizationID)
@@ -335,9 +335,9 @@ func validateIntegration(organizationID string, ref *compb.IntegrationRef) error
 		return fmt.Errorf("invalid organization ID: %v", err)
 	}
 
-	_, err = models.FindAppInstallation(orgID, installationID)
+	_, err = models.FindAppInstallation(orgID, integrationID)
 	if err != nil {
-		return fmt.Errorf("app installation not found or does not belong to this organization")
+		return fmt.Errorf("integration not found or does not belong to this organization")
 	}
 
 	return nil

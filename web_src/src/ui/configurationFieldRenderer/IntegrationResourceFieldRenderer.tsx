@@ -6,7 +6,7 @@ import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { toTestId } from "@/utils/testID";
 import { useEffect, useMemo } from "react";
 
-interface AppInstallationResourceFieldRendererProps {
+interface IntegrationResourceFieldRendererProps {
   field: ConfigurationField;
   value: string | string[] | undefined;
   onChange: (value: string | string[] | undefined) => void;
@@ -20,13 +20,13 @@ type SelectOption = {
   value: string;
 };
 
-export const AppInstallationResourceFieldRenderer = ({
+export const IntegrationResourceFieldRenderer = ({
   field,
   value,
   onChange,
   organizationId,
   integrationId,
-}: AppInstallationResourceFieldRendererProps) => {
+}: IntegrationResourceFieldRendererProps) => {
   const resourceType = field.typeOptions?.resource?.type;
   const useNameAsValue = field.typeOptions?.resource?.useNameAsValue ?? false;
   // Check for multi - be explicit about truthiness since it's a boolean field
