@@ -162,7 +162,7 @@ func Test__InstallApplication(t *testing.T) {
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "application nonexistent-app not found")
+		assert.Contains(t, s.Message(), "integration nonexistent-app not found")
 	})
 
 	t.Run("sync fails -> installation created in error state", func(t *testing.T) {
