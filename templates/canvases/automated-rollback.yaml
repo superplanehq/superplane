@@ -23,7 +23,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: true
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-fswk8u"
@@ -43,7 +43,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-g0f7j5"
@@ -67,7 +67,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-yfk4ek"
@@ -89,7 +89,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: true
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-aktoyi"
@@ -111,7 +111,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: true
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "component-node-pdfas0"
@@ -133,7 +133,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: true
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "github-onworkflowrun-github-onworkflowrun-k6enyi"
@@ -159,7 +159,7 @@ spec:
         name: "github.onWorkflowRun"
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "github-runworkflow-github-runworkflow-z5400d"
@@ -183,7 +183,7 @@ spec:
       trigger: null
       widget: null
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "annotation-note-ar1tgr"
@@ -204,7 +204,7 @@ spec:
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "annotation-note-ar2rbk"
@@ -225,7 +225,7 @@ spec:
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "annotation-note-ar3hlt"
@@ -246,7 +246,7 @@ spec:
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
     - id: "annotation-note-ar4res"
@@ -267,7 +267,7 @@ spec:
       widget:
         name: "annotation"
       isCollapsed: false
-      appInstallation: null
+      integration: null
       errorMessage: ""
       warningMessage: ""
   edges:
