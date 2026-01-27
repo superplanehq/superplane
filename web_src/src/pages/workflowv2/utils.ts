@@ -31,14 +31,17 @@ export function generateNodeId(blockName: string, nodeName: string): string {
  * @returns A unique node name (e.g., "semaphore.onPipelineDone" or "semaphore.onPipelineDone2")
  */
 export function generateUniqueNodeName(componentName: string, existingNodeNames: string[]): string {
-  // Escape special regex characters in the component name
-  const escapedName = componentName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const nameMatch = componentName.match(/^(.*?)(?:\s+(\d+))?$/);
+  const baseName = nameMatch?.[1] || componentName;
 
-  // Check if the base name (without number) already exists
-  const baseNameExists = existingNodeNames.includes(componentName);
+  // Escape special regex characters in the base name
+  const escapedBaseName = baseName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-  // Find all existing nodes with this base name pattern (name + number)
-  const pattern = new RegExp(`^${escapedName}(\\d+)$`);
+  // Check if the base name already exists
+  const baseNameExists = existingNodeNames.includes(baseName);
+
+  // Find all existing nodes with this base name pattern (base + space + number)
+  const pattern = new RegExp(`^${escapedBaseName}\\s+(\\d+)$`);
   const existingOrdinals: number[] = [];
 
   for (const name of existingNodeNames) {
@@ -48,18 +51,15 @@ export function generateUniqueNodeName(componentName: string, existingNodeNames:
     }
   }
 
-  // If no existing nodes with this name, return the base name
+  // If no existing nodes with this name, return the original name
   if (!baseNameExists && existingOrdinals.length === 0) {
     return componentName;
   }
 
   // Find the next available ordinal (starting from 2)
-  let nextOrdinal = 2;
-  if (existingOrdinals.length > 0) {
-    nextOrdinal = Math.max(...existingOrdinals) + 1;
-  }
+  const nextOrdinal = existingOrdinals.length > 0 ? Math.max(...existingOrdinals) + 1 : 2;
 
-  return `${componentName}${nextOrdinal}`;
+  return `${baseName} ${nextOrdinal}`;
 }
 
 export function mapTriggerEventsToSidebarEvents(
