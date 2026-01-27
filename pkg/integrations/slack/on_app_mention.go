@@ -126,7 +126,7 @@ func (t *OnAppMention) subscribe(ctx core.TriggerContext, metadata AppMentionMet
 
 	logrus.Infof("creating new subscription")
 
-	subscriptionID, err := ctx.AppInstallation.Subscribe(SubscriptionConfiguration{
+	subscriptionID, err := ctx.Integration.Subscribe(SubscriptionConfiguration{
 		EventTypes: []string{"app_mention"},
 	})
 
@@ -148,7 +148,7 @@ func (t *OnAppMention) validateChannel(ctx core.TriggerContext, config OnAppMent
 		return metadata.Channel, nil
 	}
 
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Slack client: %w", err)
 	}
@@ -176,7 +176,7 @@ func (t *OnAppMention) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 	return http.StatusOK, nil
 }
 
-func (t *OnAppMention) OnAppMessage(ctx core.AppMessageContext) error {
+func (t *OnAppMention) OnIntegrationMessage(ctx core.IntegrationMessageContext) error {
 	config := OnAppMentionConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {

@@ -4,12 +4,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-func (s *Slack) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.ApplicationResource, error) {
+func (s *Slack) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	if resourceType != "channel" {
-		return []core.ApplicationResource{}, nil
+		return []core.IntegrationResource{}, nil
 	}
 
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
@@ -19,9 +19,9 @@ func (s *Slack) ListResources(resourceType string, ctx core.ListResourcesContext
 		return nil, err
 	}
 
-	resources := make([]core.ApplicationResource, 0, len(channels))
+	resources := make([]core.IntegrationResource, 0, len(channels))
 	for _, channel := range channels {
-		resources = append(resources, core.ApplicationResource{
+		resources = append(resources, core.IntegrationResource{
 			Type: resourceType,
 			Name: channel.Name,
 			ID:   channel.ID,

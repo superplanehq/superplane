@@ -26,10 +26,10 @@ func Test__ListIncidents__Setup(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{}
 
 		err := component.Setup(core.SetupContext{
-			Configuration:   map[string]any{},
-			HTTP:            &contexts.HTTPContext{},
-			AppInstallation: appCtx,
-			Metadata:        metadataCtx,
+			Configuration: map[string]any{},
+			HTTP:          &contexts.HTTPContext{},
+			Integration:   appCtx,
+			Metadata:      metadataCtx,
 		})
 
 		require.NoError(t, err)
@@ -66,9 +66,9 @@ func Test__ListIncidents__Setup(t *testing.T) {
 			Configuration: map[string]any{
 				"services": []string{"PX123456"},
 			},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			Metadata:        metadataCtx,
+			HTTP:        httpContext,
+			Integration: appCtx,
+			Metadata:    metadataCtx,
 		})
 
 		require.NoError(t, err)
@@ -102,9 +102,9 @@ func Test__ListIncidents__Setup(t *testing.T) {
 			Configuration: map[string]any{
 				"services": []string{"PX123456"},
 			},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			Metadata:        metadataCtx,
+			HTTP:        httpContext,
+			Integration: appCtx,
+			Metadata:    metadataCtx,
 		})
 
 		require.NoError(t, err)
@@ -133,9 +133,9 @@ func Test__ListIncidents__Setup(t *testing.T) {
 			Configuration: map[string]any{
 				"services": []string{"INVALID"},
 			},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			Metadata:        &contexts.MetadataContext{},
+			HTTP:        httpContext,
+			Integration: appCtx,
+			Metadata:    &contexts.MetadataContext{},
 		})
 
 		require.Error(t, err)
@@ -201,11 +201,11 @@ func Test__ListIncidents__Execute(t *testing.T) {
 		nodeMetadataCtx := &contexts.MetadataContext{}
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
-			Configuration:   map[string]any{},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  execCtx,
-			NodeMetadata:    nodeMetadataCtx,
+			Configuration:  map[string]any{},
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: execCtx,
+			NodeMetadata:   nodeMetadataCtx,
 		})
 
 		require.NoError(t, err)
@@ -262,11 +262,11 @@ func Test__ListIncidents__Execute(t *testing.T) {
 		nodeMetadataCtx := &contexts.MetadataContext{}
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
-			Configuration:   map[string]any{},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  execCtx,
-			NodeMetadata:    nodeMetadataCtx,
+			Configuration:  map[string]any{},
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: execCtx,
+			NodeMetadata:   nodeMetadataCtx,
 		})
 
 		require.NoError(t, err)
@@ -299,11 +299,11 @@ func Test__ListIncidents__Execute(t *testing.T) {
 		nodeMetadataCtx := &contexts.MetadataContext{}
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
-			Configuration:   map[string]any{},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  execCtx,
-			NodeMetadata:    nodeMetadataCtx,
+			Configuration:  map[string]any{},
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: execCtx,
+			NodeMetadata:   nodeMetadataCtx,
 		})
 
 		require.NoError(t, err)
@@ -367,11 +367,11 @@ func Test__ListIncidents__Execute(t *testing.T) {
 		nodeMetadataCtx := &contexts.MetadataContext{}
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
-			Configuration:   map[string]any{},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  execCtx,
-			NodeMetadata:    nodeMetadataCtx,
+			Configuration:  map[string]any{},
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: execCtx,
+			NodeMetadata:   nodeMetadataCtx,
 		})
 
 		require.NoError(t, err)
@@ -423,10 +423,10 @@ func Test__ListIncidents__Execute(t *testing.T) {
 			Configuration: map[string]any{
 				"services": []string{"PX123456", "PX789012"},
 			},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  execCtx,
-			NodeMetadata:    nodeMetadataCtx,
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: execCtx,
+			NodeMetadata:   nodeMetadataCtx,
 		})
 
 		require.NoError(t, err)
@@ -461,11 +461,11 @@ func Test__ListIncidents__Execute(t *testing.T) {
 		nodeMetadataCtx := &contexts.MetadataContext{}
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
-			Configuration:   map[string]any{},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			ExecutionState:  execCtx,
-			NodeMetadata:    nodeMetadataCtx,
+			Configuration:  map[string]any{},
+			HTTP:           httpContext,
+			Integration:    appCtx,
+			ExecutionState: execCtx,
+			NodeMetadata:   nodeMetadataCtx,
 		})
 
 		require.Error(t, err)

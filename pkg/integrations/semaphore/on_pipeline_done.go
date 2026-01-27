@@ -118,7 +118,7 @@ func (p *OnPipelineDone) Setup(ctx core.TriggerContext) error {
 		return nil
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}
@@ -140,7 +140,7 @@ func (p *OnPipelineDone) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("error setting metadata: %v", err)
 	}
 
-	return ctx.AppInstallation.RequestWebhook(WebhookConfiguration{
+	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		Project: project.Metadata.ProjectName,
 	})
 }

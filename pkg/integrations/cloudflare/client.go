@@ -18,7 +18,7 @@ type Client struct {
 	BaseURL string
 }
 
-func NewClient(http core.HTTPContext, ctx core.AppInstallationContext) (*Client, error) {
+func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
 	apiToken, err := ctx.GetConfig("apiToken")
 	if err != nil {
 		return nil, fmt.Errorf("error finding API token: %v", err)

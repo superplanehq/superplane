@@ -236,7 +236,7 @@ func (c *SendEmail) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("body is required")
 	}
 
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create SMTP client: %w", err)
 	}

@@ -18,9 +18,9 @@ type Client struct {
 	http    core.HTTPContext
 }
 
-func NewClient(httpClient core.HTTPContext, ctx core.AppInstallationContext) (*Client, error) {
+func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
 	if ctx == nil {
-		return nil, fmt.Errorf("no app installation context")
+		return nil, fmt.Errorf("no integration context")
 	}
 
 	apiKey, err := ctx.GetConfig("apiKey")

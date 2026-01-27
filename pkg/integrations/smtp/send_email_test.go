@@ -19,9 +19,9 @@ func Test__SendEmail__Setup(t *testing.T) {
 
 	t.Run("invalid configuration -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{},
-			Metadata:        &contexts.MetadataContext{},
-			Configuration:   "invalid",
+			Integration:   &contexts.AppInstallationContext{},
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: "invalid",
 		})
 
 		require.ErrorContains(t, err, "failed to decode configuration")
@@ -29,8 +29,8 @@ func Test__SendEmail__Setup(t *testing.T) {
 
 	t.Run("missing to -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{},
-			Metadata:        &contexts.MetadataContext{},
+			Integration: &contexts.AppInstallationContext{},
+			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"subject": "Test Subject",
 				"body":    "Test body",
@@ -42,8 +42,8 @@ func Test__SendEmail__Setup(t *testing.T) {
 
 	t.Run("missing subject -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{},
-			Metadata:        &contexts.MetadataContext{},
+			Integration: &contexts.AppInstallationContext{},
+			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"to":   "test@example.com",
 				"body": "Test body",
@@ -55,8 +55,8 @@ func Test__SendEmail__Setup(t *testing.T) {
 
 	t.Run("missing body -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{},
-			Metadata:        &contexts.MetadataContext{},
+			Integration: &contexts.AppInstallationContext{},
+			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"to":      "test@example.com",
 				"subject": "Test Subject",
@@ -68,8 +68,8 @@ func Test__SendEmail__Setup(t *testing.T) {
 
 	t.Run("invalid email in to -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{},
-			Metadata:        &contexts.MetadataContext{},
+			Integration: &contexts.AppInstallationContext{},
+			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"to":      "not-an-email",
 				"subject": "Test Subject",
@@ -83,8 +83,8 @@ func Test__SendEmail__Setup(t *testing.T) {
 	t.Run("valid configuration -> stores metadata", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{},
-			Metadata:        metadata,
+			Integration: &contexts.AppInstallationContext{},
+			Metadata:    metadata,
 			Configuration: map[string]any{
 				"to":      "recipient@example.com",
 				"subject": "Test Subject",
@@ -102,8 +102,8 @@ func Test__SendEmail__Setup(t *testing.T) {
 	t.Run("valid configuration with multiple recipients -> stores all", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{},
-			Metadata:        metadata,
+			Integration: &contexts.AppInstallationContext{},
+			Metadata:    metadata,
 			Configuration: map[string]any{
 				"to":      "a@example.com, b@example.com, c@example.com",
 				"subject": "Test Subject",
@@ -123,7 +123,7 @@ func Test__SendEmail__Execute(t *testing.T) {
 
 	t.Run("missing to -> error", func(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
-			AppInstallation: &contexts.AppInstallationContext{
+			Integration: &contexts.AppInstallationContext{
 				Configuration: map[string]any{
 					"host":      "smtp.example.com",
 					"port":      "587",
@@ -166,8 +166,8 @@ func Test__SendEmail__Execute(t *testing.T) {
 		}
 
 		err := component.Execute(core.ExecutionContext{
-			AppInstallation: appCtx,
-			ExecutionState:  execState,
+			Integration:    appCtx,
+			ExecutionState: execState,
 			Configuration: map[string]any{
 				"to":      "recipient@example.com",
 				"subject": "Test Subject",
@@ -210,8 +210,8 @@ func Test__SendEmail__Execute(t *testing.T) {
 		}
 
 		err := component.Execute(core.ExecutionContext{
-			AppInstallation: appCtx,
-			ExecutionState:  &contexts.ExecutionStateContext{KVs: map[string]string{}},
+			Integration:    appCtx,
+			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 			Configuration: map[string]any{
 				"to":      "recipient@example.com",
 				"subject": "Test",

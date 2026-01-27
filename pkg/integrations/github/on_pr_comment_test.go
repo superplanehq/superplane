@@ -358,9 +358,9 @@ func Test__OnPRComment__Setup(t *testing.T) {
 	t.Run("repository is required", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallation: appCtx,
-			Metadata:        &contexts.MetadataContext{},
-			Configuration:   map[string]any{"repository": ""},
+			Integration:   appCtx,
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"repository": ""},
 		})
 
 		require.ErrorContains(t, err, "repository is required")
@@ -373,9 +373,9 @@ func Test__OnPRComment__Setup(t *testing.T) {
 			},
 		}
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallation: appCtx,
-			Metadata:        &contexts.MetadataContext{},
-			Configuration:   map[string]any{"repository": "world"},
+			Integration:   appCtx,
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"repository": "world"},
 		})
 
 		require.ErrorContains(t, err, "repository world is not accessible to app installation")
@@ -390,9 +390,9 @@ func Test__OnPRComment__Setup(t *testing.T) {
 
 		nodeMetadataCtx := contexts.MetadataContext{}
 		require.NoError(t, trigger.Setup(core.TriggerContext{
-			AppInstallation: appCtx,
-			Metadata:        &nodeMetadataCtx,
-			Configuration:   map[string]any{"repository": "hello"},
+			Integration:   appCtx,
+			Metadata:      &nodeMetadataCtx,
+			Configuration: map[string]any{"repository": "hello"},
 		}))
 
 		require.Equal(t, nodeMetadataCtx.Get(), NodeMetadata{Repository: &helloRepo})

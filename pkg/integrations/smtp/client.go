@@ -108,7 +108,7 @@ var smtpDial smtpDialer = func(addr string) (smtpClient, error) {
 	return &smtpClientAdapter{client: client}, nil
 }
 
-func NewClient(ctx core.AppInstallationContext) (*Client, error) {
+func NewClient(ctx core.IntegrationContext) (*Client, error) {
 	host, err := ctx.GetConfig("host")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get host: %w", err)

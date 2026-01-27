@@ -31,9 +31,9 @@ func ListApplicationResources(ctx context.Context, registry *registry.Registry, 
 		return nil, err
 	}
 
-	app, err := registry.GetApplication(appInstallation.AppName)
+	integration, err := registry.GetIntegration(appInstallation.AppName)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "application %s not found", appInstallation.AppName)
+		return nil, status.Errorf(codes.Internal, "integration %s not found", appInstallation.AppName)
 	}
 
 	appCtx := contexts.NewAppInstallationContext(
@@ -50,11 +50,11 @@ func ListApplicationResources(ctx context.Context, registry *registry.Registry, 
 			"app_name":            appInstallation.AppName,
 			"resource_type":       resourceType,
 		}),
-		HTTP:            contexts.NewHTTPContext(registry.GetHTTPClient()),
-		AppInstallation: appCtx,
+		HTTP:        contexts.NewHTTPContext(registry.GetHTTPClient()),
+		Integration: appCtx,
 	}
 
-	resources, err := app.ListResources(resourceType, listCtx)
+	resources, err := integration.ListResources(resourceType, listCtx)
 	if err != nil {
 		log.WithError(err).Errorf("failed to list resources for app installation %s", appInstallation.ID)
 		return nil, status.Error(codes.Internal, "failed to list application resources")
@@ -65,7 +65,7 @@ func ListApplicationResources(ctx context.Context, registry *registry.Registry, 
 	}, nil
 }
 
-func serializeAppInstallationResources(resources []core.ApplicationResource) []*pb.AppInstallationResourceRef {
+func serializeAppInstallationResources(resources []core.IntegrationResource) []*pb.AppInstallationResourceRef {
 	out := make([]*pb.AppInstallationResourceRef, 0, len(resources))
 	for _, resource := range resources {
 		out = append(out, &pb.AppInstallationResourceRef{

@@ -72,7 +72,7 @@ type AppInstallationContext struct {
 	State            string
 	StateDescription string
 	BrowserAction    *core.BrowserAction
-	Secrets          map[string]core.InstallationSecret
+	Secrets          map[string]core.IntegrationSecret
 	WebhookRequests  []any
 	ResyncRequests   []time.Duration
 	Subscriptions    []Subscription
@@ -131,12 +131,12 @@ func (c *AppInstallationContext) RemoveBrowserAction() {
 }
 
 func (c *AppInstallationContext) SetSecret(name string, value []byte) error {
-	c.Secrets[name] = core.InstallationSecret{Name: name, Value: value}
+	c.Secrets[name] = core.IntegrationSecret{Name: name, Value: value}
 	return nil
 }
 
-func (c *AppInstallationContext) GetSecrets() ([]core.InstallationSecret, error) {
-	secrets := make([]core.InstallationSecret, 0, len(c.Secrets))
+func (c *AppInstallationContext) GetSecrets() ([]core.IntegrationSecret, error) {
+	secrets := make([]core.IntegrationSecret, 0, len(c.Secrets))
 	for _, secret := range c.Secrets {
 		secrets = append(secrets, secret)
 	}
@@ -153,7 +153,7 @@ func (c *AppInstallationContext) ScheduleResync(interval time.Duration) error {
 	return nil
 }
 
-func (c *AppInstallationContext) ListSubscriptions() ([]core.AppSubscriptionContext, error) {
+func (c *AppInstallationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
 	return nil, nil
 }
 

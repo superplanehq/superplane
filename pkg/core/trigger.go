@@ -76,14 +76,14 @@ type Trigger interface {
 }
 
 type TriggerContext struct {
-	Logger          *log.Entry
-	Configuration   any
-	HTTP            HTTPContext
-	Metadata        MetadataContext
-	Requests        RequestContext
-	Events          EventContext
-	Webhook         NodeWebhookContext
-	AppInstallation AppInstallationContext
+	Logger        *log.Entry
+	Configuration any
+	HTTP          HTTPContext
+	Metadata      MetadataContext
+	Requests      RequestContext
+	Events        EventContext
+	Webhook       NodeWebhookContext
+	Integration   IntegrationContext
 }
 
 type EventContext interface {
@@ -91,16 +91,16 @@ type EventContext interface {
 }
 
 type TriggerActionContext struct {
-	Name            string
-	Parameters      map[string]any
-	Configuration   any
-	Logger          *log.Entry
-	HTTP            HTTPContext
-	Metadata        MetadataContext
-	Requests        RequestContext
-	Events          EventContext
-	Webhook         NodeWebhookContext
-	AppInstallation AppInstallationContext
+	Name          string
+	Parameters    map[string]any
+	Configuration any
+	Logger        *log.Entry
+	HTTP          HTTPContext
+	Metadata      MetadataContext
+	Requests      RequestContext
+	Events        EventContext
+	Webhook       NodeWebhookContext
+	Integration   IntegrationContext
 }
 
 type WebhookRequestContext struct {

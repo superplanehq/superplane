@@ -225,7 +225,7 @@ func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 		return nil
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}
@@ -247,7 +247,7 @@ func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error setting metadata: %v", err)
 	}
 
-	ctx.AppInstallation.RequestWebhook(WebhookConfiguration{
+	ctx.Integration.RequestWebhook(WebhookConfiguration{
 		Project: project.Metadata.ProjectName,
 	})
 
@@ -267,7 +267,7 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}
@@ -467,7 +467,7 @@ func (r *RunWorkflow) poll(ctx core.ActionContext) error {
 		return nil
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}

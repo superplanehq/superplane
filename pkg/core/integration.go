@@ -10,44 +10,44 @@ import (
 	"github.com/superplanehq/superplane/pkg/oidc"
 )
 
-type Application interface {
+type Integration interface {
 	/*
-	 * The name of the application.
+	 * The name of the integration.
 	 */
 	Name() string
 
 	/*
-	 * Display name for the application.
+	 * Display name for the integration.
 	 */
 	Label() string
 
 	/*
-	 * The icon used by the application.
+	 * The icon used by the integration.
 	 */
 	Icon() string
 
 	/*
-	 * A description of what the application does.
+	 * A description of what the integration does.
 	 */
 	Description() string
 
 	/*
-	 * Markdown-formatted instructions shown in the installation modal.
+	 * Markdown-formatted instructions shown in the connection modal.
 	 */
-	InstallationInstructions() string
+	Instructions() string
 
 	/*
-	 * The configuration fields of the application.
+	 * The configuration fields of the integration.
 	 */
 	Configuration() []configuration.Field
 
 	/*
-	 * The list of components exposed by the application.
+	 * The list of components exposed by the integration.
 	 */
 	Components() []Component
 
 	/*
-	 * The list of triggers exposed by the application.
+	 * The list of triggers exposed by the integration.
 	 */
 	Triggers() []Trigger
 
@@ -59,7 +59,7 @@ type Application interface {
 	/*
 	 * List resources of a given type.
 	 */
-	ListResources(resourceType string, ctx ListResourcesContext) ([]ApplicationResource, error)
+	ListResources(resourceType string, ctx ListResourcesContext) ([]IntegrationResource, error)
 
 	/*
 	 * HTTP request handler
@@ -74,71 +74,71 @@ type Application interface {
 	CompareWebhookConfig(a, b any) (bool, error)
 
 	/*
-	 * Set up webhooks through the app installation, in the external system.
+	 * Set up webhooks through the integration, in the external system.
 	 * This is called by the webhook provisioner, for pending webhook records.
 	 */
 	SetupWebhook(ctx SetupWebhookContext) (any, error)
 
 	/*
-	 * Delete webhooks through the app installation, in the external system.
+	 * Delete webhooks through the integration, in the external system.
 	 * This is called by the webhook cleanup worker, for webhook records that were deleted.
 	 */
 	CleanupWebhook(ctx CleanupWebhookContext) error
 }
 
-type AppComponent interface {
+type IntegrationComponent interface {
 
 	/*
-	 * AppComponent inherits all the methods from Component interface,
+	 * IntegrationComponent inherits all the methods from Component interface,
 	 * and adds a couple more, which are only applicable to app components.
 	 */
 	Component
 
-	OnAppMessage(ctx AppMessageContext) error
+	OnIntegrationMessage(ctx IntegrationMessageContext) error
 }
 
-type AppTrigger interface {
+type IntegrationTrigger interface {
 
 	/*
 	 * Inherits all the methods from Trigger interface,
-	 * and adds a couple more, which are only applicable to app triggers.
+	 * and adds a couple more, which are only applicable to integration triggers.
 	 */
 	Trigger
 
-	OnAppMessage(ctx AppMessageContext) error
+	OnIntegrationMessage(ctx IntegrationMessageContext) error
 }
 
-type AppMessageContext struct {
-	Message         any
-	Configuration   any
-	Logger          *logrus.Entry
-	AppInstallation AppInstallationContext
-	Events          EventContext
+type IntegrationMessageContext struct {
+	Message       any
+	Configuration any
+	Logger        *logrus.Entry
+	Integration   IntegrationContext
+	Events        EventContext
 }
 
-type ApplicationResource struct {
+type IntegrationResource struct {
 	Type string
 	Name string
 	ID   string
 }
 
 type ListResourcesContext struct {
-	Logger          *logrus.Entry
-	HTTP            HTTPContext
-	AppInstallation AppInstallationContext
+	Logger      *logrus.Entry
+	HTTP        HTTPContext
+	Integration IntegrationContext
 }
 
 type SetupWebhookContext struct {
-	HTTP            HTTPContext
-	Webhook         WebhookContext
-	Logger          *logrus.Entry
-	AppInstallation AppInstallationContext
+	HTTP        HTTPContext
+	Webhook     WebhookContext
+	Logger      *logrus.Entry
+	Integration IntegrationContext
 }
 
 type CleanupWebhookContext struct {
-	HTTP            HTTPContext
-	Webhook         WebhookContext
-	AppInstallation AppInstallationContext
+	HTTP        HTTPContext
+	Webhook     WebhookContext
+	Integration IntegrationContext
 }
 
 type WebhookOptions struct {
@@ -156,17 +156,17 @@ type SyncContext struct {
 	OrganizationID  string
 	InstallationID  string
 	HTTP            HTTPContext
-	AppInstallation AppInstallationContext
+	Integration     IntegrationContext
 	OIDC            oidc.Provider
 }
 
 /*
- * AppInstallationContext allows components to access app installation information.
+ * IntegrationContext allows components to access integration information.
  */
-type AppInstallationContext interface {
+type IntegrationContext interface {
 
 	//
-	// Control the metadata and config of the app installation
+	// Control the metadata and config of the integration
 	//
 	ID() uuid.UUID
 	GetMetadata() any
@@ -174,51 +174,51 @@ type AppInstallationContext interface {
 	GetConfig(name string) ([]byte, error)
 
 	//
-	// Control the state of the app installation
+	// Control the state of the integration
 	//
 	GetState() string
 	SetState(state, stateDescription string)
 
 	//
-	// Control the browser action of the app installation
+	// Control the browser action of the integration
 	//
 	NewBrowserAction(action BrowserAction)
 	RemoveBrowserAction()
 
 	//
-	// Control the secrets of the app installation
+	// Control the secrets of the integration
 	//
 	SetSecret(name string, value []byte) error
-	GetSecrets() ([]InstallationSecret, error)
+	GetSecrets() ([]IntegrationSecret, error)
 
 	/*
-	 * Request a new webhook from the app installation.
+	 * Request a new webhook from the integration.
 	 * Called from the components/triggers Setup().
 	 */
 	RequestWebhook(configuration any) error
 
 	/*
-	 * Subscribe to app events.
+	 * Subscribe to integration events.
 	 */
 	Subscribe(any) (*uuid.UUID, error)
 
 	/*
-	 * Schedule a sync call for the app installation.
+	 * Schedule a sync call for the integration.
 	 */
 	ScheduleResync(interval time.Duration) error
 
 	/*
-	 * List app installation subscriptions from nodes.
+	 * List integration subscriptions from nodes.
 	 */
-	ListSubscriptions() ([]AppSubscriptionContext, error)
+	ListSubscriptions() ([]IntegrationSubscriptionContext, error)
 }
 
-type AppSubscriptionContext interface {
+type IntegrationSubscriptionContext interface {
 	Configuration() any
 	SendMessage(any) error
 }
 
-type InstallationSecret struct {
+type IntegrationSecret struct {
 	Name  string
 	Value []byte
 }
@@ -238,7 +238,7 @@ type HTTPRequestContext struct {
 	BaseURL         string
 	WebhooksBaseURL string
 	HTTP            HTTPContext
-	AppInstallation AppInstallationContext
+	Integration     IntegrationContext
 }
 
 /*

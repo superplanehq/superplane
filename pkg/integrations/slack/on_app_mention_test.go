@@ -17,9 +17,9 @@ func Test__OnAppMention__Setup(t *testing.T) {
 
 	t.Run("invalid configuration -> error", func(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallation: &contexts.AppInstallationContext{},
-			Metadata:        &contexts.MetadataContext{},
-			Configuration:   "invalid",
+			Integration:   &contexts.AppInstallationContext{},
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: "invalid",
 		})
 
 		require.ErrorContains(t, err, "failed to decode configuration")
@@ -29,9 +29,9 @@ func Test__OnAppMention__Setup(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 		appCtx := &contexts.AppInstallationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallation: appCtx,
-			Metadata:        metadata,
-			Configuration:   map[string]any{"channel": ""},
+			Integration:   appCtx,
+			Metadata:      metadata,
+			Configuration: map[string]any{"channel": ""},
 		})
 
 		require.NoError(t, err)
@@ -56,9 +56,9 @@ func Test__OnAppMention__Setup(t *testing.T) {
 
 		appCtx := &contexts.AppInstallationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallation: appCtx,
-			Metadata:        metadata,
-			Configuration:   map[string]any{"channel": "C123"},
+			Integration:   appCtx,
+			Metadata:      metadata,
+			Configuration: map[string]any{"channel": "C123"},
 		})
 
 		require.NoError(t, err)
@@ -87,9 +87,9 @@ func Test__OnAppMention__Setup(t *testing.T) {
 		}
 
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallation: appCtx,
-			Metadata:        metadata,
-			Configuration:   map[string]any{"channel": "C456"},
+			Integration:   appCtx,
+			Metadata:      metadata,
+			Configuration: map[string]any{"channel": "C456"},
 		})
 
 		require.NoError(t, err)
@@ -118,9 +118,9 @@ func Test__OnAppMention__Setup(t *testing.T) {
 		}
 
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallation: appCtx,
-			Metadata:        metadata,
-			Configuration:   map[string]any{"channel": "C123"},
+			Integration:   appCtx,
+			Metadata:      metadata,
+			Configuration: map[string]any{"channel": "C123"},
 		})
 
 		require.NoError(t, err)
@@ -157,9 +157,9 @@ func Test__OnAppMention__Setup(t *testing.T) {
 		}
 
 		err := trigger.Setup(core.TriggerContext{
-			AppInstallation: appCtx,
-			Metadata:        metadata,
-			Configuration:   map[string]any{"channel": "C123"},
+			Integration:   appCtx,
+			Metadata:      metadata,
+			Configuration: map[string]any{"channel": "C123"},
 		})
 
 		require.NoError(t, err)
@@ -183,7 +183,7 @@ func Test__OnAppMention__OnAppMessage(t *testing.T) {
 
 	t.Run("channel mismatch -> ignore", func(t *testing.T) {
 		events := &contexts.EventContext{}
-		err := trigger.OnAppMessage(core.AppMessageContext{
+		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
 			Configuration: map[string]any{"channel": "C999"},
 			Message:       map[string]any{"channel": "C123"},
 			Logger:        logrus.NewEntry(logrus.New()),
@@ -197,7 +197,7 @@ func Test__OnAppMention__OnAppMessage(t *testing.T) {
 	t.Run("channel match -> emit", func(t *testing.T) {
 		message := map[string]any{"channel": "C123", "text": "hi"}
 		events := &contexts.EventContext{}
-		err := trigger.OnAppMessage(core.AppMessageContext{
+		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
 			Configuration: map[string]any{"channel": "C123"},
 			Message:       message,
 			Logger:        logrus.NewEntry(logrus.New()),
@@ -213,7 +213,7 @@ func Test__OnAppMention__OnAppMessage(t *testing.T) {
 	t.Run("no channel configured -> emit", func(t *testing.T) {
 		message := map[string]any{"channel": "C123", "text": "hi"}
 		events := &contexts.EventContext{}
-		err := trigger.OnAppMessage(core.AppMessageContext{
+		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
 			Configuration: map[string]any{},
 			Message:       message,
 			Logger:        logrus.NewEntry(logrus.New()),

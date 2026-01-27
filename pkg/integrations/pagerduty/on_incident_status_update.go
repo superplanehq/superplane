@@ -86,12 +86,9 @@ func (t *OnIncidentStatusUpdate) Configuration() []configuration.Field {
 }
 
 func (t *OnIncidentStatusUpdate) Setup(ctx core.TriggerContext) error {
-	log.Printf("[OnIncidentStatusUpdate] Setup called")
-
 	metadata := NodeMetadata{}
 	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
-		log.Printf("[OnIncidentStatusUpdate] Failed to decode metadata: %v", err)
 		return fmt.Errorf("failed to decode metadata: %v", err)
 	}
 
@@ -99,47 +96,35 @@ func (t *OnIncidentStatusUpdate) Setup(ctx core.TriggerContext) error {
 	// If metadata is already set, skip setup
 	//
 	if metadata.Service != nil {
-		log.Printf("[OnIncidentStatusUpdate] Metadata already set, skipping setup. Service: %s", metadata.Service.Name)
 		return nil
 	}
 
 	config := OnIncidentStatusUpdateConfiguration{}
 	err = mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		log.Printf("[OnIncidentStatusUpdate] Failed to decode configuration: %v", err)
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	if config.Service == "" {
-		log.Printf("[OnIncidentStatusUpdate] Service is required but not provided")
 		return fmt.Errorf("service is required")
 	}
 
-	log.Printf("[OnIncidentStatusUpdate] Creating client for service: %s", config.Service)
-
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		log.Printf("[OnIncidentStatusUpdate] Error creating client: %v", err)
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
 	service, err := client.GetService(config.Service)
 	if err != nil {
-		log.Printf("[OnIncidentStatusUpdate] Error finding service: %v", err)
 		return fmt.Errorf("error finding service: %v", err)
 	}
 
-	log.Printf("[OnIncidentStatusUpdate] Found service: %s (%s)", service.Name, service.ID)
-
 	err = ctx.Metadata.Set(NodeMetadata{Service: service})
 	if err != nil {
-		log.Printf("[OnIncidentStatusUpdate] Error setting node metadata: %v", err)
 		return fmt.Errorf("error setting node metadata: %v", err)
 	}
 
-	log.Printf("[OnIncidentStatusUpdate] Requesting webhook for event: incident.status_update_published, filter: service_reference/%s", config.Service)
-
-	return ctx.AppInstallation.RequestWebhook(WebhookConfiguration{
+	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		Events: []string{"incident.status_update_published"},
 		Filter: WebhookFilter{
 			Type: "service_reference",

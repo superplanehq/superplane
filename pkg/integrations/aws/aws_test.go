@@ -22,9 +22,9 @@ func Test__AWS__Sync(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 
 		err := a.Sync(core.SyncContext{
-			Configuration:   map[string]any{"region": "us-east-1"},
-			AppInstallation: appCtx,
-			BaseURL:         "http://localhost:8000",
+			Configuration: map[string]any{"region": "us-east-1"},
+			Integration:   appCtx,
+			BaseURL:       "http://localhost:8000",
 		})
 
 		require.NoError(t, err)
@@ -63,16 +63,16 @@ func Test__AWS__Sync(t *testing.T) {
 				"region":                 "us-east-1",
 				"sessionDurationSeconds": 3600,
 			},
-			Secrets:       map[string]core.InstallationSecret{},
+			Secrets:       map[string]core.IntegrationSecret{},
 			BrowserAction: &core.BrowserAction{},
 		}
 
 		err := a.Sync(core.SyncContext{
-			Configuration:   appCtx.Configuration,
-			HTTP:            httpContext,
-			OIDC:            support.NewOIDCProvider(),
-			AppInstallation: appCtx,
-			InstallationID:  "installation-123",
+			Configuration:  appCtx.Configuration,
+			HTTP:           httpContext,
+			OIDC:           support.NewOIDCProvider(),
+			Integration:    appCtx,
+			InstallationID: "installation-123",
 		})
 
 		require.NoError(t, err)
@@ -107,7 +107,7 @@ func Test__AWS__ListResources(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 
 		resources, err := a.ListResources("unknown", core.ListResourcesContext{
-			AppInstallation: appCtx,
+			Integration: appCtx,
 		})
 
 		require.NoError(t, err)
@@ -116,11 +116,11 @@ func Test__AWS__ListResources(t *testing.T) {
 
 	t.Run("lambda.function without credentials returns error", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{
-			Secrets: map[string]core.InstallationSecret{},
+			Secrets: map[string]core.IntegrationSecret{},
 		}
 
 		_, err := a.ListResources("lambda.function", core.ListResourcesContext{
-			AppInstallation: appCtx,
+			Integration: appCtx,
 		})
 
 		require.ErrorContains(t, err, "AWS session credentials are missing")
@@ -131,7 +131,7 @@ func Test__AWS__ListResources(t *testing.T) {
 			Configuration: map[string]any{
 				"region": "   ",
 			},
-			Secrets: map[string]core.InstallationSecret{
+			Secrets: map[string]core.IntegrationSecret{
 				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -139,7 +139,7 @@ func Test__AWS__ListResources(t *testing.T) {
 		}
 
 		_, err := a.ListResources("lambda.function", core.ListResourcesContext{
-			AppInstallation: appCtx,
+			Integration: appCtx,
 		})
 
 		require.ErrorContains(t, err, "region is required")
@@ -168,7 +168,7 @@ func Test__AWS__ListResources(t *testing.T) {
 			Configuration: map[string]any{
 				"region": "us-east-1",
 			},
-			Secrets: map[string]core.InstallationSecret{
+			Secrets: map[string]core.IntegrationSecret{
 				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -176,8 +176,8 @@ func Test__AWS__ListResources(t *testing.T) {
 		}
 
 		resources, err := a.ListResources("lambda.function", core.ListResourcesContext{
-			AppInstallation: appCtx,
-			HTTP:            httpContext,
+			Integration: appCtx,
+			HTTP:        httpContext,
 		})
 
 		require.NoError(t, err)

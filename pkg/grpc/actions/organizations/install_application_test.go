@@ -169,7 +169,7 @@ func Test__InstallApplication(t *testing.T) {
 		//
 		// Register a test application that always fails on Sync
 		//
-		r.Registry.Applications["dummy"] = support.NewDummyApplication(func(ctx core.SyncContext) error {
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
 			return errors.New("oops")
 		})
 
@@ -209,8 +209,8 @@ func Test__InstallApplication(t *testing.T) {
 		//
 		// Register a test application that succeeds on Sync
 		//
-		r.Registry.Applications["dummy"] = support.NewDummyApplication(func(ctx core.SyncContext) error {
-			ctx.AppInstallation.SetState("ready", "")
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
+			ctx.Integration.SetState("ready", "")
 			return nil
 		})
 

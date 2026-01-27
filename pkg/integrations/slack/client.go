@@ -15,7 +15,7 @@ type Client struct {
 	BotToken string
 }
 
-func NewClient(ctx core.AppInstallationContext) (*Client, error) {
+func NewClient(ctx core.IntegrationContext) (*Client, error) {
 	botToken, err := ctx.GetConfig("botToken")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get bot token: %w", err)

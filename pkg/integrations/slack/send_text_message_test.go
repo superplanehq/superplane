@@ -17,9 +17,9 @@ func Test__SendTextMessage__Setup(t *testing.T) {
 
 	t.Run("invalid configuration -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{},
-			Metadata:        &contexts.MetadataContext{},
-			Configuration:   "invalid",
+			Integration:   &contexts.AppInstallationContext{},
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: "invalid",
 		})
 
 		require.ErrorContains(t, err, "failed to decode configuration")
@@ -27,9 +27,9 @@ func Test__SendTextMessage__Setup(t *testing.T) {
 
 	t.Run("missing channel -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{},
-			Metadata:        &contexts.MetadataContext{},
-			Configuration:   map[string]any{"channel": ""},
+			Integration:   &contexts.AppInstallationContext{},
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"channel": ""},
 		})
 
 		require.ErrorContains(t, err, "channel is required")
@@ -50,9 +50,9 @@ func Test__SendTextMessage__Setup(t *testing.T) {
 		}
 
 		err := component.Setup(core.SetupContext{
-			AppInstallation: appCtx,
-			Metadata:        metadata,
-			Configuration:   map[string]any{"channel": "C123"},
+			Integration:   appCtx,
+			Metadata:      metadata,
+			Configuration: map[string]any{"channel": "C123"},
 		})
 
 		require.NoError(t, err)
@@ -69,9 +69,9 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 
 	t.Run("missing channel -> error", func(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
-			AppInstallation: &contexts.AppInstallationContext{},
-			ExecutionState:  &contexts.ExecutionStateContext{KVs: map[string]string{}},
-			Configuration:   map[string]any{"channel": ""},
+			Integration:    &contexts.AppInstallationContext{},
+			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+			Configuration:  map[string]any{"channel": ""},
 		})
 
 		require.ErrorContains(t, err, "channel is required")
@@ -101,9 +101,9 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 		}
 
 		err := component.Execute(core.ExecutionContext{
-			AppInstallation: appCtx,
-			ExecutionState:  execState,
-			Configuration:   map[string]any{"channel": "C123", "text": "hello"},
+			Integration:    appCtx,
+			ExecutionState: execState,
+			Configuration:  map[string]any{"channel": "C123", "text": "hello"},
 		})
 
 		require.NoError(t, err)

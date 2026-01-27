@@ -108,7 +108,7 @@ func (c *SendTextMessage) Setup(ctx core.SetupContext) error {
 		return errors.New("channel is required")
 	}
 
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create Slack client: %w", err)
 	}
@@ -142,7 +142,7 @@ func (c *SendTextMessage) Execute(ctx core.ExecutionContext) error {
 		return errors.New("channel is required")
 	}
 
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create Slack client: %w", err)
 	}
