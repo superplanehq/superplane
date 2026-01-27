@@ -5,6 +5,7 @@ export interface ComponentActionsProps {
   // When true, shows Run as disabled with tooltip
   runDisabled?: boolean;
   runDisabledTooltip?: string;
+  onTogglePause?: () => void;
   onDuplicate?: () => void;
   onEdit?: () => void;
   onConfigure?: () => void;

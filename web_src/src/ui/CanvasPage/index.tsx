@@ -175,6 +175,7 @@ export interface CanvasPageProps {
   onEdit?: (nodeId: string) => void;
   onConfigure?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
+  onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onToggleCollapse?: () => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
@@ -283,6 +284,9 @@ const nodeTypes = {
         onDuplicate={callbacks.onDuplicate.current ? () => callbacks.onDuplicate.current?.(nodeProps.id) : undefined}
         onConfigure={callbacks.onConfigure.current ? () => callbacks.onConfigure.current?.(nodeProps.id) : undefined}
         onDeactivate={callbacks.onDeactivate.current ? () => callbacks.onDeactivate.current?.(nodeProps.id) : undefined}
+        onTogglePause={
+          callbacks.onTogglePause.current ? () => callbacks.onTogglePause.current?.(nodeProps.id) : undefined
+        }
         onToggleView={callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined}
         onToggleCollapse={
           callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined
@@ -814,6 +818,7 @@ function CanvasPage(props: CanvasPageProps) {
               onDeactivate={props.onDeactivate}
               onAnnotationUpdate={props.onAnnotationUpdate}
               onAnnotationBlur={props.onAnnotationBlur}
+              onTogglePause={props.onTogglePause}
               runDisabled={props.runDisabled}
               runDisabledTooltip={props.runDisabledTooltip}
               onBuildingBlockDrop={handleBuildingBlockDrop}
@@ -1250,6 +1255,7 @@ function CanvasContent({
   onDuplicate,
   onConfigure,
   onDeactivate,
+  onTogglePause,
   onToggleView,
   onToggleCollapse,
   onAnnotationUpdate,
@@ -1292,6 +1298,7 @@ function CanvasContent({
   onDuplicate?: (nodeId: string) => void;
   onConfigure?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
+  onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onToggleCollapse?: () => void;
   onDelete?: (nodeId: string) => void;
@@ -1486,6 +1493,9 @@ function CanvasContent({
 
   const onDeactivateRef = useRef(onDeactivate);
   onDeactivateRef.current = onDeactivate;
+
+  const onTogglePauseRef = useRef(onTogglePause);
+  onTogglePauseRef.current = onTogglePause;
 
   const onToggleViewRef = useRef(onToggleView);
   onToggleViewRef.current = onToggleView;
@@ -1718,6 +1728,7 @@ function CanvasContent({
     onDuplicate: onDuplicateRef,
     onConfigure: onConfigureRef,
     onDeactivate: onDeactivateRef,
+    onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
@@ -1734,6 +1745,7 @@ function CanvasContent({
     onDuplicate: onDuplicateRef,
     onConfigure: onConfigureRef,
     onDeactivate: onDeactivateRef,
+    onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
