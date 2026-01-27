@@ -92,8 +92,8 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
       ? [{ label: "Roles", href: organizationId ? `/${organizationId}/settings/roles` : "#", Icon: Shield }]
       : []),
     {
-      label: "Applications",
-      href: organizationId ? `/${organizationId}/settings/applications` : "#",
+      label: "Integrations",
+      href: organizationId ? `/${organizationId}/settings/integrations` : "#",
       Icon: AppWindow,
     },
     { label: "Change Organization", href: "/", Icon: ArrowRightLeft },

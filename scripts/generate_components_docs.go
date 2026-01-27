@@ -57,7 +57,7 @@ func writeIntegrationDocs(integration core.Integration, order int) error {
 	sort.Slice(components, func(i, j int) bool { return components[i].Name() < components[j].Name() })
 	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
 
-	return writeAppIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.mdx", appFilename(integration))), integration, components, triggers, order)
+	return writeIntegrationIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.mdx", integrationFilename(integration))), integration, components, triggers, order)
 }
 
 func writeCoreComponentsDoc(components []core.Component, triggers []core.Trigger) error {
@@ -79,7 +79,7 @@ func writeCoreComponentsDoc(components []core.Component, triggers []core.Trigger
 	return writeFile(filepath.Join(docsRoot, "Core.mdx"), buf.Bytes())
 }
 
-func writeAppIndex(
+func writeIntegrationIndex(
 	path string,
 	integration core.Integration,
 	components []core.Component,
@@ -272,7 +272,7 @@ func slugify(value string) string {
 	return strings.ToLower(withDashes)
 }
 
-func appFilename(integration core.Integration) string {
+func integrationFilename(integration core.Integration) string {
 	label := strings.TrimSpace(integration.Label())
 	if label == "" {
 		return slugify(integration.Name())

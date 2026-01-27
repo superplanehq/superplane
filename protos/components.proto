@@ -141,7 +141,7 @@ message Node {
   TriggerRef trigger = 9;
   WidgetRef widget = 10;
   bool is_collapsed = 11;
-  AppInstallationRef app_installation = 12;
+  IntegrationRef integration = 12;
   string error_message = 13;
   string warning_message = 14;
 }
@@ -157,7 +157,7 @@ message Edge {
   string channel = 3;
 }
 
-message AppInstallationRef {
+message IntegrationRef {
   string id = 1;
   string name = 2;
 }

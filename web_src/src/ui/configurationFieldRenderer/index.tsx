@@ -40,7 +40,7 @@ interface ConfigurationFieldRendererProps extends FieldRendererProps {
   allowExpressions?: boolean;
   domainId?: string;
   domainType?: AuthorizationDomainType;
-  appInstallationId?: string;
+  integrationId?: string;
   organizationId?: string;
   hasError?: boolean;
   validationErrors?: ValidationError[] | Set<string>;
@@ -57,7 +57,7 @@ export const ConfigurationFieldRenderer = ({
   allValues = {},
   domainId,
   domainType,
-  appInstallationId,
+  integrationId,
   organizationId,
   hasError = false,
   validationErrors,
@@ -229,7 +229,7 @@ export const ConfigurationFieldRenderer = ({
       allValues,
       hasError: hasFieldError,
       autocompleteExampleObj,
-      appInstallationId,
+      integrationId,
       organizationId,
       allowExpressions,
     };
@@ -290,7 +290,7 @@ export const ConfigurationFieldRenderer = ({
             value={value as string | string[] | undefined}
             onChange={onChange}
             organizationId={organizationId}
-            appInstallationId={appInstallationId}
+            integrationId={integrationId}
           />
         );
 

@@ -11,8 +11,8 @@ import { useOrganization } from "../../../hooks/useOrganizationData";
 import { useAccount } from "../../../contexts/AccountContext";
 import { useParams } from "react-router-dom";
 import { Members } from "./Members";
-import { Applications } from "./Applications";
-import { ApplicationDetails } from "./ApplicationDetails";
+import { Integrations } from "./Integrations";
+import { IntegrationDetails } from "./IntegrationDetails";
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { cn } from "@/lib/utils";
 import {
@@ -80,7 +80,7 @@ export function OrganizationSettings() {
     Icon: LucideIcon;
   };
 
-  const sectionIds = ["profile", "general", "members", "groups", "roles", "applications"];
+  const sectionIds = ["profile", "general", "members", "groups", "roles", "integrations"];
   const pathSegments = location.pathname?.split("/").filter(Boolean) || [];
   const settingsIndex = pathSegments.indexOf("settings");
   const segmentsAfterSettings = settingsIndex >= 0 ? pathSegments.slice(settingsIndex + 1) : [];
@@ -105,7 +105,7 @@ export function OrganizationSettings() {
     ...(isRBACEnabled()
       ? [{ id: "roles", label: "Roles", href: `/${organizationId}/settings/roles`, Icon: Shield }]
       : []),
-    { id: "applications", label: "Applications", href: `/${organizationId}/settings/applications`, Icon: AppWindow },
+    { id: "integrations", label: "Integrations", href: `/${organizationId}/settings/integrations`, Icon: AppWindow },
     { id: "change-org", label: "Change Organization", href: "/", Icon: ArrowRightLeft },
   ];
 
@@ -136,7 +136,7 @@ export function OrganizationSettings() {
     if (link.id === "change-org" || link.id === "sign-out") {
       return false;
     }
-    if (link.id === "applications" && currentSection === "applications") {
+    if (link.id === "integrations" && currentSection === "integrations") {
       return true;
     }
     return currentSection === link.id;
@@ -165,8 +165,8 @@ export function OrganizationSettings() {
       title: "Roles",
       description: "Define fine-grained access by creating and assigning roles.",
     },
-    applications: {
-      title: "Applications",
+    integrations: {
+      title: "Integrations",
       description: "Connect external tools and services to extend SuperPlane.",
     },
     profile: {
@@ -288,11 +288,10 @@ export function OrganizationSettings() {
             <Route path="members" element={<Members organizationId={organizationId || ""} />} />
             <Route path="groups" element={<Groups organizationId={organizationId || ""} />} />
             <Route path="roles" element={<Roles organizationId={organizationId || ""} />} />
-            <Route path="integrations" element={<Navigate to="../applications" replace />} />
-            <Route path="applications" element={<Applications organizationId={organizationId || ""} />} />
+            <Route path="integrations" element={<Integrations organizationId={organizationId || ""} />} />
             <Route
-              path="applications/:installationId"
-              element={<ApplicationDetails organizationId={organizationId || ""} />}
+              path="integrations/:integrationId"
+              element={<IntegrationDetails organizationId={organizationId || ""} />}
             />
             <Route path="groups/:groupName/members" element={<GroupMembersPage />} />
             <Route path="create-group" element={<CreateGroupPage />} />

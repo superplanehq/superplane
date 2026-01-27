@@ -625,9 +625,9 @@ func ProtoToConfigurationField(pbField *configpb.Field) configuration.Field {
 func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 	result := make([]models.Node, len(nodes))
 	for i, node := range nodes {
-		var appInstallationID *string
-		if node.AppInstallation != nil && node.AppInstallation.Id != "" {
-			appInstallationID = &node.AppInstallation.Id
+		var integrationID *string
+		if node.Integration != nil && node.Integration.Id != "" {
+			integrationID = &node.Integration.Id
 		}
 
 		var errorMessage *string
@@ -641,16 +641,16 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 		}
 
 		result[i] = models.Node{
-			ID:                node.Id,
-			Name:              node.Name,
-			Type:              ProtoToNodeType(node.Type),
-			Ref:               ProtoToNodeRef(node),
-			Configuration:     node.Configuration.AsMap(),
-			Position:          ProtoToPosition(node.Position),
-			IsCollapsed:       node.IsCollapsed,
-			AppInstallationID: appInstallationID,
-			ErrorMessage:      errorMessage,
-			WarningMessage:    warningMessage,
+			ID:             node.Id,
+			Name:           node.Name,
+			Type:           ProtoToNodeType(node.Type),
+			Ref:            ProtoToNodeRef(node),
+			Configuration:  node.Configuration.AsMap(),
+			Position:       ProtoToPosition(node.Position),
+			IsCollapsed:    node.IsCollapsed,
+			IntegrationID:  integrationID,
+			ErrorMessage:   errorMessage,
+			WarningMessage: warningMessage,
 		}
 	}
 	return result
@@ -699,9 +699,9 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 			result[i].Metadata, _ = structpb.NewStruct(node.Metadata)
 		}
 
-		if node.AppInstallationID != nil && *node.AppInstallationID != "" {
-			result[i].AppInstallation = &componentpb.AppInstallationRef{
-				Id: *node.AppInstallationID,
+		if node.IntegrationID != nil && *node.IntegrationID != "" {
+			result[i].Integration = &componentpb.IntegrationRef{
+				Id: *node.IntegrationID,
 			}
 		}
 

@@ -129,7 +129,7 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 
 		// For application components, validate the app installation
 		if len(parts) == 2 {
-			if err := validateAppInstallation(organizationID, node.AppInstallation); err != nil {
+			if err := validateIntegration(organizationID, node.Integration); err != nil {
 				return err
 			}
 		}
@@ -145,14 +145,14 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 	}
 }
 
-func validateAppInstallation(organizationID string, ref *componentpb.AppInstallationRef) error {
+func validateIntegration(organizationID string, ref *componentpb.IntegrationRef) error {
 	if ref == nil || ref.Id == "" {
-		return fmt.Errorf("app installation is required")
+		return fmt.Errorf("integration is required")
 	}
 
-	installationID, err := uuid.Parse(ref.Id)
+	integrationID, err := uuid.Parse(ref.Id)
 	if err != nil {
-		return fmt.Errorf("invalid app installation ID: %v", err)
+		return fmt.Errorf("invalid integration ID: %v", err)
 	}
 
 	orgID, err := uuid.Parse(organizationID)
@@ -160,9 +160,9 @@ func validateAppInstallation(organizationID string, ref *componentpb.AppInstalla
 		return fmt.Errorf("invalid organization ID: %v", err)
 	}
 
-	_, err = models.FindAppInstallation(orgID, installationID)
+	_, err = models.FindAppInstallation(orgID, integrationID)
 	if err != nil {
-		return fmt.Errorf("app installation not found or does not belong to this organization")
+		return fmt.Errorf("integration not found or does not belong to this organization")
 	}
 
 	return nil
