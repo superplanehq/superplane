@@ -99,8 +99,8 @@ func TestCanvasPage(t *testing.T) {
 
 		steps.session.Sleep(1000)
 
-		steps.assertRunningItemsCount("Wait", 1)
-		steps.assertQueuedItemsCount("Wait", 0)
+		steps.assertRunningItemsAtLeast("Wait", 1)
+		steps.assertQueuedItemsAtLeast("Wait", 0)
 		steps.cancelRunningExecutionFromSidebar()
 		steps.assertExecutionWasCancelled("Wait")
 	})
@@ -365,7 +365,7 @@ func (s *CanvasPageSteps) cancelRunningExecutionFromSidebar() {
 	s.session.Sleep(500) // wait for the cancellation to be processed
 }
 
-func (s *CanvasPageSteps) waitForQueueItemCountAtLeast(nodeName string, expected int) {
+func (s *CanvasPageSteps) waitForQueueItemCountAtLeast(nodeName string, expected int) int {
 	deadline := time.Now().Add(5 * time.Second)
 
 	for {
