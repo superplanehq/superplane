@@ -15,7 +15,7 @@ import { DateTimeFieldRenderer } from "./DateTimeFieldRenderer";
 import { UrlFieldRenderer } from "./UrlFieldRenderer";
 import { ListFieldRenderer } from "./ListFieldRenderer";
 import { ObjectFieldRenderer } from "./ObjectFieldRenderer";
-import { AppInstallationResourceFieldRenderer } from "./AppInstallationResourceFieldRenderer";
+import { IntegrationResourceFieldRenderer } from "./IntegrationResourceFieldRenderer";
 import { TimeFieldRenderer } from "./TimeFieldRenderer";
 import { DayInYearFieldRenderer } from "./DayInYearFieldRenderer";
 import { CronFieldRenderer } from "./CronFieldRenderer";
@@ -94,7 +94,7 @@ export const ConfigurationFieldRenderer = ({
           field.type === "multi-select" ||
           field.type === "days-of-week" ||
           field.type === "any-predicate-list" ||
-          (field.type === "app-installation-resource" && field.typeOptions?.resource?.multi)
+          (field.type === "integration-resource" && field.typeOptions?.resource?.multi)
         ) {
           onChange(Array.isArray(parsedDefaultValue) ? parsedDefaultValue : []);
         } else if (field.type === "object") {
@@ -283,9 +283,9 @@ export const ConfigurationFieldRenderer = ({
       case "cron":
         return <CronFieldRenderer {...commonProps} />;
 
-      case "app-installation-resource":
+      case "integration-resource":
         return (
-          <AppInstallationResourceFieldRenderer
+          <IntegrationResourceFieldRenderer
             field={field}
             value={value as string | string[] | undefined}
             onChange={onChange}

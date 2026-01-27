@@ -89,7 +89,7 @@ func (c *UpdateRedirectRule) Configuration() []configuration.Field {
 		{
 			Name:        "zone",
 			Label:       "Zone",
-			Type:        configuration.FieldTypeAppInstallationResource,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "The Cloudflare zone containing the redirect rule",
 			Placeholder: "Select a zone",

@@ -113,7 +113,7 @@ func (c *UpdateIncident) Configuration() []configuration.Field {
 		{
 			Name:        "priority",
 			Label:       "Priority",
-			Type:        configuration.FieldTypeAppInstallationResource,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Description: "Update the incident priority",
 			TypeOptions: &configuration.TypeOptions{
@@ -139,7 +139,7 @@ func (c *UpdateIncident) Configuration() []configuration.Field {
 		{
 			Name:        "escalationPolicy",
 			Label:       "Escalation Policy",
-			Type:        configuration.FieldTypeAppInstallationResource,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Description: "Update the escalation policy",
 			TypeOptions: &configuration.TypeOptions{

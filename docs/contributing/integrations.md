@@ -363,7 +363,7 @@ func (i *MyIntegration) CompareWebhookConfig(a, b any) (bool, error) {
 
 // SetupWebhook creates a webhook in the external service.
 // This is called by the webhook provisioner for pending webhook records.
-func (i *MyIntegration) SetupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) (any, error) {
+func (i *MyIntegration) SetupWebhook(ctx core.IntegrationContext, options core.WebhookOptions) (any, error) {
 	// Create webhook in the external service
 	// Return metadata about the created webhook (e.g., webhook ID)
 	return nil, nil
@@ -371,7 +371,7 @@ func (i *MyIntegration) SetupWebhook(ctx core.AppInstallationContext, options co
 
 // CleanupWebhook deletes a webhook from the external service.
 // This is called by the webhook cleanup worker for deleted webhook records.
-func (i *MyIntegration) CleanupWebhook(ctx core.AppInstallationContext, options core.WebhookOptions) error {
+func (i *MyIntegration) CleanupWebhook(ctx core.IntegrationContext, options core.WebhookOptions) error {
 	// Delete webhook from the external service using the metadata
 	return nil
 }

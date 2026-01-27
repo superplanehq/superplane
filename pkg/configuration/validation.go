@@ -596,7 +596,7 @@ func validateFieldValue(field Field, value any) error {
 	case FieldTypeDaysOfWeek:
 		return validateDaysOfWeek(field, value)
 
-	case FieldTypeAppInstallationResource:
+	case FieldTypeIntegrationResource:
 		// If Multi is true, validate as array of strings
 		// Otherwise, validate as a single string
 		if field.TypeOptions != nil && field.TypeOptions.Resource != nil && field.TypeOptions.Resource.Multi {
