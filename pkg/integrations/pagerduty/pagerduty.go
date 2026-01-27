@@ -36,7 +36,7 @@ import (
  */
 
 func init() {
-	registry.RegisterApplication("pagerduty", &PagerDuty{})
+	registry.RegisterIntegration("pagerduty", &PagerDuty{})
 }
 
 type PagerDuty struct{}
@@ -76,7 +76,7 @@ func (p *PagerDuty) Description() string {
 	return "Manage and react to incidents in PagerDuty"
 }
 
-func (p *PagerDuty) InstallationInstructions() string {
+func (p *PagerDuty) Instructions() string {
 	return ""
 }
 
@@ -191,7 +191,7 @@ func (p *PagerDuty) Sync(ctx core.SyncContext) error {
 	}
 
 	metadata := Metadata{}
-	err = mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &metadata)
+	err = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to decode metadata: %v", err)
 	}
@@ -207,7 +207,7 @@ func (p *PagerDuty) Sync(ctx core.SyncContext) error {
 }
 
 func (p *PagerDuty) apiTokenSync(ctx core.SyncContext) error {
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}
@@ -217,8 +217,8 @@ func (p *PagerDuty) apiTokenSync(ctx core.SyncContext) error {
 		return fmt.Errorf("error listing services: %v", err)
 	}
 
-	ctx.AppInstallation.SetMetadata(Metadata{Services: services})
-	ctx.AppInstallation.SetState("ready", "")
+	ctx.Integration.SetMetadata(Metadata{Services: services})
+	ctx.Integration.SetState("ready", "")
 	return nil
 }
 
@@ -227,7 +227,7 @@ func (p *PagerDuty) appOAuthSync(ctx core.SyncContext, configuration Configurati
 		return fmt.Errorf("clientId is required")
 	}
 
-	clientSecret, err := ctx.AppInstallation.GetConfig("clientSecret")
+	clientSecret, err := ctx.Integration.GetConfig("clientSecret")
 	if err != nil {
 		return err
 	}
@@ -283,7 +283,7 @@ func (p *PagerDuty) appOAuthSync(ctx core.SyncContext, configuration Configurati
 		return fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
-	err = ctx.AppInstallation.SetSecret(AppAccessToken, []byte(tokenResponse.AccessToken))
+	err = ctx.Integration.SetSecret(AppAccessToken, []byte(tokenResponse.AccessToken))
 	if err != nil {
 		return err
 	}
@@ -291,7 +291,7 @@ func (p *PagerDuty) appOAuthSync(ctx core.SyncContext, configuration Configurati
 	//
 	// Verify that the auth is working by listing the services.
 	//
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client")
 	}
@@ -301,13 +301,13 @@ func (p *PagerDuty) appOAuthSync(ctx core.SyncContext, configuration Configurati
 		return fmt.Errorf("error determing abilities: %v", err)
 	}
 
-	ctx.AppInstallation.SetMetadata(Metadata{Services: services})
-	ctx.AppInstallation.SetState("ready", "")
+	ctx.Integration.SetMetadata(Metadata{Services: services})
+	ctx.Integration.SetState("ready", "")
 
 	//
 	// Schedule a new sync to refresh the access token before it expires
 	//
-	return ctx.AppInstallation.ScheduleResync(tokenResponse.GetExpiration())
+	return ctx.Integration.ScheduleResync(tokenResponse.GetExpiration())
 }
 
 func (p *PagerDuty) HandleRequest(ctx core.HTTPRequestContext) {
@@ -395,7 +395,7 @@ func (p *PagerDuty) CompareWebhookConfig(a, b any) (bool, error) {
 }
 
 func (p *PagerDuty) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
@@ -433,7 +433,7 @@ func (p *PagerDuty) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 		return fmt.Errorf("error decoding webhook metadata: %v", err)
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}

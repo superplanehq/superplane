@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	registry.RegisterApplication("semaphore", &Semaphore{})
+	registry.RegisterIntegration("semaphore", &Semaphore{})
 }
 
 type Semaphore struct{}
@@ -41,7 +41,7 @@ func (s *Semaphore) Description() string {
 	return "Run and react to your Semaphore workflows"
 }
 
-func (s *Semaphore) InstallationInstructions() string {
+func (s *Semaphore) Instructions() string {
 	return ""
 }
 
@@ -74,12 +74,12 @@ func (s *Semaphore) Sync(ctx core.SyncContext) error {
 	}
 
 	metadata := Metadata{}
-	err = mapstructure.Decode(ctx.AppInstallation.GetMetadata(), &metadata)
+	err = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 	if err != nil {
 		return fmt.Errorf("Failed to decode metadata: %v", err)
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}
@@ -93,7 +93,7 @@ func (s *Semaphore) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("error listing projects: %v", err)
 	}
 
-	ctx.AppInstallation.SetState("ready", "")
+	ctx.Integration.SetState("ready", "")
 	return nil
 }
 
@@ -135,7 +135,7 @@ type WebhookNotificationMetadata struct {
 }
 
 func (s *Semaphore) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +189,7 @@ func (s *Semaphore) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 		return fmt.Errorf("error decoding webhook metadata: %v", err)
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}

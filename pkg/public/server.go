@@ -489,13 +489,13 @@ func (s *Server) HandleAppInstallationRequest(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	app, err := s.registry.GetApplication(appInstallation.AppName)
+	integration, err := s.registry.GetIntegration(appInstallation.AppName)
 	if err != nil {
 		http.Error(w, "app not found", http.StatusNotFound)
 		return
 	}
 
-	app.HandleRequest(core.HTTPRequestContext{
+	integration.HandleRequest(core.HTTPRequestContext{
 		Logger:          logging.ForAppInstallation(*appInstallation),
 		Request:         r,
 		Response:        w,
@@ -503,7 +503,7 @@ func (s *Server) HandleAppInstallationRequest(w http.ResponseWriter, r *http.Req
 		WebhooksBaseURL: s.WebhooksBaseURL,
 		OrganizationID:  appInstallation.OrganizationID.String(),
 		HTTP:            contexts.NewHTTPContext(s.registry.GetHTTPClient()),
-		AppInstallation: contexts.NewAppInstallationContext(
+		Integration: contexts.NewAppInstallationContext(
 			database.Conn(),
 			nil,
 			appInstallation,

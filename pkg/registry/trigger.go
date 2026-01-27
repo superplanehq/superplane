@@ -101,20 +101,20 @@ func (s *PanicableTrigger) HandleAction(ctx core.TriggerActionContext) (result m
 	return s.underlying.HandleAction(ctx)
 }
 
-func (s *PanicableTrigger) OnAppMessage(ctx core.AppMessageContext) (err error) {
+func (s *PanicableTrigger) OnIntegrationMessage(ctx core.IntegrationMessageContext) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			ctx.Logger.Errorf("Trigger %s panicked in OnAppMessage(): %v\nStack: %s",
+			ctx.Logger.Errorf("Trigger %s panicked in OnIntegrationMessage(): %v\nStack: %s",
 				s.underlying.Name(), r, debug.Stack())
-			err = fmt.Errorf("trigger %s panicked in OnAppMessage(): %v",
+			err = fmt.Errorf("trigger %s panicked in OnIntegrationMessage(): %v",
 				s.underlying.Name(), r)
 		}
 	}()
 
-	appTrigger, ok := s.underlying.(core.AppTrigger)
+	integrationTrigger, ok := s.underlying.(core.IntegrationTrigger)
 	if !ok {
-		return fmt.Errorf("trigger %s is not an app trigger", s.underlying.Name())
+		return fmt.Errorf("trigger %s is not an integration trigger", s.underlying.Name())
 	}
 
-	return appTrigger.OnAppMessage(ctx)
+	return integrationTrigger.OnIntegrationMessage(ctx)
 }

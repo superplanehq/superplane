@@ -14,7 +14,7 @@ func Test__GitHub__Setup(t *testing.T) {
 
 	t.Run("personal scope", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
-		require.NoError(t, g.Sync(core.SyncContext{AppInstallation: appCtx}))
+		require.NoError(t, g.Sync(core.SyncContext{Integration: appCtx}))
 
 		//
 		// Browser action is created
@@ -36,8 +36,8 @@ func Test__GitHub__Setup(t *testing.T) {
 	t.Run("organization scope", func(t *testing.T) {
 		appCtx := &contexts.AppInstallationContext{}
 		require.NoError(t, g.Sync(core.SyncContext{
-			Configuration:   Configuration{Organization: "testhq"},
-			AppInstallation: appCtx,
+			Configuration: Configuration{Organization: "testhq"},
+			Integration:   appCtx,
 		}))
 
 		//

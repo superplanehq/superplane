@@ -291,7 +291,7 @@ func findAndValidateTrigger(registry *registry.Registry, organizationID string, 
 		return nil, err
 	}
 
-	return registry.GetApplicationTrigger(parts[0], node.Trigger.Name)
+	return registry.GetIntegrationTrigger(parts[0], node.Trigger.Name)
 }
 
 func findAndValidateWidget(registry *registry.Registry, organizationID string, node *compb.Node) (core.Widget, error) {
@@ -317,7 +317,7 @@ func findAndValidateComponent(registry *registry.Registry, organizationID string
 		return nil, err
 	}
 
-	return registry.GetApplicationComponent(parts[0], node.Component.Name)
+	return registry.GetIntegrationComponent(parts[0], node.Component.Name)
 }
 
 func validateAppInstallation(organizationID string, ref *compb.AppInstallationRef) error {

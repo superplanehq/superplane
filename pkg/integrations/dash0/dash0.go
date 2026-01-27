@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	registry.RegisterApplication("dash0", &Dash0{})
+	registry.RegisterIntegration("dash0", &Dash0{})
 }
 
 type Dash0 struct{}
@@ -40,7 +40,7 @@ func (d *Dash0) Description() string {
 	return "Connect to Dash0 to query data using Prometheus API"
 }
 
-func (d *Dash0) InstallationInstructions() string {
+func (d *Dash0) Instructions() string {
 	return ""
 }
 
@@ -92,7 +92,7 @@ func (d *Dash0) Sync(ctx core.SyncContext) error {
 	}
 
 	// Validate connection by creating a client and making a test query
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}
@@ -104,17 +104,17 @@ func (d *Dash0) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("error validating connection: %v", err)
 	}
 
-	ctx.AppInstallation.SetMetadata(Metadata{})
-	ctx.AppInstallation.SetState("ready", "")
+	ctx.Integration.SetMetadata(Metadata{})
+	ctx.Integration.SetState("ready", "")
 	return nil
 }
 
-func (d *Dash0) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.ApplicationResource, error) {
+func (d *Dash0) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	if resourceType != "check-rule" {
-		return []core.ApplicationResource{}, nil
+		return []core.IntegrationResource{}, nil
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("error creating dash0 client: %w", err)
 	}
@@ -122,12 +122,12 @@ func (d *Dash0) ListResources(resourceType string, ctx core.ListResourcesContext
 	checkRules, err := client.ListCheckRules()
 	if err != nil {
 		ctx.Logger.Warnf("Error fetching check rules: %v", err)
-		return []core.ApplicationResource{}, nil
+		return []core.IntegrationResource{}, nil
 	}
 
-	resources := make([]core.ApplicationResource, 0, len(checkRules))
+	resources := make([]core.IntegrationResource, 0, len(checkRules))
 	for _, rule := range checkRules {
-		resources = append(resources, core.ApplicationResource{
+		resources = append(resources, core.IntegrationResource{
 			Type: resourceType,
 			Name: rule.Name,
 			ID:   rule.ID,

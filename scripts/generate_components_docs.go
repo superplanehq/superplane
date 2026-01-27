@@ -26,19 +26,19 @@ func main() {
 	createOutputDirectory()
 
 	reg := registry.NewRegistry(crypto.NewNoOpEncryptor())
-	apps := reg.ListApplications()
+	integrations := reg.ListIntegrations()
 
-	// Sort apps by name
-	sort.Slice(apps, func(i, j int) bool {
-		return apps[i].Label() < apps[j].Label()
+	// Sort integrations by name
+	sort.Slice(integrations, func(i, j int) bool {
+		return integrations[i].Label() < integrations[j].Label()
 	})
 
 	if err := writeCoreComponentsDoc(reg.ListComponents(), reg.ListTriggers()); err != nil {
 		exitWithError(err)
 	}
 
-	for i, app := range apps {
-		if err := writeAppDocs(app, i+2); err != nil {
+	for i, integration := range integrations {
+		if err := writeIntegrationDocs(integration, i+2); err != nil {
 			exitWithError(err)
 		}
 	}
@@ -50,14 +50,14 @@ func createOutputDirectory() {
 	}
 }
 
-func writeAppDocs(app core.Application, order int) error {
-	components := app.Components()
-	triggers := app.Triggers()
+func writeIntegrationDocs(integration core.Integration, order int) error {
+	components := integration.Components()
+	triggers := integration.Triggers()
 
 	sort.Slice(components, func(i, j int) bool { return components[i].Name() < components[j].Name() })
 	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
 
-	return writeAppIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.mdx", appFilename(app))), app, components, triggers, order)
+	return writeAppIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.mdx", appFilename(integration))), integration, components, triggers, order)
 }
 
 func writeCoreComponentsDoc(components []core.Component, triggers []core.Trigger) error {
@@ -81,20 +81,20 @@ func writeCoreComponentsDoc(components []core.Component, triggers []core.Trigger
 
 func writeAppIndex(
 	path string,
-	app core.Application,
+	integration core.Integration,
 	components []core.Component,
 	triggers []core.Trigger,
 	order int,
 ) error {
 	var buf bytes.Buffer
-	writeFrontMatter(&buf, app.Label(), order)
+	writeFrontMatter(&buf, integration.Label(), order)
 
-	writeOverviewSection(&buf, app.Description())
+	writeOverviewSection(&buf, integration.Description())
 	writeCardGridTriggers(&buf, triggers)
 	writeCardGridComponents(&buf, components)
 
-	if instructions := strings.TrimSpace(app.InstallationInstructions()); instructions != "" {
-		buf.WriteString("## Installation\n\n")
+	if instructions := strings.TrimSpace(integration.Instructions()); instructions != "" {
+		buf.WriteString("## Instructions\n\n")
 		buf.WriteString(instructions)
 		buf.WriteString("\n\n")
 	}
@@ -272,10 +272,10 @@ func slugify(value string) string {
 	return strings.ToLower(withDashes)
 }
 
-func appFilename(app core.Application) string {
-	label := strings.TrimSpace(app.Label())
+func appFilename(integration core.Integration) string {
+	label := strings.TrimSpace(integration.Label())
 	if label == "" {
-		return slugify(app.Name())
+		return slugify(integration.Name())
 	}
 	return label
 }

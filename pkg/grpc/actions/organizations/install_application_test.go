@@ -162,14 +162,14 @@ func Test__InstallApplication(t *testing.T) {
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "application nonexistent-app not found")
+		assert.Contains(t, s.Message(), "integration nonexistent-app not found")
 	})
 
 	t.Run("sync fails -> installation created in error state", func(t *testing.T) {
 		//
 		// Register a test application that always fails on Sync
 		//
-		r.Registry.Applications["dummy"] = support.NewDummyApplication(func(ctx core.SyncContext) error {
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
 			return errors.New("oops")
 		})
 
@@ -209,8 +209,8 @@ func Test__InstallApplication(t *testing.T) {
 		//
 		// Register a test application that succeeds on Sync
 		//
-		r.Registry.Applications["dummy"] = support.NewDummyApplication(func(ctx core.SyncContext) error {
-			ctx.AppInstallation.SetState("ready", "")
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
+			ctx.Integration.SetState("ready", "")
 			return nil
 		})
 

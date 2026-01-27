@@ -49,9 +49,9 @@ func Test__CreateIncident__Setup(t *testing.T) {
 				"service":     "PX123456",
 				"description": "Test description",
 			},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			Metadata:        metadataCtx,
+			HTTP:        httpContext,
+			Integration: appCtx,
+			Metadata:    metadataCtx,
 		})
 
 		require.NoError(t, err)
@@ -120,9 +120,9 @@ func Test__CreateIncident__Setup(t *testing.T) {
 				"urgency": "high",
 				"service": "INVALID",
 			},
-			HTTP:            httpContext,
-			AppInstallation: appCtx,
-			Metadata:        &contexts.MetadataContext{},
+			HTTP:        httpContext,
+			Integration: appCtx,
+			Metadata:    &contexts.MetadataContext{},
 		})
 
 		require.Error(t, err)

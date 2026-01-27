@@ -25,8 +25,8 @@ func Test__DescribeApplication(t *testing.T) {
 		//
 		// Register a test application
 		//
-		r.Registry.Applications["dummy"] = support.NewDummyApplication(func(ctx core.SyncContext) error {
-			ctx.AppInstallation.SetState("ready", "")
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
+			ctx.Integration.SetState("ready", "")
 			return nil
 		})
 
@@ -95,8 +95,8 @@ func Test__DescribeApplication(t *testing.T) {
 		//
 		// Register a test application
 		//
-		r.Registry.Applications["dummy"] = support.NewDummyApplication(func(ctx core.SyncContext) error {
-			ctx.AppInstallation.SetState("ready", "")
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
+			ctx.Integration.SetState("ready", "")
 			return nil
 		})
 
@@ -128,8 +128,8 @@ func Test__DescribeApplication(t *testing.T) {
 		//
 		// Register a test application
 		//
-		r.Registry.Applications["dummy"] = support.NewDummyApplication(func(ctx core.SyncContext) error {
-			ctx.AppInstallation.SetState("ready", "")
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
+			ctx.Integration.SetState("ready", "")
 			return nil
 		})
 

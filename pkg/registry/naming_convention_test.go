@@ -46,13 +46,13 @@ func TestComponentsAndTriggersUseCamelCaseNames(t *testing.T) {
 		assert.True(t, isValidName(tr.Name()), "Trigger %q is not camelCase", tr.Name())
 	}
 
-	for _, app := range reg.ListApplications() {
-		assert.True(t, isCamelCase(app.Name()), "Application %q is not camelCase", app.Name())
+	for _, integration := range reg.ListIntegrations() {
+		assert.True(t, isCamelCase(integration.Name()), "Integration %q is not camelCase", integration.Name())
 
-		for _, c := range app.Components() {
+		for _, c := range integration.Components() {
 			assert.True(t, isValidName(c.Name()), "Component %q is not camelCase", c.Name())
 		}
-		for _, tr := range app.Triggers() {
+		for _, tr := range integration.Triggers() {
 			assert.True(t, isValidName(tr.Name()), "Trigger %q is not camelCase", tr.Name())
 		}
 	}

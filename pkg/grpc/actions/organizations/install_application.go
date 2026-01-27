@@ -20,9 +20,9 @@ import (
 )
 
 func InstallApplication(ctx context.Context, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, webhooksBaseURL string, orgID string, appName, installationName string, appConfig *structpb.Struct) (*pb.InstallApplicationResponse, error) {
-	app, err := registry.GetApplication(appName)
+	integration, err := registry.GetIntegration(appName)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "application %s not found", appName)
+		return nil, status.Errorf(codes.InvalidArgument, "integration %s not found", appName)
 	}
 
 	org, err := uuid.Parse(orgID)
@@ -42,7 +42,7 @@ func InstallApplication(ctx context.Context, registry *registry.Registry, oidcPr
 	// We must encrypt the sensitive configuration fields before storing
 	//
 	installationID := uuid.New()
-	configuration, err := encryptConfigurationIfNeeded(ctx, registry, app, appConfig.AsMap(), installationID, nil)
+	configuration, err := encryptConfigurationIfNeeded(ctx, registry, integration, appConfig.AsMap(), installationID, nil)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to encrypt sensitive configuration: %v", err)
 	}
@@ -60,9 +60,9 @@ func InstallApplication(ctx context.Context, registry *registry.Registry, oidcPr
 		registry,
 	)
 
-	syncErr := app.Sync(core.SyncContext{
+	syncErr := integration.Sync(core.SyncContext{
 		HTTP:            contexts.NewHTTPContext(registry.GetHTTPClient()),
-		AppInstallation: appCtx,
+		Integration:     appCtx,
 		Configuration:   appInstallation.Configuration.Data(),
 		BaseURL:         baseURL,
 		WebhooksBaseURL: webhooksBaseURL,
@@ -96,7 +96,7 @@ func InstallApplication(ctx context.Context, registry *registry.Registry, oidcPr
 }
 
 func serializeAppInstallation(registry *registry.Registry, appInstallation *models.AppInstallation, nodeRefs []models.WorkflowNodeReference) (*pb.AppInstallation, error) {
-	app, err := registry.GetApplication(appInstallation.AppName)
+	integration, err := registry.GetIntegration(appInstallation.AppName)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func serializeAppInstallation(registry *registry.Registry, appInstallation *mode
 	//
 	// We do not return sensitive values when serializing app installations.
 	//
-	config, err := structpb.NewStruct(sanitizeConfigurationIfNeeded(app, appInstallation.Configuration.Data()))
+	config, err := structpb.NewStruct(sanitizeConfigurationIfNeeded(integration, appInstallation.Configuration.Data()))
 	if err != nil {
 		return nil, err
 	}
@@ -153,10 +153,10 @@ func serializeAppInstallation(registry *registry.Registry, appInstallation *mode
 	return proto, nil
 }
 
-func encryptConfigurationIfNeeded(ctx context.Context, registry *registry.Registry, app core.Application, config map[string]any, installationID uuid.UUID, existingConfig map[string]any) (map[string]any, error) {
+func encryptConfigurationIfNeeded(ctx context.Context, registry *registry.Registry, integration core.Integration, config map[string]any, installationID uuid.UUID, existingConfig map[string]any) (map[string]any, error) {
 	result := maps.Clone(config)
 
-	for _, field := range app.Configuration() {
+	for _, field := range integration.Configuration() {
 		if !field.Sensitive {
 			continue
 		}
@@ -200,10 +200,10 @@ func encryptConfigurationIfNeeded(ctx context.Context, registry *registry.Regist
 	return result, nil
 }
 
-func sanitizeConfigurationIfNeeded(app core.Application, config map[string]any) map[string]any {
+func sanitizeConfigurationIfNeeded(integration core.Integration, config map[string]any) map[string]any {
 	sanitized := maps.Clone(config)
 
-	for _, field := range app.Configuration() {
+	for _, field := range integration.Configuration() {
 		if !field.Sensitive {
 			continue
 		}

@@ -148,7 +148,7 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("service is required")
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.AppInstallation)
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}
@@ -163,7 +163,7 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("error setting node metadata: %v", err)
 	}
 
-	return ctx.AppInstallation.RequestWebhook(WebhookConfiguration{
+	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		Events: config.Events,
 		Filter: WebhookFilter{
 			Type: "service_reference",

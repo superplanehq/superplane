@@ -18,9 +18,9 @@ func Test__RunFunction__Setup(t *testing.T) {
 
 	t.Run("invalid configuration -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{},
-			Metadata:        &contexts.MetadataContext{},
-			Configuration:   "invalid",
+			Integration:   &contexts.AppInstallationContext{},
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: "invalid",
 		})
 
 		require.ErrorContains(t, err, "failed to decode configuration")
@@ -28,9 +28,9 @@ func Test__RunFunction__Setup(t *testing.T) {
 
 	t.Run("missing function arn -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{},
-			Metadata:        &contexts.MetadataContext{},
-			Configuration:   map[string]any{"functionArn": " "},
+			Integration:   &contexts.AppInstallationContext{},
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"functionArn": " "},
 		})
 
 		require.ErrorContains(t, err, "Function ARN is required")
@@ -39,9 +39,9 @@ func Test__RunFunction__Setup(t *testing.T) {
 	t.Run("valid configuration -> stores metadata", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{},
-			Metadata:        metadata,
-			Configuration:   map[string]any{"functionArn": "  arn:aws:lambda:us-east-1:123:function:test  "},
+			Integration:   &contexts.AppInstallationContext{},
+			Metadata:      metadata,
+			Configuration: map[string]any{"functionArn": "  arn:aws:lambda:us-east-1:123:function:test  "},
 		})
 
 		require.NoError(t, err)
@@ -56,10 +56,10 @@ func Test__RunFunction__Execute(t *testing.T) {
 
 	t.Run("invalid configuration -> error", func(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
-			Configuration:   "invalid",
-			NodeMetadata:    &contexts.MetadataContext{},
-			ExecutionState:  &contexts.ExecutionStateContext{KVs: map[string]string{}},
-			AppInstallation: &contexts.AppInstallationContext{},
+			Configuration:  "invalid",
+			NodeMetadata:   &contexts.MetadataContext{},
+			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+			Integration:    &contexts.AppInstallationContext{},
 		})
 
 		require.ErrorContains(t, err, "failed to decode configuration")
@@ -67,10 +67,10 @@ func Test__RunFunction__Execute(t *testing.T) {
 
 	t.Run("invalid metadata -> error", func(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
-			Configuration:   map[string]any{"payload": map[string]any{"hello": "world"}},
-			NodeMetadata:    &contexts.MetadataContext{Metadata: "invalid"},
-			ExecutionState:  &contexts.ExecutionStateContext{KVs: map[string]string{}},
-			AppInstallation: &contexts.AppInstallationContext{},
+			Configuration:  map[string]any{"payload": map[string]any{"hello": "world"}},
+			NodeMetadata:   &contexts.MetadataContext{Metadata: "invalid"},
+			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+			Integration:    &contexts.AppInstallationContext{},
 		})
 
 		require.ErrorContains(t, err, "failed to decode metadata")
@@ -81,9 +81,9 @@ func Test__RunFunction__Execute(t *testing.T) {
 			Configuration:  map[string]any{"payload": map[string]any{"hello": "world"}},
 			NodeMetadata:   &contexts.MetadataContext{Metadata: RunFunctionMetadata{FunctionArn: "arn:aws:lambda:us-east-1:123:function:test"}},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
-			AppInstallation: &contexts.AppInstallationContext{
+			Integration: &contexts.AppInstallationContext{
 				Configuration: map[string]any{"region": "us-east-1"},
-				Secrets:       map[string]core.InstallationSecret{},
+				Secrets:       map[string]core.IntegrationSecret{},
 			},
 		})
 
@@ -107,9 +107,9 @@ func Test__RunFunction__Execute(t *testing.T) {
 			NodeMetadata:   &contexts.MetadataContext{Metadata: RunFunctionMetadata{FunctionArn: "arn:aws:lambda:us-west-2:123:function:test"}},
 			ExecutionState: execState,
 			HTTP:           httpContext,
-			AppInstallation: &contexts.AppInstallationContext{
+			Integration: &contexts.AppInstallationContext{
 				Configuration: map[string]any{"region": " "},
-				Secrets: map[string]core.InstallationSecret{
+				Secrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -153,9 +153,9 @@ func Test__RunFunction__Execute(t *testing.T) {
 			NodeMetadata:   &contexts.MetadataContext{Metadata: RunFunctionMetadata{FunctionArn: "arn:aws:lambda:us-east-1:123:function:test"}},
 			ExecutionState: execState,
 			HTTP:           httpContext,
-			AppInstallation: &contexts.AppInstallationContext{
+			Integration: &contexts.AppInstallationContext{
 				Configuration: map[string]any{"region": "us-east-1"},
-				Secrets: map[string]core.InstallationSecret{
+				Secrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -194,9 +194,9 @@ func Test__RunFunction__Execute(t *testing.T) {
 			NodeMetadata:   &contexts.MetadataContext{Metadata: RunFunctionMetadata{FunctionArn: "arn:aws:lambda:us-east-1:123:function:test"}},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 			HTTP:           httpContext,
-			AppInstallation: &contexts.AppInstallationContext{
+			Integration: &contexts.AppInstallationContext{
 				Configuration: map[string]any{"region": "us-east-1"},
-				Secrets: map[string]core.InstallationSecret{
+				Secrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},

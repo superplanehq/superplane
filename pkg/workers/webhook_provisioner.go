@@ -90,15 +90,15 @@ func (w *WebhookProvisioner) processAppInstallationWebhook(tx *gorm.DB, webhook 
 		return w.handleWebhookError(tx, webhook, err)
 	}
 
-	app, err := w.registry.GetApplication(appInstallation.AppName)
+	integration, err := w.registry.GetIntegration(appInstallation.AppName)
 	if err != nil {
 		return w.handleWebhookError(tx, webhook, err)
 	}
 
-	webhookMetadata, err := app.SetupWebhook(core.SetupWebhookContext{
-		HTTP:            contexts.NewHTTPContext(w.registry.GetHTTPClient()),
-		Webhook:         contexts.NewWebhookContext(tx, webhook, w.encryptor, w.baseURL),
-		AppInstallation: contexts.NewAppInstallationContext(tx, nil, appInstallation, w.encryptor, w.registry),
+	webhookMetadata, err := integration.SetupWebhook(core.SetupWebhookContext{
+		HTTP:        contexts.NewHTTPContext(w.registry.GetHTTPClient()),
+		Webhook:     contexts.NewWebhookContext(tx, webhook, w.encryptor, w.baseURL),
+		Integration: contexts.NewAppInstallationContext(tx, nil, appInstallation, w.encryptor, w.registry),
 	})
 
 	if err != nil {
