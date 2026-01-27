@@ -2,8 +2,6 @@ ARG GO_VERSION=1.25.3
 ARG UBUNTU_VERSION=22.04
 ARG BUILDER_IMAGE="ubuntu:${UBUNTU_VERSION}"
 ARG RUNNER_IMAGE="ubuntu:${UBUNTU_VERSION}"
-ARG APT_MIRROR="http://archive.ubuntu.com/ubuntu"
-ARG APT_SECURITY_MIRROR="http://security.ubuntu.com/ubuntu"
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Base stage with build dependencies (mirrors root Dockerfile's base).
@@ -14,14 +12,6 @@ FROM ${BUILDER_IMAGE} AS base
 WORKDIR /tmp
 
 COPY scripts/docker scripts
-ARG APT_MIRROR
-ARG APT_SECURITY_MIRROR
-RUN if [ -n "${APT_MIRROR}" ]; then \
-  sed -i "s|http://archive.ubuntu.com/ubuntu|${APT_MIRROR}|g" /etc/apt/sources.list; \
-fi && \
-if [ -n "${APT_SECURITY_MIRROR}" ]; then \
-  sed -i "s|http://security.ubuntu.com/ubuntu|${APT_SECURITY_MIRROR}|g" /etc/apt/sources.list; \
-fi
 
 ENV GO_VERSION=1.25.3
 ENV PATH="/usr/local/go/bin:${PATH}"
@@ -74,14 +64,6 @@ RUN VITE_BASE_URL=$BASE_URL npm run build
 FROM ${RUNNER_IMAGE} AS demo
 
 ENV DEBIAN_FRONTEND=noninteractive
-ARG APT_MIRROR
-ARG APT_SECURITY_MIRROR
-RUN if [ -n "${APT_MIRROR}" ]; then \
-  sed -i "s|http://archive.ubuntu.com/ubuntu|${APT_MIRROR}|g" /etc/apt/sources.list; \
-fi && \
-if [ -n "${APT_SECURITY_MIRROR}" ]; then \
-  sed -i "s|http://security.ubuntu.com/ubuntu|${APT_SECURITY_MIRROR}|g" /etc/apt/sources.list; \
-fi
 
 LABEL org.opencontainers.image.title="superplane-demo" \
   org.opencontainers.image.description="SuperPlane demo image with embedded PostgreSQL and RabbitMQ for local trials." \
