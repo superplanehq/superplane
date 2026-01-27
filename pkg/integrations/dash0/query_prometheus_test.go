@@ -16,9 +16,8 @@ func Test__QueryPrometheus__Setup(t *testing.T) {
 	component := QueryPrometheus{}
 
 	t.Run("query is required", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
 		err := component.Setup(core.SetupContext{
-			Integration:   appCtx,
+			Integration:   &contexts.IntegrationContext{},
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: map[string]any{"query": ""},
 		})
@@ -27,9 +26,8 @@ func Test__QueryPrometheus__Setup(t *testing.T) {
 	})
 
 	t.Run("query cannot be empty", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
 		err := component.Setup(core.SetupContext{
-			Integration:   appCtx,
+			Integration:   &contexts.IntegrationContext{},
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: map[string]any{"query": "   "},
 		})
@@ -38,9 +36,8 @@ func Test__QueryPrometheus__Setup(t *testing.T) {
 	})
 
 	t.Run("dataset is required", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
 		err := component.Setup(core.SetupContext{
-			Integration:   appCtx,
+			Integration:   &contexts.IntegrationContext{},
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: map[string]any{"query": "up", "dataset": ""},
 		})
@@ -49,9 +46,8 @@ func Test__QueryPrometheus__Setup(t *testing.T) {
 	})
 
 	t.Run("range query requires start", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
 		err := component.Setup(core.SetupContext{
-			Integration: appCtx,
+			Integration: &contexts.IntegrationContext{},
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"query":   "up",
@@ -64,9 +60,8 @@ func Test__QueryPrometheus__Setup(t *testing.T) {
 	})
 
 	t.Run("range query requires end", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
 		err := component.Setup(core.SetupContext{
-			Integration: appCtx,
+			Integration: &contexts.IntegrationContext{},
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"query":   "up",
@@ -80,9 +75,8 @@ func Test__QueryPrometheus__Setup(t *testing.T) {
 	})
 
 	t.Run("range query requires step", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
 		err := component.Setup(core.SetupContext{
-			Integration: appCtx,
+			Integration: &contexts.IntegrationContext{},
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"query":   "up",
@@ -97,9 +91,8 @@ func Test__QueryPrometheus__Setup(t *testing.T) {
 	})
 
 	t.Run("valid instant query setup", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
 		err := component.Setup(core.SetupContext{
-			Integration: appCtx,
+			Integration: &contexts.IntegrationContext{},
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"query":   "up",
@@ -112,9 +105,8 @@ func Test__QueryPrometheus__Setup(t *testing.T) {
 	})
 
 	t.Run("valid range query setup", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
 		err := component.Setup(core.SetupContext{
-			Integration: appCtx,
+			Integration: &contexts.IntegrationContext{},
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"query":   "up",
@@ -156,13 +148,6 @@ func Test__QueryPrometheus__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
-			Configuration: map[string]any{
-				"apiToken": "token123",
-				"baseURL":  "https://api.us-west-2.aws.dash0.com",
-			},
-		}
-
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -170,8 +155,13 @@ func Test__QueryPrometheus__Execute(t *testing.T) {
 				"dataset": "default",
 				"type":    "instant",
 			},
-			HTTP:           httpContext,
-			Integration:    appCtx,
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken": "token123",
+					"baseURL":  "https://api.us-west-2.aws.dash0.com",
+				},
+			},
 			ExecutionState: execCtx,
 		})
 
@@ -205,13 +195,6 @@ func Test__QueryPrometheus__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
-			Configuration: map[string]any{
-				"apiToken": "token123",
-				"baseURL":  "https://api.us-west-2.aws.dash0.com",
-			},
-		}
-
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -222,8 +205,13 @@ func Test__QueryPrometheus__Execute(t *testing.T) {
 				"end":     "now",
 				"step":    "15s",
 			},
-			HTTP:           httpContext,
-			Integration:    appCtx,
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken": "token123",
+					"baseURL":  "https://api.us-west-2.aws.dash0.com",
+				},
+			},
 			ExecutionState: execCtx,
 		})
 
@@ -244,13 +232,6 @@ func Test__QueryPrometheus__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
-			Configuration: map[string]any{
-				"apiToken": "token123",
-				"baseURL":  "https://api.us-west-2.aws.dash0.com",
-			},
-		}
-
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -258,8 +239,13 @@ func Test__QueryPrometheus__Execute(t *testing.T) {
 				"dataset": "default",
 				"type":    "instant",
 			},
-			HTTP:           httpContext,
-			Integration:    appCtx,
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken": "token123",
+					"baseURL":  "https://api.us-west-2.aws.dash0.com",
+				},
+			},
 			ExecutionState: execCtx,
 		})
 

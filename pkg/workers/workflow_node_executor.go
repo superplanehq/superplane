@@ -314,7 +314,7 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		}
 
 		logger = logging.WithAppInstallation(logger, *appInstallation)
-		ctx.Integration = contexts.NewAppInstallationContext(tx, node, appInstallation, w.encryptor, w.registry)
+		ctx.Integration = contexts.NewIntegrationContext(tx, node, appInstallation, w.encryptor, w.registry)
 	}
 
 	ctx.Logger = logger

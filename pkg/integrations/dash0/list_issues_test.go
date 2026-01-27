@@ -25,9 +25,8 @@ func Test__ListIssues__Setup(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		appCtx := &contexts.AppInstallationContext{}
 		err = component.Setup(core.SetupContext{
-			Integration:   appCtx,
+			Integration:   &contexts.IntegrationContext{},
 			Metadata:      nodeMetadataCtx,
 			Configuration: map[string]any{},
 		})
@@ -50,7 +49,7 @@ func Test__ListIssues__Setup(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 				"baseURL":  "https://api.us-west-2.aws.dash0.com",
@@ -59,7 +58,7 @@ func Test__ListIssues__Setup(t *testing.T) {
 
 		nodeMetadataCtx := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			HTTP:          httpContext,
 			Metadata:      nodeMetadataCtx,
 			Configuration: map[string]any{},
@@ -109,7 +108,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 				"baseURL":  "https://api.us-west-2.aws.dash0.com",
@@ -121,7 +120,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Configuration:  map[string]any{},
 			HTTP:           httpContext,
-			Integration:    appCtx,
+			Integration:    integrationCtx,
 			ExecutionState: execCtx,
 			NodeMetadata:   nodeMetadataCtx,
 		})
@@ -164,7 +163,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 				"baseURL":  "https://api.us-west-2.aws.dash0.com",
@@ -176,7 +175,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Configuration:  map[string]any{},
 			HTTP:           httpContext,
-			Integration:    appCtx,
+			Integration:    integrationCtx,
 			ExecutionState: execCtx,
 			NodeMetadata:   nodeMetadataCtx,
 		})
@@ -213,7 +212,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 				"baseURL":  "https://api.us-west-2.aws.dash0.com",
@@ -225,7 +224,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Configuration:  map[string]any{},
 			HTTP:           httpContext,
-			Integration:    appCtx,
+			Integration:    integrationCtx,
 			ExecutionState: execCtx,
 			NodeMetadata:   nodeMetadataCtx,
 		})
@@ -276,7 +275,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 				"baseURL":  "https://api.us-west-2.aws.dash0.com",
@@ -288,7 +287,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Configuration:  map[string]any{},
 			HTTP:           httpContext,
-			Integration:    appCtx,
+			Integration:    integrationCtx,
 			ExecutionState: execCtx,
 			NodeMetadata:   nodeMetadataCtx,
 		})
@@ -309,7 +308,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 				"baseURL":  "https://api.us-west-2.aws.dash0.com",
@@ -321,7 +320,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Configuration:  map[string]any{},
 			HTTP:           httpContext,
-			Integration:    appCtx,
+			Integration:    integrationCtx,
 			ExecutionState: execCtx,
 			NodeMetadata:   nodeMetadataCtx,
 		})
@@ -384,7 +383,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 				"baseURL":  "https://api.us-west-2.aws.dash0.com",
@@ -407,7 +406,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 				"checkRules": []string{"rule-1"},
 			},
 			HTTP:           httpContext,
-			Integration:    appCtx,
+			Integration:    integrationCtx,
 			ExecutionState: execCtx,
 			NodeMetadata:   nodeMetadataCtx,
 		})
@@ -474,7 +473,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 				"baseURL":  "https://api.us-west-2.aws.dash0.com",
@@ -488,7 +487,7 @@ func Test__ListIssues__Execute(t *testing.T) {
 				"checkRules": []string{},
 			},
 			HTTP:           httpContext,
-			Integration:    appCtx,
+			Integration:    integrationCtx,
 			ExecutionState: execCtx,
 			NodeMetadata:   nodeMetadataCtx,
 		})

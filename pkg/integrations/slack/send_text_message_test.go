@@ -17,7 +17,7 @@ func Test__SendTextMessage__Setup(t *testing.T) {
 
 	t.Run("invalid configuration -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			Integration:   &contexts.AppInstallationContext{},
+			Integration:   &contexts.IntegrationContext{},
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: "invalid",
 		})
@@ -27,7 +27,7 @@ func Test__SendTextMessage__Setup(t *testing.T) {
 
 	t.Run("missing channel -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			Integration:   &contexts.AppInstallationContext{},
+			Integration:   &contexts.IntegrationContext{},
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: map[string]any{"channel": ""},
 		})
@@ -43,14 +43,14 @@ func Test__SendTextMessage__Setup(t *testing.T) {
 		})
 
 		metadata := &contexts.MetadataContext{}
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"botToken": "token-123",
 			},
 		}
 
 		err := component.Setup(core.SetupContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      metadata,
 			Configuration: map[string]any{"channel": "C123"},
 		})
@@ -69,7 +69,7 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 
 	t.Run("missing channel -> error", func(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
-			Integration:    &contexts.AppInstallationContext{},
+			Integration:    &contexts.IntegrationContext{},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 			Configuration:  map[string]any{"channel": ""},
 		})
@@ -94,14 +94,14 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 		})
 
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"botToken": "token-123",
 			},
 		}
 
 		err := component.Execute(core.ExecutionContext{
-			Integration:    appCtx,
+			Integration:    integrationCtx,
 			ExecutionState: execState,
 			Configuration:  map[string]any{"channel": "C123", "text": "hello"},
 		})

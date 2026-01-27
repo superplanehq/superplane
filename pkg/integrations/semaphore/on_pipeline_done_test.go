@@ -109,9 +109,9 @@ func Test__OnPipelineDone__Setup(t *testing.T) {
 	trigger := OnPipelineDone{}
 
 	t.Run("project is required", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
+		integrationCtx := &contexts.IntegrationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: OnPipelineDoneConfiguration{Project: ""},
 		})
@@ -129,7 +129,7 @@ func Test__OnPipelineDone__Setup(t *testing.T) {
 		}
 
 		err := trigger.Setup(core.TriggerContext{
-			Integration:   &contexts.AppInstallationContext{},
+			Integration:   &contexts.IntegrationContext{},
 			Metadata:      metadataCtx,
 			Configuration: OnPipelineDoneConfiguration{Project: "test-project"},
 		})
@@ -140,9 +140,9 @@ func Test__OnPipelineDone__Setup(t *testing.T) {
 	})
 
 	t.Run("invalid configuration -> decode error", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
+		integrationCtx := &contexts.IntegrationContext{}
 		err := trigger.Setup(core.TriggerContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: "invalid-config",
 		})

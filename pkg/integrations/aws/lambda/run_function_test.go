@@ -18,7 +18,7 @@ func Test__RunFunction__Setup(t *testing.T) {
 
 	t.Run("invalid configuration -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			Integration:   &contexts.AppInstallationContext{},
+			Integration:   &contexts.IntegrationContext{},
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: "invalid",
 		})
@@ -28,7 +28,7 @@ func Test__RunFunction__Setup(t *testing.T) {
 
 	t.Run("missing function arn -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			Integration:   &contexts.AppInstallationContext{},
+			Integration:   &contexts.IntegrationContext{},
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: map[string]any{"functionArn": " "},
 		})
@@ -39,7 +39,7 @@ func Test__RunFunction__Setup(t *testing.T) {
 	t.Run("valid configuration -> stores metadata", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{
-			Integration:   &contexts.AppInstallationContext{},
+			Integration:   &contexts.IntegrationContext{},
 			Metadata:      metadata,
 			Configuration: map[string]any{"functionArn": "  arn:aws:lambda:us-east-1:123:function:test  "},
 		})
@@ -59,7 +59,7 @@ func Test__RunFunction__Execute(t *testing.T) {
 			Configuration:  "invalid",
 			NodeMetadata:   &contexts.MetadataContext{},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
-			Integration:    &contexts.AppInstallationContext{},
+			Integration:    &contexts.IntegrationContext{},
 		})
 
 		require.ErrorContains(t, err, "failed to decode configuration")
@@ -70,7 +70,7 @@ func Test__RunFunction__Execute(t *testing.T) {
 			Configuration:  map[string]any{"payload": map[string]any{"hello": "world"}},
 			NodeMetadata:   &contexts.MetadataContext{Metadata: "invalid"},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
-			Integration:    &contexts.AppInstallationContext{},
+			Integration:    &contexts.IntegrationContext{},
 		})
 
 		require.ErrorContains(t, err, "failed to decode metadata")
@@ -81,7 +81,7 @@ func Test__RunFunction__Execute(t *testing.T) {
 			Configuration:  map[string]any{"payload": map[string]any{"hello": "world"}},
 			NodeMetadata:   &contexts.MetadataContext{Metadata: RunFunctionMetadata{FunctionArn: "arn:aws:lambda:us-east-1:123:function:test"}},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
-			Integration: &contexts.AppInstallationContext{
+			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{"region": "us-east-1"},
 				Secrets:       map[string]core.IntegrationSecret{},
 			},
@@ -107,7 +107,7 @@ func Test__RunFunction__Execute(t *testing.T) {
 			NodeMetadata:   &contexts.MetadataContext{Metadata: RunFunctionMetadata{FunctionArn: "arn:aws:lambda:us-west-2:123:function:test"}},
 			ExecutionState: execState,
 			HTTP:           httpContext,
-			Integration: &contexts.AppInstallationContext{
+			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{"region": " "},
 				Secrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
@@ -153,7 +153,7 @@ func Test__RunFunction__Execute(t *testing.T) {
 			NodeMetadata:   &contexts.MetadataContext{Metadata: RunFunctionMetadata{FunctionArn: "arn:aws:lambda:us-east-1:123:function:test"}},
 			ExecutionState: execState,
 			HTTP:           httpContext,
-			Integration: &contexts.AppInstallationContext{
+			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{"region": "us-east-1"},
 				Secrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
@@ -194,7 +194,7 @@ func Test__RunFunction__Execute(t *testing.T) {
 			NodeMetadata:   &contexts.MetadataContext{Metadata: RunFunctionMetadata{FunctionArn: "arn:aws:lambda:us-east-1:123:function:test"}},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 			HTTP:           httpContext,
-			Integration: &contexts.AppInstallationContext{
+			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{"region": "us-east-1"},
 				Secrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},

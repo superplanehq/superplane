@@ -13,35 +13,35 @@ import (
 
 func Test__NewClient(t *testing.T) {
 	t.Run("missing apiToken -> error", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"baseURL": "https://api.us-west-2.aws.dash0.com",
 			},
 		}
 
 		httpCtx := &contexts.HTTPContext{}
-		_, err := NewClient(httpCtx, appCtx)
+		_, err := NewClient(httpCtx, integrationCtx)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "api token")
 	})
 
 	t.Run("missing baseURL -> error", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 			},
 		}
 
 		httpCtx := &contexts.HTTPContext{}
-		_, err := NewClient(httpCtx, appCtx)
+		_, err := NewClient(httpCtx, integrationCtx)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "baseURL is required")
 	})
 
 	t.Run("successful client creation", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 				"baseURL":  "https://api.us-west-2.aws.dash0.com",
@@ -49,7 +49,7 @@ func Test__NewClient(t *testing.T) {
 		}
 
 		httpCtx := &contexts.HTTPContext{}
-		client, err := NewClient(httpCtx, appCtx)
+		client, err := NewClient(httpCtx, integrationCtx)
 
 		require.NoError(t, err)
 		assert.Equal(t, "token123", client.Token)
@@ -57,7 +57,7 @@ func Test__NewClient(t *testing.T) {
 	})
 
 	t.Run("baseURL with /api/prometheus suffix -> strips suffix", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 				"baseURL":  "https://api.us-west-2.aws.dash0.com/api/prometheus",
@@ -65,7 +65,7 @@ func Test__NewClient(t *testing.T) {
 		}
 
 		httpCtx := &contexts.HTTPContext{}
-		client, err := NewClient(httpCtx, appCtx)
+		client, err := NewClient(httpCtx, integrationCtx)
 
 		require.NoError(t, err)
 		assert.Equal(t, "https://api.us-west-2.aws.dash0.com", client.BaseURL)
@@ -96,14 +96,14 @@ func Test__Client__ExecutePrometheusInstantQuery(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 				"baseURL":  "https://api.us-west-2.aws.dash0.com",
 			},
 		}
 
-		client, err := NewClient(httpContext, appCtx)
+		client, err := NewClient(httpContext, integrationCtx)
 		require.NoError(t, err)
 
 		response, err := client.ExecutePrometheusInstantQuery("up", "default")
@@ -125,14 +125,14 @@ func Test__Client__ExecutePrometheusInstantQuery(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 				"baseURL":  "https://api.us-west-2.aws.dash0.com",
 			},
 		}
 
-		client, err := NewClient(httpContext, appCtx)
+		client, err := NewClient(httpContext, integrationCtx)
 		require.NoError(t, err)
 
 		_, err = client.ExecutePrometheusInstantQuery("invalid query", "default")
@@ -152,14 +152,14 @@ func Test__Client__ExecutePrometheusInstantQuery(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 				"baseURL":  "https://api.us-west-2.aws.dash0.com",
 			},
 		}
 
-		client, err := NewClient(httpContext, appCtx)
+		client, err := NewClient(httpContext, integrationCtx)
 		require.NoError(t, err)
 
 		_, err = client.ExecutePrometheusInstantQuery("up", "default")
@@ -192,14 +192,14 @@ func Test__Client__ExecutePrometheusRangeQuery(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
 				"baseURL":  "https://api.us-west-2.aws.dash0.com",
 			},
 		}
 
-		client, err := NewClient(httpContext, appCtx)
+		client, err := NewClient(httpContext, integrationCtx)
 		require.NoError(t, err)
 
 		response, err := client.ExecutePrometheusRangeQuery("up", "default", "now-5m", "now", "15s")

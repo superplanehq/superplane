@@ -13,9 +13,9 @@ func Test__DeleteRelease__Setup(t *testing.T) {
 	component := DeleteRelease{}
 
 	t.Run("repository is required", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{}
+		integrationCtx := &contexts.IntegrationContext{}
 		err := component.Setup(core.SetupContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: map[string]any{"repository": ""},
 		})
@@ -24,13 +24,13 @@ func Test__DeleteRelease__Setup(t *testing.T) {
 	})
 
 	t.Run("repository is not accessible", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Metadata: Metadata{
 				Repositories: []Repository{helloRepo},
 			},
 		}
 		err := component.Setup(core.SetupContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: map[string]any{"repository": "world"},
 		})
@@ -39,7 +39,7 @@ func Test__DeleteRelease__Setup(t *testing.T) {
 	})
 
 	t.Run("metadata is set successfully", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Metadata: Metadata{
 				Repositories: []Repository{helloRepo},
 			},
@@ -47,7 +47,7 @@ func Test__DeleteRelease__Setup(t *testing.T) {
 
 		nodeMetadataCtx := contexts.MetadataContext{}
 		require.NoError(t, component.Setup(core.SetupContext{
-			Integration:   appCtx,
+			Integration:   integrationCtx,
 			Metadata:      &nodeMetadataCtx,
 			Configuration: map[string]any{"repository": "hello"},
 		}))
