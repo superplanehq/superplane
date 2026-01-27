@@ -173,11 +173,11 @@ const OwnerSetup: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
-      <div className="max-w-md w-full bg-white dark:bg-gray-900 rounded-lg outline outline-gray-950/10 shadow-sm p-8">
+    <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-neutral-900 px-4">
+      <div className="max-w-md w-full bg-white dark:bg-neutral-800 rounded-lg outline outline-gray-950/10 dark:outline-neutral-700 shadow-sm p-8">
         {step === "owner" && (
           <div className="text-center mb-8">
-            <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto mb-4 h-8 w-8" />
+            <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto mb-4 h-8 w-8 dark:invert" />
             <h4 className="text-xl font-medium text-gray-800 dark:text-white mb-1">Set up owner account</h4>
             <Text className="text-gray-800 dark:text-gray-300">Create an account for this SuperPlane instance.</Text>
           </div>
@@ -194,7 +194,7 @@ const OwnerSetup: React.FC = () => {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <Label className="block text-left mb-2">
-                  First Name <span className="text-gray-800">*</span>
+                  First Name <span className="text-gray-800 dark:text-gray-400">*</span>
                 </Label>
                 <InputGroup>
                   <Input
@@ -212,7 +212,7 @@ const OwnerSetup: React.FC = () => {
 
               <div>
                 <Label className="block text-left mb-2">
-                  Last Name <span className="text-gray-800">*</span>
+                  Last Name <span className="text-gray-800 dark:text-gray-400">*</span>
                 </Label>
                 <InputGroup>
                   <Input
@@ -231,7 +231,7 @@ const OwnerSetup: React.FC = () => {
 
             <div>
               <Label className="block text-left mb-2">
-                Email <span className="text-gray-800">*</span>
+                Email <span className="text-gray-800 dark:text-gray-400">*</span>
               </Label>
               <InputGroup>
                 <Input
@@ -247,7 +247,7 @@ const OwnerSetup: React.FC = () => {
 
             <div>
               <Label className="block text-left mb-2">
-                Password <span className="text-gray-800">*</span>
+                Password <span className="text-gray-800 dark:text-gray-400">*</span>
               </Label>
               <InputGroup>
                 <Input
@@ -269,7 +269,7 @@ const OwnerSetup: React.FC = () => {
 
             <div>
               <Label className="block text-left mb-2">
-                Confirm Password <span className="text-gray-800">*</span>
+                Confirm Password <span className="text-gray-800 dark:text-gray-400">*</span>
               </Label>
               <InputGroup>
                 <Input
@@ -332,7 +332,7 @@ const OwnerSetup: React.FC = () => {
 
             <div>
               <Label className="block text-left mb-2">
-                SMTP Host <span className="text-gray-800">*</span>
+                SMTP Host <span className="text-gray-800 dark:text-gray-400">*</span>
               </Label>
               <InputGroup>
                 <Input
@@ -350,7 +350,7 @@ const OwnerSetup: React.FC = () => {
 
             <div>
               <Label className="block text-left mb-2">
-                SMTP Port <span className="text-gray-800">*</span>
+                SMTP Port <span className="text-gray-800 dark:text-gray-400">*</span>
               </Label>
               <InputGroup>
                 <Input
@@ -408,7 +408,7 @@ const OwnerSetup: React.FC = () => {
 
             <div>
               <Label className="block text-left mb-2">
-                From Email <span className="text-gray-800">*</span>
+                From Email <span className="text-gray-800 dark:text-gray-400">*</span>
               </Label>
               <InputGroup>
                 <Input

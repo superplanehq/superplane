@@ -3,7 +3,6 @@ import { getBackgroundColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
 import { TriggerRenderer } from "../types";
 import { TriggerProps } from "@/ui/trigger";
-import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
 import { Agent } from "./types";
 
 interface OnIncidentStatusUpdateMetadata {
@@ -92,7 +91,7 @@ export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
 
     const props: TriggerProps = {
       title: node.name!,
-      iconSrc: pdIcon,
+      appName: "pagerduty",
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: metadataItems,
     };
