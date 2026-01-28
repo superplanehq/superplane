@@ -2,7 +2,7 @@ import { BuildingBlockCategory } from "../../BuildingBlocksSidebar";
 
 export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
   {
-    name: "Primitives",
+    name: "Core",
     blocks: [
       // Primitives
       {
