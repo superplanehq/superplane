@@ -1,0 +1,48 @@
+package daytona
+
+import (
+	_ "embed"
+	"sync"
+
+	"github.com/superplanehq/superplane/pkg/utils"
+)
+
+//go:embed example_output_create_sandbox.json
+var exampleOutputCreateSandboxBytes []byte
+
+//go:embed example_output_execute_code.json
+var exampleOutputExecuteCodeBytes []byte
+
+//go:embed example_output_execute_command.json
+var exampleOutputExecuteCommandBytes []byte
+
+//go:embed example_output_delete_sandbox.json
+var exampleOutputDeleteSandboxBytes []byte
+
+var exampleOutputCreateSandboxOnce sync.Once
+var exampleOutputCreateSandbox map[string]any
+
+var exampleOutputExecuteCodeOnce sync.Once
+var exampleOutputExecuteCode map[string]any
+
+var exampleOutputExecuteCommandOnce sync.Once
+var exampleOutputExecuteCommand map[string]any
+
+var exampleOutputDeleteSandboxOnce sync.Once
+var exampleOutputDeleteSandbox map[string]any
+
+func (c *CreateSandbox) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateSandboxOnce, exampleOutputCreateSandboxBytes, &exampleOutputCreateSandbox)
+}
+
+func (e *ExecuteCode) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputExecuteCodeOnce, exampleOutputExecuteCodeBytes, &exampleOutputExecuteCode)
+}
+
+func (e *ExecuteCommand) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputExecuteCommandOnce, exampleOutputExecuteCommandBytes, &exampleOutputExecuteCommand)
+}
+
+func (d *DeleteSandbox) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteSandboxOnce, exampleOutputDeleteSandboxBytes, &exampleOutputDeleteSandbox)
+}
