@@ -162,7 +162,7 @@ func Test__DeleteSandbox__ComponentInfo(t *testing.T) {
 	assert.Equal(t, "daytona.deleteSandbox", component.Name())
 	assert.Equal(t, "Delete Sandbox", component.Label())
 	assert.Equal(t, "Delete a sandbox environment", component.Description())
-	assert.Equal(t, "trash", component.Icon())
+	assert.Equal(t, "daytona", component.Icon())
 	assert.Equal(t, "orange", component.Color())
 	assert.NotEmpty(t, component.Documentation())
 }

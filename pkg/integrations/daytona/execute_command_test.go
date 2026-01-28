@@ -213,7 +213,7 @@ func Test__ExecuteCommand__ComponentInfo(t *testing.T) {
 	assert.Equal(t, "daytona.executeCommand", component.Name())
 	assert.Equal(t, "Execute Command", component.Label())
 	assert.Equal(t, "Run a shell command in a sandbox environment", component.Description())
-	assert.Equal(t, "terminal", component.Icon())
+	assert.Equal(t, "daytona", component.Icon())
 	assert.Equal(t, "orange", component.Color())
 	assert.NotEmpty(t, component.Documentation())
 }
