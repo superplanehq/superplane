@@ -88,12 +88,19 @@ func (c *CreateSandbox) Configuration() []configuration.Field {
 			Placeholder: "default",
 		},
 		{
-			Name:        "target",
-			Label:       "Target Region",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Target region for the sandbox (e.g., us, eu)",
-			Placeholder: "us",
+			Name:     "target",
+			Label:    "Target Region",
+			Type:     configuration.FieldTypeSelect,
+			Required: false,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "US", Value: "us"},
+						{Label: "EU", Value: "eu"},
+					},
+				},
+			},
+			Description: "Target region for the sandbox",
 		},
 		{
 			Name:        "autoStopInterval",
@@ -110,6 +117,10 @@ func (c *CreateSandbox) Setup(ctx core.SetupContext) error {
 	spec := CreateSandboxSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)
+	}
+
+	if spec.AutoStopInterval < 0 {
+		return fmt.Errorf("autoStopInterval must be a positive number")
 	}
 
 	return nil
