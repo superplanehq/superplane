@@ -62,7 +62,7 @@ func (c *SendTextMessage) Configuration() []configuration.Field {
 		{
 			Name:     "channel",
 			Label:    "Channel",
-			Type:     configuration.FieldTypeAppInstallationResource,
+			Type:     configuration.FieldTypeIntegrationResource,
 			Required: true,
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
@@ -140,7 +140,7 @@ func (c *SendTextMessage) Setup(ctx core.SetupContext) error {
 	}
 
 	// Get channel info to store in metadata
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create Discord client: %w", err)
 	}
@@ -175,7 +175,7 @@ func (c *SendTextMessage) Execute(ctx core.ExecutionContext) error {
 		return errors.New("channel is required")
 	}
 
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create Discord client: %w", err)
 	}
