@@ -1,0 +1,71 @@
+---
+title: "Datadog"
+sidebar:
+  order: 5
+---
+
+Create events in Datadog
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Event" href="#create-event" description="Create a new event in Datadog" />
+</CardGrid>
+
+## Instructions
+
+To configure Datadog to work with SuperPlane:
+
+1. **Get API Keys**: In Datadog, go to Organization Settings > API Keys to get your API Key
+2. **Get Application Key**: Go to Organization Settings > Application Keys to create an Application Key
+3. **Select Site**: Choose the Datadog site that matches your account (US1, US3, US5, EU, or AP1)
+4. **Enter Credentials**: Provide your API Key, Application Key, and Site in the integration configuration
+
+<a id="create-event"></a>
+
+## Create Event
+
+The Create Event component creates a new event in Datadog.
+
+### Use Cases
+
+- **Deployment tracking**: Log deployment events to correlate with metrics
+- **Incident annotation**: Add context to incidents with custom events
+- **Workflow notifications**: Create events to track workflow execution milestones
+
+### Outputs
+
+The component emits an event containing:
+- `id`: The unique identifier of the created event
+- `title`: The event title
+- `text`: The event body
+- `date_happened`: Unix timestamp when the event occurred
+- `alert_type`: The severity level (info, warning, error, success)
+- `priority`: Event priority (normal, low)
+- `tags`: Array of tags attached to the event
+- `url`: Link to view the event in Datadog
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alert_type": "info",
+    "date_happened": 1704067200,
+    "id": 1234567890,
+    "priority": "normal",
+    "tags": [
+      "env:prod",
+      "service:web"
+    ],
+    "text": "Application v1.2.3 has been deployed successfully",
+    "title": "Deployment completed",
+    "url": "https://app.datadoghq.com/event/event?id=1234567890"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "datadog.event"
+}
+```
+
