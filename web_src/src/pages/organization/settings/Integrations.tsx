@@ -16,6 +16,7 @@ import { resolveIcon } from "@/lib/utils";
 import { getApiErrorMessage } from "@/utils/errors";
 import { Icon } from "@/components/Icon";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
+import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
@@ -46,6 +47,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   const appLogoMap: Record<string, string> = {
     aws: awsIcon,
     dash0: dash0Icon,
+    daytona: daytonaIcon,
     github: githubIcon,
     openai: openAiIcon,
     "open-ai": openAiIcon,
