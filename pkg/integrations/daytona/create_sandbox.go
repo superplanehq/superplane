@@ -66,7 +66,7 @@ Returns the sandbox information including:
 }
 
 func (c *CreateSandbox) Icon() string {
-	return "box"
+	return "daytona"
 }
 
 func (c *CreateSandbox) Color() string {

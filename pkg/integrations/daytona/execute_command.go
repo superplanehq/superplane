@@ -69,7 +69,7 @@ Returns the command result including:
 }
 
 func (e *ExecuteCommand) Icon() string {
-	return "terminal"
+	return "daytona"
 }
 
 func (e *ExecuteCommand) Color() string {

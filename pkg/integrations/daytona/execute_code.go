@@ -69,7 +69,7 @@ Returns the execution result including:
 }
 
 func (e *ExecuteCode) Icon() string {
-	return "code"
+	return "daytona"
 }
 
 func (e *ExecuteCode) Color() string {

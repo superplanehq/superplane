@@ -63,7 +63,7 @@ Returns deletion confirmation including:
 }
 
 func (d *DeleteSandbox) Icon() string {
-	return "trash"
+	return "daytona"
 }
 
 func (d *DeleteSandbox) Color() string {
