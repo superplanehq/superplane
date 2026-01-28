@@ -15,9 +15,15 @@ const SandboxPayloadType = "daytona.sandbox"
 type CreateSandbox struct{}
 
 type CreateSandboxSpec struct {
-	Snapshot         string `json:"snapshot,omitempty"`
-	Target           string `json:"target,omitempty"`
-	AutoStopInterval int    `json:"autoStopInterval,omitempty"`
+	Snapshot         string        `json:"snapshot,omitempty"`
+	Target           string        `json:"target,omitempty"`
+	AutoStopInterval int           `json:"autoStopInterval,omitempty"`
+	Env              []EnvVariable `json:"env,omitempty"`
+}
+
+type EnvVariable struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 type SandboxPayload struct {
@@ -51,6 +57,7 @@ func (c *CreateSandbox) Documentation() string {
 - **Snapshot**: Base environment snapshot (optional, uses default if not specified)
 - **Target**: Target region for the sandbox (optional)
 - **Auto Stop Interval**: Time in minutes before the sandbox auto-stops
+- **Environment Variables**: Key-value pairs to set as environment variables in the sandbox
 
 ## Output
 
@@ -95,8 +102,8 @@ func (c *CreateSandbox) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
-						{Label: "US", Value: "us"},
-						{Label: "EU", Value: "eu"},
+						{Label: "us", Value: "us"},
+						{Label: "eu", Value: "eu"},
 					},
 				},
 			},
@@ -109,6 +116,35 @@ func (c *CreateSandbox) Configuration() []configuration.Field {
 			Required:    false,
 			Description: "Time in minutes before the sandbox auto-stops",
 			Placeholder: "15",
+		},
+		{
+			Name:  "env",
+			Label: "Environment Variables",
+			Type:  configuration.FieldTypeList,
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Variable",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:     "name",
+								Label:    "Name",
+								Type:     configuration.FieldTypeString,
+								Required: true,
+							},
+							{
+								Name:     "value",
+								Label:    "Value",
+								Type:     configuration.FieldTypeString,
+								Required: true,
+							},
+						},
+					},
+				},
+			},
+			Required:    false,
+			Description: "Environment variables to set in the sandbox",
 		},
 	}
 }
@@ -137,10 +173,19 @@ func (c *CreateSandbox) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create client: %v", err)
 	}
 
+	var envMap map[string]string
+	if len(spec.Env) > 0 {
+		envMap = make(map[string]string, len(spec.Env))
+		for _, e := range spec.Env {
+			envMap[e.Name] = e.Value
+		}
+	}
+
 	req := &CreateSandboxRequest{
 		Snapshot:         spec.Snapshot,
 		Target:           spec.Target,
 		AutoStopInterval: spec.AutoStopInterval,
+		Env:              envMap,
 	}
 
 	sandbox, err := client.CreateSandbox(req)

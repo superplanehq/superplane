@@ -18,7 +18,6 @@ type Daytona struct{}
 type Configuration struct {
 	APIKey  string `json:"apiKey"`
 	BaseURL string `json:"baseURL"`
-	Target  string `json:"target"`
 }
 
 type Metadata struct {
@@ -56,13 +55,6 @@ func (d *Daytona) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "API base URL (default: https://app.daytona.io/api)",
-		},
-		{
-			Name:        "target",
-			Label:       "Target Region",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Target region (us or eu)",
 		},
 	}
 }
