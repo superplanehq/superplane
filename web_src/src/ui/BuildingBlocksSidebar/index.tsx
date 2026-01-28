@@ -11,6 +11,7 @@ import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
+import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
@@ -313,6 +314,7 @@ function CategorySection({
           // Use SVG icons for application components/triggers
           const appLogoMap: Record<string, string> = {
             dash0: dash0Icon,
+            daytona: daytonaIcon,
             github: githubIcon,
             openai: openAiIcon,
             "open-ai": openAiIcon,
