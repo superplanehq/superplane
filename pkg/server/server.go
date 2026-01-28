@@ -22,14 +22,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/workers"
 
 	// Import integrations, components and triggers to register them via init()
-	_ "github.com/superplanehq/superplane/pkg/applications/dash0"
-	_ "github.com/superplanehq/superplane/pkg/applications/discord"
-	_ "github.com/superplanehq/superplane/pkg/applications/github"
-	_ "github.com/superplanehq/superplane/pkg/applications/openai"
-	_ "github.com/superplanehq/superplane/pkg/applications/pagerduty"
-	_ "github.com/superplanehq/superplane/pkg/applications/semaphore"
-	_ "github.com/superplanehq/superplane/pkg/applications/slack"
-	_ "github.com/superplanehq/superplane/pkg/applications/smtp"
 	_ "github.com/superplanehq/superplane/pkg/components/approval"
 	_ "github.com/superplanehq/superplane/pkg/components/filter"
 	_ "github.com/superplanehq/superplane/pkg/components/http"
