@@ -17,9 +17,9 @@ func Test__SendTextMessage__Setup(t *testing.T) {
 
 	t.Run("invalid configuration -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{},
-			Metadata:        &contexts.MetadataContext{},
-			Configuration:   "invalid",
+			Integration:   &contexts.IntegrationContext{},
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: "invalid",
 		})
 
 		require.ErrorContains(t, err, "failed to decode configuration")
@@ -27,9 +27,9 @@ func Test__SendTextMessage__Setup(t *testing.T) {
 
 	t.Run("missing channel -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{},
-			Metadata:        &contexts.MetadataContext{},
-			Configuration:   map[string]any{"content": "Hello"},
+			Integration:   &contexts.IntegrationContext{},
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"content": "Hello"},
 		})
 
 		require.ErrorContains(t, err, "channel is required")
@@ -37,7 +37,7 @@ func Test__SendTextMessage__Setup(t *testing.T) {
 
 	t.Run("no content or embed -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{
+			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{"botToken": "test-token"},
 			},
 			Metadata:      &contexts.MetadataContext{},
@@ -49,7 +49,7 @@ func Test__SendTextMessage__Setup(t *testing.T) {
 
 	t.Run("invalid embed color -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{
+			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{"botToken": "test-token"},
 			},
 			Metadata: &contexts.MetadataContext{},
@@ -76,7 +76,7 @@ func Test__SendTextMessage__Setup(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{
+			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{"botToken": "test-token"},
 			},
 			Metadata: metadata,
@@ -106,7 +106,7 @@ func Test__SendTextMessage__Setup(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 
 		err := component.Setup(core.SetupContext{
-			AppInstallation: &contexts.AppInstallationContext{
+			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{"botToken": "test-token"},
 			},
 			Metadata: metadata,
@@ -151,13 +151,13 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 		})
 
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{"botToken": "test-bot-token"},
 		}
 
 		err := component.Execute(core.ExecutionContext{
-			AppInstallation: appCtx,
-			ExecutionState:  execState,
+			Integration:    integrationCtx,
+			ExecutionState: execState,
 			Configuration: map[string]any{
 				"channel": "123456789",
 				"content": "Hello, Discord!",
@@ -199,13 +199,13 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 		})
 
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{"botToken": "test-bot-token"},
 		}
 
 		err := component.Execute(core.ExecutionContext{
-			AppInstallation: appCtx,
-			ExecutionState:  execState,
+			Integration:    integrationCtx,
+			ExecutionState: execState,
 			Configuration: map[string]any{
 				"channel":          "123456789",
 				"content":          "Hello!",
@@ -224,13 +224,13 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 		})
 
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{"botToken": "test-bot-token"},
 		}
 
 		err := component.Execute(core.ExecutionContext{
-			AppInstallation: appCtx,
-			ExecutionState:  execState,
+			Integration:    integrationCtx,
+			ExecutionState: execState,
 			Configuration: map[string]any{
 				"channel": "123456789",
 				"content": "Hello",
@@ -243,14 +243,14 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 
 	t.Run("missing channel -> error", func(t *testing.T) {
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{"botToken": "test-bot-token"},
 		}
 
 		err := component.Execute(core.ExecutionContext{
-			AppInstallation: appCtx,
-			ExecutionState:  execState,
-			Configuration:   map[string]any{"content": "Hello"},
+			Integration:    integrationCtx,
+			ExecutionState: execState,
+			Configuration:  map[string]any{"content": "Hello"},
 		})
 
 		require.Error(t, err)

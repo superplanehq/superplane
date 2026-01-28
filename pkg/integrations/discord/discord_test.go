@@ -15,13 +15,13 @@ func Test__Discord__Sync(t *testing.T) {
 	d := &Discord{}
 
 	t.Run("missing bot token -> error", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{},
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration:   map[string]any{},
-			AppInstallation: appCtx,
+			Configuration: map[string]any{},
+			Integration:   integrationCtx,
 		})
 
 		require.Error(t, err)
@@ -29,15 +29,15 @@ func Test__Discord__Sync(t *testing.T) {
 	})
 
 	t.Run("empty bot token -> error", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"botToken": "",
 			},
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration:   map[string]any{"botToken": ""},
-			AppInstallation: appCtx,
+			Configuration: map[string]any{"botToken": ""},
+			Integration:   integrationCtx,
 		})
 
 		require.Error(t, err)
@@ -58,22 +58,22 @@ func Test__Discord__Sync(t *testing.T) {
 		})
 
 		botToken := "test-bot-token"
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"botToken": botToken,
 			},
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration:   map[string]any{"botToken": botToken},
-			AppInstallation: appCtx,
+			Configuration: map[string]any{"botToken": botToken},
+			Integration:   integrationCtx,
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "ready", appCtx.State)
-		assert.Contains(t, appCtx.StateDescription, "TestBot")
+		assert.Equal(t, "ready", integrationCtx.State)
+		assert.Contains(t, integrationCtx.StateDescription, "TestBot")
 
-		metadata, ok := appCtx.Metadata.(Metadata)
+		metadata, ok := integrationCtx.Metadata.(Metadata)
 		require.True(t, ok)
 		assert.Equal(t, "123456789", metadata.BotID)
 		assert.Equal(t, "TestBot", metadata.Username)
@@ -85,15 +85,15 @@ func Test__Discord__Sync(t *testing.T) {
 		})
 
 		botToken := "invalid-token"
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"botToken": botToken,
 			},
 		}
 
 		err := d.Sync(core.SyncContext{
-			Configuration:   map[string]any{"botToken": botToken},
-			AppInstallation: appCtx,
+			Configuration: map[string]any{"botToken": botToken},
+			Integration:   integrationCtx,
 		})
 
 		require.Error(t, err)
@@ -120,15 +120,15 @@ func Test__Discord__ListResources(t *testing.T) {
 			return jsonResponse(http.StatusNotFound, `{}`), nil
 		})
 
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"botToken": "test-token",
 			},
 		}
 
 		resources, err := d.ListResources("channel", core.ListResourcesContext{
-			AppInstallation: appCtx,
-			Logger:          logrus.NewEntry(logrus.New()),
+			Integration: integrationCtx,
+			Logger:      logrus.NewEntry(logrus.New()),
 		})
 
 		require.NoError(t, err)
@@ -140,15 +140,15 @@ func Test__Discord__ListResources(t *testing.T) {
 	})
 
 	t.Run("unknown resource type returns empty", func(t *testing.T) {
-		appCtx := &contexts.AppInstallationContext{
+		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"botToken": "test-token",
 			},
 		}
 
 		resources, err := d.ListResources("unknown", core.ListResourcesContext{
-			AppInstallation: appCtx,
-			Logger:          logrus.NewEntry(logrus.New()),
+			Integration: integrationCtx,
+			Logger:      logrus.NewEntry(logrus.New()),
 		})
 
 		require.NoError(t, err)

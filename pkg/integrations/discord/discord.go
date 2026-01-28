@@ -9,7 +9,7 @@ import (
 )
 
 func init() {
-	registry.RegisterApplication("discord", &Discord{})
+	registry.RegisterIntegration("discord", &Discord{})
 }
 
 type Discord struct{}
@@ -39,7 +39,7 @@ func (d *Discord) Description() string {
 	return "Send messages to Discord channels"
 }
 
-func (d *Discord) InstallationInstructions() string {
+func (d *Discord) Instructions() string {
 	return `To set up Discord integration:
 
 1. Go to the **Discord Developer Portal** (https://discord.com/developers/applications)
@@ -78,7 +78,7 @@ func (d *Discord) Triggers() []core.Trigger {
 
 func (d *Discord) Sync(ctx core.SyncContext) error {
 	// Get the decrypted bot token using GetConfig (sensitive fields are encrypted)
-	botTokenBytes, err := ctx.AppInstallation.GetConfig("botToken")
+	botTokenBytes, err := ctx.Integration.GetConfig("botToken")
 	if err != nil {
 		return fmt.Errorf("botToken is required")
 	}
@@ -89,7 +89,7 @@ func (d *Discord) Sync(ctx core.SyncContext) error {
 	}
 
 	// Verify the bot token is valid by getting the current user
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.Integration)
 	if err != nil {
 		return err
 	}
@@ -99,12 +99,12 @@ func (d *Discord) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to verify bot token: %v", err)
 	}
 
-	ctx.AppInstallation.SetMetadata(Metadata{
+	ctx.Integration.SetMetadata(Metadata{
 		BotID:    botUser.ID,
 		Username: botUser.Username,
 	})
 
-	ctx.AppInstallation.SetState("ready", fmt.Sprintf("Connected as: %s", botUser.Username))
+	ctx.Integration.SetState("ready", fmt.Sprintf("Connected as: %s", botUser.Username))
 	return nil
 }
 
@@ -116,12 +116,12 @@ func (d *Discord) CompareWebhookConfig(a, b any) (bool, error) {
 	return true, nil
 }
 
-func (d *Discord) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.ApplicationResource, error) {
+func (d *Discord) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	if resourceType != "channel" {
-		return []core.ApplicationResource{}, nil
+		return []core.IntegrationResource{}, nil
 	}
 
-	client, err := NewClient(ctx.AppInstallation)
+	client, err := NewClient(ctx.Integration)
 	if err != nil {
 		if ctx.Logger != nil {
 			ctx.Logger.Errorf("Discord: failed to create client: %v", err)
@@ -141,7 +141,7 @@ func (d *Discord) ListResources(resourceType string, ctx core.ListResourcesConte
 		ctx.Logger.Infof("Discord: found %d guilds", len(guilds))
 	}
 
-	var resources []core.ApplicationResource
+	var resources []core.IntegrationResource
 	for _, guild := range guilds {
 		if ctx.Logger != nil {
 			ctx.Logger.Infof("Discord: fetching channels for guild %s (%s)", guild.ID, guild.Name)
@@ -160,7 +160,7 @@ func (d *Discord) ListResources(resourceType string, ctx core.ListResourcesConte
 		for _, channel := range channels {
 			// Only include text channels (type 0)
 			if channel.Type == 0 {
-				resources = append(resources, core.ApplicationResource{
+				resources = append(resources, core.IntegrationResource{
 					Type: "channel",
 					ID:   channel.ID,
 					Name: fmt.Sprintf("#%s (%s)", channel.Name, guild.Name),
