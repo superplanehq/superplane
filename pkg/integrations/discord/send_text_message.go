@@ -45,6 +45,35 @@ func (c *SendTextMessage) Description() string {
 	return "Send a text message to a Discord channel"
 }
 
+func (c *SendTextMessage) Documentation() string {
+	return `The Send Text Message component sends a message to a Discord channel.
+
+## Use Cases
+
+- **Notifications**: Send notifications about workflow events or system status
+- **Alerts**: Alert teams about important events or errors
+- **Updates**: Provide status updates on long-running processes
+
+## Configuration
+
+- **Channel**: Select the Discord channel to send the message to
+- **Content**: Plain text message content (max 2000 characters)
+- **Embed Title**: Optional title for a rich embed
+- **Embed Description**: Optional description for a rich embed
+- **Embed Color**: Hex color code for the embed (e.g., #5865F2)
+- **Embed URL**: Optional URL to link from the embed title
+
+## Output
+
+Returns metadata about the sent message including message ID, channel ID, and author information.
+
+## Notes
+
+- Either content or embed (title/description) must be provided
+- The Discord bot must be installed and have permission to post to the selected channel
+- Supports Discord's rich embed formatting for visually appealing messages`
+}
+
 func (c *SendTextMessage) Icon() string {
 	return "discord"
 }
