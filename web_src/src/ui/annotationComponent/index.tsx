@@ -135,14 +135,25 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
   const activeColor = annotationColor && NOTE_COLORS[annotationColor] ? annotationColor : "yellow";
   const colorStyles = NOTE_COLORS[activeColor];
 
+  const annotationTextRef = React.useRef(annotationText || "");
+  const onAnnotationUpdateRef = React.useRef(onAnnotationUpdate);
+
+  useEffect(() => {
+    annotationTextRef.current = annotationText || "";
+  }, [annotationText]);
+
+  useEffect(() => {
+    onAnnotationUpdateRef.current = onAnnotationUpdate;
+  }, [onAnnotationUpdate]);
+
   const debouncedTextUpdate = useMemo(
     () =>
       debounce((nextText: string) => {
-        if (nextText !== (annotationText || "")) {
-          onAnnotationUpdate?.({ text: nextText });
+        if (nextText !== annotationTextRef.current) {
+          onAnnotationUpdateRef.current?.({ text: nextText });
         }
-      }, 400),
-    [annotationText, onAnnotationUpdate],
+      }, 1000),
+    [],
   );
 
   useEffect(() => {
