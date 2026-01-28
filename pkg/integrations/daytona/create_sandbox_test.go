@@ -91,6 +91,40 @@ func Test__CreateSandbox__Execute(t *testing.T) {
 		require.Len(t, execCtx.Payloads, 1)
 	})
 
+	t.Run("sandbox creation with env variables", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"sandbox-789","state":"started"}`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.AppInstallationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"env": []map[string]any{
+					{"name": "API_KEY", "value": "secret123"},
+					{"name": "DEBUG", "value": "true"},
+				},
+			},
+			HTTP:            httpContext,
+			AppInstallation: appCtx,
+			ExecutionState:  execCtx,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, execCtx.Finished)
+		assert.True(t, execCtx.Passed)
+	})
+
 	t.Run("sandbox creation with snapshot", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -167,7 +201,7 @@ func Test__CreateSandbox__Configuration(t *testing.T) {
 	component := CreateSandbox{}
 
 	config := component.Configuration()
-	assert.Len(t, config, 3)
+	assert.Len(t, config, 4)
 
 	fieldNames := make([]string, len(config))
 	for i, f := range config {
@@ -177,6 +211,7 @@ func Test__CreateSandbox__Configuration(t *testing.T) {
 	assert.Contains(t, fieldNames, "snapshot")
 	assert.Contains(t, fieldNames, "target")
 	assert.Contains(t, fieldNames, "autoStopInterval")
+	assert.Contains(t, fieldNames, "env")
 
 	for _, f := range config {
 		assert.False(t, f.Required, "all fields should be optional")

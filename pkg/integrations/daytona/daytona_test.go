@@ -185,7 +185,7 @@ func Test__Daytona__Configuration(t *testing.T) {
 	d := &Daytona{}
 
 	config := d.Configuration()
-	assert.Len(t, config, 3)
+	assert.Len(t, config, 2)
 
 	fieldNames := make([]string, len(config))
 	for i, f := range config {
@@ -194,7 +194,6 @@ func Test__Daytona__Configuration(t *testing.T) {
 
 	assert.Contains(t, fieldNames, "apiKey")
 	assert.Contains(t, fieldNames, "baseURL")
-	assert.Contains(t, fieldNames, "target")
 
 	for _, f := range config {
 		if f.Name == "apiKey" {
