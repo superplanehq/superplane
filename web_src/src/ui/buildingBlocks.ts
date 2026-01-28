@@ -44,39 +44,35 @@ export function buildBuildingBlockCategories(
 
   // Combine triggers and components into a single "Core" category
   const coreBlocks: BuildingBlock[] = [
-    ...filteredTriggers.map(
-      (t): BuildingBlock => {
-        const block: BuildingBlock = {
-          name: t.name!,
-          label: t.label,
-          description: t.description,
-          type: "trigger",
-          configuration: t.configuration,
-          icon: t.icon,
-          color: t.color,
-          isLive: true,
-        };
-        block.componentSubtype = getComponentSubtype(block);
-        return block;
-      },
-    ),
-    ...filteredComponents.map(
-      (c): BuildingBlock => {
-        const block: BuildingBlock = {
-          name: c.name!,
-          label: c.label,
-          description: c.description,
-          type: "component",
-          outputChannels: c.outputChannels,
-          configuration: c.configuration,
-          icon: c.icon,
-          color: c.color,
-          isLive: true,
-        };
-        block.componentSubtype = getComponentSubtype(block);
-        return block;
-      },
-    ),
+    ...filteredTriggers.map((t): BuildingBlock => {
+      const block: BuildingBlock = {
+        name: t.name!,
+        label: t.label,
+        description: t.description,
+        type: "trigger",
+        configuration: t.configuration,
+        icon: t.icon,
+        color: t.color,
+        isLive: true,
+      };
+      block.componentSubtype = getComponentSubtype(block);
+      return block;
+    }),
+    ...filteredComponents.map((c): BuildingBlock => {
+      const block: BuildingBlock = {
+        name: c.name!,
+        label: c.label,
+        description: c.description,
+        type: "component",
+        outputChannels: c.outputChannels,
+        configuration: c.configuration,
+        icon: c.icon,
+        color: c.color,
+        isLive: true,
+      };
+      block.componentSubtype = getComponentSubtype(block);
+      return block;
+    }),
   ];
 
   const liveCategories: BuildingBlockCategory[] = [
@@ -86,23 +82,21 @@ export function buildBuildingBlockCategories(
     },
     {
       name: "Bundles",
-      blocks: blueprints.map(
-        (b): BuildingBlock => {
-          const block: BuildingBlock = {
-            id: b.id,
-            name: b.name!,
-            description: b.description,
-            type: "blueprint",
-            outputChannels: b.outputChannels,
-            configuration: b.configuration,
-            icon: "component",
-            color: "gray",
-            isLive: true,
-          };
-          block.componentSubtype = getComponentSubtype(block);
-          return block;
-        },
-      ),
+      blocks: blueprints.map((b): BuildingBlock => {
+        const block: BuildingBlock = {
+          id: b.id,
+          name: b.name!,
+          description: b.description,
+          type: "blueprint",
+          outputChannels: b.outputChannels,
+          configuration: b.configuration,
+          icon: "component",
+          color: "gray",
+          isLive: true,
+        };
+        block.componentSubtype = getComponentSubtype(block);
+        return block;
+      }),
     },
   ];
 

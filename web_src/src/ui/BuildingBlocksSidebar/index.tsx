@@ -2,13 +2,7 @@ import type { SuperplaneBlueprintsOutputChannel, SuperplaneComponentsOutputChann
 import { Button } from "@/components/ui/button";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { resolveIcon } from "@/lib/utils";
 import { isCustomComponentsEnabled } from "@/lib/env";
 import { getBackgroundColorClass } from "@/utils/colors";
