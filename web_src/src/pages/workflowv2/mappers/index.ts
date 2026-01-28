@@ -34,6 +34,11 @@ import {
   eventStateRegistry as dash0EventStateRegistry,
 } from "./dash0/index";
 import {
+  componentMappers as daytonaComponentMappers,
+  triggerRenderers as daytonaTriggerRenderers,
+  eventStateRegistry as daytonaEventStateRegistry,
+} from "./daytona/index";
+import {
   componentMappers as slackComponentMappers,
   triggerRenderers as slackTriggerRenderers,
   eventStateRegistry as slackEventStateRegistry,
@@ -75,6 +80,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   github: githubComponentMappers,
   pagerduty: pagerdutyComponentMappers,
   dash0: dash0ComponentMappers,
+  daytona: daytonaComponentMappers,
   slack: slackComponentMappers,
   smtp: smtpComponentMappers,
 };
@@ -84,6 +90,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   github: githubTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
   dash0: dash0TriggerRenderers,
+  daytona: daytonaTriggerRenderers,
   slack: slackTriggerRenderers,
   smtp: smtpTriggerRenderers,
 };
@@ -93,6 +100,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   github: githubEventStateRegistry,
   pagerduty: pagerdutyEventStateRegistry,
   dash0: dash0EventStateRegistry,
+  daytona: daytonaEventStateRegistry,
   slack: slackEventStateRegistry,
   smtp: smtpEventStateRegistry,
 };
