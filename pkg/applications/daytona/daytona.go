@@ -21,6 +21,9 @@ type Configuration struct {
 	Target  string `json:"target"`
 }
 
+type Metadata struct {
+}
+
 func (d *Daytona) Name() string {
 	return "daytona"
 }
@@ -100,6 +103,7 @@ func (d *Daytona) Sync(ctx core.SyncContext) error {
 		return err
 	}
 
+	ctx.AppInstallation.SetMetadata(Metadata{})
 	ctx.AppInstallation.SetState("ready", "")
 	return nil
 }
