@@ -106,7 +106,7 @@ const sampleBlueprints: BuildingBlock[] = [
 
 const sampleBlocks: BuildingBlockCategory[] = [
   {
-    name: "Primitives",
+    name: "Core",
     blocks: [...sampleTriggers, ...sampleComponents],
   },
   {
@@ -203,7 +203,7 @@ export const OnlyTriggers: Story = {
     isOpen: true,
     blocks: [
       {
-        name: "Primitives",
+        name: "Core",
         blocks: sampleTriggers,
       },
     ],
