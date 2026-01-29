@@ -165,7 +165,9 @@ export function useConversations(options: UseConversationsOptions = {}): UseConv
 
                 // Save conversation if handler is provided
                 if (onSaveConversation) {
-                  onSaveConversation(updatedConv).catch(console.error);
+                  onSaveConversation(updatedConv).catch((err) => {
+                    setError(err instanceof Error ? err.message : "Failed to save conversation");
+                  });
                 }
 
                 return updatedConv;

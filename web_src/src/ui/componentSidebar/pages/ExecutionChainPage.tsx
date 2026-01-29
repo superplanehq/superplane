@@ -326,7 +326,6 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
 
       setChainItems(transformedItems);
     } catch (err) {
-      console.error("Failed to load execution chain:", err);
       setError(err instanceof Error ? err.message : "Failed to load execution chain");
     } finally {
       setLoading(false);

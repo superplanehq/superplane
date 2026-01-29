@@ -29,6 +29,7 @@ import { organizationKeys } from "@/hooks/useOrganizationData";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { workflowKeys } from "@/hooks/useWorkflowData";
 import { formatTimeAgo } from "@/utils/date";
+import { showErrorToast } from "@/utils/toast";
 
 type ApprovalItem = {
   type: string;
@@ -583,8 +584,8 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
             queryClient.invalidateQueries({
               queryKey: workflowKeys.nodeExecution(workflowId, node.id!),
             });
-          } catch (error) {
-            console.error("Failed to approve:", error);
+          } catch (_error) {
+            showErrorToast("Failed to approve");
           }
         },
         onReject: async (comment?: string) => {
@@ -610,8 +611,8 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
             queryClient.invalidateQueries({
               queryKey: workflowKeys.nodeExecution(workflowId, node.id!),
             });
-          } catch (error) {
-            console.error("Failed to reject:", error);
+          } catch (_error) {
+            showErrorToast("Failed to reject");
           }
         },
       };

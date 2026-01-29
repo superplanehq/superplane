@@ -5,6 +5,7 @@ import { Input } from "../../../components/Input/input";
 import { useAddUserToGroup, useOrganizationGroupUsers, useOrganizationUsers } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/ui/checkbox";
+import { showErrorToast } from "@/utils/toast";
 
 interface AddMembersSectionProps {
   showRoleSelection?: boolean;
@@ -98,7 +99,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
 
         onMemberAdded?.();
       } catch {
-        console.error("Failed to add existing members");
+        showErrorToast("Failed to add existing members");
       }
     };
 

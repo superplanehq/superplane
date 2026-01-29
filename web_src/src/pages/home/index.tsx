@@ -617,7 +617,6 @@ function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActio
           closeDialog();
         },
         onError: (error) => {
-          console.error("Failed to delete canvas:", error);
           showErrorToast("Failed to delete canvas");
         },
       });
@@ -629,7 +628,6 @@ function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActio
       showSuccessToast("Canvas deleted successfully");
       closeDialog();
     } catch (error) {
-      console.error("Failed to delete canvas:", error);
       showErrorToast("Failed to delete canvas");
     }
   };
@@ -723,7 +721,6 @@ function BlueprintActionsMenu({ blueprint, organizationId }: BlueprintActionsMen
       showSuccessToast("Component deleted successfully");
       closeDialog();
     } catch (error) {
-      console.error("Failed to delete Bundle:", error);
       showErrorToast("Failed to delete Bundle");
     }
   };
