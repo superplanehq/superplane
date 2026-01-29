@@ -123,7 +123,7 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			Label:       "From Email",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Email address of a valid PagerDuty user. Required for App OAuth and account-level API tokens, optional for user-level API tokens.",
+			Description: "Valid PagerDuty user email.",
 			Placeholder: "user@example.com",
 		},
 	}

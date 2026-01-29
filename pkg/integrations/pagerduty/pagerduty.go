@@ -98,10 +98,11 @@ func (p *PagerDuty) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "subdomain",
-			Label:    "Sub Domain",
-			Type:     configuration.FieldTypeString,
-			Required: true,
+			Name:        "subdomain",
+			Label:       "Sub Domain",
+			Type:        configuration.FieldTypeString,
+			Description: "The subdomain of your PagerDuty account. This is the part of your PagerDuty URL before the .pagerduty.com domain (e.g., your-org for https://your-org.us.pagerduty.com).",
+			Required:    true,
 		},
 		{
 			Name:     "authType",
