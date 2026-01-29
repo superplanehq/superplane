@@ -1,0 +1,60 @@
+{
+    "type": "pagerduty.incident.annotated",
+    "data": {
+        "agent": {
+            "html_url": "https://acme.pagerduty.com/users/PLH1HKV",
+            "id": "PLH1HKV",
+            "self": "https://api.pagerduty.com/users/PLH1HKV",
+            "summary": "Tenex Engineer",
+            "type": "user_reference"
+        },
+        "incident": {
+            "id": "PGR0VU2",
+            "type": "incident",
+            "self": "https://api.pagerduty.com/incidents/PGR0VU2",
+            "html_url": "https://acme.pagerduty.com/incidents/PGR0VU2",
+            "number": 2,
+            "status": "acknowledged",
+            "incident_key": "d3640fbd41094207a1c11e58e46b1662",
+            "created_at": "2020-04-09T15:16:27Z",
+            "title": "A little bump in the road",
+            "urgency": "high",
+            "service": {
+                "html_url": "https://acme.pagerduty.com/services/PF9KMXH",
+                "id": "PF9KMXH",
+                "self": "https://api.pagerduty.com/services/PF9KMXH",
+                "summary": "API Service",
+                "type": "service_reference"
+            },
+            "assignees": [
+                {
+                    "html_url": "https://acme.pagerduty.com/users/PTUXL6G",
+                    "id": "PTUXL6G",
+                    "self": "https://api.pagerduty.com/users/PTUXL6G",
+                    "summary": "User 123",
+                    "type": "user_reference"
+                }
+            ],
+            "escalation_policy": {
+                "html_url": "https://acme.pagerduty.com/escalation_policies/PUS0KTE",
+                "id": "PUS0KTE",
+                "self": "https://api.pagerduty.com/escalation_policies/PUS0KTE",
+                "summary": "Default",
+                "type": "escalation_policy_reference"
+            },
+            "teams": [
+                {
+                    "html_url": "https://acme.pagerduty.com/teams/PFCVPS0",
+                    "id": "PFCVPS0",
+                    "self": "https://api.pagerduty.com/teams/PFCVPS0",
+                    "summary": "Engineering",
+                    "type": "team_reference"
+                }
+            ]
+        },
+        "annotation": {
+            "content": "Investigating the root cause. Initial analysis suggests a database connection timeout."
+        }
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}

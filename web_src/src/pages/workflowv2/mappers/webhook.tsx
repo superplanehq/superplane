@@ -119,7 +119,7 @@ export const webhookTriggerRenderer: TriggerRenderer = {
     const configuration = node.configuration as WebhookConfiguration | undefined;
 
     const props: TriggerProps = {
-      title: node.name!,
+      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
       iconSlug: trigger.icon || "webhook",
       iconColor: getColorClass("black"),
       collapsedBackground: "bg-white",

@@ -44,10 +44,10 @@ export const runFunctionMapper: ComponentBaseMapper = {
     _items?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition.name!;
+    const componentName = componentDefinition.name || node.component?.name || "unknown";
 
     return {
-      title: node.name!,
+      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
       iconSrc: awsLambdaIcon,
       iconColor: getColorClass(componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(componentDefinition.color),

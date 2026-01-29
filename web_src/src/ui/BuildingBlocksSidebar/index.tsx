@@ -14,6 +14,7 @@ import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
+import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
@@ -339,6 +340,7 @@ function CategorySection({
   // Determine category icon
   const appLogoMap: Record<string, string | Record<string, string>> = {
     dash0: dash0Icon,
+    datadog: datadogIcon,
     github: githubIcon,
     openai: openAiIcon,
     "open-ai": openAiIcon,
@@ -398,6 +400,7 @@ function CategorySection({
           const appLogoMap: Record<string, string | Record<string, string>> = {
             dash0: dash0Icon,
             daytona: daytonaIcon,
+            datadog: datadogIcon,
             github: githubIcon,
             openai: openAiIcon,
             "open-ai": openAiIcon,

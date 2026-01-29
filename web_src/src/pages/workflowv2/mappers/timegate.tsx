@@ -34,7 +34,7 @@ export const timeGateMapper: ComponentBaseMapper = {
       iconColor: getColorClass("black"),
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-white",
-      title: node.name!,
+      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
       eventSections: lastExecutions[0]
         ? getTimeGateEventSections(nodes, lastExecutions[0], nodeQueueItems, componentName)
         : undefined,
