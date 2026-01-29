@@ -2677,6 +2677,52 @@
         ]
       }
     },
+    "/api/v1/workflows/{workflowId}/nodes/{nodeId}/pause": {
+      "patch": {
+        "summary": "Pause or resume node processing",
+        "description": "Pauses or resumes processing for a workflow node while continuing to queue incoming items",
+        "operationId": "Workflows_UpdateNodePause",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/WorkflowsUpdateNodePauseResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/WorkflowsUpdateNodePauseBody"
+            }
+          }
+        ],
+        "tags": [
+          "WorkflowNode"
+        ]
+      }
+    },
     "/api/v1/workflows/{workflowId}/nodes/{nodeId}/queue": {
       "get": {
         "summary": "List items in a node's queue",
@@ -3124,6 +3170,9 @@
         },
         "warningMessage": {
           "type": "string"
+        },
+        "paused": {
+          "type": "boolean"
         }
       }
     },
@@ -4965,6 +5014,22 @@
     },
     "WorkflowsResolveExecutionErrorsResponse": {
       "type": "object"
+    },
+    "WorkflowsUpdateNodePauseBody": {
+      "type": "object",
+      "properties": {
+        "paused": {
+          "type": "boolean"
+        }
+      }
+    },
+    "WorkflowsUpdateNodePauseResponse": {
+      "type": "object",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/ComponentsNode"
+        }
+      }
     },
     "WorkflowsUpdateWorkflowBody": {
       "type": "object",

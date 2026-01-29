@@ -113,6 +113,7 @@ export type ComponentsNode = {
   integration?: ComponentsIntegrationRef;
   errorMessage?: string;
   warningMessage?: string;
+  paused?: boolean;
 };
 
 export type ComponentsNodeType = "TYPE_COMPONENT" | "TYPE_BLUEPRINT" | "TYPE_TRIGGER" | "TYPE_WIDGET";
@@ -899,6 +900,14 @@ export type WorkflowsResolveExecutionErrorsBody = {
 
 export type WorkflowsResolveExecutionErrorsResponse = {
   [key: string]: unknown;
+};
+
+export type WorkflowsUpdateNodePauseBody = {
+  paused?: boolean;
+};
+
+export type WorkflowsUpdateNodePauseResponse = {
+  node?: ComponentsNode;
 };
 
 export type WorkflowsUpdateWorkflowBody = {
@@ -2960,6 +2969,35 @@ export type WorkflowsListNodeExecutionsResponses = {
 
 export type WorkflowsListNodeExecutionsResponse2 =
   WorkflowsListNodeExecutionsResponses[keyof WorkflowsListNodeExecutionsResponses];
+
+export type WorkflowsUpdateNodePauseData = {
+  body: WorkflowsUpdateNodePauseBody;
+  path: {
+    workflowId: string;
+    nodeId: string;
+  };
+  query?: never;
+  url: "/api/v1/workflows/{workflowId}/nodes/{nodeId}/pause";
+};
+
+export type WorkflowsUpdateNodePauseErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type WorkflowsUpdateNodePauseError = WorkflowsUpdateNodePauseErrors[keyof WorkflowsUpdateNodePauseErrors];
+
+export type WorkflowsUpdateNodePauseResponses = {
+  /**
+   * A successful response.
+   */
+  200: WorkflowsUpdateNodePauseResponse;
+};
+
+export type WorkflowsUpdateNodePauseResponse2 =
+  WorkflowsUpdateNodePauseResponses[keyof WorkflowsUpdateNodePauseResponses];
 
 export type WorkflowsListNodeQueueItemsData = {
   body?: never;

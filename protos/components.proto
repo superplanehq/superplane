@@ -144,6 +144,7 @@ message Node {
   IntegrationRef integration = 12;
   string error_message = 13;
   string warning_message = 14;
+  bool paused = 15;
 }
 
 message Position {

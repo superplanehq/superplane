@@ -2,9 +2,11 @@ import type { SuperplaneBlueprintsOutputChannel, SuperplaneComponentsOutputChann
 import { Button } from "@/components/ui/button";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { resolveIcon } from "@/lib/utils";
 import { isCustomComponentsEnabled } from "@/lib/env";
 import { getBackgroundColorClass } from "@/utils/colors";
+import { getComponentSubtype } from "../buildingBlocks";
 import { ChevronRight, GripVerticalIcon, Plus, Search, StickyNote, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
@@ -24,6 +26,7 @@ export interface BuildingBlock {
   label?: string;
   description?: string;
   type: "trigger" | "component" | "blueprint";
+  componentSubtype?: "trigger" | "action" | "flow";
   outputChannels?: Array<SuperplaneComponentsOutputChannel | SuperplaneBlueprintsOutputChannel>;
   configuration?: any[];
   icon?: string;
@@ -79,7 +82,9 @@ export function BuildingBlocksSidebar({
   }
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"all" | "trigger" | "action" | "flow">("all");
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const isDraggingRef = useRef(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
@@ -93,6 +98,16 @@ export function BuildingBlocksSidebar({
   useEffect(() => {
     localStorage.setItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
   }, [sidebarWidth]);
+
+  // Auto-focus search input when sidebar opens
+  useEffect(() => {
+    if (isOpen && searchInputRef.current) {
+      // Small delay to ensure the sidebar is fully rendered
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 100);
+    }
+  }, [isOpen]);
 
   // Handle resize mouse events
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -133,8 +148,7 @@ export function BuildingBlocksSidebar({
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
   const categoryOrder: Record<string, number> = {
-    Primitives: 0,
-    Triggers: 1,
+    Core: 0,
     Bundles: 2,
   };
 
@@ -195,11 +209,12 @@ export function BuildingBlocksSidebar({
         </div>
       </div>
 
-      {/* Search */}
+      {/* Search and Filter */}
       <div className="flex items-center gap-2 px-5">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
           <input
+            ref={searchInputRef}
             type="text"
             placeholder="Filter components..."
             className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-800 focus:border-transparent"
@@ -207,6 +222,17 @@ export function BuildingBlocksSidebar({
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as typeof typeFilter)}>
+          <SelectTrigger size="sm" className="w-[120px]">
+            <SelectValue placeholder="All Types" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="trigger">Trigger</SelectItem>
+            <SelectItem value="action">Action</SelectItem>
+            <SelectItem value="flow">Flow</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="gap-2 py-6">
@@ -216,6 +242,7 @@ export function BuildingBlocksSidebar({
             category={category}
             canvasZoom={canvasZoom}
             searchTerm={searchTerm}
+            typeFilter={typeFilter}
             isDraggingRef={isDraggingRef}
             setHoveredBlock={setHoveredBlock}
             dragPreviewRef={dragPreviewRef}
@@ -265,6 +292,7 @@ interface CategorySectionProps {
   category: BuildingBlockCategory;
   canvasZoom: number;
   searchTerm?: string;
+  typeFilter?: "all" | "trigger" | "action" | "flow";
   isDraggingRef: React.RefObject<boolean>;
   setHoveredBlock: (block: BuildingBlock | null) => void;
   dragPreviewRef: React.RefObject<HTMLDivElement | null>;
@@ -275,6 +303,7 @@ function CategorySection({
   category,
   canvasZoom,
   searchTerm = "",
+  typeFilter = "all",
   isDraggingRef,
   setHoveredBlock,
   dragPreviewRef,
@@ -292,18 +321,71 @@ function CategorySection({
       });
 
   // Only show live/ready blocks
-  const allBlocks = baseBlocks.filter((b) => b.isLive);
+  let allBlocks = baseBlocks.filter((b) => b.isLive);
+
+  // Apply type filter
+  if (typeFilter !== "all") {
+    allBlocks = allBlocks.filter((block) => {
+      const subtype = block.componentSubtype || getComponentSubtype(block);
+      return subtype === typeFilter;
+    });
+  }
 
   if (allBlocks.length === 0) {
     return null;
   }
 
+  // Determine category icon
+  const appLogoMap: Record<string, string | Record<string, string>> = {
+    dash0: dash0Icon,
+    github: githubIcon,
+    openai: openAiIcon,
+    "open-ai": openAiIcon,
+    pagerduty: pagerDutyIcon,
+    semaphore: SemaphoreLogo,
+    slack: slackIcon,
+    smtp: smtpIcon,
+    aws: {
+      lambda: awsLambdaIcon,
+    },
+  };
+
+  // Get integration name from first block if available, or match category name
+  const firstBlock = allBlocks[0];
+  const integrationName = firstBlock?.integrationName || category.name.toLowerCase();
+  const appLogo = appLogoMap[integrationName];
+  const categoryIconSrc = typeof appLogo === "string" ? appLogo : undefined;
+
+  // Determine icon for special categories
+  let CategoryIcon: React.ComponentType<{ size?: number; className?: string }> | null = null;
+  if (category.name === "Core") {
+    CategoryIcon = resolveIcon("zap");
+  } else if (category.name === "Bundles") {
+    CategoryIcon = resolveIcon("package");
+  } else if (categoryIconSrc) {
+    // Integration category - will use img tag
+  } else {
+    CategoryIcon = resolveIcon("puzzle");
+  }
+
+  const isCoreCategory = category.name === "Core";
+  const hasSearchTerm = query.length > 0;
+  // Expand if it's Core category (default) or if there's a search term (show results)
+  const shouldBeOpen = isCoreCategory || hasSearchTerm;
+
   return (
-    <details className="flex-1 px-5 mb-5" open>
-      <summary className="relative cursor-pointer hover:text-gray-500 dark:hover:text-gray-300 mb-3 flex items-center gap-1 [&::-webkit-details-marker]:hidden [&::marker]:hidden before:absolute before:inset-x-0 before:top-1/2 before:-translate-y-1/2 before:h-px before:bg-slate-300 dark:before:bg-gray-800 before:content-[''] before:transform">
+    <details className="flex-1 px-5 mb-5 group" open={shouldBeOpen}>
+      <summary className="relative cursor-pointer hover:text-gray-500 dark:hover:text-gray-300 mb-3 flex items-center gap-1 [&::-webkit-details-marker]:hidden [&::marker]:hidden">
         <span className="relative z-10 flex items-center gap-1 bg-white dark:bg-gray-900 pr-3">
-          <ChevronRight className="h-3 w-3 transition-transform [[details[open]]>&]:rotate-90" />
-          <span className="text-[13px] text-gray-500 font-medium pl-1">{category.name}</span>
+          <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" />
+          {categoryIconSrc ? (
+            <img src={categoryIconSrc} alt={category.name} className="size-3.5" />
+          ) : CategoryIcon ? (
+            <CategoryIcon size={14} className="text-gray-500" />
+          ) : null}
+          <span className="text-[13px] text-gray-500 font-medium pl-1">
+            {category.name} ({allBlocks.length})
+          </span>
         </span>
       </summary>
 
@@ -415,6 +497,20 @@ function CategorySection({
               <ItemContent>
                 <div className="flex items-center gap-2">
                   <ItemTitle className="text-sm font-normal">{block.label || block.name}</ItemTitle>
+                  {(() => {
+                    const subtype = block.componentSubtype || getComponentSubtype(block);
+                    const badgeClass =
+                      subtype === "trigger"
+                        ? "px-1.5 py-0.5 text-[11px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 rounded whitespace-nowrap"
+                        : subtype === "flow"
+                          ? "px-1.5 py-0.5 text-[11px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 rounded whitespace-nowrap"
+                          : "px-1.5 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400 rounded whitespace-nowrap";
+                    return (
+                      <span className={badgeClass}>
+                        {subtype === "trigger" ? "Trigger" : subtype === "flow" ? "Flow" : "Action"}
+                      </span>
+                    );
+                  })()}
                   {block.deprecated && (
                     <span className="px-1.5 py-0.5 text-[11px] font-medium bg-gray-950/5 text-gray-500 rounded whitespace-nowrap">
                       Deprecated

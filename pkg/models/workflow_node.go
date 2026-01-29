@@ -18,6 +18,7 @@ const (
 	WorkflowNodeStateReady      = "ready"
 	WorkflowNodeStateProcessing = "processing"
 	WorkflowNodeStateError      = "error"
+	WorkflowNodeStatePaused     = "paused"
 
 	NodeTypeTrigger   = "trigger"
 	NodeTypeComponent = "component"
@@ -225,6 +226,36 @@ func LockWorkflowNode(tx *gorm.DB, workflowID uuid.UUID, nodeId string) (*Workfl
 	}
 
 	return &node, nil
+}
+
+func LockWorkflowNodeForUpdate(tx *gorm.DB, workflowID uuid.UUID, nodeId string) (*WorkflowNode, error) {
+	var node WorkflowNode
+
+	err := tx.
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeId).
+		First(&node).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &node, nil
+}
+
+func ResumeStateForNodeInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (string, error) {
+	runningCount, err := CountRunningExecutionsForNodeInTransaction(tx, workflowID, nodeID)
+	if err != nil {
+		return "", err
+	}
+
+	if runningCount > 0 {
+		return WorkflowNodeStateProcessing, nil
+	}
+
+	return WorkflowNodeStateReady, nil
 }
 
 func (w *WorkflowNode) UpdateState(tx *gorm.DB, state string) error {

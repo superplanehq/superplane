@@ -207,6 +207,26 @@ func CountNodeExecutions(workflowID uuid.UUID, nodeID string, states []string, r
 	return totalCount, nil
 }
 
+func CountRunningExecutionsForNode(workflowID uuid.UUID, nodeID string) (int64, error) {
+	return CountRunningExecutionsForNodeInTransaction(database.Conn(), workflowID, nodeID)
+}
+
+func CountRunningExecutionsForNodeInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (int64, error) {
+	var runningCount int64
+	err := tx.
+		Model(&WorkflowNodeExecution{}).
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeID).
+		Where("state = ?", WorkflowNodeExecutionStateStarted).
+		Count(&runningCount).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return runningCount, nil
+}
+
 func FindNodeExecution(workflowID, id uuid.UUID) (*WorkflowNodeExecution, error) {
 	return FindNodeExecutionInTransaction(database.Conn(), workflowID, id)
 }
@@ -399,9 +419,11 @@ func (e *WorkflowNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs ma
 	}
 
 	if node != nil {
-		err = node.UpdateState(tx, WorkflowNodeStateReady)
-		if err != nil {
-			return nil, err
+		if node.State != WorkflowNodeStatePaused {
+			err = node.UpdateState(tx, WorkflowNodeStateReady)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -453,9 +475,11 @@ func (e *WorkflowNodeExecution) FailInTransaction(tx *gorm.DB, reason, message s
 	}
 
 	if node != nil {
-		err := node.UpdateState(tx, WorkflowNodeStateReady)
-		if err != nil {
-			return err
+		if node.State != WorkflowNodeStatePaused {
+			err := node.UpdateState(tx, WorkflowNodeStateReady)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -501,9 +525,11 @@ func (e *WorkflowNodeExecution) CancelInTransaction(tx *gorm.DB, cancelledBy *uu
 	}
 
 	if node != nil {
-		err := node.UpdateState(tx, WorkflowNodeStateReady)
-		if err != nil {
-			return err
+		if node.State != WorkflowNodeStatePaused {
+			err := node.UpdateState(tx, WorkflowNodeStateReady)
+			if err != nil {
+				return err
+			}
 		}
 	}
 

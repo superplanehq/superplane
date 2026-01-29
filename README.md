@@ -2,7 +2,7 @@
 
 SuperPlane is an **open source DevOps control plane** for defining and running
 event-based workflows. It works across the tools you already use such as
-CI/CD, release management, incident response, infra, notifications, etc.
+Git, CI/CD, observability, incident response, infra, and notifications.
 
 ![SuperPlane screenshot](./screenshot.png)
 

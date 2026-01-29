@@ -20,6 +20,7 @@ import {
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
   workflowsEmitNodeEvent,
+  workflowsUpdateNodePause,
 } from "@/api-client";
 import { useOrganizationGroups, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
@@ -2294,6 +2295,56 @@ export function WorkflowPageV2() {
     [workflowId],
   );
 
+  const handleTogglePause = useCallback(
+    async (nodeId: string) => {
+      if (!workflowId || !organizationId || !workflow) return;
+
+      const node = workflow.spec?.nodes?.find((n) => n.id === nodeId);
+      if (!node) return;
+
+      if (node.type === "TYPE_TRIGGER") {
+        showErrorToast("Triggers cannot be paused");
+        return;
+      }
+
+      const nextPaused = !node.paused;
+
+      try {
+        const result = await workflowsUpdateNodePause(
+          withOrganizationHeader({
+            path: {
+              workflowId: workflowId,
+              nodeId: nodeId,
+            },
+            body: {
+              paused: nextPaused,
+            },
+          }),
+        );
+
+        const updatedPaused = result.data?.node?.paused ?? nextPaused;
+        const updatedNodes = (workflow.spec?.nodes || []).map((item) =>
+          item.id === nodeId ? { ...item, paused: updatedPaused } : item,
+        );
+
+        const updatedWorkflow = {
+          ...workflow,
+          spec: {
+            ...workflow.spec,
+            nodes: updatedNodes,
+          },
+        };
+
+        queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+        showSuccessToast(updatedPaused ? "Component paused" : "Component resumed");
+      } catch (error) {
+        console.error("Failed to update node pause state:", error);
+        showErrorToast("Failed to update pause state");
+      }
+    },
+    [workflowId, organizationId, workflow, queryClient],
+  );
+
   const handleReEmit = useCallback(
     async (nodeId: string, eventOrExecutionId: string) => {
       const nodeEvents = nodeEventsMap[nodeId];
@@ -2753,6 +2804,7 @@ export function WorkflowPageV2() {
         onToggleView={handleNodeCollapseChange}
         onToggleCollapse={() => markUnsavedChange("structural")}
         onRun={handleRun}
+        onTogglePause={handleTogglePause}
         onDuplicate={handleNodeDuplicate}
         onConfigure={handleConfigure}
         buildingBlocks={buildingBlocks}
@@ -3060,6 +3112,7 @@ function prepareCompositeNode(
         isMissing: isMissing,
         error: node.errorMessage,
         warning: node.warningMessage,
+        paused: !!node.paused,
         parameters:
           Object.keys(node.configuration!).length > 0
             ? [
@@ -3324,6 +3377,7 @@ function prepareComponentBaseNode(
         emptyStateProps,
         error: node.errorMessage,
         warning: node.warningMessage,
+        paused: !!node.paused,
       },
     },
   };
@@ -3388,6 +3442,7 @@ function prepareMergeNode(
         eventStateMap: mergeStateMap,
         error: node.errorMessage,
         warning: node.warningMessage,
+        paused: !!node.paused,
       },
     },
   };
