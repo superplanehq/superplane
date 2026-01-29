@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { login } from "@/services/authService";
+import { fetchOrganizations } from "@/services/organizationService";
 
 const EmailLogin: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -22,18 +24,10 @@ const EmailLogin: React.FC = () => {
     setError(null);
 
     try {
-      const formData = new URLSearchParams();
-      formData.append("email", email.trim());
-      formData.append("password", password);
-
-      const url = redirectParam ? `/login?redirect=${encodeURIComponent(redirectParam)}` : "/login";
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        credentials: "include",
-        body: formData.toString(),
+      const response = await login({
+        email,
+        password,
+        redirect: redirectParam,
       });
 
       if (!response.ok) {
@@ -55,17 +49,11 @@ const EmailLogin: React.FC = () => {
       // If no redirect param, check if user has exactly one organization
       // and redirect to it automatically
       try {
-        const orgsResponse = await fetch("/organizations", {
-          credentials: "include",
-        });
-
-        if (orgsResponse.ok) {
-          const organizations = await orgsResponse.json();
-          if (organizations.length === 1) {
-            // User has exactly one organization, redirect to it
-            window.location.href = `/${organizations[0].id}`;
-            return;
-          }
+        const organizations = await fetchOrganizations();
+        if (organizations.length === 1) {
+          // User has exactly one organization, redirect to it
+          window.location.href = `/${organizations[0].id}`;
+          return;
         }
       } catch (err) {
         // If fetching organizations fails, fall through to default redirect
