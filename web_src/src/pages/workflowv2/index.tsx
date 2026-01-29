@@ -2338,8 +2338,12 @@ export function WorkflowPageV2() {
         queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
         showSuccessToast(updatedPaused ? "Component paused" : "Component resumed");
       } catch (error) {
-        console.error("Failed to update node pause state:", error);
-        showErrorToast("Failed to update pause state");
+        let parsedError = error as { message: string };
+        if (parsedError?.message) {
+          showErrorToast(parsedError.message);
+        } else {
+          console.error("Failed to update node pause state:", error);
+        }
       }
     },
     [workflowId, organizationId, workflow, queryClient],
