@@ -1,5 +1,18 @@
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#00D4AA"/>
-  <path d="M2 17L12 22L22 17" stroke="#00D4AA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M2 12L12 17L22 12" stroke="#00D4AA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<svg width="24" height="24" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Center leaf (top) -->
+  <ellipse cx="50" cy="28" rx="6" ry="14" fill="#F5A623"/>
+  <!-- Inner left leaf -->
+  <ellipse cx="38" cy="32" rx="5" ry="12" transform="rotate(-30 38 32)" fill="#F5A623"/>
+  <!-- Inner right leaf -->
+  <ellipse cx="62" cy="32" rx="5" ry="12" transform="rotate(30 62 32)" fill="#F5A623"/>
+  <!-- Middle left leaf -->
+  <ellipse cx="28" cy="40" rx="5" ry="11" transform="rotate(-55 28 40)" fill="#F5A623"/>
+  <!-- Middle right leaf -->
+  <ellipse cx="72" cy="40" rx="5" ry="11" transform="rotate(55 72 40)" fill="#F5A623"/>
+  <!-- Outer left leaf -->
+  <ellipse cx="20" cy="52" rx="5" ry="10" transform="rotate(-75 20 52)" fill="#F5A623"/>
+  <!-- Outer right leaf -->
+  <ellipse cx="80" cy="52" rx="5" ry="10" transform="rotate(75 80 52)" fill="#F5A623"/>
+  <!-- Open book base -->
+  <path d="M10 75 Q10 65 50 60 Q90 65 90 75 L85 80 Q50 70 50 70 Q50 70 15 80 Z" fill="#F5A623"/>
 </svg>
