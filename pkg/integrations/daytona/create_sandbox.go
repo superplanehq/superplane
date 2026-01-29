@@ -3,6 +3,7 @@ package daytona
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -24,11 +25,6 @@ type CreateSandboxSpec struct {
 type EnvVariable struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
-}
-
-type SandboxPayload struct {
-	ID    string `json:"id"`
-	State string `json:"state"`
 }
 
 func (c *CreateSandbox) Name() string {
@@ -87,18 +83,25 @@ func (c *CreateSandbox) OutputChannels(configuration any) []core.OutputChannel {
 func (c *CreateSandbox) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "snapshot",
-			Label:       "Snapshot",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Base environment snapshot for the sandbox (optional)",
-			Placeholder: "default",
+			Name:     "snapshot",
+			Label:    "Snapshot",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: false,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "snapshot",
+					UseNameAsValue: true,
+				},
+			},
+			Description: "Base environment snapshot for the sandbox",
+			Default:     "default",
 		},
 		{
 			Name:     "target",
 			Label:    "Target Region",
 			Type:     configuration.FieldTypeSelect,
 			Required: false,
+			Default:  "us",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
@@ -115,7 +118,7 @@ func (c *CreateSandbox) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
 			Description: "Time in minutes before the sandbox auto-stops",
-			Placeholder: "15",
+			Default:     15,
 		},
 		{
 			Name:  "env",
@@ -155,8 +158,15 @@ func (c *CreateSandbox) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
 
+	if spec.Snapshot != "" {
+		trimmed := strings.TrimSpace(spec.Snapshot)
+		if trimmed == "" {
+			return fmt.Errorf("snapshot must not be empty if provided")
+		}
+	}
+
 	if spec.AutoStopInterval < 0 {
-		return fmt.Errorf("autoStopInterval must be a positive number")
+		return fmt.Errorf("autoStopInterval cannot be negative")
 	}
 
 	return nil
@@ -193,15 +203,10 @@ func (c *CreateSandbox) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create sandbox: %v", err)
 	}
 
-	payload := SandboxPayload{
-		ID:    sandbox.ID,
-		State: sandbox.State,
-	}
-
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		SandboxPayloadType,
-		[]any{payload},
+		[]any{sandbox},
 	)
 }
 

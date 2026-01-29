@@ -51,7 +51,7 @@ func Test__CreateSandbox__Setup(t *testing.T) {
 			},
 		})
 
-		require.ErrorContains(t, err, "autoStopInterval must be a positive number")
+		require.ErrorContains(t, err, "autoStopInterval cannot be negative")
 	})
 }
 

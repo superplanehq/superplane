@@ -15,8 +15,8 @@ const DeleteSandboxPayloadType = "daytona.delete.response"
 type DeleteSandbox struct{}
 
 type DeleteSandboxSpec struct {
-	SandboxID string `json:"sandboxId"`
-	Force     bool   `json:"force,omitempty"`
+	Sandbox string `json:"sandbox"`
+	Force   bool   `json:"force,omitempty"`
 }
 
 type DeleteSandboxPayload struct {
@@ -47,7 +47,7 @@ func (d *DeleteSandbox) Documentation() string {
 
 ## Configuration
 
-- **Sandbox ID**: The ID of the sandbox to delete (from createSandbox output)
+- **Sandbox**: The ID or name of the sandbox to delete (from createSandbox output)
 - **Force**: Optional flag to force deletion even if sandbox is running
 
 ## Output
@@ -77,12 +77,11 @@ func (d *DeleteSandbox) OutputChannels(configuration any) []core.OutputChannel {
 func (d *DeleteSandbox) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "sandboxId",
-			Label:       "Sandbox ID",
-			Type:        configuration.FieldTypeExpression,
+			Name:        "sandbox",
+			Label:       "Sandbox",
+			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "The ID of the sandbox to delete",
-			Placeholder: "{{ $.createSandbox.data.id }}",
+			Description: "The ID or name of the sandbox to delete",
 		},
 		{
 			Name:        "force",
@@ -101,8 +100,8 @@ func (d *DeleteSandbox) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
 
-	if spec.SandboxID == "" {
-		return fmt.Errorf("sandboxId is required")
+	if spec.Sandbox == "" {
+		return fmt.Errorf("sandbox is required")
 	}
 
 	return nil
@@ -119,14 +118,14 @@ func (d *DeleteSandbox) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create client: %v", err)
 	}
 
-	err = client.DeleteSandbox(spec.SandboxID, spec.Force)
+	err = client.DeleteSandbox(spec.Sandbox, spec.Force)
 	if err != nil {
 		return fmt.Errorf("failed to delete sandbox: %v", err)
 	}
 
 	payload := DeleteSandboxPayload{
 		Deleted: true,
-		ID:      spec.SandboxID,
+		ID:      spec.Sandbox,
 	}
 
 	return ctx.ExecutionState.Emit(

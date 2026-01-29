@@ -54,7 +54,8 @@ func (d *Daytona) Configuration() []configuration.Field {
 			Label:       "Base URL",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "API base URL (default: https://app.daytona.io/api)",
+			Default:     "https://app.daytona.io/api",
+			Description: "API base URL",
 		},
 	}
 }
@@ -109,7 +110,30 @@ func (d *Daytona) CompareWebhookConfig(a, b any) (bool, error) {
 }
 
 func (d *Daytona) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	return []core.IntegrationResource{}, nil
+	if resourceType != "snapshot" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	snapshots, err := client.ListSnapshots()
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(snapshots))
+	for _, s := range snapshots {
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: s.Name,
+			ID:   s.ID,
+		})
+	}
+
+	return resources, nil
 }
 
 func (d *Daytona) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {

@@ -81,6 +81,32 @@ type ExecuteCommandResponse struct {
 	Result   string `json:"result"`
 }
 
+// Snapshot represents a Daytona snapshot
+type Snapshot struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// PaginatedSnapshots represents a paginated list of snapshots
+type PaginatedSnapshots struct {
+	Items []Snapshot `json:"items"`
+}
+
+// ListSnapshots lists available snapshots
+func (c *Client) ListSnapshots() ([]Snapshot, error) {
+	responseBody, err := c.execRequest(http.MethodGet, c.BaseURL+"/snapshots", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result PaginatedSnapshots
+	if err := json.Unmarshal(responseBody, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal snapshots response: %v", err)
+	}
+
+	return result.Items, nil
+}
+
 // Verify checks if the API key is valid by listing sandboxes
 func (c *Client) Verify() error {
 	_, err := c.execRequest(http.MethodGet, c.BaseURL+"/sandbox", nil)
@@ -122,15 +148,9 @@ func (c *Client) ExecuteCode(sandboxID string, req *ExecuteCodeRequest) (*Execut
 		command = fmt.Sprintf("python3 -c %q", req.Code)
 	}
 
-	// Convert ms to seconds, rounding up to ensure sub-second timeouts get at least 1 second
-	var timeoutSeconds int
-	if req.Timeout > 0 {
-		timeoutSeconds = (req.Timeout + 999) / 1000
-	}
-
 	cmdReq := &ExecuteCommandRequest{
 		Command: command,
-		Timeout: timeoutSeconds,
+		Timeout: req.Timeout,
 	}
 
 	body, err := json.Marshal(cmdReq)

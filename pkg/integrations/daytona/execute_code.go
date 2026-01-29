@@ -21,11 +21,6 @@ type ExecuteCodeSpec struct {
 	Timeout   int    `json:"timeout,omitempty"`
 }
 
-type ExecuteCodePayload struct {
-	ExitCode int    `json:"exitCode"`
-	Result   string `json:"result"`
-}
-
 func (e *ExecuteCode) Name() string {
 	return "daytona.executeCode"
 }
@@ -88,7 +83,7 @@ func (e *ExecuteCode) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeExpression,
 			Required:    true,
 			Description: "The ID of the sandbox to execute code in",
-			Placeholder: "{{ $.createSandbox.data.id }}",
+			Placeholder: `{{ $["daytona.createSandbox"].data.id }}`,
 		},
 		{
 			Name:        "code",
@@ -120,8 +115,8 @@ func (e *ExecuteCode) Configuration() []configuration.Field {
 			Label:       "Timeout",
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
-			Description: "Execution timeout in milliseconds",
-			Placeholder: "30000",
+			Description: "Execution timeout in seconds",
+			Default:     30,
 		},
 	}
 }
@@ -178,15 +173,10 @@ func (e *ExecuteCode) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to execute code: %v", err)
 	}
 
-	payload := ExecuteCodePayload{
-		ExitCode: response.ExitCode,
-		Result:   response.Result,
-	}
-
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		ExecuteCodePayloadType,
-		[]any{payload},
+		[]any{response},
 	)
 }
 

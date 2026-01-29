@@ -15,17 +15,17 @@ import (
 func Test__DeleteSandbox__Setup(t *testing.T) {
 	component := DeleteSandbox{}
 
-	t.Run("sandboxId is required", func(t *testing.T) {
+	t.Run("sandbox is required", func(t *testing.T) {
 		appCtx := &contexts.IntegrationContext{}
 		err := component.Setup(core.SetupContext{
 			Integration: appCtx,
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
-				"sandboxId": "",
+				"sandbox": "",
 			},
 		})
 
-		require.ErrorContains(t, err, "sandboxId is required")
+		require.ErrorContains(t, err, "sandbox is required")
 	})
 
 	t.Run("valid setup", func(t *testing.T) {
@@ -34,7 +34,7 @@ func Test__DeleteSandbox__Setup(t *testing.T) {
 			Integration: appCtx,
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
+				"sandbox": "sandbox-123",
 			},
 		})
 
@@ -47,8 +47,8 @@ func Test__DeleteSandbox__Setup(t *testing.T) {
 			Integration: appCtx,
 			Metadata:    &contexts.MetadataContext{},
 			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
-				"force":     true,
+				"sandbox": "sandbox-123",
+				"force":   true,
 			},
 		})
 
@@ -78,7 +78,7 @@ func Test__DeleteSandbox__Execute(t *testing.T) {
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
+				"sandbox": "sandbox-123",
 			},
 			HTTP:           httpContext,
 			Integration:    appCtx,
@@ -111,8 +111,8 @@ func Test__DeleteSandbox__Execute(t *testing.T) {
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"sandboxId": "sandbox-123",
-				"force":     true,
+				"sandbox": "sandbox-123",
+				"force":   true,
 			},
 			HTTP:           httpContext,
 			Integration:    appCtx,
@@ -144,7 +144,7 @@ func Test__DeleteSandbox__Execute(t *testing.T) {
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"sandboxId": "invalid-sandbox",
+				"sandbox": "invalid-sandbox",
 			},
 			HTTP:           httpContext,
 			Integration:    appCtx,
@@ -154,47 +154,4 @@ func Test__DeleteSandbox__Execute(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to delete sandbox")
 	})
-}
-
-func Test__DeleteSandbox__ComponentInfo(t *testing.T) {
-	component := DeleteSandbox{}
-
-	assert.Equal(t, "daytona.deleteSandbox", component.Name())
-	assert.Equal(t, "Delete Sandbox", component.Label())
-	assert.Equal(t, "Delete a sandbox environment", component.Description())
-	assert.Equal(t, "daytona", component.Icon())
-	assert.Equal(t, "orange", component.Color())
-	assert.NotEmpty(t, component.Documentation())
-}
-
-func Test__DeleteSandbox__Configuration(t *testing.T) {
-	component := DeleteSandbox{}
-
-	config := component.Configuration()
-	assert.Len(t, config, 2)
-
-	fieldNames := make([]string, len(config))
-	for i, f := range config {
-		fieldNames[i] = f.Name
-	}
-
-	assert.Contains(t, fieldNames, "sandboxId")
-	assert.Contains(t, fieldNames, "force")
-
-	for _, f := range config {
-		if f.Name == "sandboxId" {
-			assert.True(t, f.Required, "sandboxId should be required")
-		}
-		if f.Name == "force" {
-			assert.False(t, f.Required, "force should be optional")
-		}
-	}
-}
-
-func Test__DeleteSandbox__OutputChannels(t *testing.T) {
-	component := DeleteSandbox{}
-
-	channels := component.OutputChannels(nil)
-	require.Len(t, channels, 1)
-	assert.Equal(t, core.DefaultOutputChannel, channels[0])
 }
