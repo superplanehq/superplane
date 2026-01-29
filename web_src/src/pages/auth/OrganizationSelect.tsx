@@ -4,13 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/AccountContext";
-
-interface Organization {
-  id: string;
-  name: string;
-  canvasCount?: number;
-  memberCount?: number;
-}
+import { fetchOrganizations, type Organization } from "@/services/organizationService";
 
 const formatCount = (count: number, noun: string) => {
   const safeCount = Number.isFinite(count) ? count : 0;
@@ -42,26 +36,18 @@ const OrganizationSelect: React.FC = () => {
       return;
     }
 
-    fetchOrganizations();
+    loadOrganizations();
   }, [account, accountLoading, location.pathname, location.search, navigate]);
 
-  const fetchOrganizations = async () => {
+  const loadOrganizations = async () => {
     if (!account) {
       setLoading(false);
       return;
     }
 
     try {
-      const orgsResponse = await fetch("/organizations", {
-        credentials: "include",
-      });
-
-      if (orgsResponse.ok) {
-        const organizations = await orgsResponse.json();
-        setOrganizations(organizations);
-      } else {
-        setError("Failed to load organizations");
-      }
+      const organizations = await fetchOrganizations();
+      setOrganizations(organizations);
     } catch {
       setError("Failed to load organizations");
     } finally {

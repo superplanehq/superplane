@@ -5,12 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAccount } from "../../contexts/AccountContext";
-
-type AuthConfig = {
-  providers: string[];
-  passwordLoginEnabled: boolean;
-  signupEnabled: boolean;
-};
+import { fetchAuthConfig, login, signup, type AuthConfig } from "@/services/authService";
+import { fetchOrganizations } from "@/services/organizationService";
 
 const isValidRedirectPath = (path: string | null): path is string => {
   if (!path || path[0] !== "/") {
@@ -90,14 +86,9 @@ export const Login: React.FC = () => {
   useEffect(() => {
     let canceled = false;
 
-    const fetchAuthConfig = async () => {
+    const loadAuthConfig = async () => {
       try {
-        const response = await fetch("/auth/config");
-        if (!response.ok) {
-          throw new Error("Failed to load auth configuration");
-        }
-
-        const data = (await response.json()) as AuthConfig;
+        const data = await fetchAuthConfig();
         if (!canceled) {
           setAuthConfig({
             providers: data.providers || [],
@@ -116,7 +107,7 @@ export const Login: React.FC = () => {
       }
     };
 
-    fetchAuthConfig();
+    loadAuthConfig();
 
     return () => {
       canceled = true;
@@ -158,18 +149,10 @@ export const Login: React.FC = () => {
     setSubmitLoading(true);
 
     try {
-      const formData = new URLSearchParams();
-      formData.append("email", loginEmail.trim());
-      formData.append("password", loginPassword);
-
-      const url = redirectTarget ? `/login?redirect=${encodeURIComponent(redirectTarget)}` : "/login";
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        credentials: "include",
-        body: formData.toString(),
+      const response = await login({
+        email: loginEmail,
+        password: loginPassword,
+        redirect: redirectTarget,
       });
 
       if (!response.ok) {
@@ -188,16 +171,10 @@ export const Login: React.FC = () => {
       }
 
       try {
-        const orgsResponse = await fetch("/organizations", {
-          credentials: "include",
-        });
-
-        if (orgsResponse.ok) {
-          const organizations = await orgsResponse.json();
-          if (organizations.length === 1) {
-            window.location.href = `/${organizations[0].id}`;
-            return;
-          }
+        const organizations = await fetchOrganizations();
+        if (organizations.length === 1) {
+          window.location.href = `/${organizations[0].id}`;
+          return;
         }
       } catch {
         // fall through to default redirect
@@ -238,22 +215,13 @@ export const Login: React.FC = () => {
     setSubmitLoading(true);
 
     try {
-      const formData = new URLSearchParams();
-      formData.append("name", `${signupFirstName.trim()} ${signupLastName.trim()}`);
-      formData.append("email", signupEmail.trim());
-      formData.append("password", signupPassword);
-      if (inviteToken) {
-        formData.append("invite_token", inviteToken);
-      }
-
-      const url = redirectTarget ? `/signup?redirect=${encodeURIComponent(redirectTarget)}` : "/signup";
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        credentials: "include",
-        body: formData.toString(),
+      const response = await signup({
+        firstName: signupFirstName,
+        lastName: signupLastName,
+        email: signupEmail,
+        password: signupPassword,
+        inviteToken: inviteToken || undefined,
+        redirect: redirectTarget,
       });
 
       if (!response.ok) {
@@ -273,16 +241,10 @@ export const Login: React.FC = () => {
       }
 
       try {
-        const orgsResponse = await fetch("/organizations", {
-          credentials: "include",
-        });
-
-        if (orgsResponse.ok) {
-          const organizations = await orgsResponse.json();
-          if (organizations.length === 1) {
-            window.location.href = `/${organizations[0].id}`;
-            return;
-          }
+        const organizations = await fetchOrganizations();
+        if (organizations.length === 1) {
+          window.location.href = `/${organizations[0].id}`;
+          return;
         }
       } catch {
         // fall through to default redirect

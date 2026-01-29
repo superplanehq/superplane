@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Text } from "../../components/Text/text";
 import { Button } from "../../components/ui/button";
 import superplaneLogo from "../../assets/superplane.svg";
+import { organizationsSetupOwner } from "@/api-client/sdk.gen";
 
 const OwnerSetup: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -97,17 +98,11 @@ const OwnerSetup: React.FC = () => {
 
   const submitSetup = async (enableSMTP: boolean) => {
     setError(null);
-
     setLoading(true);
 
     try {
-      const response = await fetch("/api/v1/setup-owner", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
+      const response = await organizationsSetupOwner({
+        body: {
           email: email.trim(),
           first_name: firstName.trim(),
           last_name: lastName.trim(),
@@ -120,27 +115,14 @@ const OwnerSetup: React.FC = () => {
           smtp_from_name: enableSMTP ? smtpFromName.trim() : "",
           smtp_from_email: enableSMTP ? smtpFromEmail.trim() : "",
           smtp_use_tls: enableSMTP ? smtpUseTLS : false,
-        }),
+        },
       });
 
-      if (!response.ok) {
-        try {
-          const data = await response.json();
-          setError(data.message || "Failed to set up owner account");
-        } catch {
-          if (response.status === 409) {
-            setError("This instance is already initialized.");
-          } else {
-            setError(`Failed to set up owner account (${response.status})`);
-          }
-        }
-        return;
-      }
-
-      const data: { organization_id: string } = await response.json();
+      const data = response.data as { organization_id: string };
       window.location.href = `/${data.organization_id}`;
     } catch (err) {
-      setError("Network error occurred");
+      const message = err instanceof Error ? err.message : "Network error occurred";
+      setError(message);
     } finally {
       setLoading(false);
     }
