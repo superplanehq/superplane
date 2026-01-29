@@ -501,9 +501,8 @@ export function WorkflowPageV2() {
             }
 
             // Auto-save completed silently (no toast or state changes)
-          } catch (error: any) {
-            console.error("Failed to auto-save canvas changes:", error);
-            // Don't show error toast for auto-save failures to avoid being intrusive
+          } catch (error) {
+            console.error("Failed to auto-save", error);
           } finally {
             if (focusedNoteId) {
               requestAnimationFrame(() => {
@@ -1318,7 +1317,7 @@ export function WorkflowPageV2() {
         setInitialWorkflowSnapshot(null);
         lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(targetWorkflow));
       } catch (error: any) {
-        console.error("Failed to save changes to the canvas:", error);
+        console.error("Failed to save canvas", error);
         const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
         showErrorToast(errorMessage);
         setLiveCanvasEntries((prev) => [
@@ -2287,7 +2286,6 @@ export function WorkflowPageV2() {
         );
         // Note: Success toast is shown by EmitEventModal
       } catch (error) {
-        console.error("Failed to emit event:", error);
         showErrorToast("Failed to emit event");
         throw error; // Re-throw to let EmitEventModal handle it
       }
@@ -2506,9 +2504,12 @@ export function WorkflowPageV2() {
         // Clear the snapshot since changes are now saved
         setInitialWorkflowSnapshot(null);
         lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(updatedWorkflow));
-      } catch (error: any) {
-        console.error("Failed to save changes to the canvas:", error);
-        const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
+      } catch (error) {
+        console.error("Failed to save canvas", error);
+        const errorMessage =
+          (error as { response?: { data?: { message: string } } })?.response?.data?.message ||
+          (error as { message: string })?.message ||
+          "Failed to save changes to the canvas";
         showErrorToast(errorMessage);
       }
     },
@@ -2594,8 +2595,7 @@ export function WorkflowPageV2() {
       try {
         await navigator.clipboard.writeText(payload.yamlText);
         showSuccessToast("YAML copied to clipboard");
-      } catch (error) {
-        console.error("Failed to copy YAML to clipboard:", error);
+      } catch (_error) {
         showErrorToast("Failed to copy YAML to clipboard");
       }
     },
@@ -2655,8 +2655,7 @@ export function WorkflowPageV2() {
         await queryClient.invalidateQueries({ queryKey: workflowKeys.eventList(workflowId, 50) });
         await queryClient.invalidateQueries({ queryKey: workflowKeys.nodeExecutions() });
         showSuccessToast("Execution errors resolved");
-      } catch (error) {
-        console.error("Failed to resolve execution errors:", error);
+      } catch (_error) {
         showErrorToast("Failed to resolve execution errors");
       } finally {
         setIsResolvingErrors(false);

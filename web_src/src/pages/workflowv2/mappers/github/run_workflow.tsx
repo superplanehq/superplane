@@ -244,9 +244,7 @@ const CopyCodeButton: React.FC<{ code: string }> = ({ code }) => {
       await navigator.clipboard.writeText(code);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy text: ", err);
-    }
+    } catch (_err) {}
   };
 
   return (

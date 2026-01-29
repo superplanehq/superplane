@@ -13,6 +13,7 @@ import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
 import { Alert, AlertDescription } from "@/ui/alert";
 import { resolveIcon } from "@/lib/utils";
+import { showErrorToast } from "@/utils/toast";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
@@ -103,8 +104,8 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
     try {
       await updateMutation.mutateAsync(configValues);
       navigate(`/${organizationId}/settings/integrations`);
-    } catch (error) {
-      console.error("Failed to update configuration:", error);
+    } catch (_error) {
+      showErrorToast("Failed to update configuration");
     }
   };
 
@@ -145,8 +146,8 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
     try {
       await deleteMutation.mutateAsync();
       navigate(`/${organizationId}/settings/integrations`);
-    } catch (error) {
-      console.error("Failed to delete integration:", error);
+    } catch (_error) {
+      showErrorToast("Failed to delete integration");
     }
   };
 

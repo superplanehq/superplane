@@ -15,6 +15,7 @@ import type { IntegrationsIntegrationDefinition } from "../../../api-client/type
 import { resolveIcon } from "@/lib/utils";
 import { getApiErrorMessage } from "@/utils/errors";
 import { Icon } from "@/components/Icon";
+import { showErrorToast } from "@/utils/toast";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
@@ -92,8 +93,8 @@ export function Integrations({ organizationId }: IntegrationsProps) {
       if (result.data?.integration?.metadata?.id) {
         navigate(`/${organizationId}/settings/integrations/${result.data.integration.metadata.id}`);
       }
-    } catch (error) {
-      console.error("Failed to create integration:", error);
+    } catch (_error) {
+      showErrorToast("Failed to create integration");
     }
   };
 

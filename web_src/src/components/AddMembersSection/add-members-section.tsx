@@ -57,7 +57,7 @@ export function AddMembersSection({
       await onAddMembers(selectedUsers);
       setSelectedUsers([]);
     } catch (error) {
-      console.error("Error adding members:", error);
+      console.error("Failed to add members", error);
     }
   };
 
