@@ -99,7 +99,7 @@ export const filterMapper: ComponentBaseMapper = {
       iconSlug: "filter",
       collapsed: node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
-      title: node.name!,
+      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
       eventSections: lastExecution ? getfilterEventSections(nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       specs,

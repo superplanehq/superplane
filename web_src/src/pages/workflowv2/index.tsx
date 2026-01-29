@@ -3334,23 +3334,29 @@ function prepareComponentBaseNode(
   const metadata = components.find((c) => c.name === node.component?.name);
   const displayLabel = node.name || metadata?.label;
   const componentDef = components.find((c) => c.name === node.component?.name);
+  const fallbackComponentDef = componentDef || {
+    name: node.component?.name,
+    label: node.name,
+  };
   const nodeQueueItems = nodeQueueItemsMap?.[node.id!];
 
-  const additionalData = getComponentAdditionalDataBuilder(node.component?.name || "")?.buildAdditionalData(
-    nodes,
-    node,
-    componentDef!,
-    executions,
-    workflowId,
-    queryClient,
-    organizationId,
-    currentUser,
-  );
+  const additionalData = componentDef
+    ? getComponentAdditionalDataBuilder(node.component?.name || "")?.buildAdditionalData(
+        nodes,
+        node,
+        componentDef,
+        executions,
+        workflowId,
+        queryClient,
+        organizationId,
+        currentUser,
+      )
+    : undefined;
 
   const componentBaseProps = getComponentBaseMapper(node.component?.name || "").props(
     nodes,
     node,
-    componentDef!,
+    fallbackComponentDef,
     executions,
     nodeQueueItems,
     additionalData,

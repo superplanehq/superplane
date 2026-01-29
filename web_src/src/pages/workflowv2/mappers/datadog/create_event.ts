@@ -22,13 +22,13 @@ export const createEventMapper: ComponentBaseMapper = {
     _?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition.name!;
+    const componentName = componentDefinition.name || node.component?.name || "unknown";
 
     return {
       iconSrc: datadogIcon,
       collapsedBackground: getBackgroundColorClass(componentDefinition.color),
       collapsed: node.isCollapsed,
-      title: node.name!,
+      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
       eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
       metadata: metadataList(node),
       includeEmptyState: !lastExecution,

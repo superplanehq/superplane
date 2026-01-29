@@ -85,7 +85,7 @@ export const listIssuesMapper: ComponentBaseMapper = {
     _?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition.name!;
+    const componentName = componentDefinition.name || node.component?.name || "unknown";
 
     const configuration = node.configuration as unknown as ListIssuesConfiguration;
     const specs = getSpecs(configuration);
@@ -94,7 +94,7 @@ export const listIssuesMapper: ComponentBaseMapper = {
       iconSrc: dash0Icon,
       collapsedBackground: "bg-white",
       collapsed: node.isCollapsed,
-      title: node.name!,
+      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
       eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
       metadata: metadataList(node),
       specs,

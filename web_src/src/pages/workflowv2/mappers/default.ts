@@ -20,7 +20,7 @@ export const defaultTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
     const props: TriggerProps = {
-      title: node.name!,
+      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
       iconSlug: trigger.icon || "bolt",
       iconColor: getColorClass("black"),
       collapsedBackground: getBackgroundColorClass(trigger.color),
