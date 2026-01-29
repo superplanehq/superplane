@@ -50,6 +50,11 @@ import {
 } from "./smtp";
 import { componentMappers as awsComponentMappers, triggerRenderers as awsTriggerRenderers } from "./aws";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
+import {
+  componentMappers as discordComponentMappers,
+  triggerRenderers as discordTriggerRenderers,
+  eventStateRegistry as discordEventStateRegistry,
+} from "./discord";
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
@@ -87,6 +92,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   slack: slackComponentMappers,
   smtp: smtpComponentMappers,
   aws: awsComponentMappers,
+  discord: discordComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -98,6 +104,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   slack: slackTriggerRenderers,
   smtp: smtpTriggerRenderers,
   aws: awsTriggerRenderers,
+  discord: discordTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -108,6 +115,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   datadog: datadogEventStateRegistry,
   slack: slackEventStateRegistry,
   smtp: smtpEventStateRegistry,
+  discord: discordEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
