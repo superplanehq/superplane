@@ -1,7 +1,10 @@
 package aws
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -28,12 +31,6 @@ type Configuration struct {
 	RoleArn                string `json:"roleArn" mapstructure:"roleArn"`
 	Region                 string `json:"region" mapstructure:"region"`
 	SessionDurationSeconds int    `json:"sessionDurationSeconds" mapstructure:"sessionDurationSeconds"`
-}
-
-type SessionMetadata struct {
-	RoleArn   string `json:"roleArn"`
-	Region    string `json:"region"`
-	ExpiresAt string `json:"expiresAt"`
 }
 
 func (a *AWS) Name() string {
@@ -98,6 +95,7 @@ func (a *AWS) Components() []core.Component {
 
 func (a *AWS) Triggers() []core.Trigger {
 	return []core.Trigger{
+		&ecr.OnImageScan{},
 		&ecr.OnImagePush{},
 	}
 }
@@ -175,10 +173,18 @@ func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration) er
 		return err
 	}
 
-	ctx.Integration.SetMetadata(SessionMetadata{
-		RoleArn:   config.RoleArn,
-		Region:    strings.TrimSpace(config.Region),
-		ExpiresAt: credentials.Expiration.Format(time.RFC3339),
+	apiDestination, err := CreateAPIDestination(ctx)
+	if err != nil {
+		return err
+	}
+
+	ctx.Integration.SetMetadata(common.IntegrationMetadata{
+		APIDestination: apiDestination,
+		Session: &common.SessionMetadata{
+			RoleArn:   config.RoleArn,
+			Region:    strings.TrimSpace(config.Region),
+			ExpiresAt: credentials.Expiration.Format(time.RFC3339),
+		},
 	})
 
 	ctx.Integration.SetState("ready", "")
@@ -193,11 +199,113 @@ func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration) er
 }
 
 func (a *AWS) HandleRequest(ctx core.HTTPRequestContext) {
-	// no-op
+	if strings.HasSuffix(ctx.Request.URL.Path, "/events") {
+		a.handleEvent(ctx)
+		return
+	}
+
+	ctx.Logger.Warnf("unknown path: %s", ctx.Request.URL.Path)
+	ctx.Response.WriteHeader(http.StatusNotFound)
+}
+
+func (a *AWS) handleEvent(ctx core.HTTPRequestContext) {
+	apiKey := ctx.Request.Header.Get(APIKeyHeaderName)
+	if apiKey == "" {
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		ctx.Response.Write([]byte("missing " + APIKeyHeaderName + " header"))
+		return
+	}
+
+	secrets, err := ctx.Integration.GetSecrets()
+	if err != nil {
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		ctx.Response.Write([]byte("error finding integration secrets: " + err.Error()))
+		return
+	}
+
+	var secret string
+	for _, s := range secrets {
+		if s.Name == EventBridgeConnectionSecretName {
+			secret = string(s.Value)
+			break
+		}
+	}
+
+	if apiKey != secret {
+		ctx.Response.WriteHeader(http.StatusForbidden)
+		ctx.Response.Write([]byte("invalid " + APIKeyHeaderName + " header"))
+		return
+	}
+
+	subscriptions, err := ctx.Integration.ListSubscriptions()
+	if err != nil {
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		ctx.Response.Write([]byte("error listing integration subscriptions: " + err.Error()))
+		return
+	}
+
+	body, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		ctx.Response.Write([]byte("error reading request body: " + err.Error()))
+		return
+	}
+
+	data := map[string]any{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		ctx.Response.Write([]byte("error parsing request body: " + err.Error()))
+		return
+	}
+
+	for _, subscription := range subscriptions {
+		if !a.subscriptionApplies(subscription, data) {
+			continue
+		}
+
+		err = subscription.SendMessage(data)
+		if err != nil {
+			ctx.Logger.Errorf("error sending message from app: %v", err)
+		}
+	}
+
+	ctx.Response.WriteHeader(http.StatusOK)
+}
+
+func (a *AWS) subscriptionApplies(subscription core.IntegrationSubscriptionContext, data map[string]any) bool {
+	var event common.EventBridgeEvent
+	err := mapstructure.Decode(data, &event)
+	if err != nil {
+		return false
+	}
+
+	var configuration common.EventBridgeEvent
+	err = mapstructure.Decode(subscription.Configuration(), &configuration)
+	if err != nil {
+		return false
+	}
+
+	if configuration.DetailType != event.DetailType {
+		return false
+	}
+
+	if configuration.Source != event.Source {
+		return false
+	}
+
+	if len(configuration.Detail) > 0 {
+		for key, value := range configuration.Detail {
+			if event.Detail[key] != value {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 func (a *AWS) CompareWebhookConfig(aConfig, bConfig any) (bool, error) {
-	return ecr.CompareWebhookConfig(aConfig, bConfig)
+	return false, nil
 }
 
 func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -230,20 +338,94 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 
 		return resources, nil
 
+	case "ecr.repository":
+		creds, err := common.CredentialsFromInstallation(ctx.Integration)
+		if err != nil {
+			return nil, err
+		}
+
+		region := common.RegionFromInstallation(ctx.Integration)
+		if strings.TrimSpace(region) == "" {
+			return nil, fmt.Errorf("region is required")
+		}
+
+		client := ecr.NewClient(ctx.HTTP, creds, region)
+		repositories, err := client.ListRepositories()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list ECR repositories: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(repositories))
+		for _, repository := range repositories {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: repository.RepositoryName,
+				ID:   repository.RepositoryArn,
+			})
+		}
+
+		return resources, nil
+
 	default:
 		return []core.IntegrationResource{}, nil
 	}
 }
 
 func (a *AWS) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	config := ecr.WebhookConfiguration{}
-	if err := mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config); err != nil {
-		return nil, fmt.Errorf("failed to decode webhook configuration: %w", err)
-	}
-
-	return ecr.SetupWebhook(ctx, config)
+	// no-op
+	return nil, nil
 }
 
 func (a *AWS) CleanupWebhook(ctx core.CleanupWebhookContext) error {
-	return ecr.CleanupWebhook(ctx)
+	// no-op
+	return nil
 }
+
+// func CleanupWebhook(ctx core.CleanupWebhookContext) error {
+// 	metadata := WebhookMetadata{}
+// 	if err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &metadata); err != nil {
+// 		return fmt.Errorf("error decoding webhook metadata: %w", err)
+// 	}
+
+// 	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	region := strings.TrimSpace(common.RegionFromInstallation(ctx.Integration))
+// 	if region == "" {
+// 		return fmt.Errorf("region is required")
+// 	}
+
+// 	client := eventbridge.NewClient(ctx.HTTP, creds, region)
+
+// 	if metadata.RuleName != "" && metadata.TargetID != "" {
+// 		err := client.RemoveTargets(metadata.RuleName, []string{metadata.TargetID})
+// 		if err != nil && !common.IsNotFoundErr(err) {
+// 			return err
+// 		}
+// 	}
+
+// 	if metadata.RuleName != "" {
+// 		err := client.DeleteRule(metadata.RuleName)
+// 		if err != nil && !common.IsNotFoundErr(err) {
+// 			return err
+// 		}
+// 	}
+
+// 	if metadata.ApiDestinationName != "" {
+// 		err := client.DeleteApiDestination(metadata.ApiDestinationName)
+// 		if err != nil && !common.IsNotFoundErr(err) {
+// 			return err
+// 		}
+// 	}
+
+// 	if metadata.ConnectionName != "" {
+// 		err := client.DeleteConnection(metadata.ConnectionName)
+// 		if err != nil && !common.IsNotFoundErr(err) {
+// 			return err
+// 		}
+// 	}
+
+// 	return nil
+// }

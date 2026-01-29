@@ -14,63 +14,68 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/eventbridge"
 )
 
-type OnImagePush struct{}
+type OnImageScan struct{}
 
-type OnImagePushConfiguration struct {
+type OnImageScanConfiguration struct {
 	Repository string `json:"repository" mapstructure:"repository"`
 }
 
-type OnImagePushMetadata struct {
+type OnImageScanMetadata struct {
 	Repository     *Repository `json:"repository" mapstructure:"repository"`
 	SubscriptionID string      `json:"subscriptionId" mapstructure:"subscriptionId"`
 	RuleArn        string      `json:"ruleArn" mapstructure:"ruleArn"`
 	TargetID       string      `json:"targetId" mapstructure:"targetId"`
 }
 
-func (p *OnImagePush) Name() string {
-	return "aws.ecr.onImagePush"
+func (p *OnImageScan) Name() string {
+	return "aws.ecr.onImageScan"
 }
 
-func (p *OnImagePush) Label() string {
-	return "ECR - On Image Push"
+func (p *OnImageScan) Label() string {
+	return "ECR - On Image Scan"
 }
 
-func (p *OnImagePush) Description() string {
-	return "Listen to AWS ECR image push events"
+func (p *OnImageScan) Description() string {
+	return "Listen to AWS ECR image scan events"
 }
 
-func (p *OnImagePush) Documentation() string {
-	return `The On Image Push trigger starts a workflow execution when an image is pushed to an ECR repository.
+func (p *OnImageScan) Documentation() string {
+	return `The On Image Scan trigger starts a workflow execution when an ECR image scan completes.
 
 ## Use Cases
 
-- **Build pipelines**: Trigger builds and deployments on container pushes
-- **Security automation**: Kick off scans or alerts for newly pushed images
-- **Release workflows**: Promote artifacts when a tag is published
+- **Security automation**: Notify teams or open issues on new findings
+- **Compliance checks**: Gate promotions based on severity thresholds
+- **Reporting**: Aggregate scan findings across repositories
 
 ## Configuration
 
 - **Repositories**: Optional filters for ECR repository names
-- **Image Tags**: Optional filters for image tags (for example: ` + "`latest`" + ` or ` + "`^v[0-9]+`" + `)
+
+## Notes
+
+- **Enhanced scanning**: Enhanced scanning events are sent by Amazon Inspector (aws.inspector2)
 
 ## Event Data
 
-Each image push event includes:
+Each image scan event includes:
+- **detail.scan-status**: Scan status (for example: COMPLETE)
 - **detail.repository-name**: ECR repository name
-- **detail.image-tag**: Tag that was pushed
 - **detail.image-digest**: Digest of the image
+- **detail.image-tags**: Tags associated with the image
+- **detail.finding-severity-counts**: Counts per severity level (if any)
 `
 }
 
-func (p *OnImagePush) Icon() string {
+func (p *OnImageScan) Icon() string {
 	return "aws"
 }
 
-func (p *OnImagePush) Color() string {
+func (p *OnImageScan) Color() string {
 	return "gray"
 }
 
-func (p *OnImagePush) Configuration() []configuration.Field {
+func (p *OnImageScan) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "repository",
@@ -87,14 +92,14 @@ func (p *OnImagePush) Configuration() []configuration.Field {
 	}
 }
 
-func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
-	metadata := OnImagePushMetadata{}
+func (p *OnImageScan) Setup(ctx core.TriggerContext) error {
+	metadata := OnImageScanMetadata{}
 	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	config := OnImagePushConfiguration{}
+	config := OnImageScanConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
@@ -139,10 +144,9 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 	//
 	eventPattern, err := json.Marshal(map[string]any{
 		"source":      []string{"aws.ecr"},
-		"detail-type": []string{"ECR Image Action"},
+		"detail-type": []string{"ECR Image Scan"},
 		"detail": map[string]any{
-			"action-type": []string{"PUSH"},
-			"result":      []string{"SUCCESS"},
+			"scan-status": []string{"COMPLETE"},
 		},
 	})
 
@@ -171,21 +175,20 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 
 	subscriptionID, err := ctx.Integration.Subscribe(
 		common.EventBridgeEvent{
-			DetailType: "ECR Image Action",
+			DetailType: "ECR Image Scan",
 			Source:     "aws.ecr",
 			Detail: map[string]any{
-				"action-type":     "PUSH",
-				"result":          "SUCCESS",
+				"scan-status":     "COMPLETE",
 				"repository-name": repository.RepositoryName,
 			},
 		},
 	)
 
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to ECR image push events: %w", err)
+		return fmt.Errorf("failed to subscribe to ECR image scan events: %w", err)
 	}
 
-	return ctx.Metadata.Set(OnImagePushMetadata{
+	return ctx.Metadata.Set(OnImageScanMetadata{
 		SubscriptionID: subscriptionID.String(),
 		Repository:     repository,
 		RuleArn:        ruleArn,
@@ -193,19 +196,19 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (p *OnImagePush) Actions() []core.Action {
+func (p *OnImageScan) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (p *OnImagePush) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (p *OnImageScan) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
 	return nil, nil
 }
 
-func (p *OnImagePush) OnIntegrationMessage(ctx core.IntegrationMessageContext) error {
-	return ctx.Events.Emit("aws.ecr.image.push", ctx.Message)
+func (p *OnImageScan) OnIntegrationMessage(ctx core.IntegrationMessageContext) error {
+	return ctx.Events.Emit("aws.ecr.image.scan", ctx.Message)
 }
 
-func (p *OnImagePush) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (p *OnImageScan) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	// no-op, since events are received through the integration
 	// and routed to OnIntegrationMessage()
 	return http.StatusOK, nil

@@ -29,8 +29,9 @@ type Client struct {
 }
 
 type Target struct {
-	ID  string `json:"Id"`
-	Arn string `json:"Arn"`
+	ID      string `json:"Id"`
+	Arn     string `json:"Arn"`
+	RoleArn string `json:"RoleArn,omitempty"`
 }
 
 func NewClient(httpCtx core.HTTPContext, creds aws.Credentials, region string) *Client {

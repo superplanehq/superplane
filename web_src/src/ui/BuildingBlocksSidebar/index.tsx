@@ -17,6 +17,7 @@ import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import smtpIcon from "@/assets/icons/integrations/smtp.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
+import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 export interface BuildingBlock {
@@ -322,6 +323,7 @@ function CategorySection({
             slack: slackIcon,
             smtp: smtpIcon,
             aws: {
+              ecr: awsEcrIcon,
               lambda: awsLambdaIcon,
             },
           };

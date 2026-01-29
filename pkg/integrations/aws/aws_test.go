@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -86,11 +87,11 @@ func Test__AWS__Sync(t *testing.T) {
 		assert.Equal(t, []byte("secret"), integrationCtx.Secrets["secretAccessKey"].Value)
 		assert.Equal(t, []byte("token"), integrationCtx.Secrets["sessionToken"].Value)
 
-		metadata, ok := integrationCtx.Metadata.(SessionMetadata)
+		metadata, ok := integrationCtx.Metadata.(common.IntegrationMetadata)
 		require.True(t, ok)
-		assert.Equal(t, "arn:aws:iam::123456789012:role/test-role", metadata.RoleArn)
-		assert.Equal(t, "us-east-1", metadata.Region)
-		assert.Equal(t, expiration, metadata.ExpiresAt)
+		assert.Equal(t, "arn:aws:iam::123456789012:role/test-role", metadata.Session.RoleArn)
+		assert.Equal(t, "us-east-1", metadata.Session.Region)
+		assert.Equal(t, expiration, metadata.Session.ExpiresAt)
 
 		require.Len(t, integrationCtx.ResyncRequests, 1)
 		assert.GreaterOrEqual(t, integrationCtx.ResyncRequests[0], time.Minute)

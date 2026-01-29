@@ -14,6 +14,28 @@ const (
 	sessionTokenSecret    = "sessionToken"
 )
 
+type IntegrationMetadata struct {
+	Session        *SessionMetadata        `json:"session" mapstructure:"session"`
+	APIDestination *APIDestinationMetadata `json:"apiDestination" mapstructure:"apiDestination"`
+}
+
+type SessionMetadata struct {
+	RoleArn   string `json:"roleArn"`
+	Region    string `json:"region"`
+	ExpiresAt string `json:"expiresAt"`
+}
+
+type APIDestinationMetadata struct {
+	ConnectionArn     string `json:"connectionArn"`
+	ApiDestinationArn string `json:"apiDestinationArn"`
+}
+
+type EventBridgeEvent struct {
+	DetailType string         `json:"detail-type"`
+	Source     string         `json:"source"`
+	Detail     map[string]any `json:"detail"`
+}
+
 func CredentialsFromInstallation(ctx core.IntegrationContext) (aws.Credentials, error) {
 	secrets, err := ctx.GetSecrets()
 	if err != nil {
