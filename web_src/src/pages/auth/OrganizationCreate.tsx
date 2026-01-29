@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Text } from "../../components/Text/text";
 import { Button } from "../../ui/button";
+import { createOrganization } from "@/services/organizationService";
 
 const OrganizationCreate: React.FC = () => {
   const [name, setName] = useState("");
@@ -15,37 +16,12 @@ const OrganizationCreate: React.FC = () => {
     setError(null);
 
     try {
-      const response = await fetch("/organizations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          name: name.trim(),
-        }),
-      });
-
-      if (response.ok) {
-        const org = await response.json();
-        // Redirect to the new organization
-        window.location.href = `/${org.id}`;
-      } else {
-        try {
-          const errorData = await response.json();
-          setError(errorData.message || "Failed to create organization");
-        } catch {
-          // If we can't parse the error response, show a generic message based on status
-          if (response.status === 409) {
-            setError("An organization with this name already exists");
-          } else {
-            setError(`Failed to create organization (${response.status})`);
-          }
-        }
-      }
+      const org = await createOrganization({ name });
+      // Redirect to the new organization
+      window.location.href = `/${org.id}`;
     } catch (err) {
-      setError("Network error occurred");
-    } finally {
+      const message = err instanceof Error ? err.message : "Network error occurred";
+      setError(message);
       setLoading(false);
     }
   };
