@@ -103,7 +103,7 @@ export const ifMapper: ComponentBaseMapper = {
       iconSlug: "split",
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-white",
-      title: node.name!,
+      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
       eventSections: lastExecution ? getEventSections(nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       specs: specs,

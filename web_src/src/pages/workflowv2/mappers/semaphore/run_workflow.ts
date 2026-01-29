@@ -112,7 +112,7 @@ export const runWorkflowMapper: ComponentBaseMapper = {
     _nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
     return {
-      title: node.name!,
+      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
       iconSrc: SemaphoreLogo,
       iconSlug: componentDefinition.icon || "workflow",
       iconColor: getColorClass(componentDefinition?.color || "gray"),

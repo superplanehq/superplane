@@ -314,7 +314,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
               <span>Run</span>
             </button>
           )}
-          {onTogglePause && (
+          {onTogglePause && !hasError && (
             <button
               type="button"
               data-testid="node-action-pause"

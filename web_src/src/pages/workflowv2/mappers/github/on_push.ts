@@ -39,7 +39,7 @@ export const onPushTriggerRenderer: TriggerRenderer = {
     const configuration = node.configuration as unknown as GithubConfiguration;
 
     const props: TriggerProps = {
-      title: node.name!,
+      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
       iconSrc: githubIcon,
       iconColor: getColorClass(trigger.color),
       collapsedBackground: getBackgroundColorClass(trigger.color),

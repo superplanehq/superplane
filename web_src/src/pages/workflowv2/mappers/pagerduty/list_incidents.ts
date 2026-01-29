@@ -93,7 +93,7 @@ export const listIncidentsMapper: ComponentBaseMapper = {
     _?: WorkflowsWorkflowNodeQueueItem[],
   ): ComponentBaseProps {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition.name!;
+    const componentName = componentDefinition.name || node.component?.name || "unknown";
 
     const configuration = node.configuration as unknown as ListIncidentsConfiguration;
     const specs = getSpecs(configuration);
@@ -102,7 +102,7 @@ export const listIncidentsMapper: ComponentBaseMapper = {
       iconSrc: pdIcon,
       collapsedBackground: getBackgroundColorClass(componentDefinition.color),
       collapsed: node.isCollapsed,
-      title: node.name!,
+      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
       eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
       metadata: metadataList(node),
       specs,

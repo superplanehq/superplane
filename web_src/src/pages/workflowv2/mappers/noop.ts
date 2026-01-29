@@ -25,7 +25,7 @@ export const noopMapper: ComponentBaseMapper = {
       iconSlug: componentDefinition?.icon ?? "circle-off",
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-white",
-      title: node.name!,
+      title: node.name || componentDefinition?.label || componentDefinition?.name || "Unnamed component",
       eventSections: lastExecution ? getNoopEventSections(nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
