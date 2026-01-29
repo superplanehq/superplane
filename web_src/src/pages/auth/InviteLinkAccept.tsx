@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAccount } from "@/contexts/AccountContext";
 import { showErrorToast } from "@/utils/toast";
+import { organizationsAcceptInviteLink } from "@/api-client/sdk.gen";
 
 type AcceptStatus = "idle" | "loading" | "error";
 
@@ -35,17 +36,11 @@ export default function InviteLinkAccept() {
     const acceptInvite = async () => {
       try {
         setStatus("loading");
-        const response = await fetch(`/api/v1/invite-links/${token}/accept`, {
-          method: "POST",
-          credentials: "include",
+        const response = await organizationsAcceptInviteLink({
+          path: { token },
         });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || "Unable to accept invite link.");
-        }
-
-        const data = (await response.json()) as { organization_id?: string };
+        const data = response.data as { organization_id?: string };
         if (!data.organization_id) {
           throw new Error("Invite link response was missing organization details.");
         }
