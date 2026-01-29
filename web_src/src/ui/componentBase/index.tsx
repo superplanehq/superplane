@@ -276,7 +276,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   const hasBadge = hasError || hasWarning;
   const RunIcon = React.useMemo(() => resolveIcon("play"), []);
   const PauseIcon = React.useMemo(() => resolveIcon("pause"), []);
-  const ResumeIcon = React.useMemo(() => resolveIcon("play"), []);
+  const ResumeIcon = React.useMemo(() => resolveIcon("step-forward"), []);
   const DuplicateIcon = React.useMemo(() => resolveIcon("copy"), []);
   const DeleteIcon = React.useMemo(() => resolveIcon("trash-2"), []);
   const ToggleViewIcon = React.useMemo(
@@ -412,7 +412,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                 </div>
               </TooltipTrigger>
               <TooltipContent>
-                <p className="max-w-xs text-sm">Paused</p>
+                <p className="max-w-xs text-sm">Queued items will not be consumed.</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
