@@ -726,6 +726,40 @@
         ]
       }
     },
+    "/api/v1/setup-owner": {
+      "post": {
+        "summary": "Setup owner account",
+        "description": "Creates the initial owner account for a new SuperPlane instance",
+        "operationId": "Organizations_SetupOwner",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SetupOwnerResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SetupOwnerRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
     "/api/v1/me": {
       "get": {
         "summary": "Get current user",
@@ -5305,6 +5339,79 @@
           }
         }
       }
+    },
+    "SetupOwnerRequest": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Email address for the owner account"
+        },
+        "first_name": {
+          "type": "string",
+          "description": "First name of the owner"
+        },
+        "last_name": {
+          "type": "string",
+          "description": "Last name of the owner"
+        },
+        "password": {
+          "type": "string",
+          "description": "Password for the owner account"
+        },
+        "smtp_enabled": {
+          "type": "boolean",
+          "description": "Whether SMTP email delivery is enabled"
+        },
+        "smtp_host": {
+          "type": "string",
+          "description": "SMTP server hostname"
+        },
+        "smtp_port": {
+          "type": "integer",
+          "format": "int32",
+          "description": "SMTP server port"
+        },
+        "smtp_username": {
+          "type": "string",
+          "description": "SMTP authentication username"
+        },
+        "smtp_password": {
+          "type": "string",
+          "description": "SMTP authentication password"
+        },
+        "smtp_from_name": {
+          "type": "string",
+          "description": "Display name for outgoing emails"
+        },
+        "smtp_from_email": {
+          "type": "string",
+          "description": "From email address for outgoing emails"
+        },
+        "smtp_use_tls": {
+          "type": "boolean",
+          "description": "Whether to use TLS (STARTTLS) for SMTP"
+        }
+      },
+      "required": [
+        "email",
+        "first_name",
+        "last_name",
+        "password",
+        "smtp_enabled"
+      ]
+    },
+    "SetupOwnerResponse": {
+      "type": "object",
+      "properties": {
+        "organization_id": {
+          "type": "string",
+          "description": "ID of the created organization"
+        }
+      },
+      "required": [
+        "organization_id"
+      ]
     },
     "protobufAny": {
       "type": "object",
