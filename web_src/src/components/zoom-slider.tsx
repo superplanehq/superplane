@@ -77,6 +77,7 @@ export function ZoomSlider({
       backgroundColor: "#F1F5F9",
       width: imageWidth,
       height: imageHeight,
+      skipFonts: true,
       style: {
         width: String(imageWidth),
         height: String(imageHeight),
