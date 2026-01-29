@@ -88,7 +88,7 @@ func (e *ExecuteCommand) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeExpression,
 			Required:    true,
 			Description: "The ID of the sandbox to run the command in",
-			Placeholder: "{{ $.createSandbox.data.id }}",
+			Placeholder: `{{ $["daytona.createSandbox"].data.id }}`,
 		},
 		{
 			Name:        "command",
