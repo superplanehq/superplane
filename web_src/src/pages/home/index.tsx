@@ -616,7 +616,7 @@ function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActio
           showSuccessToast("Canvas deleted successfully");
           closeDialog();
         },
-        onError: (error) => {
+        onError: (_error) => {
           showErrorToast("Failed to delete canvas");
         },
       });
