@@ -37,6 +37,12 @@ var exampleDataOnIncidentStatusUpdateBytes []byte
 var exampleDataOnIncidentStatusUpdateOnce sync.Once
 var exampleDataOnIncidentStatusUpdate map[string]any
 
+//go:embed example_data_on_incident_annotated.json
+var exampleDataOnIncidentAnnotatedBytes []byte
+
+var exampleDataOnIncidentAnnotatedOnce sync.Once
+var exampleDataOnIncidentAnnotated map[string]any
+
 //go:embed example_output_list_incidents.json
 var exampleOutputListIncidentsBytes []byte
 
@@ -65,4 +71,8 @@ func (t *OnIncident) ExampleData() map[string]any {
 
 func (t *OnIncidentStatusUpdate) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIncidentStatusUpdateOnce, exampleDataOnIncidentStatusUpdateBytes, &exampleDataOnIncidentStatusUpdate)
+}
+
+func (t *OnIncidentAnnotated) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIncidentAnnotatedOnce, exampleDataOnIncidentAnnotatedBytes, &exampleDataOnIncidentAnnotated)
 }
