@@ -30,13 +30,6 @@ func ensureRepoInMetadata(ctx core.MetadataContext, app core.IntegrationContext,
 		return fmt.Errorf("failed to decode node metadata: %w", err)
 	}
 
-	//
-	// If metadata is already set, skip setup
-	//
-	if nodeMetadata.Repository != nil {
-		return nil
-	}
-
 	repository := getRepositoryFromConfiguration(configuration)
 	if repository == "" {
 		return fmt.Errorf("repository is required")
@@ -56,6 +49,10 @@ func ensureRepoInMetadata(ctx core.MetadataContext, app core.IntegrationContext,
 
 	if repoIndex == -1 {
 		return fmt.Errorf("repository %s is not accessible to app installation", repository)
+	}
+
+	if nodeMetadata.Repository != nil && nodeMetadata.Repository.Name == repository {
+		return nil
 	}
 
 	return ctx.Set(NodeMetadata{
