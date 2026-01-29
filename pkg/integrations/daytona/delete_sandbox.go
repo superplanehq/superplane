@@ -82,6 +82,7 @@ func (d *DeleteSandbox) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Description: "The ID or name of the sandbox to delete",
+			Placeholder: `{{ $["daytona.createSandbox"].data.id }}`,
 		},
 		{
 			Name:        "force",
