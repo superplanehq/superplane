@@ -1,0 +1,81 @@
+---
+title: "Discord"
+sidebar:
+  order: 6
+---
+
+Send messages to Discord channels
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Send Text Message" href="#send-text-message" description="Send a text message to a Discord channel" />
+</CardGrid>
+
+## Instructions
+
+To set up Discord integration:
+
+1. Go to the **Discord Developer Portal** (https://discord.com/developers/applications)
+2. Click **New Application** and give it a name
+3. Go to the **Bot** section and click **Add Bot**
+4. Under **Token**, click **Reset Token** then **Copy** to copy the bot token
+5. Go to **OAuth2** → **URL Generator**:
+   - Under **Scopes**, select **bot**
+   - Under **Bot Permissions**, select: **View Channels**, **Send Messages**
+6. Copy the generated URL and open it to invite the bot to your server
+7. Paste the **Bot Token** below
+
+<a id="send-text-message"></a>
+
+## Send Text Message
+
+The Send Text Message component sends a message to a Discord channel.
+
+### Use Cases
+
+- **Notifications**: Send notifications about workflow events or system status
+- **Alerts**: Alert teams about important events or errors
+- **Updates**: Provide status updates on long-running processes
+
+### Configuration
+
+- **Channel**: Select the Discord channel to send the message to
+- **Content**: Plain text message content (max 2000 characters)
+- **Embed Title**: Optional title for a rich embed
+- **Embed Description**: Optional description for a rich embed
+- **Embed Color**: Hex color code for the embed (e.g., #5865F2)
+- **Embed URL**: Optional URL to link from the embed title
+
+### Output
+
+Returns metadata about the sent message including message ID, channel ID, and author information.
+
+### Notes
+
+- Either content or embed (title/description) must be provided
+- The Discord bot must be installed and have permission to post to the selected channel
+- Supports Discord's rich embed formatting for visually appealing messages
+
+### Example Output
+
+```json
+{
+  "data": {
+    "author": {
+      "bot": true,
+      "id": "1111111111111111111",
+      "username": "Webhook"
+    },
+    "channel_id": "9876543210987654321",
+    "content": "Hello from SuperPlane",
+    "id": "1234567890123456789",
+    "timestamp": "2026-01-16T12:00:00.000Z"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "discord.message.sent"
+}
+```
+
