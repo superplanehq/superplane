@@ -1,7 +1,7 @@
 ---
 title: "Slack"
 sidebar:
-  order: 11
+  order: 12
 ---
 
 Send and react to Slack messages and interactions
@@ -45,6 +45,7 @@ The On App Mention trigger starts a workflow execution when the Slack app is men
 ### Event Data
 
 Each mention event includes:
+
 - **event**: Event information including message text, channel, and timestamp
 - **user**: User who mentioned the app
 - **channel**: Channel where the mention occurred
@@ -60,10 +61,7 @@ This trigger automatically sets up a Slack event subscription when configured. T
 {
   "data": {
     "api_app_id": "A123ABC456",
-    "authed_users": [
-      "U123ABC456",
-      "U222222222"
-    ],
+    "authed_users": ["U123ABC456", "U222222222"],
     "event": {
       "channel": "C123ABC456",
       "event_ts": "1515449522000016",
@@ -125,4 +123,3 @@ Returns metadata about the sent message including channel information.
   "type": "slack.message.sent"
 }
 ```
-

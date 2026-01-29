@@ -1,7 +1,7 @@
 ---
 title: "Semaphore"
 sidebar:
-  order: 10
+  order: 11
 ---
 
 Run and react to your Semaphore workflows
@@ -40,6 +40,7 @@ The On Pipeline Done trigger starts a workflow execution when a Semaphore pipeli
 ### Event Data
 
 Each pipeline done event includes:
+
 - **pipeline**: Pipeline information including ID, state, and result
 - **workflow**: Workflow information including ID and URL
 - **project**: Project information
@@ -247,4 +248,3 @@ The Run Workflow component triggers a Semaphore CI/CD workflow and waits for it 
   "type": "semaphore.workflow.finished"
 }
 ```
-
