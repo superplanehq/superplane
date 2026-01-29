@@ -1,11 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-
-interface Account {
-  id: string;
-  name: string;
-  email: string;
-  avatar_url: string;
-}
+import { fetchAccount, type Account } from "@/services/authService";
 
 interface AccountContextType {
   account: Account | null;
@@ -37,24 +31,19 @@ export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) =>
   const [setupRequired, setSetupRequired] = useState(false);
 
   useEffect(() => {
-    const fetchAccount = async () => {
+    const loadAccount = async () => {
       try {
-        const response = await fetch("/account", {
-          method: "GET",
-          credentials: "include",
-          redirect: "manual", // Don't follow redirects, check status code instead
-        });
+        const result = await fetchAccount();
 
-        if (response.status === 409 && response.headers.get("X-Owner-Setup-Required") === "true") {
+        if (result.setupRequired) {
           setSetupRequired(true);
           return;
         }
 
-        if (response.status === 200) {
-          const accountData = await response.json();
-          setAccount(accountData);
+        if (result.account) {
+          setAccount(result.account);
         }
-        // If response is not 200 (e.g., 307 redirect, 401, etc.), user is not authenticated
+        // If no account, user is not authenticated
       } catch (error) {
         // Network errors or other unexpected errors
         console.error("Failed to fetch account:", error);
@@ -63,7 +52,7 @@ export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) =>
       }
     };
 
-    fetchAccount();
+    loadAccount();
   }, []);
 
   return <AccountContext.Provider value={{ account, loading, setupRequired }}>{children}</AccountContext.Provider>;
