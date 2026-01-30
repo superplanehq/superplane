@@ -13,7 +13,7 @@ import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
 import { buildIncidentExecutionDetails } from "./base";
 import { formatTimeAgo } from "@/utils/date";
 
-export const updateIncidentMapper: ComponentBaseMapper = {
+export const annotateIncidentMapper: ComponentBaseMapper = {
   props(
     nodes: ComponentsNode[],
     node: ComponentsNode,
@@ -53,26 +53,11 @@ function metadataList(node: ComponentsNode): MetadataItem[] {
     metadata.push({ icon: "alert-triangle", label: `Incident: ${configuration.incidentId}` });
   }
 
-  // Show which fields are being updated
-  const updates: string[] = [];
-  if (configuration.status) {
-    updates.push(`Status: ${configuration.status}`);
-  }
-  if (configuration.priority) {
-    updates.push("Priority");
-  }
-  if (configuration.title) {
-    updates.push("Title");
-  }
-  if (configuration.escalationPolicy) {
-    updates.push("Escalation Policy");
-  }
-  if (configuration.assignees && configuration.assignees.length > 0) {
-    updates.push(`Assignees (${configuration.assignees.length})`);
-  }
-
-  if (updates.length > 0) {
-    metadata.push({ icon: "funnel", label: `Updating: ${updates.join(", ")}` });
+  if (configuration.content) {
+    const truncatedContent = configuration.content.length > 50
+      ? configuration.content.substring(0, 50) + "..."
+      : configuration.content;
+    metadata.push({ icon: "message-square", label: `Note: ${truncatedContent}` });
   }
 
   return metadata;
