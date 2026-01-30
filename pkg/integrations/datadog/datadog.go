@@ -128,7 +128,7 @@ func (d *Datadog) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("invalid credentials: %v", err)
 	}
 
-	ctx.Integration.SetState("ready", "")
+	ctx.Integration.Ready()
 	return nil
 }
 

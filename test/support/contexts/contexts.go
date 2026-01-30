@@ -117,9 +117,14 @@ func (c *IntegrationContext) GetState() string {
 	return ""
 }
 
-func (c *IntegrationContext) SetState(state, stateDescription string) {
-	c.State = state
-	c.StateDescription = stateDescription
+func (c *IntegrationContext) Ready() {
+	c.State = "ready"
+	c.StateDescription = ""
+}
+
+func (c *IntegrationContext) Error(message string) {
+	c.State = "error"
+	c.StateDescription = message
 }
 
 func (c *IntegrationContext) NewBrowserAction(action core.BrowserAction) {
