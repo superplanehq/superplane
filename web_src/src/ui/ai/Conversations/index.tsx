@@ -3,6 +3,7 @@ import { BotIcon, CheckIcon, CopyIcon, FileIcon, ListIcon, PaperclipIcon, PlusIc
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "../../button";
+import { showErrorToast } from "@/utils/toast";
 
 export namespace Conversations {
   export interface Message {
@@ -122,8 +123,8 @@ function CopyButton({ text }: { text: string }) {
       setCopied(true);
       // Reset after 2 seconds
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy text: ", err);
+    } catch (_err) {
+      showErrorToast("Failed to copy message");
     }
   };
 
@@ -240,8 +241,8 @@ export function Conversations({
     try {
       await onSendMessage(inputMessage, activeConversationId);
       setInputMessage("");
-    } catch (error) {
-      console.error("Failed to send message:", error);
+    } catch (_error) {
+      showErrorToast("Failed to send message");
     }
   };
 

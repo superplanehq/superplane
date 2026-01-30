@@ -8,6 +8,7 @@ import { Text } from "../../../components/Text/text";
 import { useCreateRole, useRole, useUpdateRole } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/ui/checkbox";
+import { showErrorToast } from "@/utils/toast";
 
 interface Permission {
   id: string;
@@ -311,7 +312,7 @@ export function CreateRolePage() {
 
       navigate(`/${orgId}/settings/roles`);
     } catch {
-      console.error("Failed to create role");
+      showErrorToast("Failed to create role");
     }
   };
 
