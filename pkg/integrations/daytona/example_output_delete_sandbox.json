@@ -1,0 +1,8 @@
+{
+    "type": "daytona.delete.response",
+    "data": {
+        "deleted": true,
+        "id": "sandbox-abc123def456"
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}

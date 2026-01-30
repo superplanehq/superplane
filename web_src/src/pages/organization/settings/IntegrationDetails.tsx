@@ -15,6 +15,7 @@ import { Alert, AlertDescription } from "@/ui/alert";
 import { resolveIcon } from "@/lib/utils";
 import { showErrorToast } from "@/utils/toast";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
+import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
@@ -46,6 +47,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
     dash0: dash0Icon,
     github: githubIcon,
     openai: openAiIcon,
+    daytona: daytonaIcon,
     "open-ai": openAiIcon,
     pagerduty: pagerDutyIcon,
     rootly: rootlyIcon,
