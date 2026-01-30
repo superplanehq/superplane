@@ -127,7 +127,7 @@ Organization (1) ──→ (N) Integrations
   - `pkg/models/` - Database models and ORM logic
   - `pkg/components/` - Workflow component implementations
   - `pkg/triggers/` - Event trigger implementations
-  - `pkg/applications/` - Third-party integration implementations (GitHub, Semaphore)
+  - `pkg/integrations/` - Third-party integration implementations (GitHub, Slack, Discord, etc.)
   - `pkg/public/` - Public HTTP server (serves UI + REST API)
   - `pkg/registry/` - Component and trigger registry
   - `pkg/authentication/` - User authentication logic

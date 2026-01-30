@@ -57,7 +57,7 @@ export const startTriggerRenderer: TriggerRenderer = {
     };
 
     const props: TriggerProps = {
-      title: node.name!,
+      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
       iconSlug: trigger.icon || "play",
       iconColor: getColorClass("purple"),
       collapsedBackground: getBackgroundColorClass(trigger.color),

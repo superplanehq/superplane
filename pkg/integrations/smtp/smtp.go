@@ -141,7 +141,7 @@ func (s *SMTP) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("SMTP connection test failed: %w", err)
 	}
 
-	ctx.Integration.SetState("ready", "")
+	ctx.Integration.Ready()
 	return nil
 }
 

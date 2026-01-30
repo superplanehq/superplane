@@ -179,8 +179,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         }) as ExecutionChainItem[];
 
         setExecutionChainData(processedChainData);
-      } catch (error) {
-        console.error("Failed to load execution chain:", error);
+      } catch (_error) {
         if (!forceReload) {
           setExecutionChainData([]);
         }

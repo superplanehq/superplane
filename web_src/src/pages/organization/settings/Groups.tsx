@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { isRBACEnabled } from "@/lib/env";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { showErrorToast } from "@/utils/toast";
 
 interface GroupsProps {
   organizationId: string;
@@ -58,8 +59,8 @@ export function Groups({ organizationId }: GroupsProps) {
         groupName,
         organizationId,
       });
-    } catch (err) {
-      console.error("Error deleting group:", err);
+    } catch (_err) {
+      showErrorToast("Failed to delete group");
     }
   };
 
@@ -70,8 +71,8 @@ export function Groups({ organizationId }: GroupsProps) {
         organizationId,
         role: newRoleName,
       });
-    } catch (err) {
-      console.error("Error updating group role:", err);
+    } catch (_err) {
+      showErrorToast("Failed to update group role");
     }
   };
 
