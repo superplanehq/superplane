@@ -22,7 +22,6 @@ type UpdateIncidentSpec struct {
 	Description      string   `json:"description"`
 	EscalationPolicy string   `json:"escalationPolicy"`
 	Assignees        []string `json:"assignees"`
-	Note             string   `json:"note"`
 }
 
 func (c *UpdateIncident) Name() string {
@@ -45,7 +44,6 @@ func (c *UpdateIncident) Documentation() string {
 - **Status updates**: Update incident status (acknowledge, resolve)
 - **Priority management**: Change incident priority
 - **Assignment**: Assign incidents to users or escalation policies
-- **Note addition**: Add notes to incidents with updates
 
 ## Configuration
 
@@ -57,7 +55,6 @@ func (c *UpdateIncident) Documentation() string {
 - **Description**: Update incident description (optional, supports expressions)
 - **Escalation Policy**: Change escalation policy (optional)
 - **Assignees**: Assign to specific users (optional)
-- **Note**: Add a note to the incident (optional, supports expressions)
 
 ## Output
 
@@ -163,13 +160,6 @@ func (c *UpdateIncident) Configuration() []configuration.Field {
 				},
 			},
 		},
-		{
-			Name:        "note",
-			Label:       "Note",
-			Type:        configuration.FieldTypeText,
-			Required:    false,
-			Description: "Add a note/comment to the incident",
-		},
 	}
 }
 
@@ -189,8 +179,8 @@ func (c *UpdateIncident) Setup(ctx core.SetupContext) error {
 		spec.Title != "" || spec.Description != "" ||
 		spec.EscalationPolicy != "" || len(spec.Assignees) > 0
 
-	if !hasUpdate && spec.Note == "" {
-		return errors.New("at least one field to update or a note must be provided")
+	if !hasUpdate {
+		return errors.New("at least one field to update must be provided")
 	}
 
 	// Store minimal metadata (no external API call needed for setup)
@@ -209,42 +199,18 @@ func (c *UpdateIncident) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	// Update incident fields if any are provided
-	hasUpdate := spec.Status != "" || spec.Priority != "" ||
-		spec.Title != "" || spec.Description != "" ||
-		spec.EscalationPolicy != "" || len(spec.Assignees) > 0
-
-	var incident any
-	if hasUpdate {
-		incident, err = client.UpdateIncident(
-			spec.IncidentID,
-			spec.FromEmail,
-			spec.Status,
-			spec.Priority,
-			spec.Title,
-			spec.Description,
-			spec.EscalationPolicy,
-			spec.Assignees,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to update incident: %v", err)
-		}
-	}
-
-	// Add note if provided
-	if spec.Note != "" {
-		err = client.AddIncidentNote(spec.IncidentID, spec.FromEmail, spec.Note)
-		if err != nil {
-			return fmt.Errorf("failed to add note to incident: %v", err)
-		}
-	}
-
-	// If only note was added, fetch the incident to return
-	if incident == nil {
-		incident, err = client.GetIncident(spec.IncidentID)
-		if err != nil {
-			return fmt.Errorf("failed to fetch incident: %v", err)
-		}
+	incident, err := client.UpdateIncident(
+		spec.IncidentID,
+		spec.FromEmail,
+		spec.Status,
+		spec.Priority,
+		spec.Title,
+		spec.Description,
+		spec.EscalationPolicy,
+		spec.Assignees,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update incident: %v", err)
 	}
 
 	return ctx.ExecutionState.Emit(
