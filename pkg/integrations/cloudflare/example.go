@@ -16,3 +16,13 @@ var exampleOutputUpdateRedirectRule map[string]any
 func (c *UpdateRedirectRule) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateRedirectRuleOnce, exampleOutputUpdateRedirectRuleBytes, &exampleOutputUpdateRedirectRule)
 }
+
+//go:embed example_output_update_dns_record.json
+var exampleOutputUpdateDNSRecordBytes []byte
+
+var exampleOutputUpdateDNSRecordOnce sync.Once
+var exampleOutputUpdateDNSRecord map[string]any
+
+func (c *UpdateDNSRecord) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateDNSRecordOnce, exampleOutputUpdateDNSRecordBytes, &exampleOutputUpdateDNSRecord)
+}

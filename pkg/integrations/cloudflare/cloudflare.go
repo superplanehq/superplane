@@ -50,6 +50,7 @@ func (c *Cloudflare) Instructions() string {
    - **Permissions** (click "+ Add more" to add each):
      - Zone / Zone / Read
      - Zone / Dynamic Redirect / Edit
+     - Zone / DNS / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
 5. Click **Continue to summary**, then **Create Token**
 6. Copy the token and paste it below
@@ -73,6 +74,7 @@ func (c *Cloudflare) Configuration() []configuration.Field {
 func (c *Cloudflare) Components() []core.Component {
 	return []core.Component{
 		&UpdateRedirectRule{},
+		&UpdateDNSRecord{},
 	}
 }
 

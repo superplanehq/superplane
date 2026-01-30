@@ -221,6 +221,82 @@ func (c *Client) GetRulesetForPhase(zoneID, phase string) (*Ruleset, error) {
 	return &response.Result, nil
 }
 
+// DNSRecord represents a Cloudflare DNS record
+type DNSRecord struct {
+	ID      string `json:"id"`
+	Type    string `json:"type"`
+	Name    string `json:"name"`
+	Content string `json:"content"`
+	TTL     int    `json:"ttl"`
+	Proxied bool   `json:"proxied"`
+}
+
+// GetDNSRecord retrieves a DNS record by ID from a zone
+func (c *Client) GetDNSRecord(zoneID, recordID string) (*DNSRecord, error) {
+	url := fmt.Sprintf("%s/zones/%s/dns_records/%s", c.BaseURL, zoneID, recordID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool      `json:"success"`
+		Result  DNSRecord `json:"result"`
+	}
+
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
+// UpdateDNSRecordRequest is the payload for updating a DNS record.
+// Cloudflare's Update DNS Record endpoint expects a full record object (type, name, content, ttl, proxied).
+type UpdateDNSRecordRequest struct {
+	Type    string `json:"type"`
+	Name    string `json:"name"`
+	Content string `json:"content"`
+	TTL     int    `json:"ttl"`
+	Proxied bool   `json:"proxied"`
+}
+
+// UpdateDNSRecord updates an existing DNS record in a zone.
+func (c *Client) UpdateDNSRecord(zoneID, recordID string, req UpdateDNSRecordRequest) (*DNSRecord, error) {
+	url := fmt.Sprintf("%s/zones/%s/dns_records/%s", c.BaseURL, zoneID, recordID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPut, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool      `json:"success"`
+		Result  DNSRecord `json:"result"`
+	}
+
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
 // CreateRedirectRuleRequest is the payload for creating a new redirect rule
 type CreateRedirectRuleRequest struct {
 	Action      string              `json:"action"`
