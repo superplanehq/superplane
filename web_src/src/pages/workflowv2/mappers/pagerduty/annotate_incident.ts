@@ -54,9 +54,8 @@ function metadataList(node: ComponentsNode): MetadataItem[] {
   }
 
   if (configuration.content) {
-    const truncatedContent = configuration.content.length > 50
-      ? configuration.content.substring(0, 50) + "..."
-      : configuration.content;
+    const truncatedContent =
+      configuration.content.length > 50 ? configuration.content.substring(0, 50) + "..." : configuration.content;
     metadata.push({ icon: "message-square", label: `Note: ${truncatedContent}` });
   }
 
