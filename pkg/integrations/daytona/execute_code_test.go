@@ -130,6 +130,10 @@ func Test__ExecuteCode__Execute(t *testing.T) {
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`{"exitCode":0,"result":"hello world"}`)),
 				},
 			},
@@ -163,6 +167,10 @@ func Test__ExecuteCode__Execute(t *testing.T) {
 	t.Run("code execution with non-zero exit code", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
+				},
 				{
 					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`{"exitCode":1,"result":"error: division by zero"}`)),

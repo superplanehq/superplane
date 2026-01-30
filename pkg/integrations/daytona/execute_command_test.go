@@ -82,6 +82,10 @@ func Test__ExecuteCommand__Execute(t *testing.T) {
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`{"exitCode":0,"result":"hello world"}`)),
 				},
 			},
@@ -116,6 +120,10 @@ func Test__ExecuteCommand__Execute(t *testing.T) {
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`{"exitCode":0,"result":"/home/daytona"}`)),
 				},
 			},
@@ -147,6 +155,10 @@ func Test__ExecuteCommand__Execute(t *testing.T) {
 	t.Run("command with non-zero exit code", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
+				},
 				{
 					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`{"exitCode":127,"result":"command not found"}`)),

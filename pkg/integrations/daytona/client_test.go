@@ -181,6 +181,10 @@ func Test__Client__ExecuteCommand(t *testing.T) {
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`{"exitCode":0,"result":"hello world"}`)),
 				},
 			},
@@ -202,8 +206,8 @@ func Test__Client__ExecuteCommand(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 0, response.ExitCode)
 		assert.Equal(t, "hello world", response.Result)
-		require.Len(t, httpContext.Requests, 1)
-		assert.Contains(t, httpContext.Requests[0].URL.String(), "/toolbox/sandbox-123/toolbox/process/execute")
+		require.Len(t, httpContext.Requests, 2)
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "/toolbox/sandbox-123/process/execute")
 	})
 
 	t.Run("command execution failure -> error", func(t *testing.T) {
@@ -239,6 +243,10 @@ func Test__Client__ExecuteCode(t *testing.T) {
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`{"exitCode":0,"result":"42"}`)),
 				},
 			},
@@ -266,6 +274,10 @@ func Test__Client__ExecuteCode(t *testing.T) {
 	t.Run("successful javascript code execution", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"proxyToolboxUrl":"https://app.daytona.io/api/toolbox"}`)),
+				},
 				{
 					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`{"exitCode":0,"result":"hello"}`)),
