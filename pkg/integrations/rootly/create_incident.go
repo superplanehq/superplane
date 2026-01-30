@@ -95,7 +95,8 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			Placeholder: "Select a severity",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: "severity",
+					Type:           "severity",
+					UseNameAsValue: true,
 				},
 			},
 		},

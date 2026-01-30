@@ -55,7 +55,7 @@ func (r *Rootly) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Sensitive:   true,
-			Description: "API key from Rootly. You can generate one in Organization Settings > API Keys.",
+			Description: "API key from Rootly. You can generate one in Configuration > API Keys.",
 		},
 	}
 }
@@ -190,10 +190,11 @@ func verifyWebhookSignature(signature string, body, secret []byte) error {
 	}
 
 	// Parse the signature header
-	// Format: "t=1492774588, v1=6657a869..."
+	// Format: "t=1492774588,v1=6657a869..."
 	var timestamp, sig string
-	parts := strings.Split(signature, ", ")
+	parts := strings.Split(signature, ",")
 	for _, part := range parts {
+		part = strings.TrimSpace(part)
 		if strings.HasPrefix(part, "t=") {
 			timestamp = strings.TrimPrefix(part, "t=")
 		} else if strings.HasPrefix(part, "v1=") {

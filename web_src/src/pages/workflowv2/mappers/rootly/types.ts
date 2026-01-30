@@ -7,12 +7,19 @@ export interface BaseNodeMetadata {
   };
 }
 
+export interface Severity {
+  id?: string;
+  name?: string;
+  slug?: string;
+  color?: string;
+}
+
 export interface Incident {
   id?: string;
   title?: string;
   summary?: string;
   status?: string;
-  severity?: string;
+  severity?: Severity;
   started_at?: string;
   resolved_at?: string;
   mitigated_at?: string;

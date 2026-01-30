@@ -135,7 +135,7 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	eventType := webhook.Event
+	eventType := webhook.Event.Type
 
 	// Since the webhook may be shared and receive more events than this trigger cares about,
 	// we need to filter events by their type here.
@@ -157,13 +157,22 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 
 // WebhookPayload represents the Rootly webhook payload
 type WebhookPayload struct {
-	Event string         `json:"event"`
+	Event WebhookEvent   `json:"event"`
 	Data  map[string]any `json:"data"`
+}
+
+// WebhookEvent represents the event metadata in a Rootly webhook
+type WebhookEvent struct {
+	ID       string `json:"id"`
+	Type     string `json:"type"`
+	IssuedAt string `json:"issued_at"`
 }
 
 func buildIncidentPayload(webhook WebhookPayload) map[string]any {
 	payload := map[string]any{
-		"event": webhook.Event,
+		"event":      webhook.Event.Type,
+		"event_id":   webhook.Event.ID,
+		"issued_at":  webhook.Event.IssuedAt,
 	}
 
 	if webhook.Data != nil {

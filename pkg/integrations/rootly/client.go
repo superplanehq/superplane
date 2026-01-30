@@ -377,6 +377,7 @@ type CreateWebhookEndpointData struct {
 }
 
 type CreateWebhookEndpointAttributes struct {
+	Name           string   `json:"name"`
 	URL            string   `json:"url"`
 	EventTypes     []string `json:"event_types"`
 	Enabled        bool     `json:"enabled"`
@@ -386,8 +387,9 @@ type CreateWebhookEndpointAttributes struct {
 func (c *Client) CreateWebhookEndpoint(url string, events []string) (*WebhookEndpoint, error) {
 	request := CreateWebhookEndpointRequest{
 		Data: CreateWebhookEndpointData{
-			Type: "webhook_endpoints",
+			Type: "webhooks_endpoints",
 			Attributes: CreateWebhookEndpointAttributes{
+				Name:           "SuperPlane",
 				URL:            url,
 				EventTypes:     events,
 				Enabled:        true,

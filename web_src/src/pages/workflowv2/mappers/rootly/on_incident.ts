@@ -7,6 +7,20 @@ import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import { Incident } from "./types";
 import { getDetailsForIncident } from "./base";
 
+// Map event values to display labels (matching backend configuration)
+const eventLabels: Record<string, string> = {
+  "incident.created": "Created",
+  "incident.updated": "Updated",
+  "incident.mitigated": "Mitigated",
+  "incident.resolved": "Resolved",
+  "incident.cancelled": "Cancelled",
+  "incident.deleted": "Deleted",
+};
+
+function formatEventLabel(event: string): string {
+  return eventLabels[event] || event.replace("incident.", "").charAt(0).toUpperCase() + event.replace("incident.", "").slice(1);
+}
+
 interface OnIncidentEventData {
   event?: string;
   incident?: Incident;
@@ -19,7 +33,7 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
     const eventData = event.data?.data as OnIncidentEventData;
     const incident = eventData?.incident;
-    const contentParts = [incident?.severity, incident?.status].filter(Boolean).join(" · ");
+    const contentParts = [incident?.severity?.name, incident?.status].filter(Boolean).join(" · ");
     const subtitle = buildSubtitle(contentParts, event.createdAt);
 
     return {
@@ -38,9 +52,10 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
     const metadataItems = [];
 
     if (configuration?.events) {
+      const formattedEvents = configuration.events.map(formatEventLabel).join(", ");
       metadataItems.push({
         icon: "funnel",
-        label: `Events: ${configuration.events.join(", ")}`,
+        label: `Events: ${formattedEvents}`,
       });
     }
 
@@ -54,7 +69,7 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
     if (lastEvent) {
       const eventData = lastEvent.data?.data as OnIncidentEventData;
       const incident = eventData?.incident;
-      const contentParts = [incident?.severity, incident?.status].filter(Boolean).join(" · ");
+      const contentParts = [incident?.severity?.name, incident?.status].filter(Boolean).join(" · ");
       const subtitle = buildSubtitle(contentParts, lastEvent.createdAt);
 
       props.lastEventData = {
