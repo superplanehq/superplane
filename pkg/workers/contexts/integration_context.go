@@ -227,9 +227,14 @@ func (c *IntegrationContext) GetState() string {
 	return c.appInstallation.State
 }
 
-func (c *IntegrationContext) SetState(state, stateDescription string) {
-	c.appInstallation.State = state
-	c.appInstallation.StateDescription = stateDescription
+func (c *IntegrationContext) Ready() {
+	c.appInstallation.State = models.AppInstallationStateReady
+	c.appInstallation.StateDescription = ""
+}
+
+func (c *IntegrationContext) Error(message string) {
+	c.appInstallation.State = models.AppInstallationStateError
+	c.appInstallation.StateDescription = message
 }
 
 func (c *IntegrationContext) SetSecret(name string, value []byte) error {

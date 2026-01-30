@@ -94,7 +94,7 @@ func (r *Rootly) Sync(ctx core.SyncContext) error {
 	}
 
 	ctx.Integration.SetMetadata(Metadata{Services: services})
-	ctx.Integration.SetState("ready", "")
+	ctx.Integration.Ready()
 	return nil
 }
 

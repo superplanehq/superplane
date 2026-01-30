@@ -176,8 +176,8 @@ type IntegrationContext interface {
 	//
 	// Control the state of the integration
 	//
-	GetState() string
-	SetState(state, stateDescription string)
+	Ready()
+	Error(message string)
 
 	//
 	// Control the browser action of the integration

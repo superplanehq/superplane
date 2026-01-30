@@ -27,7 +27,7 @@ func Test__UpdateIntegration(t *testing.T) {
 		// Register a test integration that succeeds on Sync
 		//
 		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			ctx.Integration.SetState("ready", "")
+			ctx.Integration.Ready()
 			return nil
 		})
 
@@ -81,7 +81,7 @@ func Test__UpdateIntegration(t *testing.T) {
 		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
 			syncCount++
 			if syncCount == 1 {
-				ctx.Integration.SetState("ready", "")
+				ctx.Integration.Ready()
 				return nil
 			}
 			return errors.New("sync failed on update")
@@ -149,7 +149,7 @@ func Test__UpdateIntegration(t *testing.T) {
 		// Register a test integration that succeeds on Sync
 		//
 		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			ctx.Integration.SetState("ready", "")
+			ctx.Integration.Ready()
 			return nil
 		})
 

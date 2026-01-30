@@ -178,7 +178,7 @@ func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration) er
 		ExpiresAt: credentials.Expiration.Format(time.RFC3339),
 	})
 
-	ctx.Integration.SetState("ready", "")
+	ctx.Integration.Ready()
 	ctx.Integration.RemoveBrowserAction()
 
 	refreshAfter := time.Until(credentials.Expiration) / 2

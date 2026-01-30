@@ -81,7 +81,7 @@ func (o *OpenAI) Sync(ctx core.SyncContext) error {
 		return err
 	}
 
-	ctx.Integration.SetState("ready", "")
+	ctx.Integration.Ready()
 	return nil
 }
 

@@ -106,7 +106,7 @@ func (d *Discord) Sync(ctx core.SyncContext) error {
 		Username: botUser.Username,
 	})
 
-	ctx.Integration.SetState("ready", fmt.Sprintf("Connected as: %s", botUser.Username))
+	ctx.Integration.Ready()
 	return nil
 }
 
