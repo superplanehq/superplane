@@ -14,6 +14,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record in a Cloudflare zone" />
   <LinkCard title="Update DNS Record" href="#update-dns-record" description="Update an existing DNS record in a Cloudflare zone" />
   <LinkCard title="Update Redirect Rule" href="#update-redirect-rule" description="Update a redirect rule in a Cloudflare zone" />
+  <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a Cloudflare zone" />
 </CardGrid>
 
 ## Instructions
@@ -168,6 +169,46 @@ Returns the updated redirect rule with all current configuration.
   },
   "ruleId": "rule_abc123",
   "zoneId": "zone_xyz789"
+}
+```
+
+<a id="delete-dns-record"></a>
+
+## Delete DNS Record
+
+The Delete DNS Record component removes a DNS record from a Cloudflare zone.
+
+### Use Cases
+
+- **Deprovisioning**: Remove DNS records when services or environments are torn down
+- **Cleanup**: Delete temporary verification records (e.g. migration or certificate validation)
+- **Maintenance**: Remove stale or incorrect records as part of workflow automation
+
+### Configuration
+
+- **Zone**: Cloudflare zone (zone ID or domain name)
+- **Record ID**: DNS record ID to delete
+
+### Output Channels
+
+- **Success**: Emitted when the DNS record is deleted
+- **Failed**: Emitted when the zone/record is not found or when deletion fails
+
+### Example Output
+
+```json
+{
+  "success": true,
+  "message": "DNS record deleted",
+  "zone": "example.com",
+  "zoneId": "zone_xyz789",
+  "recordId": "record_abc123",
+  "record": {
+    "id": "record_abc123",
+    "type": "CNAME",
+    "name": "app.example.com",
+    "content": "example.com"
+  }
 }
 ```
 
