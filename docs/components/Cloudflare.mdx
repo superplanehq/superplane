@@ -11,6 +11,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record in a Cloudflare zone" />
   <LinkCard title="Update DNS Record" href="#update-dns-record" description="Update an existing DNS record in a Cloudflare zone" />
   <LinkCard title="Update Redirect Rule" href="#update-redirect-rule" description="Update a redirect rule in a Cloudflare zone" />
 </CardGrid>
@@ -26,13 +27,53 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
    - **Token name**: SuperPlane Integration
    - **Permissions** (click "+ Add more" to add each):
      - Zone / Zone / Read
-     - Zone / Dynamic Redirect / Edit
      - Zone / DNS / Edit
+     - Zone / Dynamic Redirect / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
 5. Click **Continue to summary**, then **Create Token**
 6. Copy the token and paste it below
 
 > **Note**: The token is only shown once. Store it securely if needed elsewhere.
+
+<a id="create-dns-record"></a>
+
+## Create DNS Record
+
+The Create DNS Record component creates a DNS record in a Cloudflare zone.
+
+### Use Cases
+
+- **Provisioning**: Add a record when a new service or environment is provisioned
+- **Verification**: Create TXT or CNAME records for certificates or domain ownership
+- **Releases**: Add or update DNS records during canary rollouts or migrations
+
+### Configuration
+
+- **Zone**: Zone ID or domain name (e.g., `example.com`)
+- **Type**: Record type (A, AAAA, CNAME, MX, TXT, NS, etc.)
+- **Name**: Record name (e.g., `www`, `api`, or `@` for apex)
+- **Content**: Record value (IP, hostname, or text)
+- **TTL**: TTL in seconds (use `1` for auto)
+- **Proxied**: Proxy through Cloudflare (A, AAAA, CNAME only)
+- **Priority**: MX or SRV priority (optional)
+
+### Output
+
+**Success channel**: Emits the created DNS record (id, type, name, content, proxied, ttl)  
+**Failed channel**: Emits when the zone is not found, the record is invalid, or a duplicate exists
+
+### Example Output
+
+```json
+{
+  "id": "record_abc123",
+  "type": "A",
+  "name": "api.example.com",
+  "content": "192.0.2.1",
+  "proxied": false,
+  "ttl": 1
+}
+```
 
 <a id="update-dns-record"></a>
 
@@ -129,4 +170,3 @@ Returns the updated redirect rule with all current configuration.
   "zoneId": "zone_xyz789"
 }
 ```
-

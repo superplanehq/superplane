@@ -49,6 +49,7 @@ func (c *Cloudflare) Instructions() string {
    - **Token name**: SuperPlane Integration
    - **Permissions** (click "+ Add more" to add each):
      - Zone / Zone / Read
+     - Zone / DNS / Edit
      - Zone / Dynamic Redirect / Edit
      - Zone / DNS / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
@@ -73,6 +74,7 @@ func (c *Cloudflare) Configuration() []configuration.Field {
 
 func (c *Cloudflare) Components() []core.Component {
 	return []core.Component{
+		&CreateDNSRecord{},
 		&UpdateRedirectRule{},
 		&UpdateDNSRecord{},
 	}
