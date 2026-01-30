@@ -196,7 +196,7 @@ export function Header({
                   setExportAction("");
                 }}
               >
-                <SelectTrigger className="min-w-fit flex-shrink-0 px-3">
+                <SelectTrigger className="w-fit min-w-32">
                   <SelectValue placeholder="YAML" />
                 </SelectTrigger>
                 <SelectContent align="end">
