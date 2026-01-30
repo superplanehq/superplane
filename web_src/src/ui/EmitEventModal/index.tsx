@@ -92,7 +92,7 @@ export const EmitEventModal = ({ isOpen, onClose, nodeName, channels, onEmit, in
       showSuccessToast("Event emitted successfully");
       handleClose();
     } catch (error) {
-      console.error("Error emitting event:", error);
+      console.error("Failed to emit event", error);
       showErrorToast("Failed to emit event");
       setIsSubmitting(false);
     }

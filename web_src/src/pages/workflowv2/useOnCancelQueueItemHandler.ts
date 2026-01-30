@@ -5,6 +5,7 @@ import { workflowsDeleteNodeQueueItem, WorkflowsWorkflow } from "@/api-client";
 import { workflowKeys } from "@/hooks/useWorkflowData";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { showErrorToast } from "@/utils/toast";
 
 type Params = {
   workflowId: string;
@@ -46,6 +47,7 @@ export function useOnCancelQueueItemHandler({ workflowId, organizationId, workfl
         }
       } catch (err) {
         console.error("Failed to cancel queue item", err);
+        showErrorToast("Failed to cancel queue item");
       }
     },
     [workflowId, organizationId, queryClient, workflow, refetchNodeDataMethod, loadSidebarData],

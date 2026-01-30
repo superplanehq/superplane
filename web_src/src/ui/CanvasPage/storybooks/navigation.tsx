@@ -21,17 +21,14 @@ export const navigateToStoryWithData = (storyId: string, data?: any) => {
 
     // Navigate using the correct window
     targetWindow.location.href = newUrl;
-  } catch (error) {
-    console.error("❌ Navigation failed:", error);
+  } catch (_error) {
     // Ultimate fallback - try direct URL construction
     try {
       const fallbackUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?path=/story/${storyId}`;
       if (window.top?.location) {
         window.top.location.href = fallbackUrl;
       }
-    } catch (fallbackError) {
-      console.error("❌ Fallback also failed:", fallbackError);
-    }
+    } catch (_fallbackError) {}
   }
 };
 
@@ -57,9 +54,7 @@ export const getStorybookData = () => {
         return parsedData;
       }
     }
-  } catch (error) {
-    console.error("❌ Failed to parse Storybook data:", error);
-  }
+  } catch (_error) {}
 
   return null;
 };

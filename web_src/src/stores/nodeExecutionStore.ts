@@ -258,9 +258,7 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
         });
         return { data: newData, version: state.version + 1 };
       });
-    } catch (error) {
-      console.error("Failed to load node data:", error);
-
+    } catch (_error) {
       // Mark as not loading on error
       set((state) => {
         const newData = new Map(state.data);
@@ -324,9 +322,7 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
         });
         return { data: newData, version: state.version + 1 };
       });
-    } catch (error) {
-      console.error("Failed to refetch node data:", error);
-
+    } catch (_error) {
       // Mark as not loading on error
       set((state) => {
         const newData = new Map(state.data);
