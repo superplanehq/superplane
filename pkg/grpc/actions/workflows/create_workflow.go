@@ -18,6 +18,8 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+const ErrDuplicateCanvasName = "duplicate key value violates unique constraint"
+
 func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizationID string, pbWorkflow *pb.Workflow) (*pb.CreateWorkflowResponse, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
@@ -63,6 +65,9 @@ func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizati
 		//
 		err := tx.Clauses(clause.Returning{}).Create(&workflow).Error
 		if err != nil {
+			if strings.Contains(err.Error(), ErrDuplicateCanvasName) {
+				return status.Errorf(codes.AlreadyExists, "Canvas with the same name already exists")
+			}
 			return err
 		}
 

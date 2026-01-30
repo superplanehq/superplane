@@ -115,7 +115,7 @@ export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
         : undefined;
 
     const props: TriggerProps = {
-      title: node.name!,
+      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
       iconSrc: githubIcon,
       iconColor: getColorClass(trigger.color),
       collapsedBackground: getBackgroundColorClass(trigger.color),

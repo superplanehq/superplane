@@ -46,6 +46,10 @@ func (c *IntegrationContext) RequestWebhook(configuration any) error {
 		return err
 	}
 
+	if err := c.replaceMismatchedWebhook(configuration, integration); err != nil {
+		return err
+	}
+
 	webhooks, err := models.ListAppInstallationWebhooks(c.tx, c.appInstallation.ID)
 	if err != nil {
 		return fmt.Errorf("Failed to list webhooks: %v", err)
@@ -64,6 +68,39 @@ func (c *IntegrationContext) RequestWebhook(configuration any) error {
 	}
 
 	return c.createWebhook(configuration)
+}
+
+func (c *IntegrationContext) replaceMismatchedWebhook(configuration any, integration core.Integration) error {
+	if c.node == nil || c.node.WebhookID == nil {
+		return nil
+	}
+
+	webhook, err := models.FindWebhookInTransaction(c.tx, *c.node.WebhookID)
+	if err != nil {
+		return err
+	}
+
+	matches, err := integration.CompareWebhookConfig(webhook.Configuration.Data(), configuration)
+	if err != nil {
+		return err
+	}
+
+	if matches {
+		return nil
+	}
+
+	c.node.WebhookID = nil
+
+	nodes, err := models.FindWebhookNodesInTransaction(c.tx, webhook.ID)
+	if err != nil {
+		return err
+	}
+
+	if len(nodes) > 1 {
+		return nil
+	}
+
+	return c.tx.Delete(webhook).Error
 }
 
 func (c *IntegrationContext) createWebhook(configuration any) error {

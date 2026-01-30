@@ -78,7 +78,7 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
     }
 
     const props: TriggerProps = {
-      title: node.name!,
+      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
       iconSrc: SemaphoreLogo,
       iconColor: getColorClass(trigger.color),
       collapsedBackground: getBackgroundColorClass(trigger.color),

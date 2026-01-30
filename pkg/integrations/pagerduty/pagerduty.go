@@ -157,6 +157,7 @@ func (p *PagerDuty) Components() []core.Component {
 		&CreateIncident{},
 		&UpdateIncident{},
 		&ListIncidents{},
+		&SnoozeIncident{},
 	}
 }
 
@@ -164,6 +165,7 @@ func (p *PagerDuty) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnIncident{},
 		&OnIncidentStatusUpdate{},
+		&OnIncidentAnnotated{},
 	}
 }
 

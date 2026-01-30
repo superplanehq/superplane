@@ -41,7 +41,7 @@ export function usePushThroughHandler({ workflowId, organizationId, workflow }: 
 
         showSuccessToast("Pushed through");
       } catch (error) {
-        console.error("Failed to push through:", error);
+        console.error("Failed to push through", error);
         showErrorToast("Failed to push through");
       }
     },

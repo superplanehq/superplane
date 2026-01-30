@@ -71,7 +71,7 @@ export const waitMapper: ComponentBaseMapper = {
       metadata: getWaitMetadataList(node),
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-white",
-      title: node.name!,
+      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
       eventSections: lastExecution
         ? getWaitEventSections(nodes, lastExecution, nodeQueueItems, node.configuration, componentName)
         : undefined,
