@@ -170,9 +170,9 @@ type WebhookEvent struct {
 
 func buildIncidentPayload(webhook WebhookPayload) map[string]any {
 	payload := map[string]any{
-		"event":      webhook.Event.Type,
-		"event_id":   webhook.Event.ID,
-		"issued_at":  webhook.Event.IssuedAt,
+		"event":     webhook.Event.Type,
+		"event_id":  webhook.Event.ID,
+		"issued_at": webhook.Event.IssuedAt,
 	}
 
 	if webhook.Data != nil {
