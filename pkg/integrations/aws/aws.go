@@ -28,9 +28,9 @@ func init() {
 type AWS struct{}
 
 type Configuration struct {
-	RoleArn                string `json:"roleArn" mapstructure:"roleArn"`
-	Region                 string `json:"region" mapstructure:"region"`
-	SessionDurationSeconds int    `json:"sessionDurationSeconds" mapstructure:"sessionDurationSeconds"`
+	RoleArn                string       `json:"roleArn" mapstructure:"roleArn"`
+	Region                 string       `json:"region" mapstructure:"region"`
+	SessionDurationSeconds int          `json:"sessionDurationSeconds" mapstructure:"sessionDurationSeconds"`
 	Tags                   []common.Tag `json:"tags" mapstructure:"tags"`
 }
 

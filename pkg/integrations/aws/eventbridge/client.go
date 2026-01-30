@@ -55,7 +55,7 @@ func (c *Client) CreateConnection(name, apiKeyHeader, apiKeyValue string, tags [
 		},
 	}
 
-	if tagPayload := normalizeTags(tags); len(tagPayload) > 0 {
+	if tagPayload := common.NormalizeTags(tags); len(tagPayload) > 0 {
 		payload["Tags"] = tagPayload
 	}
 
@@ -98,7 +98,7 @@ func (c *Client) CreateApiDestination(name, connectionArn, url string, tags []co
 		"InvocationRateLimitPerSecond": 10,
 	}
 
-	if tagPayload := normalizeTags(tags); len(tagPayload) > 0 {
+	if tagPayload := common.NormalizeTags(tags); len(tagPayload) > 0 {
 		payload["Tags"] = tagPayload
 	}
 
@@ -139,7 +139,7 @@ func (c *Client) PutRule(name, pattern, description string, tags []common.Tag) (
 		"Description":  description,
 	}
 
-	if tagPayload := normalizeTags(tags); len(tagPayload) > 0 {
+	if tagPayload := common.NormalizeTags(tags); len(tagPayload) > 0 {
 		payload["Tags"] = tagPayload
 	}
 
@@ -181,7 +181,7 @@ func (c *Client) DeleteRule(rule string) error {
 }
 
 func (c *Client) TagResource(resourceArn string, tags []common.Tag) error {
-	tagPayload := normalizeTags(tags)
+	tagPayload := common.NormalizeTags(tags)
 	if len(tagPayload) == 0 {
 		return nil
 	}
@@ -249,21 +249,4 @@ func (c *Client) signRequest(req *http.Request, payload []byte) error {
 	hash := sha256.Sum256(payload)
 	payloadHash := hex.EncodeToString(hash[:])
 	return c.signer.SignHTTP(context.Background(), c.creds, req, payloadHash, "events", c.region, time.Now())
-}
-
-func normalizeTags(tags []common.Tag) []Tag {
-	normalized := common.NormalizeTags(tags)
-	if len(normalized) == 0 {
-		return nil
-	}
-
-	result := make([]Tag, 0, len(normalized))
-	for _, tag := range normalized {
-		result = append(result, Tag{
-			Key:   tag.Key,
-			Value: tag.Value,
-		})
-	}
-
-	return result
 }
