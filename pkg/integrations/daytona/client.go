@@ -133,8 +133,48 @@ func (c *Client) CreateSandbox(req *CreateSandboxRequest) (*Sandbox, error) {
 	return &sandbox, nil
 }
 
+// APIConfig represents the relevant fields from the /api/config endpoint
+type APIConfig struct {
+	ProxyToolboxURL string `json:"proxyToolboxUrl"`
+}
+
+// FetchConfig fetches the API configuration from the /api/config endpoint
+func (c *Client) FetchConfig() (*APIConfig, error) {
+	responseBody, err := c.execRequest(http.MethodGet, c.BaseURL+"/config", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch config: %v", err)
+	}
+
+	var config APIConfig
+	if err := json.Unmarshal(responseBody, &config); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config response: %v", err)
+	}
+
+	return &config, nil
+}
+
+// toolboxURL returns the toolbox execute URL for a given sandbox.
+// It fetches the proxyToolboxUrl from /api/config and constructs the URL.
+func (c *Client) toolboxURL(sandboxID string) (string, error) {
+	config, err := c.FetchConfig()
+	if err != nil {
+		return "", err
+	}
+
+	if config.ProxyToolboxURL == "" {
+		return "", fmt.Errorf("proxyToolboxUrl not found in config")
+	}
+
+	return fmt.Sprintf("%s/%s/process/execute", config.ProxyToolboxURL, sandboxID), nil
+}
+
 // ExecuteCode executes code in a sandbox (uses the execute command endpoint)
 func (c *Client) ExecuteCode(sandboxID string, req *ExecuteCodeRequest) (*ExecuteCodeResponse, error) {
+	url, err := c.toolboxURL(sandboxID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve toolbox URL: %v", err)
+	}
+
 	// Convert code execution to a command based on language
 	var command string
 	switch req.Language {
@@ -158,7 +198,6 @@ func (c *Client) ExecuteCode(sandboxID string, req *ExecuteCodeRequest) (*Execut
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
-	url := fmt.Sprintf("%s/toolbox/%s/toolbox/process/execute", c.BaseURL, sandboxID)
 	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -174,12 +213,16 @@ func (c *Client) ExecuteCode(sandboxID string, req *ExecuteCodeRequest) (*Execut
 
 // ExecuteCommand executes a shell command in a sandbox
 func (c *Client) ExecuteCommand(sandboxID string, req *ExecuteCommandRequest) (*ExecuteCommandResponse, error) {
+	url, err := c.toolboxURL(sandboxID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve toolbox URL: %v", err)
+	}
+
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
-	url := fmt.Sprintf("%s/toolbox/%s/toolbox/process/execute", c.BaseURL, sandboxID)
 	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, err

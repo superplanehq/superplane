@@ -97,19 +97,11 @@ func (c *CreateSandbox) Configuration() []configuration.Field {
 			Default:     "default",
 		},
 		{
-			Name:     "target",
-			Label:    "Target Region",
-			Type:     configuration.FieldTypeSelect,
-			Required: false,
-			Default:  "us",
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "us", Value: "us"},
-						{Label: "eu", Value: "eu"},
-					},
-				},
-			},
+			Name:        "target",
+			Label:       "Target Region",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Placeholder: "e.g. us, eu, local",
 			Description: "Target region for the sandbox",
 		},
 		{
