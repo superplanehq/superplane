@@ -182,8 +182,8 @@ func (c *IntegrationContext) GetConfig(name string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to find config %s: %w", name, err)
 	}
 
-	if configDef.Type != configuration.FieldTypeString && configDef.Type != configuration.FieldTypeSelect {
-		return nil, fmt.Errorf("config %s is not of type: [string, select]", name)
+	if configDef.Type != configuration.FieldTypeString && configDef.Type != configuration.FieldTypeSelect && configDef.Type != configuration.FieldTypeText {
+		return nil, fmt.Errorf("config %s is not of type: [string, select, text]", name)
 	}
 
 	s, ok := v.(string)
