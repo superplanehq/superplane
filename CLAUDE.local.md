@@ -1,0 +1,2 @@
+- Whenever you need to run a "go" command, I dont have go installed locally, but you can use docker (e.g. docker compose -f docker-compose.dev.yml exec app go <command> or similar). Also you can use the make commands
+- Dont run format, build, tests, etc - unless specificly asked for
