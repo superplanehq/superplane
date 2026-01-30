@@ -18,7 +18,10 @@ const eventLabels: Record<string, string> = {
 };
 
 function formatEventLabel(event: string): string {
-  return eventLabels[event] || event.replace("incident.", "").charAt(0).toUpperCase() + event.replace("incident.", "").slice(1);
+  return (
+    eventLabels[event] ||
+    event.replace("incident.", "").charAt(0).toUpperCase() + event.replace("incident.", "").slice(1)
+  );
 }
 
 interface OnIncidentEventData {
