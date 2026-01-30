@@ -20,7 +20,7 @@ var _ MappedNullable = &ConfigurationListItemDefinition{}
 
 // ConfigurationListItemDefinition struct for ConfigurationListItemDefinition
 type ConfigurationListItemDefinition struct {
-	Type   *string              `json:"type,omitempty"`
+	Type *string `json:"type,omitempty"`
 	Schema []ConfigurationField `json:"schema,omitempty"`
 }
 
@@ -106,7 +106,7 @@ func (o *ConfigurationListItemDefinition) SetSchema(v []ConfigurationField) {
 }
 
 func (o ConfigurationListItemDefinition) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -159,3 +159,5 @@ func (v *NullableConfigurationListItemDefinition) UnmarshalJSON(src []byte) erro
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

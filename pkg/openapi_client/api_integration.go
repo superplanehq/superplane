@@ -19,11 +19,12 @@ import (
 	"net/url"
 )
 
+
 // IntegrationAPIService IntegrationAPI service
 type IntegrationAPIService service
 
 type ApiIntegrationsListIntegrationsRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *IntegrationAPIService
 }
 
@@ -36,25 +37,24 @@ IntegrationsListIntegrations List available integrations
 
 List available integrations
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ApiIntegrationsListIntegrationsRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiIntegrationsListIntegrationsRequest
 */
 func (a *IntegrationAPIService) IntegrationsListIntegrations(ctx context.Context) ApiIntegrationsListIntegrationsRequest {
 	return ApiIntegrationsListIntegrationsRequest{
 		ApiService: a,
-		ctx:        ctx,
+		ctx: ctx,
 	}
 }
 
 // Execute executes the request
-//
-//	@return SuperplaneIntegrationsListIntegrationsResponse
+//  @return SuperplaneIntegrationsListIntegrationsResponse
 func (a *IntegrationAPIService) IntegrationsListIntegrationsExecute(r ApiIntegrationsListIntegrationsRequest) (*SuperplaneIntegrationsListIntegrationsResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *SuperplaneIntegrationsListIntegrationsResponse
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *SuperplaneIntegrationsListIntegrationsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "IntegrationAPIService.IntegrationsListIntegrations")
@@ -107,14 +107,14 @@ func (a *IntegrationAPIService) IntegrationsListIntegrationsExecute(r ApiIntegra
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 

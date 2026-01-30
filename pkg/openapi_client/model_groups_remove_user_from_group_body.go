@@ -21,9 +21,9 @@ var _ MappedNullable = &GroupsRemoveUserFromGroupBody{}
 // GroupsRemoveUserFromGroupBody struct for GroupsRemoveUserFromGroupBody
 type GroupsRemoveUserFromGroupBody struct {
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
-	DomainId   *string                  `json:"domainId,omitempty"`
-	UserId     *string                  `json:"userId,omitempty"`
-	UserEmail  *string                  `json:"userEmail,omitempty"`
+	DomainId *string `json:"domainId,omitempty"`
+	UserId *string `json:"userId,omitempty"`
+	UserEmail *string `json:"userEmail,omitempty"`
 }
 
 // NewGroupsRemoveUserFromGroupBody instantiates a new GroupsRemoveUserFromGroupBody object
@@ -176,7 +176,7 @@ func (o *GroupsRemoveUserFromGroupBody) SetUserEmail(v string) {
 }
 
 func (o GroupsRemoveUserFromGroupBody) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -235,3 +235,5 @@ func (v *NullableGroupsRemoveUserFromGroupBody) UnmarshalJSON(src []byte) error 
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

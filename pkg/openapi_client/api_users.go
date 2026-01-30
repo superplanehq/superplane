@@ -20,15 +20,16 @@ import (
 	"strings"
 )
 
+
 // UsersAPIService UsersAPI service
 type UsersAPIService service
 
 type ApiUsersListUserPermissionsRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *UsersAPIService
-	userId     string
+	userId string
 	domainType *string
-	domainId   *string
+	domainId *string
 }
 
 func (r ApiUsersListUserPermissionsRequest) DomainType(domainType string) ApiUsersListUserPermissionsRequest {
@@ -50,27 +51,26 @@ UsersListUserPermissions List user permissions
 
 Returns all permissions a user has within a specific domain
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param userId
-	@return ApiUsersListUserPermissionsRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param userId
+ @return ApiUsersListUserPermissionsRequest
 */
 func (a *UsersAPIService) UsersListUserPermissions(ctx context.Context, userId string) ApiUsersListUserPermissionsRequest {
 	return ApiUsersListUserPermissionsRequest{
 		ApiService: a,
-		ctx:        ctx,
-		userId:     userId,
+		ctx: ctx,
+		userId: userId,
 	}
 }
 
 // Execute executes the request
-//
-//	@return UsersListUserPermissionsResponse
+//  @return UsersListUserPermissionsResponse
 func (a *UsersAPIService) UsersListUserPermissionsExecute(r ApiUsersListUserPermissionsRequest) (*UsersListUserPermissionsResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *UsersListUserPermissionsResponse
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *UsersListUserPermissionsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "UsersAPIService.UsersListUserPermissions")
@@ -133,14 +133,14 @@ func (a *UsersAPIService) UsersListUserPermissionsExecute(r ApiUsersListUserPerm
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -157,11 +157,11 @@ func (a *UsersAPIService) UsersListUserPermissionsExecute(r ApiUsersListUserPerm
 }
 
 type ApiUsersListUserRolesRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *UsersAPIService
-	userId     string
+	userId string
 	domainType *string
-	domainId   *string
+	domainId *string
 }
 
 func (r ApiUsersListUserRolesRequest) DomainType(domainType string) ApiUsersListUserRolesRequest {
@@ -183,27 +183,26 @@ UsersListUserRoles Get user roles
 
 Returns the roles a user has within a specific domain
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param userId
-	@return ApiUsersListUserRolesRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param userId
+ @return ApiUsersListUserRolesRequest
 */
 func (a *UsersAPIService) UsersListUserRoles(ctx context.Context, userId string) ApiUsersListUserRolesRequest {
 	return ApiUsersListUserRolesRequest{
 		ApiService: a,
-		ctx:        ctx,
-		userId:     userId,
+		ctx: ctx,
+		userId: userId,
 	}
 }
 
 // Execute executes the request
-//
-//	@return UsersListUserRolesResponse
+//  @return UsersListUserRolesResponse
 func (a *UsersAPIService) UsersListUserRolesExecute(r ApiUsersListUserRolesRequest) (*UsersListUserRolesResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *UsersListUserRolesResponse
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *UsersListUserRolesResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "UsersAPIService.UsersListUserRoles")
@@ -266,14 +265,14 @@ func (a *UsersAPIService) UsersListUserRolesExecute(r ApiUsersListUserRolesReque
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -290,10 +289,10 @@ func (a *UsersAPIService) UsersListUserRolesExecute(r ApiUsersListUserRolesReque
 }
 
 type ApiUsersListUsersRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *UsersAPIService
 	domainType *string
-	domainId   *string
+	domainId *string
 }
 
 func (r ApiUsersListUsersRequest) DomainType(domainType string) ApiUsersListUsersRequest {
@@ -315,25 +314,24 @@ UsersListUsers List users
 
 Returns all users that have roles within a domain
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ApiUsersListUsersRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiUsersListUsersRequest
 */
 func (a *UsersAPIService) UsersListUsers(ctx context.Context) ApiUsersListUsersRequest {
 	return ApiUsersListUsersRequest{
 		ApiService: a,
-		ctx:        ctx,
+		ctx: ctx,
 	}
 }
 
 // Execute executes the request
-//
-//	@return UsersListUsersResponse
+//  @return UsersListUsersResponse
 func (a *UsersAPIService) UsersListUsersExecute(r ApiUsersListUsersRequest) (*UsersListUsersResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *UsersListUsersResponse
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *UsersListUsersResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "UsersAPIService.UsersListUsers")
@@ -395,14 +393,14 @@ func (a *UsersAPIService) UsersListUsersExecute(r ApiUsersListUsersRequest) (*Us
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 

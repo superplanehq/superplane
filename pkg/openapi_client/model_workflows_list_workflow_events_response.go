@@ -21,10 +21,10 @@ var _ MappedNullable = &WorkflowsListWorkflowEventsResponse{}
 
 // WorkflowsListWorkflowEventsResponse struct for WorkflowsListWorkflowEventsResponse
 type WorkflowsListWorkflowEventsResponse struct {
-	Events        []WorkflowsWorkflowEventWithExecutions `json:"events,omitempty"`
-	TotalCount    *int64                                 `json:"totalCount,omitempty"`
-	HasNextPage   *bool                                  `json:"hasNextPage,omitempty"`
-	LastTimestamp *time.Time                             `json:"lastTimestamp,omitempty"`
+	Events []WorkflowsWorkflowEventWithExecutions `json:"events,omitempty"`
+	TotalCount *int64 `json:"totalCount,omitempty"`
+	HasNextPage *bool `json:"hasNextPage,omitempty"`
+	LastTimestamp *time.Time `json:"lastTimestamp,omitempty"`
 }
 
 // NewWorkflowsListWorkflowEventsResponse instantiates a new WorkflowsListWorkflowEventsResponse object
@@ -173,7 +173,7 @@ func (o *WorkflowsListWorkflowEventsResponse) SetLastTimestamp(v time.Time) {
 }
 
 func (o WorkflowsListWorkflowEventsResponse) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -232,3 +232,5 @@ func (v *NullableWorkflowsListWorkflowEventsResponse) UnmarshalJSON(src []byte) 
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

@@ -45,6 +45,15 @@
     },
     {
       "name": "Workflows"
+    },
+    {
+      "name": "Authentication"
+    },
+    {
+      "name": "Account"
+    },
+    {
+      "name": "Setup"
     }
   ],
   "schemes": [
@@ -723,40 +732,6 @@
         ],
         "tags": [
           "Organization"
-        ]
-      }
-    },
-    "/api/v1/setup-owner": {
-      "post": {
-        "summary": "Setup owner account",
-        "description": "Creates the initial owner account for a new SuperPlane instance",
-        "operationId": "Organizations_SetupOwner",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SetupOwnerResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/SetupOwnerRequest"
-            }
-          }
-        ],
-        "tags": [
-          "Organizations"
         ]
       }
     },
@@ -2902,6 +2877,255 @@
         ],
         "tags": [
           "WorkflowNode"
+        ]
+      }
+    },
+    "/auth/config": {
+      "get": {
+        "summary": "Get authentication configuration",
+        "description": "Returns available authentication providers and configuration",
+        "operationId": "Auth_GetConfig",
+        "responses": {
+          "200": {
+            "description": "Authentication configuration",
+            "schema": {
+              "$ref": "#/definitions/AuthConfig"
+            }
+          }
+        },
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/login": {
+      "post": {
+        "summary": "Login with password",
+        "description": "Authenticate with email and password",
+        "operationId": "Auth_Login",
+        "consumes": [
+          "application/x-www-form-urlencoded"
+        ],
+        "parameters": [
+          {
+            "name": "email",
+            "in": "formData",
+            "required": true,
+            "type": "string",
+            "description": "User email address"
+          },
+          {
+            "name": "password",
+            "in": "formData",
+            "required": true,
+            "type": "string",
+            "description": "User password"
+          },
+          {
+            "name": "redirect",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Redirect URL after successful login"
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Successful login, redirects to application"
+          },
+          "401": {
+            "description": "Invalid credentials"
+          }
+        },
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/signup": {
+      "post": {
+        "summary": "Sign up with password",
+        "description": "Create a new account with email and password",
+        "operationId": "Auth_Signup",
+        "consumes": [
+          "application/x-www-form-urlencoded"
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "formData",
+            "required": true,
+            "type": "string",
+            "description": "Full name"
+          },
+          {
+            "name": "email",
+            "in": "formData",
+            "required": true,
+            "type": "string",
+            "description": "Email address"
+          },
+          {
+            "name": "password",
+            "in": "formData",
+            "required": true,
+            "type": "string",
+            "description": "Password"
+          },
+          {
+            "name": "invite_token",
+            "in": "formData",
+            "required": false,
+            "type": "string",
+            "description": "Optional invitation token"
+          },
+          {
+            "name": "redirect",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "Redirect URL after successful signup"
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Successful signup, redirects to application"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "403": {
+            "description": "Signup disabled"
+          }
+        },
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/account": {
+      "get": {
+        "summary": "Get current account",
+        "description": "Returns the currently authenticated account information",
+        "operationId": "Account_GetAccount",
+        "responses": {
+          "200": {
+            "description": "Account information",
+            "schema": {
+              "$ref": "#/definitions/Account"
+            }
+          },
+          "401": {
+            "description": "Not authenticated"
+          },
+          "409": {
+            "description": "Owner setup required",
+            "headers": {
+              "X-Owner-Setup-Required": {
+                "type": "string",
+                "description": "Set to 'true' when initial setup is required"
+              }
+            }
+          }
+        },
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/organizations": {
+      "get": {
+        "summary": "List account organizations",
+        "description": "Returns all organizations the authenticated account belongs to",
+        "operationId": "Account_ListOrganizations",
+        "responses": {
+          "200": {
+            "description": "List of organizations",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/AccountOrganization"
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated"
+          }
+        },
+        "tags": [
+          "Account"
+        ]
+      },
+      "post": {
+        "summary": "Create organization",
+        "description": "Creates a new organization for the authenticated account",
+        "operationId": "Account_CreateOrganization",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CreateOrganizationRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Created organization",
+            "schema": {
+              "$ref": "#/definitions/AccountOrganization"
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Not authenticated"
+          },
+          "409": {
+            "description": "Organization name already exists"
+          }
+        },
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/api/v1/setup-owner": {
+      "post": {
+        "summary": "Setup owner account",
+        "description": "Initial setup endpoint to create the first owner account and organization",
+        "operationId": "Setup_SetupOwner",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SetupOwnerRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Owner setup completed",
+            "schema": {
+              "$ref": "#/definitions/SetupOwnerResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "404": {
+            "description": "Setup not enabled"
+          },
+          "409": {
+            "description": "Instance already initialized"
+          }
+        },
+        "tags": [
+          "Setup"
         ]
       }
     }
@@ -5340,79 +5564,6 @@
         }
       }
     },
-    "SetupOwnerRequest": {
-      "type": "object",
-      "properties": {
-        "email": {
-          "type": "string",
-          "description": "Email address for the owner account"
-        },
-        "first_name": {
-          "type": "string",
-          "description": "First name of the owner"
-        },
-        "last_name": {
-          "type": "string",
-          "description": "Last name of the owner"
-        },
-        "password": {
-          "type": "string",
-          "description": "Password for the owner account"
-        },
-        "smtp_enabled": {
-          "type": "boolean",
-          "description": "Whether SMTP email delivery is enabled"
-        },
-        "smtp_host": {
-          "type": "string",
-          "description": "SMTP server hostname"
-        },
-        "smtp_port": {
-          "type": "integer",
-          "format": "int32",
-          "description": "SMTP server port"
-        },
-        "smtp_username": {
-          "type": "string",
-          "description": "SMTP authentication username"
-        },
-        "smtp_password": {
-          "type": "string",
-          "description": "SMTP authentication password"
-        },
-        "smtp_from_name": {
-          "type": "string",
-          "description": "Display name for outgoing emails"
-        },
-        "smtp_from_email": {
-          "type": "string",
-          "description": "From email address for outgoing emails"
-        },
-        "smtp_use_tls": {
-          "type": "boolean",
-          "description": "Whether to use TLS (STARTTLS) for SMTP"
-        }
-      },
-      "required": [
-        "email",
-        "first_name",
-        "last_name",
-        "password",
-        "smtp_enabled"
-      ]
-    },
-    "SetupOwnerResponse": {
-      "type": "object",
-      "properties": {
-        "organization_id": {
-          "type": "string",
-          "description": "ID of the created organization"
-        }
-      },
-      "required": [
-        "organization_id"
-      ]
-    },
     "protobufAny": {
       "type": "object",
       "properties": {
@@ -5429,6 +5580,154 @@
       ],
       "default": "NULL_VALUE",
       "description": "`NullValue` is a singleton enumeration to represent the null value for the\n`Value` type union.\n\n The JSON representation for `NullValue` is JSON `null`.\n\n - NULL_VALUE: Null value."
+    },
+    "AuthConfig": {
+      "type": "object",
+      "properties": {
+        "providers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Available OAuth providers (e.g., 'github', 'google')"
+        },
+        "passwordLoginEnabled": {
+          "type": "boolean",
+          "description": "Whether password-based login is enabled"
+        },
+        "signupEnabled": {
+          "type": "boolean",
+          "description": "Whether new user signup is enabled"
+        }
+      }
+    },
+    "Account": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Account ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Account holder's name"
+        },
+        "email": {
+          "type": "string",
+          "description": "Account email address"
+        },
+        "avatar_url": {
+          "type": "string",
+          "description": "Avatar image URL"
+        }
+      }
+    },
+    "AccountOrganization": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Organization ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Organization name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Organization description"
+        },
+        "canvasCount": {
+          "type": "integer",
+          "format": "int64",
+          "description": "Number of canvases in the organization"
+        },
+        "memberCount": {
+          "type": "integer",
+          "format": "int64",
+          "description": "Number of members in the organization"
+        }
+      }
+    },
+    "CreateOrganizationRequest": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Organization name"
+        }
+      }
+    },
+    "SetupOwnerRequest": {
+      "type": "object",
+      "required": [
+        "email",
+        "first_name",
+        "last_name",
+        "password"
+      ],
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Owner email address"
+        },
+        "first_name": {
+          "type": "string",
+          "description": "Owner first name"
+        },
+        "last_name": {
+          "type": "string",
+          "description": "Owner last name"
+        },
+        "password": {
+          "type": "string",
+          "description": "Owner password"
+        },
+        "smtp_enabled": {
+          "type": "boolean",
+          "description": "Enable SMTP email configuration"
+        },
+        "smtp_host": {
+          "type": "string",
+          "description": "SMTP server host"
+        },
+        "smtp_port": {
+          "type": "integer",
+          "description": "SMTP server port"
+        },
+        "smtp_username": {
+          "type": "string",
+          "description": "SMTP username"
+        },
+        "smtp_password": {
+          "type": "string",
+          "description": "SMTP password"
+        },
+        "smtp_from_name": {
+          "type": "string",
+          "description": "SMTP from name"
+        },
+        "smtp_from_email": {
+          "type": "string",
+          "description": "SMTP from email address"
+        },
+        "smtp_use_tls": {
+          "type": "boolean",
+          "description": "Use TLS for SMTP connection"
+        }
+      }
+    },
+    "SetupOwnerResponse": {
+      "type": "object",
+      "properties": {
+        "organization_id": {
+          "type": "string",
+          "description": "ID of the created organization"
+        }
+      }
     }
   }
 }

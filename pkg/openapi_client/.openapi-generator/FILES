@@ -3,6 +3,8 @@
 .travis.yml
 README.md
 api/openapi.yaml
+api_account.go
+api_authentication.go
 api_blueprint.go
 api_component.go
 api_groups.go
@@ -11,6 +13,7 @@ api_me.go
 api_organization.go
 api_roles.go
 api_secret.go
+api_setup.go
 api_trigger.go
 api_users.go
 api_widget.go
@@ -20,6 +23,11 @@ api_workflow_node.go
 api_workflow_node_execution.go
 client.go
 configuration.go
+docs/Account.md
+docs/AccountAPI.md
+docs/AccountOrganization.md
+docs/AuthConfig.md
+docs/AuthenticationAPI.md
 docs/AuthorizationDomainType.md
 docs/AuthorizationPermission.md
 docs/BlueprintAPI.md
@@ -61,6 +69,7 @@ docs/ConfigurationTimeTypeOptions.md
 docs/ConfigurationTypeOptions.md
 docs/ConfigurationValidationRule.md
 docs/ConfigurationVisibilityCondition.md
+docs/CreateOrganizationRequest.md
 docs/GooglerpcStatus.md
 docs/GroupsAPI.md
 docs/GroupsAddUserToGroupBody.md
@@ -137,6 +146,9 @@ docs/SecretsSecretMetadata.md
 docs/SecretsSecretSpec.md
 docs/SecretsUpdateSecretBody.md
 docs/SecretsUpdateSecretResponse.md
+docs/SetupAPI.md
+docs/SetupOwnerRequest.md
+docs/SetupOwnerResponse.md
 docs/SuperplaneBlueprintsOutputChannel.md
 docs/SuperplaneBlueprintsUserRef.md
 docs/SuperplaneComponentsOutputChannel.md
@@ -198,6 +210,9 @@ docs/WorkflowsWorkflowNodeQueueItem.md
 docs/WorkflowsWorkflowSpec.md
 docs/WorkflowsWorkflowStatus.md
 git_push.sh
+model_account.go
+model_account_organization.go
+model_auth_config.go
 model_authorization_domain_type.go
 model_authorization_permission.go
 model_blueprints_blueprint.go
@@ -237,6 +252,7 @@ model_configuration_time_type_options.go
 model_configuration_type_options.go
 model_configuration_validation_rule.go
 model_configuration_visibility_condition.go
+model_create_organization_request.go
 model_googlerpc_status.go
 model_groups_add_user_to_group_body.go
 model_groups_create_group_request.go
@@ -307,6 +323,8 @@ model_secrets_secret_metadata.go
 model_secrets_secret_spec.go
 model_secrets_update_secret_body.go
 model_secrets_update_secret_response.go
+model_setup_owner_request.go
+model_setup_owner_response.go
 model_superplane_blueprints_output_channel.go
 model_superplane_blueprints_user_ref.go
 model_superplane_components_output_channel.go
@@ -361,6 +379,8 @@ model_workflows_workflow_node_queue_item.go
 model_workflows_workflow_spec.go
 model_workflows_workflow_status.go
 response.go
+test/api_account_test.go
+test/api_authentication_test.go
 test/api_blueprint_test.go
 test/api_component_test.go
 test/api_groups_test.go
@@ -369,6 +389,7 @@ test/api_me_test.go
 test/api_organization_test.go
 test/api_roles_test.go
 test/api_secret_test.go
+test/api_setup_test.go
 test/api_trigger_test.go
 test/api_users_test.go
 test/api_widget_test.go

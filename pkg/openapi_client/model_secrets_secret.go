@@ -21,7 +21,7 @@ var _ MappedNullable = &SecretsSecret{}
 // SecretsSecret struct for SecretsSecret
 type SecretsSecret struct {
 	Metadata *SecretsSecretMetadata `json:"metadata,omitempty"`
-	Spec     *SecretsSecretSpec     `json:"spec,omitempty"`
+	Spec *SecretsSecretSpec `json:"spec,omitempty"`
 }
 
 // NewSecretsSecret instantiates a new SecretsSecret object
@@ -106,7 +106,7 @@ func (o *SecretsSecret) SetSpec(v SecretsSecretSpec) {
 }
 
 func (o SecretsSecret) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -159,3 +159,5 @@ func (v *NullableSecretsSecret) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

@@ -21,24 +21,24 @@ var _ MappedNullable = &WorkflowsWorkflowNodeExecution{}
 
 // WorkflowsWorkflowNodeExecution struct for WorkflowsWorkflowNodeExecution
 type WorkflowsWorkflowNodeExecution struct {
-	Id                  *string                            `json:"id,omitempty"`
-	WorkflowId          *string                            `json:"workflowId,omitempty"`
-	NodeId              *string                            `json:"nodeId,omitempty"`
-	ParentExecutionId   *string                            `json:"parentExecutionId,omitempty"`
-	PreviousExecutionId *string                            `json:"previousExecutionId,omitempty"`
-	State               *WorkflowNodeExecutionState        `json:"state,omitempty"`
-	Result              *WorkflowNodeExecutionResult       `json:"result,omitempty"`
-	ResultReason        *WorkflowNodeExecutionResultReason `json:"resultReason,omitempty"`
-	ResultMessage       *string                            `json:"resultMessage,omitempty"`
-	Input               map[string]interface{}             `json:"input,omitempty"`
-	Outputs             map[string]interface{}             `json:"outputs,omitempty"`
-	CreatedAt           *time.Time                         `json:"createdAt,omitempty"`
-	UpdatedAt           *time.Time                         `json:"updatedAt,omitempty"`
-	Metadata            map[string]interface{}             `json:"metadata,omitempty"`
-	Configuration       map[string]interface{}             `json:"configuration,omitempty"`
-	ChildExecutions     []WorkflowsWorkflowNodeExecution   `json:"childExecutions,omitempty"`
-	RootEvent           *WorkflowsWorkflowEvent            `json:"rootEvent,omitempty"`
-	CancelledBy         *SuperplaneWorkflowsUserRef        `json:"cancelledBy,omitempty"`
+	Id *string `json:"id,omitempty"`
+	WorkflowId *string `json:"workflowId,omitempty"`
+	NodeId *string `json:"nodeId,omitempty"`
+	ParentExecutionId *string `json:"parentExecutionId,omitempty"`
+	PreviousExecutionId *string `json:"previousExecutionId,omitempty"`
+	State *WorkflowNodeExecutionState `json:"state,omitempty"`
+	Result *WorkflowNodeExecutionResult `json:"result,omitempty"`
+	ResultReason *WorkflowNodeExecutionResultReason `json:"resultReason,omitempty"`
+	ResultMessage *string `json:"resultMessage,omitempty"`
+	Input map[string]interface{} `json:"input,omitempty"`
+	Outputs map[string]interface{} `json:"outputs,omitempty"`
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	Configuration map[string]interface{} `json:"configuration,omitempty"`
+	ChildExecutions []WorkflowsWorkflowNodeExecution `json:"childExecutions,omitempty"`
+	RootEvent *WorkflowsWorkflowEvent `json:"rootEvent,omitempty"`
+	CancelledBy *SuperplaneWorkflowsUserRef `json:"cancelledBy,omitempty"`
 }
 
 // NewWorkflowsWorkflowNodeExecution instantiates a new WorkflowsWorkflowNodeExecution object
@@ -647,7 +647,7 @@ func (o *WorkflowsWorkflowNodeExecution) SetCancelledBy(v SuperplaneWorkflowsUse
 }
 
 func (o WorkflowsWorkflowNodeExecution) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -748,3 +748,5 @@ func (v *NullableWorkflowsWorkflowNodeExecution) UnmarshalJSON(src []byte) error
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

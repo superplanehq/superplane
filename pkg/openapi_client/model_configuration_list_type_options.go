@@ -21,7 +21,7 @@ var _ MappedNullable = &ConfigurationListTypeOptions{}
 // ConfigurationListTypeOptions struct for ConfigurationListTypeOptions
 type ConfigurationListTypeOptions struct {
 	ItemDefinition *ConfigurationListItemDefinition `json:"itemDefinition,omitempty"`
-	ItemLabel      *string                          `json:"itemLabel,omitempty"`
+	ItemLabel *string `json:"itemLabel,omitempty"`
 }
 
 // NewConfigurationListTypeOptions instantiates a new ConfigurationListTypeOptions object
@@ -106,7 +106,7 @@ func (o *ConfigurationListTypeOptions) SetItemLabel(v string) {
 }
 
 func (o ConfigurationListTypeOptions) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -159,3 +159,5 @@ func (v *NullableConfigurationListTypeOptions) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

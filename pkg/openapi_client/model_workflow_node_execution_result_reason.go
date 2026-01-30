@@ -21,8 +21,8 @@ type WorkflowNodeExecutionResultReason string
 
 // List of WorkflowNodeExecutionResultReason
 const (
-	WORKFLOWNODEEXECUTIONRESULTREASON_RESULT_REASON_OK             WorkflowNodeExecutionResultReason = "RESULT_REASON_OK"
-	WORKFLOWNODEEXECUTIONRESULTREASON_RESULT_REASON_ERROR          WorkflowNodeExecutionResultReason = "RESULT_REASON_ERROR"
+	WORKFLOWNODEEXECUTIONRESULTREASON_RESULT_REASON_OK WorkflowNodeExecutionResultReason = "RESULT_REASON_OK"
+	WORKFLOWNODEEXECUTIONRESULTREASON_RESULT_REASON_ERROR WorkflowNodeExecutionResultReason = "RESULT_REASON_ERROR"
 	WORKFLOWNODEEXECUTIONRESULTREASON_RESULT_REASON_ERROR_RESOLVED WorkflowNodeExecutionResultReason = "RESULT_REASON_ERROR_RESOLVED"
 )
 
@@ -111,3 +111,4 @@ func (v *NullableWorkflowNodeExecutionResultReason) UnmarshalJSON(src []byte) er
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+

@@ -1014,64 +1014,6 @@ export type GooglerpcStatus = {
     details?: Array<ProtobufAny>;
 };
 
-export type SetupOwnerRequest = {
-    /**
-     * Email address for the owner account
-     */
-    email: string;
-    /**
-     * First name of the owner
-     */
-    first_name: string;
-    /**
-     * Last name of the owner
-     */
-    last_name: string;
-    /**
-     * Password for the owner account
-     */
-    password: string;
-    /**
-     * Whether SMTP email delivery is enabled
-     */
-    smtp_enabled: boolean;
-    /**
-     * SMTP server hostname
-     */
-    smtp_host?: string;
-    /**
-     * SMTP server port
-     */
-    smtp_port?: number;
-    /**
-     * SMTP authentication username
-     */
-    smtp_username?: string;
-    /**
-     * SMTP authentication password
-     */
-    smtp_password?: string;
-    /**
-     * Display name for outgoing emails
-     */
-    smtp_from_name?: string;
-    /**
-     * From email address for outgoing emails
-     */
-    smtp_from_email?: string;
-    /**
-     * Whether to use TLS (STARTTLS) for SMTP
-     */
-    smtp_use_tls?: boolean;
-};
-
-export type SetupOwnerResponse = {
-    /**
-     * ID of the created organization
-     */
-    organization_id: string;
-};
-
 export type ProtobufAny = {
     '@type'?: string;
     [key: string]: unknown | string | undefined;
@@ -1086,6 +1028,128 @@ export type ProtobufAny = {
  * - NULL_VALUE: Null value.
  */
 export type ProtobufNullValue = 'NULL_VALUE';
+
+export type AuthConfig = {
+    /**
+     * Available OAuth providers (e.g., 'github', 'google')
+     */
+    providers?: Array<string>;
+    /**
+     * Whether password-based login is enabled
+     */
+    passwordLoginEnabled?: boolean;
+    /**
+     * Whether new user signup is enabled
+     */
+    signupEnabled?: boolean;
+};
+
+export type Account = {
+    /**
+     * Account ID
+     */
+    id?: string;
+    /**
+     * Account holder's name
+     */
+    name?: string;
+    /**
+     * Account email address
+     */
+    email?: string;
+    /**
+     * Avatar image URL
+     */
+    avatar_url?: string;
+};
+
+export type AccountOrganization = {
+    /**
+     * Organization ID
+     */
+    id?: string;
+    /**
+     * Organization name
+     */
+    name?: string;
+    /**
+     * Organization description
+     */
+    description?: string;
+    /**
+     * Number of canvases in the organization
+     */
+    canvasCount?: number;
+    /**
+     * Number of members in the organization
+     */
+    memberCount?: number;
+};
+
+export type CreateOrganizationRequest = {
+    /**
+     * Organization name
+     */
+    name: string;
+};
+
+export type SetupOwnerRequest = {
+    /**
+     * Owner email address
+     */
+    email: string;
+    /**
+     * Owner first name
+     */
+    first_name: string;
+    /**
+     * Owner last name
+     */
+    last_name: string;
+    /**
+     * Owner password
+     */
+    password: string;
+    /**
+     * Enable SMTP email configuration
+     */
+    smtp_enabled?: boolean;
+    /**
+     * SMTP server host
+     */
+    smtp_host?: string;
+    /**
+     * SMTP server port
+     */
+    smtp_port?: number;
+    /**
+     * SMTP username
+     */
+    smtp_username?: string;
+    /**
+     * SMTP password
+     */
+    smtp_password?: string;
+    /**
+     * SMTP from name
+     */
+    smtp_from_name?: string;
+    /**
+     * SMTP from email address
+     */
+    smtp_from_email?: string;
+    /**
+     * Use TLS for SMTP connection
+     */
+    smtp_use_tls?: boolean;
+};
+
+export type SetupOwnerResponse = {
+    /**
+     * ID of the created organization
+     */
+    organization_id?: string;
+};
 
 export type BlueprintsListBlueprintsData = {
     body?: never;
@@ -1580,31 +1644,6 @@ export type OrganizationsAcceptInviteLinkResponses = {
 };
 
 export type OrganizationsAcceptInviteLinkResponse = OrganizationsAcceptInviteLinkResponses[keyof OrganizationsAcceptInviteLinkResponses];
-
-export type OrganizationsSetupOwnerData = {
-    body: SetupOwnerRequest;
-    path?: never;
-    query?: never;
-    url: '/api/v1/setup-owner';
-};
-
-export type OrganizationsSetupOwnerErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: GooglerpcStatus;
-};
-
-export type OrganizationsSetupOwnerError = OrganizationsSetupOwnerErrors[keyof OrganizationsSetupOwnerErrors];
-
-export type OrganizationsSetupOwnerResponses = {
-    /**
-     * A successful response.
-     */
-    200: SetupOwnerResponse;
-};
-
-export type OrganizationsSetupOwnerResponse = OrganizationsSetupOwnerResponses[keyof OrganizationsSetupOwnerResponses];
 
 export type MeMeData = {
     body?: never;
@@ -3106,6 +3145,202 @@ export type WorkflowsInvokeNodeTriggerActionResponses = {
 };
 
 export type WorkflowsInvokeNodeTriggerActionResponse2 = WorkflowsInvokeNodeTriggerActionResponses[keyof WorkflowsInvokeNodeTriggerActionResponses];
+
+export type AuthGetConfigData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/auth/config';
+};
+
+export type AuthGetConfigResponses = {
+    /**
+     * Authentication configuration
+     */
+    200: AuthConfig;
+};
+
+export type AuthGetConfigResponse = AuthGetConfigResponses[keyof AuthGetConfigResponses];
+
+export type AuthLoginData = {
+    body: {
+        /**
+         * User email address
+         */
+        email: string;
+        /**
+         * User password
+         */
+        password: string;
+    };
+    path?: never;
+    query?: {
+        /**
+         * Redirect URL after successful login
+         */
+        redirect?: string;
+    };
+    url: '/login';
+};
+
+export type AuthLoginErrors = {
+    /**
+     * Invalid credentials
+     */
+    401: unknown;
+};
+
+export type AuthSignupData = {
+    body: {
+        /**
+         * Full name
+         */
+        name: string;
+        /**
+         * Email address
+         */
+        email: string;
+        /**
+         * Password
+         */
+        password: string;
+        /**
+         * Optional invitation token
+         */
+        invite_token?: string;
+    };
+    path?: never;
+    query?: {
+        /**
+         * Redirect URL after successful signup
+         */
+        redirect?: string;
+    };
+    url: '/signup';
+};
+
+export type AuthSignupErrors = {
+    /**
+     * Invalid request
+     */
+    400: unknown;
+    /**
+     * Signup disabled
+     */
+    403: unknown;
+};
+
+export type AccountGetAccountData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/account';
+};
+
+export type AccountGetAccountErrors = {
+    /**
+     * Not authenticated
+     */
+    401: unknown;
+    /**
+     * Owner setup required
+     */
+    409: unknown;
+};
+
+export type AccountGetAccountResponses = {
+    /**
+     * Account information
+     */
+    200: Account;
+};
+
+export type AccountGetAccountResponse = AccountGetAccountResponses[keyof AccountGetAccountResponses];
+
+export type AccountListOrganizationsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/organizations';
+};
+
+export type AccountListOrganizationsErrors = {
+    /**
+     * Not authenticated
+     */
+    401: unknown;
+};
+
+export type AccountListOrganizationsResponses = {
+    /**
+     * List of organizations
+     */
+    200: Array<AccountOrganization>;
+};
+
+export type AccountListOrganizationsResponse = AccountListOrganizationsResponses[keyof AccountListOrganizationsResponses];
+
+export type AccountCreateOrganizationData = {
+    body: CreateOrganizationRequest;
+    path?: never;
+    query?: never;
+    url: '/organizations';
+};
+
+export type AccountCreateOrganizationErrors = {
+    /**
+     * Invalid request
+     */
+    400: unknown;
+    /**
+     * Not authenticated
+     */
+    401: unknown;
+    /**
+     * Organization name already exists
+     */
+    409: unknown;
+};
+
+export type AccountCreateOrganizationResponses = {
+    /**
+     * Created organization
+     */
+    200: AccountOrganization;
+};
+
+export type AccountCreateOrganizationResponse = AccountCreateOrganizationResponses[keyof AccountCreateOrganizationResponses];
+
+export type SetupSetupOwnerData = {
+    body: SetupOwnerRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/setup-owner';
+};
+
+export type SetupSetupOwnerErrors = {
+    /**
+     * Invalid request
+     */
+    400: unknown;
+    /**
+     * Setup not enabled
+     */
+    404: unknown;
+    /**
+     * Instance already initialized
+     */
+    409: unknown;
+};
+
+export type SetupSetupOwnerResponses = {
+    /**
+     * Owner setup completed
+     */
+    200: SetupOwnerResponse;
+};
+
+export type SetupSetupOwnerResponse = SetupSetupOwnerResponses[keyof SetupSetupOwnerResponses];
 
 export type ClientOptions = {
     baseUrl: `http://${string}` | `https://${string}` | (string & {});

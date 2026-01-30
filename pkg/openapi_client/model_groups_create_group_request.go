@@ -21,8 +21,8 @@ var _ MappedNullable = &GroupsCreateGroupRequest{}
 // GroupsCreateGroupRequest struct for GroupsCreateGroupRequest
 type GroupsCreateGroupRequest struct {
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
-	DomainId   *string                  `json:"domainId,omitempty"`
-	Group      *GroupsGroup             `json:"group,omitempty"`
+	DomainId *string `json:"domainId,omitempty"`
+	Group *GroupsGroup `json:"group,omitempty"`
 }
 
 // NewGroupsCreateGroupRequest instantiates a new GroupsCreateGroupRequest object
@@ -143,7 +143,7 @@ func (o *GroupsCreateGroupRequest) SetGroup(v GroupsGroup) {
 }
 
 func (o GroupsCreateGroupRequest) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -199,3 +199,5 @@ func (v *NullableGroupsCreateGroupRequest) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+
