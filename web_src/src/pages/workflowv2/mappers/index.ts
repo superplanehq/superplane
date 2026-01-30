@@ -53,6 +53,11 @@ import {
   triggerRenderers as smtpTriggerRenderers,
   eventStateRegistry as smtpEventStateRegistry,
 } from "./smtp";
+import {
+  componentMappers as rootlyComponentMappers,
+  triggerRenderers as rootlyTriggerRenderers,
+  eventStateRegistry as rootlyEventStateRegistry,
+} from "./rootly/index";
 import { componentMappers as awsComponentMappers, triggerRenderers as awsTriggerRenderers } from "./aws";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
 import {
@@ -97,6 +102,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   datadog: datadogComponentMappers,
   slack: slackComponentMappers,
   smtp: smtpComponentMappers,
+  rootly: rootlyComponentMappers,
   aws: awsComponentMappers,
   discord: discordComponentMappers,
 };
@@ -110,6 +116,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   datadog: datadogTriggerRenderers,
   slack: slackTriggerRenderers,
   smtp: smtpTriggerRenderers,
+  rootly: rootlyTriggerRenderers,
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
 };
@@ -124,6 +131,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   slack: slackEventStateRegistry,
   smtp: smtpEventStateRegistry,
   discord: discordEventStateRegistry,
+  rootly: rootlyEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {

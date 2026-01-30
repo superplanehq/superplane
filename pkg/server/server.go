@@ -39,6 +39,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/github"
 	_ "github.com/superplanehq/superplane/pkg/integrations/openai"
 	_ "github.com/superplanehq/superplane/pkg/integrations/pagerduty"
+	_ "github.com/superplanehq/superplane/pkg/integrations/rootly"
 	_ "github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	_ "github.com/superplanehq/superplane/pkg/integrations/slack"
 	_ "github.com/superplanehq/superplane/pkg/integrations/smtp"
