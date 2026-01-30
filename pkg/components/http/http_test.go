@@ -16,6 +16,11 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
+func init() {
+	// Disable SSRF protection for tests that use httptest.Server (localhost)
+	DisableSSRFProtection = true
+}
+
 // Helper function to create execution context for tests
 func createExecutionContext(config map[string]any) (core.ExecutionContext, *contexts.ExecutionStateContext, *contexts.MetadataContext) {
 	stateCtx := &contexts.ExecutionStateContext{}
