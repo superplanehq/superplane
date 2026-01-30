@@ -149,7 +149,7 @@ func (s *Slack) Sync(ctx core.SyncContext) error {
 		})
 
 		ctx.Integration.RemoveBrowserAction()
-		ctx.Integration.SetState("ready", "")
+		ctx.Integration.Ready()
 		return nil
 	}
 

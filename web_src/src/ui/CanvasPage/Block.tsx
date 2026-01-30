@@ -377,6 +377,7 @@ function BlockContent({
   onRun,
   runDisabled,
   runDisabledTooltip,
+  onTogglePause,
   onEdit,
   onConfigure,
   onDuplicate,
@@ -414,6 +415,7 @@ function BlockContent({
     onRun,
     runDisabled,
     runDisabledTooltip,
+    onTogglePause: data.type === "trigger" ? undefined : onTogglePause,
     onEdit,
     onDuplicate,
     onDeactivate,
@@ -428,7 +430,14 @@ function BlockContent({
     case "trigger":
       return <Trigger {...(data.trigger as TriggerProps)} selected={selected} {...actionProps} />;
     case "component":
-      return <ComponentBase {...(data.component as ComponentBaseProps)} selected={selected} {...actionProps} />;
+      return (
+        <ComponentBase
+          {...(data.component as ComponentBaseProps)}
+          paused={(data.component as ComponentBaseProps)?.paused}
+          selected={selected}
+          {...actionProps}
+        />
+      );
     case "composite":
       return (
         <Composite

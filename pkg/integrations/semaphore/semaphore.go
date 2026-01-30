@@ -93,7 +93,7 @@ func (s *Semaphore) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("error listing projects: %v", err)
 	}
 
-	ctx.Integration.SetState("ready", "")
+	ctx.Integration.Ready()
 	return nil
 }
 

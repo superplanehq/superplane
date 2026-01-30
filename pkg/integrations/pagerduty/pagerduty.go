@@ -156,7 +156,9 @@ func (p *PagerDuty) Components() []core.Component {
 	return []core.Component{
 		&CreateIncident{},
 		&UpdateIncident{},
+		&AnnotateIncident{},
 		&ListIncidents{},
+		&SnoozeIncident{},
 	}
 }
 
@@ -164,6 +166,7 @@ func (p *PagerDuty) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnIncident{},
 		&OnIncidentStatusUpdate{},
+		&OnIncidentAnnotated{},
 	}
 }
 
@@ -218,7 +221,7 @@ func (p *PagerDuty) apiTokenSync(ctx core.SyncContext) error {
 	}
 
 	ctx.Integration.SetMetadata(Metadata{Services: services})
-	ctx.Integration.SetState("ready", "")
+	ctx.Integration.Ready()
 	return nil
 }
 
@@ -302,7 +305,7 @@ func (p *PagerDuty) appOAuthSync(ctx core.SyncContext, configuration Configurati
 	}
 
 	ctx.Integration.SetMetadata(Metadata{Services: services})
-	ctx.Integration.SetState("ready", "")
+	ctx.Integration.Ready()
 
 	//
 	// Schedule a new sync to refresh the access token before it expires

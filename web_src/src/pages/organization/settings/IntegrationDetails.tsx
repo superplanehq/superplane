@@ -13,13 +13,16 @@ import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
 import { Alert, AlertDescription } from "@/ui/alert";
 import { resolveIcon } from "@/lib/utils";
+import { showErrorToast } from "@/utils/toast";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
+import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import smtpIcon from "@/assets/icons/integrations/smtp.svg";
 import awsIcon from "@/assets/icons/integrations/aws.svg";
+import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 interface IntegrationDetailsProps {
@@ -44,8 +47,10 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
     dash0: dash0Icon,
     github: githubIcon,
     openai: openAiIcon,
+    daytona: daytonaIcon,
     "open-ai": openAiIcon,
     pagerduty: pagerDutyIcon,
+    rootly: rootlyIcon,
     semaphore: SemaphoreLogo,
     slack: slackIcon,
     smtp: smtpIcon,
@@ -103,8 +108,8 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
     try {
       await updateMutation.mutateAsync(configValues);
       navigate(`/${organizationId}/settings/integrations`);
-    } catch (error) {
-      console.error("Failed to update configuration:", error);
+    } catch (_error) {
+      showErrorToast("Failed to update configuration");
     }
   };
 
@@ -145,8 +150,8 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
     try {
       await deleteMutation.mutateAsync();
       navigate(`/${organizationId}/settings/integrations`);
-    } catch (error) {
-      console.error("Failed to delete integration:", error);
+    } catch (_error) {
+      showErrorToast("Failed to delete integration");
     }
   };
 

@@ -86,7 +86,6 @@ export function CreateCanvasModal({
       setTemplateId("");
       onClose();
     } catch (error) {
-      console.error("Error creating canvas:", error);
       const errorMessage = (error as Error)?.message || error?.toString() || "Failed to create canvas";
 
       showErrorToast(errorMessage);

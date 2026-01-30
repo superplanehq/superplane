@@ -213,6 +213,7 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   iconSlug?: string;
   iconColor?: string;
   title: string;
+  paused?: boolean;
   specs?: ComponentBaseSpec[];
   hideCount?: boolean;
   hideMetadataList?: boolean;
@@ -250,6 +251,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   onRun,
   runDisabled,
   runDisabledTooltip: _runDisabledTooltip,
+  onTogglePause,
   onEdit: _onEdit,
   onConfigure: _onConfigure,
   onDuplicate,
@@ -267,11 +269,14 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   emptyStateProps,
   error,
   warning,
+  paused,
 }) => {
   const hasError = error && error.trim() !== "";
   const hasWarning = warning && warning.trim() !== "";
   const hasBadge = hasError || hasWarning;
   const RunIcon = React.useMemo(() => resolveIcon("play"), []);
+  const PauseIcon = React.useMemo(() => resolveIcon("pause"), []);
+  const ResumeIcon = React.useMemo(() => resolveIcon("step-forward"), []);
   const DuplicateIcon = React.useMemo(() => resolveIcon("copy"), []);
   const DeleteIcon = React.useMemo(() => resolveIcon("trash-2"), []);
   const ToggleViewIcon = React.useMemo(
@@ -307,6 +312,21 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
             >
               <RunIcon className="h-4 w-4" />
               <span>Run</span>
+            </button>
+          )}
+          {onTogglePause && !hasError && (
+            <button
+              type="button"
+              data-testid="node-action-pause"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onTogglePause();
+              }}
+              className="flex items-center gap-1 px-1 py-0.5 text-[13px] font-medium text-gray-500 transition hover:text-gray-800"
+            >
+              {paused ? <ResumeIcon className="h-4 w-4" /> : <PauseIcon className="h-4 w-4" />}
+              <span>{paused ? "Resume" : "Pause"}</span>
             </button>
           )}
           {onDuplicate && (
@@ -375,6 +395,24 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
               </TooltipTrigger>
               <TooltipContent>
                 <p className="max-w-xs text-sm">{hasError ? error : warning}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+
+        {paused && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  data-testid="node-paused-badge"
+                  className={`absolute -top-6 ${hasBadge ? "left-8" : "left-1"} bg-blue-500 rounded-t-md h-6 p-1 cursor-pointer`}
+                >
+                  <PauseIcon className="h-4 w-4 text-white" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="max-w-xs text-sm">Queued items will not be consumed.</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

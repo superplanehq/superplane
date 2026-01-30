@@ -185,6 +185,8 @@ docs/WorkflowsListNodeQueueItemsResponse.md
 docs/WorkflowsListWorkflowEventsResponse.md
 docs/WorkflowsListWorkflowsResponse.md
 docs/WorkflowsResolveExecutionErrorsBody.md
+docs/WorkflowsUpdateNodePauseBody.md
+docs/WorkflowsUpdateNodePauseResponse.md
 docs/WorkflowsUpdateWorkflowBody.md
 docs/WorkflowsUpdateWorkflowResponse.md
 docs/WorkflowsWorkflow.md
@@ -346,6 +348,8 @@ model_workflows_list_node_queue_items_response.go
 model_workflows_list_workflow_events_response.go
 model_workflows_list_workflows_response.go
 model_workflows_resolve_execution_errors_body.go
+model_workflows_update_node_pause_body.go
+model_workflows_update_node_pause_response.go
 model_workflows_update_workflow_body.go
 model_workflows_update_workflow_response.go
 model_workflows_workflow.go

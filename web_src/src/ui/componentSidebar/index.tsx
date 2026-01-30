@@ -3,9 +3,11 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { resolveIcon } from "@/lib/utils";
 import { Check, Copy, X } from "lucide-react";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
+import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
@@ -35,10 +37,12 @@ import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
 
 const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   dash0: dash0Icon,
+  daytona: daytonaIcon,
   github: githubIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
   pagerduty: pagerDutyIcon,
+  rootly: rootlyIcon,
   semaphore: SemaphoreLogo,
   slack: slackIcon,
   aws: {

@@ -14,6 +14,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { workflowKeys } from "@/hooks/useWorkflowData";
+import { showErrorToast } from "@/utils/toast";
 
 interface WebhookConfiguration {
   authentication?: string;
@@ -119,7 +120,7 @@ export const webhookTriggerRenderer: TriggerRenderer = {
     const configuration = node.configuration as WebhookConfiguration | undefined;
 
     const props: TriggerProps = {
-      title: node.name!,
+      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
       iconSlug: trigger.icon || "webhook",
       iconColor: getColorClass("black"),
       collapsedBackground: "bg-white",
@@ -162,8 +163,8 @@ const CopyCodeButton: React.FC<{ code: string }> = ({ code }) => {
       await navigator.clipboard.writeText(code);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy text: ", err);
+    } catch (_err) {
+      showErrorToast("Failed to copy text");
     }
   };
 
@@ -251,8 +252,8 @@ const ResetAuthButton: React.FC<{
           });
         }
       }
-    } catch (error) {
-      console.error("Failed to reset authentication:", error);
+    } catch (_error) {
+      showErrorToast("Failed to reset authentication");
     } finally {
       setIsResetting(false);
     }

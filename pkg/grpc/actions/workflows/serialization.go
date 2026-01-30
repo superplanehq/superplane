@@ -18,6 +18,11 @@ import (
 )
 
 func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) (*pb.Workflow, error) {
+	serializedNodes, err := serializeWorkflowNodes(workflow)
+	if err != nil {
+		return nil, err
+	}
+
 	var createdBy *pb.UserRef
 	if workflow.CreatedBy != nil {
 		idStr := workflow.CreatedBy.String()
@@ -41,7 +46,7 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) (*pb.Workf
 				IsTemplate:     workflow.IsTemplate,
 			},
 			Spec: &pb.Workflow_Spec{
-				Nodes: actions.NodesToProto(workflow.Nodes),
+				Nodes: serializedNodes,
 				Edges: actions.EdgesToProto(workflow.Edges),
 			},
 			Status: nil,
@@ -103,7 +108,7 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) (*pb.Workf
 			IsTemplate:     workflow.IsTemplate,
 		},
 		Spec: &pb.Workflow_Spec{
-			Nodes: actions.NodesToProto(workflow.Nodes),
+			Nodes: serializedNodes,
 			Edges: actions.EdgesToProto(workflow.Edges),
 		},
 		Status: &pb.Workflow_Status{
@@ -112,6 +117,31 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) (*pb.Workf
 			LastEvents:     serializedEvents,
 		},
 	}, nil
+}
+
+func serializeWorkflowNodes(workflow *models.Workflow) ([]*compb.Node, error) {
+	serialized := actions.NodesToProto(workflow.Nodes)
+	if len(serialized) == 0 {
+		return serialized, nil
+	}
+
+	workflowNodes, err := models.FindWorkflowNodes(workflow.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	pausedByID := make(map[string]bool, len(workflowNodes))
+	for _, node := range workflowNodes {
+		pausedByID[node.NodeID] = node.State == models.WorkflowNodeStatePaused
+	}
+
+	for _, node := range serialized {
+		if paused, ok := pausedByID[node.Id]; ok {
+			node.Paused = paused
+		}
+	}
+
+	return serialized, nil
 }
 
 func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workflow) ([]models.Node, []models.Edge, error) {

@@ -132,7 +132,7 @@ func (i *MyIntegration) Triggers() []core.Trigger {
 
 func (i *MyIntegration) Sync(ctx core.SyncContext) error {
 	// Validate configuration and set up the integration
-	// Set state to "ready" when done: ctx.Integration.SetState("ready", "")
+	// Set state to "ready" when done: ctx.Integration.Ready()
 	return nil
 }
 

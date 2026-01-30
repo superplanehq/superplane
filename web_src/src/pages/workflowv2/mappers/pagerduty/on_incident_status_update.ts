@@ -91,7 +91,7 @@ export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
     }
 
     const props: TriggerProps = {
-      title: node.name!,
+      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
       iconSrc: pdIcon,
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: metadataItems,

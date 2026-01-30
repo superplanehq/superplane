@@ -19,6 +19,7 @@ export interface SwitchComponentProps extends ComponentActionsProps {
   selected?: boolean;
   hideHandle?: boolean;
   collapsedBackground?: string;
+  paused?: boolean;
 }
 
 const HANDLE_STYLE = {
@@ -34,12 +35,14 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
   collapsed = false,
   selected = false,
   collapsedBackground,
+  paused,
   onRun,
   runDisabled,
   runDisabledTooltip,
   onEdit,
   onDuplicate,
   onDeactivate,
+  onTogglePause,
   onToggleView,
   onDelete,
   isCompactView,
@@ -93,12 +96,14 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
       collapsed={collapsed}
       collapsedBackground={collapsedBackground}
       selected={selected}
+      paused={paused}
       onRun={onRun}
       runDisabled={runDisabled}
       runDisabledTooltip={runDisabledTooltip}
       onEdit={onEdit}
       onDuplicate={onDuplicate}
       onDeactivate={onDeactivate}
+      onTogglePause={onTogglePause}
       onToggleView={onToggleView}
       onDelete={onDelete}
       isCompactView={isCompactView}

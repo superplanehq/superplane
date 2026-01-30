@@ -105,7 +105,7 @@ func (d *Dash0) Sync(ctx core.SyncContext) error {
 	}
 
 	ctx.Integration.SetMetadata(Metadata{})
-	ctx.Integration.SetState("ready", "")
+	ctx.Integration.Ready()
 	return nil
 }
 

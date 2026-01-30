@@ -37,7 +37,7 @@ export function useCancelExecutionHandler({ workflowId, workflow }: Params) {
 
         showSuccessToast("Execution cancelled");
       } catch (error) {
-        console.error("Failed to cancel execution:", error);
+        console.error("Failed to cancel execution", error);
         showErrorToast("Failed to cancel execution");
       }
     },

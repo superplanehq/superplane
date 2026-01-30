@@ -20,6 +20,7 @@ import {
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
   workflowsEmitNodeEvent,
+  workflowsUpdateNodePause,
 } from "@/api-client";
 import { useOrganizationGroups, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
@@ -500,9 +501,8 @@ export function WorkflowPageV2() {
             }
 
             // Auto-save completed silently (no toast or state changes)
-          } catch (error: any) {
-            console.error("Failed to auto-save canvas changes:", error);
-            // Don't show error toast for auto-save failures to avoid being intrusive
+          } catch (error) {
+            console.error("Failed to auto-save", error);
           } finally {
             if (focusedNoteId) {
               requestAnimationFrame(() => {
@@ -1317,7 +1317,7 @@ export function WorkflowPageV2() {
         setInitialWorkflowSnapshot(null);
         lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(targetWorkflow));
       } catch (error: any) {
-        console.error("Failed to save changes to the canvas:", error);
+        console.error("Failed to save canvas", error);
         const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
         showErrorToast(errorMessage);
         setLiveCanvasEntries((prev) => [
@@ -2286,12 +2286,65 @@ export function WorkflowPageV2() {
         );
         // Note: Success toast is shown by EmitEventModal
       } catch (error) {
-        console.error("Failed to emit event:", error);
         showErrorToast("Failed to emit event");
         throw error; // Re-throw to let EmitEventModal handle it
       }
     },
     [workflowId],
+  );
+
+  const handleTogglePause = useCallback(
+    async (nodeId: string) => {
+      if (!workflowId || !organizationId || !workflow) return;
+
+      const node = workflow.spec?.nodes?.find((n) => n.id === nodeId);
+      if (!node) return;
+
+      if (node.type === "TYPE_TRIGGER") {
+        showErrorToast("Triggers cannot be paused");
+        return;
+      }
+
+      const nextPaused = !node.paused;
+
+      try {
+        const result = await workflowsUpdateNodePause(
+          withOrganizationHeader({
+            path: {
+              workflowId: workflowId,
+              nodeId: nodeId,
+            },
+            body: {
+              paused: nextPaused,
+            },
+          }),
+        );
+
+        const updatedPaused = result.data?.node?.paused ?? nextPaused;
+        const updatedNodes = (workflow.spec?.nodes || []).map((item) =>
+          item.id === nodeId ? { ...item, paused: updatedPaused } : item,
+        );
+
+        const updatedWorkflow = {
+          ...workflow,
+          spec: {
+            ...workflow.spec,
+            nodes: updatedNodes,
+          },
+        };
+
+        queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+        showSuccessToast(updatedPaused ? "Component paused" : "Component resumed");
+      } catch (error) {
+        let parsedError = error as { message: string };
+        if (parsedError?.message) {
+          showErrorToast(parsedError.message);
+        } else {
+          console.error("Failed to update node pause state:", error);
+        }
+      }
+    },
+    [workflowId, organizationId, workflow, queryClient],
   );
 
   const handleReEmit = useCallback(
@@ -2314,24 +2367,27 @@ export function WorkflowPageV2() {
 
       saveWorkflowSnapshot(workflow);
 
-      let blockName = "node";
-      if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.trigger?.name) {
-        blockName = nodeToDuplicate.trigger.name;
-      } else if (nodeToDuplicate.type === "TYPE_COMPONENT" && nodeToDuplicate.component?.name) {
-        blockName = nodeToDuplicate.component.name;
-      } else if (nodeToDuplicate.type === "TYPE_BLUEPRINT" && nodeToDuplicate.blueprint?.id) {
-        // For blueprints, we need to find the blueprint metadata to get the name
-        const blueprintMetadata = blueprints.find((b) => b.id === nodeToDuplicate.blueprint?.id);
-        blockName = blueprintMetadata?.name || "blueprint";
-      }
-
-      // Get existing node names for unique name generation
       const existingNodeNames = (workflow.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
 
-      // Generate unique node name based on component name + ordinal
-      const uniqueNodeName = generateUniqueNodeName(blockName, existingNodeNames);
+      let baseName = nodeToDuplicate.name?.trim() || "";
+      if (!baseName) {
+        if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.trigger?.name) {
+          baseName = nodeToDuplicate.trigger.name;
+        } else if (nodeToDuplicate.type === "TYPE_COMPONENT" && nodeToDuplicate.component?.name) {
+          baseName = nodeToDuplicate.component.name;
+        } else if (nodeToDuplicate.type === "TYPE_BLUEPRINT" && nodeToDuplicate.blueprint?.id) {
+          // For blueprints, we need to find the blueprint metadata to get the name
+          const blueprintMetadata = blueprints.find((b) => b.id === nodeToDuplicate.blueprint?.id);
+          baseName = blueprintMetadata?.name || "blueprint";
+        } else {
+          baseName = "node";
+        }
+      }
 
-      const newNodeId = generateNodeId(blockName, uniqueNodeName);
+      // Generate unique node name based on the existing node name + ordinal
+      const uniqueNodeName = generateUniqueNodeName(baseName, existingNodeNames);
+
+      const newNodeId = generateNodeId(baseName, uniqueNodeName);
 
       const offsetX = 50;
       const offsetY = 50;
@@ -2448,9 +2504,12 @@ export function WorkflowPageV2() {
         // Clear the snapshot since changes are now saved
         setInitialWorkflowSnapshot(null);
         lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(updatedWorkflow));
-      } catch (error: any) {
-        console.error("Failed to save changes to the canvas:", error);
-        const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
+      } catch (error) {
+        console.error("Failed to save canvas", error);
+        const errorMessage =
+          (error as { response?: { data?: { message: string } } })?.response?.data?.message ||
+          (error as { message: string })?.message ||
+          "Failed to save changes to the canvas";
         showErrorToast(errorMessage);
       }
     },
@@ -2536,8 +2595,7 @@ export function WorkflowPageV2() {
       try {
         await navigator.clipboard.writeText(payload.yamlText);
         showSuccessToast("YAML copied to clipboard");
-      } catch (error) {
-        console.error("Failed to copy YAML to clipboard:", error);
+      } catch (_error) {
         showErrorToast("Failed to copy YAML to clipboard");
       }
     },
@@ -2597,8 +2655,7 @@ export function WorkflowPageV2() {
         await queryClient.invalidateQueries({ queryKey: workflowKeys.eventList(workflowId, 50) });
         await queryClient.invalidateQueries({ queryKey: workflowKeys.nodeExecutions() });
         showSuccessToast("Execution errors resolved");
-      } catch (error) {
-        console.error("Failed to resolve execution errors:", error);
+      } catch (_error) {
         showErrorToast("Failed to resolve execution errors");
       } finally {
         setIsResolvingErrors(false);
@@ -2750,6 +2807,7 @@ export function WorkflowPageV2() {
         onToggleView={handleNodeCollapseChange}
         onToggleCollapse={() => markUnsavedChange("structural")}
         onRun={handleRun}
+        onTogglePause={handleTogglePause}
         onDuplicate={handleNodeDuplicate}
         onConfigure={handleConfigure}
         buildingBlocks={buildingBlocks}
@@ -3057,6 +3115,7 @@ function prepareCompositeNode(
         isMissing: isMissing,
         error: node.errorMessage,
         warning: node.warningMessage,
+        paused: !!node.paused,
         parameters:
           Object.keys(node.configuration!).length > 0
             ? [
@@ -3274,23 +3333,29 @@ function prepareComponentBaseNode(
   const metadata = components.find((c) => c.name === node.component?.name);
   const displayLabel = node.name || metadata?.label;
   const componentDef = components.find((c) => c.name === node.component?.name);
+  const fallbackComponentDef = componentDef || {
+    name: node.component?.name,
+    label: node.name,
+  };
   const nodeQueueItems = nodeQueueItemsMap?.[node.id!];
 
-  const additionalData = getComponentAdditionalDataBuilder(node.component?.name || "")?.buildAdditionalData(
-    nodes,
-    node,
-    componentDef!,
-    executions,
-    workflowId,
-    queryClient,
-    organizationId,
-    currentUser,
-  );
+  const additionalData = componentDef
+    ? getComponentAdditionalDataBuilder(node.component?.name || "")?.buildAdditionalData(
+        nodes,
+        node,
+        componentDef,
+        executions,
+        workflowId,
+        queryClient,
+        organizationId,
+        currentUser,
+      )
+    : undefined;
 
   const componentBaseProps = getComponentBaseMapper(node.component?.name || "").props(
     nodes,
     node,
-    componentDef!,
+    fallbackComponentDef,
     executions,
     nodeQueueItems,
     additionalData,
@@ -3321,6 +3386,7 @@ function prepareComponentBaseNode(
         emptyStateProps,
         error: node.errorMessage,
         warning: node.warningMessage,
+        paused: !!node.paused,
       },
     },
   };
@@ -3385,6 +3451,7 @@ function prepareMergeNode(
         eventStateMap: mergeStateMap,
         error: node.errorMessage,
         warning: node.warningMessage,
+        paused: !!node.paused,
       },
     },
   };

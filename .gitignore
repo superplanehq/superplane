@@ -9,7 +9,9 @@ main
 tmp/screenshots
 e2e.test
 wget-log*
+.env
 .env.docker
 vendor/bundle
 .claude/settings.local.json
+CLAUDE.local.md
 .env

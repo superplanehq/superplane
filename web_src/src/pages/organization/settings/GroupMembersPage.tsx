@@ -18,6 +18,7 @@ import {
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { AddMembersSection, AddMembersSectionRef } from "./AddMembersSection";
+import { showErrorToast } from "@/utils/toast";
 
 export function GroupMembersPage() {
   const { groupName: encodedGroupName } = useParams<{ groupName: string }>();
@@ -75,8 +76,8 @@ export function GroupMembersPage() {
       // Refetch group data from server to ensure consistency
       await refetchGroup();
       setIsEditingGroupName(false);
-    } catch (err) {
-      console.error("Error updating group name:", err);
+    } catch (_err) {
+      showErrorToast("Failed to update group name");
     }
   };
 
@@ -97,8 +98,8 @@ export function GroupMembersPage() {
 
       // Trigger refresh of the AddMembersSection to update the "From organization" tab
       addMembersSectionRef.current?.refreshExistingMembers();
-    } catch (err) {
-      console.error("Error removing member:", err);
+    } catch (_err) {
+      showErrorToast("Failed to remove member");
     }
   };
 

@@ -67,7 +67,7 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
     }
 
     const props: TriggerProps = {
-      title: node.name!,
+      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
       iconSrc: slackIcon,
       iconSlug: "slack",
       iconColor: getColorClass(trigger.color),

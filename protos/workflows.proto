@@ -106,6 +106,18 @@ service Workflows {
     };
   }
 
+  rpc UpdateNodePause(UpdateNodePauseRequest) returns (UpdateNodePauseResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/workflows/{workflow_id}/nodes/{node_id}/pause"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Pause or resume node processing";
+      description: "Pauses or resumes processing for a workflow node while continuing to queue incoming items";
+      tags: "WorkflowNode";
+    };
+  }
+
   rpc ListNodeExecutions(ListNodeExecutionsRequest) returns (ListNodeExecutionsResponse) {
     option (google.api.http) = {
       get: "/api/v1/workflows/{workflow_id}/nodes/{node_id}/executions"
@@ -341,6 +353,16 @@ message DeleteNodeQueueItemRequest {
 }
 
 message DeleteNodeQueueItemResponse {}
+
+message UpdateNodePauseRequest {
+  string workflow_id = 1;
+  string node_id = 2;
+  bool paused = 3;
+}
+
+message UpdateNodePauseResponse {
+  Components.Node node = 1;
+}
 
 message ListNodeExecutionsRequest {
   string workflow_id = 1;

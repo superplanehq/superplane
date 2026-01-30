@@ -55,9 +55,8 @@ export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) =>
           setAccount(accountData);
         }
         // If response is not 200 (e.g., 307 redirect, 401, etc.), user is not authenticated
-      } catch (error) {
+      } catch (_error) {
         // Network errors or other unexpected errors
-        console.error("Failed to fetch account:", error);
       } finally {
         setLoading(false);
       }
