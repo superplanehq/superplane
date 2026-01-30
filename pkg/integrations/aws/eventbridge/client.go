@@ -43,7 +43,7 @@ func NewClient(httpCtx core.HTTPContext, creds aws.Credentials, region string) *
 	}
 }
 
-func (c *Client) CreateConnection(name, apiKeyHeader, apiKeyValue string) (string, error) {
+func (c *Client) CreateConnection(name, apiKeyHeader, apiKeyValue string, tags []common.Tag) (string, error) {
 	payload := map[string]any{
 		"Name":              name,
 		"AuthorizationType": "API_KEY",
@@ -53,6 +53,10 @@ func (c *Client) CreateConnection(name, apiKeyHeader, apiKeyValue string) (strin
 				"ApiKeyValue": apiKeyValue,
 			},
 		},
+	}
+
+	if tagPayload := normalizeTags(tags); len(tagPayload) > 0 {
+		payload["Tags"] = tagPayload
 	}
 
 	var response struct {
@@ -85,13 +89,17 @@ func (c *Client) DeleteConnection(name string) error {
 	return c.postJSON("DeleteConnection", payload, nil)
 }
 
-func (c *Client) CreateApiDestination(name, connectionArn, url string) (string, error) {
+func (c *Client) CreateApiDestination(name, connectionArn, url string, tags []common.Tag) (string, error) {
 	payload := map[string]any{
 		"Name":                         name,
 		"ConnectionArn":                connectionArn,
 		"InvocationEndpoint":           url,
 		"HttpMethod":                   http.MethodPost,
 		"InvocationRateLimitPerSecond": 10,
+	}
+
+	if tagPayload := normalizeTags(tags); len(tagPayload) > 0 {
+		payload["Tags"] = tagPayload
 	}
 
 	var response struct {
@@ -123,12 +131,16 @@ func (c *Client) DeleteApiDestination(name string) error {
 	return c.postJSON("DeleteApiDestination", payload, nil)
 }
 
-func (c *Client) PutRule(name, pattern, description string) (string, error) {
+func (c *Client) PutRule(name, pattern, description string, tags []common.Tag) (string, error) {
 	payload := map[string]any{
 		"Name":         name,
 		"EventPattern": pattern,
 		"State":        "ENABLED",
 		"Description":  description,
+	}
+
+	if tagPayload := normalizeTags(tags); len(tagPayload) > 0 {
+		payload["Tags"] = tagPayload
 	}
 
 	var response struct {
@@ -166,6 +178,20 @@ func (c *Client) DeleteRule(rule string) error {
 	}
 
 	return c.postJSON("DeleteRule", payload, nil)
+}
+
+func (c *Client) TagResource(resourceArn string, tags []common.Tag) error {
+	tagPayload := normalizeTags(tags)
+	if len(tagPayload) == 0 {
+		return nil
+	}
+
+	payload := map[string]any{
+		"ResourceARN": resourceArn,
+		"Tags":        tagPayload,
+	}
+
+	return c.postJSON("TagResource", payload, nil)
 }
 
 func (c *Client) postJSON(action string, payload any, out any) error {
@@ -223,4 +249,21 @@ func (c *Client) signRequest(req *http.Request, payload []byte) error {
 	hash := sha256.Sum256(payload)
 	payloadHash := hex.EncodeToString(hash[:])
 	return c.signer.SignHTTP(context.Background(), c.creds, req, payloadHash, "events", c.region, time.Now())
+}
+
+func normalizeTags(tags []common.Tag) []Tag {
+	normalized := common.NormalizeTags(tags)
+	if len(normalized) == 0 {
+		return nil
+	}
+
+	result := make([]Tag, 0, len(normalized))
+	for _, tag := range normalized {
+		result = append(result, Tag{
+			Key:   tag.Key,
+			Value: tag.Value,
+		})
+	}
+
+	return result
 }

@@ -153,9 +153,13 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 	// TODO: use a more meaningful names and IDs
 	targetID := uuid.NewString()
 	ruleName := fmt.Sprintf("superplane-%s", uuid.NewString())
-	ruleArn, err := client.PutRule(ruleName, string(eventPattern), "SuperPlane ECR webhook rule")
+	ruleArn, err := client.PutRule(ruleName, string(eventPattern), "SuperPlane ECR webhook rule", integrationMetadata.Tags)
 	if err != nil {
 		return fmt.Errorf("error creating EventBridge rule: %v", err)
+	}
+
+	if err := client.TagResource(ruleArn, integrationMetadata.Tags); err != nil {
+		return fmt.Errorf("error tagging EventBridge rule: %v", err)
 	}
 
 	err = client.PutTargets(ruleName, []eventbridge.Target{

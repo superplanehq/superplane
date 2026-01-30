@@ -17,6 +17,7 @@ const (
 type IntegrationMetadata struct {
 	Session        *SessionMetadata        `json:"session" mapstructure:"session"`
 	APIDestination *APIDestinationMetadata `json:"apiDestination" mapstructure:"apiDestination"`
+	Tags           []Tag                   `json:"tags" mapstructure:"tags"`
 }
 
 type SessionMetadata struct {
@@ -34,6 +35,11 @@ type EventBridgeEvent struct {
 	DetailType string         `json:"detail-type"`
 	Source     string         `json:"source"`
 	Detail     map[string]any `json:"detail"`
+}
+
+type Tag struct {
+	Key   string `json:"key" mapstructure:"key"`
+	Value string `json:"value" mapstructure:"value"`
 }
 
 func CredentialsFromInstallation(ctx core.IntegrationContext) (aws.Credentials, error) {
@@ -75,4 +81,33 @@ func RegionFromInstallation(ctx core.IntegrationContext) string {
 		return ""
 	}
 	return strings.TrimSpace(string(regionBytes))
+}
+
+func NormalizeTags(tags []Tag) []Tag {
+	if len(tags) == 0 {
+		return nil
+	}
+
+	normalized := make([]Tag, 0, len(tags))
+	seen := map[string]int{}
+	for _, tag := range tags {
+		key := strings.TrimSpace(tag.Key)
+		if key == "" {
+			continue
+		}
+
+		value := strings.TrimSpace(tag.Value)
+		if index, ok := seen[key]; ok {
+			normalized[index].Value = value
+			continue
+		}
+
+		seen[key] = len(normalized)
+		normalized = append(normalized, Tag{
+			Key:   key,
+			Value: value,
+		})
+	}
+
+	return normalized
 }

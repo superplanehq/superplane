@@ -31,6 +31,7 @@ type Configuration struct {
 	RoleArn                string `json:"roleArn" mapstructure:"roleArn"`
 	Region                 string `json:"region" mapstructure:"region"`
 	SessionDurationSeconds int    `json:"sessionDurationSeconds" mapstructure:"sessionDurationSeconds"`
+	Tags                   []common.Tag `json:"tags" mapstructure:"tags"`
 }
 
 func (a *AWS) Name() string {
@@ -83,6 +84,36 @@ func (a *AWS) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "ARN for the IAM role that SuperPlane should assume. Leave empty to be guided through the identity provider and IAM role creation process.",
+		},
+		{
+			Name:        "tags",
+			Label:       "Tags",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Description: "Tags to apply to AWS resources created by this integration",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Tag",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:               "key",
+								Label:              "Key",
+								Type:               configuration.FieldTypeString,
+								Required:           true,
+								DisallowExpression: true,
+							},
+							{
+								Name:     "value",
+								Label:    "Value",
+								Type:     configuration.FieldTypeString,
+								Required: true,
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -173,7 +204,8 @@ func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration) er
 		return err
 	}
 
-	apiDestination, err := CreateAPIDestination(ctx)
+	tags := common.NormalizeTags(config.Tags)
+	apiDestination, err := CreateAPIDestination(ctx, tags)
 	if err != nil {
 		return err
 	}
@@ -185,6 +217,7 @@ func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration) er
 			Region:    strings.TrimSpace(config.Region),
 			ExpiresAt: credentials.Expiration.Format(time.RFC3339),
 		},
+		Tags: tags,
 	})
 
 	ctx.Integration.SetState("ready", "")
