@@ -7,20 +7,14 @@ import {
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import { ComponentBaseMapper } from "../types";
+import { ComponentBaseMapper, OutputPayload } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
-import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
-import { buildIncidentExecutionDetails } from "./base";
+import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
+import { Incident } from "./types";
+import { getDetailsForIncident } from "./base";
 import { formatTimeAgo } from "@/utils/date";
 
-const DURATION_LABELS: Record<string, string> = {
-  "3600": "1 hour",
-  "14400": "4 hours",
-  "28800": "8 hours",
-  "86400": "24 hours",
-};
-
-export const snoozeIncidentMapper: ComponentBaseMapper = {
+export const createIncidentMapper: ComponentBaseMapper = {
   props(
     nodes: ComponentsNode[],
     node: ComponentsNode,
@@ -32,7 +26,7 @@ export const snoozeIncidentMapper: ComponentBaseMapper = {
     const componentName = componentDefinition.name!;
 
     return {
-      iconSrc: pdIcon,
+      iconSrc: rootlyIcon,
       collapsedBackground: getBackgroundColorClass(componentDefinition.color),
       collapsed: node.isCollapsed,
       title: node.name!,
@@ -43,9 +37,15 @@ export const snoozeIncidentMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _: ComponentsNode): Record<string, any> {
-    return buildIncidentExecutionDetails(execution);
+  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _: ComponentsNode): Record<string, string> {
+    const outputs = execution.outputs as { default: OutputPayload[] };
+    if (!outputs?.default || outputs.default.length === 0) {
+      return {};
+    }
+    const incident = outputs.default[0].data as Incident;
+    return getDetailsForIncident(incident);
   },
+
   subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
     if (!execution.createdAt) return "";
     return formatTimeAgo(new Date(execution.createdAt));
@@ -54,15 +54,10 @@ export const snoozeIncidentMapper: ComponentBaseMapper = {
 
 function metadataList(node: ComponentsNode): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as { severity?: string };
 
-  if (configuration.incidentId) {
-    metadata.push({ icon: "alert-triangle", label: `Incident: ${configuration.incidentId}` });
-  }
-
-  if (configuration.duration) {
-    const durationLabel = DURATION_LABELS[configuration.duration] || configuration.duration;
-    metadata.push({ icon: "clock", label: `Duration: ${durationLabel}` });
+  if (configuration?.severity) {
+    metadata.push({ icon: "funnel", label: "Severity: " + configuration.severity });
   }
 
   return metadata;

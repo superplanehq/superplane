@@ -1,0 +1,121 @@
+---
+title: "Rootly"
+sidebar:
+  order: 10
+---
+
+Manage and react to incidents in Rootly
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Incident" href="#on-incident" description="Listen to incident events" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in Rootly" />
+</CardGrid>
+
+<a id="on-incident"></a>
+
+## On Incident
+
+The On Incident trigger starts a workflow execution when Rootly incident events occur.
+
+### Use Cases
+
+- **Incident automation**: Automate responses to incident events
+- **Notification workflows**: Send notifications when incidents are created or resolved
+- **Integration workflows**: Sync incidents with external systems
+- **Post-incident actions**: Trigger follow-up workflows when incidents are mitigated or resolved
+
+### Configuration
+
+- **Events**: Select which incident events to listen for (created, updated, mitigated, resolved, cancelled, deleted)
+
+### Event Data
+
+Each incident event includes:
+- **event**: Event type (incident.created, incident.updated, etc.)
+- **incident**: Complete incident information including title, summary, severity, status
+
+### Webhook Setup
+
+This trigger automatically sets up a Rootly webhook endpoint when configured. The endpoint is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "event": "incident.created",
+    "incident": {
+      "id": "abc123-def456",
+      "mitigated_at": null,
+      "resolved_at": null,
+      "severity": "sev2",
+      "started_at": "2026-01-19T12:00:00Z",
+      "status": "started",
+      "summary": "The API response times have increased significantly across all endpoints.",
+      "title": "API latency spike detected",
+      "url": "https://app.rootly.com/incidents/abc123-def456"
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "rootly.onIncident"
+}
+```
+
+<a id="create-incident"></a>
+
+## Create Incident
+
+The Create Incident component creates a new incident in Rootly.
+
+### Use Cases
+
+- **Alert escalation**: Create incidents from monitoring alerts
+- **Error tracking**: Automatically create incidents when errors are detected
+- **Manual incident creation**: Create incidents from workflow events
+- **Integration workflows**: Create incidents from external system events
+
+### Configuration
+
+- **Title**: A succinct description of the incident (required, supports expressions)
+- **Summary**: Additional details about the incident (optional, supports expressions)
+- **Severity**: Incident severity level (optional, supports expressions)
+
+### Output
+
+Returns the created incident object including:
+- **id**: Incident ID
+- **title**: Incident title
+- **status**: Current incident status
+- **severity**: Incident severity
+- **started_at**: Incident creation timestamp
+- **url**: Link to the incident in Rootly
+
+### Example Output
+
+```json
+{
+  "data": {
+    "incident": {
+      "id": "abc123-def456",
+      "severity": "sev1",
+      "started_at": "2026-01-19T12:00:00Z",
+      "status": "started",
+      "summary": "Users are experiencing slow database queries and connection timeouts.",
+      "title": "Database connection issues",
+      "url": "https://app.rootly.com/incidents/abc123-def456"
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "rootly.incident"
+}
+```
+

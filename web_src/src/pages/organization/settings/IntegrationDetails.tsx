@@ -22,6 +22,7 @@ import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import smtpIcon from "@/assets/icons/integrations/smtp.svg";
 import awsIcon from "@/assets/icons/integrations/aws.svg";
+import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 interface IntegrationDetailsProps {
@@ -49,6 +50,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
     daytona: daytonaIcon,
     "open-ai": openAiIcon,
     pagerduty: pagerDutyIcon,
+    rootly: rootlyIcon,
     semaphore: SemaphoreLogo,
     slack: slackIcon,
     smtp: smtpIcon,
