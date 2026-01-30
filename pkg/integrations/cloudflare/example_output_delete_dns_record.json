@@ -1,0 +1,14 @@
+{
+  "success": true,
+  "message": "DNS record deleted",
+  "zone": "example.com",
+  "zoneId": "zone_xyz789",
+  "recordId": "record_abc123",
+  "record": {
+    "id": "record_abc123",
+    "type": "CNAME",
+    "name": "app.example.com",
+    "content": "example.com"
+  }
+}
+
