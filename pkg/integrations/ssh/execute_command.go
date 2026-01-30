@@ -231,7 +231,7 @@ func (c *ExecuteCommand) Actions() []core.Action {
 }
 
 func (c *ExecuteCommand) HandleAction(ctx core.ActionContext) error {
-	return nil
+	return fmt.Errorf("no actions defined for executeCommand")
 }
 
 func (c *ExecuteCommand) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {

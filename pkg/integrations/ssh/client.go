@@ -367,10 +367,13 @@ func normalizePrivateKey(raw []byte) []byte {
 				s = strings.Replace(s, beginMarker+" ", beginMarker+"\n", 1)
 				s = strings.Replace(s, " "+endMarker, "\n"+endMarker, 1)
 
-				// Remove spaces in the base64 body line (if any)
+				// Remove spaces in the base64 body lines only (not header/footer)
 				lines := strings.Split(s, "\n")
 				for i := range lines {
-					lines[i] = strings.ReplaceAll(lines[i], " ", "")
+					// Only remove spaces from body lines, not from BEGIN/END markers
+					if !strings.HasPrefix(lines[i], "-----") {
+						lines[i] = strings.ReplaceAll(lines[i], " ", "")
+					}
 				}
 				s = strings.Join(lines, "\n")
 				break

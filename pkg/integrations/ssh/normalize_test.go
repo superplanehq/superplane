@@ -10,12 +10,6 @@ import (
 // Test normalizePrivateKey with various user input formats
 func Test__NormalizePrivateKey__UserInputFormats(t *testing.T) {
 	// Sample key structure for testing (not a real key)
-	validKeyWithNewlines := `-----BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACBHK9tolyHskjIGBp8V78J3F11jf7wQrEb1jW04E6G/vwAAAJAh4h3CIeId
-wgAAAAtzc2gtZWQyNTUxOQAAACBHK9tolyHskjIGBp8V78J3F11jf7wQrEb1jW04E6G/vw
------END OPENSSH PRIVATE KEY-----`
-
 	t.Run("key with literal backslash-n sequences", func(t *testing.T) {
 		// User pastes: -----BEGIN OPENSSH PRIVATE KEY-----\nb3Blbn...\n-----END OPENSSH PRIVATE KEY-----
 		inputWithEscapedNewlines := `-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\nQyNTUxOQAAACBHK9tolyHskjIGBp8V78J3F11jf7wQrEb1jW04E6G/vwAAAJAh4h3CIeId\nwgAAAAtzc2gtZWQyNTUxOQAAACBHK9tolyHskjIGBp8V78J3F11jf7wQrEb1jW04E6G/vw\n-----END OPENSSH PRIVATE KEY-----`
