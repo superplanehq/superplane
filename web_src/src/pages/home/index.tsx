@@ -333,11 +333,7 @@ function Content({
     }
 
     return (
-      <CanvasGridView
-        filteredCanvases={filteredCanvases}
-        organizationId={organizationId}
-        onEditCanvas={onEditCanvas}
-      />
+      <CanvasGridView filteredCanvases={filteredCanvases} organizationId={organizationId} onEditCanvas={onEditCanvas} />
     );
   } else if (activeTab === "custom-components") {
     if (filteredBlueprints.length === 0) {

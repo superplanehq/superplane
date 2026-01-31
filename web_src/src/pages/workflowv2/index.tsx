@@ -584,14 +584,7 @@ export function WorkflowPageV2() {
 
   const { nodes, edges } = useMemo(() => {
     // Don't prepare data until everything is loaded
-    if (
-      !canvas ||
-      canvasLoading ||
-      triggersLoading ||
-      blueprintsLoading ||
-      componentsLoading ||
-      integrationsLoading
-    ) {
+    if (!canvas || canvasLoading || triggersLoading || blueprintsLoading || componentsLoading || integrationsLoading) {
       return { nodes: [], edges: [] };
     }
 
@@ -1497,9 +1490,7 @@ export function WorkflowPageV2() {
             return;
           }
 
-          const latestWorkflow = queryClient.getQueryData<CanvasesCanvas>(
-            canvasKeys.detail(organizationId, canvasId),
-          );
+          const latestWorkflow = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
 
           if (!latestWorkflow?.spec?.nodes) return;
 
