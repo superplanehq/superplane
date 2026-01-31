@@ -11,10 +11,10 @@ import (
 
 type NodeRequestContext struct {
 	tx   *gorm.DB
-	node *models.WorkflowNode
+	node *models.CanvasNode
 }
 
-func NewNodeRequestContext(tx *gorm.DB, node *models.WorkflowNode) *NodeRequestContext {
+func NewNodeRequestContext(tx *gorm.DB, node *models.CanvasNode) *NodeRequestContext {
 	return &NodeRequestContext{tx: tx, node: node}
 }
 

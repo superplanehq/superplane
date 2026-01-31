@@ -10,10 +10,10 @@ import (
 
 type ExecutionMetadataContext struct {
 	tx        *gorm.DB
-	execution *models.WorkflowNodeExecution
+	execution *models.CanvasNodeExecution
 }
 
-func NewExecutionMetadataContext(tx *gorm.DB, execution *models.WorkflowNodeExecution) *ExecutionMetadataContext {
+func NewExecutionMetadataContext(tx *gorm.DB, execution *models.CanvasNodeExecution) *ExecutionMetadataContext {
 	return &ExecutionMetadataContext{tx: tx, execution: execution}
 }
 

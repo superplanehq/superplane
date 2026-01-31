@@ -656,7 +656,7 @@ func (e *HTTP) handleRequestError(ctx core.ExecutionContext, err error, totalAtt
 		return fmt.Errorf("request failed after %d attempts: %w (and failed to emit event: %v)", totalAttempts, err, emitErr)
 	}
 
-	err = ctx.ExecutionState.Fail(models.WorkflowNodeExecutionResultReasonError, fmt.Sprintf("Request failed after %d attempts: %v", totalAttempts, err))
+	err = ctx.ExecutionState.Fail(models.CanvasNodeExecutionResultReasonError, fmt.Sprintf("Request failed after %d attempts: %v", totalAttempts, err))
 	if err != nil {
 		return fmt.Errorf("request failed after %d attempts: %w (and failed to mark execution as failed: %v)", totalAttempts, err, err)
 	}
@@ -742,7 +742,7 @@ func (e *HTTP) processResponse(ctx core.ExecutionContext, resp *http.Response, s
 	}
 
 	if !isSuccess {
-		ctx.ExecutionState.Fail(models.WorkflowNodeExecutionResultReasonError, fmt.Sprintf("HTTP request failed with status %d", resp.StatusCode))
+		ctx.ExecutionState.Fail(models.CanvasNodeExecutionResultReasonError, fmt.Sprintf("HTTP request failed with status %d", resp.StatusCode))
 		return nil
 	}
 

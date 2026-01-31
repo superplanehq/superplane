@@ -16,11 +16,11 @@ func Test__ResolveExecutionErrors__ResolvesMultipleExecutions(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
@@ -41,38 +41,38 @@ func Test__ResolveExecutionErrors__ResolvesMultipleExecutions(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
-	executionOne := support.CreateWorkflowNodeExecution(t, workflow.ID, "node-1", rootEvent.ID, rootEvent.ID, nil)
-	executionTwo := support.CreateWorkflowNodeExecution(t, workflow.ID, "node-2", rootEvent.ID, rootEvent.ID, nil)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	executionOne := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID, nil)
+	executionTwo := support.CreateCanvasNodeExecution(t, canvas.ID, "node-2", rootEvent.ID, rootEvent.ID, nil)
 
-	require.NoError(t, executionOne.Fail(models.WorkflowNodeExecutionResultReasonError, "boom"))
-	require.NoError(t, executionTwo.Fail(models.WorkflowNodeExecutionResultReasonError, "boom"))
+	require.NoError(t, executionOne.Fail(models.CanvasNodeExecutionResultReasonError, "boom"))
+	require.NoError(t, executionTwo.Fail(models.CanvasNodeExecutionResultReasonError, "boom"))
 
-	response, err := ResolveExecutionErrors(context.Background(), workflow.ID, []uuid.UUID{
+	response, err := ResolveExecutionErrors(context.Background(), canvas.ID, []uuid.UUID{
 		executionOne.ID,
 		executionTwo.ID,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, response)
 
-	updatedExecutionOne, err := models.FindNodeExecution(workflow.ID, executionOne.ID)
+	updatedExecutionOne, err := models.FindNodeExecution(canvas.ID, executionOne.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeExecutionResultReasonErrorResolved, updatedExecutionOne.ResultReason)
+	assert.Equal(t, models.CanvasNodeExecutionResultReasonErrorResolved, updatedExecutionOne.ResultReason)
 
-	updatedExecutionTwo, err := models.FindNodeExecution(workflow.ID, executionTwo.ID)
+	updatedExecutionTwo, err := models.FindNodeExecution(canvas.ID, executionTwo.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeExecutionResultReasonErrorResolved, updatedExecutionTwo.ResultReason)
+	assert.Equal(t, models.CanvasNodeExecutionResultReasonErrorResolved, updatedExecutionTwo.ResultReason)
 }
 
 func Test__ResolveExecutionErrors__ReturnsErrorForNonErrorExecution(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
@@ -85,13 +85,13 @@ func Test__ResolveExecutionErrors__ReturnsErrorForNonErrorExecution(t *testing.T
 		[]models.Edge{},
 	)
 
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
-	execution := support.CreateWorkflowNodeExecution(t, workflow.ID, "node-1", rootEvent.ID, rootEvent.ID, nil)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID, nil)
 
-	_, err := ResolveExecutionErrors(context.Background(), workflow.ID, []uuid.UUID{execution.ID})
+	_, err := ResolveExecutionErrors(context.Background(), canvas.ID, []uuid.UUID{execution.ID})
 	require.Error(t, err)
 
-	updatedExecution, err := models.FindNodeExecution(workflow.ID, execution.ID)
+	updatedExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "", updatedExecution.ResultReason)
 }

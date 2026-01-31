@@ -167,27 +167,27 @@ func CreateUser(t *testing.T, r *ResourceRegistry, organizationID uuid.UUID) *mo
 	return user
 }
 
-func EmitWorkflowEventForNode(t *testing.T, workflowID uuid.UUID, nodeID string, channel string, executionID *uuid.UUID) *models.WorkflowEvent {
-	return EmitWorkflowEventForNodeWithData(t, workflowID, nodeID, channel, executionID, map[string]any{"key": "value"})
+func EmitCanvasEventForNode(t *testing.T, canvasID uuid.UUID, nodeID string, channel string, executionID *uuid.UUID) *models.CanvasEvent {
+	return EmitCanvasEventForNodeWithData(t, canvasID, nodeID, channel, executionID, map[string]any{"key": "value"})
 }
 
-func EmitWorkflowEventForNodeWithData(
+func EmitCanvasEventForNodeWithData(
 	t *testing.T,
-	workflowID uuid.UUID,
+	canvasID uuid.UUID,
 	nodeID string,
 	channel string,
 	executionID *uuid.UUID,
 	data map[string]any,
-) *models.WorkflowEvent {
-	ensureWorkflowNodeExists(t, workflowID, nodeID)
+) *models.CanvasEvent {
+	ensureCanvasNodeExists(t, canvasID, nodeID)
 
 	now := time.Now()
-	event := models.WorkflowEvent{
-		WorkflowID:  workflowID,
+	event := models.CanvasEvent{
+		WorkflowID:  canvasID,
 		NodeID:      nodeID,
 		Channel:     channel,
 		Data:        datatypes.NewJSONType[any](data),
-		State:       models.WorkflowEventStatePending,
+		State:       models.CanvasEventStatePending,
 		ExecutionID: executionID,
 		CreatedAt:   &now,
 	}
@@ -195,10 +195,10 @@ func EmitWorkflowEventForNodeWithData(
 	return &event
 }
 
-func CreateWorkflowQueueItem(t *testing.T, workflowID uuid.UUID, nodeID string, rootEventID uuid.UUID, eventID uuid.UUID) *models.WorkflowNodeQueueItem {
+func CreateQueueItem(t *testing.T, workflowID uuid.UUID, nodeID string, rootEventID uuid.UUID, eventID uuid.UUID) *models.CanvasNodeQueueItem {
 	now := time.Now()
 
-	queueItem := models.WorkflowNodeQueueItem{
+	queueItem := models.CanvasNodeQueueItem{
 		ID:          uuid.New(),
 		WorkflowID:  workflowID,
 		NodeID:      nodeID,
@@ -220,17 +220,17 @@ func CreateNodeExecutionWithConfiguration(
 	eventID uuid.UUID,
 	parentExecutionID *uuid.UUID,
 	configuration map[string]any,
-) *models.WorkflowNodeExecution {
-	ensureWorkflowNodeExists(t, workflowID, nodeID)
+) *models.CanvasNodeExecution {
+	ensureCanvasNodeExists(t, workflowID, nodeID)
 
 	now := time.Now()
-	execution := models.WorkflowNodeExecution{
+	execution := models.CanvasNodeExecution{
 		WorkflowID:        workflowID,
 		NodeID:            nodeID,
 		RootEventID:       rootEventID,
 		EventID:           eventID,
 		ParentExecutionID: parentExecutionID,
-		State:             models.WorkflowNodeExecutionStatePending,
+		State:             models.CanvasNodeExecutionStatePending,
 		Configuration:     datatypes.NewJSONType(configuration),
 		CreatedAt:         &now,
 		UpdatedAt:         &now,
@@ -240,24 +240,24 @@ func CreateNodeExecutionWithConfiguration(
 	return &execution
 }
 
-func CreateWorkflowNodeExecution(
+func CreateCanvasNodeExecution(
 	t *testing.T,
-	workflowID uuid.UUID,
+	canvasID uuid.UUID,
 	nodeID string,
 	rootEventID uuid.UUID,
 	eventID uuid.UUID,
 	parentExecutionID *uuid.UUID,
-) *models.WorkflowNodeExecution {
-	ensureWorkflowNodeExists(t, workflowID, nodeID)
+) *models.CanvasNodeExecution {
+	ensureCanvasNodeExists(t, canvasID, nodeID)
 
 	now := time.Now()
-	execution := models.WorkflowNodeExecution{
-		WorkflowID:        workflowID,
+	execution := models.CanvasNodeExecution{
+		WorkflowID:        canvasID,
 		NodeID:            nodeID,
 		RootEventID:       rootEventID,
 		EventID:           eventID,
 		ParentExecutionID: parentExecutionID,
-		State:             models.WorkflowNodeExecutionStatePending,
+		State:             models.CanvasNodeExecutionStatePending,
 		Configuration:     datatypes.NewJSONType(map[string]any{}),
 		CreatedAt:         &now,
 		UpdatedAt:         &now,
@@ -274,17 +274,17 @@ func CreateNextNodeExecution(
 	rootEventID uuid.UUID,
 	eventID uuid.UUID,
 	previous *uuid.UUID,
-) *models.WorkflowNodeExecution {
-	ensureWorkflowNodeExists(t, workflowID, nodeID)
+) *models.CanvasNodeExecution {
+	ensureCanvasNodeExists(t, workflowID, nodeID)
 
 	now := time.Now()
-	execution := models.WorkflowNodeExecution{
+	execution := models.CanvasNodeExecution{
 		WorkflowID:          workflowID,
 		NodeID:              nodeID,
 		RootEventID:         rootEventID,
 		EventID:             eventID,
 		PreviousExecutionID: previous,
-		State:               models.WorkflowNodeExecutionStatePending,
+		State:               models.CanvasNodeExecutionStatePending,
 		Configuration:       datatypes.NewJSONType(map[string]any{}),
 		CreatedAt:           &now,
 		UpdatedAt:           &now,
@@ -294,7 +294,7 @@ func CreateNextNodeExecution(
 	return &execution
 }
 
-func CreateWorkflow(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []models.WorkflowNode, edges []models.Edge) (*models.Workflow, []models.WorkflowNode) {
+func CreateCanvas(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []models.CanvasNode, edges []models.Edge) (*models.Canvas, []models.CanvasNode) {
 	now := time.Now()
 
 	inputNodes := make([]models.Node, len(nodes))
@@ -312,13 +312,13 @@ func CreateWorkflow(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []mod
 	}
 
 	//
-	// Create workflow
+	// Create canvas
 	//
-	workflow := &models.Workflow{
+	workflow := &models.Canvas{
 		ID:             uuid.New(),
 		OrganizationID: orgID,
-		Name:           RandomName("workflow"),
-		Description:    "Test workflow",
+		Name:           RandomName("canvas"),
+		Description:    "Test canvas",
 		Nodes:          datatypes.NewJSONSlice(inputNodes),
 		Edges:          datatypes.NewJSONSlice(edges),
 		CreatedBy:      &userID,
@@ -334,7 +334,7 @@ func CreateWorkflow(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []mod
 	expandedNodes, err := expandBlueprintNodes(t, orgID, inputNodes)
 	require.NoError(t, err)
 
-	var createdNodes []models.WorkflowNode
+	var createdNodes []models.CanvasNode
 	for _, node := range expandedNodes {
 		var parentNodeID *string
 		if idx := strings.Index(node.ID, ":"); idx != -1 {
@@ -342,12 +342,12 @@ func CreateWorkflow(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []mod
 			parentNodeID = &parent
 		}
 
-		workflowNode := models.WorkflowNode{
+		canvasNode := models.CanvasNode{
 			WorkflowID:    workflow.ID,
 			NodeID:        node.ID,
 			ParentNodeID:  parentNodeID,
 			Name:          node.Name,
-			State:         models.WorkflowNodeStateReady,
+			State:         models.CanvasNodeStateReady,
 			Type:          node.Type,
 			Ref:           datatypes.NewJSONType(node.Ref),
 			Configuration: datatypes.NewJSONType(node.Configuration),
@@ -358,8 +358,8 @@ func CreateWorkflow(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []mod
 			UpdatedAt:     &now,
 		}
 
-		require.NoError(t, database.Conn().Clauses(clause.Returning{}).Create(&workflowNode).Error)
-		createdNodes = append(createdNodes, workflowNode)
+		require.NoError(t, database.Conn().Clauses(clause.Returning{}).Create(&canvasNode).Error)
+		createdNodes = append(createdNodes, canvasNode)
 	}
 
 	return workflow, createdNodes
@@ -384,11 +384,24 @@ func CreateBlueprint(t *testing.T, orgID uuid.UUID, nodes []models.Node, edges [
 	return &blueprint
 }
 
-func VerifyWorkflowEventsCount(t *testing.T, workflowID uuid.UUID, expected int) {
+func VerifyCanvasEventsCount(t *testing.T, canvasID uuid.UUID, expected int) {
 	var actual int64
 
 	err := database.Conn().
-		Model(&models.WorkflowEvent{}).
+		Model(&models.CanvasEvent{}).
+		Where("workflow_id = ?", canvasID).
+		Count(&actual).
+		Error
+
+	require.NoError(t, err)
+	require.Equal(t, expected, int(actual))
+}
+
+func VerifyNodeExecutionsCount(t *testing.T, workflowID uuid.UUID, expected int) {
+	var actual int64
+
+	err := database.Conn().
+		Model(&models.CanvasNodeExecution{}).
 		Where("workflow_id = ?", workflowID).
 		Count(&actual).
 		Error
@@ -397,11 +410,11 @@ func VerifyWorkflowEventsCount(t *testing.T, workflowID uuid.UUID, expected int)
 	require.Equal(t, expected, int(actual))
 }
 
-func VerifyWorkflowNodeExecutionsCount(t *testing.T, workflowID uuid.UUID, expected int) {
+func VerifyNodeQueueCount(t *testing.T, workflowID uuid.UUID, expected int) {
 	var actual int64
 
 	err := database.Conn().
-		Model(&models.WorkflowNodeExecution{}).
+		Model(&models.CanvasNodeQueueItem{}).
 		Where("workflow_id = ?", workflowID).
 		Count(&actual).
 		Error
@@ -410,11 +423,11 @@ func VerifyWorkflowNodeExecutionsCount(t *testing.T, workflowID uuid.UUID, expec
 	require.Equal(t, expected, int(actual))
 }
 
-func VerifyWorkflowNodeQueueCount(t *testing.T, workflowID uuid.UUID, expected int) {
+func VerifyNodeExecutionKVCount(t *testing.T, workflowID uuid.UUID, expected int) {
 	var actual int64
 
 	err := database.Conn().
-		Model(&models.WorkflowNodeQueueItem{}).
+		Model(&models.CanvasNodeExecutionKV{}).
 		Where("workflow_id = ?", workflowID).
 		Count(&actual).
 		Error
@@ -423,11 +436,11 @@ func VerifyWorkflowNodeQueueCount(t *testing.T, workflowID uuid.UUID, expected i
 	require.Equal(t, expected, int(actual))
 }
 
-func VerifyWorkflowNodeExecutionKVCount(t *testing.T, workflowID uuid.UUID, expected int) {
+func VerifyNodeRequestCount(t *testing.T, workflowID uuid.UUID, expected int) {
 	var actual int64
 
 	err := database.Conn().
-		Model(&models.WorkflowNodeExecutionKV{}).
+		Model(&models.CanvasNodeRequest{}).
 		Where("workflow_id = ?", workflowID).
 		Count(&actual).
 		Error
@@ -436,23 +449,8 @@ func VerifyWorkflowNodeExecutionKVCount(t *testing.T, workflowID uuid.UUID, expe
 	require.Equal(t, expected, int(actual))
 }
 
-func VerifyWorkflowNodeRequestCount(t *testing.T, workflowID uuid.UUID, expected int) {
-	var actual int64
-
-	err := database.Conn().
-		Model(&models.WorkflowNodeRequest{}).
-		Where("workflow_id = ?", workflowID).
-		Count(&actual).
-		Error
-
-	require.NoError(t, err)
-	require.Equal(t, expected, int(actual))
-}
-
-// ensureWorkflowNodeExists creates a minimal workflow node if it doesn't exist
-// This is needed to satisfy FK constraints when creating events/executions
-func ensureWorkflowNodeExists(t *testing.T, workflowID uuid.UUID, nodeID string) {
-	var existingNode models.WorkflowNode
+func ensureCanvasNodeExists(t *testing.T, workflowID uuid.UUID, nodeID string) {
+	var existingNode models.CanvasNode
 	err := database.Conn().
 		Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).
 		First(&existingNode).Error
@@ -464,11 +462,11 @@ func ensureWorkflowNodeExists(t *testing.T, workflowID uuid.UUID, nodeID string)
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
 	now := time.Now()
-	node := models.WorkflowNode{
+	node := models.CanvasNode{
 		WorkflowID:    workflowID,
 		NodeID:        nodeID,
 		Name:          "Auto-created node for test",
-		State:         models.WorkflowNodeStateReady,
+		State:         models.CanvasNodeStateReady,
 		Type:          models.NodeTypeComponent,
 		Ref:           datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
 		Configuration: datatypes.NewJSONType(map[string]any{}),

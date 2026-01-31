@@ -8,18 +8,18 @@ import (
 )
 
 //
-// WorkflowNodeExecutionKV is a model that maps custom key-value pairs
-// to specific workflow node executions, that enable fast lookups based on
+// CanvasNodeExecutionKV is a model that maps custom key-value pairs
+// to specific canvas node executions, that enable fast lookups based on
 // business logic identifiers.
 //
 // The guarantee is that the lookup is indexed and fast to query.
 //
 // DO NOT store any key/values here that are not strictly necessary for lookups,
-// or fast retrieval of workflow node executions. Use the metadata field on
-// WorkflowNodeExecution for arbitrary data storage.
+// or fast retrieval of canvas node executions. Use the metadata field on
+// CanvasNodeExecution for arbitrary data storage.
 //
 
-type WorkflowNodeExecutionKV struct {
+type CanvasNodeExecutionKV struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
 	WorkflowID  uuid.UUID `gorm:"type:uuid;not null"`
 	NodeID      string    `gorm:"type:varchar(128);not null"`
@@ -29,8 +29,12 @@ type WorkflowNodeExecutionKV struct {
 	CreatedAt   *time.Time
 }
 
-func CreateWorkflowNodeExecutionKVInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID string, executionID uuid.UUID, key, value string) error {
-	rec := WorkflowNodeExecutionKV{
+func (c *CanvasNodeExecutionKV) TableName() string {
+	return "workflow_node_execution_kvs"
+}
+
+func CreateNodeExecutionKVInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID string, executionID uuid.UUID, key, value string) error {
+	rec := CanvasNodeExecutionKV{
 		WorkflowID:  workflowID,
 		NodeID:      nodeID,
 		ExecutionID: executionID,
@@ -41,11 +45,11 @@ func CreateWorkflowNodeExecutionKVInTransaction(tx *gorm.DB, workflowID uuid.UUI
 	return tx.Create(&rec).Error
 }
 
-func FirstNodeExecutionByKVInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID, key, value string) (*WorkflowNodeExecution, error) {
-	var execution WorkflowNodeExecution
+func FirstNodeExecutionByKVInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID, key, value string) (*CanvasNodeExecution, error) {
+	var execution CanvasNodeExecution
 
 	err := tx.
-		Model(&WorkflowNodeExecution{}).
+		Model(&CanvasNodeExecution{}).
 		Where("id IN (?)", tx.
 			Select("execution_id").
 			Table("workflow_node_execution_kvs").

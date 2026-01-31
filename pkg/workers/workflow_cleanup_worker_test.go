@@ -19,13 +19,13 @@ func Test__WorkflowCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 	worker := NewWorkflowCleanupWorker()
 
 	//
-	// Create a workflow with nodes, events, executions, and queue items
+	// Create a canvas with nodes, events, executions, and queue items
 	//
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Type:   models.NodeTypeComponent,
@@ -45,15 +45,15 @@ func Test__WorkflowCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 	)
 
 	// Create associated data
-	event1 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
-	event2 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-2", "default", nil)
-	execution := support.CreateWorkflowNodeExecution(t, workflow.ID, "node-1", event1.ID, event2.ID, nil)
-	support.CreateWorkflowQueueItem(t, workflow.ID, "node-1", event1.ID, event2.ID)
+	event1 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	event2 := support.EmitCanvasEventForNode(t, canvas.ID, "node-2", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", event1.ID, event2.ID, nil)
+	support.CreateQueueItem(t, canvas.ID, "node-1", event1.ID, event2.ID)
 
-	// Create workflow node execution KV
-	require.NoError(t, models.CreateWorkflowNodeExecutionKVInTransaction(
+	// Create canvas node execution KV
+	require.NoError(t, models.CreateNodeExecutionKVInTransaction(
 		database.Conn(),
-		workflow.ID,
+		canvas.ID,
 		"node-1",
 		execution.ID,
 		"test-key",
@@ -61,9 +61,9 @@ func Test__WorkflowCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 	))
 
 	// Create workflow node request
-	nodeRequest := models.WorkflowNodeRequest{
+	nodeRequest := models.CanvasNodeRequest{
 		ID:         uuid.New(),
-		WorkflowID: workflow.ID,
+		WorkflowID: canvas.ID,
 		NodeID:     "node-1",
 		Type:       models.NodeRequestTypeInvokeAction,
 		State:      models.NodeExecutionRequestStatePending,
@@ -79,51 +79,51 @@ func Test__WorkflowCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 	//
 	// Verify all data exists before soft delete
 	//
-	_, err := models.FindWorkflow(r.Organization.ID, workflow.ID)
+	_, err := models.FindCanvas(r.Organization.ID, canvas.ID)
 	require.NoError(t, err)
-	nodes, err := models.FindWorkflowNodes(workflow.ID)
+	nodes, err := models.FindCanvasNodes(canvas.ID)
 	require.NoError(t, err)
 	assert.Len(t, nodes, 2)
-	support.VerifyWorkflowEventsCount(t, workflow.ID, 2)
-	support.VerifyWorkflowNodeExecutionsCount(t, workflow.ID, 1)
-	support.VerifyWorkflowNodeQueueCount(t, workflow.ID, 1)
+	support.VerifyCanvasEventsCount(t, canvas.ID, 2)
+	support.VerifyNodeExecutionsCount(t, canvas.ID, 1)
+	support.VerifyNodeQueueCount(t, canvas.ID, 1)
 
 	// Verify KV and request exist
-	support.VerifyWorkflowNodeExecutionKVCount(t, workflow.ID, 1)
-	support.VerifyWorkflowNodeRequestCount(t, workflow.ID, 1)
+	support.VerifyNodeExecutionKVCount(t, canvas.ID, 1)
+	support.VerifyNodeRequestCount(t, canvas.ID, 1)
 
 	//
-	// Soft delete the workflow using the new soft delete method
+	// Soft delete the canvas using the new soft delete method
 	//
-	err = workflow.SoftDelete()
+	err = canvas.SoftDelete()
 	require.NoError(t, err)
 
 	// Verify workflow is soft deleted
-	_, err = models.FindWorkflow(r.Organization.ID, workflow.ID)
+	_, err = models.FindCanvas(r.Organization.ID, canvas.ID)
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
 	//
 	// Fetch the updated workflow with deleted_at set
 	//
-	deletedWorkflow, err := models.FindUnscopedWorkflow(workflow.ID)
+	deletedCanvas, err := models.FindUnscopedCanvas(canvas.ID)
 	require.NoError(t, err)
-	require.True(t, deletedWorkflow.DeletedAt.Valid, "DeletedAt should be set")
+	require.True(t, deletedCanvas.DeletedAt.Valid, "DeletedAt should be set")
 
 	//
-	// Process the deleted workflow with cleanup worker
+	// Process the deleted canvas with cleanup worker
 	// The worker now processes resources in batches, so it might take multiple calls
 	//
 
 	// Process until everything is cleaned up (with a reasonable limit)
 	maxAttempts := 10
 	for i := 0; i < maxAttempts; i++ {
-		err = worker.LockAndProcessWorkflow(*deletedWorkflow)
+		err = worker.LockAndProcessCanvas(*deletedCanvas)
 		require.NoError(t, err)
 
 		// Check if workflow is completely deleted
-		var workflowCount int64
-		database.Conn().Unscoped().Model(&models.Workflow{}).Where("id = ?", workflow.ID).Count(&workflowCount)
-		if workflowCount == 0 {
+		var canvasCount int64
+		database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Count(&canvasCount)
+		if canvasCount == 0 {
 			break
 		}
 	}
@@ -132,23 +132,23 @@ func Test__WorkflowCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 	// Verify everything is permanently deleted
 	//
 
-	// Workflow should be permanently deleted
-	var workflowCount int64
-	database.Conn().Unscoped().Model(&models.Workflow{}).Where("id = ?", workflow.ID).Count(&workflowCount)
-	assert.Equal(t, int64(0), workflowCount)
+	// Canvas should be permanently deleted
+	var canvasCount int64
+	database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Count(&canvasCount)
+	assert.Equal(t, int64(0), canvasCount)
 
 	// All associated data should be permanently deleted
-	nodes, err = models.FindWorkflowNodes(workflow.ID)
+	nodes, err = models.FindCanvasNodes(canvas.ID)
 	require.NoError(t, err)
 	assert.Len(t, nodes, 0)
 
-	support.VerifyWorkflowEventsCount(t, workflow.ID, 0)
-	support.VerifyWorkflowNodeExecutionsCount(t, workflow.ID, 0)
-	support.VerifyWorkflowNodeQueueCount(t, workflow.ID, 0)
+	support.VerifyCanvasEventsCount(t, canvas.ID, 0)
+	support.VerifyNodeExecutionsCount(t, canvas.ID, 0)
+	support.VerifyNodeQueueCount(t, canvas.ID, 0)
 
 	// KV and request should be deleted
-	support.VerifyWorkflowNodeExecutionKVCount(t, workflow.ID, 0)
-	support.VerifyWorkflowNodeRequestCount(t, workflow.ID, 0)
+	support.VerifyNodeExecutionKVCount(t, canvas.ID, 0)
+	support.VerifyNodeRequestCount(t, canvas.ID, 0)
 }
 
 func Test__WorkflowCleanupWorker_ProcessesWorkflowWithWebhook(t *testing.T) {
@@ -168,13 +168,13 @@ func Test__WorkflowCleanupWorker_ProcessesWorkflowWithWebhook(t *testing.T) {
 	require.NoError(t, database.Conn().Create(&webhook).Error)
 
 	//
-	// Create a workflow with node that has webhook
+	// Create a canvas with node that has webhook
 	//
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Type:   models.NodeTypeComponent,
@@ -188,9 +188,9 @@ func Test__WorkflowCleanupWorker_ProcessesWorkflowWithWebhook(t *testing.T) {
 	)
 
 	//
-	// Soft delete the workflow using the new soft delete method
+	// Soft delete the canvas using the new soft delete method
 	//
-	err := workflow.SoftDelete()
+	err := canvas.SoftDelete()
 	require.NoError(t, err)
 
 	//
@@ -202,23 +202,23 @@ func Test__WorkflowCleanupWorker_ProcessesWorkflowWithWebhook(t *testing.T) {
 	//
 	// Fetch the updated workflow with deleted_at set
 	//
-	deletedWorkflow, err := models.FindUnscopedWorkflow(workflow.ID)
+	deletedCanvas, err := models.FindUnscopedCanvas(canvas.ID)
 	require.NoError(t, err)
-	require.True(t, deletedWorkflow.DeletedAt.Valid, "DeletedAt should be set")
+	require.True(t, deletedCanvas.DeletedAt.Valid, "DeletedAt should be set")
 
 	//
-	// Process the deleted workflow with cleanup worker
+	// Process the deleted canvas with cleanup worker
 	// May take multiple calls due to batched resource deletion
 	//
 	maxAttempts := 10
 	for i := 0; i < maxAttempts; i++ {
-		err = worker.LockAndProcessWorkflow(*deletedWorkflow)
+		err = worker.LockAndProcessCanvas(*deletedCanvas)
 		require.NoError(t, err)
 
 		// Check if workflow is completely deleted
-		var workflowCount int64
-		database.Conn().Unscoped().Model(&models.Workflow{}).Where("id = ?", workflow.ID).Count(&workflowCount)
-		if workflowCount == 0 {
+		var canvasCount int64
+		database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Count(&canvasCount)
+		if canvasCount == 0 {
 			break
 		}
 	}
@@ -238,41 +238,41 @@ func Test__WorkflowCleanupWorker_HandlesEmptyWorkflow(t *testing.T) {
 	worker := NewWorkflowCleanupWorker()
 
 	//
-	// Create a minimal workflow with no nodes, events, etc.
+	// Create a minimal canvas with no nodes, events, etc.
 	//
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{},
+		[]models.CanvasNode{},
 		[]models.Edge{},
 	)
 
 	//
-	// Soft delete the workflow using the new soft delete method
+	// Soft delete the canvas using the new soft delete method
 	//
-	err := workflow.SoftDelete()
+	err := canvas.SoftDelete()
 	require.NoError(t, err)
 
 	//
 	// Fetch the updated workflow with deleted_at set
 	//
-	deletedWorkflow, err := models.FindUnscopedWorkflow(workflow.ID)
+	deletedCanvas, err := models.FindUnscopedCanvas(canvas.ID)
 	require.NoError(t, err)
-	require.True(t, deletedWorkflow.DeletedAt.Valid, "DeletedAt should be set")
+	require.True(t, deletedCanvas.DeletedAt.Valid, "DeletedAt should be set")
 
 	//
-	// Process the deleted workflow with cleanup worker
+	// Process the deleted canvas with cleanup worker
 	//
-	err = worker.LockAndProcessWorkflow(*deletedWorkflow)
+	err = worker.LockAndProcessCanvas(*deletedCanvas)
 	require.NoError(t, err)
 
 	//
-	// Verify workflow is permanently deleted
+	// Verify canvas is permanently deleted
 	//
-	var workflowCount int64
-	database.Conn().Unscoped().Model(&models.Workflow{}).Where("id = ?", workflow.ID).Count(&workflowCount)
-	assert.Equal(t, int64(0), workflowCount)
+	var canvasCount int64
+	database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Count(&canvasCount)
+	assert.Equal(t, int64(0), canvasCount)
 }
 
 func Test__WorkflowCleanupWorker_HandlesConcurrentProcessing(t *testing.T) {
@@ -280,13 +280,13 @@ func Test__WorkflowCleanupWorker_HandlesConcurrentProcessing(t *testing.T) {
 	defer r.Close()
 
 	//
-	// Create a workflow with some data
+	// Create a canvas with some data
 	//
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Type:   models.NodeTypeComponent,
@@ -298,35 +298,35 @@ func Test__WorkflowCleanupWorker_HandlesConcurrentProcessing(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	event := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
-	support.CreateWorkflowNodeExecution(t, workflow.ID, "node-1", event.ID, event.ID, nil)
+	event := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", event.ID, event.ID, nil)
 
 	//
-	// Soft delete the workflow using the new soft delete method
+	// Soft delete the canvas using the new soft delete method
 	//
-	err := workflow.SoftDelete()
+	err := canvas.SoftDelete()
 	require.NoError(t, err)
 
 	//
 	// Fetch the updated workflow with deleted_at set
 	//
-	deletedWorkflow, err := models.FindUnscopedWorkflow(workflow.ID)
+	deletedCanvas, err := models.FindUnscopedCanvas(canvas.ID)
 	require.NoError(t, err)
-	require.True(t, deletedWorkflow.DeletedAt.Valid, "DeletedAt should be set")
+	require.True(t, deletedCanvas.DeletedAt.Valid, "DeletedAt should be set")
 
 	//
-	// Have two workers try to process the same workflow concurrently
+	// Have two workers try to process the same canvas concurrently
 	//
 	results := make(chan error, 2)
 
 	go func() {
 		worker1 := NewWorkflowCleanupWorker()
-		results <- worker1.LockAndProcessWorkflow(*deletedWorkflow)
+		results <- worker1.LockAndProcessCanvas(*deletedCanvas)
 	}()
 
 	go func() {
 		worker2 := NewWorkflowCleanupWorker()
-		results <- worker2.LockAndProcessWorkflow(*deletedWorkflow)
+		results <- worker2.LockAndProcessCanvas(*deletedCanvas)
 	}()
 
 	// Collect results - both should succeed (return nil)
@@ -339,27 +339,27 @@ func Test__WorkflowCleanupWorker_HandlesConcurrentProcessing(t *testing.T) {
 	maxAttempts := 10
 	for i := 0; i < maxAttempts; i++ {
 		worker := NewWorkflowCleanupWorker()
-		err := worker.LockAndProcessWorkflow(*deletedWorkflow)
+		err := worker.LockAndProcessCanvas(*deletedCanvas)
 		require.NoError(t, err)
 
 		// Check if workflow is completely deleted
-		var workflowCount int64
-		database.Conn().Unscoped().Model(&models.Workflow{}).Where("id = ?", workflow.ID).Count(&workflowCount)
-		if workflowCount == 0 {
+		var canvasCount int64
+		database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Count(&canvasCount)
+		if canvasCount == 0 {
 			break
 		}
 	}
 
 	//
-	// Verify workflow is permanently deleted
+	// Verify canvas is permanently deleted
 	//
-	var workflowCount int64
-	database.Conn().Unscoped().Model(&models.Workflow{}).Where("id = ?", workflow.ID).Count(&workflowCount)
-	assert.Equal(t, int64(0), workflowCount)
+	var canvasCount int64
+	database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Count(&canvasCount)
+	assert.Equal(t, int64(0), canvasCount)
 
 	// Verify associated data is cleaned up
-	support.VerifyWorkflowEventsCount(t, workflow.ID, 0)
-	support.VerifyWorkflowNodeExecutionsCount(t, workflow.ID, 0)
+	support.VerifyCanvasEventsCount(t, canvas.ID, 0)
+	support.VerifyNodeExecutionsCount(t, canvas.ID, 0)
 }
 
 func Test__WorkflowCleanupWorker_IgnoresNonDeletedWorkflows(t *testing.T) {
@@ -368,13 +368,13 @@ func Test__WorkflowCleanupWorker_IgnoresNonDeletedWorkflows(t *testing.T) {
 	worker := NewWorkflowCleanupWorker()
 
 	//
-	// Create a normal (non-deleted) workflow
+	// Create a normal (non-deleted) canvas
 	//
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Type:   models.NodeTypeComponent,
@@ -386,23 +386,23 @@ func Test__WorkflowCleanupWorker_IgnoresNonDeletedWorkflows(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	_ = support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
+	_ = support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 
 	//
-	// Try to process a non-deleted workflow (should be harmless)
+	// Try to process a non-deleted canvas (should be harmless)
 	//
-	err := worker.LockAndProcessWorkflow(*workflow)
+	err := worker.LockAndProcessCanvas(*canvas)
 	require.NoError(t, err)
 
 	//
-	// Verify workflow and data still exist
+	// Verify canvas and data still exist
 	//
-	_, err = models.FindWorkflow(r.Organization.ID, workflow.ID)
+	_, err = models.FindCanvas(r.Organization.ID, canvas.ID)
 	require.NoError(t, err)
 
-	nodes, err := models.FindWorkflowNodes(workflow.ID)
+	nodes, err := models.FindCanvasNodes(canvas.ID)
 	require.NoError(t, err)
 	assert.Len(t, nodes, 1)
 
-	support.VerifyWorkflowEventsCount(t, workflow.ID, 1)
+	support.VerifyCanvasEventsCount(t, canvas.ID, 1)
 }

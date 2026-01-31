@@ -28,15 +28,15 @@ func Test__WorkflowEventRouter_ProcessRootEvent(t *testing.T) {
 	defer queueConsumer.Stop()
 
 	//
-	// Create a simple workflow with just a trigger and a component nodes.
+	// Create a simple canvas with just a trigger and a component nodes.
 	//
 	node1 := "trigger-1"
 	node2 := "component-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{NodeID: node1, Type: models.NodeTypeTrigger},
 			{NodeID: node2, Type: models.NodeTypeComponent},
 		},
@@ -48,7 +48,7 @@ func Test__WorkflowEventRouter_ProcessRootEvent(t *testing.T) {
 	//
 	// Create the root event for the trigger node, and process it.
 	//
-	event := support.EmitWorkflowEventForNode(t, workflow.ID, node1, "default", nil)
+	event := support.EmitCanvasEventForNode(t, canvas.ID, node1, "default", nil)
 	err := router.LockAndProcessEvent(logger, *event)
 	require.NoError(t, err)
 
@@ -56,11 +56,11 @@ func Test__WorkflowEventRouter_ProcessRootEvent(t *testing.T) {
 	// Verify event was marked as routed and
 	// new queue item was created for the target node.
 	//
-	updatedEvent, err := models.FindWorkflowEvent(event.ID)
+	updatedEvent, err := models.FindCanvasEvent(event.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowEventStateRouted, updatedEvent.State)
+	assert.Equal(t, models.CanvasEventStateRouted, updatedEvent.State)
 
-	queueItems, err := models.ListNodeQueueItems(workflow.ID, node2, 10, nil)
+	queueItems, err := models.ListNodeQueueItems(canvas.ID, node2, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, queueItems, 1)
 	assert.Equal(t, node2, queueItems[0].NodeID)
@@ -86,11 +86,11 @@ func Test__WorkflowEventRouter_ProcessExecutionEvent(t *testing.T) {
 	trigger1 := "trigger-1"
 	node1 := "component-1"
 	node2 := "component-2"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{NodeID: trigger1, Type: models.NodeTypeTrigger},
 			{NodeID: node1, Type: models.NodeTypeComponent},
 			{NodeID: node2, Type: models.NodeTypeComponent},
@@ -105,26 +105,26 @@ func Test__WorkflowEventRouter_ProcessExecutionEvent(t *testing.T) {
 	// Create root event for trigger node,
 	// and create execution with output event for node1.
 	//
-	triggerEvent := support.EmitWorkflowEventForNode(t, workflow.ID, trigger1, "default", nil)
-	execution := support.CreateWorkflowNodeExecution(t, workflow.ID, node1, triggerEvent.ID, triggerEvent.ID, nil)
+	triggerEvent := support.EmitCanvasEventForNode(t, canvas.ID, trigger1, "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node1, triggerEvent.ID, triggerEvent.ID, nil)
 	_, err := execution.Pass(map[string][]any{"default": {map[string]any{}}})
 	require.NoError(t, err)
 
 	//
 	// Process node1 output event and verify it was routed properly.
 	//
-	events, err := models.ListWorkflowEvents(workflow.ID, node1, 10, nil)
+	events, err := models.ListCanvasEvents(canvas.ID, node1, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	outputEvent := events[0]
 	err = router.LockAndProcessEvent(logger, outputEvent)
 	require.NoError(t, err)
 
-	updatedEvent, err := models.FindWorkflowEvent(outputEvent.ID)
+	updatedEvent, err := models.FindCanvasEvent(outputEvent.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowEventStateRouted, updatedEvent.State)
+	assert.Equal(t, models.CanvasEventStateRouted, updatedEvent.State)
 
-	queueItems, err := models.ListNodeQueueItems(workflow.ID, node2, 10, nil)
+	queueItems, err := models.ListNodeQueueItems(canvas.ID, node2, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, queueItems, 1)
 	assert.Equal(t, node2, queueItems[0].NodeID)
@@ -163,13 +163,13 @@ func Test__WorkflowEventRouter_CustomComponent_RespectsOutputChannels(t *testing
 		},
 	)
 
-	// Create a workflow that uses this custom component
+	// Create a canvas that uses this custom component
 	customComponentNode := "blueprint-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "trigger-1",
 				Type:   models.NodeTypeTrigger,
@@ -200,15 +200,15 @@ func Test__WorkflowEventRouter_CustomComponent_RespectsOutputChannels(t *testing
 	//
 	// Create parent execution for the custom component
 	//
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "trigger-1", "default", nil)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger-1", "default", nil)
 	require.NoError(t, rootEvent.Routed())
-	parentExecution := support.CreateWorkflowNodeExecution(t, workflow.ID, customComponentNode, rootEvent.ID, rootEvent.ID, nil)
+	parentExecution := support.CreateCanvasNodeExecution(t, canvas.ID, customComponentNode, rootEvent.ID, rootEvent.ID, nil)
 
 	//
 	// Create and pass child execution,
 	// emit output event on "true" channel.
 	//
-	childExecution := support.CreateWorkflowNodeExecution(t, workflow.ID, customComponentNode+":if-1", rootEvent.ID, rootEvent.ID, &parentExecution.ID)
+	childExecution := support.CreateCanvasNodeExecution(t, canvas.ID, customComponentNode+":if-1", rootEvent.ID, rootEvent.ID, &parentExecution.ID)
 	_, err := childExecution.Pass(map[string][]any{
 		"true": {map[string]any{}},
 	})
@@ -219,18 +219,18 @@ func Test__WorkflowEventRouter_CustomComponent_RespectsOutputChannels(t *testing
 	// verify parent execution is completed,
 	// and verify parent execution emitted events only on the "up" channel, NOT on "down"
 	//
-	events, err := models.ListWorkflowEvents(workflow.ID, customComponentNode+":if-1", 10, nil)
+	events, err := models.ListCanvasEvents(canvas.ID, customComponentNode+":if-1", 10, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	childOutputEvent := events[0]
 	err = router.LockAndProcessEvent(logger, childOutputEvent)
 	require.NoError(t, err)
 
-	parent, err := models.FindNodeExecution(workflow.ID, parentExecution.ID)
+	parent, err := models.FindNodeExecution(canvas.ID, parentExecution.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeExecutionStateFinished, parent.State)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, parent.State)
 
-	parentOutputEvents, err := models.ListWorkflowEvents(workflow.ID, customComponentNode, 10, nil)
+	parentOutputEvents, err := models.ListCanvasEvents(canvas.ID, customComponentNode, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, filterEventsByChannel(parentOutputEvents, "up"), 1)
 	assert.Len(t, filterEventsByChannel(parentOutputEvents, "down"), 0)
@@ -265,13 +265,13 @@ func TestWorkflowEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
 		},
 	)
 
-	// Create a workflow that uses this custom component
+	// Create a canvas that uses this custom component
 	customComponentNode := "blueprint-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "trigger-1",
 				Type:   models.NodeTypeTrigger,
@@ -297,14 +297,14 @@ func TestWorkflowEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
 	//
 	// Create parent execution for the custom component
 	//
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "trigger-1", "default", nil)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger-1", "default", nil)
 	require.NoError(t, rootEvent.Routed())
-	parentExecution := support.CreateWorkflowNodeExecution(t, workflow.ID, customComponentNode, rootEvent.ID, rootEvent.ID, nil)
+	parentExecution := support.CreateCanvasNodeExecution(t, canvas.ID, customComponentNode, rootEvent.ID, rootEvent.ID, nil)
 
 	//
 	// Create and pass child execution, emitting 5 events.
 	//
-	childExecution := support.CreateWorkflowNodeExecution(t, workflow.ID, customComponentNode+":filter-1", rootEvent.ID, rootEvent.ID, &parentExecution.ID)
+	childExecution := support.CreateCanvasNodeExecution(t, canvas.ID, customComponentNode+":filter-1", rootEvent.ID, rootEvent.ID, &parentExecution.ID)
 	_, err := childExecution.Pass(map[string][]any{
 		"default": {
 			map[string]any{},
@@ -321,26 +321,26 @@ func TestWorkflowEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
 	// verify parent execution is completed,
 	// emitting 5 events too.
 	//
-	events, err := models.ListWorkflowEvents(workflow.ID, customComponentNode+":filter-1", 10, nil)
+	events, err := models.ListCanvasEvents(canvas.ID, customComponentNode+":filter-1", 10, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 5)
 	childOutputEvent := events[0]
 	err = router.LockAndProcessEvent(logger, childOutputEvent)
 	require.NoError(t, err)
 
-	parent, err := models.FindNodeExecution(workflow.ID, parentExecution.ID)
+	parent, err := models.FindNodeExecution(canvas.ID, parentExecution.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeExecutionStateFinished, parent.State)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, parent.State)
 
-	parentOutputEvents, err := models.ListWorkflowEvents(workflow.ID, customComponentNode, 10, nil)
+	parentOutputEvents, err := models.ListCanvasEvents(canvas.ID, customComponentNode, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, filterEventsByChannel(parentOutputEvents, "default"), 5)
 
 	assert.True(t, executionConsumer.HasReceivedMessage())
 }
 
-func filterEventsByChannel(events []models.WorkflowEvent, channel string) []models.WorkflowEvent {
-	var filtered []models.WorkflowEvent
+func filterEventsByChannel(events []models.CanvasEvent, channel string) []models.CanvasEvent {
+	var filtered []models.CanvasEvent
 	for _, event := range events {
 		if event.Channel == channel {
 			filtered = append(filtered, event)

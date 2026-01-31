@@ -37,11 +37,11 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Create a canvas with nodes and edges
 		//
-		workflow, _ := support.CreateWorkflow(
+		canvas, _ := support.CreateCanvas(
 			t,
 			r.Organization.ID,
 			r.User,
-			[]models.WorkflowNode{
+			[]models.CanvasNode{
 				{
 					NodeID: "node-1",
 					Name:   "First Node",
@@ -69,15 +69,15 @@ func Test__DescribeCanvas(t *testing.T) {
 		)
 
 		require.NoError(t, database.Conn().
-			Model(&models.WorkflowNode{}).
-			Where("workflow_id = ? AND node_id = ?", workflow.ID, "node-1").
-			Update("state", models.WorkflowNodeStatePaused).
+			Model(&models.CanvasNode{}).
+			Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-1").
+			Update("state", models.CanvasNodeStatePaused).
 			Error)
 
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), workflow.ID.String())
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Canvas)
@@ -86,10 +86,10 @@ func Test__DescribeCanvas(t *testing.T) {
 		// Verify metadata structure
 		//
 		require.NotNil(t, response.Canvas.Metadata)
-		assert.Equal(t, workflow.ID.String(), response.Canvas.Metadata.Id)
-		assert.Equal(t, workflow.OrganizationID.String(), response.Canvas.Metadata.OrganizationId)
-		assert.Equal(t, workflow.Name, response.Canvas.Metadata.Name)
-		assert.Equal(t, workflow.Description, response.Canvas.Metadata.Description)
+		assert.Equal(t, canvas.ID.String(), response.Canvas.Metadata.Id)
+		assert.Equal(t, canvas.OrganizationID.String(), response.Canvas.Metadata.OrganizationId)
+		assert.Equal(t, canvas.Name, response.Canvas.Metadata.Name)
+		assert.Equal(t, canvas.Description, response.Canvas.Metadata.Description)
 		assert.NotNil(t, response.Canvas.Metadata.CreatedAt)
 		assert.NotNil(t, response.Canvas.Metadata.UpdatedAt)
 		assert.NotNil(t, response.Canvas.Metadata.CreatedBy)
@@ -132,11 +132,11 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Create a canvas with two nodes
 		//
-		workflow, _ := support.CreateWorkflow(
+		canvas, _ := support.CreateCanvas(
 			t,
 			r.Organization.ID,
 			r.User,
-			[]models.WorkflowNode{
+			[]models.CanvasNode{
 				{
 					NodeID: "node-1",
 					Name:   "First Node",
@@ -160,27 +160,27 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Create events for executions
 		//
-		rootEvent1 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
-		event1 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
-		rootEvent2 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-2", "default", nil)
-		event2 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-2", "default", nil)
+		rootEvent1 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+		event1 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+		rootEvent2 := support.EmitCanvasEventForNode(t, canvas.ID, "node-2", "default", nil)
+		event2 := support.EmitCanvasEventForNode(t, canvas.ID, "node-2", "default", nil)
 
 		//
 		// Create multiple executions for node-1 (older one first)
 		//
-		oldExecution := support.CreateWorkflowNodeExecution(t, workflow.ID, "node-1", rootEvent1.ID, event1.ID, nil)
+		oldExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, event1.ID, nil)
 		// Wait a bit to ensure different timestamps
-		support.CreateWorkflowNodeExecution(t, workflow.ID, "node-1", rootEvent1.ID, event1.ID, nil)
+		support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, event1.ID, nil)
 
 		//
 		// Create one execution for node-2
 		//
-		support.CreateWorkflowNodeExecution(t, workflow.ID, "node-2", rootEvent2.ID, event2.ID, nil)
+		support.CreateCanvasNodeExecution(t, canvas.ID, "node-2", rootEvent2.ID, event2.ID, nil)
 
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), workflow.ID.String())
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -190,14 +190,14 @@ func Test__DescribeCanvas(t *testing.T) {
 		assert.Len(t, response.Canvas.Status.LastExecutions, 2)
 
 		// Verify the latest execution for node-1 is NOT the old one
-		var node1Execution *models.WorkflowNodeExecution
-		var node2Execution *models.WorkflowNodeExecution
+		var node1Execution *models.CanvasNodeExecution
+		var node2Execution *models.CanvasNodeExecution
 		for _, exec := range response.Canvas.Status.LastExecutions {
 			if exec.NodeId == "node-1" {
-				node1Execution = &models.WorkflowNodeExecution{ID: uuid.MustParse(exec.Id)}
+				node1Execution = &models.CanvasNodeExecution{ID: uuid.MustParse(exec.Id)}
 			}
 			if exec.NodeId == "node-2" {
-				node2Execution = &models.WorkflowNodeExecution{ID: uuid.MustParse(exec.Id)}
+				node2Execution = &models.CanvasNodeExecution{ID: uuid.MustParse(exec.Id)}
 			}
 		}
 
@@ -210,11 +210,11 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Create a canvas with two nodes
 		//
-		workflow, _ := support.CreateWorkflow(
+		canvas, _ := support.CreateCanvas(
 			t,
 			r.Organization.ID,
 			r.User,
-			[]models.WorkflowNode{
+			[]models.CanvasNode{
 				{
 					NodeID: "node-1",
 					Name:   "First Node",
@@ -238,27 +238,27 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Create events for queue items
 		//
-		rootEvent1 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
-		event1 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
-		rootEvent2 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-2", "default", nil)
-		event2 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-2", "default", nil)
+		rootEvent1 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+		event1 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+		rootEvent2 := support.EmitCanvasEventForNode(t, canvas.ID, "node-2", "default", nil)
+		event2 := support.EmitCanvasEventForNode(t, canvas.ID, "node-2", "default", nil)
 
 		//
 		// Create multiple queue items for node-1 (oldest one first)
 		//
-		support.CreateWorkflowQueueItem(t, workflow.ID, "node-1", rootEvent1.ID, event1.ID)
+		support.CreateQueueItem(t, canvas.ID, "node-1", rootEvent1.ID, event1.ID)
 		// Wait a bit to ensure different timestamps
-		support.CreateWorkflowQueueItem(t, workflow.ID, "node-1", rootEvent1.ID, event1.ID)
+		support.CreateQueueItem(t, canvas.ID, "node-1", rootEvent1.ID, event1.ID)
 
 		//
 		// Create one queue item for node-2
 		//
-		support.CreateWorkflowQueueItem(t, workflow.ID, "node-2", rootEvent2.ID, event2.ID)
+		support.CreateQueueItem(t, canvas.ID, "node-2", rootEvent2.ID, event2.ID)
 
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), workflow.ID.String())
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -268,14 +268,14 @@ func Test__DescribeCanvas(t *testing.T) {
 		assert.Len(t, response.Canvas.Status.NextQueueItems, 2)
 
 		// Verify each node has a queue item
-		var node1QueueItem *models.WorkflowNodeQueueItem
-		var node2QueueItem *models.WorkflowNodeQueueItem
+		var node1QueueItem *models.CanvasNodeQueueItem
+		var node2QueueItem *models.CanvasNodeQueueItem
 		for _, item := range response.Canvas.Status.NextQueueItems {
 			if item.NodeId == "node-1" {
-				node1QueueItem = &models.WorkflowNodeQueueItem{ID: uuid.MustParse(item.Id)}
+				node1QueueItem = &models.CanvasNodeQueueItem{ID: uuid.MustParse(item.Id)}
 			}
 			if item.NodeId == "node-2" {
-				node2QueueItem = &models.WorkflowNodeQueueItem{ID: uuid.MustParse(item.Id)}
+				node2QueueItem = &models.CanvasNodeQueueItem{ID: uuid.MustParse(item.Id)}
 			}
 		}
 
@@ -287,11 +287,11 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Create a canvas with two nodes
 		//
-		workflow, _ := support.CreateWorkflow(
+		canvas, _ := support.CreateCanvas(
 			t,
 			r.Organization.ID,
 			r.User,
-			[]models.WorkflowNode{
+			[]models.CanvasNode{
 				{
 					NodeID: "node-1",
 					Name:   "First Node",
@@ -315,19 +315,19 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Create multiple events for node-1 (older one first)
 		//
-		oldEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
+		oldEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 		// Wait a bit to ensure different timestamps
-		support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
+		support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 
 		//
 		// Create one event for node-2
 		//
-		support.EmitWorkflowEventForNode(t, workflow.ID, "node-2", "default", nil)
+		support.EmitCanvasEventForNode(t, canvas.ID, "node-2", "default", nil)
 
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), workflow.ID.String())
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -337,14 +337,14 @@ func Test__DescribeCanvas(t *testing.T) {
 		assert.Len(t, response.Canvas.Status.LastEvents, 2)
 
 		// Verify the latest event for node-1 is NOT the old one
-		var node1Event *models.WorkflowEvent
-		var node2Event *models.WorkflowEvent
+		var node1Event *models.CanvasEvent
+		var node2Event *models.CanvasEvent
 		for _, event := range response.Canvas.Status.LastEvents {
 			if event.NodeId == "node-1" {
-				node1Event = &models.WorkflowEvent{ID: uuid.MustParse(event.Id)}
+				node1Event = &models.CanvasEvent{ID: uuid.MustParse(event.Id)}
 			}
 			if event.NodeId == "node-2" {
-				node2Event = &models.WorkflowEvent{ID: uuid.MustParse(event.Id)}
+				node2Event = &models.CanvasEvent{ID: uuid.MustParse(event.Id)}
 			}
 		}
 
@@ -357,11 +357,11 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Create a canvas with nodes but no executions or queue items
 		//
-		workflow, _ := support.CreateWorkflow(
+		canvas, _ := support.CreateCanvas(
 			t,
 			r.Organization.ID,
 			r.User,
-			[]models.WorkflowNode{
+			[]models.CanvasNode{
 				{
 					NodeID: "node-1",
 					Name:   "First Node",
@@ -377,7 +377,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), workflow.ID.String())
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -393,11 +393,11 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Create a canvas with three nodes
 		//
-		workflow, workflowNodes := support.CreateWorkflow(
+		canvas, canvasNodes := support.CreateCanvas(
 			t,
 			r.Organization.ID,
 			r.User,
-			[]models.WorkflowNode{
+			[]models.CanvasNode{
 				{
 					NodeID: "active-node-1",
 					Name:   "Active Node 1",
@@ -429,27 +429,27 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Create events for executions
 		//
-		rootEvent1 := support.EmitWorkflowEventForNode(t, workflow.ID, "active-node-1", "default", nil)
-		event1 := support.EmitWorkflowEventForNode(t, workflow.ID, "active-node-1", "default", nil)
-		rootEvent2 := support.EmitWorkflowEventForNode(t, workflow.ID, "active-node-2", "default", nil)
-		event2 := support.EmitWorkflowEventForNode(t, workflow.ID, "active-node-2", "default", nil)
-		rootEvent3 := support.EmitWorkflowEventForNode(t, workflow.ID, "deleted-node", "default", nil)
-		event3 := support.EmitWorkflowEventForNode(t, workflow.ID, "deleted-node", "default", nil)
+		rootEvent1 := support.EmitCanvasEventForNode(t, canvas.ID, "active-node-1", "default", nil)
+		event1 := support.EmitCanvasEventForNode(t, canvas.ID, "active-node-1", "default", nil)
+		rootEvent2 := support.EmitCanvasEventForNode(t, canvas.ID, "active-node-2", "default", nil)
+		event2 := support.EmitCanvasEventForNode(t, canvas.ID, "active-node-2", "default", nil)
+		rootEvent3 := support.EmitCanvasEventForNode(t, canvas.ID, "deleted-node", "default", nil)
+		event3 := support.EmitCanvasEventForNode(t, canvas.ID, "deleted-node", "default", nil)
 
 		//
 		// Create executions for all nodes
 		//
-		activeExec1 := support.CreateWorkflowNodeExecution(t, workflow.ID, "active-node-1", rootEvent1.ID, event1.ID, nil)
-		activeExec2 := support.CreateWorkflowNodeExecution(t, workflow.ID, "active-node-2", rootEvent2.ID, event2.ID, nil)
-		deletedExec := support.CreateWorkflowNodeExecution(t, workflow.ID, "deleted-node", rootEvent3.ID, event3.ID, nil)
+		activeExec1 := support.CreateCanvasNodeExecution(t, canvas.ID, "active-node-1", rootEvent1.ID, event1.ID, nil)
+		activeExec2 := support.CreateCanvasNodeExecution(t, canvas.ID, "active-node-2", rootEvent2.ID, event2.ID, nil)
+		deletedExec := support.CreateCanvasNodeExecution(t, canvas.ID, "deleted-node", rootEvent3.ID, event3.ID, nil)
 
 		//
 		// Delete one node (soft delete)
 		//
-		var deletedNode *models.WorkflowNode
-		for i := range workflowNodes {
-			if workflowNodes[i].NodeID == "deleted-node" {
-				deletedNode = &workflowNodes[i]
+		var deletedNode *models.CanvasNode
+		for i := range canvasNodes {
+			if canvasNodes[i].NodeID == "deleted-node" {
+				deletedNode = &canvasNodes[i]
 				break
 			}
 		}
@@ -460,7 +460,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), workflow.ID.String())
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -486,11 +486,11 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Create a canvas with three nodes
 		//
-		workflow, workflowNodes := support.CreateWorkflow(
+		canvas, canvasNodes := support.CreateCanvas(
 			t,
 			r.Organization.ID,
 			r.User,
-			[]models.WorkflowNode{
+			[]models.CanvasNode{
 				{
 					NodeID: "active-node-1",
 					Name:   "Active Node 1",
@@ -522,27 +522,27 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Create events for queue items
 		//
-		rootEvent1 := support.EmitWorkflowEventForNode(t, workflow.ID, "active-node-1", "default", nil)
-		event1 := support.EmitWorkflowEventForNode(t, workflow.ID, "active-node-1", "default", nil)
-		rootEvent2 := support.EmitWorkflowEventForNode(t, workflow.ID, "active-node-2", "default", nil)
-		event2 := support.EmitWorkflowEventForNode(t, workflow.ID, "active-node-2", "default", nil)
-		rootEvent3 := support.EmitWorkflowEventForNode(t, workflow.ID, "deleted-node", "default", nil)
-		event3 := support.EmitWorkflowEventForNode(t, workflow.ID, "deleted-node", "default", nil)
+		rootEvent1 := support.EmitCanvasEventForNode(t, canvas.ID, "active-node-1", "default", nil)
+		event1 := support.EmitCanvasEventForNode(t, canvas.ID, "active-node-1", "default", nil)
+		rootEvent2 := support.EmitCanvasEventForNode(t, canvas.ID, "active-node-2", "default", nil)
+		event2 := support.EmitCanvasEventForNode(t, canvas.ID, "active-node-2", "default", nil)
+		rootEvent3 := support.EmitCanvasEventForNode(t, canvas.ID, "deleted-node", "default", nil)
+		event3 := support.EmitCanvasEventForNode(t, canvas.ID, "deleted-node", "default", nil)
 
 		//
 		// Create queue items for all nodes
 		//
-		activeQI1 := support.CreateWorkflowQueueItem(t, workflow.ID, "active-node-1", rootEvent1.ID, event1.ID)
-		activeQI2 := support.CreateWorkflowQueueItem(t, workflow.ID, "active-node-2", rootEvent2.ID, event2.ID)
-		deletedQI := support.CreateWorkflowQueueItem(t, workflow.ID, "deleted-node", rootEvent3.ID, event3.ID)
+		activeQI1 := support.CreateQueueItem(t, canvas.ID, "active-node-1", rootEvent1.ID, event1.ID)
+		activeQI2 := support.CreateQueueItem(t, canvas.ID, "active-node-2", rootEvent2.ID, event2.ID)
+		deletedQI := support.CreateQueueItem(t, canvas.ID, "deleted-node", rootEvent3.ID, event3.ID)
 
 		//
 		// Delete one node (soft delete)
 		//
-		var deletedNode *models.WorkflowNode
-		for i := range workflowNodes {
-			if workflowNodes[i].NodeID == "deleted-node" {
-				deletedNode = &workflowNodes[i]
+		var deletedNode *models.CanvasNode
+		for i := range canvasNodes {
+			if canvasNodes[i].NodeID == "deleted-node" {
+				deletedNode = &canvasNodes[i]
 				break
 			}
 		}
@@ -553,7 +553,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), workflow.ID.String())
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -579,11 +579,11 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Create a canvas with three nodes
 		//
-		workflow, workflowNodes := support.CreateWorkflow(
+		canvas, canvasNodes := support.CreateCanvas(
 			t,
 			r.Organization.ID,
 			r.User,
-			[]models.WorkflowNode{
+			[]models.CanvasNode{
 				{
 					NodeID: "active-node-1",
 					Name:   "Active Node 1",
@@ -615,17 +615,17 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Create events for all nodes
 		//
-		activeEvent1 := support.EmitWorkflowEventForNode(t, workflow.ID, "active-node-1", "default", nil)
-		activeEvent2 := support.EmitWorkflowEventForNode(t, workflow.ID, "active-node-2", "default", nil)
-		deletedEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "deleted-node", "default", nil)
+		activeEvent1 := support.EmitCanvasEventForNode(t, canvas.ID, "active-node-1", "default", nil)
+		activeEvent2 := support.EmitCanvasEventForNode(t, canvas.ID, "active-node-2", "default", nil)
+		deletedEvent := support.EmitCanvasEventForNode(t, canvas.ID, "deleted-node", "default", nil)
 
 		//
 		// Delete one node (soft delete)
 		//
-		var deletedNode *models.WorkflowNode
-		for i := range workflowNodes {
-			if workflowNodes[i].NodeID == "deleted-node" {
-				deletedNode = &workflowNodes[i]
+		var deletedNode *models.CanvasNode
+		for i := range canvasNodes {
+			if canvasNodes[i].NodeID == "deleted-node" {
+				deletedNode = &canvasNodes[i]
 				break
 			}
 		}
@@ -636,7 +636,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), workflow.ID.String())
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 

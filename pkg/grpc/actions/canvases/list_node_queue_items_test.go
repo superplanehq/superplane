@@ -14,10 +14,10 @@ import (
 	"gorm.io/datatypes"
 )
 
-func createWorkflowNodeQueueItem(t *testing.T, workflowID uuid.UUID, nodeID string, eventID uuid.UUID, rootEventID *uuid.UUID) *models.WorkflowNodeQueueItem {
+func createNodeQueueItem(t *testing.T, workflowID uuid.UUID, nodeID string, eventID uuid.UUID, rootEventID *uuid.UUID) *models.CanvasNodeQueueItem {
 	now := time.Now()
 
-	queueItem := models.WorkflowNodeQueueItem{
+	queueItem := models.CanvasNodeQueueItem{
 		ID:         uuid.New(),
 		WorkflowID: workflowID,
 		NodeID:     nodeID,
@@ -40,11 +40,11 @@ func createWorkflowNodeQueueItem(t *testing.T, workflowID uuid.UUID, nodeID stri
 func Test__ListNodeQueueItems__ReturnsEmptyListWhenNoQueueItemsExist(t *testing.T) {
 	r := support.Setup(t)
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
@@ -57,7 +57,7 @@ func Test__ListNodeQueueItems__ReturnsEmptyListWhenNoQueueItemsExist(t *testing.
 		[]models.Edge{},
 	)
 
-	response, err := ListNodeQueueItems(context.Background(), r.Registry, workflow.ID.String(), "node-1", 10, nil)
+	response, err := ListNodeQueueItems(context.Background(), r.Registry, canvas.ID.String(), "node-1", 10, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.Empty(t, response.Items)
@@ -69,11 +69,11 @@ func Test__ListNodeQueueItems__ReturnsEmptyListWhenNoQueueItemsExist(t *testing.
 func Test__ListNodeQueueItems__ReturnsQueueItemsWithInputData(t *testing.T) {
 	r := support.Setup(t)
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
@@ -86,13 +86,13 @@ func Test__ListNodeQueueItems__ReturnsQueueItemsWithInputData(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	inputEvent := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, "node-1", "default", nil, map[string]interface{}{
+	inputEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "node-1", "default", nil, map[string]interface{}{
 		"test_field": "test_value",
 	})
 
-	queueItem := createWorkflowNodeQueueItem(t, workflow.ID, "node-1", inputEvent.ID, nil)
+	queueItem := createNodeQueueItem(t, canvas.ID, "node-1", inputEvent.ID, nil)
 
-	response, err := ListNodeQueueItems(context.Background(), r.Registry, workflow.ID.String(), "node-1", 10, nil)
+	response, err := ListNodeQueueItems(context.Background(), r.Registry, canvas.ID.String(), "node-1", 10, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Items, 1)
@@ -101,7 +101,7 @@ func Test__ListNodeQueueItems__ReturnsQueueItemsWithInputData(t *testing.T) {
 
 	item := response.Items[0]
 	assert.Equal(t, queueItem.ID.String(), item.Id)
-	assert.Equal(t, workflow.ID.String(), item.CanvasId)
+	assert.Equal(t, canvas.ID.String(), item.CanvasId)
 	assert.Equal(t, "node-1", item.NodeId)
 	assert.NotNil(t, item.CreatedAt)
 	assert.NotNil(t, item.Input)
@@ -114,11 +114,11 @@ func Test__ListNodeQueueItems__ReturnsQueueItemsWithInputData(t *testing.T) {
 func Test__ListNodeQueueItems__ReturnsQueueItemsWithRootEvent(t *testing.T) {
 	r := support.Setup(t)
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
@@ -131,14 +131,14 @@ func Test__ListNodeQueueItems__ReturnsQueueItemsWithRootEvent(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "root-node", "default", nil)
-	inputEvent := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, "node-1", "default", nil, map[string]interface{}{
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "root-node", "default", nil)
+	inputEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "node-1", "default", nil, map[string]interface{}{
 		"data": "value",
 	})
 
-	queueItem := createWorkflowNodeQueueItem(t, workflow.ID, "node-1", inputEvent.ID, &rootEvent.ID)
+	queueItem := createNodeQueueItem(t, canvas.ID, "node-1", inputEvent.ID, &rootEvent.ID)
 
-	response, err := ListNodeQueueItems(context.Background(), r.Registry, workflow.ID.String(), "node-1", 10, nil)
+	response, err := ListNodeQueueItems(context.Background(), r.Registry, canvas.ID.String(), "node-1", 10, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Items, 1)
@@ -152,11 +152,11 @@ func Test__ListNodeQueueItems__ReturnsQueueItemsWithRootEvent(t *testing.T) {
 func Test__ListNodeQueueItems__HandlesPaginationCorrectly(t *testing.T) {
 	r := support.Setup(t)
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
@@ -169,16 +169,16 @@ func Test__ListNodeQueueItems__HandlesPaginationCorrectly(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	var queueItems []models.WorkflowNodeQueueItem
+	var queueItems []models.CanvasNodeQueueItem
 	for i := 0; i < 5; i++ {
-		inputEvent := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, "node-1", "default", nil, map[string]interface{}{
+		inputEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "node-1", "default", nil, map[string]interface{}{
 			"index": i,
 		})
-		queueItem := createWorkflowNodeQueueItem(t, workflow.ID, "node-1", inputEvent.ID, nil)
+		queueItem := createNodeQueueItem(t, canvas.ID, "node-1", inputEvent.ID, nil)
 		queueItems = append(queueItems, *queueItem)
 	}
 
-	response, err := ListNodeQueueItems(context.Background(), r.Registry, workflow.ID.String(), "node-1", 3, nil)
+	response, err := ListNodeQueueItems(context.Background(), r.Registry, canvas.ID.String(), "node-1", 3, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Items, 3)
@@ -190,11 +190,11 @@ func Test__ListNodeQueueItems__HandlesPaginationCorrectly(t *testing.T) {
 func Test__ListNodeQueueItems__FiltersQueueItemsByNodeID(t *testing.T) {
 	r := support.Setup(t)
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
@@ -215,13 +215,13 @@ func Test__ListNodeQueueItems__FiltersQueueItemsByNodeID(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	inputEvent1 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
-	inputEvent2 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-2", "default", nil)
+	inputEvent1 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	inputEvent2 := support.EmitCanvasEventForNode(t, canvas.ID, "node-2", "default", nil)
 
-	queueItem1 := createWorkflowNodeQueueItem(t, workflow.ID, "node-1", inputEvent1.ID, nil)
-	createWorkflowNodeQueueItem(t, workflow.ID, "node-2", inputEvent2.ID, nil)
+	queueItem1 := createNodeQueueItem(t, canvas.ID, "node-1", inputEvent1.ID, nil)
+	createNodeQueueItem(t, canvas.ID, "node-2", inputEvent2.ID, nil)
 
-	response, err := ListNodeQueueItems(context.Background(), r.Registry, workflow.ID.String(), "node-1", 10, nil)
+	response, err := ListNodeQueueItems(context.Background(), r.Registry, canvas.ID.String(), "node-1", 10, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Items, 1)
@@ -235,11 +235,11 @@ func Test__ListNodeQueueItems__FiltersQueueItemsByNodeID(t *testing.T) {
 func Test__ListNodeQueueItems__HandlesPaginationWithTimestamp(t *testing.T) {
 	r := support.Setup(t)
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
@@ -253,22 +253,22 @@ func Test__ListNodeQueueItems__HandlesPaginationWithTimestamp(t *testing.T) {
 	)
 
 	for i := 0; i < 3; i++ {
-		inputEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
-		createWorkflowNodeQueueItem(t, workflow.ID, "node-1", inputEvent.ID, nil)
+		inputEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+		createNodeQueueItem(t, canvas.ID, "node-1", inputEvent.ID, nil)
 	}
 
-	firstResponse, err := ListNodeQueueItems(context.Background(), r.Registry, workflow.ID.String(), "node-1", 2, nil)
+	firstResponse, err := ListNodeQueueItems(context.Background(), r.Registry, canvas.ID.String(), "node-1", 2, nil)
 	require.NoError(t, err)
 	require.Len(t, firstResponse.Items, 2)
 	assert.True(t, firstResponse.HasNextPage)
 
-	secondResponse, err := ListNodeQueueItems(context.Background(), r.Registry, workflow.ID.String(), "node-1", 2, firstResponse.LastTimestamp)
+	secondResponse, err := ListNodeQueueItems(context.Background(), r.Registry, canvas.ID.String(), "node-1", 2, firstResponse.LastTimestamp)
 	require.NoError(t, err)
 	require.Len(t, secondResponse.Items, 1)
 	assert.False(t, secondResponse.HasNextPage)
 }
 
-func Test__ListNodeQueueItems__ReturnsErrorForInvalidWorkflowID(t *testing.T) {
+func Test__ListNodeQueueItems__ReturnsErrorForInvalidCanvasID(t *testing.T) {
 	r := support.Setup(t)
 
 	response, err := ListNodeQueueItems(context.Background(), r.Registry, "invalid-uuid", "node-1", 10, nil)
@@ -277,7 +277,7 @@ func Test__ListNodeQueueItems__ReturnsErrorForInvalidWorkflowID(t *testing.T) {
 }
 
 func Test__SerializeNodeQueueItems__HandlesEmptyList(t *testing.T) {
-	result, err := SerializeNodeQueueItems([]models.WorkflowNodeQueueItem{})
+	result, err := SerializeNodeQueueItems([]models.CanvasNodeQueueItem{})
 	require.NoError(t, err)
 	assert.Empty(t, result)
 }

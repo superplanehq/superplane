@@ -12,7 +12,7 @@ type CanvasEventCreatedMessage struct {
 	message *pb.CanvasNodeEventMessage
 }
 
-func NewCanvasEventCreatedMessage(canvasId string, event *models.WorkflowEvent) CanvasEventCreatedMessage {
+func NewCanvasEventCreatedMessage(canvasId string, event *models.CanvasEvent) CanvasEventCreatedMessage {
 	return CanvasEventCreatedMessage{
 		message: &pb.CanvasNodeEventMessage{
 			Id:        event.ID.String(),

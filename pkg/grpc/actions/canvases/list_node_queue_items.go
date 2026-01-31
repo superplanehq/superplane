@@ -50,11 +50,11 @@ func ListNodeQueueItems(ctx context.Context, registry *registry.Registry, workfl
 	}, nil
 }
 
-func SerializeNodeQueueItems(queueItems []models.WorkflowNodeQueueItem) ([]*pb.CanvasNodeQueueItem, error) {
+func SerializeNodeQueueItems(queueItems []models.CanvasNodeQueueItem) ([]*pb.CanvasNodeQueueItem, error) {
 	//
 	// Fetch all input records
 	//
-	inputEvents, err := models.FindWorkflowEvents(eventIDsFromQueueItems(queueItems))
+	inputEvents, err := models.FindCanvasEvents(eventIDsFromQueueItems(queueItems))
 	if err != nil {
 		return nil, fmt.Errorf("error find input events: %v", err)
 	}
@@ -91,14 +91,14 @@ func SerializeNodeQueueItems(queueItems []models.WorkflowNodeQueueItem) ([]*pb.C
 	return result, nil
 }
 
-func getLastQueueItemTimestamp(queueItems []models.WorkflowNodeQueueItem) *timestamppb.Timestamp {
+func getLastQueueItemTimestamp(queueItems []models.CanvasNodeQueueItem) *timestamppb.Timestamp {
 	if len(queueItems) > 0 {
 		return timestamppb.New(*queueItems[len(queueItems)-1].CreatedAt)
 	}
 	return nil
 }
 
-func eventIDsFromQueueItems(queueItems []models.WorkflowNodeQueueItem) []string {
+func eventIDsFromQueueItems(queueItems []models.CanvasNodeQueueItem) []string {
 	ids := make([]string, len(queueItems))
 	for i, queueItem := range queueItems {
 		ids[i] = queueItem.EventID.String()
@@ -107,7 +107,7 @@ func eventIDsFromQueueItems(queueItems []models.WorkflowNodeQueueItem) []string 
 	return ids
 }
 
-func getInputForQueueItem(queueItem models.WorkflowNodeQueueItem, events []models.WorkflowEvent) (*structpb.Struct, error) {
+func getInputForQueueItem(queueItem models.CanvasNodeQueueItem, events []models.CanvasEvent) (*structpb.Struct, error) {
 	for _, event := range events {
 		if event.ID.String() == queueItem.EventID.String() {
 			eventData, ok := event.Data.Data().(map[string]any)

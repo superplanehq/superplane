@@ -21,7 +21,7 @@ func ListEventExecutions(ctx context.Context, registry *registry.Registry, workf
 		return nil, err
 	}
 
-	var executions []models.WorkflowNodeExecution
+	var executions []models.CanvasNodeExecution
 	query := database.Conn().
 		Where("workflow_id = ?", workflowUUID).
 		Where("root_event_id = ?", eventUUID).

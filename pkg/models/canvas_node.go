@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	WorkflowNodeStateReady      = "ready"
-	WorkflowNodeStateProcessing = "processing"
-	WorkflowNodeStateError      = "error"
-	WorkflowNodeStatePaused     = "paused"
+	CanvasNodeStateReady      = "ready"
+	CanvasNodeStateProcessing = "processing"
+	CanvasNodeStateError      = "error"
+	CanvasNodeStatePaused     = "paused"
 
 	NodeTypeTrigger   = "trigger"
 	NodeTypeComponent = "component"
@@ -26,7 +26,7 @@ const (
 	NodeTypeWidget    = "widget"
 )
 
-type WorkflowNode struct {
+type CanvasNode struct {
 	WorkflowID        uuid.UUID `gorm:"primaryKey"`
 	NodeID            string    `gorm:"primaryKey"`
 	ParentNodeID      *string
@@ -44,6 +44,10 @@ type WorkflowNode struct {
 	CreatedAt         *time.Time
 	UpdatedAt         *time.Time
 	DeletedAt         gorm.DeletedAt `gorm:"index"`
+}
+
+func (c *CanvasNode) TableName() string {
+	return "workflow_nodes"
 }
 
 var nodeIDSanitizer = regexp.MustCompile(`[^a-z0-9]`)
@@ -109,7 +113,7 @@ func randomNodeSuffix(length int) string {
 	return randomValue[:length]
 }
 
-func DeleteWorkflowNode(tx *gorm.DB, node WorkflowNode) error {
+func DeleteCanvasNode(tx *gorm.DB, node CanvasNode) error {
 	err := tx.Delete(&node).Error
 	if err != nil {
 		return err
@@ -147,10 +151,10 @@ func DeleteWorkflowNode(tx *gorm.DB, node WorkflowNode) error {
 	return tx.Delete(&webhook).Error
 }
 
-func FindWorkflowNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (*WorkflowNode, error) {
-	var node WorkflowNode
+func FindCanvasNode(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (*CanvasNode, error) {
+	var node CanvasNode
 	err := tx.
-		Where("workflow_id = ?", workflowID).
+		Where("workflow_id = ?", canvasID).
 		Where("node_id = ?", nodeID).
 		First(&node).
 		Error
@@ -162,10 +166,10 @@ func FindWorkflowNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (*Workfl
 	return &node, nil
 }
 
-func FindWorkflowNodesByIDs(tx *gorm.DB, workflowID uuid.UUID, nodeIDs []string) ([]WorkflowNode, error) {
-	var nodes []WorkflowNode
+func FindCanvasNodesByIDs(tx *gorm.DB, canvasID uuid.UUID, nodeIDs []string) ([]CanvasNode, error) {
+	var nodes []CanvasNode
 	err := tx.
-		Where("workflow_id = ? AND node_id IN ?", workflowID, nodeIDs).
+		Where("workflow_id = ? AND node_id IN ?", canvasID, nodeIDs).
 		Find(&nodes).
 		Error
 
@@ -176,13 +180,13 @@ func FindWorkflowNodesByIDs(tx *gorm.DB, workflowID uuid.UUID, nodeIDs []string)
 	return nodes, nil
 }
 
-func ListWorkflowNodesReady() ([]WorkflowNode, error) {
-	var nodes []WorkflowNode
+func ListCanvasNodesReady() ([]CanvasNode, error) {
+	var nodes []CanvasNode
 	err := database.Conn().
 		Distinct().
 		Joins("JOIN workflow_node_queue_items ON workflow_nodes.workflow_id = workflow_node_queue_items.workflow_id AND workflow_nodes.node_id = workflow_node_queue_items.node_id").
 		Joins("JOIN workflows ON workflow_nodes.workflow_id = workflows.id").
-		Where("workflow_nodes.state = ?", WorkflowNodeStateReady).
+		Where("workflow_nodes.state = ?", CanvasNodeStateReady).
 		Where("workflow_nodes.type IN ?", []string{NodeTypeComponent, NodeTypeBlueprint}).
 		Where("workflows.deleted_at IS NULL").
 		Find(&nodes).
@@ -195,10 +199,10 @@ func ListWorkflowNodesReady() ([]WorkflowNode, error) {
 	return nodes, nil
 }
 
-func ListReadyTriggers() ([]WorkflowNode, error) {
-	var nodes []WorkflowNode
+func ListReadyTriggers() ([]CanvasNode, error) {
+	var nodes []CanvasNode
 	err := database.Conn().
-		Where("state = ?", WorkflowNodeStateReady).
+		Where("state = ?", CanvasNodeStateReady).
 		Where("type = ?", NodeTypeTrigger).
 		Find(&nodes).
 		Error
@@ -210,14 +214,14 @@ func ListReadyTriggers() ([]WorkflowNode, error) {
 	return nodes, nil
 }
 
-func LockWorkflowNode(tx *gorm.DB, workflowID uuid.UUID, nodeId string) (*WorkflowNode, error) {
-	var node WorkflowNode
+func LockCanvasNode(tx *gorm.DB, workflowID uuid.UUID, nodeId string) (*CanvasNode, error) {
+	var node CanvasNode
 
 	err := tx.
 		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 		Where("workflow_id = ?", workflowID).
 		Where("node_id = ?", nodeId).
-		Where("state = ?", WorkflowNodeStateReady).
+		Where("state = ?", CanvasNodeStateReady).
 		First(&node).
 		Error
 
@@ -228,8 +232,8 @@ func LockWorkflowNode(tx *gorm.DB, workflowID uuid.UUID, nodeId string) (*Workfl
 	return &node, nil
 }
 
-func LockWorkflowNodeForUpdate(tx *gorm.DB, workflowID uuid.UUID, nodeId string) (*WorkflowNode, error) {
-	var node WorkflowNode
+func LockCanvasNodeForUpdate(tx *gorm.DB, workflowID uuid.UUID, nodeId string) (*CanvasNode, error) {
+	var node CanvasNode
 
 	err := tx.
 		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
@@ -252,24 +256,24 @@ func ResumeStateForNodeInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID s
 	}
 
 	if runningCount > 0 {
-		return WorkflowNodeStateProcessing, nil
+		return CanvasNodeStateProcessing, nil
 	}
 
-	return WorkflowNodeStateReady, nil
+	return CanvasNodeStateReady, nil
 }
 
-func (w *WorkflowNode) UpdateState(tx *gorm.DB, state string) error {
-	return tx.Model(w).
+func (c *CanvasNode) UpdateState(tx *gorm.DB, state string) error {
+	return tx.Model(c).
 		Update("state", state).
 		Update("updated_at", time.Now()).
 		Error
 }
 
-func (w *WorkflowNode) FirstQueueItem(tx *gorm.DB) (*WorkflowNodeQueueItem, error) {
-	var queueItem WorkflowNodeQueueItem
+func (c *CanvasNode) FirstQueueItem(tx *gorm.DB) (*CanvasNodeQueueItem, error) {
+	var queueItem CanvasNodeQueueItem
 	err := tx.
-		Where("workflow_id = ?", w.WorkflowID).
-		Where("node_id = ?", w.NodeID).
+		Where("workflow_id = ?", c.WorkflowID).
+		Where("node_id = ?", c.NodeID).
 		Order("created_at ASC").
 		First(&queueItem).
 		Error
@@ -281,10 +285,10 @@ func (w *WorkflowNode) FirstQueueItem(tx *gorm.DB) (*WorkflowNodeQueueItem, erro
 	return &queueItem, nil
 }
 
-func (w *WorkflowNode) CreateRequest(tx *gorm.DB, reqType string, spec NodeExecutionRequestSpec, runAt *time.Time) error {
-	return tx.Create(&WorkflowNodeRequest{
-		WorkflowID: w.WorkflowID,
-		NodeID:     w.NodeID,
+func (c *CanvasNode) CreateRequest(tx *gorm.DB, reqType string, spec NodeExecutionRequestSpec, runAt *time.Time) error {
+	return tx.Create(&CanvasNodeRequest{
+		WorkflowID: c.WorkflowID,
+		NodeID:     c.NodeID,
 		ID:         uuid.New(),
 		State:      NodeExecutionRequestStatePending,
 		Type:       reqType,
@@ -295,7 +299,7 @@ func (w *WorkflowNode) CreateRequest(tx *gorm.DB, reqType string, spec NodeExecu
 	}).Error
 }
 
-type WorkflowNodeQueueItem struct {
+type CanvasNodeQueueItem struct {
 	ID         uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
 	WorkflowID uuid.UUID
 	NodeID     string
@@ -309,21 +313,25 @@ type WorkflowNodeQueueItem struct {
 	// for that event with a simple query.
 	//
 	RootEventID uuid.UUID
-	RootEvent   *WorkflowEvent `gorm:"foreignKey:RootEventID"`
+	RootEvent   *CanvasEvent `gorm:"foreignKey:RootEventID"`
 
 	//
-	// The reference to a WorkflowEvent record,
+	// The reference to a CanvasEvent record,
 	// which holds the input for this queue item.
 	//
 	EventID uuid.UUID
 }
 
-func (i *WorkflowNodeQueueItem) Delete(tx *gorm.DB) error {
+func (i *CanvasNodeQueueItem) TableName() string {
+	return "workflow_node_queue_items"
+}
+
+func (i *CanvasNodeQueueItem) Delete(tx *gorm.DB) error {
 	return tx.Delete(i).Error
 }
 
-func ListNodeQueueItems(workflowID uuid.UUID, nodeID string, limit int, beforeTime *time.Time) ([]WorkflowNodeQueueItem, error) {
-	var queueItems []WorkflowNodeQueueItem
+func ListNodeQueueItems(workflowID uuid.UUID, nodeID string, limit int, beforeTime *time.Time) ([]CanvasNodeQueueItem, error) {
+	var queueItems []CanvasNodeQueueItem
 	query := database.Conn().
 		Preload("RootEvent").
 		Where("workflow_id = ?", workflowID).
@@ -346,7 +354,7 @@ func ListNodeQueueItems(workflowID uuid.UUID, nodeID string, limit int, beforeTi
 func CountNodeQueueItems(workflowID uuid.UUID, nodeID string) (int64, error) {
 	var totalCount int64
 	countQuery := database.Conn().
-		Model(&WorkflowNodeQueueItem{}).
+		Model(&CanvasNodeQueueItem{}).
 		Where("workflow_id = ?", workflowID).
 		Where("node_id = ?", nodeID)
 
@@ -360,8 +368,8 @@ func CountNodeQueueItems(workflowID uuid.UUID, nodeID string) (int64, error) {
 // FindNextQueueItemPerNode finds the next (oldest) queue item for each node in a workflow
 // using DISTINCT ON to get one queue item per node_id, ordered by created_at ASC
 // Only returns queue items for nodes that have not been deleted
-func FindNextQueueItemPerNode(workflowID uuid.UUID) ([]WorkflowNodeQueueItem, error) {
-	var queueItems []WorkflowNodeQueueItem
+func FindNextQueueItemPerNode(workflowID uuid.UUID) ([]CanvasNodeQueueItem, error) {
+	var queueItems []CanvasNodeQueueItem
 	err := database.Conn().
 		Raw(`
 			SELECT DISTINCT ON (qi.node_id) qi.*
@@ -383,8 +391,8 @@ func FindNextQueueItemPerNode(workflowID uuid.UUID) ([]WorkflowNodeQueueItem, er
 	return queueItems, nil
 }
 
-func FindNodeQueueItem(workflowID uuid.UUID, queueItemID uuid.UUID) (*WorkflowNodeQueueItem, error) {
-	var queueItem WorkflowNodeQueueItem
+func FindNodeQueueItem(workflowID uuid.UUID, queueItemID uuid.UUID) (*CanvasNodeQueueItem, error) {
+	var queueItem CanvasNodeQueueItem
 	err := database.Conn().
 		Preload("RootEvent").
 		Where("workflow_id = ? AND id = ?", workflowID, queueItemID).

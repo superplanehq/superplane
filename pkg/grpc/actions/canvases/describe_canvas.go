@@ -20,10 +20,10 @@ func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizati
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
 	}
 
-	canvas, err := models.FindWorkflow(uuid.MustParse(organizationID), canvasID)
+	canvas, err := models.FindCanvas(uuid.MustParse(organizationID), canvasID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			template, templateErr := models.FindWorkflowTemplate(canvasID)
+			template, templateErr := models.FindCanvasTemplate(canvasID)
 			if templateErr != nil {
 				return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 			}

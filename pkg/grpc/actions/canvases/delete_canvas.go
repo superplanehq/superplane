@@ -20,10 +20,10 @@ func DeleteCanvas(ctx context.Context, registry *registry.Registry, organization
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
 	}
 
-	canvas, err := models.FindWorkflow(organizationID, canvasID)
+	canvas, err := models.FindCanvas(organizationID, canvasID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			if _, templateErr := models.FindWorkflowTemplate(canvasID); templateErr == nil {
+			if _, templateErr := models.FindCanvasTemplate(canvasID); templateErr == nil {
 				return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 			}
 		}

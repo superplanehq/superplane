@@ -21,13 +21,13 @@ func Test__ListNodeExecutions(t *testing.T) {
 
 	t.Run("node does not exist -> 404 error", func(t *testing.T) {
 		//
-		// Create a workflow with a node
+		// Create a canvas with a node
 		//
-		workflow, _ := support.CreateWorkflow(
+		canvas, _ := support.CreateCanvas(
 			t,
 			r.Organization.ID,
 			r.User,
-			[]models.WorkflowNode{
+			[]models.CanvasNode{
 				{
 					NodeID: "node-1",
 					Name:   "Test Node",
@@ -46,7 +46,7 @@ func Test__ListNodeExecutions(t *testing.T) {
 		_, err := ListNodeExecutions(
 			context.Background(),
 			r.Registry,
-			workflow.ID.String(),
+			canvas.ID.String(),
 			"non-existent-node",
 			[]pb.CanvasNodeExecution_State{},
 			[]pb.CanvasNodeExecution_Result{},
@@ -60,12 +60,12 @@ func Test__ListNodeExecutions(t *testing.T) {
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, s.Code())
-		assert.Contains(t, s.Message(), "workflow node not found")
+		assert.Contains(t, s.Message(), "canvas node not found")
 	})
 
-	t.Run("workflow does not exist -> 404 error", func(t *testing.T) {
+	t.Run("canvas does not exist -> 404 error", func(t *testing.T) {
 		//
-		// Try to list executions for a non-existent workflow
+		// Try to list executions for a non-existent canvas
 		//
 		_, err := ListNodeExecutions(
 			context.Background(),
@@ -84,18 +84,18 @@ func Test__ListNodeExecutions(t *testing.T) {
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, s.Code())
-		assert.Contains(t, s.Message(), "workflow node not found")
+		assert.Contains(t, s.Message(), "canvas node not found")
 	})
 
 	t.Run("returns executions for existing node", func(t *testing.T) {
 		//
-		// Create a workflow with a node
+		// Create a canvas with a node
 		//
-		workflow, _ := support.CreateWorkflow(
+		canvas, _ := support.CreateCanvas(
 			t,
 			r.Organization.ID,
 			r.User,
-			[]models.WorkflowNode{
+			[]models.CanvasNode{
 				{
 					NodeID: "node-1",
 					Name:   "Test Node",
@@ -111,12 +111,12 @@ func Test__ListNodeExecutions(t *testing.T) {
 		//
 		// Create events and executions
 		//
-		rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
+		rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 		customName := "Custom Root Event"
 		rootEvent.CustomName = &customName
 		require.NoError(t, database.Conn().Save(rootEvent).Error)
-		event := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
-		support.CreateWorkflowNodeExecution(t, workflow.ID, "node-1", rootEvent.ID, event.ID, nil)
+		event := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+		support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, event.ID, nil)
 
 		//
 		// List executions for the node
@@ -124,7 +124,7 @@ func Test__ListNodeExecutions(t *testing.T) {
 		response, err := ListNodeExecutions(
 			context.Background(),
 			r.Registry,
-			workflow.ID.String(),
+			canvas.ID.String(),
 			"node-1",
 			[]pb.CanvasNodeExecution_State{},
 			[]pb.CanvasNodeExecution_Result{},

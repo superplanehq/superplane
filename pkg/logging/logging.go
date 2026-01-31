@@ -5,7 +5,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
-func ForEvent(logger *log.Entry, event models.WorkflowEvent) *log.Entry {
+func ForEvent(logger *log.Entry, event models.CanvasEvent) *log.Entry {
 	return logger.WithFields(log.Fields{
 		"event_id": event.ID,
 		"node_id":  event.NodeID,
@@ -13,14 +13,14 @@ func ForEvent(logger *log.Entry, event models.WorkflowEvent) *log.Entry {
 	})
 }
 
-func ForExecution(execution *models.WorkflowNodeExecution, parent *models.WorkflowNodeExecution) *log.Entry {
+func ForExecution(execution *models.CanvasNodeExecution, parent *models.CanvasNodeExecution) *log.Entry {
 	return WithExecution(log.NewEntry(log.StandardLogger()), execution, parent)
 }
 
 func WithExecution(
 	logger *log.Entry,
-	execution *models.WorkflowNodeExecution,
-	parent *models.WorkflowNodeExecution,
+	execution *models.CanvasNodeExecution,
+	parent *models.CanvasNodeExecution,
 ) *log.Entry {
 	logEntry := logger.WithFields(log.Fields{
 		"root_event": execution.RootEventID,
@@ -37,11 +37,11 @@ func WithExecution(
 	return logEntry
 }
 
-func ForNode(node models.WorkflowNode) *log.Entry {
+func ForNode(node models.CanvasNode) *log.Entry {
 	return WithNode(log.NewEntry(log.StandardLogger()), node)
 }
 
-func WithNode(logger *log.Entry, node models.WorkflowNode) *log.Entry {
+func WithNode(logger *log.Entry, node models.CanvasNode) *log.Entry {
 	if node.ParentNodeID != nil {
 		return logger.WithFields(log.Fields{
 			"node_id": node.NodeID,
@@ -54,7 +54,7 @@ func WithNode(logger *log.Entry, node models.WorkflowNode) *log.Entry {
 	})
 }
 
-func WithQueueItem(logger *log.Entry, queueItem models.WorkflowNodeQueueItem) *log.Entry {
+func WithQueueItem(logger *log.Entry, queueItem models.CanvasNodeQueueItem) *log.Entry {
 	return logger.WithFields(log.Fields{
 		"queue_item_id": queueItem.ID,
 		"root_event":    queueItem.RootEventID,

@@ -10,22 +10,22 @@ import (
 	"gorm.io/gorm"
 )
 
-func Test__WorkflowNodeExecutionKV(t *testing.T) {
+func Test__CanvasNodeExecutionKV(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
-	steps := WorkflowNodeExecutionKVTesSteps{t: t}
+	steps := CanvasNodeExecutionKVTestSteps{t: t}
 
-	steps.CreateWorkflow()
-	steps.CreateWorkflowNode()
+	steps.CreateCanvas()
+	steps.CreateCanvasNode()
 	steps.CreateEvent()
 
-	t.Run("CreateWorkflowNodeExecutionKVInTransaction", func(t *testing.T) {
+	t.Run("CreateNodeExecutionKVInTransaction", func(t *testing.T) {
 		tx := database.Conn().Begin()
 		defer tx.Rollback()
 
 		exec := steps.CreateExecution()
 
-		err := CreateWorkflowNodeExecutionKVInTransaction(tx, exec.WorkflowID, exec.NodeID, exec.ID, "test-key", "test-value")
+		err := CreateNodeExecutionKVInTransaction(tx, exec.WorkflowID, exec.NodeID, exec.ID, "test-key", "test-value")
 		require.NoError(t, err)
 	})
 
@@ -36,10 +36,10 @@ func Test__WorkflowNodeExecutionKV(t *testing.T) {
 		exec1 := steps.CreateExecution()
 		exec2 := steps.CreateExecution()
 
-		err := CreateWorkflowNodeExecutionKVInTransaction(tx, exec1.WorkflowID, exec1.NodeID, exec1.ID, "test-key", "test-value")
+		err := CreateNodeExecutionKVInTransaction(tx, exec1.WorkflowID, exec1.NodeID, exec1.ID, "test-key", "test-value")
 		require.NoError(t, err)
 
-		err = CreateWorkflowNodeExecutionKVInTransaction(tx, exec2.WorkflowID, exec2.NodeID, exec2.ID, "test-key", "test-value")
+		err = CreateNodeExecutionKVInTransaction(tx, exec2.WorkflowID, exec2.NodeID, exec2.ID, "test-key", "test-value")
 		require.NoError(t, err)
 
 		foundExec, err := FirstNodeExecutionByKVInTransaction(tx, exec1.WorkflowID, exec1.NodeID, "test-key", "test-value")
@@ -62,11 +62,11 @@ func Test__WorkflowNodeExecutionKV(t *testing.T) {
 
 		exec := steps.CreateExecution()
 
-		err := CreateWorkflowNodeExecutionKVInTransaction(tx, exec.WorkflowID, exec.NodeID, exec.ID, "test-key", "test-value")
+		err := CreateNodeExecutionKVInTransaction(tx, exec.WorkflowID, exec.NodeID, exec.ID, "test-key", "test-value")
 		require.NoError(t, err)
 
 		// Mark execution as finished
-		exec.State = WorkflowNodeExecutionStateFinished
+		exec.State = CanvasNodeExecutionStateFinished
 		require.NoError(t, tx.Save(exec).Error)
 
 		_, err = FirstNodeExecutionByKVInTransaction(tx, exec.WorkflowID, exec.NodeID, "test-key", "test-value")
@@ -74,46 +74,46 @@ func Test__WorkflowNodeExecutionKV(t *testing.T) {
 	})
 }
 
-type WorkflowNodeExecutionKVTesSteps struct {
+type CanvasNodeExecutionKVTestSteps struct {
 	t *testing.T
 
-	wf        *Workflow
-	node      *WorkflowNode
-	rootEvent *WorkflowEvent
+	wf        *Canvas
+	node      *CanvasNode
+	rootEvent *CanvasEvent
 }
 
-func (s *WorkflowNodeExecutionKVTesSteps) CreateWorkflow() {
-	s.wf = &Workflow{
+func (s *CanvasNodeExecutionKVTestSteps) CreateCanvas() {
+	s.wf = &Canvas{
 		OrganizationID: uuid.New(),
-		Name:           "Test Workflow",
+		Name:           "Test Canvas",
 		Description:    "This is a test workflow",
 	}
 	require.NoError(s.t, database.Conn().Create(s.wf).Error)
 }
 
-func (s *WorkflowNodeExecutionKVTesSteps) CreateWorkflowNode() {
+func (s *CanvasNodeExecutionKVTestSteps) CreateCanvasNode() {
 
-	s.node = &WorkflowNode{
+	s.node = &CanvasNode{
 		WorkflowID: s.wf.ID,
 		NodeID:     "node-1",
 	}
 	require.NoError(s.t, database.Conn().Create(s.node).Error)
 }
 
-func (s *WorkflowNodeExecutionKVTesSteps) CreateEvent() {
+func (s *CanvasNodeExecutionKVTestSteps) CreateEvent() {
 
-	s.rootEvent = &WorkflowEvent{
+	s.rootEvent = &CanvasEvent{
 		WorkflowID: s.wf.ID,
 		NodeID:     s.node.NodeID,
 		Channel:    "default",
 		Data:       datatypes.JSONType[any]{},
-		State:      WorkflowEventStatePending,
+		State:      CanvasEventStatePending,
 	}
 	require.NoError(s.t, database.Conn().Create(s.rootEvent).Error)
 }
 
-func (s *WorkflowNodeExecutionKVTesSteps) CreateExecution() *WorkflowNodeExecution {
-	exec := &WorkflowNodeExecution{
+func (s *CanvasNodeExecutionKVTestSteps) CreateExecution() *CanvasNodeExecution {
+	exec := &CanvasNodeExecution{
 		WorkflowID:  s.wf.ID,
 		NodeID:      s.node.NodeID,
 		RootEventID: s.rootEvent.ID,

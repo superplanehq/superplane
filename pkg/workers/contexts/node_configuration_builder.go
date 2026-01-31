@@ -27,7 +27,7 @@ type NodeConfigurationBuilder struct {
 	previousExecutionID *uuid.UUID
 	rootEventID         *uuid.UUID
 	input               any
-	parentBlueprintNode *models.WorkflowNode
+	parentBlueprintNode *models.CanvasNode
 	configurationFields []configuration.Field
 }
 
@@ -38,7 +38,7 @@ func NewNodeConfigurationBuilder(tx *gorm.DB, workflowID uuid.UUID) *NodeConfigu
 	}
 }
 
-func (b *NodeConfigurationBuilder) ForBlueprintNode(parentBlueprintNode *models.WorkflowNode) *NodeConfigurationBuilder {
+func (b *NodeConfigurationBuilder) ForBlueprintNode(parentBlueprintNode *models.CanvasNode) *NodeConfigurationBuilder {
 	b.parentBlueprintNode = parentBlueprintNode
 	return b
 }
@@ -421,7 +421,7 @@ func extractInputMap(input any) map[string]any {
 }
 
 func (b *NodeConfigurationBuilder) resolveNodeRefs(nodeRefs []string, executionChainNodeIDs []string) (map[string]string, error) {
-	nodes, err := models.FindWorkflowNodesInTransaction(b.tx, b.workflowID)
+	nodes, err := models.FindCanvasNodesInTransaction(b.tx, b.workflowID)
 	if err != nil {
 		return nil, err
 	}
@@ -489,12 +489,12 @@ func (b *NodeConfigurationBuilder) resolveNodeRefs(nodeRefs []string, executionC
 	return refToNodeID, nil
 }
 
-func (b *NodeConfigurationBuilder) fetchRootEvent() (*models.WorkflowEvent, error) {
+func (b *NodeConfigurationBuilder) fetchRootEvent() (*models.CanvasEvent, error) {
 	if b.rootEventID == nil {
 		return nil, nil
 	}
 
-	rootEvent, err := models.FindWorkflowEventInTransaction(b.tx, *b.rootEventID)
+	rootEvent, err := models.FindCanvasEventInTransaction(b.tx, *b.rootEventID)
 	if err != nil {
 		return nil, err
 	}
@@ -514,7 +514,7 @@ func (b *NodeConfigurationBuilder) resolveRootPayload() (any, error) {
 	return rootEvent.Data.Data(), nil
 }
 
-func populateFromInputOrRoot(messageChain map[string]any, inputMap map[string]any, rootEvent *models.WorkflowEvent, refToNodeID map[string]string) map[string]string {
+func populateFromInputOrRoot(messageChain map[string]any, inputMap map[string]any, rootEvent *models.CanvasEvent, refToNodeID map[string]string) map[string]string {
 	chainRefs := make(map[string]string, len(refToNodeID))
 	for nodeRef, nodeID := range refToNodeID {
 		if value, ok := inputMap[nodeID]; ok {
@@ -543,7 +543,7 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(messageChain map[strin
 		return err
 	}
 
-	executionByNode := make(map[string]models.WorkflowNodeExecution, len(executionsInChain))
+	executionByNode := make(map[string]models.CanvasNodeExecution, len(executionsInChain))
 	for _, execution := range executionsInChain {
 		executionByNode[execution.NodeID] = execution
 	}
@@ -559,7 +559,7 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(messageChain map[strin
 		executionIDByRef[nodeRef] = execution.ID
 	}
 
-	events, err := models.ListWorkflowEventsForExecutionsInTransaction(b.tx, executionIDs)
+	events, err := models.ListCanvasEventsForExecutionsInTransaction(b.tx, executionIDs)
 	if err != nil {
 		return err
 	}
@@ -577,8 +577,8 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(messageChain map[strin
 	return nil
 }
 
-func latestEventByExecution(events []models.WorkflowEvent, executionIDs []uuid.UUID) map[uuid.UUID]models.WorkflowEvent {
-	latestByExecution := make(map[uuid.UUID]models.WorkflowEvent, len(executionIDs))
+func latestEventByExecution(events []models.CanvasEvent, executionIDs []uuid.UUID) map[uuid.UUID]models.CanvasEvent {
+	latestByExecution := make(map[uuid.UUID]models.CanvasEvent, len(executionIDs))
 	for _, event := range events {
 		if event.ExecutionID == nil {
 			continue
@@ -707,7 +707,7 @@ func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, ha
 		executionIDs = append(executionIDs, execution.ID)
 	}
 
-	events, err := models.ListWorkflowEventsForExecutionsInTransaction(b.tx, executionIDs)
+	events, err := models.ListCanvasEventsForExecutionsInTransaction(b.tx, executionIDs)
 	if err != nil {
 		return step, nil, err
 	}
@@ -769,7 +769,7 @@ func (b *NodeConfigurationBuilder) singleInputPayload() (any, bool, error) {
 	return nil, false, nil
 }
 
-func (b *NodeConfigurationBuilder) listExecutionsInChain() ([]models.WorkflowNodeExecution, error) {
+func (b *NodeConfigurationBuilder) listExecutionsInChain() ([]models.CanvasNodeExecution, error) {
 	executions, err := b.listLinearExecutionsInChain()
 	if err != nil {
 		return nil, err
@@ -787,7 +787,7 @@ func (b *NodeConfigurationBuilder) listExecutionsInChain() ([]models.WorkflowNod
 		return executions, nil
 	}
 
-	var upstreamExecutions []models.WorkflowNodeExecution
+	var upstreamExecutions []models.CanvasNodeExecution
 	err = b.tx.
 		Where("workflow_id = ? AND root_event_id = ? AND node_id IN ?", b.workflowID, *b.rootEventID, upstreamNodeIDs).
 		Find(&upstreamExecutions).
@@ -796,7 +796,7 @@ func (b *NodeConfigurationBuilder) listExecutionsInChain() ([]models.WorkflowNod
 		return nil, err
 	}
 
-	executionByID := make(map[uuid.UUID]models.WorkflowNodeExecution, len(executions)+len(upstreamExecutions))
+	executionByID := make(map[uuid.UUID]models.CanvasNodeExecution, len(executions)+len(upstreamExecutions))
 	for _, execution := range executions {
 		executionByID[execution.ID] = execution
 	}
@@ -804,7 +804,7 @@ func (b *NodeConfigurationBuilder) listExecutionsInChain() ([]models.WorkflowNod
 		executionByID[execution.ID] = execution
 	}
 
-	combined := make([]models.WorkflowNodeExecution, 0, len(executionByID))
+	combined := make([]models.CanvasNodeExecution, 0, len(executionByID))
 	for _, execution := range executionByID {
 		combined = append(combined, execution)
 	}
@@ -829,12 +829,12 @@ func (b *NodeConfigurationBuilder) listExecutionsInChain() ([]models.WorkflowNod
 	return combined, nil
 }
 
-func (b *NodeConfigurationBuilder) listLinearExecutionsInChain() ([]models.WorkflowNodeExecution, error) {
+func (b *NodeConfigurationBuilder) listLinearExecutionsInChain() ([]models.CanvasNodeExecution, error) {
 	if b.previousExecutionID == nil {
 		return nil, nil
 	}
 
-	var executions []models.WorkflowNodeExecution
+	var executions []models.CanvasNodeExecution
 
 	err := b.tx.Raw(`
 		WITH RECURSIVE execution_chain AS (
@@ -897,16 +897,16 @@ func (b *NodeConfigurationBuilder) listUpstreamNodeIDs() ([]string, error) {
 		return nil, nil
 	}
 
-	workflow, err := models.FindWorkflowWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
 	if err != nil {
 		return nil, err
 	}
-	if len(workflow.Edges) == 0 {
+	if len(canvas.Edges) == 0 {
 		return nil, nil
 	}
 
-	incoming := make(map[string][]string, len(workflow.Edges))
-	for _, edge := range workflow.Edges {
+	incoming := make(map[string][]string, len(canvas.Edges))
+	for _, edge := range canvas.Edges {
 		incoming[edge.TargetID] = append(incoming[edge.TargetID], edge.SourceID)
 	}
 

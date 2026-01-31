@@ -45,7 +45,7 @@ func CreateCanvas(ctx context.Context, registry *registry.Registry, organization
 		targetOrganizationID = models.TemplateOrganizationID
 	}
 
-	workflow := models.Workflow{
+	canvas := models.Canvas{
 		ID:             uuid.New(),
 		OrganizationID: targetOrganizationID,
 		IsTemplate:     isTemplate,
@@ -63,7 +63,7 @@ func CreateCanvas(ctx context.Context, registry *registry.Registry, organization
 		//
 		// Create the workflow record
 		//
-		err := tx.Clauses(clause.Returning{}).Create(&workflow).Error
+		err := tx.Clauses(clause.Returning{}).Create(&canvas).Error
 		if err != nil {
 			if strings.Contains(err.Error(), ErrDuplicateCanvasName) {
 				return status.Errorf(codes.AlreadyExists, "Canvas with the same name already exists")
@@ -82,12 +82,12 @@ func CreateCanvas(ctx context.Context, registry *registry.Registry, organization
 				parentNodeID = &parent
 			}
 
-			workflowNode := models.WorkflowNode{
-				WorkflowID:    workflow.ID,
+			canvasNode := models.CanvasNode{
+				WorkflowID:    canvas.ID,
 				NodeID:        node.ID,
 				ParentNodeID:  parentNodeID,
 				Name:          node.Name,
-				State:         models.WorkflowNodeStateReady,
+				State:         models.CanvasNodeStateReady,
 				Type:          node.Type,
 				Ref:           datatypes.NewJSONType(node.Ref),
 				Configuration: datatypes.NewJSONType(node.Configuration),
@@ -96,7 +96,7 @@ func CreateCanvas(ctx context.Context, registry *registry.Registry, organization
 				UpdatedAt:     &now,
 			}
 
-			if err := tx.Create(&workflowNode).Error; err != nil {
+			if err := tx.Create(&canvasNode).Error; err != nil {
 				return err
 			}
 		}
@@ -108,7 +108,7 @@ func CreateCanvas(ctx context.Context, registry *registry.Registry, organization
 		return nil, err
 	}
 
-	proto, err := SerializeCanvas(&workflow, false)
+	proto, err := SerializeCanvas(&canvas, false)
 	if err != nil {
 		return nil, err
 	}

@@ -31,12 +31,12 @@ func (c *NotificationContext) Send(title, body, url, urlLabel string, receivers 
 			return fmt.Errorf("notification context missing organization and workflow IDs")
 		}
 
-		workflow, err := models.FindWorkflowWithoutOrgScopeInTransaction(c.tx, c.workflowID)
+		canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(c.tx, c.workflowID)
 		if err != nil {
 			return fmt.Errorf("failed to resolve workflow organization: %w", err)
 		}
 
-		orgID = workflow.OrganizationID
+		orgID = canvas.OrganizationID
 	}
 
 	message := messages.NewNotificationEmailRequestedMessage(

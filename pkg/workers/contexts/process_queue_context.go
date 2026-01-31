@@ -16,9 +16,9 @@ import (
 
 type ConfigurationBuildError struct {
 	Err         error
-	QueueItem   *models.WorkflowNodeQueueItem
-	Node        *models.WorkflowNode
-	Event       *models.WorkflowEvent
+	QueueItem   *models.CanvasNodeQueueItem
+	Node        *models.CanvasNode
+	Event       *models.CanvasEvent
 	RootEventID uuid.UUID
 }
 
@@ -30,8 +30,8 @@ func (e *ConfigurationBuildError) Unwrap() error {
 	return e.Err
 }
 
-func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models.WorkflowNode, queueItem *models.WorkflowNodeQueueItem, configFields []configuration.Field) (*core.ProcessQueueContext, error) {
-	event, err := models.FindWorkflowEventInTransaction(tx, queueItem.EventID)
+func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models.CanvasNode, queueItem *models.CanvasNodeQueueItem, configFields []configuration.Field) (*core.ProcessQueueContext, error) {
+	event, err := models.FindCanvasEventInTransaction(tx, queueItem.EventID)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 	}
 
 	if node.ParentNodeID != nil {
-		parent, err := models.FindWorkflowNode(tx, node.WorkflowID, *node.ParentNodeID)
+		parent, err := models.FindCanvasNode(tx, node.WorkflowID, *node.ParentNodeID)
 		if err != nil {
 			return nil, err
 		}
@@ -88,13 +88,13 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 	ctx.CreateExecution = func() (*core.ExecutionContext, error) {
 		now := time.Now()
 
-		execution := models.WorkflowNodeExecution{
+		execution := models.CanvasNodeExecution{
 			WorkflowID:          queueItem.WorkflowID,
 			NodeID:              node.NodeID,
 			RootEventID:         queueItem.RootEventID,
 			EventID:             event.ID,
 			PreviousExecutionID: event.ExecutionID,
-			State:               models.WorkflowNodeExecutionStatePending,
+			State:               models.CanvasNodeExecutionStatePending,
 			Configuration:       datatypes.NewJSONType(config),
 			CreatedAt:           &now,
 			UpdatedAt:           &now,
@@ -149,7 +149,7 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 			return nil, err
 		}
 
-		if err := ctx.UpdateNodeState(models.WorkflowNodeStateProcessing); err != nil {
+		if err := ctx.UpdateNodeState(models.CanvasNodeStateProcessing); err != nil {
 			return nil, err
 		}
 
@@ -160,7 +160,7 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 		// Similar blueprint-aware logic as CountIncomingEdges, but count
 		// distinct source nodes rather than edge count.
 		if node.ParentNodeID != nil && *node.ParentNodeID != "" {
-			parent, err := models.FindWorkflowNode(tx, node.WorkflowID, *node.ParentNodeID)
+			parent, err := models.FindCanvasNode(tx, node.WorkflowID, *node.ParentNodeID)
 			if err != nil {
 				return 0, err
 			}
@@ -188,7 +188,7 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 			}
 		}
 
-		wf, err := models.FindWorkflowWithoutOrgScopeInTransaction(tx, node.WorkflowID)
+		wf, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, node.WorkflowID)
 		if err != nil {
 			return 0, err
 		}

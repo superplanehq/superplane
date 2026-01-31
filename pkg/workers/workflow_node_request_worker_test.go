@@ -26,14 +26,14 @@ func Test__NodeRequestWorker_InvokeTriggerAction(t *testing.T) {
 	defer executionConsumer.Stop()
 
 	//
-	// Create a simple workflow with a schedule trigger node.
+	// Create a simple canvas with a schedule trigger node.
 	//
 	triggerNode := "trigger-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Type:   models.NodeTypeTrigger,
@@ -52,9 +52,9 @@ func Test__NodeRequestWorker_InvokeTriggerAction(t *testing.T) {
 	//
 	// Create a node request for invoking the emitEvent action on the schedule trigger.
 	//
-	request := models.WorkflowNodeRequest{
+	request := models.CanvasNodeRequest{
 		ID:         uuid.New(),
-		WorkflowID: workflow.ID,
+		WorkflowID: canvas.ID,
 		NodeID:     triggerNode,
 		Type:       models.NodeRequestTypeInvokeAction,
 		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
@@ -76,7 +76,7 @@ func Test__NodeRequestWorker_InvokeTriggerAction(t *testing.T) {
 	//
 	// Verify the request was marked as completed.
 	//
-	var updatedRequest models.WorkflowNodeRequest
+	var updatedRequest models.CanvasNodeRequest
 	err = database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error
 	require.NoError(t, err)
 	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
@@ -94,14 +94,14 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 	defer executionConsumer.Stop()
 
 	//
-	// Create a simple workflow with a schedule trigger node.
+	// Create a simple canvas with a schedule trigger node.
 	//
 	triggerNode := "trigger-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Type:   models.NodeTypeTrigger,
@@ -120,9 +120,9 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 	//
 	// Create a node request for invoking a trigger action.
 	//
-	request := models.WorkflowNodeRequest{
+	request := models.CanvasNodeRequest{
 		ID:         uuid.New(),
-		WorkflowID: workflow.ID,
+		WorkflowID: canvas.ID,
 		NodeID:     triggerNode,
 		Type:       models.NodeRequestTypeInvokeAction,
 		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
@@ -164,7 +164,7 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 	//
 	// Verify the request was marked as completed.
 	//
-	var updatedRequest models.WorkflowNodeRequest
+	var updatedRequest models.CanvasNodeRequest
 	err := database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error
 	require.NoError(t, err)
 	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
@@ -172,7 +172,7 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 	//
 	// Verify that exactly one workflow event was emitted (proving only one worker processed it).
 	//
-	eventCount, err := models.CountWorkflowEvents(workflow.ID, triggerNode)
+	eventCount, err := models.CountCanvasEvents(canvas.ID, triggerNode)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), eventCount, "Expected exactly 1 workflow event, but found %d", eventCount)
 
@@ -190,14 +190,14 @@ func Test__NodeRequestWorker_UnsupportedRequestType(t *testing.T) {
 	defer executionConsumer.Stop()
 
 	//
-	// Create a simple workflow with a trigger node.
+	// Create a simple canvas with a trigger node.
 	//
 	triggerNode := "trigger-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Type:   models.NodeTypeTrigger,
@@ -216,9 +216,9 @@ func Test__NodeRequestWorker_UnsupportedRequestType(t *testing.T) {
 	//
 	// Create a node request with an unsupported type.
 	//
-	request := models.WorkflowNodeRequest{
+	request := models.CanvasNodeRequest{
 		ID:         uuid.New(),
-		WorkflowID: workflow.ID,
+		WorkflowID: canvas.ID,
 		NodeID:     triggerNode,
 		Type:       "unsupported-type",
 		Spec:       datatypes.NewJSONType(models.NodeExecutionRequestSpec{}),
@@ -247,14 +247,14 @@ func Test__NodeRequestWorker_MissingInvokeActionSpec(t *testing.T) {
 	defer executionConsumer.Stop()
 
 	//
-	// Create a simple workflow with a trigger node.
+	// Create a simple canvas with a trigger node.
 	//
 	triggerNode := "trigger-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Type:   models.NodeTypeTrigger,
@@ -273,9 +273,9 @@ func Test__NodeRequestWorker_MissingInvokeActionSpec(t *testing.T) {
 	//
 	// Create a node request without an InvokeAction spec.
 	//
-	request := models.WorkflowNodeRequest{
+	request := models.CanvasNodeRequest{
 		ID:         uuid.New(),
-		WorkflowID: workflow.ID,
+		WorkflowID: canvas.ID,
 		NodeID:     triggerNode,
 		Type:       models.NodeRequestTypeInvokeAction,
 		Spec:       datatypes.NewJSONType(models.NodeExecutionRequestSpec{}), // Missing InvokeAction
@@ -304,14 +304,14 @@ func Test__NodeRequestWorker_NonExistentTrigger(t *testing.T) {
 	defer executionConsumer.Stop()
 
 	//
-	// Create a simple workflow with a trigger node that references a non-existent trigger.
+	// Create a simple canvas with a trigger node that references a non-existent trigger.
 	//
 	triggerNode := "trigger-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Type:   models.NodeTypeTrigger,
@@ -324,9 +324,9 @@ func Test__NodeRequestWorker_NonExistentTrigger(t *testing.T) {
 	//
 	// Create a node request for invoking a trigger action.
 	//
-	request := models.WorkflowNodeRequest{
+	request := models.CanvasNodeRequest{
 		ID:         uuid.New(),
-		WorkflowID: workflow.ID,
+		WorkflowID: canvas.ID,
 		NodeID:     triggerNode,
 		Type:       models.NodeRequestTypeInvokeAction,
 		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
@@ -360,14 +360,14 @@ func Test__NodeRequestWorker_NonExistentAction(t *testing.T) {
 	defer executionConsumer.Stop()
 
 	//
-	// Create a simple workflow with a schedule trigger node.
+	// Create a simple canvas with a schedule trigger node.
 	//
 	triggerNode := "trigger-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Type:   models.NodeTypeTrigger,
@@ -386,9 +386,9 @@ func Test__NodeRequestWorker_NonExistentAction(t *testing.T) {
 	//
 	// Create a node request for invoking a non-existent action.
 	//
-	request := models.WorkflowNodeRequest{
+	request := models.CanvasNodeRequest{
 		ID:         uuid.New(),
-		WorkflowID: workflow.ID,
+		WorkflowID: canvas.ID,
 		NodeID:     triggerNode,
 		Type:       models.NodeRequestTypeInvokeAction,
 		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
@@ -421,14 +421,14 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedNodeRequests(t *testing.T) {
 	defer executionConsumer.Stop()
 
 	//
-	// Create a simple workflow with a schedule trigger node.
+	// Create a simple canvas with a schedule trigger node.
 	//
 	triggerNode := "trigger-1"
-	workflow, workflowNodes := support.CreateWorkflow(
+	canvas, canvasNodes := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Type:   models.NodeTypeTrigger,
@@ -447,9 +447,9 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedNodeRequests(t *testing.T) {
 	//
 	// Create a node request for the trigger.
 	//
-	request := models.WorkflowNodeRequest{
+	request := models.CanvasNodeRequest{
 		ID:         uuid.New(),
-		WorkflowID: workflow.ID,
+		WorkflowID: canvas.ID,
 		NodeID:     triggerNode,
 		Type:       models.NodeRequestTypeInvokeAction,
 		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
@@ -465,7 +465,7 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedNodeRequests(t *testing.T) {
 	//
 	// Soft delete the workflow node.
 	//
-	require.NoError(t, database.Conn().Delete(&workflowNodes[0]).Error)
+	require.NoError(t, database.Conn().Delete(&canvasNodes[0]).Error)
 
 	//
 	// Verify that ListNodeRequests does not return the request for the deleted node.
@@ -496,14 +496,14 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedWorkflowRequests(t *testing.T)
 	defer executionConsumer.Stop()
 
 	//
-	// Create a simple workflow with a schedule trigger node.
+	// Create a simple canvas with a schedule trigger node.
 	//
 	triggerNode := "trigger-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Type:   models.NodeTypeTrigger,
@@ -522,9 +522,9 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedWorkflowRequests(t *testing.T)
 	//
 	// Create a node request for the trigger.
 	//
-	request := models.WorkflowNodeRequest{
+	request := models.CanvasNodeRequest{
 		ID:         uuid.New(),
-		WorkflowID: workflow.ID,
+		WorkflowID: canvas.ID,
 		NodeID:     triggerNode,
 		Type:       models.NodeRequestTypeInvokeAction,
 		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
@@ -540,7 +540,7 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedWorkflowRequests(t *testing.T)
 	//
 	// Soft delete the entire workflow.
 	//
-	require.NoError(t, database.Conn().Delete(&workflow).Error)
+	require.NoError(t, database.Conn().Delete(&canvas).Error)
 
 	//
 	// Verify that ListNodeRequests does not return the request for the deleted workflow.

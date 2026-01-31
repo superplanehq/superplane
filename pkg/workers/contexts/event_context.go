@@ -12,12 +12,12 @@ import (
 )
 
 type EventContext struct {
-	tx           *gorm.DB
-	workflowNode *models.WorkflowNode
+	tx   *gorm.DB
+	node *models.CanvasNode
 }
 
-func NewEventContext(tx *gorm.DB, workflowNode *models.WorkflowNode) *EventContext {
-	return &EventContext{tx: tx, workflowNode: workflowNode}
+func NewEventContext(tx *gorm.DB, node *models.CanvasNode) *EventContext {
+	return &EventContext{tx: tx, node: node}
 }
 
 func (s *EventContext) Emit(payloadType string, payload any) error {
@@ -35,12 +35,12 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	}
 
 	now := time.Now()
-	event := models.WorkflowEvent{
-		WorkflowID: s.workflowNode.WorkflowID,
-		NodeID:     s.workflowNode.NodeID,
+	event := models.CanvasEvent{
+		WorkflowID: s.node.WorkflowID,
+		NodeID:     s.node.NodeID,
 		Channel:    "default",
 		Data:       datatypes.NewJSONType(v),
-		State:      models.WorkflowEventStatePending,
+		State:      models.CanvasEventStatePending,
 		CreatedAt:  &now,
 	}
 
@@ -54,7 +54,7 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 }
 
 func (s *EventContext) resolveCustomName(payload any) (*string, error) {
-	config := s.workflowNode.Configuration.Data()
+	config := s.node.Configuration.Data()
 	if config == nil {
 		return nil, nil
 	}
@@ -74,9 +74,9 @@ func (s *EventContext) resolveCustomName(payload any) (*string, error) {
 		return nil, nil
 	}
 
-	builder := NewNodeConfigurationBuilder(s.tx, s.workflowNode.WorkflowID).
-		WithNodeID(s.workflowNode.NodeID).
-		WithInput(map[string]any{s.workflowNode.NodeID: payload})
+	builder := NewNodeConfigurationBuilder(s.tx, s.node.WorkflowID).
+		WithNodeID(s.node.NodeID).
+		WithInput(map[string]any{s.node.NodeID: payload})
 	resolved, err := builder.ResolveExpression(template)
 	if err != nil {
 		return nil, err

@@ -17,7 +17,7 @@ const (
 	NodeExecutionRequestStateCompleted = "completed"
 )
 
-type WorkflowNodeRequest struct {
+type CanvasNodeRequest struct {
 	ID          uuid.UUID
 	WorkflowID  uuid.UUID
 	NodeID      string
@@ -30,6 +30,10 @@ type WorkflowNodeRequest struct {
 	UpdatedAt   time.Time
 }
 
+func (r *CanvasNodeRequest) TableName() string {
+	return "workflow_node_requests"
+}
+
 type NodeExecutionRequestSpec struct {
 	InvokeAction *InvokeAction `json:"invoke_action,omitempty"`
 }
@@ -39,8 +43,8 @@ type InvokeAction struct {
 	Parameters map[string]any `json:"parameters"`
 }
 
-func LockNodeRequest(tx *gorm.DB, id uuid.UUID) (*WorkflowNodeRequest, error) {
-	var request WorkflowNodeRequest
+func LockNodeRequest(tx *gorm.DB, id uuid.UUID) (*CanvasNodeRequest, error) {
+	var request CanvasNodeRequest
 
 	err := tx.
 		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
@@ -55,8 +59,8 @@ func LockNodeRequest(tx *gorm.DB, id uuid.UUID) (*WorkflowNodeRequest, error) {
 	return &request, nil
 }
 
-func ListNodeRequests() ([]WorkflowNodeRequest, error) {
-	var requests []WorkflowNodeRequest
+func ListNodeRequests() ([]CanvasNodeRequest, error) {
+	var requests []CanvasNodeRequest
 
 	now := time.Now()
 	err := database.Conn().
@@ -76,8 +80,8 @@ func ListNodeRequests() ([]WorkflowNodeRequest, error) {
 	return requests, nil
 }
 
-func FindPendingRequestForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (*WorkflowNodeRequest, error) {
-	var request WorkflowNodeRequest
+func FindPendingRequestForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (*CanvasNodeRequest, error) {
+	var request CanvasNodeRequest
 
 	err := tx.
 		Where("workflow_id = ?", workflowID).
@@ -94,7 +98,7 @@ func FindPendingRequestForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string)
 	return &request, nil
 }
 
-func (r *WorkflowNodeRequest) Complete(tx *gorm.DB) error {
+func (r *CanvasNodeRequest) Complete(tx *gorm.DB) error {
 	return tx.Model(r).
 		Update("state", NodeExecutionRequestStateCompleted).
 		Update("updated_at", time.Now()).

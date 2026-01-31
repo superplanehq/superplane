@@ -46,9 +46,9 @@ func (w *WorkflowNodeQueueWorker) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			tickStart := time.Now()
-			nodes, err := models.ListWorkflowNodesReady()
+			nodes, err := models.ListCanvasNodesReady()
 			if err != nil {
-				w.logger.Errorf("Error finding workflow nodes ready to be processed: %v", err)
+				w.logger.Errorf("Error finding canvas nodes ready to be processed: %v", err)
 			}
 
 			telemetry.RecordQueueWorkerNodesCount(context.Background(), len(nodes))
@@ -60,7 +60,7 @@ func (w *WorkflowNodeQueueWorker) Start(ctx context.Context) {
 					continue
 				}
 
-				go func(node models.WorkflowNode) {
+				go func(node models.CanvasNode) {
 					defer w.semaphore.Release(1)
 
 					if err := w.LockAndProcessNode(logger, node); err != nil {
@@ -74,11 +74,11 @@ func (w *WorkflowNodeQueueWorker) Start(ctx context.Context) {
 	}
 }
 
-func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.WorkflowNode) error {
+func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.CanvasNode) error {
 	var executionIDs []*uuid.UUID
-	var queueItem *models.WorkflowNodeQueueItem
+	var queueItem *models.CanvasNodeQueueItem
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		n, err := models.LockWorkflowNode(tx, node.WorkflowID, node.NodeID)
+		n, err := models.LockCanvasNode(tx, node.WorkflowID, node.NodeID)
 		if err != nil {
 			logger.Info("Node already being processed - skipping")
 			return nil
@@ -115,7 +115,7 @@ func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node mod
 	return err
 }
 
-func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *models.WorkflowNode) ([]*uuid.UUID, *models.WorkflowNodeQueueItem, error) {
+func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *models.CanvasNode) ([]*uuid.UUID, *models.CanvasNodeQueueItem, error) {
 	queueItem, err := node.FirstQueueItem(tx)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -183,7 +183,7 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, no
 	return []*uuid.UUID{executionID}, queueItem, err
 }
 
-func (w *WorkflowNodeQueueWorker) configurationFieldsForNode(tx *gorm.DB, node *models.WorkflowNode) ([]configuration.Field, error) {
+func (w *WorkflowNodeQueueWorker) configurationFieldsForNode(tx *gorm.DB, node *models.CanvasNode) ([]configuration.Field, error) {
 	ref := node.Ref.Data()
 	switch node.Type {
 	case models.NodeTypeComponent:
@@ -213,7 +213,7 @@ func (w *WorkflowNodeQueueWorker) configurationFieldsForNode(tx *gorm.DB, node *
 	}
 }
 
-func (w *WorkflowNodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, node *models.WorkflowNode) (*uuid.UUID, error) {
+func (w *WorkflowNodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, node *models.CanvasNode) (*uuid.UUID, error) {
 	ref := node.Ref.Data()
 
 	if ref.Component == nil || ref.Component.Name == "" {
@@ -244,17 +244,17 @@ func (w *WorkflowNodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logg
 	}
 
 	now := time.Now()
-	execution := models.WorkflowNodeExecution{
+	execution := models.CanvasNodeExecution{
 		WorkflowID:          configErr.QueueItem.WorkflowID,
 		NodeID:              configErr.Node.NodeID,
 		RootEventID:         configErr.RootEventID,
 		EventID:             configErr.Event.ID,
 		PreviousExecutionID: configErr.Event.ExecutionID,
 		ParentExecutionID:   parentExecutionID,
-		State:               models.WorkflowNodeExecutionStateFinished,
+		State:               models.CanvasNodeExecutionStateFinished,
 		Configuration:       configErr.Node.Configuration,
-		Result:              models.WorkflowNodeExecutionResultFailed,
-		ResultReason:        models.WorkflowNodeExecutionResultReasonError,
+		Result:              models.CanvasNodeExecutionResultFailed,
+		ResultReason:        models.CanvasNodeExecutionResultReasonError,
 		ResultMessage:       configErr.Err.Error(),
 		CreatedAt:           &now,
 		UpdatedAt:           &now,
@@ -278,7 +278,7 @@ func (w *WorkflowNodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logg
 		return nil, err
 	}
 
-	err = parent.FailInTransaction(tx, models.WorkflowNodeExecutionResultReasonError, configErr.Err.Error())
+	err = parent.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, configErr.Err.Error())
 	if err != nil {
 		return nil, err
 	}

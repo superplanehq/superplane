@@ -23,11 +23,11 @@ func (a *IntegrationSubscription) TableName() string {
 	return "app_installation_subscriptions"
 }
 
-func CreateIntegrationSubscription(node *WorkflowNode, integration *Integration, configuration any) (*IntegrationSubscription, error) {
+func CreateIntegrationSubscription(node *CanvasNode, integration *Integration, configuration any) (*IntegrationSubscription, error) {
 	return CreateIntegrationSubscriptionInTransaction(database.Conn(), node, integration, configuration)
 }
 
-func CreateIntegrationSubscriptionInTransaction(tx *gorm.DB, node *WorkflowNode, integration *Integration, configuration any) (*IntegrationSubscription, error) {
+func CreateIntegrationSubscriptionInTransaction(tx *gorm.DB, node *CanvasNode, integration *Integration, configuration any) (*IntegrationSubscription, error) {
 	now := time.Now()
 	s := IntegrationSubscription{
 		InstallationID: integration.ID,

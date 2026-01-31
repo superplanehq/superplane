@@ -12,7 +12,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/models"
 )
 
 const PayloadType = "semaphore.workflow.finished"
@@ -285,7 +284,7 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 
 	response, err := client.RunWorkflow(params)
 	if err != nil {
-		return ctx.ExecutionState.Fail(models.WorkflowNodeExecutionResultReasonError, err.Error())
+		return fmt.Errorf("error running workflow: %v", err)
 	}
 
 	ctx.Logger.Infof("New workflow created - workflow=%s, pipeline=%s", response.WorkflowID, response.PipelineID)

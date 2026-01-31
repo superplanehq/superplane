@@ -52,11 +52,11 @@ func uniqueExecutionIDs(executionIDs []uuid.UUID) []uuid.UUID {
 	return unique
 }
 
-func invalidErrorResolutionIDs(executions []models.WorkflowNodeExecution) []string {
+func invalidErrorResolutionIDs(executions []models.CanvasNodeExecution) []string {
 	invalidIDs := make([]string, 0)
 	for _, execution := range executions {
-		if execution.ResultReason == models.WorkflowNodeExecutionResultReasonError ||
-			execution.ResultReason == models.WorkflowNodeExecutionResultReasonErrorResolved {
+		if execution.ResultReason == models.CanvasNodeExecutionResultReasonError ||
+			execution.ResultReason == models.CanvasNodeExecutionResultReasonErrorResolved {
 			continue
 		}
 		invalidIDs = append(invalidIDs, execution.ID.String())

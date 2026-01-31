@@ -61,7 +61,7 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 					continue
 				}
 
-				go func(request models.WorkflowNodeRequest) {
+				go func(request models.CanvasNodeRequest) {
 					defer w.semaphore.Release(1)
 
 					if err := w.LockAndProcessRequest(request); err != nil {
@@ -79,7 +79,7 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 	}
 }
 
-func (w *NodeRequestWorker) LockAndProcessRequest(request models.WorkflowNodeRequest) error {
+func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeRequest) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		r, err := models.LockNodeRequest(tx, request.ID)
 		if err != nil {
@@ -91,7 +91,7 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.WorkflowNodeReq
 	})
 }
 
-func (w *NodeRequestWorker) processRequest(tx *gorm.DB, request *models.WorkflowNodeRequest) error {
+func (w *NodeRequestWorker) processRequest(tx *gorm.DB, request *models.CanvasNodeRequest) error {
 	switch request.Type {
 	case models.NodeRequestTypeInvokeAction:
 		return w.invokeAction(tx, request)
@@ -100,7 +100,7 @@ func (w *NodeRequestWorker) processRequest(tx *gorm.DB, request *models.Workflow
 	return fmt.Errorf("unsupported node execution request type %s", request.Type)
 }
 
-func (w *NodeRequestWorker) invokeAction(tx *gorm.DB, request *models.WorkflowNodeRequest) error {
+func (w *NodeRequestWorker) invokeAction(tx *gorm.DB, request *models.CanvasNodeRequest) error {
 	if request.ExecutionID == nil {
 		return w.invokeTriggerAction(tx, request)
 	}
@@ -108,8 +108,8 @@ func (w *NodeRequestWorker) invokeAction(tx *gorm.DB, request *models.WorkflowNo
 	return w.invokeComponentAction(tx, request)
 }
 
-func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.WorkflowNodeRequest) error {
-	node, err := models.FindWorkflowNode(tx, request.WorkflowID, request.NodeID)
+func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.CanvasNodeRequest) error {
+	node, err := models.FindCanvasNode(tx, request.WorkflowID, request.NodeID)
 	if err != nil {
 		return fmt.Errorf("node not found: %w", err)
 	}
@@ -168,7 +168,7 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Wor
 	return request.Complete(tx)
 }
 
-func (w *NodeRequestWorker) invokeComponentAction(tx *gorm.DB, request *models.WorkflowNodeRequest) error {
+func (w *NodeRequestWorker) invokeComponentAction(tx *gorm.DB, request *models.CanvasNodeRequest) error {
 	execution, err := models.FindNodeExecutionInTransaction(tx, request.WorkflowID, *request.ExecutionID)
 	if err != nil {
 		return fmt.Errorf("execution %s not found: %w", request.ExecutionID, err)
@@ -181,8 +181,8 @@ func (w *NodeRequestWorker) invokeComponentAction(tx *gorm.DB, request *models.W
 	return w.invokeChildNodeComponentAction(tx, request, execution)
 }
 
-func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request *models.WorkflowNodeRequest, execution *models.WorkflowNodeExecution) error {
-	node, err := models.FindWorkflowNode(tx, execution.WorkflowID, execution.NodeID)
+func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request *models.CanvasNodeRequest, execution *models.CanvasNodeExecution) error {
+	node, err := models.FindCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
 		return fmt.Errorf("node not found: %w", err)
 	}
@@ -239,13 +239,13 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 	return request.Complete(tx)
 }
 
-func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request *models.WorkflowNodeRequest, execution *models.WorkflowNodeExecution) error {
+func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request *models.CanvasNodeRequest, execution *models.CanvasNodeExecution) error {
 	parentExecution, err := models.FindNodeExecutionInTransaction(tx, execution.WorkflowID, *execution.ParentExecutionID)
 	if err != nil {
 		return fmt.Errorf("parent execution %s not found: %w", execution.ParentExecutionID, err)
 	}
 
-	parentNode, err := models.FindWorkflowNode(tx, execution.WorkflowID, parentExecution.NodeID)
+	parentNode, err := models.FindCanvasNode(tx, execution.WorkflowID, parentExecution.NodeID)
 	if err != nil {
 		return fmt.Errorf("node not found: %w", err)
 	}

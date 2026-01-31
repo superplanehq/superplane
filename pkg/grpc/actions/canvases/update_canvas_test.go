@@ -20,11 +20,11 @@ func TestUpdateCanvas_NodeRemovalUseSoftDelete(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
@@ -41,12 +41,12 @@ func TestUpdateCanvas_NodeRemovalUseSoftDelete(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	event := support.EmitWorkflowEventForNode(t, workflow.ID, "node-2", "default", nil)
-	execution := support.CreateWorkflowNodeExecution(t, workflow.ID, "node-2", event.ID, event.ID, nil)
+	event := support.EmitCanvasEventForNode(t, canvas.ID, "node-2", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-2", event.ID, event.ID, nil)
 
-	require.NoError(t, models.CreateWorkflowNodeExecutionKVInTransaction(
+	require.NoError(t, models.CreateNodeExecutionKVInTransaction(
 		database.Conn(),
-		workflow.ID,
+		canvas.ID,
 		"node-2",
 		execution.ID,
 		"test-key",
@@ -55,8 +55,8 @@ func TestUpdateCanvas_NodeRemovalUseSoftDelete(t *testing.T) {
 
 	canvasPb := &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Name:        workflow.Name,
-			Description: workflow.Description,
+			Name:        canvas.Name,
+			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: []*componentpb.Node{
@@ -78,40 +78,40 @@ func TestUpdateCanvas_NodeRemovalUseSoftDelete(t *testing.T) {
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
-		workflow.ID.String(),
+		canvas.ID.String(),
 		canvasPb,
 		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err, "UpdateCanvas should succeed when removing nodes with execution KVs")
 
 	var normalCount int64
-	database.Conn().Model(&models.WorkflowNode{}).Where("workflow_id = ? AND node_id = ?", workflow.ID, "node-2").Count(&normalCount)
+	database.Conn().Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-2").Count(&normalCount)
 	assert.Equal(t, int64(0), normalCount, "node-2 should not be visible in normal queries (soft deleted)")
 
 	var unscopedCount int64
-	database.Conn().Unscoped().Model(&models.WorkflowNode{}).Where("workflow_id = ? AND node_id = ?", workflow.ID, "node-2").Count(&unscopedCount)
+	database.Conn().Unscoped().Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-2").Count(&unscopedCount)
 	assert.Equal(t, int64(1), unscopedCount, "node-2 should be visible with Unscoped() (soft deleted, not hard deleted)")
 
-	var softDeletedNode models.WorkflowNode
-	err = database.Conn().Unscoped().Where("workflow_id = ? AND node_id = ?", workflow.ID, "node-2").First(&softDeletedNode).Error
+	var softDeletedNode models.CanvasNode
+	err = database.Conn().Unscoped().Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-2").First(&softDeletedNode).Error
 	require.NoError(t, err, "should be able to find soft deleted node with Unscoped()")
 	assert.True(t, softDeletedNode.DeletedAt.Valid, "node-2 should have valid deleted_at timestamp")
 
 	var activeCount int64
-	database.Conn().Model(&models.WorkflowNode{}).Where("workflow_id = ? AND node_id = ?", workflow.ID, "node-1").Count(&activeCount)
+	database.Conn().Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-1").Count(&activeCount)
 	assert.Equal(t, int64(1), activeCount, "node-1 should still be active")
 
-	var activeNode models.WorkflowNode
-	err = database.Conn().Where("workflow_id = ? AND node_id = ?", workflow.ID, "node-1").First(&activeNode).Error
+	var activeNode models.CanvasNode
+	err = database.Conn().Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-1").First(&activeNode).Error
 	require.NoError(t, err, "should be able to find active node")
 	assert.False(t, activeNode.DeletedAt.Valid, "node-1 should not have deleted_at timestamp")
 
 	var kvCount int64
-	database.Conn().Model(&models.WorkflowNodeExecutionKV{}).Where("workflow_id = ? AND node_id = ?", workflow.ID, "node-2").Count(&kvCount)
+	database.Conn().Model(&models.CanvasNodeExecutionKV{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-2").Count(&kvCount)
 	assert.Equal(t, int64(1), kvCount, "execution KV should still exist (FK constraint satisfied by soft deleted node)")
 
 	var executionCount int64
-	database.Conn().Model(&models.WorkflowNodeExecution{}).Where("workflow_id = ? AND node_id = ?", workflow.ID, "node-2").Count(&executionCount)
+	database.Conn().Model(&models.CanvasNodeExecution{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-2").Count(&executionCount)
 	assert.Equal(t, int64(1), executionCount, "execution should still exist (FK constraint satisfied by soft deleted node)")
 }
 
@@ -119,11 +119,11 @@ func TestUpdateCanvas_RemapConflictingNodeIDs(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
@@ -148,8 +148,8 @@ func TestUpdateCanvas_RemapConflictingNodeIDs(t *testing.T) {
 
 	removeNodePB := &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Name:        workflow.Name,
-			Description: workflow.Description,
+			Name:        canvas.Name,
+			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: []*componentpb.Node{
@@ -171,7 +171,7 @@ func TestUpdateCanvas_RemapConflictingNodeIDs(t *testing.T) {
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
-		workflow.ID.String(),
+		canvas.ID.String(),
 		removeNodePB,
 		"http://localhost:3000/api/v1",
 	)
@@ -179,8 +179,8 @@ func TestUpdateCanvas_RemapConflictingNodeIDs(t *testing.T) {
 
 	remapCanvasPB := &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Name:        workflow.Name,
-			Description: workflow.Description,
+			Name:        canvas.Name,
+			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: []*componentpb.Node{
@@ -216,7 +216,7 @@ func TestUpdateCanvas_RemapConflictingNodeIDs(t *testing.T) {
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
-		workflow.ID.String(),
+		canvas.ID.String(),
 		remapCanvasPB,
 		"http://localhost:3000/api/v1",
 	)
@@ -245,15 +245,15 @@ func TestUpdateCanvas_RemapConflictingNodeIDs(t *testing.T) {
 	assert.Equal(t, remappedNode.GetId(), remappedEdge.GetSourceId(), "edge should point at remapped node ID")
 
 	var activeCount int64
-	database.Conn().Model(&models.WorkflowNode{}).Where("workflow_id = ? AND node_id = ?", workflow.ID, "node-1").Count(&activeCount)
+	database.Conn().Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-1").Count(&activeCount)
 	assert.Equal(t, int64(0), activeCount, "soft-deleted node should not be active")
 
 	var unscopedCount int64
-	database.Conn().Unscoped().Model(&models.WorkflowNode{}).Where("workflow_id = ? AND node_id = ?", workflow.ID, "node-1").Count(&unscopedCount)
+	database.Conn().Unscoped().Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-1").Count(&unscopedCount)
 	assert.Equal(t, int64(1), unscopedCount, "soft-deleted node should remain in history")
 
 	var remappedCount int64
-	database.Conn().Model(&models.WorkflowNode{}).Where("workflow_id = ? AND node_id = ?", workflow.ID, remappedNode.GetId()).Count(&remappedCount)
+	database.Conn().Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, remappedNode.GetId()).Count(&remappedCount)
 	assert.Equal(t, int64(1), remappedCount, "remapped node should be active")
 }
 
@@ -261,11 +261,11 @@ func TestUpdateCanvas_ErroredNodesCanExist(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
@@ -283,18 +283,18 @@ func TestUpdateCanvas_ErroredNodesCanExist(t *testing.T) {
 	)
 
 	errorReason := "Simulated setup error during component initialization"
-	err := database.Conn().Model(&models.WorkflowNode{}).
-		Where("workflow_id = ? AND node_id = ?", workflow.ID, "node-2").
+	err := database.Conn().Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-2").
 		Updates(map[string]interface{}{
-			"state":        models.WorkflowNodeStateError,
+			"state":        models.CanvasNodeStateError,
 			"state_reason": errorReason,
 		}).Error
 	require.NoError(t, err, "should be able to set node to error state")
 
 	updatedCanvasPB := &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Name:        workflow.Name + " Updated",
-			Description: workflow.Description + " Updated",
+			Name:        canvas.Name + " Updated",
+			Description: canvas.Description + " Updated",
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: []*componentpb.Node{
@@ -324,23 +324,23 @@ func TestUpdateCanvas_ErroredNodesCanExist(t *testing.T) {
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
-		workflow.ID.String(),
+		canvas.ID.String(),
 		updatedCanvasPB,
 		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err, "UpdateCanvas should succeed even with existing errored nodes")
 
-	var goodNode models.WorkflowNode
-	err = database.Conn().Where("workflow_id = ? AND node_id = ?", workflow.ID, "node-1").First(&goodNode).Error
+	var goodNode models.CanvasNode
+	err = database.Conn().Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-1").First(&goodNode).Error
 	require.NoError(t, err, "should be able to find good node")
-	assert.Equal(t, models.WorkflowNodeStateReady, goodNode.State, "good node should be ready")
+	assert.Equal(t, models.CanvasNodeStateReady, goodNode.State, "good node should be ready")
 	assert.Nil(t, goodNode.StateReason, "good node should not have state reason")
 	assert.Equal(t, "Node 1 Updated", goodNode.Name, "good node name should be updated")
 
-	var previouslyErroredNode models.WorkflowNode
-	err = database.Conn().Where("workflow_id = ? AND node_id = ?", workflow.ID, "node-2").First(&previouslyErroredNode).Error
+	var previouslyErroredNode models.CanvasNode
+	err = database.Conn().Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-2").First(&previouslyErroredNode).Error
 	require.NoError(t, err, "should be able to find previously errored node")
-	assert.Equal(t, models.WorkflowNodeStateReady, previouslyErroredNode.State, "previously errored node should be reset to ready")
+	assert.Equal(t, models.CanvasNodeStateReady, previouslyErroredNode.State, "previously errored node should be reset to ready")
 	assert.Nil(t, previouslyErroredNode.StateReason, "previously errored node should have cleared state reason")
 	assert.Equal(t, "Node 2 Updated", previouslyErroredNode.Name, "previously errored node name should be updated")
 }
@@ -349,16 +349,16 @@ func TestUpdateWorkflow_ErroredNodeResetOnUpdate(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
 				Type:   models.NodeTypeComponent,
-				State:  models.WorkflowNodeStateReady,
+				State:  models.CanvasNodeStateReady,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
 			},
 		},
@@ -366,25 +366,25 @@ func TestUpdateWorkflow_ErroredNodeResetOnUpdate(t *testing.T) {
 	)
 
 	errorReason := "Previous error"
-	err := database.Conn().Model(&models.WorkflowNode{}).
-		Where("workflow_id = ? AND node_id = ?", workflow.ID, "node-1").
+	err := database.Conn().Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-1").
 		Updates(map[string]interface{}{
-			"state":        models.WorkflowNodeStateError,
+			"state":        models.CanvasNodeStateError,
 			"state_reason": errorReason,
 		}).Error
 	require.NoError(t, err, "should be able to manually set node to error state")
 
-	var initialNode models.WorkflowNode
-	err = database.Conn().Where("workflow_id = ? AND node_id = ?", workflow.ID, "node-1").First(&initialNode).Error
+	var initialNode models.CanvasNode
+	err = database.Conn().Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-1").First(&initialNode).Error
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeStateError, initialNode.State)
+	assert.Equal(t, models.CanvasNodeStateError, initialNode.State)
 	assert.NotNil(t, initialNode.StateReason)
 	assert.Equal(t, "Previous error", *initialNode.StateReason)
 
 	updatedCanvasPB := &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Name:        workflow.Name,
-			Description: workflow.Description,
+			Name:        canvas.Name,
+			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: []*componentpb.Node{
@@ -406,16 +406,16 @@ func TestUpdateWorkflow_ErroredNodeResetOnUpdate(t *testing.T) {
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
-		workflow.ID.String(),
+		canvas.ID.String(),
 		updatedCanvasPB,
 		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err, "UpdateCanvas should succeed and reset errored node")
 
-	var updatedNode models.WorkflowNode
-	err = database.Conn().Where("workflow_id = ? AND node_id = ?", workflow.ID, "node-1").First(&updatedNode).Error
+	var updatedNode models.CanvasNode
+	err = database.Conn().Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-1").First(&updatedNode).Error
 	require.NoError(t, err, "should be able to find updated node")
-	assert.Equal(t, models.WorkflowNodeStateReady, updatedNode.State, "previously errored node should now be ready")
+	assert.Equal(t, models.CanvasNodeStateReady, updatedNode.State, "previously errored node should now be ready")
 	assert.Nil(t, updatedNode.StateReason, "error reason should be cleared")
 	assert.Equal(t, "Node 1 Updated", updatedNode.Name, "node name should be updated")
 }
@@ -424,54 +424,54 @@ func TestUpdateCanvas_NonErroredNodesKeepState(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "ready-node",
 				Name:   "Ready Node",
 				Type:   models.NodeTypeComponent,
-				State:  models.WorkflowNodeStateReady,
+				State:  models.CanvasNodeStateReady,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
 			},
 			{
 				NodeID: "processing-node",
 				Name:   "Processing Node",
 				Type:   models.NodeTypeComponent,
-				State:  models.WorkflowNodeStateReady,
+				State:  models.CanvasNodeStateReady,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
 			},
 			{
 				NodeID: "errored-node",
 				Name:   "Errored Node",
 				Type:   models.NodeTypeComponent,
-				State:  models.WorkflowNodeStateReady,
+				State:  models.CanvasNodeStateReady,
 				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
 			},
 		},
 		[]models.Edge{},
 	)
 
-	err := database.Conn().Model(&models.WorkflowNode{}).
-		Where("workflow_id = ? AND node_id = ?", workflow.ID, "processing-node").
-		Update("state", models.WorkflowNodeStateProcessing).Error
+	err := database.Conn().Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", canvas.ID, "processing-node").
+		Update("state", models.CanvasNodeStateProcessing).Error
 	require.NoError(t, err)
 
 	errorReason := "Previous error"
-	err = database.Conn().Model(&models.WorkflowNode{}).
-		Where("workflow_id = ? AND node_id = ?", workflow.ID, "errored-node").
+	err = database.Conn().Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", canvas.ID, "errored-node").
 		Updates(map[string]interface{}{
-			"state":        models.WorkflowNodeStateError,
+			"state":        models.CanvasNodeStateError,
 			"state_reason": errorReason,
 		}).Error
 	require.NoError(t, err)
 
 	updatedCanvasPB := &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Name:        workflow.Name,
-			Description: workflow.Description,
+			Name:        canvas.Name,
+			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: []*componentpb.Node{
@@ -509,30 +509,30 @@ func TestUpdateCanvas_NonErroredNodesKeepState(t *testing.T) {
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
-		workflow.ID.String(),
+		canvas.ID.String(),
 		updatedCanvasPB,
 		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err, "UpdateWorkflow should succeed")
 
-	var readyNode models.WorkflowNode
-	err = database.Conn().Where("workflow_id = ? AND node_id = ?", workflow.ID, "ready-node").First(&readyNode).Error
+	var readyNode models.CanvasNode
+	err = database.Conn().Where("workflow_id = ? AND node_id = ?", canvas.ID, "ready-node").First(&readyNode).Error
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeStateReady, readyNode.State, "ready node should stay ready")
+	assert.Equal(t, models.CanvasNodeStateReady, readyNode.State, "ready node should stay ready")
 	assert.Nil(t, readyNode.StateReason, "ready node should not have error reason")
 	assert.Equal(t, "Ready Node Updated", readyNode.Name, "ready node name should be updated")
 
-	var processingNode models.WorkflowNode
-	err = database.Conn().Where("workflow_id = ? AND node_id = ?", workflow.ID, "processing-node").First(&processingNode).Error
+	var processingNode models.CanvasNode
+	err = database.Conn().Where("workflow_id = ? AND node_id = ?", canvas.ID, "processing-node").First(&processingNode).Error
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeStateProcessing, processingNode.State, "processing node should stay processing")
+	assert.Equal(t, models.CanvasNodeStateProcessing, processingNode.State, "processing node should stay processing")
 	assert.Nil(t, processingNode.StateReason, "processing node should not have error reason")
 	assert.Equal(t, "Processing Node Updated", processingNode.Name, "processing node name should be updated")
 
-	var erroredNode models.WorkflowNode
-	err = database.Conn().Where("workflow_id = ? AND node_id = ?", workflow.ID, "errored-node").First(&erroredNode).Error
+	var erroredNode models.CanvasNode
+	err = database.Conn().Where("workflow_id = ? AND node_id = ?", canvas.ID, "errored-node").First(&erroredNode).Error
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeStateReady, erroredNode.State, "errored node should be reset to ready")
+	assert.Equal(t, models.CanvasNodeStateReady, erroredNode.State, "errored node should be reset to ready")
 	assert.Nil(t, erroredNode.StateReason, "errored node error reason should be cleared")
 	assert.Equal(t, "Errored Node Updated", erroredNode.Name, "errored node name should be updated")
 }
@@ -541,18 +541,18 @@ func TestUpdateCanvas_ValidationErrorsPersisted(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{},
+		[]models.CanvasNode{},
 		[]models.Edge{},
 	)
 
 	updatedCanvasPB := &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Name:        workflow.Name,
-			Description: workflow.Description,
+			Name:        canvas.Name,
+			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: []*componentpb.Node{
@@ -582,22 +582,22 @@ func TestUpdateCanvas_ValidationErrorsPersisted(t *testing.T) {
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
-		workflow.ID.String(),
+		canvas.ID.String(),
 		updatedCanvasPB,
 		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err, "UpdateCanvas should succeed even with validation errors")
 
-	var validNode models.WorkflowNode
-	err = database.Conn().Where("workflow_id = ? AND node_id = ?", workflow.ID, "valid-node").First(&validNode).Error
+	var validNode models.CanvasNode
+	err = database.Conn().Where("workflow_id = ? AND node_id = ?", canvas.ID, "valid-node").First(&validNode).Error
 	require.NoError(t, err, "should be able to find valid node")
-	assert.Equal(t, models.WorkflowNodeStateReady, validNode.State, "valid node should be ready")
+	assert.Equal(t, models.CanvasNodeStateReady, validNode.State, "valid node should be ready")
 	assert.Nil(t, validNode.StateReason, "valid node should not have error reason")
 
-	var invalidNode models.WorkflowNode
-	err = database.Conn().Where("workflow_id = ? AND node_id = ?", workflow.ID, "invalid-node").First(&invalidNode).Error
+	var invalidNode models.CanvasNode
+	err = database.Conn().Where("workflow_id = ? AND node_id = ?", canvas.ID, "invalid-node").First(&invalidNode).Error
 	require.NoError(t, err, "should be able to find invalid node")
-	assert.Equal(t, models.WorkflowNodeStateError, invalidNode.State, "invalid node should be in error state")
+	assert.Equal(t, models.CanvasNodeStateError, invalidNode.State, "invalid node should be in error state")
 	assert.NotNil(t, invalidNode.StateReason, "invalid node should have error reason")
 	assert.Contains(t, *invalidNode.StateReason, "nonexistent-component", "error reason should mention the invalid component")
 }
@@ -622,18 +622,18 @@ func TestUpdateCanvas_SetupErrorsPersistedInResponse(t *testing.T) {
 		[]models.BlueprintOutputChannel{},
 	)
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{},
+		[]models.CanvasNode{},
 		[]models.Edge{},
 	)
 
 	updatedCanvasPB := &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Name:        workflow.Name,
-			Description: workflow.Description,
+			Name:        canvas.Name,
+			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: []*componentpb.Node{
@@ -655,7 +655,7 @@ func TestUpdateCanvas_SetupErrorsPersistedInResponse(t *testing.T) {
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
-		workflow.ID.String(),
+		canvas.ID.String(),
 		updatedCanvasPB,
 		"http://localhost:3000/api/v1",
 	)
@@ -677,18 +677,18 @@ func TestUpdateCanvas_ErroredNodeBecomesValidAgain(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{},
+		[]models.CanvasNode{},
 		[]models.Edge{},
 	)
 
 	invalidCanvasPB := &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Name:        workflow.Name,
-			Description: workflow.Description,
+			Name:        canvas.Name,
+			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: []*componentpb.Node{
@@ -710,22 +710,22 @@ func TestUpdateCanvas_ErroredNodeBecomesValidAgain(t *testing.T) {
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
-		workflow.ID.String(),
+		canvas.ID.String(),
 		invalidCanvasPB,
 		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err, "UpdateCanvas should succeed even with validation errors")
 
-	var testNode models.WorkflowNode
-	err = database.Conn().Where("workflow_id = ? AND node_id = ?", workflow.ID, "test-node").First(&testNode).Error
+	var testNode models.CanvasNode
+	err = database.Conn().Where("workflow_id = ? AND node_id = ?", canvas.ID, "test-node").First(&testNode).Error
 	require.NoError(t, err, "should be able to find test node")
-	assert.Equal(t, models.WorkflowNodeStateError, testNode.State, "node should be in error state")
+	assert.Equal(t, models.CanvasNodeStateError, testNode.State, "node should be in error state")
 	assert.NotNil(t, testNode.StateReason, "node should have error reason")
 
 	validCanvasPB := &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Name:        workflow.Name,
-			Description: workflow.Description,
+			Name:        canvas.Name,
+			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: []*componentpb.Node{
@@ -747,15 +747,15 @@ func TestUpdateCanvas_ErroredNodeBecomesValidAgain(t *testing.T) {
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
-		workflow.ID.String(),
+		canvas.ID.String(),
 		validCanvasPB,
 		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err, "UpdateCanvas should succeed with valid configuration")
 
-	err = database.Conn().Where("workflow_id = ? AND node_id = ?", workflow.ID, "test-node").First(&testNode).Error
+	err = database.Conn().Where("workflow_id = ? AND node_id = ?", canvas.ID, "test-node").First(&testNode).Error
 	require.NoError(t, err, "should be able to find test node")
-	assert.Equal(t, models.WorkflowNodeStateReady, testNode.State, "node should now be in ready state")
+	assert.Equal(t, models.CanvasNodeStateReady, testNode.State, "node should now be in ready state")
 	assert.Nil(t, testNode.StateReason, "node should not have error reason")
 }
 
@@ -763,11 +763,11 @@ func TestUpdateCanvas_WidgetNodesHandled(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{},
+		[]models.CanvasNode{},
 		[]models.Edge{},
 	)
 
@@ -778,8 +778,8 @@ func TestUpdateCanvas_WidgetNodesHandled(t *testing.T) {
 
 	initialCanvasPB := &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Name:        workflow.Name,
-			Description: workflow.Description,
+			Name:        canvas.Name,
+			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: []*componentpb.Node{
@@ -810,18 +810,18 @@ func TestUpdateCanvas_WidgetNodesHandled(t *testing.T) {
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
-		workflow.ID.String(),
+		canvas.ID.String(),
 		initialCanvasPB,
 		"http://localhost:3000/api/v1",
 	)
 	require.NoError(t, err, "UpdateCanvas should succeed with widget nodes")
 
 	var widgetNodeCount int64
-	database.Conn().Model(&models.WorkflowNode{}).Where("workflow_id = ? AND node_id = ?", workflow.ID, "annotation-1").Count(&widgetNodeCount)
+	database.Conn().Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, "annotation-1").Count(&widgetNodeCount)
 	assert.Equal(t, int64(0), widgetNodeCount, "widget nodes should not be persisted in workflow_nodes table")
 
-	var componentNode models.WorkflowNode
-	err = database.Conn().Where("workflow_id = ? AND node_id = ?", workflow.ID, "component-1").First(&componentNode).Error
+	var componentNode models.CanvasNode
+	err = database.Conn().Where("workflow_id = ? AND node_id = ?", canvas.ID, "component-1").First(&componentNode).Error
 	require.NoError(t, err, "should be able to find component node")
 	assert.Equal(t, models.NodeTypeComponent, componentNode.Type, "component node should have correct type")
 
@@ -845,8 +845,8 @@ func TestUpdateCanvas_WidgetNodesHandled(t *testing.T) {
 
 	updatedCanvasPB := &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Name:        workflow.Name,
-			Description: workflow.Description,
+			Name:        canvas.Name,
+			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: []*componentpb.Node{
@@ -877,7 +877,7 @@ func TestUpdateCanvas_WidgetNodesHandled(t *testing.T) {
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
-		workflow.ID.String(),
+		canvas.ID.String(),
 		updatedCanvasPB,
 		"http://localhost:3000/api/v1",
 	)
@@ -900,11 +900,11 @@ func TestUpdateCanvas_WidgetNodesCannotConnect(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{},
+		[]models.CanvasNode{},
 		[]models.Edge{},
 	)
 
@@ -914,8 +914,8 @@ func TestUpdateCanvas_WidgetNodesCannotConnect(t *testing.T) {
 
 	workflowWithWidgetAsSource := &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Name:        workflow.Name,
-			Description: workflow.Description,
+			Name:        canvas.Name,
+			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: []*componentpb.Node{
@@ -952,7 +952,7 @@ func TestUpdateCanvas_WidgetNodesCannotConnect(t *testing.T) {
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
-		workflow.ID.String(),
+		canvas.ID.String(),
 		workflowWithWidgetAsSource,
 		"http://localhost:3000/api/v1",
 	)
@@ -961,8 +961,8 @@ func TestUpdateCanvas_WidgetNodesCannotConnect(t *testing.T) {
 
 	workflowWithWidgetAsTarget := &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Name:        workflow.Name,
-			Description: workflow.Description,
+			Name:        canvas.Name,
+			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: []*componentpb.Node{
@@ -999,7 +999,7 @@ func TestUpdateCanvas_WidgetNodesCannotConnect(t *testing.T) {
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
-		workflow.ID.String(),
+		canvas.ID.String(),
 		workflowWithWidgetAsTarget,
 		"http://localhost:3000/api/v1",
 	)
@@ -1011,11 +1011,11 @@ func TestUpdateCanvas_WidgetTextLengthValidation(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{},
+		[]models.CanvasNode{},
 		[]models.Edge{},
 	)
 
@@ -1027,8 +1027,8 @@ func TestUpdateCanvas_WidgetTextLengthValidation(t *testing.T) {
 
 	workflowWithLongAnnotation := &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Name:        workflow.Name,
-			Description: workflow.Description,
+			Name:        canvas.Name,
+			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: []*componentpb.Node{
@@ -1051,7 +1051,7 @@ func TestUpdateCanvas_WidgetTextLengthValidation(t *testing.T) {
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
-		workflow.ID.String(),
+		canvas.ID.String(),
 		workflowWithLongAnnotation,
 		"http://localhost:3000/api/v1",
 	)
@@ -1075,8 +1075,8 @@ func TestUpdateCanvas_WidgetTextLengthValidation(t *testing.T) {
 
 	workflowWithMaxAnnotation := &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Name:        workflow.Name,
-			Description: workflow.Description,
+			Name:        canvas.Name,
+			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: []*componentpb.Node{
@@ -1099,7 +1099,7 @@ func TestUpdateCanvas_WidgetTextLengthValidation(t *testing.T) {
 		r.Encryptor,
 		r.Registry,
 		r.Organization.ID.String(),
-		workflow.ID.String(),
+		canvas.ID.String(),
 		workflowWithMaxAnnotation,
 		"http://localhost:3000/api/v1",
 	)
@@ -1118,6 +1118,6 @@ func TestUpdateCanvas_WidgetTextLengthValidation(t *testing.T) {
 
 	// Widgets should NOT be persisted in workflow_nodes table
 	var annotationNodeCount int64
-	database.Conn().Model(&models.WorkflowNode{}).Where("workflow_id = ? AND node_id = ?", workflow.ID, "annotation-2").Count(&annotationNodeCount)
+	database.Conn().Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, "annotation-2").Count(&annotationNodeCount)
 	assert.Equal(t, int64(0), annotationNodeCount, "widget nodes should not be persisted in workflow_nodes table")
 }
