@@ -43,10 +43,6 @@ blocks:
           commands:
             - make setup.playwright
             - make test.e2e.autoparallel INDEX=$SEMAPHORE_JOB_INDEX TOTAL=$SEMAPHORE_JOB_COUNT
-          epilogue:
-            always:
-              commands:
-                - 'if [ -d tmp/screenshots ] && ls tmp/screenshots/*.png >/dev/null 2>&1; then artifact push job tmp/screenshots; fi'
         - name: 'Check: DB structure'
           commands:
             - make check.db.structure
@@ -62,6 +58,7 @@ blocks:
         always:
           commands:
             - '[ -f junit-report.xml ] && test-results publish junit-report.xml'
+            - 'if [ -d tmp/screenshots ] && ls tmp/screenshots/*.png >/dev/null 2>&1; then artifact push job tmp/screenshots; fi'
   - name: "\U0001F528 Frontend Build"
     dependencies: []
     task:
