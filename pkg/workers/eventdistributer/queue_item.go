@@ -24,7 +24,7 @@ const (
 	QueueItemConsumedEvent = "queue_item_consumed"
 )
 
-func HandleWorkflowQueueItemCreated(messageBody []byte, wsHub *ws.Hub) error {
+func HandleQueueItemCreated(messageBody []byte, wsHub *ws.Hub) error {
 	log.Debugf("Received queue_item_created event")
 
 	pbMsg := &pb.CanvasNodeQueueItemMessage{}
@@ -35,7 +35,7 @@ func HandleWorkflowQueueItemCreated(messageBody []byte, wsHub *ws.Hub) error {
 	return handleQueueItemState(pbMsg.CanvasId, pbMsg.Id, pbMsg.NodeId, wsHub, QueueItemCreatedEvent)
 }
 
-func HandleWorkflowQueueItemConsumed(messageBody []byte, wsHub *ws.Hub) error {
+func HandleQueueItemConsumed(messageBody []byte, wsHub *ws.Hub) error {
 	log.Debugf("Received queue_item_consumed event")
 
 	pbMsg := &pb.CanvasNodeQueueItemMessage{}

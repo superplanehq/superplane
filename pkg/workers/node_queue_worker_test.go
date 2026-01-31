@@ -17,10 +17,10 @@ import (
 	"gorm.io/datatypes"
 )
 
-func Test__WorkflowNodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
+func Test__NodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewWorkflowNodeQueueWorker(r.Registry)
+	worker := NewNodeQueueWorker(r.Registry)
 	logger := log.NewEntry(log.New())
 
 	amqpURL, _ := config.RabbitMQURL()
@@ -105,7 +105,7 @@ func Test__WorkflowNodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
 	assert.True(t, queueConsumedConsumer.HasReceivedMessage())
 }
 
-func Test__WorkflowNodeQueueWorker_BlueprintNodeQueueIsProcessed(t *testing.T) {
+func Test__NodeQueueWorker_BlueprintNodeQueueIsProcessed(t *testing.T) {
 	r := support.Setup(t)
 	logger := log.NewEntry(log.New())
 
@@ -196,7 +196,7 @@ func Test__WorkflowNodeQueueWorker_BlueprintNodeQueueIsProcessed(t *testing.T) {
 	// - Node state is updated to processing
 	// - Queue item is deleted
 	//
-	worker := NewWorkflowNodeQueueWorker(r.Registry)
+	worker := NewNodeQueueWorker(r.Registry)
 	err = worker.LockAndProcessNode(logger, *node)
 	require.NoError(t, err)
 
@@ -222,10 +222,10 @@ func Test__WorkflowNodeQueueWorker_BlueprintNodeQueueIsProcessed(t *testing.T) {
 	assert.True(t, queueConsumedConsumer.HasReceivedMessage())
 }
 
-func Test__WorkflowNodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
+func Test__NodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewWorkflowNodeQueueWorker(r.Registry)
+	worker := NewNodeQueueWorker(r.Registry)
 	logger := log.NewEntry(log.New())
 
 	amqpURL, _ := config.RabbitMQURL()
@@ -326,10 +326,10 @@ func Test__WorkflowNodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
 	assert.True(t, queueConsumedConsumer.HasReceivedMessage())
 }
 
-func Test__WorkflowNodeQueueWorker_EmptyQueue(t *testing.T) {
+func Test__NodeQueueWorker_EmptyQueue(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewWorkflowNodeQueueWorker(r.Registry)
+	worker := NewNodeQueueWorker(r.Registry)
 	logger := log.NewEntry(log.New())
 
 	amqpURL, _ := config.RabbitMQURL()
@@ -384,7 +384,7 @@ func Test__WorkflowNodeQueueWorker_EmptyQueue(t *testing.T) {
 	assert.False(t, queueConsumedConsumer.HasReceivedMessage())
 }
 
-func Test__WorkflowNodeQueueWorker_PreventsConcurrentProcessing(t *testing.T) {
+func Test__NodeQueueWorker_PreventsConcurrentProcessing(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -433,13 +433,13 @@ func Test__WorkflowNodeQueueWorker_PreventsConcurrentProcessing(t *testing.T) {
 	// Create two workers and have them try to process the node concurrently.
 	//
 	go func() {
-		worker1 := NewWorkflowNodeQueueWorker(r.Registry)
+		worker1 := NewNodeQueueWorker(r.Registry)
 		logger := log.NewEntry(log.New())
 		results <- worker1.LockAndProcessNode(logger, *node)
 	}()
 
 	go func() {
-		worker2 := NewWorkflowNodeQueueWorker(r.Registry)
+		worker2 := NewNodeQueueWorker(r.Registry)
 		logger := log.NewEntry(log.New())
 		results <- worker2.LockAndProcessNode(logger, *node)
 	}()
@@ -470,10 +470,10 @@ func Test__WorkflowNodeQueueWorker_PreventsConcurrentProcessing(t *testing.T) {
 	assert.True(t, queueConsumedConsumer.HasReceivedMessage())
 }
 
-func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure(t *testing.T) {
+func Test__NodeQueueWorker_ConfigurationBuildFailure(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewWorkflowNodeQueueWorker(r.Registry)
+	worker := NewNodeQueueWorker(r.Registry)
 	logger := log.NewEntry(log.New())
 
 	amqpURL, _ := config.RabbitMQURL()
@@ -567,7 +567,7 @@ func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure(t *testing.T) {
 func Test__WorkflowNodeQueueWorker_MergeComponentReturnsNilExecution(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewWorkflowNodeQueueWorker(r.Registry)
+	worker := NewNodeQueueWorker(r.Registry)
 	logger := log.NewEntry(log.New())
 
 	amqpURL, _ := config.RabbitMQURL()
@@ -651,7 +651,7 @@ func Test__WorkflowNodeQueueWorker_MergeComponentReturnsNilExecution(t *testing.
 func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure_PropagateToParent(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewWorkflowNodeQueueWorker(r.Registry)
+	worker := NewNodeQueueWorker(r.Registry)
 	logger := log.NewEntry(log.New())
 
 	amqpURL, _ := config.RabbitMQURL()
