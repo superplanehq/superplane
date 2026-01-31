@@ -107,6 +107,10 @@ func (s *Slack) Triggers() []core.Trigger {
 	}
 }
 
+func (s *Slack) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (s *Slack) Sync(ctx core.SyncContext) error {
 	metadata := Metadata{}
 	err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)

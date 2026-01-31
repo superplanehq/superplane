@@ -24,10 +24,12 @@ func Test__AppInstallationRequestWorker_Sync(t *testing.T) {
 	// Register a dummy application and install it.
 	//
 	var syncCalled bool
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-		ctx.Integration.Ready()
-		syncCalled = true
-		return nil
+	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+		OnSync: func(ctx core.SyncContext) error {
+			ctx.Integration.Ready()
+			syncCalled = true
+			return nil
+		},
 	})
 
 	installation, err := models.CreateAppInstallation(uuid.New(), r.Organization.ID, "dummy", support.RandomName("installation"), nil)
@@ -68,9 +70,11 @@ func Test__AppInstallationRequestWorker_SyncError(t *testing.T) {
 	// Register a dummy application and install it.
 	//
 	var syncCalled bool
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-		syncCalled = true
-		return errors.New("sync failed")
+	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+		OnSync: func(ctx core.SyncContext) error {
+			syncCalled = true
+			return errors.New("sync failed")
+		},
 	})
 
 	installation, err := models.CreateAppInstallation(uuid.New(), r.Organization.ID, "dummy", support.RandomName("installation"), nil)

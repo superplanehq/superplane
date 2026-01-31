@@ -113,6 +113,10 @@ func (s *SMTP) Instructions() string {
 	return ""
 }
 
+func (s *SMTP) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (s *SMTP) Sync(ctx core.SyncContext) error {
 	config := Configuration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {

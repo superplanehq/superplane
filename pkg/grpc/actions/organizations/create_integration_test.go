@@ -169,9 +169,13 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Register a test integration that always fails on Sync
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			return errors.New("oops")
-		})
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(
+			support.DummyIntegrationOptions{
+				OnSync: func(ctx core.SyncContext) error {
+					return errors.New("oops")
+				},
+			},
+		)
 
 		name := support.RandomName("integration")
 		appConfig, err := structpb.NewStruct(map[string]interface{}{})
@@ -209,9 +213,11 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Register a test integration that succeeds on Sync
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			ctx.Integration.Ready()
-			return nil
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
 		})
 
 		name := support.RandomName("integration")

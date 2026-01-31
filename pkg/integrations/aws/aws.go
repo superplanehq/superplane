@@ -112,6 +112,10 @@ func (a *AWS) Sync(ctx core.SyncContext) error {
 	return a.generateCredentials(ctx, config)
 }
 
+func (a *AWS) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 	ctx.Integration.NewBrowserAction(core.BrowserAction{
 		Description: fmt.Sprintf(`

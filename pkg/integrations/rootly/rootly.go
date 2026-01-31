@@ -72,6 +72,10 @@ func (r *Rootly) Triggers() []core.Trigger {
 	}
 }
 
+func (r *Rootly) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (r *Rootly) Sync(ctx core.SyncContext) error {
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)

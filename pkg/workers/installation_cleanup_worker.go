@@ -8,17 +8,28 @@ import (
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
 
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
 type InstallationCleanupWorker struct {
+	baseURL   string
 	semaphore *semaphore.Weighted
+	registry  *registry.Registry
+	encryptor crypto.Encryptor
 }
 
-func NewInstallationCleanupWorker() *InstallationCleanupWorker {
+func NewInstallationCleanupWorker(registry *registry.Registry, encryptor crypto.Encryptor, baseURL string) *InstallationCleanupWorker {
 	return &InstallationCleanupWorker{
 		semaphore: semaphore.NewWeighted(25),
+		registry:  registry,
+		encryptor: encryptor,
+		baseURL:   baseURL,
 	}
 }
 
@@ -78,7 +89,27 @@ func (w *InstallationCleanupWorker) processAppInstallation(tx *gorm.DB, installa
 		return nil
 	}
 
-	w.log("Deleting app installation %s", installation.ID)
+	w.log("Cleaning up app installation %s", installation.ID)
+	impl, err := w.registry.GetIntegration(installation.AppName)
+	if err != nil {
+		return err
+	}
+
+	err = impl.Cleanup(core.IntegrationCleanupContext{
+		Configuration:  installation.Configuration.Data(),
+		BaseURL:        w.baseURL,
+		OrganizationID: installation.OrganizationID.String(),
+		InstallationID: installation.ID.String(),
+		HTTP:           contexts.NewHTTPContext(w.registry.GetHTTPClient()),
+		Integration:    contexts.NewIntegrationContext(tx, nil, installation, w.encryptor, w.registry),
+		Logger:         logging.ForAppInstallation(*installation),
+	})
+
+	if err != nil {
+		return err
+	}
+
+	w.log("Cleanup completed for app installation %s - deleting", installation.ID)
 	return tx.Unscoped().Delete(installation).Error
 }
 

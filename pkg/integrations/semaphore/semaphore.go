@@ -66,6 +66,11 @@ func (s *Semaphore) Configuration() []configuration.Field {
 	}
 }
 
+func (s *Semaphore) Cleanup(ctx core.IntegrationCleanupContext) error {
+	ctx.Logger.Info("Cleaning up Semaphore")
+	return nil
+}
+
 func (s *Semaphore) Sync(ctx core.SyncContext) error {
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)

@@ -99,6 +99,10 @@ func (d *Datadog) Triggers() []core.Trigger {
 	return []core.Trigger{}
 }
 
+func (d *Datadog) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (d *Datadog) Sync(ctx core.SyncContext) error {
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
