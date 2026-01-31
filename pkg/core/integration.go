@@ -57,6 +57,11 @@ type Integration interface {
 	Sync(ctx SyncContext) error
 
 	/*
+	 * Called when the integration is deleted.
+	 */
+	Cleanup(ctx IntegrationCleanupContext) error
+
+	/*
 	 * List resources of a given type.
 	 */
 	ListResources(resourceType string, ctx ListResourcesContext) ([]IntegrationResource, error)
@@ -158,6 +163,16 @@ type SyncContext struct {
 	HTTP            HTTPContext
 	Integration     IntegrationContext
 	OIDC            oidc.Provider
+}
+
+type IntegrationCleanupContext struct {
+	Configuration  any
+	BaseURL        string
+	OrganizationID string
+	InstallationID string
+	Logger         *logrus.Entry
+	HTTP           HTTPContext
+	Integration    IntegrationContext
 }
 
 /*

@@ -55,12 +55,11 @@ func Test__WebhookProvisioner_RetryOnError(t *testing.T) {
 
 	provisioner := NewWebhookProvisioner("https://example.com", &BadEncryptor{}, r.Registry)
 
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegrationWithSetupWebhook(
-		nil,
-		func(ctx core.SetupWebhookContext) (any, error) {
+	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+		OnSetupWebhook: func(ctx core.SetupWebhookContext) (any, error) {
 			return nil, errors.New("oops")
 		},
-	)
+	})
 
 	installation, err := models.CreateAppInstallation(
 		uuid.New(),
@@ -98,12 +97,11 @@ func Test__WebhookProvisioner_MaxRetriesExceeded(t *testing.T) {
 
 	provisioner := NewWebhookProvisioner("https://example.com", &BadEncryptor{}, r.Registry)
 
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegrationWithSetupWebhook(
-		nil,
-		func(ctx core.SetupWebhookContext) (any, error) {
+	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+		OnSetupWebhook: func(ctx core.SetupWebhookContext) (any, error) {
 			return nil, errors.New("oops")
 		},
-	)
+	})
 
 	installation, err := models.CreateAppInstallation(
 		uuid.New(),

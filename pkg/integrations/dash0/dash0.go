@@ -109,6 +109,10 @@ func (d *Dash0) Sync(ctx core.SyncContext) error {
 	return nil
 }
 
+func (d *Dash0) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (d *Dash0) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	if resourceType != "check-rule" {
 		return []core.IntegrationResource{}, nil

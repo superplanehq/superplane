@@ -81,6 +81,16 @@ func (s *PanicableIntegration) Sync(ctx core.SyncContext) (err error) {
 	return s.underlying.Sync(ctx)
 }
 
+func (s *PanicableIntegration) Cleanup(ctx core.IntegrationCleanupContext) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("integration %s panicked in Cleanup(): %v",
+				s.underlying.Name(), r)
+		}
+	}()
+	return s.underlying.Cleanup(ctx)
+}
+
 func (s *PanicableIntegration) ListResources(resourceType string, ctx core.ListResourcesContext) (resources []core.IntegrationResource, err error) {
 	defer func() {
 		if r := recover(); r != nil {

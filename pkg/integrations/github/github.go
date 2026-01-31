@@ -118,6 +118,10 @@ func (g *GitHub) Triggers() []core.Trigger {
 	}
 }
 
+func (g *GitHub) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (g *GitHub) Sync(ctx core.SyncContext) error {
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)

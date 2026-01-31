@@ -106,6 +106,10 @@ func (c *Cloudflare) Sync(ctx core.SyncContext) error {
 	return nil
 }
 
+func (c *Cloudflare) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
 	case "zone":

@@ -118,6 +118,10 @@ func (d *Discord) CompareWebhookConfig(a, b any) (bool, error) {
 	return true, nil
 }
 
+func (d *Discord) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (d *Discord) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	if resourceType != "channel" {
 		return []core.IntegrationResource{}, nil

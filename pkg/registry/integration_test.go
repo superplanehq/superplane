@@ -25,6 +25,10 @@ func (p *panickingIntegration) Components() []core.Component         { return ni
 func (p *panickingIntegration) Triggers() []core.Trigger             { return nil }
 func (p *panickingIntegration) Sync(ctx core.SyncContext) error      { panic("sync panic") }
 
+func (p *panickingIntegration) Cleanup(ctx core.IntegrationCleanupContext) error {
+	panic("cleanup panic")
+}
+
 func (p *panickingIntegration) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	panic("list resources panic")
 }

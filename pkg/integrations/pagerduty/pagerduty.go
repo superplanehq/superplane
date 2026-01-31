@@ -170,6 +170,10 @@ func (p *PagerDuty) Triggers() []core.Trigger {
 	}
 }
 
+func (p *PagerDuty) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (p *PagerDuty) Sync(ctx core.SyncContext) error {
 	configuration := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &configuration)

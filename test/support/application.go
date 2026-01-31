@@ -10,21 +10,27 @@ import (
 //
 
 type DummyIntegration struct {
-	onSync         func(ctx core.SyncContext) error
-	onSetupWebhook func(ctx core.SetupWebhookContext) (any, error)
+	onSync                 func(ctx core.SyncContext) error
+	onCompareWebhookConfig func(a, b any) (bool, error)
+	onSetupWebhook         func(ctx core.SetupWebhookContext) (any, error)
+	onCleanup              func(ctx core.IntegrationCleanupContext) error
 }
 
-func NewDummyIntegration(onSync func(ctx core.SyncContext) error) *DummyIntegration {
-	return NewDummyIntegrationWithSetupWebhook(onSync, nil)
+type DummyIntegrationOptions struct {
+	OnSync                 func(ctx core.SyncContext) error
+	OnCompareWebhookConfig func(a, b any) (bool, error)
+	OnSetupWebhook         func(ctx core.SetupWebhookContext) (any, error)
+	OnCleanup              func(ctx core.IntegrationCleanupContext) error
 }
 
-func NewDummyIntegrationWithSetupWebhook(
-	onSync func(ctx core.SyncContext) error,
-	onSetupWebhook func(ctx core.SetupWebhookContext) (any, error),
+func NewDummyIntegration(
+	options DummyIntegrationOptions,
 ) *DummyIntegration {
 	return &DummyIntegration{
-		onSync:         onSync,
-		onSetupWebhook: onSetupWebhook,
+		onSync:                 options.OnSync,
+		onCompareWebhookConfig: options.OnCompareWebhookConfig,
+		onSetupWebhook:         options.OnSetupWebhook,
+		onCleanup:              options.OnCleanup,
 	}
 }
 
@@ -67,6 +73,13 @@ func (t *DummyIntegration) Sync(ctx core.SyncContext) error {
 	return t.onSync(ctx)
 }
 
+func (t *DummyIntegration) Cleanup(ctx core.IntegrationCleanupContext) error {
+	if t.onCleanup == nil {
+		return nil
+	}
+	return t.onCleanup(ctx)
+}
+
 func (t *DummyIntegration) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	return []core.IntegrationResource{}, nil
 }
@@ -75,7 +88,10 @@ func (t *DummyIntegration) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (t *DummyIntegration) CompareWebhookConfig(a, b any) (bool, error) {
-	return false, nil
+	if t.onCompareWebhookConfig != nil {
+		return t.onCompareWebhookConfig(a, b)
+	}
+	return true, nil
 }
 
 func (t *DummyIntegration) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
