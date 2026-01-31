@@ -12,6 +12,15 @@ import (
 
 const baseURL = "https://api.cloudflare.com/client/v4"
 
+type APIError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("request got %d code: %s", e.StatusCode, e.Body)
+}
+
 type Client struct {
 	Token   string
 	http    core.HTTPContext
@@ -52,7 +61,7 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+		return nil, &APIError{StatusCode: res.StatusCode, Body: string(responseBody)}
 	}
 
 	return responseBody, nil
@@ -80,6 +89,31 @@ func (c *Client) ListZones() ([]Zone, error) {
 
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return response.Result, nil
+}
+
+// DeleteDNSRecord deletes a DNS record by its ID within a zone.
+// It returns the Cloudflare API "result" object (when available).
+func (c *Client) DeleteDNSRecord(zoneID, recordID string) (map[string]any, error) {
+	url := fmt.Sprintf("%s/zones/%s/dns_records/%s", c.BaseURL, zoneID, recordID)
+	responseBody, err := c.execRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool           `json:"success"`
+		Result  map[string]any `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
 		return nil, fmt.Errorf("error parsing response: %v", err)
 	}
 
