@@ -291,6 +291,8 @@ export const ConfigurationFieldRenderer = ({
             onChange={onChange}
             organizationId={organizationId}
             integrationId={integrationId}
+            allowExpressions={allowExpressions}
+            autocompleteExampleObj={autocompleteExampleObj}
           />
         );
 

@@ -1,10 +1,12 @@
 import { AutoCompleteSelect, type AutoCompleteOption } from "@/components/AutoCompleteSelect";
+import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
 import { MultiCombobox, MultiComboboxLabel } from "@/components/MultiCombobox/multi-combobox";
 import { Select, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfigurationField } from "../../api-client";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { toTestId } from "@/utils/testID";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface IntegrationResourceFieldRendererProps {
   field: ConfigurationField;
@@ -12,6 +14,8 @@ interface IntegrationResourceFieldRendererProps {
   onChange: (value: string | string[] | undefined) => void;
   organizationId?: string;
   integrationId?: string;
+  allowExpressions?: boolean;
+  autocompleteExampleObj?: Record<string, unknown> | null;
 }
 
 type SelectOption = {
@@ -20,17 +24,30 @@ type SelectOption = {
   value: string;
 };
 
+/** Detect if value looks like an expression (e.g. {{ $json.id }}) */
+function isExpressionValue(value: string | string[] | undefined): boolean {
+  if (value == null) return false;
+  const str = Array.isArray(value) ? value[0] : value;
+  return typeof str === "string" && (str.trim().startsWith("{{") || str.includes("{{"));
+}
+
 export const IntegrationResourceFieldRenderer = ({
   field,
   value,
   onChange,
   organizationId,
   integrationId,
+  allowExpressions = false,
+  autocompleteExampleObj = null,
 }: IntegrationResourceFieldRendererProps) => {
   const resourceType = field.typeOptions?.resource?.type;
   const useNameAsValue = field.typeOptions?.resource?.useNameAsValue ?? false;
   // Check for multi - be explicit about truthiness since it's a boolean field
   const isMulti = Boolean(field.typeOptions?.resource?.multi);
+
+  // Fixed vs Expression mode for single-select when expressions are allowed
+  const initialIsExpression = allowExpressions && !isMulti && isExpressionValue(value);
+  const [useExpressionMode, setUseExpressionMode] = useState(initialIsExpression);
 
   const {
     data: resources,
@@ -134,14 +151,60 @@ export const IntegrationResourceFieldRenderer = ({
           ? value
           : "";
 
+    const expressionValue = typeof value === "string" ? value : "";
+
+    const picker = (
+      <AutoCompleteSelect
+        options={options}
+        value={selectedValue}
+        onChange={(val) => onChange(val || undefined)}
+        placeholder={field.placeholder ?? `Select ${resourceType}`}
+      />
+    );
+
+    const expressionInput = (
+      <AutoCompleteInput
+        exampleObj={autocompleteExampleObj}
+        value={expressionValue}
+        onChange={(nextValue) => onChange(nextValue || undefined)}
+        placeholder={field.placeholder ?? `e.g. {{ $json.resourceId }}`}
+        startWord="{{"
+        prefix="{{ "
+        suffix=" }}"
+        inputSize="md"
+        showValuePreview
+        quickTip="Tip: type {{ to start an expression."
+        className=""
+      />
+    );
+
+    if (allowExpressions) {
+      return (
+        <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)} className="space-y-2">
+          <Tabs
+            value={useExpressionMode ? "expression" : "fixed"}
+            onValueChange={(v) => setUseExpressionMode(v === "expression")}
+          >
+            <div className="flex justify-end">
+              <TabsList className="h-7 rounded-md p-0.5">
+                <TabsTrigger value="fixed" className="text-xs px-2 py-1 data-[state=active]:shadow-sm">
+                  Fixed
+                </TabsTrigger>
+                <TabsTrigger value="expression" className="text-xs px-2 py-1 data-[state=active]:shadow-sm">
+                  Expression
+                </TabsTrigger>
+              </TabsList>
+            </div>
+            <TabsContent value="fixed">{picker}</TabsContent>
+            <TabsContent value="expression">{expressionInput}</TabsContent>
+          </Tabs>
+        </div>
+      );
+    }
+
     return (
       <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)}>
-        <AutoCompleteSelect
-          options={options}
-          value={selectedValue}
-          onChange={(val) => onChange(val || undefined)}
-          placeholder={`Select ${resourceType}`}
-        />
+        {picker}
       </div>
     );
   }
