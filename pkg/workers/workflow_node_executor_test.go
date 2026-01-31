@@ -218,7 +218,7 @@ func Test__WorkflowNodeExecutor_ComponentNodeWithoutStateChange(t *testing.T) {
 	// Create a root event and a pending execution for the approval node.
 	//
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, approvalNode, rootEvent.ID, rootEvent.ID, nil)
+	execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, approvalNode, rootEvent.ID, rootEvent.ID, nil, approvalConfiguration)
 
 	//
 	// Process the execution and verify the execution is started but NOT finished.

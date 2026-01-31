@@ -262,18 +262,18 @@ func ResumeStateForNodeInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID s
 	return CanvasNodeStateReady, nil
 }
 
-func (w *CanvasNode) UpdateState(tx *gorm.DB, state string) error {
-	return tx.Model(w).
+func (c *CanvasNode) UpdateState(tx *gorm.DB, state string) error {
+	return tx.Model(c).
 		Update("state", state).
 		Update("updated_at", time.Now()).
 		Error
 }
 
-func (w *CanvasNode) FirstQueueItem(tx *gorm.DB) (*CanvasNodeQueueItem, error) {
+func (c *CanvasNode) FirstQueueItem(tx *gorm.DB) (*CanvasNodeQueueItem, error) {
 	var queueItem CanvasNodeQueueItem
 	err := tx.
-		Where("workflow_id = ?", w.WorkflowID).
-		Where("node_id = ?", w.NodeID).
+		Where("workflow_id = ?", c.WorkflowID).
+		Where("node_id = ?", c.NodeID).
 		Order("created_at ASC").
 		First(&queueItem).
 		Error
@@ -285,10 +285,10 @@ func (w *CanvasNode) FirstQueueItem(tx *gorm.DB) (*CanvasNodeQueueItem, error) {
 	return &queueItem, nil
 }
 
-func (w *CanvasNode) CreateRequest(tx *gorm.DB, reqType string, spec NodeExecutionRequestSpec, runAt *time.Time) error {
+func (c *CanvasNode) CreateRequest(tx *gorm.DB, reqType string, spec NodeExecutionRequestSpec, runAt *time.Time) error {
 	return tx.Create(&CanvasNodeRequest{
-		WorkflowID: w.WorkflowID,
-		NodeID:     w.NodeID,
+		WorkflowID: c.WorkflowID,
+		NodeID:     c.NodeID,
 		ID:         uuid.New(),
 		State:      NodeExecutionRequestStatePending,
 		Type:       reqType,
