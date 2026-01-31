@@ -8,7 +8,7 @@ import { Input } from "../../components/Input/input";
 import { Text } from "../../components/Text/text";
 import { Textarea } from "../../components/ui/textarea";
 import { Button } from "../../components/ui/button";
-import { useCreateWorkflow, useWorkflowTemplates } from "../../hooks/useWorkflowData";
+import { useCreateCanvas, useCanvasTemplates } from "../../hooks/useCanvasData";
 import { showErrorToast } from "../../utils/toast";
 import type { ComponentsEdge, ComponentsNode } from "@/api-client";
 import { Rainbow } from "lucide-react";
@@ -25,8 +25,8 @@ export function CreateCanvasPage() {
   const [description, setDescription] = useState("");
   const [nameError, setNameError] = useState("");
 
-  const createMutation = useCreateWorkflow(organizationId || "");
-  const { data: workflowTemplates = [] } = useWorkflowTemplates(organizationId || "");
+  const createMutation = useCreateCanvas(organizationId || "");
+  const { data: workflowTemplates = [] } = useCanvasTemplates(organizationId || "");
 
   const handleSubmit = async () => {
     setNameError("");
@@ -52,8 +52,8 @@ export function CreateCanvasPage() {
         description: description.trim() || undefined,
       });
 
-      if (result?.data?.workflow?.metadata?.id) {
-        navigate(`/${organizationId}/workflows/${result.data.workflow.metadata.id}`);
+      if (result?.data?.canvas?.metadata?.id) {
+        navigate(`/${organizationId}/workflows/${result.data.canvas.metadata.id}`);
       }
     } catch (error) {
       const errorMessage = (error as Error)?.message || error?.toString() || "Failed to create canvas";

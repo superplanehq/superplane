@@ -14,13 +14,13 @@ import {
   ComponentsEdge,
   ComponentsNode,
   TriggersTrigger,
-  WorkflowsListEventExecutionsResponse,
-  WorkflowsWorkflow,
-  WorkflowsWorkflowEvent,
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
-  workflowsEmitNodeEvent,
-  workflowsUpdateNodePause,
+  CanvasesListEventExecutionsResponse,
+  CanvasesCanvas,
+  CanvasesCanvasEvent,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
+  canvasesEmitNodeEvent,
+  canvasesUpdateNodePause,
 } from "@/api-client";
 import { useOrganizationGroups, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
@@ -31,15 +31,15 @@ import { useQueueHistory } from "@/hooks/useQueueHistory";
 import { useAvailableIntegrations, useConnectedIntegrations } from "@/hooks/useIntegrations";
 import {
   eventExecutionsQueryOptions,
-  useCreateWorkflow,
+  useCreateCanvas,
   useTriggers,
-  useUpdateWorkflow,
-  useWorkflow,
-  useWorkflowEvents,
+  useUpdateCanvas,
+  useCanvas,
+  useCanvasEvents,
   useWidgets,
-  workflowKeys,
-} from "@/hooks/useWorkflowData";
-import { useWorkflowWebsocket } from "@/hooks/useWorkflowWebsocket";
+  canvasKeys,
+} from "@/hooks/useCanvasData";
+import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import {
@@ -107,26 +107,22 @@ export function WorkflowPageV2() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { account } = useAccount();
-  const updateWorkflowMutation = useUpdateWorkflow(organizationId!, workflowId!);
+  const updateWorkflowMutation = useUpdateCanvas(organizationId!, workflowId!);
   const { data: triggers = [], isLoading: triggersLoading } = useTriggers();
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
   const { data: widgets = [], isLoading: widgetsLoading } = useWidgets();
   const { data: availableIntegrations = [], isLoading: integrationsLoading } = useAvailableIntegrations();
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!);
-  const {
-    data: workflow,
-    isLoading: workflowLoading,
-    error: workflowError,
-  } = useWorkflow(organizationId!, workflowId!);
-  const { data: workflowEventsResponse } = useWorkflowEvents(workflowId!);
+  const { data: workflow, isLoading: workflowLoading, error: workflowError } = useCanvas(organizationId!, workflowId!);
+  const { data: workflowEventsResponse } = useCanvasEvents(workflowId!);
 
   usePageTitle([workflow?.metadata?.name || "Canvas"]);
 
   const isTemplate = workflow?.metadata?.isTemplate ?? false;
   const isDev = import.meta.env.DEV;
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
-  const createWorkflowMutation = useCreateWorkflow(organizationId!);
+  const createWorkflowMutation = useCreateCanvas(organizationId!);
 
   // Warm up org users and roles cache so approval specs can pretty-print
   // user IDs as emails and role names as display names.
@@ -199,9 +195,9 @@ export function WorkflowPageV2() {
   const canAutoSave = isAutoSaveEnabled && !isTemplate;
 
   // Revert functionality - track initial workflow snapshot
-  const [initialWorkflowSnapshot, setInitialWorkflowSnapshot] = useState<WorkflowsWorkflow | null>(null);
-  const lastSavedWorkflowRef = useRef<WorkflowsWorkflow | null>(null);
-  const workflowRef = useRef<WorkflowsWorkflow | null>(workflow ?? null);
+  const [initialWorkflowSnapshot, setInitialWorkflowSnapshot] = useState<CanvasesCanvas | null>(null);
+  const lastSavedWorkflowRef = useRef<CanvasesCanvas | null>(null);
+  const workflowRef = useRef<CanvasesCanvas | null>(workflow ?? null);
   useEffect(() => {
     workflowRef.current = workflow ?? null;
   }, [workflow]);
@@ -267,13 +263,13 @@ export function WorkflowPageV2() {
   // Build maps from store for canvas display (using initial data from workflow.status and websocket updates)
   // Rebuild whenever store version changes (indicates data was updated)
   const { nodeExecutionsMap, nodeQueueItemsMap, nodeEventsMap } = useMemo<{
-    nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>;
-    nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>;
-    nodeEventsMap: Record<string, WorkflowsWorkflowEvent[]>;
+    nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>;
+    nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>;
+    nodeEventsMap: Record<string, CanvasesCanvasEvent[]>;
   }>(() => {
-    const executionsMap: Record<string, WorkflowsWorkflowNodeExecution[]> = {};
-    const queueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]> = {};
-    const eventsMap: Record<string, WorkflowsWorkflowEvent[]> = {};
+    const executionsMap: Record<string, CanvasesCanvasNodeExecution[]> = {};
+    const queueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]> = {};
+    const eventsMap: Record<string, CanvasesCanvasEvent[]> = {};
 
     // Get current store data
     const storeData = useNodeExecutionStore.getState().data;
@@ -323,7 +319,7 @@ export function WorkflowPageV2() {
   const { loadExecutionChain } = useExecutionChainData(workflowId!, queryClient, workflow);
 
   const saveWorkflowSnapshot = useCallback(
-    (currentWorkflow: WorkflowsWorkflow) => {
+    (currentWorkflow: CanvasesCanvas) => {
       if (!initialWorkflowSnapshot) {
         setInitialWorkflowSnapshot(JSON.parse(JSON.stringify(currentWorkflow)));
       }
@@ -342,7 +338,7 @@ export function WorkflowPageV2() {
   const handleRevert = useCallback(() => {
     if (initialWorkflowSnapshot && organizationId && workflowId) {
       // Restore the initial state
-      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), initialWorkflowSnapshot);
+      queryClient.setQueryData(canvasKeys.detail(organizationId, workflowId), initialWorkflowSnapshot);
 
       // Clear the snapshot since we're back to the initial state
       setInitialWorkflowSnapshot(null);
@@ -402,8 +398,8 @@ export function WorkflowPageV2() {
             }
 
             // Fetch the latest workflow from the cache
-            const latestWorkflow = queryClient.getQueryData<WorkflowsWorkflow>(
-              workflowKeys.detail(organizationId, workflowId),
+            const latestWorkflow = queryClient.getQueryData<CanvasesCanvas>(
+              canvasKeys.detail(organizationId, workflowId),
             );
 
             if (!latestWorkflow?.spec?.nodes) return;
@@ -473,8 +469,8 @@ export function WorkflowPageV2() {
 
             // After save, merge any new pending updates into the cache
             // This prevents the server response from overwriting newer local changes
-            const currentWorkflow = queryClient.getQueryData<WorkflowsWorkflow>(
-              workflowKeys.detail(organizationId, workflowId),
+            const currentWorkflow = queryClient.getQueryData<CanvasesCanvas>(
+              canvasKeys.detail(organizationId, workflowId),
             );
 
             if (currentWorkflow?.spec?.nodes && pendingPositionUpdatesRef.current.size > 0) {
@@ -491,7 +487,7 @@ export function WorkflowPageV2() {
                 return node;
               });
 
-              queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), {
+              queryClient.setQueryData(canvasKeys.detail(organizationId, workflowId), {
                 ...currentWorkflow,
                 spec: {
                   ...currentWorkflow.spec,
@@ -528,19 +524,19 @@ export function WorkflowPageV2() {
     (nodeId: string, event: string) => {
       if (event.includes("event_created")) {
         queryClient.invalidateQueries({
-          queryKey: workflowKeys.nodeEventHistory(workflowId!, nodeId),
+          queryKey: canvasKeys.nodeEventHistory(workflowId!, nodeId),
         });
       }
 
       if (event.startsWith("execution")) {
         queryClient.invalidateQueries({
-          queryKey: workflowKeys.nodeExecutionHistory(workflowId!, nodeId),
+          queryKey: canvasKeys.nodeExecutionHistory(workflowId!, nodeId),
         });
       }
 
       if (event.startsWith("queue_item")) {
         queryClient.invalidateQueries({
-          queryKey: workflowKeys.nodeQueueItemHistory(workflowId!, nodeId),
+          queryKey: canvasKeys.nodeQueueItemHistory(workflowId!, nodeId),
         });
       }
     },
@@ -699,7 +695,7 @@ export function WorkflowPageV2() {
   );
 
   const onCancelQueueItem = useOnCancelQueueItemHandler({
-    workflowId: workflowId!,
+    canvasId: workflowId!,
     organizationId,
     workflow,
     loadSidebarData,
@@ -778,7 +774,7 @@ export function WorkflowPageV2() {
   );
 
   const buildLiveRunItemFromExecution = useCallback(
-    (execution: WorkflowsWorkflowNodeExecution): LogRunItem => {
+    (execution: CanvasesCanvasNodeExecution): LogRunItem => {
       return buildRunItemFromExecution({
         execution,
         nodes: workflow?.spec?.nodes || [],
@@ -791,7 +787,7 @@ export function WorkflowPageV2() {
   );
 
   const buildLiveRunEntryFromEvent = useCallback(
-    (event: WorkflowsWorkflowEvent, runItems: LogRunItem[] = []): LogEntry => {
+    (event: CanvasesCanvasEvent, runItems: LogRunItem[] = []): LogEntry => {
       return buildRunEntryFromEvent({
         event,
         nodes: workflow?.spec?.nodes || [],
@@ -802,7 +798,7 @@ export function WorkflowPageV2() {
   );
 
   const handleWorkflowEventCreated = useCallback(
-    (event: WorkflowsWorkflowEvent) => {
+    (event: CanvasesCanvasEvent) => {
       if (!event.id) {
         return;
       }
@@ -827,7 +823,7 @@ export function WorkflowPageV2() {
   );
 
   const handleExecutionEvent = useCallback(
-    (execution: WorkflowsWorkflowNodeExecution) => {
+    (execution: CanvasesCanvasNodeExecution) => {
       if (!execution.rootEvent?.id) {
         return;
       }
@@ -839,7 +835,7 @@ export function WorkflowPageV2() {
         const runItemsMap = new Map(existingRunItems.map((item) => [item.id, item]));
         runItemsMap.set(runItem.id, runItem);
         const runItems = Array.from(runItemsMap.values());
-        const entry = buildLiveRunEntryFromEvent(execution.rootEvent as WorkflowsWorkflowEvent, runItems);
+        const entry = buildLiveRunEntryFromEvent(execution.rootEvent as CanvasesCanvasEvent, runItems);
         const next = [entry, ...prev.filter((item) => item.id !== entry.id)];
         return next.sort((a, b) => {
           const aTime = Date.parse(a.timestamp || "") || 0;
@@ -851,7 +847,7 @@ export function WorkflowPageV2() {
     [buildLiveRunEntryFromEvent, buildLiveRunItemFromExecution],
   );
 
-  useWorkflowWebsocket(
+  useCanvasWebsocket(
     workflowId!,
     organizationId!,
     handleNodeWebsocketEvent,
@@ -1268,7 +1264,7 @@ export function WorkflowPageV2() {
   );
 
   const handleSaveWorkflow = useCallback(
-    async (workflowToSave?: WorkflowsWorkflow, options?: { showToast?: boolean }) => {
+    async (workflowToSave?: CanvasesCanvas, options?: { showToast?: boolean }) => {
       const targetWorkflow = workflowToSave || workflowRef.current;
       if (!targetWorkflow || !organizationId || !workflowId) return;
       if (isTemplate) {
@@ -1460,7 +1456,7 @@ export function WorkflowPageV2() {
       };
 
       // Update local cache
-      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      queryClient.setQueryData(canvasKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
@@ -1501,8 +1497,8 @@ export function WorkflowPageV2() {
             return;
           }
 
-          const latestWorkflow = queryClient.getQueryData<WorkflowsWorkflow>(
-            workflowKeys.detail(organizationId, workflowId),
+          const latestWorkflow = queryClient.getQueryData<CanvasesCanvas>(
+            canvasKeys.detail(organizationId, workflowId),
           );
 
           if (!latestWorkflow?.spec?.nodes) return;
@@ -1571,7 +1567,7 @@ export function WorkflowPageV2() {
       saveWorkflowSnapshot(workflow);
 
       const latestWorkflow =
-        queryClient.getQueryData<WorkflowsWorkflow>(workflowKeys.detail(organizationId, workflowId)) || workflow;
+        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, workflowId)) || workflow;
 
       // Separate position updates from configuration updates
       const { x, y, ...configurationUpdates } = updates;
@@ -1616,7 +1612,7 @@ export function WorkflowPageV2() {
           },
         };
 
-        queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+        queryClient.setQueryData(canvasKeys.detail(organizationId, workflowId), updatedWorkflow);
       }
 
       if (hasConfigurationUpdate) {
@@ -1738,7 +1734,7 @@ export function WorkflowPageV2() {
       };
 
       // Update local cache
-      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      queryClient.setQueryData(canvasKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
@@ -1803,7 +1799,7 @@ export function WorkflowPageV2() {
         },
       };
 
-      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      queryClient.setQueryData(canvasKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
@@ -1918,7 +1914,7 @@ export function WorkflowPageV2() {
         },
       };
 
-      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      queryClient.setQueryData(canvasKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
@@ -1964,7 +1960,7 @@ export function WorkflowPageV2() {
       };
 
       // Update local cache
-      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      queryClient.setQueryData(canvasKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
@@ -2007,7 +2003,7 @@ export function WorkflowPageV2() {
       };
 
       // Update local cache
-      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      queryClient.setQueryData(canvasKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
@@ -2065,7 +2061,7 @@ export function WorkflowPageV2() {
       };
 
       // Update local cache
-      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      queryClient.setQueryData(canvasKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
@@ -2118,7 +2114,7 @@ export function WorkflowPageV2() {
         },
       };
 
-      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      queryClient.setQueryData(canvasKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (canAutoSave) {
         pendingPositionUpdatesRef.current.set(nodeId, roundedPosition);
@@ -2174,7 +2170,7 @@ export function WorkflowPageV2() {
         },
       };
 
-      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      queryClient.setQueryData(canvasKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (canAutoSave) {
         // Add all position updates to pending updates
@@ -2231,7 +2227,7 @@ export function WorkflowPageV2() {
         },
       };
 
-      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      queryClient.setQueryData(canvasKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
@@ -2272,10 +2268,10 @@ export function WorkflowPageV2() {
       if (!workflowId) return;
 
       try {
-        await workflowsEmitNodeEvent(
+        await canvasesEmitNodeEvent(
           withOrganizationHeader({
             path: {
-              workflowId: workflowId,
+              canvasId: workflowId,
               nodeId: nodeId,
             },
             body: {
@@ -2308,10 +2304,10 @@ export function WorkflowPageV2() {
       const nextPaused = !node.paused;
 
       try {
-        const result = await workflowsUpdateNodePause(
+        const result = await canvasesUpdateNodePause(
           withOrganizationHeader({
             path: {
-              workflowId: workflowId,
+              canvasId: workflowId,
               nodeId: nodeId,
             },
             body: {
@@ -2333,7 +2329,7 @@ export function WorkflowPageV2() {
           },
         };
 
-        queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+        queryClient.setQueryData(canvasKeys.detail(organizationId, workflowId), updatedWorkflow);
         showSuccessToast(updatedPaused ? "Component paused" : "Component resumed");
       } catch (error) {
         let parsedError = error as { message: string };
@@ -2416,7 +2412,7 @@ export function WorkflowPageV2() {
       };
 
       // Update local cache
-      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      queryClient.setQueryData(canvasKeys.detail(organizationId, workflowId), updatedWorkflow);
       if (canAutoSave) {
         await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       } else {
@@ -2607,7 +2603,7 @@ export function WorkflowPageV2() {
       if (!workflow || !organizationId) return;
 
       const latestWorkflow =
-        queryClient.getQueryData<WorkflowsWorkflow>(workflowKeys.detail(organizationId, workflowId!)) || workflow;
+        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, workflowId!)) || workflow;
 
       const result = await createWorkflowMutation.mutateAsync({
         name: data.name,
@@ -2616,9 +2612,9 @@ export function WorkflowPageV2() {
         edges: latestWorkflow.spec?.edges,
       });
 
-      if (result?.data?.workflow?.metadata?.id) {
+      if (result?.data?.canvas?.metadata?.id) {
         setIsUseTemplateOpen(false);
-        navigate(`/${organizationId}/workflows/${result.data.workflow.metadata.id}`);
+        navigate(`/${organizationId}/workflows/${result.data.canvas.metadata.id}`);
       }
     },
     [workflow, organizationId, createWorkflowMutation, navigate, queryClient, workflowId],
@@ -2626,13 +2622,13 @@ export function WorkflowPageV2() {
 
   // Provide pass-through handlers regardless of workflow being loaded to keep hook order stable
   const { onPushThrough, supportsPushThrough } = usePushThroughHandler({
-    workflowId: workflowId!,
+    canvasId: workflowId!,
     organizationId,
     workflow,
   });
 
   const { onCancelExecution } = useCancelExecutionHandler({
-    workflowId: workflowId!,
+    canvasId: workflowId!,
     workflow,
   });
 
@@ -2652,8 +2648,8 @@ export function WorkflowPageV2() {
           executionIds.forEach((id) => next.add(id));
           return next;
         });
-        await queryClient.invalidateQueries({ queryKey: workflowKeys.eventList(workflowId, 50) });
-        await queryClient.invalidateQueries({ queryKey: workflowKeys.nodeExecutions() });
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.eventList(workflowId, 50) });
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeExecutions() });
         showSuccessToast("Execution errors resolved");
       } catch (_error) {
         showErrorToast("Failed to resolve execution errors");
@@ -2666,7 +2662,7 @@ export function WorkflowPageV2() {
 
   // Provide state function based on component type
   const getExecutionState = useCallback(
-    (nodeId: string, execution: WorkflowsWorkflowNodeExecution): { map: EventStateMap; state: EventState } => {
+    (nodeId: string, execution: CanvasesCanvasNodeExecution): { map: EventStateMap; state: EventState } => {
       const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) {
         return {
@@ -2892,22 +2888,22 @@ export function WorkflowPageV2() {
   );
 }
 
-function useExecutionChainData(workflowId: string, queryClient: QueryClient, workflow?: WorkflowsWorkflow) {
+function useExecutionChainData(workflowId: string, queryClient: QueryClient, workflow?: CanvasesCanvas) {
   const loadExecutionChain = useCallback(
     async (
       eventId: string,
       nodeId?: string,
       currentExecution?: Record<string, unknown>,
       forceReload = false,
-    ): Promise<WorkflowsWorkflowNodeExecution[]> => {
+    ): Promise<CanvasesCanvasNodeExecution[]> => {
       const queryOptions = eventExecutionsQueryOptions(workflowId, eventId);
 
-      let allExecutions: WorkflowsWorkflowNodeExecution[] = [];
+      let allExecutions: CanvasesCanvasNodeExecution[] = [];
 
       if (!forceReload) {
         const cachedData = queryClient.getQueryData(queryOptions.queryKey);
         if (cachedData) {
-          allExecutions = (cachedData as WorkflowsListEventExecutionsResponse)?.executions || [];
+          allExecutions = (cachedData as CanvasesListEventExecutionsResponse)?.executions || [];
         }
       }
 
@@ -2916,7 +2912,7 @@ function useExecutionChainData(workflowId: string, queryClient: QueryClient, wor
           await queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
         }
         const data = await queryClient.fetchQuery(queryOptions);
-        allExecutions = (data as WorkflowsListEventExecutionsResponse)?.executions || [];
+        allExecutions = (data as CanvasesListEventExecutionsResponse)?.executions || [];
       }
 
       // Apply topological filtering - the logic you wanted back!
@@ -2951,7 +2947,7 @@ function useExecutionChainData(workflowId: string, queryClient: QueryClient, wor
 }
 
 // Helper function to build topological path to find all nodes that should execute before the given target node
-function getNodesBeforeTarget(targetNodeId: string, workflow: WorkflowsWorkflow): Set<string> {
+function getNodesBeforeTarget(targetNodeId: string, workflow: CanvasesCanvas): Set<string> {
   const nodesBefore = new Set<string>();
   if (!workflow?.spec?.edges) return nodesBefore;
 
@@ -2999,13 +2995,13 @@ function getNodesBeforeTarget(targetNodeId: string, workflow: WorkflowsWorkflow)
 }
 
 function prepareData(
-  workflow: WorkflowsWorkflow,
+  workflow: CanvasesCanvas,
   triggers: TriggersTrigger[],
   blueprints: BlueprintsBlueprint[],
   components: ComponentsComponent[],
-  nodeEventsMap: Record<string, WorkflowsWorkflowEvent[]>,
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
+  nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
+  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
+  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
   workflowId: string,
   queryClient: QueryClient,
   organizationId: string,
@@ -3046,7 +3042,7 @@ function prepareData(
 function prepareTriggerNode(
   node: ComponentsNode,
   triggers: TriggersTrigger[],
-  nodeEventsMap: Record<string, WorkflowsWorkflowEvent[]>,
+  nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
 ): CanvasNode {
   const triggerMetadata = triggers.find((t) => t.name === node.trigger?.name);
   const renderer = getTriggerRenderer(node.trigger?.name || "");
@@ -3078,8 +3074,8 @@ function prepareCompositeNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
   blueprints: BlueprintsBlueprint[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
+  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
+  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
 ): CanvasNode {
   const blueprintMetadata = blueprints.find((b) => b.id === node.blueprint?.id);
   const isMissing = !blueprintMetadata;
@@ -3164,7 +3160,7 @@ function prepareCompositeNode(
   return canvasNode;
 }
 
-function getRunItemState(execution: WorkflowsWorkflowNodeExecution): LastRunState {
+function getRunItemState(execution: CanvasesCanvasNodeExecution): LastRunState {
   if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
     return "running";
   }
@@ -3182,9 +3178,9 @@ function prepareNode(
   triggers: TriggersTrigger[],
   blueprints: BlueprintsBlueprint[],
   components: ComponentsComponent[],
-  nodeEventsMap: Record<string, WorkflowsWorkflowEvent[]>,
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
+  nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
+  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
+  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
   workflowId: string,
   queryClient: any,
   organizationId: string,
@@ -3258,8 +3254,8 @@ function prepareComponentNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
   components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
+  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
+  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
   workflowId: string,
   queryClient: QueryClient,
   organizationId?: string,
@@ -3322,8 +3318,8 @@ function prepareComponentBaseNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
   components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
+  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
+  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
   workflowId: string,
   queryClient: QueryClient,
   organizationId: string,
@@ -3396,8 +3392,8 @@ function prepareMergeNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
   components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  nodeQueueItemsMap?: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
+  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
+  nodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>,
   edges?: ComponentsEdge[],
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
@@ -3474,9 +3470,9 @@ function prepareSidebarData(
   blueprints: BlueprintsBlueprint[],
   components: ComponentsComponent[],
   triggers: TriggersTrigger[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
-  nodeEventsMap: Record<string, WorkflowsWorkflowEvent[]>,
+  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
+  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
+  nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
   totalHistoryCount?: number,
   totalQueueCount?: number,
   workflowId?: string,

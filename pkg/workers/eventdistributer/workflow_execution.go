@@ -6,9 +6,9 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/workflows"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -28,12 +28,12 @@ const (
 func HandleWorkflowExecution(messageBody []byte, wsHub *ws.Hub) error {
 	log.Debugf("Received execution event")
 
-	pbMsg := &pb.WorkflowNodeExecutionMessage{}
+	pbMsg := &pb.CanvasNodeExecutionMessage{}
 	if err := proto.Unmarshal(messageBody, pbMsg); err != nil {
 		return fmt.Errorf("failed to unmarshal execution event: %w", err)
 	}
 
-	return handleExecutionState(pbMsg.WorkflowId, pbMsg.Id, wsHub)
+	return handleExecutionState(pbMsg.CanvasId, pbMsg.Id, wsHub)
 }
 
 func workflowExecutionStateToWsEvent(workflowState string) string {
@@ -70,7 +70,7 @@ func handleExecutionState(workflowID string, executionID string, wsHub *ws.Hub) 
 		return fmt.Errorf("unknown execution state: %s", execution.State)
 	}
 
-	serializedExecutions, err := workflows.SerializeNodeExecutions([]models.WorkflowNodeExecution{*execution}, []models.WorkflowNodeExecution{})
+	serializedExecutions, err := canvases.SerializeNodeExecutions([]models.WorkflowNodeExecution{*execution}, []models.WorkflowNodeExecution{})
 	if err != nil {
 		return fmt.Errorf("failed to serialize execution: %w", err)
 	}

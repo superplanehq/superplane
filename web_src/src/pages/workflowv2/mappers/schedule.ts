@@ -1,4 +1,4 @@
-import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
+import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass } from "@/utils/colors";
 import { formatTimestampInUserTimezone } from "@/utils/timezone";
 import { getNextCronExecution } from "@/utils/cron";
@@ -309,7 +309,7 @@ function formatNextTrigger(configuration: ScheduleConfiguration, metadata?: { ne
  * Renderer for the "schedule" trigger type
  */
 export const scheduleTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
     const eventDate = new Date(event.createdAt!);
     const formattedDate = eventDate.toLocaleDateString("en-US", {
       year: "numeric",
@@ -327,13 +327,13 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getRootEventValues: (event: WorkflowsWorkflowEvent): Record<string, string> => {
+  getRootEventValues: (event: CanvasesCanvasEvent): Record<string, string> => {
     return {
       Timestamp: (event.data?.["timestamp"] as string) || "n/a",
     };
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent?: WorkflowsWorkflowEvent) => {
+  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent?: CanvasesCanvasEvent) => {
     const props: TriggerProps = {
       title: node.name || trigger.label || trigger.name || "Unnamed trigger",
       iconSlug: trigger.icon,

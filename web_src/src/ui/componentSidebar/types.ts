@@ -1,4 +1,4 @@
-import { WorkflowsWorkflowEvent, WorkflowsWorkflowNodeExecution } from "@/api-client";
+import { CanvasesCanvasEvent, CanvasesCanvasNodeExecution } from "@/api-client";
 import { ChildEventsState } from "../composite";
 
 export interface SidebarEvent {
@@ -10,8 +10,8 @@ export interface SidebarEvent {
   isOpen: boolean;
   receivedAt?: Date;
   values?: Record<string, string>;
-  originalEvent?: WorkflowsWorkflowEvent;
-  originalExecution?: WorkflowsWorkflowNodeExecution;
+  originalEvent?: CanvasesCanvasEvent;
+  originalExecution?: CanvasesCanvasNodeExecution;
 
   // Optional specific identifiers to avoid overloading `id`
   // Present for execution items

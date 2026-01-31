@@ -95,7 +95,7 @@ func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node mod
 					continue
 				}
 
-				messages.NewWorkflowExecutionMessage(
+				messages.NewCanvasExecutionMessage(
 					node.WorkflowID.String(),
 					executionID.String(),
 					node.NodeID,
@@ -104,7 +104,7 @@ func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node mod
 		}
 
 		if queueItem != nil {
-			messages.NewWorkflowQueueItemMessage(
+			messages.NewCanvasQueueItemMessage(
 				queueItem.WorkflowID.String(),
 				queueItem.ID.String(),
 				queueItem.NodeID,

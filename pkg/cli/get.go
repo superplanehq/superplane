@@ -29,13 +29,13 @@ var getCanvasCmd = &cobra.Command{
 		client := DefaultClient()
 		ctx := context.Background()
 
-		workflowID, err := findWorkflowID(ctx, client, nameOrID)
+		canvasID, err := findCanvasID(ctx, client, nameOrID)
 		Check(err)
 
-		response, _, err := client.WorkflowAPI.WorkflowsDescribeWorkflow(ctx, workflowID).Execute()
+		response, _, err := client.CanvasAPI.CanvasesDescribeCanvas(ctx, canvasID).Execute()
 		Check(err)
 
-		resource := models.CanvasResourceFromWorkflow(*response.Workflow)
+		resource := models.CanvasResourceFromCanvas(*response.Canvas)
 		output, err := yaml.Marshal(resource)
 		Check(err)
 
@@ -43,13 +43,13 @@ var getCanvasCmd = &cobra.Command{
 	},
 }
 
-func findWorkflowID(ctx context.Context, client *openapi_client.APIClient, nameOrID string) (string, error) {
+func findCanvasID(ctx context.Context, client *openapi_client.APIClient, nameOrID string) (string, error) {
 	_, err := uuid.Parse(nameOrID)
 	if err == nil {
 		return nameOrID, nil
 	}
 
-	return findWorkflowIDByName(ctx, client, nameOrID)
+	return findCanvasIDByName(ctx, client, nameOrID)
 }
 
 func init() {

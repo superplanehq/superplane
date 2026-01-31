@@ -44,7 +44,7 @@
       "name": "Blueprints"
     },
     {
-      "name": "Workflows"
+      "name": "Canvases"
     }
   ],
   "schemes": [
@@ -211,6 +211,812 @@
         ],
         "tags": [
           "Blueprint"
+        ]
+      }
+    },
+    "/api/v1/canvases": {
+      "get": {
+        "summary": "List canvases",
+        "description": "Returns a list of all canvases",
+        "operationId": "Canvases_ListCanvases",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesListCanvasesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "includeTemplates",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "Canvas"
+        ]
+      },
+      "post": {
+        "summary": "Create canvas",
+        "description": "Creates a new canvas",
+        "operationId": "Canvases_CreateCanvas",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesCreateCanvasResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesCreateCanvasRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Canvas"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasId}/events": {
+      "get": {
+        "summary": "List canvas events",
+        "description": "Returns a list of root events that triggered executions in a canvas",
+        "operationId": "Canvases_ListCanvasEvents",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesListCanvasEventsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          }
+        ],
+        "tags": [
+          "CanvasEvent"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasId}/events/{eventId}/executions": {
+      "get": {
+        "summary": "List event executions",
+        "description": "Returns a list of all node executions triggered by a root event",
+        "operationId": "Canvases_ListEventExecutions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesListEventExecutionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "CanvasEvent"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasId}/executions/resolve": {
+      "patch": {
+        "summary": "Resolve execution errors",
+        "description": "Marks canvas node execution errors as resolved",
+        "operationId": "Canvases_ResolveExecutionErrors",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesResolveExecutionErrorsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesResolveExecutionErrorsBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasNodeExecution"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasId}/executions/{executionId}/actions/{actionName}": {
+      "post": {
+        "summary": "Invoke execution action",
+        "description": "Invokes a custom action on a canvas node execution",
+        "operationId": "Canvases_InvokeNodeExecutionAction",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesInvokeNodeExecutionActionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "actionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesInvokeNodeExecutionActionBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasNodeExecution"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasId}/executions/{executionId}/cancel": {
+      "patch": {
+        "summary": "Cancel execution",
+        "description": "Cancels a running canvas node execution",
+        "operationId": "Canvases_CancelExecution",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesCancelExecutionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesCancelExecutionBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasNodeExecution"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasId}/executions/{executionId}/children": {
+      "post": {
+        "summary": "List child executions for an execution",
+        "description": "List child executions for an execution",
+        "operationId": "Canvases_ListChildExecutions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesListChildExecutionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesListChildExecutionsBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasNodeExecution"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasId}/nodes/{nodeId}/events": {
+      "get": {
+        "summary": "List node events",
+        "description": "Returns a list of events for a specific canvas node",
+        "operationId": "Canvases_ListNodeEvents",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesListNodeEventsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          }
+        ],
+        "tags": [
+          "CanvasNode"
+        ]
+      },
+      "post": {
+        "summary": "Emit output event for canvas node",
+        "description": "Emit output event for canvas node",
+        "operationId": "Canvases_EmitNodeEvent",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesEmitNodeEventResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesEmitNodeEventBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasNode"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasId}/nodes/{nodeId}/executions": {
+      "get": {
+        "summary": "List node executions",
+        "description": "Returns a list of executions for a specific canvas node",
+        "operationId": "Canvases_ListNodeExecutions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesListNodeExecutionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "states",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "STATE_UNKNOWN",
+                "STATE_PENDING",
+                "STATE_STARTED",
+                "STATE_FINISHED"
+              ]
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "results",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "RESULT_UNKNOWN",
+                "RESULT_PASSED",
+                "RESULT_FAILED",
+                "RESULT_CANCELLED"
+              ]
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          }
+        ],
+        "tags": [
+          "CanvasNode"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasId}/nodes/{nodeId}/pause": {
+      "patch": {
+        "summary": "Pause or resume node processing",
+        "description": "Pauses or resumes processing for a canvas node while continuing to queue incoming items",
+        "operationId": "Canvases_UpdateNodePause",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesUpdateNodePauseResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesUpdateNodePauseBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasNode"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasId}/nodes/{nodeId}/queue": {
+      "get": {
+        "summary": "List items in a node's queue",
+        "description": "Returns a list of items in a node's queue",
+        "operationId": "Canvases_ListNodeQueueItems",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesListNodeQueueItemsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          }
+        ],
+        "tags": [
+          "CanvasNode"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasId}/nodes/{nodeId}/queue/{itemId}": {
+      "delete": {
+        "summary": "Delete item from a node's queue",
+        "description": "Deletes a specific item in a node's queue",
+        "operationId": "Canvases_DeleteNodeQueueItem",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesDeleteNodeQueueItemResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "CanvasNode"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasId}/triggers/{nodeId}/actions/{actionName}": {
+      "post": {
+        "summary": "Invoke trigger action",
+        "description": "Invokes a custom action on a canvas node trigger",
+        "operationId": "Canvases_InvokeNodeTriggerAction",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesInvokeNodeTriggerActionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "actionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesInvokeNodeTriggerActionBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasNode"
+        ]
+      }
+    },
+    "/api/v1/canvases/{id}": {
+      "get": {
+        "summary": "Describe canvas",
+        "description": "Returns a canvas by ID",
+        "operationId": "Canvases_DescribeCanvas",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesDescribeCanvasResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Canvas"
+        ]
+      },
+      "delete": {
+        "summary": "Delete canvas",
+        "description": "Deletes an existing canvas",
+        "operationId": "Canvases_DeleteCanvas",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesDeleteCanvasResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Canvas"
+        ]
+      },
+      "put": {
+        "summary": "Update canvas",
+        "description": "Updates an existing canvas",
+        "operationId": "Canvases_UpdateCanvas",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesUpdateCanvasResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesUpdateCanvasBody"
+            }
+          }
+        ],
+        "tags": [
+          "Canvas"
         ]
       }
     },
@@ -2064,812 +2870,6 @@
           "Widget"
         ]
       }
-    },
-    "/api/v1/workflows": {
-      "get": {
-        "summary": "List workflows",
-        "description": "Returns a list of all workflows",
-        "operationId": "Workflows_ListWorkflows",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/WorkflowsListWorkflowsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "includeTemplates",
-            "in": "query",
-            "required": false,
-            "type": "boolean"
-          }
-        ],
-        "tags": [
-          "Workflow"
-        ]
-      },
-      "post": {
-        "summary": "Create workflow",
-        "description": "Creates a new workflow",
-        "operationId": "Workflows_CreateWorkflow",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/WorkflowsCreateWorkflowResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/WorkflowsCreateWorkflowRequest"
-            }
-          }
-        ],
-        "tags": [
-          "Workflow"
-        ]
-      }
-    },
-    "/api/v1/workflows/{id}": {
-      "get": {
-        "summary": "Describe workflow",
-        "description": "Returns a workflow by ID",
-        "operationId": "Workflows_DescribeWorkflow",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/WorkflowsDescribeWorkflowResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Workflow"
-        ]
-      },
-      "delete": {
-        "summary": "Delete workflow",
-        "description": "Deletes an existing workflow",
-        "operationId": "Workflows_DeleteWorkflow",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/WorkflowsDeleteWorkflowResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Workflow"
-        ]
-      },
-      "put": {
-        "summary": "Update workflow",
-        "description": "Updates an existing workflow",
-        "operationId": "Workflows_UpdateWorkflow",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/WorkflowsUpdateWorkflowResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/WorkflowsUpdateWorkflowBody"
-            }
-          }
-        ],
-        "tags": [
-          "Workflow"
-        ]
-      }
-    },
-    "/api/v1/workflows/{workflowId}/events": {
-      "get": {
-        "summary": "List workflow events",
-        "description": "Returns a list of root events that triggered executions in a workflow",
-        "operationId": "Workflows_ListWorkflowEvents",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/WorkflowsListWorkflowEventsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "workflowId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "type": "integer",
-            "format": "int64"
-          },
-          {
-            "name": "before",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "format": "date-time"
-          }
-        ],
-        "tags": [
-          "WorkflowEvent"
-        ]
-      }
-    },
-    "/api/v1/workflows/{workflowId}/events/{eventId}/executions": {
-      "get": {
-        "summary": "List event executions",
-        "description": "Returns a list of all node executions triggered by a root event",
-        "operationId": "Workflows_ListEventExecutions",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/WorkflowsListEventExecutionsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "workflowId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "eventId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "WorkflowEvent"
-        ]
-      }
-    },
-    "/api/v1/workflows/{workflowId}/executions/resolve": {
-      "patch": {
-        "summary": "Resolve execution errors",
-        "description": "Marks workflow node execution errors as resolved",
-        "operationId": "Workflows_ResolveExecutionErrors",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/WorkflowsResolveExecutionErrorsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "workflowId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/WorkflowsResolveExecutionErrorsBody"
-            }
-          }
-        ],
-        "tags": [
-          "WorkflowNodeExecution"
-        ]
-      }
-    },
-    "/api/v1/workflows/{workflowId}/executions/{executionId}/actions/{actionName}": {
-      "post": {
-        "summary": "Invoke execution action",
-        "description": "Invokes a custom action on a workflow node execution",
-        "operationId": "Workflows_InvokeNodeExecutionAction",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/WorkflowsInvokeNodeExecutionActionResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "workflowId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "executionId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "actionName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/WorkflowsInvokeNodeExecutionActionBody"
-            }
-          }
-        ],
-        "tags": [
-          "WorkflowNodeExecution"
-        ]
-      }
-    },
-    "/api/v1/workflows/{workflowId}/executions/{executionId}/cancel": {
-      "patch": {
-        "summary": "Cancel execution",
-        "description": "Cancels a running workflow node execution",
-        "operationId": "Workflows_CancelExecution",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/WorkflowsCancelExecutionResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "workflowId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "executionId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/WorkflowsCancelExecutionBody"
-            }
-          }
-        ],
-        "tags": [
-          "WorkflowNodeExecution"
-        ]
-      }
-    },
-    "/api/v1/workflows/{workflowId}/executions/{executionId}/children": {
-      "post": {
-        "summary": "List child executions for an execution",
-        "description": "List child executions for an execution",
-        "operationId": "Workflows_ListChildExecutions",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/WorkflowsListChildExecutionsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "workflowId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "executionId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/WorkflowsListChildExecutionsBody"
-            }
-          }
-        ],
-        "tags": [
-          "WorkflowNodeExecution"
-        ]
-      }
-    },
-    "/api/v1/workflows/{workflowId}/nodes/{nodeId}/events": {
-      "get": {
-        "summary": "List node events",
-        "description": "Returns a list of events for a specific workflow node",
-        "operationId": "Workflows_ListNodeEvents",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/WorkflowsListNodeEventsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "workflowId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "nodeId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "type": "integer",
-            "format": "int64"
-          },
-          {
-            "name": "before",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "format": "date-time"
-          }
-        ],
-        "tags": [
-          "WorkflowNode"
-        ]
-      },
-      "post": {
-        "summary": "Emit output event for workflow node",
-        "description": "Emit output event for workflow node",
-        "operationId": "Workflows_EmitNodeEvent",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/WorkflowsEmitNodeEventResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "workflowId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "nodeId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/WorkflowsEmitNodeEventBody"
-            }
-          }
-        ],
-        "tags": [
-          "WorkflowNode"
-        ]
-      }
-    },
-    "/api/v1/workflows/{workflowId}/nodes/{nodeId}/executions": {
-      "get": {
-        "summary": "List node executions",
-        "description": "Returns a list of executions for a specific workflow node",
-        "operationId": "Workflows_ListNodeExecutions",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/WorkflowsListNodeExecutionsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "workflowId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "nodeId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "states",
-            "in": "query",
-            "required": false,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "STATE_UNKNOWN",
-                "STATE_PENDING",
-                "STATE_STARTED",
-                "STATE_FINISHED"
-              ]
-            },
-            "collectionFormat": "multi"
-          },
-          {
-            "name": "results",
-            "in": "query",
-            "required": false,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "RESULT_UNKNOWN",
-                "RESULT_PASSED",
-                "RESULT_FAILED",
-                "RESULT_CANCELLED"
-              ]
-            },
-            "collectionFormat": "multi"
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "type": "integer",
-            "format": "int64"
-          },
-          {
-            "name": "before",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "format": "date-time"
-          }
-        ],
-        "tags": [
-          "WorkflowNode"
-        ]
-      }
-    },
-    "/api/v1/workflows/{workflowId}/nodes/{nodeId}/pause": {
-      "patch": {
-        "summary": "Pause or resume node processing",
-        "description": "Pauses or resumes processing for a workflow node while continuing to queue incoming items",
-        "operationId": "Workflows_UpdateNodePause",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/WorkflowsUpdateNodePauseResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "workflowId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "nodeId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/WorkflowsUpdateNodePauseBody"
-            }
-          }
-        ],
-        "tags": [
-          "WorkflowNode"
-        ]
-      }
-    },
-    "/api/v1/workflows/{workflowId}/nodes/{nodeId}/queue": {
-      "get": {
-        "summary": "List items in a node's queue",
-        "description": "Returns a list of items in a node's queue",
-        "operationId": "Workflows_ListNodeQueueItems",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/WorkflowsListNodeQueueItemsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "workflowId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "nodeId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "type": "integer",
-            "format": "int64"
-          },
-          {
-            "name": "before",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "format": "date-time"
-          }
-        ],
-        "tags": [
-          "WorkflowNode"
-        ]
-      }
-    },
-    "/api/v1/workflows/{workflowId}/nodes/{nodeId}/queue/{itemId}": {
-      "delete": {
-        "summary": "Delete item from a node's queue",
-        "description": "Deletes a specific item in a node's queue",
-        "operationId": "Workflows_DeleteNodeQueueItem",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/WorkflowsDeleteNodeQueueItemResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "workflowId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "nodeId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "itemId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "WorkflowNode"
-        ]
-      }
-    },
-    "/api/v1/workflows/{workflowId}/triggers/{nodeId}/actions/{actionName}": {
-      "post": {
-        "summary": "Invoke trigger action",
-        "description": "Invokes a custom action on a workflow node trigger",
-        "operationId": "Workflows_InvokeNodeTriggerAction",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/WorkflowsInvokeNodeTriggerActionResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "workflowId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "nodeId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "actionName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/WorkflowsInvokeNodeTriggerActionBody"
-            }
-          }
-        ],
-        "tags": [
-          "WorkflowNode"
-        ]
-      }
     }
   },
   "definitions": {
@@ -3011,6 +3011,534 @@
       "properties": {
         "blueprint": {
           "$ref": "#/definitions/BlueprintsBlueprint"
+        }
+      }
+    },
+    "CanvasNodeExecutionResult": {
+      "type": "string",
+      "enum": [
+        "RESULT_UNKNOWN",
+        "RESULT_PASSED",
+        "RESULT_FAILED",
+        "RESULT_CANCELLED"
+      ],
+      "default": "RESULT_UNKNOWN"
+    },
+    "CanvasNodeExecutionResultReason": {
+      "type": "string",
+      "enum": [
+        "RESULT_REASON_OK",
+        "RESULT_REASON_ERROR",
+        "RESULT_REASON_ERROR_RESOLVED"
+      ],
+      "default": "RESULT_REASON_OK"
+    },
+    "CanvasNodeExecutionState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNKNOWN",
+        "STATE_PENDING",
+        "STATE_STARTED",
+        "STATE_FINISHED"
+      ],
+      "default": "STATE_UNKNOWN"
+    },
+    "CanvasesCancelExecutionBody": {
+      "type": "object"
+    },
+    "CanvasesCancelExecutionResponse": {
+      "type": "object"
+    },
+    "CanvasesCanvas": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/CanvasesCanvasMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/CanvasesCanvasSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/CanvasesCanvasStatus"
+        }
+      }
+    },
+    "CanvasesCanvasEvent": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "canvasId": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "channel": {
+          "type": "string"
+        },
+        "customName": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "CanvasesCanvasEventWithExecutions": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "canvasId": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "channel": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "executions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasNodeExecution"
+          }
+        },
+        "customName": {
+          "type": "string"
+        }
+      }
+    },
+    "CanvasesCanvasMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "organizationId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdBy": {
+          "$ref": "#/definitions/SuperplaneCanvasesUserRef"
+        },
+        "isTemplate": {
+          "type": "boolean"
+        }
+      }
+    },
+    "CanvasesCanvasNodeExecution": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "canvasId": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "parentExecutionId": {
+          "type": "string"
+        },
+        "previousExecutionId": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/CanvasNodeExecutionState"
+        },
+        "result": {
+          "$ref": "#/definitions/CanvasNodeExecutionResult"
+        },
+        "resultReason": {
+          "$ref": "#/definitions/CanvasNodeExecutionResultReason"
+        },
+        "resultMessage": {
+          "type": "string"
+        },
+        "input": {
+          "type": "object"
+        },
+        "outputs": {
+          "type": "object"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "metadata": {
+          "type": "object"
+        },
+        "configuration": {
+          "type": "object"
+        },
+        "childExecutions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasNodeExecution"
+          }
+        },
+        "rootEvent": {
+          "$ref": "#/definitions/CanvasesCanvasEvent"
+        },
+        "cancelledBy": {
+          "$ref": "#/definitions/SuperplaneCanvasesUserRef"
+        }
+      }
+    },
+    "CanvasesCanvasNodeQueueItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "canvasId": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "input": {
+          "type": "object"
+        },
+        "rootEvent": {
+          "$ref": "#/definitions/CanvasesCanvasEvent"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "CanvasesCanvasSpec": {
+      "type": "object",
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsNode"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsEdge"
+          }
+        }
+      }
+    },
+    "CanvasesCanvasStatus": {
+      "type": "object",
+      "properties": {
+        "lastExecutions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasNodeExecution"
+          }
+        },
+        "nextQueueItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasNodeQueueItem"
+          }
+        },
+        "lastEvents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasEvent"
+          }
+        }
+      }
+    },
+    "CanvasesCreateCanvasRequest": {
+      "type": "object",
+      "properties": {
+        "canvas": {
+          "$ref": "#/definitions/CanvasesCanvas"
+        }
+      }
+    },
+    "CanvasesCreateCanvasResponse": {
+      "type": "object",
+      "properties": {
+        "canvas": {
+          "$ref": "#/definitions/CanvasesCanvas"
+        }
+      }
+    },
+    "CanvasesDeleteCanvasResponse": {
+      "type": "object"
+    },
+    "CanvasesDeleteNodeQueueItemResponse": {
+      "type": "object"
+    },
+    "CanvasesDescribeCanvasResponse": {
+      "type": "object",
+      "properties": {
+        "canvas": {
+          "$ref": "#/definitions/CanvasesCanvas"
+        }
+      }
+    },
+    "CanvasesEmitNodeEventBody": {
+      "type": "object",
+      "properties": {
+        "channel": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object"
+        }
+      }
+    },
+    "CanvasesEmitNodeEventResponse": {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string"
+        }
+      }
+    },
+    "CanvasesInvokeNodeExecutionActionBody": {
+      "type": "object",
+      "properties": {
+        "parameters": {
+          "type": "object"
+        }
+      }
+    },
+    "CanvasesInvokeNodeExecutionActionResponse": {
+      "type": "object"
+    },
+    "CanvasesInvokeNodeTriggerActionBody": {
+      "type": "object",
+      "properties": {
+        "parameters": {
+          "type": "object"
+        }
+      }
+    },
+    "CanvasesInvokeNodeTriggerActionResponse": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "object"
+        }
+      }
+    },
+    "CanvasesListCanvasEventsResponse": {
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasEventWithExecutions"
+          }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "lastTimestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "CanvasesListCanvasesResponse": {
+      "type": "object",
+      "properties": {
+        "canvases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvas"
+          }
+        }
+      }
+    },
+    "CanvasesListChildExecutionsBody": {
+      "type": "object"
+    },
+    "CanvasesListChildExecutionsResponse": {
+      "type": "object",
+      "properties": {
+        "executions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasNodeExecution"
+          }
+        }
+      }
+    },
+    "CanvasesListEventExecutionsResponse": {
+      "type": "object",
+      "properties": {
+        "executions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasNodeExecution"
+          }
+        }
+      }
+    },
+    "CanvasesListNodeEventsResponse": {
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasEvent"
+          }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "lastTimestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "CanvasesListNodeExecutionsResponse": {
+      "type": "object",
+      "properties": {
+        "executions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasNodeExecution"
+          }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "lastTimestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "CanvasesListNodeQueueItemsResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasNodeQueueItem"
+          }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "lastTimestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "CanvasesResolveExecutionErrorsBody": {
+      "type": "object",
+      "properties": {
+        "executionIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "CanvasesResolveExecutionErrorsResponse": {
+      "type": "object"
+    },
+    "CanvasesUpdateCanvasBody": {
+      "type": "object",
+      "properties": {
+        "canvas": {
+          "$ref": "#/definitions/CanvasesCanvas"
+        }
+      }
+    },
+    "CanvasesUpdateCanvasResponse": {
+      "type": "object",
+      "properties": {
+        "canvas": {
+          "$ref": "#/definitions/CanvasesCanvas"
+        }
+      }
+    },
+    "CanvasesUpdateNodePauseBody": {
+      "type": "object",
+      "properties": {
+        "paused": {
+          "type": "boolean"
+        }
+      }
+    },
+    "CanvasesUpdateNodePauseResponse": {
+      "type": "object",
+      "properties": {
+        "node": {
+          "$ref": "#/definitions/ComponentsNode"
         }
       }
     },
@@ -4426,6 +4954,17 @@
         }
       }
     },
+    "SuperplaneCanvasesUserRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
     "SuperplaneComponentsOutputChannel": {
       "type": "object",
       "properties": {
@@ -4496,17 +5035,6 @@
         },
         "status": {
           "$ref": "#/definitions/UsersUserStatus"
-        }
-      }
-    },
-    "SuperplaneWorkflowsUserRef": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
         }
       }
     },
@@ -4755,534 +5283,6 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/ConfigurationField"
-          }
-        }
-      }
-    },
-    "WorkflowNodeExecutionResult": {
-      "type": "string",
-      "enum": [
-        "RESULT_UNKNOWN",
-        "RESULT_PASSED",
-        "RESULT_FAILED",
-        "RESULT_CANCELLED"
-      ],
-      "default": "RESULT_UNKNOWN"
-    },
-    "WorkflowNodeExecutionResultReason": {
-      "type": "string",
-      "enum": [
-        "RESULT_REASON_OK",
-        "RESULT_REASON_ERROR",
-        "RESULT_REASON_ERROR_RESOLVED"
-      ],
-      "default": "RESULT_REASON_OK"
-    },
-    "WorkflowNodeExecutionState": {
-      "type": "string",
-      "enum": [
-        "STATE_UNKNOWN",
-        "STATE_PENDING",
-        "STATE_STARTED",
-        "STATE_FINISHED"
-      ],
-      "default": "STATE_UNKNOWN"
-    },
-    "WorkflowsCancelExecutionBody": {
-      "type": "object"
-    },
-    "WorkflowsCancelExecutionResponse": {
-      "type": "object"
-    },
-    "WorkflowsCreateWorkflowRequest": {
-      "type": "object",
-      "properties": {
-        "workflow": {
-          "$ref": "#/definitions/WorkflowsWorkflow"
-        }
-      }
-    },
-    "WorkflowsCreateWorkflowResponse": {
-      "type": "object",
-      "properties": {
-        "workflow": {
-          "$ref": "#/definitions/WorkflowsWorkflow"
-        }
-      }
-    },
-    "WorkflowsDeleteNodeQueueItemResponse": {
-      "type": "object"
-    },
-    "WorkflowsDeleteWorkflowResponse": {
-      "type": "object"
-    },
-    "WorkflowsDescribeWorkflowResponse": {
-      "type": "object",
-      "properties": {
-        "workflow": {
-          "$ref": "#/definitions/WorkflowsWorkflow"
-        }
-      }
-    },
-    "WorkflowsEmitNodeEventBody": {
-      "type": "object",
-      "properties": {
-        "channel": {
-          "type": "string"
-        },
-        "data": {
-          "type": "object"
-        }
-      }
-    },
-    "WorkflowsEmitNodeEventResponse": {
-      "type": "object",
-      "properties": {
-        "eventId": {
-          "type": "string"
-        }
-      }
-    },
-    "WorkflowsInvokeNodeExecutionActionBody": {
-      "type": "object",
-      "properties": {
-        "parameters": {
-          "type": "object"
-        }
-      }
-    },
-    "WorkflowsInvokeNodeExecutionActionResponse": {
-      "type": "object"
-    },
-    "WorkflowsInvokeNodeTriggerActionBody": {
-      "type": "object",
-      "properties": {
-        "parameters": {
-          "type": "object"
-        }
-      }
-    },
-    "WorkflowsInvokeNodeTriggerActionResponse": {
-      "type": "object",
-      "properties": {
-        "result": {
-          "type": "object"
-        }
-      }
-    },
-    "WorkflowsListChildExecutionsBody": {
-      "type": "object"
-    },
-    "WorkflowsListChildExecutionsResponse": {
-      "type": "object",
-      "properties": {
-        "executions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/WorkflowsWorkflowNodeExecution"
-          }
-        }
-      }
-    },
-    "WorkflowsListEventExecutionsResponse": {
-      "type": "object",
-      "properties": {
-        "executions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/WorkflowsWorkflowNodeExecution"
-          }
-        }
-      }
-    },
-    "WorkflowsListNodeEventsResponse": {
-      "type": "object",
-      "properties": {
-        "events": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/WorkflowsWorkflowEvent"
-          }
-        },
-        "totalCount": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "hasNextPage": {
-          "type": "boolean"
-        },
-        "lastTimestamp": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
-    "WorkflowsListNodeExecutionsResponse": {
-      "type": "object",
-      "properties": {
-        "executions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/WorkflowsWorkflowNodeExecution"
-          }
-        },
-        "totalCount": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "hasNextPage": {
-          "type": "boolean"
-        },
-        "lastTimestamp": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
-    "WorkflowsListNodeQueueItemsResponse": {
-      "type": "object",
-      "properties": {
-        "items": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/WorkflowsWorkflowNodeQueueItem"
-          }
-        },
-        "totalCount": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "hasNextPage": {
-          "type": "boolean"
-        },
-        "lastTimestamp": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
-    "WorkflowsListWorkflowEventsResponse": {
-      "type": "object",
-      "properties": {
-        "events": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/WorkflowsWorkflowEventWithExecutions"
-          }
-        },
-        "totalCount": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "hasNextPage": {
-          "type": "boolean"
-        },
-        "lastTimestamp": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
-    "WorkflowsListWorkflowsResponse": {
-      "type": "object",
-      "properties": {
-        "workflows": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/WorkflowsWorkflow"
-          }
-        }
-      }
-    },
-    "WorkflowsResolveExecutionErrorsBody": {
-      "type": "object",
-      "properties": {
-        "executionIds": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "WorkflowsResolveExecutionErrorsResponse": {
-      "type": "object"
-    },
-    "WorkflowsUpdateNodePauseBody": {
-      "type": "object",
-      "properties": {
-        "paused": {
-          "type": "boolean"
-        }
-      }
-    },
-    "WorkflowsUpdateNodePauseResponse": {
-      "type": "object",
-      "properties": {
-        "node": {
-          "$ref": "#/definitions/ComponentsNode"
-        }
-      }
-    },
-    "WorkflowsUpdateWorkflowBody": {
-      "type": "object",
-      "properties": {
-        "workflow": {
-          "$ref": "#/definitions/WorkflowsWorkflow"
-        }
-      }
-    },
-    "WorkflowsUpdateWorkflowResponse": {
-      "type": "object",
-      "properties": {
-        "workflow": {
-          "$ref": "#/definitions/WorkflowsWorkflow"
-        }
-      }
-    },
-    "WorkflowsWorkflow": {
-      "type": "object",
-      "properties": {
-        "metadata": {
-          "$ref": "#/definitions/WorkflowsWorkflowMetadata"
-        },
-        "spec": {
-          "$ref": "#/definitions/WorkflowsWorkflowSpec"
-        },
-        "status": {
-          "$ref": "#/definitions/WorkflowsWorkflowStatus"
-        }
-      }
-    },
-    "WorkflowsWorkflowEvent": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "workflowId": {
-          "type": "string"
-        },
-        "nodeId": {
-          "type": "string"
-        },
-        "channel": {
-          "type": "string"
-        },
-        "customName": {
-          "type": "string"
-        },
-        "data": {
-          "type": "object"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
-    "WorkflowsWorkflowEventWithExecutions": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "workflowId": {
-          "type": "string"
-        },
-        "nodeId": {
-          "type": "string"
-        },
-        "channel": {
-          "type": "string"
-        },
-        "data": {
-          "type": "object"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "executions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/WorkflowsWorkflowNodeExecution"
-          }
-        },
-        "customName": {
-          "type": "string"
-        }
-      }
-    },
-    "WorkflowsWorkflowMetadata": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "organizationId": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "createdBy": {
-          "$ref": "#/definitions/SuperplaneWorkflowsUserRef"
-        },
-        "isTemplate": {
-          "type": "boolean"
-        }
-      }
-    },
-    "WorkflowsWorkflowNodeExecution": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "workflowId": {
-          "type": "string"
-        },
-        "nodeId": {
-          "type": "string"
-        },
-        "parentExecutionId": {
-          "type": "string"
-        },
-        "previousExecutionId": {
-          "type": "string"
-        },
-        "state": {
-          "$ref": "#/definitions/WorkflowNodeExecutionState"
-        },
-        "result": {
-          "$ref": "#/definitions/WorkflowNodeExecutionResult"
-        },
-        "resultReason": {
-          "$ref": "#/definitions/WorkflowNodeExecutionResultReason"
-        },
-        "resultMessage": {
-          "type": "string"
-        },
-        "input": {
-          "type": "object"
-        },
-        "outputs": {
-          "type": "object"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "metadata": {
-          "type": "object"
-        },
-        "configuration": {
-          "type": "object"
-        },
-        "childExecutions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/WorkflowsWorkflowNodeExecution"
-          }
-        },
-        "rootEvent": {
-          "$ref": "#/definitions/WorkflowsWorkflowEvent"
-        },
-        "cancelledBy": {
-          "$ref": "#/definitions/SuperplaneWorkflowsUserRef"
-        }
-      }
-    },
-    "WorkflowsWorkflowNodeQueueItem": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "workflowId": {
-          "type": "string"
-        },
-        "nodeId": {
-          "type": "string"
-        },
-        "input": {
-          "type": "object"
-        },
-        "rootEvent": {
-          "$ref": "#/definitions/WorkflowsWorkflowEvent"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
-    "WorkflowsWorkflowSpec": {
-      "type": "object",
-      "properties": {
-        "nodes": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsNode"
-          }
-        },
-        "edges": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsEdge"
-          }
-        }
-      }
-    },
-    "WorkflowsWorkflowStatus": {
-      "type": "object",
-      "properties": {
-        "lastExecutions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/WorkflowsWorkflowNodeExecution"
-          }
-        },
-        "nextQueueItems": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/WorkflowsWorkflowNodeQueueItem"
-          }
-        },
-        "lastEvents": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/WorkflowsWorkflowEvent"
           }
         }
       }

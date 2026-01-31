@@ -2,27 +2,27 @@ package messages
 
 import (
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const WorkflowEventCreatedRoutingKey = "workflow-event-created"
 
-type WorkflowEventCreatedMessage struct {
-	message *pb.WorkflowNodeEventMessage
+type CanvasEventCreatedMessage struct {
+	message *pb.CanvasNodeEventMessage
 }
 
-func NewWorkflowEventCreatedMessage(workflowId string, event *models.WorkflowEvent) WorkflowEventCreatedMessage {
-	return WorkflowEventCreatedMessage{
-		message: &pb.WorkflowNodeEventMessage{
-			Id:         event.ID.String(),
-			WorkflowId: workflowId,
-			NodeId:     event.NodeID,
-			Timestamp:  timestamppb.Now(),
+func NewCanvasEventCreatedMessage(canvasId string, event *models.WorkflowEvent) CanvasEventCreatedMessage {
+	return CanvasEventCreatedMessage{
+		message: &pb.CanvasNodeEventMessage{
+			Id:        event.ID.String(),
+			CanvasId:  canvasId,
+			NodeId:    event.NodeID,
+			Timestamp: timestamppb.Now(),
 		},
 	}
 }
 
-func (m WorkflowEventCreatedMessage) Publish() error {
+func (m CanvasEventCreatedMessage) Publish() error {
 	return Publish(WorkflowExchange, WorkflowEventCreatedRoutingKey, toBytes(m.message))
 }

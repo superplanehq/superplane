@@ -1,4 +1,4 @@
-import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
+import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
 import { TriggerRenderer } from "../types";
@@ -42,7 +42,7 @@ interface OnIncidentAnnotatedEventData {
  * Renderer for the "pagerduty.onIncidentAnnotated" trigger type
  */
 export const onIncidentAnnotatedTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
     const eventData = event.data?.data as OnIncidentAnnotatedEventData;
     const incident = eventData?.incident;
     const agent = eventData?.agent;
@@ -55,12 +55,12 @@ export const onIncidentAnnotatedTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
+  getRootEventValues: (lastEvent: CanvasesCanvasEvent): Record<string, string> => {
     const eventData = lastEvent.data?.data as OnIncidentAnnotatedEventData;
     return getDetailsForAnnotatedIncident(eventData?.incident, eventData?.agent, eventData?.annotation);
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
+  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
     const metadata = node.metadata as unknown as OnIncidentAnnotatedMetadata;
     const configuration = node.configuration as any;
     const metadataItems = [];

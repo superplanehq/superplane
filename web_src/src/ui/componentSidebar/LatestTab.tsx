@@ -2,7 +2,7 @@ import { TextAlignStart } from "lucide-react";
 import { SidebarEventItem } from "./SidebarEventItem";
 import { TabData } from "./SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "./types";
-import { ComponentsComponent, ComponentsNode, WorkflowsWorkflowNodeExecution } from "@/api-client";
+import { ComponentsComponent, ComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
 import { EventState, EventStateMap } from "../componentBase";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
 
@@ -31,7 +31,7 @@ interface LatestTabProps {
   ) => Promise<unknown[]>;
   getExecutionState?: (
     nodeId: string,
-    execution: WorkflowsWorkflowNodeExecution,
+    execution: CanvasesCanvasNodeExecution,
   ) => { map: EventStateMap; state: EventState };
   workflowNodes?: ComponentsNode[]; // Workflow spec nodes for metadata lookup
   components?: ComponentsComponent[]; // Component metadata
