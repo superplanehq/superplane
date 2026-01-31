@@ -53,7 +53,7 @@ export function CreateCanvasPage() {
       });
 
       if (result?.data?.canvas?.metadata?.id) {
-        navigate(`/${organizationId}/workflows/${result.data.canvas.metadata.id}`);
+        navigate(`/${organizationId}/canvases/${result.data.canvas.metadata.id}`);
       }
     } catch (error) {
       const errorMessage = (error as Error)?.message || error?.toString() || "Failed to create canvas";

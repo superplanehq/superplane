@@ -254,10 +254,10 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         const nodeId = execution.nodeId;
         const executionId = execution.executionId;
 
-        const link = `${window.location.origin}/${orgId}/workflows/${workflowId}/nodes/${nodeId}/${executionId}`;
+        const link = `${window.location.origin}/${orgId}/canvases/${workflowId}/nodes/${nodeId}/${executionId}`;
         copyToClipboard(link);
       } else {
-        const link = `${window.location.origin}/${orgId}/workflows/${workflowId}?sidebar=1&node=${execution.nodeId}`;
+        const link = `${window.location.origin}/${orgId}/canvases/${workflowId}?sidebar=1&node=${execution.nodeId}`;
         copyToClipboard(link);
       }
 
@@ -283,7 +283,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       const nodeId = execution.nodeId;
       const executionId = execution.executionId;
 
-      const path = `/${orgId}/workflows/${workflowId}/nodes/${nodeId}/${executionId}`;
+      const path = `/${orgId}/canvases/${workflowId}/nodes/${nodeId}/${executionId}`;
       navigate(path, { replace: false });
     },
     [navigate],

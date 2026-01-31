@@ -75,9 +75,9 @@ function AppRouter() {
             {isCustomComponentsEnabled() && (
               <Route path="custom-components/:blueprintId" element={withAuthOnly(CustomComponent)} />
             )}
-            <Route path="workflows/:workflowId" element={withAuthOnly(WorkflowPageV2)} />
-            <Route path="templates/:workflowId" element={withAuthOnly(WorkflowPageV2)} />
-            <Route path="workflows/:workflowId/nodes/:nodeId/:executionId" element={withAuthOnly(NodeRunPage)} />
+            <Route path="canvases/:canvasId" element={withAuthOnly(WorkflowPageV2)} />
+            <Route path="templates/:canvasId" element={withAuthOnly(WorkflowPageV2)} />
+            <Route path="canvases/:canvasId/nodes/:nodeId/:executionId" element={withAuthOnly(NodeRunPage)} />
             <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
           </Route>
 

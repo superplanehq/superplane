@@ -737,7 +737,7 @@ func (a *Approval) notifyApprovers(ctx core.ExecutionContext, metadata *Metadata
 	url := ""
 	if ctx.BaseURL != "" && ctx.OrganizationID != "" && ctx.WorkflowID != "" && ctx.NodeID != "" {
 		url = fmt.Sprintf(
-			"%s/%s/workflows/%s?sidebar=1&node=%s",
+			"%s/%s/canvases/%s?sidebar=1&node=%s",
 			strings.TrimRight(ctx.BaseURL, "/"),
 			ctx.OrganizationID,
 			ctx.WorkflowID,

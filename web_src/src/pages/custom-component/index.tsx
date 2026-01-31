@@ -1273,7 +1273,7 @@ export const CustomComponent = () => {
   const breadcrumbs: BreadcrumbItem[] =
     fromWorkflowId && workflowName
       ? [
-          { label: workflowName, href: `/${organizationId}/workflows/${fromWorkflowId}` },
+          { label: workflowName, href: `/${organizationId}/canvases/${fromWorkflowId}` },
           { label: blueprintName, iconSlug: BUNDLE_ICON_SLUG, iconColor: BUNDLE_ICON_COLOR_CLASS },
         ]
       : [
