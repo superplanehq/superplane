@@ -106,6 +106,10 @@ func (c *Cloudflare) Sync(ctx core.SyncContext) error {
 	return nil
 }
 
+func (c *Cloudflare) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
 	case "zone":
@@ -170,5 +174,13 @@ func (c *Cloudflare) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 }
 
 func (c *Cloudflare) CleanupWebhook(ctx core.CleanupWebhookContext) error {
+	return nil
+}
+
+func (c *Cloudflare) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (c *Cloudflare) HandleAction(ctx core.IntegrationActionContext) error {
 	return nil
 }

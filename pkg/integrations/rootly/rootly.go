@@ -72,6 +72,10 @@ func (r *Rootly) Triggers() []core.Trigger {
 	}
 }
 
+func (r *Rootly) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (r *Rootly) Sync(ctx core.SyncContext) error {
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
@@ -178,6 +182,14 @@ func (r *Rootly) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 		return fmt.Errorf("error deleting webhook endpoint: %v", err)
 	}
 
+	return nil
+}
+
+func (r *Rootly) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (r *Rootly) HandleAction(ctx core.IntegrationActionContext) error {
 	return nil
 }
 

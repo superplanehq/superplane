@@ -58,6 +58,7 @@ blocks:
         always:
           commands:
             - '[ -f junit-report.xml ] && test-results publish junit-report.xml'
+            - 'if [ -d tmp/screenshots ] && ls tmp/screenshots/*.png >/dev/null 2>&1; then artifact push job tmp/screenshots; fi'
   - name: "\U0001F528 Frontend Build"
     dependencies: []
     task:

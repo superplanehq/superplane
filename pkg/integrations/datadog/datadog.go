@@ -99,6 +99,10 @@ func (d *Datadog) Triggers() []core.Trigger {
 	return []core.Trigger{}
 }
 
+func (d *Datadog) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (d *Datadog) Sync(ctx core.SyncContext) error {
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
@@ -154,4 +158,12 @@ func (d *Datadog) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 	// Datadog webhooks are manually configured by users in the Datadog UI
 	// No automatic provisioning is supported
 	return nil, nil
+}
+
+func (d *Datadog) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (d *Datadog) HandleAction(ctx core.IntegrationActionContext) error {
+	return nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -86,6 +87,8 @@ func (w *IntegrationRequestWorker) processRequest(tx *gorm.DB, request *models.I
 	switch request.Type {
 	case models.IntegrationRequestTypeSync:
 		return w.syncIntegration(tx, request)
+	case models.IntegrationRequestTypeInvokeAction:
+		return w.invokeIntegrationAction(tx, request)
 	}
 
 	return fmt.Errorf("unsupported integration request type %s", request.Type)
@@ -123,6 +126,36 @@ func (w *IntegrationRequestWorker) syncIntegration(tx *gorm.DB, request *models.
 
 	if err := tx.Save(instance).Error; err != nil {
 		return fmt.Errorf("failed to save integration after sync: %v", err)
+	}
+
+	return request.Complete(tx)
+}
+
+func (w *IntegrationRequestWorker) invokeIntegrationAction(tx *gorm.DB, request *models.IntegrationRequest) error {
+	integration, err := models.FindUnscopedIntegrationInTransaction(tx, request.AppInstallationID)
+	if err != nil {
+		return fmt.Errorf("failed to find app installation: %v", err)
+	}
+
+	integrationImpl, err := w.registry.GetIntegration(integration.AppName)
+	if err != nil {
+		return fmt.Errorf("integration %s not found", integration.AppName)
+	}
+
+	spec := request.Spec.Data()
+	logger := logging.ForIntegration(*integration)
+	integrationCtx := contexts.NewIntegrationContext(tx, nil, integration, w.encryptor, w.registry)
+	actionCtx := core.IntegrationActionContext{
+		Name:          spec.InvokeAction.ActionName,
+		Parameters:    spec.InvokeAction.Parameters,
+		Configuration: integration.Configuration.Data(),
+		Logger:        logger,
+		Integration:   integrationCtx,
+	}
+
+	err = integrationImpl.HandleAction(actionCtx)
+	if err != nil {
+		logger.Errorf("error handling action: %v", err)
 	}
 
 	return request.Complete(tx)

@@ -5,12 +5,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 const (
-	IntegrationRequestTypeSync = "sync"
+	AppInstallationRequestTypeSync         = "sync"
+	AppInstallationRequestTypeInvokeAction = "invoke-action"
 
 	IntegrationRequestStatePending   = "pending"
 	IntegrationRequestStateCompleted = "completed"
@@ -21,6 +23,7 @@ type IntegrationRequest struct {
 	AppInstallationID uuid.UUID
 	State             string
 	Type              string
+	Spec              datatypes.JSONType[AppInstallationRequestSpec]
 	RunAt             time.Time
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
@@ -28,6 +31,15 @@ type IntegrationRequest struct {
 
 func (r *IntegrationRequest) TableName() string {
 	return "app_installation_requests"
+}
+
+type AppInstallationRequestSpec struct {
+	InvokeAction *AppInstallationInvokeAction `json:"invoke_action,omitempty"`
+}
+
+type AppInstallationInvokeAction struct {
+	ActionName string `json:"action_name"`
+	Parameters any    `json:"parameters"`
 }
 
 func LockIntegrationRequest(tx *gorm.DB, id uuid.UUID) (*IntegrationRequest, error) {

@@ -143,6 +143,15 @@ func (c *IntegrationContext) ScheduleResync(interval time.Duration) error {
 	return c.integration.CreateSyncRequest(c.tx, &runAt)
 }
 
+func (c *IntegrationContext) ScheduleActionCall(actionName string, parameters any, interval time.Duration) error {
+	if interval < time.Second {
+		return fmt.Errorf("interval must be bigger than 1s")
+	}
+
+	runAt := time.Now().Add(interval)
+	return c.appInstallation.CreateActionRequest(c.tx, actionName, parameters, &runAt)
+}
+
 func (c *IntegrationContext) completeCurrentRequestForInstallation() error {
 	request, err := models.FindPendingRequestForIntegration(c.tx, c.integration.ID)
 	if err == nil {

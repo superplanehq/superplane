@@ -26,9 +26,11 @@ func Test__UpdateIntegration(t *testing.T) {
 		//
 		// Register a test integration that succeeds on Sync
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			ctx.Integration.Ready()
-			return nil
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
 		})
 
 		integrationName := support.RandomName("integration")
@@ -78,13 +80,15 @@ func Test__UpdateIntegration(t *testing.T) {
 		// Register a test integration that succeeds initially but fails on update
 		//
 		syncCount := 0
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			syncCount++
-			if syncCount == 1 {
-				ctx.Integration.Ready()
-				return nil
-			}
-			return errors.New("sync failed on update")
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				syncCount++
+				if syncCount == 1 {
+					ctx.Integration.Ready()
+					return nil
+				}
+				return errors.New("sync failed on update")
+			},
 		})
 
 		integrationName := support.RandomName("integration")
@@ -148,9 +152,11 @@ func Test__UpdateIntegration(t *testing.T) {
 		//
 		// Register a test integration that succeeds on Sync
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			ctx.Integration.Ready()
-			return nil
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
 		})
 
 		integrationName := support.RandomName("integration")

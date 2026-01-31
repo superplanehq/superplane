@@ -112,6 +112,10 @@ func (a *AWS) Sync(ctx core.SyncContext) error {
 	return a.generateCredentials(ctx, config)
 }
 
+func (a *AWS) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 	ctx.Integration.NewBrowserAction(core.BrowserAction{
 		Description: fmt.Sprintf(`
@@ -237,5 +241,13 @@ func (a *AWS) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 }
 
 func (a *AWS) CleanupWebhook(ctx core.CleanupWebhookContext) error {
+	return nil
+}
+
+func (a *AWS) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (a *AWS) HandleAction(ctx core.IntegrationActionContext) error {
 	return nil
 }

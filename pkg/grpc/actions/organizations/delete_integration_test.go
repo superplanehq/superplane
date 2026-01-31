@@ -28,9 +28,11 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		// Register a test integration
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			ctx.Integration.Ready()
-			return nil
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
 		})
 
 		name := support.RandomName("integration")
@@ -119,9 +121,11 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		// Register a test application
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			ctx.Integration.Ready()
-			return nil
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
 		})
 
 		//
@@ -155,9 +159,11 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		// Register a test integration
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			ctx.Integration.Ready()
-			return nil
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
 		})
 
 		name := support.RandomName("integration")
@@ -192,9 +198,11 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		// Register a test integration
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			ctx.Integration.Ready()
-			return nil
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
 		})
 
 		name := support.RandomName("integration")

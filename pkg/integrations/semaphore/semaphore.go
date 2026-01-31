@@ -66,6 +66,10 @@ func (s *Semaphore) Configuration() []configuration.Field {
 	}
 }
 
+func (s *Semaphore) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (s *Semaphore) Sync(ctx core.SyncContext) error {
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
@@ -117,6 +121,14 @@ func (s *Semaphore) CompareWebhookConfig(a, b any) (bool, error) {
 	}
 
 	return configA.Project == configB.Project, nil
+}
+
+func (s *Semaphore) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (s *Semaphore) HandleAction(ctx core.IntegrationActionContext) error {
+	return nil
 }
 
 type WebhookMetadata struct {

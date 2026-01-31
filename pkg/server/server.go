@@ -115,7 +115,7 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 	if os.Getenv("START_INSTALLATION_CLEANUP_WORKER") == "yes" || os.Getenv("START_INTEGRATION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Integration Cleanup Worker")
 
-		w := workers.NewIntegrationCleanupWorker()
+		w := workers.NewIntegrationCleanupWorker(registry, encryptor, baseURL)
 		go w.Start(context.Background())
 	}
 

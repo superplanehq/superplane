@@ -118,6 +118,10 @@ func (g *GitHub) Triggers() []core.Trigger {
 	}
 }
 
+func (g *GitHub) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (g *GitHub) Sync(ctx core.SyncContext) error {
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
@@ -678,4 +682,12 @@ func (g *GitHub) createAppFromManifest(httpCtx core.HTTPContext, code string) (*
 	}
 
 	return &appData, nil
+}
+
+func (g *GitHub) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (g *GitHub) HandleAction(ctx core.IntegrationActionContext) error {
+	return nil
 }
