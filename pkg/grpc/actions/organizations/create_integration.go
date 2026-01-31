@@ -31,9 +31,9 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 	}
 
 	//
-	// Check if an installation with this name already exists in the organization
+	// Check if an integration with this name already exists in the organization
 	//
-	_, err = models.FindAppInstallationByName(org, name)
+	_, err = models.FindIntegrationByName(org, name)
 	if err == nil {
 		return nil, status.Errorf(codes.AlreadyExists, "an integration with the name %s already exists in this organization", name)
 	}
@@ -47,7 +47,7 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 		return nil, status.Errorf(codes.Internal, "failed to encrypt sensitive configuration: %v", err)
 	}
 
-	appInstallation, err := models.CreateAppInstallation(installationID, uuid.MustParse(orgID), integrationName, name, configuration)
+	newIntegration, err := models.CreateIntegration(installationID, uuid.MustParse(orgID), integrationName, name, configuration)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create integration: %v", err)
 	}
@@ -55,7 +55,7 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 	integrationCtx := contexts.NewIntegrationContext(
 		database.Conn(),
 		nil,
-		appInstallation,
+		newIntegration,
 		registry.Encryptor,
 		registry,
 	)
@@ -63,29 +63,29 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 	syncErr := integration.Sync(core.SyncContext{
 		HTTP:            contexts.NewHTTPContext(registry.GetHTTPClient()),
 		Integration:     integrationCtx,
-		Configuration:   appInstallation.Configuration.Data(),
+		Configuration:   newIntegration.Configuration.Data(),
 		BaseURL:         baseURL,
 		WebhooksBaseURL: webhooksBaseURL,
 		OrganizationID:  orgID,
-		InstallationID:  appInstallation.ID.String(),
+		InstallationID:  newIntegration.ID.String(),
 		OIDC:            oidcProvider,
 	})
 
-	err = database.Conn().Save(appInstallation).Error
+	err = database.Conn().Save(newIntegration).Error
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to save integration after sync: %v", err)
 	}
 
 	if syncErr != nil {
-		appInstallation.State = "error"
-		appInstallation.StateDescription = syncErr.Error()
-		err = database.Conn().Save(appInstallation).Error
+		newIntegration.State = "error"
+		newIntegration.StateDescription = syncErr.Error()
+		err = database.Conn().Save(newIntegration).Error
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to save integration after sync: %v", err)
 		}
 	}
 
-	proto, err := serializeIntegration(registry, appInstallation, []models.WorkflowNodeReference{})
+	proto, err := serializeIntegration(registry, newIntegration, []models.WorkflowNodeReference{})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to serialize integration: %v", err)
 	}
@@ -95,44 +95,44 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 	}, nil
 }
 
-func serializeIntegration(registry *registry.Registry, appInstallation *models.AppInstallation, nodeRefs []models.WorkflowNodeReference) (*pb.Integration, error) {
-	integration, err := registry.GetIntegration(appInstallation.AppName)
+func serializeIntegration(registry *registry.Registry, instance *models.Integration, nodeRefs []models.WorkflowNodeReference) (*pb.Integration, error) {
+	integration, err := registry.GetIntegration(instance.AppName)
 	if err != nil {
 		return nil, err
 	}
 
 	//
-	// We do not return sensitive values when serializing app installations.
+	// We do not return sensitive values when serializing integrations.
 	//
-	config, err := structpb.NewStruct(sanitizeConfigurationIfNeeded(integration, appInstallation.Configuration.Data()))
+	config, err := structpb.NewStruct(sanitizeConfigurationIfNeeded(integration, instance.Configuration.Data()))
 	if err != nil {
 		return nil, err
 	}
 
-	metadata, err := structpb.NewStruct(appInstallation.Metadata.Data())
+	metadata, err := structpb.NewStruct(instance.Metadata.Data())
 	if err != nil {
 		return nil, err
 	}
 
 	proto := &pb.Integration{
 		Metadata: &pb.Integration_Metadata{
-			Id:   appInstallation.ID.String(),
-			Name: appInstallation.InstallationName,
+			Id:   instance.ID.String(),
+			Name: instance.InstallationName,
 		},
 		Spec: &pb.Integration_Spec{
-			IntegrationName: appInstallation.AppName,
+			IntegrationName: instance.AppName,
 			Configuration:   config,
 		},
 		Status: &pb.Integration_Status{
-			State:            appInstallation.State,
-			StateDescription: appInstallation.StateDescription,
+			State:            instance.State,
+			StateDescription: instance.StateDescription,
 			Metadata:         metadata,
 			UsedIn:           []*pb.Integration_NodeRef{},
 		},
 	}
 
-	if appInstallation.BrowserAction != nil {
-		browserAction := appInstallation.BrowserAction.Data()
+	if instance.BrowserAction != nil {
+		browserAction := instance.BrowserAction.Data()
 		proto.Status.BrowserAction = &pb.BrowserAction{
 			Description: browserAction.Description,
 			Url:         browserAction.URL,

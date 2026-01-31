@@ -65,7 +65,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Verify integration exists with the correct name
 		//
-		integration, err := models.FindAppInstallationByName(r.Organization.ID, name)
+		integration, err := models.FindIntegrationByName(r.Organization.ID, name)
 		require.NoError(t, err)
 		assert.Equal(t, integrationID, integration.ID.String())
 		assert.Equal(t, name, integration.InstallationName)
@@ -79,7 +79,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Verify the installation is soft-deleted and the name has been modified
 		//
-		deletedIntegration, err := models.FindMaybeDeletedInstallationInTransaction(database.Conn(), integration.ID)
+		deletedIntegration, err := models.FindMaybeDeletedIntegrationInTransaction(database.Conn(), integration.ID)
 		require.NoError(t, err)
 		assert.True(t, deletedIntegration.DeletedAt.Valid)
 		assert.NotEqual(t, name, deletedIntegration.InstallationName)
@@ -88,7 +88,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Verify we cannot find it by the original name anymore
 		//
-		_, err = models.FindAppInstallationByName(r.Organization.ID, name)
+		_, err = models.FindIntegrationByName(r.Organization.ID, name)
 		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
 		//
@@ -103,7 +103,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Verify we can find the new installation by name
 		//
-		newIntegration, err := models.FindAppInstallationByName(r.Organization.ID, name)
+		newIntegration, err := models.FindIntegrationByName(r.Organization.ID, name)
 		require.NoError(t, err)
 		assert.Equal(t, name, newIntegration.InstallationName)
 		assert.Equal(t, response2.Integration.Metadata.Id, newIntegration.ID.String())
@@ -140,11 +140,11 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Verify both integrations exist and can be found by name in their respective organizations
 		//
-		integration1, err := models.FindAppInstallationByName(r.Organization.ID, name)
+		integration1, err := models.FindIntegrationByName(r.Organization.ID, name)
 		require.NoError(t, err)
 		assert.Equal(t, response1.Integration.Metadata.Id, integration1.ID.String())
 
-		integration2, err := models.FindAppInstallationByName(org2.ID, name)
+		integration2, err := models.FindIntegrationByName(org2.ID, name)
 		require.NoError(t, err)
 		assert.Equal(t, response2.Integration.Metadata.Id, integration2.ID.String())
 	})
@@ -192,20 +192,20 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Verify integration was created
 		//
-		integration, err := models.FindAppInstallationByName(r.Organization.ID, name)
+		integration, err := models.FindIntegrationByName(r.Organization.ID, name)
 		require.NoError(t, err)
 		assert.Equal(t, name, integration.InstallationName)
 
 		//
 		// Verify integration is in error state with the error message
 		//
-		assert.Equal(t, models.AppInstallationStateError, integration.State)
+		assert.Equal(t, models.IntegrationStateError, integration.State)
 		assert.Equal(t, "oops", integration.StateDescription)
 
 		//
 		// Verify the response also reflects the error state
 		//
-		assert.Equal(t, models.AppInstallationStateError, response.Integration.Status.State)
+		assert.Equal(t, models.IntegrationStateError, response.Integration.Status.State)
 		assert.Equal(t, "oops", response.Integration.Status.StateDescription)
 	})
 
@@ -235,7 +235,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Verify integration was created
 		//
-		integration, err := models.FindAppInstallationByName(r.Organization.ID, name)
+		integration, err := models.FindIntegrationByName(r.Organization.ID, name)
 		require.NoError(t, err)
 		assert.Equal(t, name, integration.InstallationName)
 		assert.Equal(t, "dummy", integration.AppName)
@@ -243,13 +243,13 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Verify integration is not in error state
 		//
-		assert.Equal(t, models.AppInstallationStateReady, integration.State)
+		assert.Equal(t, models.IntegrationStateReady, integration.State)
 		assert.Empty(t, integration.StateDescription)
 
 		//
 		// Verify the response reflects successful integration
 		//
-		assert.Equal(t, models.AppInstallationStateReady, response.Integration.Status.State)
+		assert.Equal(t, models.IntegrationStateReady, response.Integration.Status.State)
 		assert.Empty(t, response.Integration.Status.StateDescription)
 	})
 }

@@ -24,7 +24,7 @@ func Test__IntegrationContext_ScheduleResync(t *testing.T) {
 	//
 	// Create app installation
 	//
-	installation, err := models.CreateAppInstallation(
+	integration, err := models.CreateIntegration(
 		uuid.New(),
 		r.Organization.ID,
 		"dummy",
@@ -33,7 +33,7 @@ func Test__IntegrationContext_ScheduleResync(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx := NewIntegrationContext(database.Conn(), nil, installation, r.Encryptor, r.Registry)
+	ctx := NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry)
 
 	t.Run("rejects short interval", func(t *testing.T) {
 		err = ctx.ScheduleResync(500 * time.Millisecond)
@@ -46,8 +46,8 @@ func Test__IntegrationContext_ScheduleResync(t *testing.T) {
 		// Create previous request
 		//
 		now := time.Now()
-		require.NoError(t, installation.CreateSyncRequest(database.Conn(), &now))
-		requests, err := installation.ListRequests(models.AppInstallationRequestTypeSync)
+		require.NoError(t, integration.CreateSyncRequest(database.Conn(), &now))
+		requests, err := integration.ListRequests(models.IntegrationRequestTypeSync)
 		require.NoError(t, err)
 		require.Len(t, requests, 1)
 		previousRequest := &requests[0]
@@ -60,19 +60,19 @@ func Test__IntegrationContext_ScheduleResync(t *testing.T) {
 		//
 		// Verify previous request was completed.
 		//
-		previousRequest, err = installation.GetRequest(previousRequest.ID.String())
+		previousRequest, err = integration.GetRequest(previousRequest.ID.String())
 		require.NoError(t, err)
-		require.Equal(t, models.AppInstallationRequestStateCompleted, previousRequest.State)
+		require.Equal(t, models.IntegrationRequestStateCompleted, previousRequest.State)
 
 		//
 		// Verify new one was created
 		//
-		requests, err = installation.ListRequests(models.AppInstallationRequestTypeSync)
+		requests, err = integration.ListRequests(models.IntegrationRequestTypeSync)
 		require.NoError(t, err)
 		require.Len(t, requests, 2)
-		newRequestIndex := slices.IndexFunc(requests, func(r models.AppInstallationRequest) bool { return r.ID.String() != previousRequest.ID.String() })
+		newRequestIndex := slices.IndexFunc(requests, func(r models.IntegrationRequest) bool { return r.ID.String() != previousRequest.ID.String() })
 		newRequest := requests[newRequestIndex]
-		require.Equal(t, models.AppInstallationRequestStatePending, newRequest.State)
+		require.Equal(t, models.IntegrationRequestStatePending, newRequest.State)
 	})
 }
 
@@ -86,7 +86,7 @@ func Test__IntegrationContext_RequestWebhook_ReplacesWebhookOnConfigChange(t *te
 		},
 	})
 
-	installation, err := models.CreateAppInstallation(
+	integration, err := models.CreateIntegration(
 		uuid.New(),
 		r.Organization.ID,
 		"dummy",
@@ -109,7 +109,7 @@ func Test__IntegrationContext_RequestWebhook_ReplacesWebhookOnConfigChange(t *te
 		Secret:            encryptedKey,
 		Configuration:     datatypes.NewJSONType[any](oldConfig),
 		Metadata:          datatypes.NewJSONType[any](map[string]any{}),
-		AppInstallationID: &installation.ID,
+		AppInstallationID: &integration.ID,
 		CreatedAt:         &now,
 	}
 	require.NoError(t, database.Conn().Create(&webhook).Error)
@@ -129,11 +129,11 @@ func Test__IntegrationContext_RequestWebhook_ReplacesWebhookOnConfigChange(t *te
 	require.Len(t, nodes, 1)
 
 	node := nodes[0]
-	node.AppInstallationID = &installation.ID
+	node.AppInstallationID = &integration.ID
 	node.WebhookID = &webhookID
 	require.NoError(t, database.Conn().Save(&node).Error)
 
-	ctx := NewIntegrationContext(database.Conn(), &node, installation, r.Encryptor, r.Registry)
+	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry)
 	require.NoError(t, ctx.RequestWebhook(newConfig))
 
 	require.NotNil(t, node.WebhookID)

@@ -365,7 +365,7 @@ func validateIntegration(organizationID string, ref *compb.IntegrationRef) error
 		return fmt.Errorf("invalid organization ID: %v", err)
 	}
 
-	_, err = models.FindAppInstallation(orgID, integrationID)
+	_, err = models.FindIntegration(orgID, integrationID)
 	if err != nil {
 		return fmt.Errorf("integration not found or does not belong to this organization")
 	}

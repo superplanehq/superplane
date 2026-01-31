@@ -57,13 +57,13 @@ spec:
               value: "yes"
             - name: START_NODE_REQUEST_WORKER
               value: "yes"
-            - name: START_APP_INSTALLATION_REQUEST_WORKER
+            - name: START_INTEGRATION_REQUEST_WORKER
               value: "yes"
             - name: START_WEBHOOK_PROVISIONER
               value: "yes"
             - name: START_WEBHOOK_CLEANUP_WORKER
               value: "yes"
-            - name: START_INSTALLATION_CLEANUP_WORKER
+            - name: START_INTEGRATION_CLEANUP_WORKER
               value: "yes"
             - name: START_WORKFLOW_CLEANUP_WORKER
               value: "yes"

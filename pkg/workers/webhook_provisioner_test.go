@@ -61,11 +61,11 @@ func Test__WebhookProvisioner_RetryOnError(t *testing.T) {
 		},
 	})
 
-	installation, err := models.CreateAppInstallation(
+	integration, err := models.CreateIntegration(
 		uuid.New(),
 		r.Organization.ID,
 		"dummy",
-		support.RandomName("installation"),
+		support.RandomName("integration"),
 		nil,
 	)
 
@@ -76,7 +76,7 @@ func Test__WebhookProvisioner_RetryOnError(t *testing.T) {
 		ID:                webhookID,
 		State:             models.WebhookStatePending,
 		Secret:            []byte("encrypted-secret"),
-		AppInstallationID: &installation.ID,
+		AppInstallationID: &integration.ID,
 		RetryCount:        0,
 		MaxRetries:        3,
 	}
@@ -103,11 +103,11 @@ func Test__WebhookProvisioner_MaxRetriesExceeded(t *testing.T) {
 		},
 	})
 
-	installation, err := models.CreateAppInstallation(
+	integration, err := models.CreateIntegration(
 		uuid.New(),
 		r.Organization.ID,
 		"dummy",
-		support.RandomName("installation"),
+		support.RandomName("integration"),
 		nil,
 	)
 	require.NoError(t, err)
@@ -117,7 +117,7 @@ func Test__WebhookProvisioner_MaxRetriesExceeded(t *testing.T) {
 		ID:                webhookID,
 		State:             models.WebhookStatePending,
 		Secret:            []byte("encrypted-secret"),
-		AppInstallationID: &installation.ID,
+		AppInstallationID: &integration.ID,
 		RetryCount:        3,
 		MaxRetries:        3,
 	}

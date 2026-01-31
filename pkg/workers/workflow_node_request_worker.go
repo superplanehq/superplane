@@ -142,17 +142,17 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Wor
 	}
 
 	if node.AppInstallationID != nil {
-		appInstallation, err := models.FindUnscopedAppInstallationInTransaction(tx, *node.AppInstallationID)
+		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				w.log("app installation %s not found - completing request", *node.AppInstallationID)
+				w.log("integration %s not found - completing request", *node.AppInstallationID)
 				return request.Complete(tx)
 			}
 
-			return fmt.Errorf("failed to find app installation: %v", err)
+			return fmt.Errorf("failed to find integration: %v", err)
 		}
 
-		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, appInstallation, w.encryptor, w.registry)
+		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry)
 	}
 
 	_, err = trigger.HandleAction(actionCtx)
@@ -216,13 +216,13 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 	}
 
 	if node.AppInstallationID != nil {
-		appInstallation, err := models.FindUnscopedAppInstallationInTransaction(tx, *node.AppInstallationID)
+		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {
-			return fmt.Errorf("failed to find app installation: %v", err)
+			return fmt.Errorf("failed to find integration: %v", err)
 		}
 
-		logger = logging.WithAppInstallation(logger, *appInstallation)
-		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, appInstallation, w.encryptor, w.registry)
+		logger = logging.WithIntegration(logger, *instance)
+		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry)
 	}
 
 	actionCtx.Logger = logger

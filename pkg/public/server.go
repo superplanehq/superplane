@@ -482,20 +482,20 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	integrationInstance, err := models.FindUnscopedAppInstallation(integrationID)
+	integrationInstance, err := models.FindUnscopedIntegration(integrationID)
 	if err != nil {
-		http.Error(w, "installation not found", http.StatusNotFound)
+		http.Error(w, "integration not found", http.StatusNotFound)
 		return
 	}
 
 	integration, err := s.registry.GetIntegration(integrationInstance.AppName)
 	if err != nil {
-		http.Error(w, "app not found", http.StatusNotFound)
+		http.Error(w, "integration not found", http.StatusNotFound)
 		return
 	}
 
 	integration.HandleRequest(core.HTTPRequestContext{
-		Logger:          logging.ForAppInstallation(*integrationInstance),
+		Logger:          logging.ForIntegration(*integrationInstance),
 		Request:         r,
 		Response:        w,
 		BaseURL:         s.BaseURL,

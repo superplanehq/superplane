@@ -115,7 +115,7 @@ func DeleteWorkflowNode(tx *gorm.DB, node WorkflowNode) error {
 		return err
 	}
 
-	err = DeleteAppSubscriptionsForNodeInTransaction(tx, node.WorkflowID, node.NodeID)
+	err = DeleteIntegrationSubscriptionsForNodeInTransaction(tx, node.WorkflowID, node.NodeID)
 	if err != nil {
 		return err
 	}

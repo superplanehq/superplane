@@ -302,19 +302,19 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 	}
 
 	if node.AppInstallationID != nil {
-		appInstallation, err := models.FindUnscopedAppInstallationInTransaction(tx, *node.AppInstallationID)
+		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				logger.Errorf("app installation %s not found", *node.AppInstallationID)
-				return execution.FailInTransaction(tx, models.WorkflowNodeExecutionResultReasonError, "app installation not found")
+				logger.Errorf("integration %s not found", *node.AppInstallationID)
+				return execution.FailInTransaction(tx, models.WorkflowNodeExecutionResultReasonError, "integration not found")
 			}
 
-			logger.Errorf("failed to find app installation: %v", err)
-			return fmt.Errorf("failed to find app installation: %v", err)
+			logger.Errorf("failed to find integration: %v", err)
+			return fmt.Errorf("failed to find integration: %v", err)
 		}
 
-		logger = logging.WithAppInstallation(logger, *appInstallation)
-		ctx.Integration = contexts.NewIntegrationContext(tx, node, appInstallation, w.encryptor, w.registry)
+		logger = logging.WithIntegration(logger, *instance)
+		ctx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry)
 	}
 
 	ctx.Logger = logger

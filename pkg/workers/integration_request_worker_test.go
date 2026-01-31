@@ -15,11 +15,11 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
-func Test__AppInstallationRequestWorker_Sync(t *testing.T) {
+func Test__IntegrationRequestWorker_Sync(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewAppInstallationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
+	worker := NewIntegrationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
 
 	//
 	// Register a dummy application and install it.
@@ -33,15 +33,15 @@ func Test__AppInstallationRequestWorker_Sync(t *testing.T) {
 		},
 	})
 
-	installation, err := models.CreateAppInstallation(uuid.New(), r.Organization.ID, "dummy", support.RandomName("installation"), nil)
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "dummy", support.RandomName("integration"), nil)
 	require.NoError(t, err)
 
 	//
-	// Create the app installation sync request
+	// Create the integration sync request
 	//
 	runAt := time.Now().Add(-time.Second)
-	require.NoError(t, installation.CreateSyncRequest(database.Conn(), &runAt))
-	requests, err := installation.ListRequests(models.AppInstallationRequestTypeSync)
+	require.NoError(t, integration.CreateSyncRequest(database.Conn(), &runAt))
+	requests, err := integration.ListRequests(models.IntegrationRequestTypeSync)
 	require.NoError(t, err)
 	require.Len(t, requests, 1)
 	request := &requests[0]
@@ -55,17 +55,17 @@ func Test__AppInstallationRequestWorker_Sync(t *testing.T) {
 	//
 	// Reload request, verify it was completed, and sync was called
 	//
-	request, err = installation.GetRequest(request.ID.String())
+	request, err = integration.GetRequest(request.ID.String())
 	require.NoError(t, err)
-	assert.Equal(t, models.AppInstallationRequestStateCompleted, request.State)
+	assert.Equal(t, models.IntegrationRequestStateCompleted, request.State)
 	assert.True(t, syncCalled)
 }
 
-func Test__AppInstallationRequestWorker_SyncError(t *testing.T) {
+func Test__IntegrationRequestWorker_SyncError(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewAppInstallationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
+	worker := NewIntegrationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
 
 	//
 	// Register a dummy application and install it.
@@ -78,15 +78,15 @@ func Test__AppInstallationRequestWorker_SyncError(t *testing.T) {
 		},
 	})
 
-	installation, err := models.CreateAppInstallation(uuid.New(), r.Organization.ID, "dummy", support.RandomName("installation"), nil)
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "dummy", support.RandomName("integration"), nil)
 	require.NoError(t, err)
 
 	//
-	// Create the app installation sync request
+	// Create the integration sync request
 	//
 	runAt := time.Now().Add(-time.Second)
-	require.NoError(t, installation.CreateSyncRequest(database.Conn(), &runAt))
-	requests, err := installation.ListRequests(models.AppInstallationRequestTypeSync)
+	require.NoError(t, integration.CreateSyncRequest(database.Conn(), &runAt))
+	requests, err := integration.ListRequests(models.IntegrationRequestTypeSync)
 	require.NoError(t, err)
 	require.Len(t, requests, 1)
 	request := &requests[0]
@@ -99,22 +99,22 @@ func Test__AppInstallationRequestWorker_SyncError(t *testing.T) {
 	//
 	// Reload request, verify it was completed, and app installation was moved to error state.
 	//
-	request, err = installation.GetRequest(request.ID.String())
+	request, err = integration.GetRequest(request.ID.String())
 	require.NoError(t, err)
-	assert.Equal(t, models.AppInstallationRequestStateCompleted, request.State)
+	assert.Equal(t, models.IntegrationRequestStateCompleted, request.State)
 	assert.True(t, syncCalled)
 
-	installation, err = models.FindAppInstallation(r.Organization.ID, installation.ID)
+	integration, err = models.FindIntegration(r.Organization.ID, integration.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.AppInstallationStateError, installation.State)
-	assert.Contains(t, installation.StateDescription, "Sync failed: sync failed")
+	assert.Equal(t, models.IntegrationStateError, integration.State)
+	assert.Contains(t, integration.StateDescription, "Sync failed: sync failed")
 }
 
 func Test__AppInstallationRequestWorker_InvokeAction(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewAppInstallationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
+	worker := NewIntegrationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
 
 	//
 	// Register a dummy application and install it.
@@ -133,15 +133,15 @@ func Test__AppInstallationRequestWorker_InvokeAction(t *testing.T) {
 		},
 	})
 
-	installation, err := models.CreateAppInstallation(uuid.New(), r.Organization.ID, "dummy", support.RandomName("installation"), nil)
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "dummy", support.RandomName("integration"), nil)
 	require.NoError(t, err)
 
 	//
-	// Create the app installation sync request
+	// Create the integration sync request
 	//
 	runAt := time.Now().Add(-time.Second)
-	require.NoError(t, installation.CreateActionRequest(database.Conn(), "test", nil, &runAt))
-	requests, err := installation.ListRequests(models.AppInstallationRequestTypeInvokeAction)
+	require.NoError(t, integration.CreateActionRequest(database.Conn(), "test", nil, &runAt))
+	requests, err := integration.ListRequests(models.IntegrationRequestTypeInvokeAction)
 	require.NoError(t, err)
 	require.Len(t, requests, 1)
 	request := &requests[0]
@@ -155,9 +155,9 @@ func Test__AppInstallationRequestWorker_InvokeAction(t *testing.T) {
 	//
 	// Reload request, verify it was completed, and sync was called
 	//
-	request, err = installation.GetRequest(request.ID.String())
+	request, err = integration.GetRequest(request.ID.String())
 	require.NoError(t, err)
-	assert.Equal(t, models.AppInstallationRequestStateCompleted, request.State)
+	assert.Equal(t, models.IntegrationRequestStateCompleted, request.State)
 	assert.True(t, actionCalled)
 }
 
@@ -165,7 +165,7 @@ func Test__AppInstallationRequestWorker_InvokeActionError(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewAppInstallationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
+	worker := NewIntegrationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
 
 	//
 	// Register a dummy application and install it.
@@ -184,15 +184,15 @@ func Test__AppInstallationRequestWorker_InvokeActionError(t *testing.T) {
 		},
 	})
 
-	installation, err := models.CreateAppInstallation(uuid.New(), r.Organization.ID, "dummy", support.RandomName("installation"), nil)
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "dummy", support.RandomName("integration"), nil)
 	require.NoError(t, err)
 
 	//
-	// Create the app installation sync request
+	// Create the integration sync request
 	//
 	runAt := time.Now().Add(-time.Second)
-	require.NoError(t, installation.CreateActionRequest(database.Conn(), "test", nil, &runAt))
-	requests, err := installation.ListRequests(models.AppInstallationRequestTypeInvokeAction)
+	require.NoError(t, integration.CreateActionRequest(database.Conn(), "test", nil, &runAt))
+	requests, err := integration.ListRequests(models.IntegrationRequestTypeInvokeAction)
 	require.NoError(t, err)
 	require.Len(t, requests, 1)
 	request := &requests[0]
@@ -205,8 +205,8 @@ func Test__AppInstallationRequestWorker_InvokeActionError(t *testing.T) {
 	//
 	// Reload request, verify it was completed, even though the action failed.
 	//
-	request, err = installation.GetRequest(request.ID.String())
+	request, err = integration.GetRequest(request.ID.String())
 	require.NoError(t, err)
-	assert.Equal(t, models.AppInstallationRequestStateCompleted, request.State)
+	assert.Equal(t, models.IntegrationRequestStateCompleted, request.State)
 	assert.True(t, actionCalled)
 }

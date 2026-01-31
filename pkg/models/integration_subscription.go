@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type AppInstallationSubscription struct {
+type IntegrationSubscription struct {
 	ID             uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	InstallationID uuid.UUID
 	WorkflowID     uuid.UUID
@@ -19,14 +19,18 @@ type AppInstallationSubscription struct {
 	UpdatedAt      *time.Time
 }
 
-func CreateAppSubscription(node *WorkflowNode, installation *AppInstallation, configuration any) (*AppInstallationSubscription, error) {
-	return CreateAppSubscriptionInTransaction(database.Conn(), node, installation, configuration)
+func (a *IntegrationSubscription) TableName() string {
+	return "app_installation_subscriptions"
 }
 
-func CreateAppSubscriptionInTransaction(tx *gorm.DB, node *WorkflowNode, installation *AppInstallation, configuration any) (*AppInstallationSubscription, error) {
+func CreateIntegrationSubscription(node *WorkflowNode, integration *Integration, configuration any) (*IntegrationSubscription, error) {
+	return CreateIntegrationSubscriptionInTransaction(database.Conn(), node, integration, configuration)
+}
+
+func CreateIntegrationSubscriptionInTransaction(tx *gorm.DB, node *WorkflowNode, integration *Integration, configuration any) (*IntegrationSubscription, error) {
 	now := time.Now()
-	s := AppInstallationSubscription{
-		InstallationID: installation.ID,
+	s := IntegrationSubscription{
+		InstallationID: integration.ID,
 		WorkflowID:     node.WorkflowID,
 		NodeID:         node.NodeID,
 		Configuration:  datatypes.NewJSONType(configuration),
@@ -42,10 +46,10 @@ func CreateAppSubscriptionInTransaction(tx *gorm.DB, node *WorkflowNode, install
 	return &s, nil
 }
 
-func DeleteAppSubscriptionsForNodeInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID string) error {
+func DeleteIntegrationSubscriptionsForNodeInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID string) error {
 	return tx.
 		Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).
-		Delete(&AppInstallationSubscription{}).
+		Delete(&IntegrationSubscription{}).
 		Error
 }
 
@@ -57,7 +61,7 @@ type NodeSubscription struct {
 	Configuration datatypes.JSONType[any]
 }
 
-func ListAppSubscriptions(tx *gorm.DB, installationID uuid.UUID) ([]NodeSubscription, error) {
+func ListIntegrationSubscriptions(tx *gorm.DB, installationID uuid.UUID) ([]NodeSubscription, error) {
 	var subscriptions []NodeSubscription
 
 	err := tx.
