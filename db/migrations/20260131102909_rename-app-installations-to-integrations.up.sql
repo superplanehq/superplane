@@ -1,0 +1,51 @@
+begin;
+
+ALTER TABLE app_installations RENAME TO integrations;
+ALTER TABLE app_installation_secrets RENAME TO integration_secrets;
+ALTER TABLE app_installation_requests RENAME TO integration_requests;
+ALTER TABLE app_installation_subscriptions RENAME TO integration_subscriptions;
+
+ALTER TABLE integrations
+  RENAME CONSTRAINT app_installations_pkey TO integrations_pkey;
+ALTER TABLE integrations
+  RENAME CONSTRAINT app_installations_organization_id_fkey TO integrations_organization_id_fkey;
+
+ALTER TABLE integration_secrets
+  RENAME CONSTRAINT app_installation_secrets_pkey TO integration_secrets_pkey;
+ALTER TABLE integration_secrets
+  RENAME CONSTRAINT app_installation_secrets_installation_id_fkey TO integration_secrets_installation_id_fkey;
+ALTER TABLE integration_secrets
+  RENAME CONSTRAINT app_installation_secrets_organization_id_fkey TO integration_secrets_organization_id_fkey;
+
+ALTER TABLE integration_requests
+  RENAME CONSTRAINT app_installation_requests_pkey TO integration_requests_pkey;
+ALTER TABLE integration_requests
+  RENAME CONSTRAINT app_installation_requests_app_installation_id_fkey TO integration_requests_app_installation_id_fkey;
+
+ALTER TABLE integration_subscriptions
+  RENAME CONSTRAINT app_installation_subscriptions_pkey TO integration_subscriptions_pkey;
+ALTER TABLE integration_subscriptions
+  RENAME CONSTRAINT app_installation_subscriptions_installation_id_fkey TO integration_subscriptions_installation_id_fkey;
+ALTER TABLE integration_subscriptions
+  RENAME CONSTRAINT app_installation_subscriptions_workflow_id_fkey TO integration_subscriptions_workflow_id_fkey;
+ALTER TABLE integration_subscriptions
+  RENAME CONSTRAINT app_installation_subscriptions_workflow_id_node_id_fkey TO integration_subscriptions_workflow_id_node_id_fkey;
+ALTER TABLE integration_subscriptions
+  RENAME CONSTRAINT app_installation_subscription_installation_id_workflow_id_n_key
+  TO integration_subscription_installation_id_workflow_id_n_key;
+
+ALTER INDEX idx_app_installations_deleted_at RENAME TO idx_integrations_deleted_at;
+ALTER INDEX idx_app_installations_org_name_unique RENAME TO idx_integrations_org_name_unique;
+ALTER INDEX idx_app_installations_organization_id RENAME TO idx_integrations_organization_id;
+
+ALTER INDEX idx_app_installation_secrets_installation_id RENAME TO idx_integration_secrets_installation_id;
+ALTER INDEX idx_app_installation_secrets_organization_id RENAME TO idx_integration_secrets_organization_id;
+
+ALTER INDEX idx_app_installation_requests_state_run_at RENAME TO idx_integration_requests_state_run_at;
+ALTER INDEX idx_app_installation_requests_installation_id RENAME TO idx_integration_requests_installation_id;
+
+ALTER INDEX idx_app_installation_subscriptions_installation RENAME TO idx_integration_subscriptions_installation;
+ALTER INDEX idx_app_installation_subscriptions_workflow RENAME TO idx_integration_subscriptions_workflow;
+ALTER INDEX idx_app_installation_subscriptions_node RENAME TO idx_integration_subscriptions_node;
+
+commit;
