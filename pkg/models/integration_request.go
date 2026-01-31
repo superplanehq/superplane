@@ -26,7 +26,7 @@ type IntegrationRequest struct {
 	UpdatedAt         time.Time
 }
 
-func (a *IntegrationRequest) TableName() string {
+func (r *IntegrationRequest) TableName() string {
 	return "app_installation_requests"
 }
 
