@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+#
+# Check out a pull request, recreate the dev database, and seed it with
+# the same data created when completing /setup in the browser.
+#
+# Usage: ./scripts/clean-pr-checkout <PR_NUMBER>
+#
+# Prerequisites:
+#   - gh (GitHub CLI) - https://cli.github.com/
+#   - Docker (for make targets)
+#
+# After running:
+#   - PR branch is checked out
+#   - DB has been recreated and migrated
+#   - Owner setup has been performed (Demo org, default owner account)
+#   - Services are running; open http://localhost:8000
+#
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$REPO_ROOT"
+
+if [ $# -lt 1 ]; then
+  echo "Usage: $0 <PR_NUMBER>"
+  echo ""
+  echo "Example: $0 42"
+  exit 1
+fi
+
+PR_NUMBER="$1"
+
+if ! command -v gh &>/dev/null; then
+  echo "Error: gh (GitHub CLI) is required but not installed."
+  echo "Install it from https://cli.github.com/"
+  exit 1
+fi
+
+if [ -n "$(git status --porcelain)" ]; then
+  echo "Error: Working tree is not clean. Commit or stash your changes first."
+  git status --short
+  exit 1
+fi
+
+# --- Checkout PR ---
+echo ">>> Checking out PR #${PR_NUMBER}..."
+gh pr checkout "$PR_NUMBER"
+
+# --- Recreate databases ---
+echo ">>> Recreating databases (dev + test)..."
+make db.recreate.all.dangerous
+
+# --- Start dev environment ---
+echo ">>> Starting dev environment..."
+make dev.start
+
+# --- Wait for API to be ready ---
+echo ">>> Waiting for API at http://localhost:8000..."
+MAX_ATTEMPTS=60
+ATTEMPT=0
+while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+  if curl -sf -o /dev/null "http://localhost:8000/health" 2>/dev/null; then
+    echo ">>> API is ready."
+    break
+  fi
+  ATTEMPT=$((ATTEMPT + 1))
+  if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+    echo ">>> Timeout waiting for API. Check logs with: make dev.logs.app"
+    exit 1
+  fi
+  sleep 2
+done
+
+# --- Seed via setup-owner (same as /setup in browser) ---
+echo ">>> Seeding database via setup-owner (Demo org, default owner)..."
+HTTP_CODE=$(curl -s -o /tmp/setup-owner-response.json -w "%{http_code}" -X POST "http://localhost:8000/api/v1/setup-owner" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "owner@localhost.dev",
+    "first_name": "Demo",
+    "last_name": "Owner",
+    "password": "password",
+    "smtp_enabled": false
+  }' 2>/dev/null) || HTTP_CODE="000"
+
+if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+  echo ">>> Seed complete."
+  echo ""
+  echo ">>> Done. Open http://localhost:8000 (login: owner@localhost.dev / password)"
+else
+  echo ">>> Setup-owner returned HTTP $HTTP_CODE. Check app logs: make dev.logs.app"
+  echo ">>> You can still open http://localhost:8000 and complete setup in the browser."
+  exit 1
+fi
