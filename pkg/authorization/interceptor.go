@@ -6,12 +6,12 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
+	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbOrganization "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecrets "github.com/superplanehq/superplane/pkg/protos/secrets"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
-	pbWorkflows "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -97,24 +97,24 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbBlueprints.Blueprints_DeleteBlueprint_FullMethodName:   {Resource: "blueprint", Action: "delete", DomainType: models.DomainTypeOrganization},
 
 		// Workflows rules
-		pbWorkflows.Workflows_ListWorkflows_FullMethodName:             {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_DescribeWorkflow_FullMethodName:          {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_CreateWorkflow_FullMethodName:            {Resource: "workflow", Action: "create", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_UpdateWorkflow_FullMethodName:            {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_DeleteWorkflow_FullMethodName:            {Resource: "workflow", Action: "delete", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_ListNodeExecutions_FullMethodName:        {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_ListNodeQueueItems_FullMethodName:        {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_DeleteNodeQueueItem_FullMethodName:       {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_UpdateNodePause_FullMethodName:           {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_ListWorkflowEvents_FullMethodName:        {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_ListEventExecutions_FullMethodName:       {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_ListChildExecutions_FullMethodName:       {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_CancelExecution_FullMethodName:           {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_ResolveExecutionErrors_FullMethodName:    {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_InvokeNodeExecutionAction_FullMethodName: {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_InvokeNodeTriggerAction_FullMethodName:   {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_ListNodeEvents_FullMethodName:            {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_EmitNodeEvent_FullMethodName:             {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ListCanvases_FullMethodName:              {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_DescribeCanvas_FullMethodName:            {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_CreateCanvas_FullMethodName:              {Resource: "workflow", Action: "create", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_UpdateCanvas_FullMethodName:              {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_DeleteCanvas_FullMethodName:              {Resource: "workflow", Action: "delete", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ListNodeExecutions_FullMethodName:        {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ListNodeQueueItems_FullMethodName:        {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_DeleteNodeQueueItem_FullMethodName:       {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_UpdateNodePause_FullMethodName:           {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ListCanvasEvents_FullMethodName:          {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ListEventExecutions_FullMethodName:       {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ListChildExecutions_FullMethodName:       {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_CancelExecution_FullMethodName:           {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ResolveExecutionErrors_FullMethodName:    {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_InvokeNodeExecutionAction_FullMethodName: {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_InvokeNodeTriggerAction_FullMethodName:   {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ListNodeEvents_FullMethodName:            {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_EmitNodeEvent_FullMethodName:             {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
 	}
 
 	return &AuthorizationInterceptor{

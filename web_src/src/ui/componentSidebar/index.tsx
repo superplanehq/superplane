@@ -21,7 +21,7 @@ import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import {
   AuthorizationDomainType,
   ConfigurationField,
-  WorkflowsWorkflowNodeExecution,
+  CanvasesCanvasNodeExecution,
   ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
@@ -114,7 +114,7 @@ interface ComponentSidebarProps {
   // State registry function for determining execution states
   getExecutionState?: (
     nodeId: string,
-    execution: WorkflowsWorkflowNodeExecution,
+    execution: CanvasesCanvasNodeExecution,
   ) => { map: EventStateMap; state: EventState };
 
   // Settings tab props

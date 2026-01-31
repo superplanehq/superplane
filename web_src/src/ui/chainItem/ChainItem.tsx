@@ -8,7 +8,7 @@ import {
   EventStateStyle,
   ComponentBaseSpecValue,
 } from "@/ui/componentBase";
-import { WorkflowsWorkflowNodeExecution, ComponentsNode, WorkflowsWorkflowEvent } from "@/api-client";
+import { CanvasesCanvasNodeExecution, ComponentsNode, CanvasesCanvasEvent } from "@/api-client";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { formatTimeAgo } from "@/utils/date";
@@ -35,8 +35,8 @@ export interface ChainItemData {
   nodeIconSlug?: string; // Icon slug from component/trigger/blueprint metadata
   state?: string; // Make state optional since it will be calculated
   executionId?: string;
-  originalExecution?: WorkflowsWorkflowNodeExecution; // Add execution data
-  originalEvent?: WorkflowsWorkflowEvent; // Add event data for trigger events
+  originalExecution?: CanvasesCanvasNodeExecution; // Add execution data
+  originalEvent?: CanvasesCanvasEvent; // Add event data for trigger events
   childExecutions?: ChildExecution[]; // Add child executions for composite components
   workflowNode?: ComponentsNode; // Add workflow node for subtitle generation
   additionalData?: unknown; // Add additional data for subtitle generation
@@ -121,7 +121,7 @@ interface ChainItemProps {
   onToggleOpen: (itemId: string) => void;
   getExecutionState?: (
     nodeId: string,
-    execution: WorkflowsWorkflowNodeExecution,
+    execution: CanvasesCanvasNodeExecution,
   ) => { map: EventStateMap; state: EventState };
 }
 

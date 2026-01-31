@@ -5,7 +5,7 @@ import {
   EventStateRegistry,
   CustomFieldRenderer,
 } from "./types";
-import { ComponentsNode, WorkflowsWorkflowNodeExecution } from "@/api-client";
+import { ComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
 import { defaultTriggerRenderer } from "./default";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
 import { webhookTriggerRenderer, webhookCustomFieldRenderer } from "./webhook";
@@ -268,7 +268,7 @@ export function getCustomFieldRenderer(componentName: string): CustomFieldRender
  */
 export function getExecutionDetails(
   componentName: string,
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
   node: ComponentsNode,
   nodes?: ComponentsNode[],
 ): Record<string, any> | undefined {

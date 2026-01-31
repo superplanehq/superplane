@@ -1,8 +1,8 @@
 import {
   ComponentsComponent,
   ComponentsNode,
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper, OutputPayload } from "../types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
@@ -29,8 +29,8 @@ export const sendTextMessageMapper: ComponentBaseMapper = {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
-    _items?: WorkflowsWorkflowNodeQueueItem[],
+    lastExecutions: CanvasesCanvasNodeExecution[],
+    _items?: CanvasesCanvasNodeQueueItem[],
   ): ComponentBaseProps {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
     const componentName = componentDefinition.name || node.component?.name || "unknown";
@@ -50,7 +50,7 @@ export const sendTextMessageMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, string> {
+  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
     const message = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
 
@@ -61,7 +61,7 @@ export const sendTextMessageMapper: ComponentBaseMapper = {
       Text: stringOrDash(message?.text),
     };
   },
-  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
     if (!execution.createdAt) return "";
     return formatTimeAgo(new Date(execution.createdAt));
   },
@@ -99,7 +99,7 @@ function sendTextMessageSpecs(node: ComponentsNode): ComponentBaseSpec[] {
 
 function sendTextMessageEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
   componentName: string,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);

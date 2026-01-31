@@ -1,4 +1,4 @@
-import { WorkflowsWorkflowNodeExecution } from "@/api-client";
+import { CanvasesCanvasNodeExecution } from "@/api-client";
 import { OutputPayload } from "../types";
 import { Incident, ResourceRef } from "./types";
 
@@ -6,7 +6,7 @@ import { Incident, ResourceRef } from "./types";
  * Extracts an incident from execution outputs with proper null checks.
  * Returns null if outputs are missing or empty (e.g., when execution failed with an error).
  */
-export function getIncidentFromExecution(execution: WorkflowsWorkflowNodeExecution): Incident | null {
+export function getIncidentFromExecution(execution: CanvasesCanvasNodeExecution): Incident | null {
   const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
 
   if (!outputs || !outputs.default || outputs.default.length === 0) {
@@ -69,7 +69,7 @@ export function getDetailsForIncident(incident: Incident, agent?: ResourceRef): 
  * Includes incident details if available, and adds error in the proper format if execution failed.
  * This ensures errors are displayed as key/value pairs, not raw text.
  */
-export function buildIncidentExecutionDetails(execution: WorkflowsWorkflowNodeExecution): Record<string, any> {
+export function buildIncidentExecutionDetails(execution: CanvasesCanvasNodeExecution): Record<string, any> {
   const details: Record<string, any> = {};
 
   // Add execution timestamp

@@ -1,4 +1,4 @@
-import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
+import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
@@ -20,7 +20,7 @@ interface OnPullRequestEventData {
  * Renderer for the "github.onPullRequest" trigger
  */
 export const onPullRequestTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
     const eventData = event.data?.data as OnPullRequestEventData;
 
     return {
@@ -29,7 +29,7 @@ export const onPullRequestTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
+  getRootEventValues: (lastEvent: CanvasesCanvasEvent): Record<string, string> => {
     const eventData = lastEvent.data?.data as OnPullRequestEventData;
 
     return {
@@ -40,7 +40,7 @@ export const onPullRequestTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
+  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
     const metadata = node.metadata as unknown as BaseNodeMetadata;
     const configuration = node.configuration as unknown as OnPullRequestConfiguration;
     const metadataItems = [];

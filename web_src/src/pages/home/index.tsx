@@ -13,7 +13,7 @@ import { Input } from "../../components/Input/input";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/AccountContext";
 import { useBlueprints, useDeleteBlueprint } from "../../hooks/useBlueprintData";
-import { useDeleteWorkflow, useWorkflows, workflowKeys } from "../../hooks/useWorkflowData";
+import { useDeleteCanvas, useCanvases, canvasKeys } from "../../hooks/useCanvasData";
 import { resolveIcon } from "../../lib/utils";
 import { isCustomComponentsEnabled } from "../../lib/env";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
@@ -68,7 +68,7 @@ const HomePage = () => {
     data: workflowsData = [],
     isLoading: workflowsLoading,
     error: workflowApiError,
-  } = useWorkflows(organizationId || "");
+  } = useCanvases(organizationId || "");
 
   const blueprintError = blueprintApiError ? "Failed to fetch Bundles. Please try again later." : null;
   const workflowError = workflowApiError ? "Failed to fetch workflows. Please try again later." : null;
@@ -585,7 +585,7 @@ interface WorkflowActionsMenuProps {
 
 function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActionsMenuProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const deleteWorkflowMutation = useDeleteWorkflow(organizationId);
+  const deleteWorkflowMutation = useDeleteCanvas(organizationId);
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -607,7 +607,7 @@ function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActio
 
     if (isViewingWorkflow) {
       // Remove from cache FIRST to prevent any queries from running
-      queryClient.removeQueries({ queryKey: workflowKeys.detail(organizationId, workflow.id) });
+      queryClient.removeQueries({ queryKey: canvasKeys.detail(organizationId, workflow.id) });
       // Navigate immediately with replace to avoid back button issues and prevent 404 flash
       navigate(`/${organizationId}`, { replace: true });
       // Then delete (fire and forget)

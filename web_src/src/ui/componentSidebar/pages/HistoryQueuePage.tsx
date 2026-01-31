@@ -4,7 +4,7 @@ import { Plus } from "lucide-react";
 import { SidebarEventItem } from "../SidebarEventItem";
 import { SidebarEvent } from "../types";
 import { TabData } from "../SidebarEventItem/SidebarEventItem";
-import { WorkflowsWorkflowNodeExecution } from "@/api-client";
+import { CanvasesCanvasNodeExecution } from "@/api-client";
 import { EventState, EventStateMap } from "../../componentBase";
 
 interface HistoryQueuePageProps {
@@ -27,7 +27,7 @@ interface HistoryQueuePageProps {
   ) => Promise<any[]>;
   getExecutionState?: (
     nodeId: string,
-    execution: WorkflowsWorkflowNodeExecution,
+    execution: CanvasesCanvasNodeExecution,
   ) => { map: EventStateMap; state: EventState };
 
   // Pagination props

@@ -6,9 +6,9 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/workflows"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -27,23 +27,23 @@ const (
 func HandleWorkflowQueueItemCreated(messageBody []byte, wsHub *ws.Hub) error {
 	log.Debugf("Received queue_item_created event")
 
-	pbMsg := &pb.WorkflowNodeQueueItemMessage{}
+	pbMsg := &pb.CanvasNodeQueueItemMessage{}
 	if err := proto.Unmarshal(messageBody, pbMsg); err != nil {
 		return fmt.Errorf("failed to unmarshal queue_item_created message: %w", err)
 	}
 
-	return handleQueueItemState(pbMsg.WorkflowId, pbMsg.Id, pbMsg.NodeId, wsHub, QueueItemCreatedEvent)
+	return handleQueueItemState(pbMsg.CanvasId, pbMsg.Id, pbMsg.NodeId, wsHub, QueueItemCreatedEvent)
 }
 
 func HandleWorkflowQueueItemConsumed(messageBody []byte, wsHub *ws.Hub) error {
 	log.Debugf("Received queue_item_consumed event")
 
-	pbMsg := &pb.WorkflowNodeQueueItemMessage{}
+	pbMsg := &pb.CanvasNodeQueueItemMessage{}
 	if err := proto.Unmarshal(messageBody, pbMsg); err != nil {
 		return fmt.Errorf("failed to unmarshal queue_item_consumed message: %w", err)
 	}
 
-	return handleQueueItemState(pbMsg.WorkflowId, pbMsg.Id, pbMsg.NodeId, wsHub, QueueItemConsumedEvent)
+	return handleQueueItemState(pbMsg.CanvasId, pbMsg.Id, pbMsg.NodeId, wsHub, QueueItemConsumedEvent)
 }
 
 func handleQueueItemState(workflowID string, queueItemID string, nodeID string, wsHub *ws.Hub, eventName string) error {
@@ -57,16 +57,16 @@ func handleQueueItemState(workflowID string, queueItemID string, nodeID string, 
 		return fmt.Errorf("failed to parse queue item id: %w", err)
 	}
 
-	var serializedQueueItem *pb.WorkflowNodeQueueItem
+	var serializedQueueItem *pb.CanvasNodeQueueItem
 
 	//
 	// If queie item is consumed, it means it was already deleted from the database
 	//
 	if eventName == QueueItemConsumedEvent {
-		serializedQueueItem = &pb.WorkflowNodeQueueItem{
-			WorkflowId: workflowUUID.String(),
-			NodeId:     nodeID,
-			Id:         queueItemUUID.String(),
+		serializedQueueItem = &pb.CanvasNodeQueueItem{
+			CanvasId: workflowUUID.String(),
+			NodeId:   nodeID,
+			Id:       queueItemUUID.String(),
 		}
 	} else {
 		queueItem, err := models.FindNodeQueueItem(workflowUUID, queueItemUUID)
@@ -74,7 +74,7 @@ func handleQueueItemState(workflowID string, queueItemID string, nodeID string, 
 			return fmt.Errorf("failed to find queue item: %w", err)
 		}
 
-		serializedQueueItems, err := workflows.SerializeNodeQueueItems([]models.WorkflowNodeQueueItem{*queueItem})
+		serializedQueueItems, err := canvases.SerializeNodeQueueItems([]models.WorkflowNodeQueueItem{*queueItem})
 		if err != nil {
 			return fmt.Errorf("failed to serialize queue item: %w", err)
 		}

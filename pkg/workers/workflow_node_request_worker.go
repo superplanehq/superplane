@@ -69,7 +69,7 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 					}
 
 					if request.ExecutionID != nil {
-						messages.NewWorkflowExecutionMessage(request.WorkflowID.String(), request.ExecutionID.String(), request.NodeID).Publish()
+						messages.NewCanvasExecutionMessage(request.WorkflowID.String(), request.ExecutionID.String(), request.NodeID).Publish()
 					}
 				}(request)
 			}

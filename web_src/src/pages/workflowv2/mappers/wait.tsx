@@ -2,8 +2,8 @@ import React from "react";
 import {
   ComponentsComponent,
   ComponentsNode,
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, OutputPayload, StateFunction } from "./types";
 import {
@@ -59,8 +59,8 @@ export const waitMapper: ComponentBaseMapper = {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
-    nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
+    lastExecutions: CanvasesCanvasNodeExecution[],
+    nodeQueueItems?: CanvasesCanvasNodeQueueItem[],
   ): ComponentBaseProps {
     const componentName = componentDefinition.name || "wait";
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
@@ -80,11 +80,11 @@ export const waitMapper: ComponentBaseMapper = {
       eventStateMap: getStateMap(componentName),
     };
   },
-  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): React.ReactNode {
+  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): React.ReactNode {
     const subtitle = getWaitEventSubtitle(execution, undefined, "wait");
     return subtitle || "";
   },
-  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, any> {
+  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, any> {
     const details: Record<string, any> = {};
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
     const payload = outputs?.default?.[0];
@@ -138,7 +138,7 @@ export const WAIT_STATE_MAP: EventStateMap = {
   },
 };
 
-export const waitStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
+export const waitStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
   if (!execution) return "neutral";
 
   if (
@@ -249,8 +249,8 @@ function getWaitMetadataList(node: ComponentsNode): MetadataItem[] {
 
 function getWaitEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution,
-  _nodeQueueItems: WorkflowsWorkflowNodeQueueItem[] | undefined,
+  execution: CanvasesCanvasNodeExecution,
+  _nodeQueueItems: CanvasesCanvasNodeQueueItem[] | undefined,
   configuration: Record<string, unknown> | undefined,
   componentName: string,
 ): EventSection[] {
@@ -273,7 +273,7 @@ function getWaitEventSections(
 }
 
 function getWaitEventSubtitle(
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
   configuration: Record<string, unknown> | undefined,
   componentName: string,
 ): string | React.ReactNode | undefined {

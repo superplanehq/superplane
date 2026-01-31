@@ -1,7 +1,7 @@
 package messages
 
 import (
-	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -10,22 +10,22 @@ const (
 	WorkflowQueueItemConsumedRoutingKey = "workflow-queue-item-consumed"
 )
 
-type WorkflowQueueItemMessage struct {
-	message *pb.WorkflowNodeQueueItemMessage
+type CanvasQueueItemMessage struct {
+	message *pb.CanvasNodeQueueItemMessage
 }
 
-func NewWorkflowQueueItemMessage(workflowId string, queueItemID, nodeID string) WorkflowQueueItemMessage {
-	return WorkflowQueueItemMessage{
-		message: &pb.WorkflowNodeQueueItemMessage{
-			Id:         queueItemID,
-			WorkflowId: workflowId,
-			NodeId:     nodeID,
-			Timestamp:  timestamppb.Now(),
+func NewCanvasQueueItemMessage(canvasId string, queueItemID, nodeID string) CanvasQueueItemMessage {
+	return CanvasQueueItemMessage{
+		message: &pb.CanvasNodeQueueItemMessage{
+			Id:        queueItemID,
+			CanvasId:  canvasId,
+			NodeId:    nodeID,
+			Timestamp: timestamppb.Now(),
 		},
 	}
 }
 
-func (m WorkflowQueueItemMessage) Publish(consumed bool) error {
+func (m CanvasQueueItemMessage) Publish(consumed bool) error {
 	if consumed {
 		return Publish(WorkflowExchange, WorkflowQueueItemConsumedRoutingKey, toBytes(m.message))
 	}

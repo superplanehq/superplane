@@ -1,11 +1,11 @@
 import { useCallback, useMemo } from "react";
-import { useInfiniteNodeEvents, useInfiniteNodeExecutions } from "./useWorkflowData";
+import { useInfiniteNodeEvents, useInfiniteNodeExecutions } from "./useCanvasData";
 import { SidebarEvent } from "@/ui/componentSidebar/types";
 import {
   ComponentsComponent,
   ComponentsNode,
-  WorkflowsListNodeEventsResponse,
-  WorkflowsListNodeExecutionsResponse,
+  CanvasesListNodeEventsResponse,
+  CanvasesListNodeExecutionsResponse,
 } from "@/api-client";
 import { mapTriggerEventsToSidebarEvents, mapExecutionsToSidebarEvents } from "@/pages/workflowv2/utils";
 import { QueryClient } from "@tanstack/react-query";
@@ -49,7 +49,7 @@ export const useNodeHistory = ({
   const allExecutions = useMemo(() => {
     if (!enabled || isTriggerNode) return [];
     return (
-      executionsQuery.data?.pages.flatMap((page) => (page as WorkflowsListNodeExecutionsResponse)?.executions || []) ||
+      executionsQuery.data?.pages.flatMap((page) => (page as CanvasesListNodeExecutionsResponse)?.executions || []) ||
       []
     );
   }, [enabled, isTriggerNode, executionsQuery.data]);
@@ -85,7 +85,7 @@ export const useNodeHistory = ({
 
     if (isTriggerNode) {
       const allEvents =
-        eventsQuery.data?.pages.flatMap((page) => (page as WorkflowsListNodeEventsResponse)?.events || []) || [];
+        eventsQuery.data?.pages.flatMap((page) => (page as CanvasesListNodeEventsResponse)?.events || []) || [];
       return mapTriggerEventsToSidebarEvents(allEvents, node);
     } else {
       const additionalData = getComponentAdditionalDataBuilder(componentDef?.name || "")?.buildAdditionalData(

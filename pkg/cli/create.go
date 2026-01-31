@@ -31,12 +31,12 @@ var createCmd = &cobra.Command{
 			resource, err := models.ParseCanvas(data)
 			Check(err)
 
-			workflow := models.WorkflowFromCanvas(*resource)
-			request := openapi_client.WorkflowsCreateWorkflowRequest{}
-			request.SetWorkflow(workflow)
+			canvas := models.CanvasFromCanvas(*resource)
+			request := openapi_client.CanvasesCreateCanvasRequest{}
+			request.SetCanvas(canvas)
 
 			client := DefaultClient()
-			_, _, err = client.WorkflowAPI.WorkflowsCreateWorkflow(context.Background()).Body(request).Execute()
+			_, _, err = client.CanvasAPI.CanvasesCreateCanvas(context.Background()).Body(request).Execute()
 			Check(err)
 		default:
 			Fail(fmt.Sprintf("Unsupported resource kind '%s'", kind))
@@ -55,15 +55,15 @@ var createCanvasCmd = &cobra.Command{
 		resource := models.Canvas{
 			APIVersion: APIVersion,
 			Kind:       models.CanvasKind,
-			Metadata:   &openapi_client.WorkflowsWorkflowMetadata{Name: &name},
-			Spec:       models.EmptyWorkflowSpec(),
+			Metadata:   &openapi_client.CanvasesCanvasMetadata{Name: &name},
+			Spec:       models.EmptyCanvasSpec(),
 		}
 
-		workflow := models.WorkflowFromCanvas(resource)
-		request := openapi_client.WorkflowsCreateWorkflowRequest{}
-		request.SetWorkflow(workflow)
+		canvas := models.CanvasFromCanvas(resource)
+		request := openapi_client.CanvasesCreateCanvasRequest{}
+		request.SetCanvas(canvas)
 
-		_, _, err := client.WorkflowAPI.WorkflowsCreateWorkflow(context.Background()).Body(request).Execute()
+		_, _, err := client.CanvasAPI.CanvasesCreateCanvas(context.Background()).Body(request).Execute()
 		Check(err)
 	},
 }

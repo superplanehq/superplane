@@ -35,12 +35,12 @@ var updateCmd = &cobra.Command{
 			client := DefaultClient()
 			ctx := context.Background()
 
-			workflow := models.WorkflowFromCanvas(*resource)
-			body := openapi_client.WorkflowsUpdateWorkflowBody{}
-			body.SetWorkflow(workflow)
+			canvas := models.CanvasFromCanvas(*resource)
+			body := openapi_client.CanvasesUpdateCanvasBody{}
+			body.SetCanvas(canvas)
 
-			_, _, err = client.WorkflowAPI.
-				WorkflowsUpdateWorkflow(ctx, *resource.Metadata.Id).
+			_, _, err = client.CanvasAPI.
+				CanvasesUpdateCanvas(ctx, *resource.Metadata.Id).
 				Body(body).
 				Execute()
 

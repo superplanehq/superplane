@@ -1,8 +1,8 @@
 import {
   ComponentsComponent,
   ComponentsNode,
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper, EventStateRegistry, OutputPayload, StateFunction } from "./types";
 import {
@@ -34,7 +34,7 @@ export const IF_STATE_MAP: EventStateMap = {
   },
 };
 
-export const ifStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
+export const ifStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
   if (!execution) return "neutral";
 
   if (
@@ -79,8 +79,8 @@ export const ifMapper: ComponentBaseMapper = {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
-    _nodeQueueItems: WorkflowsWorkflowNodeQueueItem[],
+    lastExecutions: CanvasesCanvasNodeExecution[],
+    _nodeQueueItems: CanvasesCanvasNodeQueueItem[],
   ): ComponentBaseProps {
     const componentName = componentDefinition.name || "if";
     // Prefer expression from execution metadata (stored at execution time)
@@ -116,7 +116,7 @@ export const ifMapper: ComponentBaseMapper = {
     if (!execution?.createdAt) return "";
     return formatTimeAgo(new Date(execution.createdAt));
   },
-  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, node: ComponentsNode): Record<string, any> {
+  getExecutionDetails(execution: CanvasesCanvasNodeExecution, node: ComponentsNode): Record<string, any> {
     const details: Record<string, any> = {};
 
     // Evaluated at
@@ -216,7 +216,7 @@ export const ifMapper: ComponentBaseMapper = {
 
 function getEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
   componentName: string,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);

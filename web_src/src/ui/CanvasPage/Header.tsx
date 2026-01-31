@@ -2,7 +2,7 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Undo2, Palette, Home, ChevronDown, Copy, Download } from "lucide-react";
 import { Button } from "../button";
 import { Switch } from "../switch";
-import { useWorkflows } from "@/hooks/useWorkflowData";
+import { useCanvases } from "@/hooks/useCanvasData";
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
@@ -49,7 +49,7 @@ export function Header({
 }: HeaderProps) {
   const { workflowId } = useParams<{ workflowId?: string }>();
   const navigate = useNavigate();
-  const { data: workflows = [], isLoading: workflowsLoading } = useWorkflows(organizationId || "");
+  const { data: workflows = [], isLoading: workflowsLoading } = useCanvases(organizationId || "");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [exportAction, setExportAction] = useState<string>("");
   const menuRef = useRef<HTMLDivElement | null>(null);

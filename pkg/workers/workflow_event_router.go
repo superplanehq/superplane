@@ -89,11 +89,11 @@ func (w *WorkflowEventRouter) LockAndProcessEvent(logger *log.Entry, event model
 		return err
 	}
 
-	messages.NewWorkflowEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+	messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
 
 	if len(createdQueueItems) > 0 {
 		for _, queueItem := range createdQueueItems {
-			messages.NewWorkflowQueueItemMessage(
+			messages.NewCanvasQueueItemMessage(
 				event.WorkflowID.String(),
 				queueItem.ID.String(),
 				queueItem.NodeID,
@@ -102,7 +102,7 @@ func (w *WorkflowEventRouter) LockAndProcessEvent(logger *log.Entry, event model
 	}
 
 	if execution != nil {
-		messages.NewWorkflowExecutionMessage(
+		messages.NewCanvasExecutionMessage(
 			event.WorkflowID.String(),
 			execution.ID.String(),
 			execution.NodeID,
