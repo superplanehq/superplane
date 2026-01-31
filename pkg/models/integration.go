@@ -288,18 +288,18 @@ func (a *Integration) CreateSyncRequest(tx *gorm.DB, runAt *time.Time) error {
 	}).Error
 }
 
-func (a *AppInstallation) CreateActionRequest(tx *gorm.DB, actionName string, parameters any, runAt *time.Time) error {
+func (a *Integration) CreateActionRequest(tx *gorm.DB, actionName string, parameters any, runAt *time.Time) error {
 	now := time.Now()
-	return tx.Create(&AppInstallationRequest{
+	return tx.Create(&IntegrationRequest{
 		ID:                uuid.New(),
 		AppInstallationID: a.ID,
-		State:             AppInstallationRequestStatePending,
-		Type:              AppInstallationRequestTypeInvokeAction,
+		State:             IntegrationRequestStatePending,
+		Type:              IntegrationRequestTypeInvokeAction,
 		RunAt:             *runAt,
 		CreatedAt:         now,
 		UpdatedAt:         now,
-		Spec: datatypes.NewJSONType(AppInstallationRequestSpec{
-			InvokeAction: &AppInstallationInvokeAction{
+		Spec: datatypes.NewJSONType(IntegrationRequestSpec{
+			InvokeAction: &IntegrationInvokeAction{
 				ActionName: actionName,
 				Parameters: parameters,
 			},

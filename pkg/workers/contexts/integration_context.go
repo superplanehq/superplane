@@ -149,7 +149,7 @@ func (c *IntegrationContext) ScheduleActionCall(actionName string, parameters an
 	}
 
 	runAt := time.Now().Add(interval)
-	return c.appInstallation.CreateActionRequest(c.tx, actionName, parameters, &runAt)
+	return c.integration.CreateActionRequest(c.tx, actionName, parameters, &runAt)
 }
 
 func (c *IntegrationContext) completeCurrentRequestForInstallation() error {

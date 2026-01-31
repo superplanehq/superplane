@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	AppInstallationRequestTypeSync         = "sync"
-	AppInstallationRequestTypeInvokeAction = "invoke-action"
+	IntegrationRequestTypeSync         = "sync"
+	IntegrationRequestTypeInvokeAction = "invoke-action"
 
 	IntegrationRequestStatePending   = "pending"
 	IntegrationRequestStateCompleted = "completed"
@@ -23,7 +23,7 @@ type IntegrationRequest struct {
 	AppInstallationID uuid.UUID
 	State             string
 	Type              string
-	Spec              datatypes.JSONType[AppInstallationRequestSpec]
+	Spec              datatypes.JSONType[IntegrationRequestSpec]
 	RunAt             time.Time
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
@@ -33,11 +33,11 @@ func (r *IntegrationRequest) TableName() string {
 	return "app_installation_requests"
 }
 
-type AppInstallationRequestSpec struct {
-	InvokeAction *AppInstallationInvokeAction `json:"invoke_action,omitempty"`
+type IntegrationRequestSpec struct {
+	InvokeAction *IntegrationInvokeAction `json:"invoke_action,omitempty"`
 }
 
-type AppInstallationInvokeAction struct {
+type IntegrationInvokeAction struct {
 	ActionName string `json:"action_name"`
 	Parameters any    `json:"parameters"`
 }

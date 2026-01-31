@@ -114,7 +114,7 @@ func Test__AppInstallationRequestWorker_InvokeAction(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewAppInstallationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
+	worker := NewIntegrationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
 
 	//
 	// Register a dummy application and install it.
@@ -133,15 +133,15 @@ func Test__AppInstallationRequestWorker_InvokeAction(t *testing.T) {
 		},
 	})
 
-	installation, err := models.CreateAppInstallation(uuid.New(), r.Organization.ID, "dummy", support.RandomName("installation"), nil)
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "dummy", support.RandomName("integration"), nil)
 	require.NoError(t, err)
 
 	//
-	// Create the app installation sync request
+	// Create the integration sync request
 	//
 	runAt := time.Now().Add(-time.Second)
-	require.NoError(t, installation.CreateActionRequest(database.Conn(), "test", nil, &runAt))
-	requests, err := installation.ListRequests(models.AppInstallationRequestTypeInvokeAction)
+	require.NoError(t, integration.CreateActionRequest(database.Conn(), "test", nil, &runAt))
+	requests, err := integration.ListRequests(models.IntegrationRequestTypeInvokeAction)
 	require.NoError(t, err)
 	require.Len(t, requests, 1)
 	request := &requests[0]
@@ -155,9 +155,9 @@ func Test__AppInstallationRequestWorker_InvokeAction(t *testing.T) {
 	//
 	// Reload request, verify it was completed, and sync was called
 	//
-	request, err = installation.GetRequest(request.ID.String())
+	request, err = integration.GetRequest(request.ID.String())
 	require.NoError(t, err)
-	assert.Equal(t, models.AppInstallationRequestStateCompleted, request.State)
+	assert.Equal(t, models.IntegrationRequestStateCompleted, request.State)
 	assert.True(t, actionCalled)
 }
 
@@ -165,7 +165,7 @@ func Test__AppInstallationRequestWorker_InvokeActionError(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker := NewAppInstallationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
+	worker := NewIntegrationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
 
 	//
 	// Register a dummy application and install it.
@@ -184,15 +184,15 @@ func Test__AppInstallationRequestWorker_InvokeActionError(t *testing.T) {
 		},
 	})
 
-	installation, err := models.CreateAppInstallation(uuid.New(), r.Organization.ID, "dummy", support.RandomName("installation"), nil)
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "dummy", support.RandomName("integration"), nil)
 	require.NoError(t, err)
 
 	//
-	// Create the app installation sync request
+	// Create the integration sync request
 	//
 	runAt := time.Now().Add(-time.Second)
-	require.NoError(t, installation.CreateActionRequest(database.Conn(), "test", nil, &runAt))
-	requests, err := installation.ListRequests(models.AppInstallationRequestTypeInvokeAction)
+	require.NoError(t, integration.CreateActionRequest(database.Conn(), "test", nil, &runAt))
+	requests, err := integration.ListRequests(models.IntegrationRequestTypeInvokeAction)
 	require.NoError(t, err)
 	require.Len(t, requests, 1)
 	request := &requests[0]
@@ -205,8 +205,8 @@ func Test__AppInstallationRequestWorker_InvokeActionError(t *testing.T) {
 	//
 	// Reload request, verify it was completed, even though the action failed.
 	//
-	request, err = installation.GetRequest(request.ID.String())
+	request, err = integration.GetRequest(request.ID.String())
 	require.NoError(t, err)
-	assert.Equal(t, models.AppInstallationRequestStateCompleted, request.State)
+	assert.Equal(t, models.IntegrationRequestStateCompleted, request.State)
 	assert.True(t, actionCalled)
 }
