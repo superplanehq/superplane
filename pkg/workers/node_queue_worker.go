@@ -22,21 +22,21 @@ import (
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
-type WorkflowNodeQueueWorker struct {
+type NodeQueueWorker struct {
 	registry  *registry.Registry
 	semaphore *semaphore.Weighted
 	logger    *log.Entry
 }
 
-func NewWorkflowNodeQueueWorker(registry *registry.Registry) *WorkflowNodeQueueWorker {
-	return &WorkflowNodeQueueWorker{
+func NewNodeQueueWorker(registry *registry.Registry) *NodeQueueWorker {
+	return &NodeQueueWorker{
 		registry:  registry,
 		semaphore: semaphore.NewWeighted(25),
-		logger:    log.WithFields(log.Fields{"worker": "WorkflowNodeQueueWorker"}),
+		logger:    log.WithFields(log.Fields{"worker": "NodeQueueWorker"}),
 	}
 }
 
-func (w *WorkflowNodeQueueWorker) Start(ctx context.Context) {
+func (w *NodeQueueWorker) Start(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
@@ -74,7 +74,7 @@ func (w *WorkflowNodeQueueWorker) Start(ctx context.Context) {
 	}
 }
 
-func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.CanvasNode) error {
+func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.CanvasNode) error {
 	var executionIDs []*uuid.UUID
 	var queueItem *models.CanvasNodeQueueItem
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -115,7 +115,7 @@ func (w *WorkflowNodeQueueWorker) LockAndProcessNode(logger *log.Entry, node mod
 	return err
 }
 
-func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *models.CanvasNode) ([]*uuid.UUID, *models.CanvasNodeQueueItem, error) {
+func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *models.CanvasNode) ([]*uuid.UUID, *models.CanvasNodeQueueItem, error) {
 	queueItem, err := node.FirstQueueItem(tx)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -183,7 +183,7 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, no
 	return []*uuid.UUID{executionID}, queueItem, err
 }
 
-func (w *WorkflowNodeQueueWorker) configurationFieldsForNode(tx *gorm.DB, node *models.CanvasNode) ([]configuration.Field, error) {
+func (w *NodeQueueWorker) configurationFieldsForNode(tx *gorm.DB, node *models.CanvasNode) ([]configuration.Field, error) {
 	ref := node.Ref.Data()
 	switch node.Type {
 	case models.NodeTypeComponent:
@@ -213,7 +213,7 @@ func (w *WorkflowNodeQueueWorker) configurationFieldsForNode(tx *gorm.DB, node *
 	}
 }
 
-func (w *WorkflowNodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, node *models.CanvasNode) (*uuid.UUID, error) {
+func (w *NodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, node *models.CanvasNode) (*uuid.UUID, error) {
 	ref := node.Ref.Data()
 
 	if ref.Component == nil || ref.Component.Name == "" {
@@ -228,7 +228,7 @@ func (w *WorkflowNodeQueueWorker) processComponentNode(ctx *core.ProcessQueueCon
 	return comp.ProcessQueueItem(*ctx)
 }
 
-func (w *WorkflowNodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.Entry, configErr *contexts.ConfigurationBuildError) ([]*uuid.UUID, error) {
+func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.Entry, configErr *contexts.ConfigurationBuildError) ([]*uuid.UUID, error) {
 	err := configErr.QueueItem.Delete(tx)
 	if err != nil {
 		return nil, err
@@ -286,7 +286,7 @@ func (w *WorkflowNodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logg
 	return []*uuid.UUID{&execution.ID, &parent.ID}, nil
 }
 
-func (w *WorkflowNodeQueueWorker) getParentExecutionID(tx *gorm.DB, logger *log.Entry, configErr *contexts.ConfigurationBuildError) (*uuid.UUID, error) {
+func (w *NodeQueueWorker) getParentExecutionID(tx *gorm.DB, logger *log.Entry, configErr *contexts.ConfigurationBuildError) (*uuid.UUID, error) {
 	if configErr.Event.ExecutionID == nil {
 		return nil, nil
 	}

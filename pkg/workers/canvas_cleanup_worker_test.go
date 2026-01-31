@@ -13,10 +13,10 @@ import (
 	"gorm.io/gorm"
 )
 
-func Test__WorkflowCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
+func Test__CanvasCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewWorkflowCleanupWorker()
+	worker := NewCanvasCleanupWorker()
 
 	//
 	// Create a canvas with nodes, events, executions, and queue items
@@ -151,10 +151,10 @@ func Test__WorkflowCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 	support.VerifyNodeRequestCount(t, canvas.ID, 0)
 }
 
-func Test__WorkflowCleanupWorker_ProcessesWorkflowWithWebhook(t *testing.T) {
+func Test__CanvasCleanupWorker_ProcessesWorkflowWithWebhook(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewWorkflowCleanupWorker()
+	worker := NewCanvasCleanupWorker()
 
 	//
 	// Create webhook
@@ -232,10 +232,10 @@ func Test__WorkflowCleanupWorker_ProcessesWorkflowWithWebhook(t *testing.T) {
 	assert.NotNil(t, webhookInDb.DeletedAt)
 }
 
-func Test__WorkflowCleanupWorker_HandlesEmptyWorkflow(t *testing.T) {
+func Test__CanvasCleanupWorker_HandlesEmptyWorkflow(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewWorkflowCleanupWorker()
+	worker := NewCanvasCleanupWorker()
 
 	//
 	// Create a minimal canvas with no nodes, events, etc.
@@ -275,7 +275,7 @@ func Test__WorkflowCleanupWorker_HandlesEmptyWorkflow(t *testing.T) {
 	assert.Equal(t, int64(0), canvasCount)
 }
 
-func Test__WorkflowCleanupWorker_HandlesConcurrentProcessing(t *testing.T) {
+func Test__CanvasCleanupWorker_HandlesConcurrentProcessing(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -320,12 +320,12 @@ func Test__WorkflowCleanupWorker_HandlesConcurrentProcessing(t *testing.T) {
 	results := make(chan error, 2)
 
 	go func() {
-		worker1 := NewWorkflowCleanupWorker()
+		worker1 := NewCanvasCleanupWorker()
 		results <- worker1.LockAndProcessCanvas(*deletedCanvas)
 	}()
 
 	go func() {
-		worker2 := NewWorkflowCleanupWorker()
+		worker2 := NewCanvasCleanupWorker()
 		results <- worker2.LockAndProcessCanvas(*deletedCanvas)
 	}()
 
@@ -338,7 +338,7 @@ func Test__WorkflowCleanupWorker_HandlesConcurrentProcessing(t *testing.T) {
 	// Process remaining work until fully cleaned up
 	maxAttempts := 10
 	for i := 0; i < maxAttempts; i++ {
-		worker := NewWorkflowCleanupWorker()
+		worker := NewCanvasCleanupWorker()
 		err := worker.LockAndProcessCanvas(*deletedCanvas)
 		require.NoError(t, err)
 
@@ -362,10 +362,10 @@ func Test__WorkflowCleanupWorker_HandlesConcurrentProcessing(t *testing.T) {
 	support.VerifyNodeExecutionsCount(t, canvas.ID, 0)
 }
 
-func Test__WorkflowCleanupWorker_IgnoresNonDeletedWorkflows(t *testing.T) {
+func Test__CanvasCleanupWorker_IgnoresNonDeletedWorkflows(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewWorkflowCleanupWorker()
+	worker := NewCanvasCleanupWorker()
 
 	//
 	// Create a normal (non-deleted) canvas

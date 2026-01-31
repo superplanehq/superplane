@@ -26,7 +26,7 @@ import (
 
 var ErrRecordLocked = errors.New("record locked")
 
-type WorkflowNodeExecutor struct {
+type NodeExecutor struct {
 	encryptor crypto.Encryptor
 	registry  *registry.Registry
 	baseURL   string
@@ -34,17 +34,17 @@ type WorkflowNodeExecutor struct {
 	logger    *logrus.Entry
 }
 
-func NewWorkflowNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string) *WorkflowNodeExecutor {
-	return &WorkflowNodeExecutor{
+func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string) *NodeExecutor {
+	return &NodeExecutor{
 		encryptor: encryptor,
 		registry:  registry,
 		baseURL:   baseURL,
 		semaphore: semaphore.NewWeighted(25),
-		logger:    logrus.WithFields(logrus.Fields{"worker": "WorkflowNodeExecutor"}),
+		logger:    logrus.WithFields(logrus.Fields{"worker": "NodeExecutor"}),
 	}
 }
 
-func (w *WorkflowNodeExecutor) Start(ctx context.Context) {
+func (w *NodeExecutor) Start(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
@@ -92,7 +92,7 @@ func (w *WorkflowNodeExecutor) Start(ctx context.Context) {
 	}
 }
 
-func (w *WorkflowNodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
+func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		var execution models.CanvasNodeExecution
 
@@ -131,7 +131,7 @@ func (w *WorkflowNodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	})
 }
 
-func (w *WorkflowNodeExecutor) processNodeExecution(tx *gorm.DB, execution *models.CanvasNodeExecution) error {
+func (w *NodeExecutor) processNodeExecution(tx *gorm.DB, execution *models.CanvasNodeExecution) error {
 	node, err := models.FindCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
 		return err
@@ -144,7 +144,7 @@ func (w *WorkflowNodeExecutor) processNodeExecution(tx *gorm.DB, execution *mode
 	return w.executeComponentNode(tx, execution, node)
 }
 
-func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode) error {
+func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode) error {
 	ref := node.Ref.Data()
 	blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, ref.Blueprint.ID)
 	if err != nil {
@@ -214,7 +214,7 @@ func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *mode
 	return err
 }
 
-func (w *WorkflowNodeExecutor) configurationFieldsForBlueprintNode(tx *gorm.DB, node models.Node) ([]configuration.Field, error) {
+func (w *NodeExecutor) configurationFieldsForBlueprintNode(tx *gorm.DB, node models.Node) ([]configuration.Field, error) {
 	switch {
 	case node.Ref.Component != nil && node.Ref.Component.Name != "":
 		comp, err := w.registry.GetComponent(node.Ref.Component.Name)
@@ -239,7 +239,7 @@ func (w *WorkflowNodeExecutor) configurationFieldsForBlueprintNode(tx *gorm.DB, 
 	}
 }
 
-func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode) error {
+func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode) error {
 	logger := logging.WithExecution(
 		logging.WithNode(w.logger, *node),
 		execution,

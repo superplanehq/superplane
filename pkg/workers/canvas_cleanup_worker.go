@@ -15,21 +15,21 @@ import (
 	"github.com/superplanehq/superplane/pkg/telemetry"
 )
 
-type WorkflowCleanupWorker struct {
+type CanvasCleanupWorker struct {
 	semaphore           *semaphore.Weighted
 	logger              *log.Entry
 	maxResourcesPerTick int
 }
 
-func NewWorkflowCleanupWorker() *WorkflowCleanupWorker {
-	return &WorkflowCleanupWorker{
+func NewCanvasCleanupWorker() *CanvasCleanupWorker {
+	return &CanvasCleanupWorker{
 		semaphore:           semaphore.NewWeighted(25),
-		logger:              log.WithFields(log.Fields{"worker": "WorkflowCleanupWorker"}),
+		logger:              log.WithFields(log.Fields{"worker": "CanvasCleanupWorker"}),
 		maxResourcesPerTick: 500,
 	}
 }
 
-func (w *WorkflowCleanupWorker) Start(ctx context.Context) {
+func (w *CanvasCleanupWorker) Start(ctx context.Context) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
@@ -67,7 +67,7 @@ func (w *WorkflowCleanupWorker) Start(ctx context.Context) {
 	}
 }
 
-func (w *WorkflowCleanupWorker) LockAndProcessCanvas(canvas models.Canvas) error {
+func (w *CanvasCleanupWorker) LockAndProcessCanvas(canvas models.Canvas) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		lockedCanvas, err := models.LockCanvas(tx, canvas.ID)
 		if err != nil {
@@ -80,7 +80,7 @@ func (w *WorkflowCleanupWorker) LockAndProcessCanvas(canvas models.Canvas) error
 	})
 }
 
-func (w *WorkflowCleanupWorker) processCanvas(tx *gorm.DB, canvas models.Canvas) error {
+func (w *CanvasCleanupWorker) processCanvas(tx *gorm.DB, canvas models.Canvas) error {
 	if !canvas.DeletedAt.Valid {
 		w.logger.Infof("Skipping non-deleted canvas %s", canvas.ID)
 		return nil
@@ -146,31 +146,7 @@ func (w *WorkflowCleanupWorker) processCanvas(tx *gorm.DB, canvas models.Canvas)
 	return nil
 }
 
-func (w *WorkflowCleanupWorker) deleteNodeResources(tx *gorm.DB, canvasID uuid.UUID, nodeID string) error {
-	if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", canvasID, nodeID).Delete(&models.CanvasNodeRequest{}).Error; err != nil {
-		return fmt.Errorf("failed to delete node requests: %w", err)
-	}
-
-	if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", canvasID, nodeID).Delete(&models.CanvasNodeExecutionKV{}).Error; err != nil {
-		return fmt.Errorf("failed to delete node execution KVs: %w", err)
-	}
-
-	if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", canvasID, nodeID).Delete(&models.CanvasNodeExecution{}).Error; err != nil {
-		return fmt.Errorf("failed to delete node executions: %w", err)
-	}
-
-	if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", canvasID, nodeID).Delete(&models.CanvasNodeQueueItem{}).Error; err != nil {
-		return fmt.Errorf("failed to delete node queue items: %w", err)
-	}
-
-	if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", canvasID, nodeID).Delete(&models.CanvasEvent{}).Error; err != nil {
-		return fmt.Errorf("failed to delete workflow events: %w", err)
-	}
-
-	return nil
-}
-
-func (w *WorkflowCleanupWorker) deleteNodeResourcesBatched(tx *gorm.DB, workflowID uuid.UUID, nodeID string, maxResources int) (resourcesDeleted int, allResourcesDeleted bool, err error) {
+func (w *CanvasCleanupWorker) deleteNodeResourcesBatched(tx *gorm.DB, workflowID uuid.UUID, nodeID string, maxResources int) (resourcesDeleted int, allResourcesDeleted bool, err error) {
 	resourceTypes := []struct {
 		model     interface{}
 		tableName string
