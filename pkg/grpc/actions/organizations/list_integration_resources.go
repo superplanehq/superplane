@@ -26,29 +26,29 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 		return nil, status.Error(codes.InvalidArgument, "invalid installation ID")
 	}
 
-	i, err := models.FindAppInstallation(org, ID)
+	instance, err := models.FindIntegration(org, ID)
 	if err != nil {
 		return nil, err
 	}
 
-	integration, err := registry.GetIntegration(i.AppName)
+	integration, err := registry.GetIntegration(instance.AppName)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "integration %s not found", i.AppName)
+		return nil, status.Errorf(codes.Internal, "integration %s not found", instance.AppName)
 	}
 
 	integrationCtx := contexts.NewIntegrationContext(
 		database.Conn(),
 		nil,
-		i,
+		instance,
 		registry.Encryptor,
 		registry,
 	)
 
 	listCtx := core.ListResourcesContext{
 		Logger: log.WithFields(log.Fields{
-			"app_installation_id": i.ID.String(),
-			"app_name":            i.AppName,
-			"resource_type":       resourceType,
+			"integration_id":   instance.ID.String(),
+			"integration_name": instance.AppName,
+			"resource_type":    resourceType,
 		}),
 		HTTP:        contexts.NewHTTPContext(registry.GetHTTPClient()),
 		Integration: integrationCtx,
@@ -56,7 +56,7 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 
 	resources, err := integration.ListResources(resourceType, listCtx)
 	if err != nil {
-		log.WithError(err).Errorf("failed to list resources for integration %s", i.ID)
+		log.WithError(err).Errorf("failed to list resources for integration %s", instance.ID)
 		return nil, status.Error(codes.Internal, "failed to list integration resources")
 	}
 

@@ -18,7 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
-type AppInstallationRequestWorker struct {
+type IntegrationRequestWorker struct {
 	semaphore       *semaphore.Weighted
 	registry        *registry.Registry
 	encryptor       crypto.Encryptor
@@ -27,8 +27,8 @@ type AppInstallationRequestWorker struct {
 	webhooksBaseURL string
 }
 
-func NewAppInstallationRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, webhooksBaseURL string) *AppInstallationRequestWorker {
-	return &AppInstallationRequestWorker{
+func NewIntegrationRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, webhooksBaseURL string) *IntegrationRequestWorker {
+	return &IntegrationRequestWorker{
 		encryptor:       encryptor,
 		registry:        registry,
 		oidcProvider:    oidcProvider,
@@ -38,7 +38,7 @@ func NewAppInstallationRequestWorker(encryptor crypto.Encryptor, registry *regis
 	}
 }
 
-func (w *AppInstallationRequestWorker) Start(ctx context.Context) {
+func (w *IntegrationRequestWorker) Start(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
@@ -47,7 +47,7 @@ func (w *AppInstallationRequestWorker) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			requests, err := models.ListAppInstallationRequests()
+			requests, err := models.ListIntegrationRequests()
 			if err != nil {
 				w.log("Error finding app installation requests: %v", err)
 			}
@@ -58,7 +58,7 @@ func (w *AppInstallationRequestWorker) Start(ctx context.Context) {
 					continue
 				}
 
-				go func(request models.AppInstallationRequest) {
+				go func(request models.IntegrationRequest) {
 					defer w.semaphore.Release(1)
 
 					if err := w.LockAndProcessRequest(request); err != nil {
@@ -70,9 +70,9 @@ func (w *AppInstallationRequestWorker) Start(ctx context.Context) {
 	}
 }
 
-func (w *AppInstallationRequestWorker) LockAndProcessRequest(request models.AppInstallationRequest) error {
+func (w *IntegrationRequestWorker) LockAndProcessRequest(request models.IntegrationRequest) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		r, err := models.LockAppInstallationRequest(tx, request.ID)
+		r, err := models.LockIntegrationRequest(tx, request.ID)
 		if err != nil {
 			w.log("Request %s already being processed - skipping", request.ID)
 			return nil
@@ -82,52 +82,52 @@ func (w *AppInstallationRequestWorker) LockAndProcessRequest(request models.AppI
 	})
 }
 
-func (w *AppInstallationRequestWorker) processRequest(tx *gorm.DB, request *models.AppInstallationRequest) error {
+func (w *IntegrationRequestWorker) processRequest(tx *gorm.DB, request *models.IntegrationRequest) error {
 	switch request.Type {
-	case models.AppInstallationRequestTypeSync:
-		return w.syncAppInstallation(tx, request)
+	case models.IntegrationRequestTypeSync:
+		return w.syncIntegration(tx, request)
 	}
 
-	return fmt.Errorf("unsupported app installation request type %s", request.Type)
+	return fmt.Errorf("unsupported integration request type %s", request.Type)
 }
 
-func (w *AppInstallationRequestWorker) syncAppInstallation(tx *gorm.DB, request *models.AppInstallationRequest) error {
-	installation, err := models.FindUnscopedAppInstallationInTransaction(tx, request.AppInstallationID)
+func (w *IntegrationRequestWorker) syncIntegration(tx *gorm.DB, request *models.IntegrationRequest) error {
+	instance, err := models.FindUnscopedIntegrationInTransaction(tx, request.AppInstallationID)
 	if err != nil {
-		return fmt.Errorf("failed to find app installation: %v", err)
+		return fmt.Errorf("failed to find integration: %v", err)
 	}
 
-	integration, err := w.registry.GetIntegration(installation.AppName)
+	integration, err := w.registry.GetIntegration(instance.AppName)
 	if err != nil {
-		return fmt.Errorf("integration %s not found", installation.AppName)
+		return fmt.Errorf("integration %s not found", instance.AppName)
 	}
 
-	integrationCtx := contexts.NewIntegrationContext(tx, nil, installation, w.encryptor, w.registry)
+	integrationCtx := contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry)
 	syncErr := integration.Sync(core.SyncContext{
 		HTTP:            contexts.NewHTTPContext(w.registry.GetHTTPClient()),
 		Integration:     integrationCtx,
-		Configuration:   installation.Configuration.Data(),
+		Configuration:   instance.Configuration.Data(),
 		BaseURL:         w.baseURL,
 		WebhooksBaseURL: w.webhooksBaseURL,
-		OrganizationID:  installation.OrganizationID.String(),
-		InstallationID:  installation.ID.String(),
+		OrganizationID:  instance.OrganizationID.String(),
+		InstallationID:  instance.ID.String(),
 		OIDC:            w.oidcProvider,
 	})
 
 	if syncErr != nil {
-		installation.State = models.AppInstallationStateError
-		installation.StateDescription = fmt.Sprintf("Sync failed: %v", syncErr)
+		instance.State = models.IntegrationStateError
+		instance.StateDescription = fmt.Sprintf("Sync failed: %v", syncErr)
 	} else {
-		installation.StateDescription = ""
+		instance.StateDescription = ""
 	}
 
-	if err := tx.Save(installation).Error; err != nil {
-		return fmt.Errorf("failed to save app installation after sync: %v", err)
+	if err := tx.Save(instance).Error; err != nil {
+		return fmt.Errorf("failed to save integration after sync: %v", err)
 	}
 
 	return request.Complete(tx)
 }
 
-func (w *AppInstallationRequestWorker) log(format string, v ...any) {
-	log.Printf("[AppInstallationRequestWorker] "+format, v...)
+func (w *IntegrationRequestWorker) log(format string, v ...any) {
+	log.Printf("[IntegrationRequestWorker] "+format, v...)
 }

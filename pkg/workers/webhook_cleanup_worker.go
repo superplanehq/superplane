@@ -86,12 +86,12 @@ func (w *WebhookCleanupWorker) processWebhook(tx *gorm.DB, webhook *models.Webho
 }
 
 func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, webhook *models.Webhook) error {
-	appInstallation, err := models.FindMaybeDeletedInstallationInTransaction(tx, *webhook.AppInstallationID)
+	instance, err := models.FindMaybeDeletedIntegrationInTransaction(tx, *webhook.AppInstallationID)
 	if err != nil {
 		return err
 	}
 
-	integration, err := w.registry.GetIntegration(appInstallation.AppName)
+	integration, err := w.registry.GetIntegration(instance.AppName)
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, webhoo
 	err = integration.CleanupWebhook(core.CleanupWebhookContext{
 		HTTP:        contexts.NewHTTPContext(w.registry.GetHTTPClient()),
 		Webhook:     contexts.NewWebhookContext(tx, webhook, w.encryptor, w.baseURL),
-		Integration: contexts.NewIntegrationContext(tx, nil, appInstallation, w.encryptor, w.registry),
+		Integration: contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry),
 	})
 
 	if err != nil {

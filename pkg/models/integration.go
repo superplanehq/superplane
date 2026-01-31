@@ -12,12 +12,12 @@ import (
 )
 
 const (
-	AppInstallationStatePending = "pending"
-	AppInstallationStateReady   = "ready"
-	AppInstallationStateError   = "error"
+	IntegrationStatePending = "pending"
+	IntegrationStateReady   = "ready"
+	IntegrationStateError   = "error"
 )
 
-type AppInstallation struct {
+type Integration struct {
 	ID               uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	OrganizationID   uuid.UUID
 	AppName          string
@@ -32,7 +32,11 @@ type AppInstallation struct {
 	DeletedAt        gorm.DeletedAt `gorm:"index"`
 }
 
-type AppInstallationSecret struct {
+func (a *Integration) TableName() string {
+	return "app_installations"
+}
+
+type IntegrationSecret struct {
 	ID             uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	OrganizationID uuid.UUID
 	InstallationID uuid.UUID
@@ -42,6 +46,10 @@ type AppInstallationSecret struct {
 	UpdatedAt      *time.Time
 }
 
+func (a *IntegrationSecret) TableName() string {
+	return "app_installation_secrets"
+}
+
 type BrowserAction struct {
 	URL         string
 	Method      string
@@ -49,40 +57,40 @@ type BrowserAction struct {
 	Description string
 }
 
-func CreateAppInstallation(id, orgID uuid.UUID, appName string, installationName string, config map[string]any) (*AppInstallation, error) {
+func CreateIntegration(id, orgID uuid.UUID, appName string, installationName string, config map[string]any) (*Integration, error) {
 	now := time.Now()
-	appInstallation := AppInstallation{
+	integration := Integration{
 		ID:               id,
 		OrganizationID:   orgID,
 		AppName:          appName,
 		InstallationName: installationName,
-		State:            AppInstallationStatePending,
+		State:            IntegrationStatePending,
 		Configuration:    datatypes.NewJSONType(config),
 		CreatedAt:        &now,
 		UpdatedAt:        &now,
 	}
 
-	err := database.Conn().Create(&appInstallation).Error
+	err := database.Conn().Create(&integration).Error
 	if err != nil {
 		return nil, err
 	}
 
-	return &appInstallation, nil
+	return &integration, nil
 }
 
-func ListAppInstallations(orgID uuid.UUID) ([]AppInstallation, error) {
-	var appInstallations []AppInstallation
-	err := database.Conn().Where("organization_id = ?", orgID).Find(&appInstallations).Error
+func ListIntegrations(orgID uuid.UUID) ([]Integration, error) {
+	var integrations []Integration
+	err := database.Conn().Where("organization_id = ?", orgID).Find(&integrations).Error
 	if err != nil {
 		return nil, err
 	}
-	return appInstallations, nil
+	return integrations, nil
 }
 
-func ListAppInstallationWebhooks(tx *gorm.DB, installationID uuid.UUID) ([]Webhook, error) {
+func ListIntegrationWebhooks(tx *gorm.DB, integrationID uuid.UUID) ([]Webhook, error) {
 	var webhooks []Webhook
 	err := tx.
-		Where("app_installation_id = ?", installationID).
+		Where("app_installation_id = ?", integrationID).
 		Find(&webhooks).
 		Error
 
@@ -92,10 +100,10 @@ func ListAppInstallationWebhooks(tx *gorm.DB, installationID uuid.UUID) ([]Webho
 	return webhooks, nil
 }
 
-func ListUnscopedAppInstallationWebhooks(tx *gorm.DB, installationID uuid.UUID) ([]Webhook, error) {
+func ListUnscopedIntegrationWebhooks(tx *gorm.DB, integrationID uuid.UUID) ([]Webhook, error) {
 	var webhooks []Webhook
 	err := tx.Unscoped().
-		Where("app_installation_id = ?", installationID).
+		Where("app_installation_id = ?", integrationID).
 		Find(&webhooks).
 		Error
 
@@ -112,13 +120,13 @@ type WorkflowNodeReference struct {
 	NodeName     string
 }
 
-func ListAppInstallationNodeReferences(installationID uuid.UUID) ([]WorkflowNodeReference, error) {
+func ListIntegrationNodeReferences(integrationID uuid.UUID) ([]WorkflowNodeReference, error) {
 	var nodeReferences []WorkflowNodeReference
 	err := database.Conn().
 		Table("workflow_nodes AS wn").
 		Joins("JOIN workflows AS w ON w.id = wn.workflow_id").
 		Select("w.id as workflow_id, w.name as workflow_name, wn.node_id as node_id, wn.name as node_name").
-		Where("wn.app_installation_id = ?", installationID).
+		Where("wn.app_installation_id = ?", integrationID).
 		Where("wn.deleted_at IS NULL").
 		Find(&nodeReferences).
 		Error
@@ -129,103 +137,103 @@ func ListAppInstallationNodeReferences(installationID uuid.UUID) ([]WorkflowNode
 	return nodeReferences, nil
 }
 
-func FindUnscopedAppInstallation(installationID uuid.UUID) (*AppInstallation, error) {
-	return FindUnscopedAppInstallationInTransaction(database.Conn(), installationID)
+func FindUnscopedIntegration(integrationID uuid.UUID) (*Integration, error) {
+	return FindUnscopedIntegrationInTransaction(database.Conn(), integrationID)
 }
 
-func FindUnscopedAppInstallationInTransaction(tx *gorm.DB, installationID uuid.UUID) (*AppInstallation, error) {
-	var appInstallation AppInstallation
+func FindUnscopedIntegrationInTransaction(tx *gorm.DB, integrationID uuid.UUID) (*Integration, error) {
+	var integration Integration
 	err := tx.
-		Where("id = ?", installationID).
-		First(&appInstallation).
+		Where("id = ?", integrationID).
+		First(&integration).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &appInstallation, nil
+	return &integration, nil
 }
 
-func FindMaybeDeletedInstallationInTransaction(tx *gorm.DB, installationID uuid.UUID) (*AppInstallation, error) {
-	var appInstallation AppInstallation
+func FindMaybeDeletedIntegrationInTransaction(tx *gorm.DB, integrationID uuid.UUID) (*Integration, error) {
+	var integration Integration
 	err := tx.Unscoped().
-		Where("id = ?", installationID).
-		First(&appInstallation).
+		Where("id = ?", integrationID).
+		First(&integration).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &appInstallation, nil
+	return &integration, nil
 }
 
-func FindAppInstallation(orgID, installationID uuid.UUID) (*AppInstallation, error) {
-	var appInstallation AppInstallation
+func FindIntegration(orgID, integrationID uuid.UUID) (*Integration, error) {
+	var integration Integration
 	err := database.Conn().
-		Where("id = ?", installationID).
+		Where("id = ?", integrationID).
 		Where("organization_id = ?", orgID).
-		First(&appInstallation).
+		First(&integration).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &appInstallation, nil
+	return &integration, nil
 }
 
-func FindAppInstallationByName(orgID uuid.UUID, installationName string) (*AppInstallation, error) {
-	var appInstallation AppInstallation
+func FindIntegrationByName(orgID uuid.UUID, integrationName string) (*Integration, error) {
+	var integration Integration
 	err := database.Conn().
 		Where("organization_id = ?", orgID).
-		Where("installation_name = ?", installationName).
-		First(&appInstallation).
+		Where("installation_name = ?", integrationName).
+		First(&integration).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &appInstallation, nil
+	return &integration, nil
 }
 
-func ListDeletedAppInstallations() ([]AppInstallation, error) {
-	var installations []AppInstallation
+func ListDeletedIntegrations() ([]Integration, error) {
+	var integrations []Integration
 	err := database.Conn().Unscoped().
 		Where("deleted_at IS NOT NULL").
-		Find(&installations).
+		Find(&integrations).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return installations, nil
+	return integrations, nil
 }
 
-func LockAppInstallation(tx *gorm.DB, ID uuid.UUID) (*AppInstallation, error) {
-	var installation AppInstallation
+func LockIntegration(tx *gorm.DB, ID uuid.UUID) (*Integration, error) {
+	var integration Integration
 
 	err := tx.Unscoped().
 		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 		Where("id = ?", ID).
-		First(&installation).
+		First(&integration).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &installation, nil
+	return &integration, nil
 }
 
-func (a *AppInstallation) SoftDelete() error {
+func (a *Integration) SoftDelete() error {
 	return a.SoftDeleteInTransaction(database.Conn())
 }
 
-func (a *AppInstallation) SoftDeleteInTransaction(tx *gorm.DB) error {
+func (a *Integration) SoftDeleteInTransaction(tx *gorm.DB) error {
 	now := time.Now()
 	timestamp := now.Unix()
 
@@ -236,8 +244,8 @@ func (a *AppInstallation) SoftDeleteInTransaction(tx *gorm.DB) error {
 	}).Error
 }
 
-func (a *AppInstallation) GetRequest(ID string) (*AppInstallationRequest, error) {
-	var request AppInstallationRequest
+func (a *Integration) GetRequest(ID string) (*IntegrationRequest, error) {
+	var request IntegrationRequest
 
 	err := database.Conn().
 		Where("id = ?", ID).
@@ -252,8 +260,8 @@ func (a *AppInstallation) GetRequest(ID string) (*AppInstallationRequest, error)
 	return &request, nil
 }
 
-func (a *AppInstallation) ListRequests(reqType string) ([]AppInstallationRequest, error) {
-	requests := []AppInstallationRequest{}
+func (a *Integration) ListRequests(reqType string) ([]IntegrationRequest, error) {
+	requests := []IntegrationRequest{}
 
 	err := database.Conn().
 		Where("app_installation_id = ?", a.ID).
@@ -267,13 +275,13 @@ func (a *AppInstallation) ListRequests(reqType string) ([]AppInstallationRequest
 	return requests, nil
 }
 
-func (a *AppInstallation) CreateSyncRequest(tx *gorm.DB, runAt *time.Time) error {
+func (a *Integration) CreateSyncRequest(tx *gorm.DB, runAt *time.Time) error {
 	now := time.Now()
-	return tx.Create(&AppInstallationRequest{
+	return tx.Create(&IntegrationRequest{
 		ID:                uuid.New(),
 		AppInstallationID: a.ID,
-		State:             AppInstallationRequestStatePending,
-		Type:              AppInstallationRequestTypeSync,
+		State:             IntegrationRequestStatePending,
+		Type:              IntegrationRequestTypeSync,
 		RunAt:             *runAt,
 		CreatedAt:         now,
 		UpdatedAt:         now,

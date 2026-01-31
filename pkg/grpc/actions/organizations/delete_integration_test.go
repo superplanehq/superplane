@@ -74,7 +74,7 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		// Verify integration is soft-deleted in the database
 		//
-		integration, err := models.FindMaybeDeletedInstallationInTransaction(database.Conn(), uuid.MustParse(integrationID))
+		integration, err := models.FindMaybeDeletedIntegrationInTransaction(database.Conn(), uuid.MustParse(integrationID))
 		require.NoError(t, err)
 		assert.True(t, integration.DeletedAt.Valid)
 	})
@@ -217,7 +217,7 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		// Verify the integration name has been modified
 		//
-		integration, err := models.FindMaybeDeletedInstallationInTransaction(database.Conn(), uuid.MustParse(integrationID))
+		integration, err := models.FindMaybeDeletedIntegrationInTransaction(database.Conn(), uuid.MustParse(integrationID))
 		require.NoError(t, err)
 		assert.True(t, integration.DeletedAt.Valid)
 		assert.NotEqual(t, name, integration.InstallationName)

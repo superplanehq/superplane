@@ -82,11 +82,11 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		go w.Start(context.Background())
 	}
 
-	if os.Getenv("START_APP_INSTALLATION_REQUEST_WORKER") == "yes" {
-		log.Println("Starting App Installation Request Worker")
+	if os.Getenv("START_APP_INSTALLATION_REQUEST_WORKER") == "yes" || os.Getenv("START_INTEGRATION_REQUEST_WORKER") == "yes" {
+		log.Println("Starting Integration Request Worker")
 
 		webhooksBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewAppInstallationRequestWorker(encryptor, registry, oidcProvider, baseURL, webhooksBaseURL)
+		w := workers.NewIntegrationRequestWorker(encryptor, registry, oidcProvider, baseURL, webhooksBaseURL)
 		go w.Start(context.Background())
 	}
 
@@ -112,10 +112,10 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		go w.Start(context.Background())
 	}
 
-	if os.Getenv("START_INSTALLATION_CLEANUP_WORKER") == "yes" {
-		log.Println("Starting App Installation Cleanup Worker")
+	if os.Getenv("START_INSTALLATION_CLEANUP_WORKER") == "yes" || os.Getenv("START_INTEGRATION_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting Integration Cleanup Worker")
 
-		w := workers.NewInstallationCleanupWorker()
+		w := workers.NewIntegrationCleanupWorker()
 		go w.Start(context.Background())
 	}
 

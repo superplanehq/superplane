@@ -339,16 +339,16 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 	}
 
 	if node.AppInstallationID != nil {
-		appInstallation, err := models.FindUnscopedAppInstallationInTransaction(tx, *node.AppInstallationID)
+		integration, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {
 			return fmt.Errorf("failed to find app installation: %v", err)
 		}
 
-		logger = logging.WithAppInstallation(logger, *appInstallation)
+		logger = logging.WithIntegration(logger, *integration)
 		triggerCtx.Integration = contexts.NewIntegrationContext(
 			tx,
 			node,
-			appInstallation,
+			integration,
 			encryptor,
 			registry,
 		)
@@ -379,16 +379,16 @@ func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.
 	}
 
 	if node.AppInstallationID != nil {
-		appInstallation, err := models.FindUnscopedAppInstallationInTransaction(tx, *node.AppInstallationID)
+		integration, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {
 			return fmt.Errorf("failed to find app installation: %v", err)
 		}
 
-		logger = logging.WithAppInstallation(logger, *appInstallation)
+		logger = logging.WithIntegration(logger, *integration)
 		setupCtx.Integration = contexts.NewIntegrationContext(
 			tx,
 			node,
-			appInstallation,
+			integration,
 			encryptor,
 			registry,
 		)

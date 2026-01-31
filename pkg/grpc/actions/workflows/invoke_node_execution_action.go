@@ -94,14 +94,14 @@ func InvokeNodeExecutionAction(
 	}
 
 	if node.AppInstallationID != nil {
-		appInstallation, err := models.FindUnscopedAppInstallationInTransaction(tx, *node.AppInstallationID)
+		integration, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {
 			logger.Errorf("error finding app installation: %v", err)
 			return nil, status.Error(codes.Internal, "error building context")
 		}
 
-		logger = logging.WithAppInstallation(logger, *appInstallation)
-		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, appInstallation, encryptor, registry)
+		logger = logging.WithIntegration(logger, *integration)
+		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, integration, encryptor, registry)
 	}
 
 	actionCtx.Logger = logger

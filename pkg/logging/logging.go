@@ -61,13 +61,13 @@ func WithQueueItem(logger *log.Entry, queueItem models.WorkflowNodeQueueItem) *l
 	})
 }
 
-func ForAppInstallation(appInstallation models.AppInstallation) *log.Entry {
-	return WithAppInstallation(log.NewEntry(log.StandardLogger()), appInstallation)
+func ForIntegration(integration models.Integration) *log.Entry {
+	return WithIntegration(log.NewEntry(log.StandardLogger()), integration)
 }
 
-func WithAppInstallation(logger *log.Entry, appInstallation models.AppInstallation) *log.Entry {
+func WithIntegration(logger *log.Entry, integration models.Integration) *log.Entry {
 	return logger.WithFields(log.Fields{
-		"app_name":        appInstallation.AppName,
-		"installation_id": appInstallation.ID,
+		"integration_name": integration.AppName,
+		"integration_id":   integration.ID,
 	})
 }

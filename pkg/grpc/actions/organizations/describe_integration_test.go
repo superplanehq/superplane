@@ -55,7 +55,7 @@ func Test__DescribeIntegration(t *testing.T) {
 		assert.Equal(t, integrationID, describeResponse.Integration.Metadata.Id)
 		assert.Equal(t, name, describeResponse.Integration.Metadata.Name)
 		assert.Equal(t, "dummy", describeResponse.Integration.Spec.IntegrationName)
-		assert.Equal(t, models.AppInstallationStateReady, describeResponse.Integration.Status.State)
+		assert.Equal(t, models.IntegrationStateReady, describeResponse.Integration.Status.State)
 	})
 
 	t.Run("invalid organization ID -> error", func(t *testing.T) {
