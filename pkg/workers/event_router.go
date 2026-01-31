@@ -16,19 +16,19 @@ import (
 	"github.com/superplanehq/superplane/pkg/telemetry"
 )
 
-type WorkflowEventRouter struct {
+type EventRouter struct {
 	semaphore *semaphore.Weighted
 	logger    *log.Entry
 }
 
-func NewWorkflowEventRouter() *WorkflowEventRouter {
-	return &WorkflowEventRouter{
+func NewEventRouter() *EventRouter {
+	return &EventRouter{
 		semaphore: semaphore.NewWeighted(25),
-		logger:    log.WithFields(log.Fields{"worker": "WorkflowEventRouter"}),
+		logger:    log.WithFields(log.Fields{"worker": "EventRouter"}),
 	}
 }
 
-func (w *WorkflowEventRouter) Start(ctx context.Context) {
+func (w *EventRouter) Start(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
@@ -67,7 +67,7 @@ func (w *WorkflowEventRouter) Start(ctx context.Context) {
 	}
 }
 
-func (w *WorkflowEventRouter) LockAndProcessEvent(logger *log.Entry, event models.CanvasEvent) error {
+func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.CanvasEvent) error {
 	var createdQueueItems []models.CanvasNodeQueueItem
 	var execution *models.CanvasNodeExecution
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -112,7 +112,7 @@ func (w *WorkflowEventRouter) LockAndProcessEvent(logger *log.Entry, event model
 	return nil
 }
 
-func (w *WorkflowEventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, *models.CanvasNodeExecution, error) {
+func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, *models.CanvasNodeExecution, error) {
 	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, event.WorkflowID)
 	if err != nil {
 		return nil, nil, err
@@ -136,7 +136,7 @@ func (w *WorkflowEventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event
 	return queueItems, execution, err
 }
 
-func (w *WorkflowEventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, error) {
+func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, error) {
 	now := time.Now()
 
 	w.logger.Infof("Processing root event %s", event.ID)
@@ -176,7 +176,7 @@ func (w *WorkflowEventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canva
 	return queueItems, nil
 }
 
-func (w *WorkflowEventRouter) processExecutionEvent(tx *gorm.DB, logger *log.Entry, canvas *models.Canvas, execution *models.CanvasNodeExecution, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, error) {
+func (w *EventRouter) processExecutionEvent(tx *gorm.DB, logger *log.Entry, canvas *models.Canvas, execution *models.CanvasNodeExecution, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, error) {
 	now := time.Now()
 
 	logger = logging.WithExecution(logger, execution, nil)
@@ -212,7 +212,7 @@ func (w *WorkflowEventRouter) processExecutionEvent(tx *gorm.DB, logger *log.Ent
 	return createdQueueItems, event.RoutedInTransaction(tx)
 }
 
-func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, logger *log.Entry, canvas *models.Canvas, execution *models.CanvasNodeExecution, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, *models.CanvasNodeExecution, error) {
+func (w *EventRouter) processChildExecutionEvent(tx *gorm.DB, logger *log.Entry, canvas *models.Canvas, execution *models.CanvasNodeExecution, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, *models.CanvasNodeExecution, error) {
 	parentExecution, err := models.FindNodeExecutionInTransaction(tx, canvas.ID, *execution.ParentExecutionID)
 	if err != nil {
 		logger.Errorf("Error finding parent execution: %v", err)
@@ -305,7 +305,7 @@ func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, logger *lo
 	return createdQueueItems, nil, event.RoutedInTransaction(tx)
 }
 
-func (w *WorkflowEventRouter) completeParentExecutionIfNeeded(
+func (w *EventRouter) completeParentExecutionIfNeeded(
 	tx *gorm.DB,
 	logger *log.Entry,
 	parentNode *models.CanvasNode,
@@ -390,7 +390,7 @@ func (w *WorkflowEventRouter) completeParentExecutionIfNeeded(
 	return event.RoutedInTransaction(tx)
 }
 
-func (w *WorkflowEventRouter) findChildrenForNode(allChildren []models.CanvasNodeExecution, nodeID string) []models.CanvasNodeExecution {
+func (w *EventRouter) findChildrenForNode(allChildren []models.CanvasNodeExecution, nodeID string) []models.CanvasNodeExecution {
 	var childrenForNode []models.CanvasNodeExecution
 	for _, child := range allChildren {
 		if child.NodeID == nodeID {

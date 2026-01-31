@@ -14,8 +14,8 @@ import (
 	"gorm.io/datatypes"
 )
 
-func Test__WorkflowEventRouter_ProcessRootEvent(t *testing.T) {
-	router := NewWorkflowEventRouter()
+func Test__EventRouter_ProcessRootEvent(t *testing.T) {
+	router := NewEventRouter()
 	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
 
@@ -70,8 +70,8 @@ func Test__WorkflowEventRouter_ProcessRootEvent(t *testing.T) {
 	assert.True(t, queueConsumer.HasReceivedMessage())
 }
 
-func Test__WorkflowEventRouter_ProcessExecutionEvent(t *testing.T) {
-	router := NewWorkflowEventRouter()
+func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
+	router := NewEventRouter()
 	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
 
@@ -134,8 +134,8 @@ func Test__WorkflowEventRouter_ProcessExecutionEvent(t *testing.T) {
 	assert.True(t, queueConsumer.HasReceivedMessage())
 }
 
-func Test__WorkflowEventRouter_CustomComponent_RespectsOutputChannels(t *testing.T) {
-	router := NewWorkflowEventRouter()
+func Test__EventRouter_CustomComponent_RespectsOutputChannels(t *testing.T) {
+	router := NewEventRouter()
 	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
 
@@ -238,8 +238,8 @@ func Test__WorkflowEventRouter_CustomComponent_RespectsOutputChannels(t *testing
 	assert.True(t, executionConsumer.HasReceivedMessage())
 }
 
-func TestWorkflowEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
-	router := NewWorkflowEventRouter()
+func TestEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
+	router := NewEventRouter()
 	logger := log.NewEntry(log.New())
 	r := support.Setup(t)
 

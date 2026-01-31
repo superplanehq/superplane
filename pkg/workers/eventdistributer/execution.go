@@ -25,7 +25,7 @@ const (
 	ExecutionStartedEvent  = "execution_started"
 )
 
-func HandleWorkflowExecution(messageBody []byte, wsHub *ws.Hub) error {
+func HandleCanvasExecution(messageBody []byte, wsHub *ws.Hub) error {
 	log.Debugf("Received execution event")
 
 	pbMsg := &pb.CanvasNodeExecutionMessage{}
