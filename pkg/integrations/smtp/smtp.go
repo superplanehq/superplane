@@ -169,3 +169,11 @@ func (s *SMTP) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 func (s *SMTP) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 	return nil
 }
+
+func (s *SMTP) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (s *SMTP) HandleAction(ctx core.IntegrationActionContext) error {
+	return nil
+}

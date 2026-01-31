@@ -188,3 +188,11 @@ func (d *Discord) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 func (d *Discord) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 	return nil
 }
+
+func (d *Discord) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (d *Discord) HandleAction(ctx core.IntegrationActionContext) error {
+	return nil
+}

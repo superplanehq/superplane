@@ -279,3 +279,22 @@ func (a *AppInstallation) CreateSyncRequest(tx *gorm.DB, runAt *time.Time) error
 		UpdatedAt:         now,
 	}).Error
 }
+
+func (a *AppInstallation) CreateActionRequest(tx *gorm.DB, actionName string, parameters any, runAt *time.Time) error {
+	now := time.Now()
+	return tx.Create(&AppInstallationRequest{
+		ID:                uuid.New(),
+		AppInstallationID: a.ID,
+		State:             AppInstallationRequestStatePending,
+		Type:              AppInstallationRequestTypeInvokeAction,
+		RunAt:             *runAt,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+		Spec: datatypes.NewJSONType(AppInstallationRequestSpec{
+			InvokeAction: &AppInstallationInvokeAction{
+				ActionName: actionName,
+				Parameters: parameters,
+			},
+		}),
+	}).Error
+}

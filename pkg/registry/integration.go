@@ -48,6 +48,10 @@ func (s *PanicableIntegration) Configuration() []configuration.Field {
 	return s.underlying.Configuration()
 }
 
+func (s *PanicableIntegration) Actions() []core.Action {
+	return s.underlying.Actions()
+}
+
 func (s *PanicableIntegration) Components() []core.Component {
 	components := s.underlying.Components()
 	safe := make([]core.Component, len(components))
@@ -89,6 +93,16 @@ func (s *PanicableIntegration) Cleanup(ctx core.IntegrationCleanupContext) (err 
 		}
 	}()
 	return s.underlying.Cleanup(ctx)
+}
+
+func (s *PanicableIntegration) HandleAction(ctx core.IntegrationActionContext) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("integration %s panicked in HandleAction(): %v",
+				s.underlying.Name(), r)
+		}
+	}()
+	return s.underlying.HandleAction(ctx)
 }
 
 func (s *PanicableIntegration) ListResources(resourceType string, ctx core.ListResourcesContext) (resources []core.IntegrationResource, err error) {

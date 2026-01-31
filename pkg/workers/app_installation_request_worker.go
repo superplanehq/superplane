@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -86,6 +87,8 @@ func (w *AppInstallationRequestWorker) processRequest(tx *gorm.DB, request *mode
 	switch request.Type {
 	case models.AppInstallationRequestTypeSync:
 		return w.syncAppInstallation(tx, request)
+	case models.AppInstallationRequestTypeInvokeAction:
+		return w.invokeIntegrationAction(tx, request)
 	}
 
 	return fmt.Errorf("unsupported app installation request type %s", request.Type)
@@ -123,6 +126,36 @@ func (w *AppInstallationRequestWorker) syncAppInstallation(tx *gorm.DB, request 
 
 	if err := tx.Save(installation).Error; err != nil {
 		return fmt.Errorf("failed to save app installation after sync: %v", err)
+	}
+
+	return request.Complete(tx)
+}
+
+func (w *AppInstallationRequestWorker) invokeIntegrationAction(tx *gorm.DB, request *models.AppInstallationRequest) error {
+	installation, err := models.FindUnscopedAppInstallationInTransaction(tx, request.AppInstallationID)
+	if err != nil {
+		return fmt.Errorf("failed to find app installation: %v", err)
+	}
+
+	integration, err := w.registry.GetIntegration(installation.AppName)
+	if err != nil {
+		return fmt.Errorf("integration %s not found", installation.AppName)
+	}
+
+	spec := request.Spec.Data()
+	logger := logging.ForAppInstallation(*installation)
+	integrationCtx := contexts.NewIntegrationContext(tx, nil, installation, w.encryptor, w.registry)
+	actionCtx := core.IntegrationActionContext{
+		Name:          spec.InvokeAction.ActionName,
+		Parameters:    spec.InvokeAction.Parameters,
+		Configuration: installation.Configuration.Data(),
+		Logger:        logger,
+		Integration:   integrationCtx,
+	}
+
+	err = integration.HandleAction(actionCtx)
+	if err != nil {
+		logger.Errorf("error handling action: %v", err)
 	}
 
 	return request.Complete(tx)

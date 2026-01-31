@@ -123,6 +123,14 @@ func (s *Semaphore) CompareWebhookConfig(a, b any) (bool, error) {
 	return configA.Project == configB.Project, nil
 }
 
+func (s *Semaphore) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (s *Semaphore) HandleAction(ctx core.IntegrationActionContext) error {
+	return nil
+}
+
 type WebhookMetadata struct {
 	Secret       WebhookSecretMetadata       `json:"secret"`
 	Notification WebhookNotificationMetadata `json:"notification"`
