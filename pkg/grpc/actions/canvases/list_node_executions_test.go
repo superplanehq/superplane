@@ -60,12 +60,12 @@ func Test__ListNodeExecutions(t *testing.T) {
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, s.Code())
-		assert.Contains(t, s.Message(), "workflow node not found")
+		assert.Contains(t, s.Message(), "canvas node not found")
 	})
 
-	t.Run("workflow does not exist -> 404 error", func(t *testing.T) {
+	t.Run("canvas does not exist -> 404 error", func(t *testing.T) {
 		//
-		// Try to list executions for a non-existent workflow
+		// Try to list executions for a non-existent canvas
 		//
 		_, err := ListNodeExecutions(
 			context.Background(),
@@ -84,7 +84,7 @@ func Test__ListNodeExecutions(t *testing.T) {
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, s.Code())
-		assert.Contains(t, s.Message(), "workflow node not found")
+		assert.Contains(t, s.Message(), "canvas node not found")
 	})
 
 	t.Run("returns executions for existing node", func(t *testing.T) {

@@ -46,6 +46,10 @@ type CanvasNode struct {
 	DeletedAt         gorm.DeletedAt `gorm:"index"`
 }
 
+func (c *CanvasNode) TableName() string {
+	return "workflow_nodes"
+}
+
 var nodeIDSanitizer = regexp.MustCompile(`[^a-z0-9]`)
 
 func GenerateUniqueNodeID(node Node, reservedIDs map[string]bool) string {

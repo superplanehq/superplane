@@ -20,7 +20,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 	r := support.Setup(t)
 	ctx := context.Background()
 
-	t.Run("workflow not found -> error", func(t *testing.T) {
+	t.Run("canvas not found -> error", func(t *testing.T) {
 		_, err := EmitNodeEvent(
 			ctx,
 			r.Organization.ID,
@@ -30,7 +30,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 			map[string]any{"test": "data"},
 		)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "workflow not found")
+		assert.Contains(t, err.Error(), "canvas not found")
 	})
 
 	t.Run("node not found -> error", func(t *testing.T) {
@@ -209,7 +209,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 			map[string]any{"test": "data"},
 		)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "workflow not found")
+		assert.Contains(t, err.Error(), "canvas not found")
 	})
 
 	t.Run("empty node ID -> error", func(t *testing.T) {
@@ -239,7 +239,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 			map[string]any{"test": "data"},
 		)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "node not found")
+		assert.Contains(t, err.Error(), "canvas node not found")
 	})
 
 	t.Run("nil data map is handled gracefully", func(t *testing.T) {

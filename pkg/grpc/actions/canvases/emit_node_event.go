@@ -31,7 +31,7 @@ func EmitNodeEvent(
 
 	node, err := canvas.FindNode(nodeID)
 	if err != nil {
-		return nil, fmt.Errorf("node not found: %w", err)
+		return nil, fmt.Errorf("canvas node not found: %w", err)
 	}
 
 	now := time.Now()

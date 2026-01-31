@@ -342,7 +342,7 @@ func CreateCanvas(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []model
 			parentNodeID = &parent
 		}
 
-		workflowNode := models.CanvasNode{
+		canvasNode := models.CanvasNode{
 			WorkflowID:    workflow.ID,
 			NodeID:        node.ID,
 			ParentNodeID:  parentNodeID,
@@ -358,8 +358,8 @@ func CreateCanvas(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []model
 			UpdatedAt:     &now,
 		}
 
-		require.NoError(t, database.Conn().Clauses(clause.Returning{}).Create(&workflowNode).Error)
-		createdNodes = append(createdNodes, workflowNode)
+		require.NoError(t, database.Conn().Clauses(clause.Returning{}).Create(&canvasNode).Error)
+		createdNodes = append(createdNodes, canvasNode)
 	}
 
 	return workflow, createdNodes
