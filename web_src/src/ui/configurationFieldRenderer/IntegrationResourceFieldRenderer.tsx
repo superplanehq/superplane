@@ -202,9 +202,7 @@ export const IntegrationResourceFieldRenderer = ({
         </TabsList>
       );
       const tabsInLabelRow =
-        labelRightReady && labelRightRef?.current
-          ? createPortal(tabsList, labelRightRef.current)
-          : null;
+        labelRightReady && labelRightRef?.current ? createPortal(tabsList, labelRightRef.current) : null;
 
       const handleTabChange = (v: string) => {
         const nextExpression = v === "expression";
@@ -216,10 +214,7 @@ export const IntegrationResourceFieldRenderer = ({
 
       return (
         <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)} className="space-y-2">
-          <Tabs
-            value={useExpressionMode ? "expression" : "fixed"}
-            onValueChange={handleTabChange}
-          >
+          <Tabs value={useExpressionMode ? "expression" : "fixed"} onValueChange={handleTabChange}>
             {tabsInLabelRow ?? <div className="flex justify-end">{tabsList}</div>}
             <TabsContent value="fixed">{picker}</TabsContent>
             <TabsContent value="expression">{expressionInput}</TabsContent>
@@ -228,11 +223,7 @@ export const IntegrationResourceFieldRenderer = ({
       );
     }
 
-    return (
-      <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)}>
-        {picker}
-      </div>
-    );
+    return <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)}>{picker}</div>;
   }
 
   // Multi-select mode
