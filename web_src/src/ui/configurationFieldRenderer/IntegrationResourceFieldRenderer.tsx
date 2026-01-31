@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { AutoCompleteSelect, type AutoCompleteOption } from "@/components/AutoCompleteSelect";
 import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
 import { MultiCombobox, MultiComboboxLabel } from "@/components/MultiCombobox/multi-combobox";
@@ -6,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfigurationField } from "../../api-client";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { toTestId } from "@/utils/testID";
-import { useEffect, useMemo, useState } from "react";
+import { type RefObject, useEffect, useMemo, useState } from "react";
 
 interface IntegrationResourceFieldRendererProps {
   field: ConfigurationField;
@@ -16,6 +17,8 @@ interface IntegrationResourceFieldRendererProps {
   integrationId?: string;
   allowExpressions?: boolean;
   autocompleteExampleObj?: Record<string, unknown> | null;
+  labelRightRef?: RefObject<HTMLDivElement | null>;
+  labelRightReady?: boolean;
 }
 
 type SelectOption = {
@@ -24,11 +27,18 @@ type SelectOption = {
   value: string;
 };
 
-/** Detect if value looks like an expression (e.g. {{ $json.id }}) */
+/**
+ * Detect if value looks like a wrapped expression (e.g. {{ $["node-name"].value }}).
+ * Requires both {{ and }} so fixed IDs (e.g. channel IDs) are not misclassified.
+ * Aligns with AutoCompleteInput wrapped expression detection.
+ */
 function isExpressionValue(value: string | string[] | undefined): boolean {
   if (value == null) return false;
   const str = Array.isArray(value) ? value[0] : value;
-  return typeof str === "string" && (str.trim().startsWith("{{") || str.includes("{{"));
+  if (typeof str !== "string") return false;
+  const trimmed = str.trim();
+  if (!trimmed.length) return false;
+  return /\{\{[\s\S]*?\}\}/.test(trimmed);
 }
 
 export const IntegrationResourceFieldRenderer = ({
@@ -39,6 +49,8 @@ export const IntegrationResourceFieldRenderer = ({
   integrationId,
   allowExpressions = false,
   autocompleteExampleObj = null,
+  labelRightRef,
+  labelRightReady = false,
 }: IntegrationResourceFieldRendererProps) => {
   const resourceType = field.typeOptions?.resource?.type;
   const useNameAsValue = field.typeOptions?.resource?.useNameAsValue ?? false;
@@ -167,7 +179,7 @@ export const IntegrationResourceFieldRenderer = ({
         exampleObj={autocompleteExampleObj}
         value={expressionValue}
         onChange={(nextValue) => onChange(nextValue || undefined)}
-        placeholder={field.placeholder ?? `e.g. {{ $json.resourceId }}`}
+        placeholder={field.placeholder ?? `e.g. {{ $["node-name"].value }}`}
         startWord="{{"
         prefix="{{ "
         suffix=" }}"
@@ -179,22 +191,36 @@ export const IntegrationResourceFieldRenderer = ({
     );
 
     if (allowExpressions) {
+      const tabsList = (
+        <TabsList className="h-7 rounded-md p-0.5">
+          <TabsTrigger value="fixed" className="text-xs px-2 py-1 data-[state=active]:shadow-sm">
+            Fixed
+          </TabsTrigger>
+          <TabsTrigger value="expression" className="text-xs px-2 py-1 data-[state=active]:shadow-sm">
+            Expression
+          </TabsTrigger>
+        </TabsList>
+      );
+      const tabsInLabelRow =
+        labelRightReady && labelRightRef?.current
+          ? createPortal(tabsList, labelRightRef.current)
+          : null;
+
+      const handleTabChange = (v: string) => {
+        const nextExpression = v === "expression";
+        if (nextExpression !== useExpressionMode) {
+          onChange(undefined);
+        }
+        setUseExpressionMode(nextExpression);
+      };
+
       return (
         <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)} className="space-y-2">
           <Tabs
             value={useExpressionMode ? "expression" : "fixed"}
-            onValueChange={(v) => setUseExpressionMode(v === "expression")}
+            onValueChange={handleTabChange}
           >
-            <div className="flex justify-end">
-              <TabsList className="h-7 rounded-md p-0.5">
-                <TabsTrigger value="fixed" className="text-xs px-2 py-1 data-[state=active]:shadow-sm">
-                  Fixed
-                </TabsTrigger>
-                <TabsTrigger value="expression" className="text-xs px-2 py-1 data-[state=active]:shadow-sm">
-                  Expression
-                </TabsTrigger>
-              </TabsList>
-            </div>
+            {tabsInLabelRow ?? <div className="flex justify-end">{tabsList}</div>}
             <TabsContent value="fixed">{picker}</TabsContent>
             <TabsContent value="expression">{expressionInput}</TabsContent>
           </Tabs>
