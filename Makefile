@@ -127,6 +127,9 @@ dev.db:
 dev.db.console:
 	$(MAKE) db.console DB_NAME=superplane_dev
 
+dev.pr.clean.checkout:
+	bash ./scripts/clean-pr-checkout $(PR)
+
 check.db.structure:
 	bash ./scripts/verify_db_structure_clean.sh
 
