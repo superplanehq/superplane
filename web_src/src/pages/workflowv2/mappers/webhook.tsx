@@ -225,7 +225,7 @@ const ResetAuthButton: React.FC<{
       const response = await canvasesInvokeNodeTriggerAction(
         withOrganizationHeader({
           path: {
-            workflowId: workflowId,
+            canvasId: workflowId,
             nodeId: nodeId,
             actionName: "resetAuthentication",
           },

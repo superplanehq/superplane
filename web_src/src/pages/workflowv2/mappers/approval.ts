@@ -568,7 +568,7 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
             await canvasesInvokeNodeExecutionAction(
               withOrganizationHeader({
                 path: {
-                  workflowId: workflowId,
+                  canvasId: workflowId,
                   executionId: execution.id,
                   actionName: "approve",
                 },
@@ -595,7 +595,7 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
             await canvasesInvokeNodeExecutionAction(
               withOrganizationHeader({
                 path: {
-                  workflowId: workflowId,
+                  canvasId: workflowId,
                   executionId: execution.id,
                   actionName: "reject",
                 },
