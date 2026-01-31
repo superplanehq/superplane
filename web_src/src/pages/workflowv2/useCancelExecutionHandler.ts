@@ -9,10 +9,10 @@ import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 
 type Params = {
   canvasId: string;
-  workflow?: CanvasesCanvas | null;
+  canvas?: CanvasesCanvas | null;
 };
 
-export function useCancelExecutionHandler({ canvasId, workflow }: Params) {
+export function useCancelExecutionHandler({ canvasId, canvas }: Params) {
   const queryClient = useQueryClient();
   const refetchNodeData = useNodeExecutionStore((state) => state.refetchNodeData);
 
@@ -29,7 +29,7 @@ export function useCancelExecutionHandler({ canvasId, workflow }: Params) {
         );
 
         await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeExecution(canvasId, nodeId) });
-        const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
+        const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
 
         if (node) {
           await refetchNodeData(canvasId, nodeId, node.type!, queryClient);
@@ -41,7 +41,7 @@ export function useCancelExecutionHandler({ canvasId, workflow }: Params) {
         showErrorToast("Failed to cancel execution");
       }
     },
-    [canvasId, queryClient, workflow?.spec?.nodes, refetchNodeData],
+    [canvasId, queryClient, canvas?.spec?.nodes, refetchNodeData],
   );
 
   return { onCancelExecution } as const;

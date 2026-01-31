@@ -208,7 +208,7 @@ function useBreadcrumbs() {
 
   return [
     { label: "Canvases", href: `/${organizationId}` },
-    { label: workflow?.metadata?.name || "Workflow", href: `/${organizationId}/workflows/${workflowId}` },
+    { label: workflow?.metadata?.name || "Workflow", href: `/${organizationId}/canvases/${workflowId}` },
     {
       label: nodeName,
       iconSlug: iconSlug || "boxes",

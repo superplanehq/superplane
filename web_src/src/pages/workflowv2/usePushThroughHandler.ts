@@ -10,10 +10,10 @@ import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 type Params = {
   canvasId: string;
   organizationId?: string;
-  workflow?: CanvasesCanvas | null;
+  canvas?: CanvasesCanvas | null;
 };
 
-export function usePushThroughHandler({ canvasId, organizationId, workflow }: Params) {
+export function usePushThroughHandler({ canvasId, organizationId, canvas }: Params) {
   const queryClient = useQueryClient();
   const refetchNodeData = useNodeExecutionStore((state) => state.refetchNodeData);
   const getNodeData = useNodeExecutionStore((state) => state.getNodeData);
@@ -33,7 +33,7 @@ export function usePushThroughHandler({ canvasId, organizationId, workflow }: Pa
         );
 
         await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeExecution(canvasId, nodeId) });
-        const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
+        const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
 
         if (node) {
           await refetchNodeData(canvasId, nodeId, node.type!, queryClient);
@@ -45,16 +45,16 @@ export function usePushThroughHandler({ canvasId, organizationId, workflow }: Pa
         showErrorToast("Failed to push through");
       }
     },
-    [canvasId, organizationId, queryClient, workflow?.spec?.nodes, refetchNodeData, getNodeData],
+    [canvasId, organizationId, queryClient, canvas?.spec?.nodes, refetchNodeData, getNodeData],
   );
 
   const supportsPushThrough = useCallback(
     (nodeId: string) => {
-      const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
+      const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
       const name = node?.component?.name;
       return name === "wait" || name === "timeGate";
     },
-    [workflow],
+    [canvas],
   );
 
   return { onPushThrough, supportsPushThrough } as const;

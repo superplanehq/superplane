@@ -97,7 +97,7 @@ func TestNoopBad(t *testing.T) {
 
     p.Start();
     p.Login();
-    p.Visit("/" + p.orgID + "/workflows/123")
+    p.Visit("/" + p.orgID + "/canvases/123")
 
     el := p.Page().Locator(".canvas .node:nth-child(2) .title")
     _ = el.Click()

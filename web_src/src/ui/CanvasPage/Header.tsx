@@ -103,7 +103,7 @@ export function Header({
   const handleWorkflowClick = (selectedWorkflowId: string) => {
     if (selectedWorkflowId && organizationId) {
       setIsMenuOpen(false);
-      navigate(`/${organizationId}/workflows/${selectedWorkflowId}`);
+      navigate(`/${organizationId}/canvases/${selectedWorkflowId}`);
     }
   };
 

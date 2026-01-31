@@ -62,7 +62,7 @@ export function useCreateCanvasModalState() {
 
     if (result?.data?.canvas?.metadata?.id) {
       onClose();
-      navigate(`/${organizationId}/workflows/${result.data.canvas.metadata.id}`);
+      navigate(`/${organizationId}/canvases/${result.data.canvas.metadata.id}`);
     }
   };
 

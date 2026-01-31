@@ -14,7 +14,7 @@ import { useAccount } from "@/contexts/AccountContext";
 import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
 
 interface UseNodeHistoryProps {
-  workflowId: string;
+  canvasId: string;
   organizationId: string;
   components: ComponentsComponent[];
   nodeId: string;
@@ -25,7 +25,7 @@ interface UseNodeHistoryProps {
 }
 
 export const useNodeHistory = ({
-  workflowId,
+  canvasId,
   nodeId,
   nodeType,
   allNodes,
@@ -38,8 +38,8 @@ export const useNodeHistory = ({
   // For trigger nodes, use events; for other nodes, use executions
   const isTriggerNode = nodeType === "TYPE_TRIGGER";
 
-  const eventsQuery = useInfiniteNodeEvents(workflowId, nodeId, enabled && isTriggerNode);
-  const executionsQuery = useInfiniteNodeExecutions(workflowId, nodeId, enabled && !isTriggerNode);
+  const eventsQuery = useInfiniteNodeEvents(canvasId, nodeId, enabled && isTriggerNode);
+  const executionsQuery = useInfiniteNodeExecutions(canvasId, nodeId, enabled && !isTriggerNode);
 
   const node = useMemo(() => allNodes.find((n) => n.id === nodeId), [allNodes, nodeId]);
   const componentDef = useMemo(
@@ -93,7 +93,7 @@ export const useNodeHistory = ({
         node,
         componentDef!,
         allExecutions,
-        workflowId || "",
+        canvasId || "",
         queryClient,
         organizationId || "",
         account ? { id: account.id, email: account.email } : undefined,
@@ -111,7 +111,7 @@ export const useNodeHistory = ({
     componentDef,
     organizationId,
     queryClient,
-    workflowId,
+    canvasId,
     account,
   ]);
 

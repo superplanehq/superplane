@@ -10,14 +10,14 @@ import { showErrorToast } from "@/utils/toast";
 type Params = {
   canvasId: string;
   organizationId?: string;
-  workflow?: CanvasesCanvas | null;
+  canvas?: CanvasesCanvas | null;
   loadSidebarData: (nodeId: string) => void;
 };
 
 /**
  * Returns a handler that cancels a queued item for a node and refreshes related data.
  */
-export function useOnCancelQueueItemHandler({ canvasId, organizationId, workflow, loadSidebarData }: Params) {
+export function useOnCancelQueueItemHandler({ canvasId, organizationId, canvas, loadSidebarData }: Params) {
   const queryClient = useQueryClient();
   const refetchNodeDataMethod = useNodeExecutionStore((state) => state.refetchNodeData);
 
@@ -39,7 +39,7 @@ export function useOnCancelQueueItemHandler({ canvasId, organizationId, workflow
         // Refresh queue items and sidebar data for this node
         await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeQueueItem(canvasId, nodeId) });
 
-        const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
+        const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
         if (node) {
           await refetchNodeDataMethod(canvasId, nodeId, node.type!, queryClient);
         } else {
@@ -50,6 +50,6 @@ export function useOnCancelQueueItemHandler({ canvasId, organizationId, workflow
         showErrorToast("Failed to cancel queue item");
       }
     },
-    [canvasId, organizationId, queryClient, workflow, refetchNodeDataMethod, loadSidebarData],
+    [canvasId, organizationId, queryClient, canvas, refetchNodeDataMethod, loadSidebarData],
   );
 }
