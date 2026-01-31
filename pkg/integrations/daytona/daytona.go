@@ -147,3 +147,11 @@ func (d *Daytona) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 func (d *Daytona) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 	return nil
 }
+
+func (d *Daytona) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (d *Daytona) HandleAction(ctx core.IntegrationActionContext) error {
+	return nil
+}

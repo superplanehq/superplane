@@ -135,3 +135,11 @@ func (o *OpenAI) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 func (o *OpenAI) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 	return nil
 }
+
+func (o *OpenAI) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (o *OpenAI) HandleAction(ctx core.IntegrationActionContext) error {
+	return nil
+}

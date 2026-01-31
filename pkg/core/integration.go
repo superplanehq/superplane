@@ -62,6 +62,17 @@ type Integration interface {
 	Cleanup(ctx IntegrationCleanupContext) error
 
 	/*
+	 * The list of actions exposed by the integration.
+	 */
+	Actions() []Action
+
+	/*
+	 * Execute an action - defined in Actions() -
+	 * on the integration.
+	 */
+	HandleAction(ctx IntegrationActionContext) error
+
+	/*
 	 * List resources of a given type.
 	 */
 	ListResources(resourceType string, ctx ListResourcesContext) ([]IntegrationResource, error)
@@ -175,6 +186,15 @@ type IntegrationCleanupContext struct {
 	Integration    IntegrationContext
 }
 
+type IntegrationActionContext struct {
+	Name          string
+	Parameters    any
+	Configuration any
+	Logger        *logrus.Entry
+	Requests      RequestContext
+	Integration   IntegrationContext
+}
+
 /*
  * IntegrationContext allows components to access integration information.
  */
@@ -218,9 +238,10 @@ type IntegrationContext interface {
 	Subscribe(any) (*uuid.UUID, error)
 
 	/*
-	 * Schedule a sync call for the integration.
+	 * Schedule actions for the integration.
 	 */
 	ScheduleResync(interval time.Duration) error
+	ScheduleActionCall(actionName string, parameters any, interval time.Duration) error
 
 	/*
 	 * List integration subscriptions from nodes.

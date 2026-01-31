@@ -95,6 +95,14 @@ func (s *Slack) Configuration() []configuration.Field {
 	}
 }
 
+func (s *Slack) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (s *Slack) HandleAction(ctx core.IntegrationActionContext) error {
+	return nil
+}
+
 func (s *Slack) Components() []core.Component {
 	return []core.Component{
 		&SendTextMessage{},

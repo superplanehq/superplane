@@ -243,3 +243,11 @@ func (a *AWS) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 func (a *AWS) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 	return nil
 }
+
+func (a *AWS) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (a *AWS) HandleAction(ctx core.IntegrationActionContext) error {
+	return nil
+}

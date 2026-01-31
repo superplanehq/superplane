@@ -159,3 +159,11 @@ func (d *Datadog) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 	// No automatic provisioning is supported
 	return nil, nil
 }
+
+func (d *Datadog) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (d *Datadog) HandleAction(ctx core.IntegrationActionContext) error {
+	return nil
+}

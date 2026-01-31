@@ -683,3 +683,11 @@ func (g *GitHub) createAppFromManifest(httpCtx core.HTTPContext, code string) (*
 
 	return &appData, nil
 }
+
+func (g *GitHub) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (g *GitHub) HandleAction(ctx core.IntegrationActionContext) error {
+	return nil
+}

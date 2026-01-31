@@ -176,3 +176,11 @@ func (c *Cloudflare) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 func (c *Cloudflare) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 	return nil
 }
+
+func (c *Cloudflare) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (c *Cloudflare) HandleAction(ctx core.IntegrationActionContext) error {
+	return nil
+}

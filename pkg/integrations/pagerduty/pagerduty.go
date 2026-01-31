@@ -452,3 +452,11 @@ func (p *PagerDuty) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 
 	return nil
 }
+
+func (p *PagerDuty) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (p *PagerDuty) HandleAction(ctx core.IntegrationActionContext) error {
+	return nil
+}

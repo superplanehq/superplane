@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -107,4 +108,105 @@ func Test__AppInstallationRequestWorker_SyncError(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.AppInstallationStateError, installation.State)
 	assert.Contains(t, installation.StateDescription, "Sync failed: sync failed")
+}
+
+func Test__AppInstallationRequestWorker_InvokeAction(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker := NewAppInstallationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
+
+	//
+	// Register a dummy application and install it.
+	//
+	var actionCalled bool
+	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+		Actions: []core.Action{
+			{
+				Name:       "test",
+				Parameters: []configuration.Field{},
+			},
+		},
+		HandleAction: func(ctx core.IntegrationActionContext) error {
+			actionCalled = true
+			return nil
+		},
+	})
+
+	installation, err := models.CreateAppInstallation(uuid.New(), r.Organization.ID, "dummy", support.RandomName("installation"), nil)
+	require.NoError(t, err)
+
+	//
+	// Create the app installation sync request
+	//
+	runAt := time.Now().Add(-time.Second)
+	require.NoError(t, installation.CreateActionRequest(database.Conn(), "test", nil, &runAt))
+	requests, err := installation.ListRequests(models.AppInstallationRequestTypeSync)
+	require.NoError(t, err)
+	require.Len(t, requests, 1)
+	request := &requests[0]
+
+	//
+	// Lock and process request
+	//
+	err = worker.LockAndProcessRequest(*request)
+	require.NoError(t, err)
+
+	//
+	// Reload request, verify it was completed, and sync was called
+	//
+	request, err = installation.GetRequest(request.ID.String())
+	require.NoError(t, err)
+	assert.Equal(t, models.AppInstallationRequestStateCompleted, request.State)
+	assert.True(t, actionCalled)
+}
+
+func Test__AppInstallationRequestWorker_InvokeActionError(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker := NewAppInstallationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
+
+	//
+	// Register a dummy application and install it.
+	//
+	var actionCalled bool
+	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+		Actions: []core.Action{
+			{
+				Name:       "test",
+				Parameters: []configuration.Field{},
+			},
+		},
+		HandleAction: func(ctx core.IntegrationActionContext) error {
+			actionCalled = true
+			return errors.New("action failed")
+		},
+	})
+
+	installation, err := models.CreateAppInstallation(uuid.New(), r.Organization.ID, "dummy", support.RandomName("installation"), nil)
+	require.NoError(t, err)
+
+	//
+	// Create the app installation sync request
+	//
+	runAt := time.Now().Add(-time.Second)
+	require.NoError(t, installation.CreateActionRequest(database.Conn(), "test", nil, &runAt))
+	requests, err := installation.ListRequests(models.AppInstallationRequestTypeSync)
+	require.NoError(t, err)
+	require.Len(t, requests, 1)
+	request := &requests[0]
+
+	//
+	// Process request
+	//
+	require.NoError(t, worker.LockAndProcessRequest(*request))
+
+	//
+	// Reload request, verify it was completed, even though the action failed.
+	//
+	request, err = installation.GetRequest(request.ID.String())
+	require.NoError(t, err)
+	assert.Equal(t, models.AppInstallationRequestStateCompleted, request.State)
+	assert.True(t, actionCalled)
 }
