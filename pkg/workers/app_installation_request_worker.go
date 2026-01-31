@@ -156,7 +156,6 @@ func (w *AppInstallationRequestWorker) invokeIntegrationAction(tx *gorm.DB, requ
 	err = integration.HandleAction(actionCtx)
 	if err != nil {
 		logger.Errorf("error handling action: %v", err)
-		return nil
 	}
 
 	return request.Complete(tx)
