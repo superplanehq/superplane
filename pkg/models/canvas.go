@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-type Workflow struct {
+type Canvas struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
 	IsTemplate     bool
@@ -25,10 +25,14 @@ type Workflow struct {
 	Edges          datatypes.JSONSlice[Edge]
 }
 
-func (w *Workflow) FindNode(id string) (*WorkflowNode, error) {
-	var node WorkflowNode
+func (c *Canvas) TableName() string {
+	return "workflows"
+}
+
+func (c *Canvas) FindNode(id string) (*CanvasNode, error) {
+	var node CanvasNode
 	err := database.Conn().
-		Where("workflow_id = ?", w.ID).
+		Where("workflow_id = ?", c.ID).
 		Where("node_id = ?", id).
 		First(&node).
 		Error
@@ -40,16 +44,16 @@ func (w *Workflow) FindNode(id string) (*WorkflowNode, error) {
 	return &node, nil
 }
 
-func FindWorkflowNodes(workflowID uuid.UUID) ([]WorkflowNode, error) {
-	return FindWorkflowNodesInTransaction(database.Conn(), workflowID)
+func FindCanvasNodes(canvasID uuid.UUID) ([]CanvasNode, error) {
+	return FindCanvasNodesInTransaction(database.Conn(), canvasID)
 }
 
-func FindWorkflowNodesUnscoped(workflowID uuid.UUID) ([]WorkflowNode, error) {
-	return FindWorkflowNodesUnscopedInTransaction(database.Conn(), workflowID)
+func FindCanvasNodesUnscoped(workflowID uuid.UUID) ([]CanvasNode, error) {
+	return FindCanvasNodesUnscopedInTransaction(database.Conn(), workflowID)
 }
 
-func FindWorkflowNodesInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]WorkflowNode, error) {
-	var nodes []WorkflowNode
+func FindCanvasNodesInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]CanvasNode, error) {
+	var nodes []CanvasNode
 	err := tx.
 		Where("workflow_id = ?", workflowID).
 		Find(&nodes).
@@ -62,8 +66,8 @@ func FindWorkflowNodesInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]Workfl
 	return nodes, nil
 }
 
-func FindWorkflowNodesUnscopedInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]WorkflowNode, error) {
-	var nodes []WorkflowNode
+func FindCanvasNodesUnscopedInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]CanvasNode, error) {
+	var nodes []CanvasNode
 	err := tx.
 		Unscoped().
 		Where("workflow_id = ?", workflowID).
@@ -77,10 +81,10 @@ func FindWorkflowNodesUnscopedInTransaction(tx *gorm.DB, workflowID uuid.UUID) (
 	return nodes, nil
 }
 
-func (w *Workflow) FindEdges(sourceID string, channel string) []Edge {
+func (c *Canvas) FindEdges(sourceID string, channel string) []Edge {
 	edges := []Edge{}
 
-	for _, edge := range w.Edges {
+	for _, edge := range c.Edges {
 		if edge.SourceID == sourceID && edge.Channel == channel {
 			edges = append(edges, edge)
 		}
@@ -89,113 +93,113 @@ func (w *Workflow) FindEdges(sourceID string, channel string) []Edge {
 	return edges
 }
 
-func (w *Workflow) SoftDelete() error {
-	return w.SoftDeleteInTransaction(database.Conn())
+func (c *Canvas) SoftDelete() error {
+	return c.SoftDeleteInTransaction(database.Conn())
 }
 
-func (w *Workflow) SoftDeleteInTransaction(tx *gorm.DB) error {
+func (c *Canvas) SoftDeleteInTransaction(tx *gorm.DB) error {
 	now := time.Now()
 	timestamp := now.Unix()
 
-	newName := fmt.Sprintf("%s (deleted-%d)", w.Name, timestamp)
-	return tx.Model(w).Updates(map[string]interface{}{
+	newName := fmt.Sprintf("%s (deleted-%d)", c.Name, timestamp)
+	return tx.Model(c).Updates(map[string]interface{}{
 		"deleted_at": now,
 		"name":       newName,
 	}).Error
 }
 
-func FindWorkflow(orgID, id uuid.UUID) (*Workflow, error) {
-	return FindWorkflowInTransaction(database.Conn(), orgID, id)
+func FindCanvas(orgID, id uuid.UUID) (*Canvas, error) {
+	return FindCanvasInTransaction(database.Conn(), orgID, id)
 }
 
-func FindWorkflowByName(name string, organizationID uuid.UUID) (*Workflow, error) {
-	var workflow Workflow
+func FindCanvasByName(name string, organizationID uuid.UUID) (*Canvas, error) {
+	var canvas Canvas
 	err := database.Conn().
 		Where("name = ? AND organization_id = ?", name, organizationID).
-		First(&workflow).
+		First(&canvas).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &workflow, nil
+	return &canvas, nil
 }
 
-func FindWorkflowTemplateByName(name string) (*Workflow, error) {
-	return FindWorkflowTemplateByNameInTransaction(database.Conn(), name)
+func FindCanvasTemplateByName(name string) (*Canvas, error) {
+	return FindCanvasTemplateByNameInTransaction(database.Conn(), name)
 }
 
-func FindWorkflowTemplateByNameInTransaction(tx *gorm.DB, name string) (*Workflow, error) {
-	var workflow Workflow
+func FindCanvasTemplateByNameInTransaction(tx *gorm.DB, name string) (*Canvas, error) {
+	var canvas Canvas
 	err := tx.
 		Where("organization_id = ?", TemplateOrganizationID).
 		Where("is_template = ?", true).
 		Where("name = ?", name).
-		First(&workflow).
+		First(&canvas).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &workflow, nil
+	return &canvas, nil
 }
 
-func FindWorkflowInTransaction(tx *gorm.DB, orgID, id uuid.UUID) (*Workflow, error) {
-	var workflow Workflow
+func FindCanvasInTransaction(tx *gorm.DB, orgID, id uuid.UUID) (*Canvas, error) {
+	var canvas Canvas
 	err := tx.
 		Where("organization_id = ?", orgID).
 		Where("id = ?", id).
-		First(&workflow).
+		First(&canvas).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &workflow, nil
+	return &canvas, nil
 }
 
-func FindWorkflowWithoutOrgScope(id uuid.UUID) (*Workflow, error) {
-	return FindWorkflowWithoutOrgScopeInTransaction(database.Conn(), id)
+func FindCanvasWithoutOrgScope(id uuid.UUID) (*Canvas, error) {
+	return FindCanvasWithoutOrgScopeInTransaction(database.Conn(), id)
 }
 
-func FindWorkflowWithoutOrgScopeInTransaction(tx *gorm.DB, id uuid.UUID) (*Workflow, error) {
-	var workflow Workflow
+func FindCanvasWithoutOrgScopeInTransaction(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
+	var canvas Canvas
 	err := tx.
 		Where("id = ?", id).
-		First(&workflow).
+		First(&canvas).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &workflow, nil
+	return &canvas, nil
 }
 
-func FindUnscopedWorkflow(id uuid.UUID) (*Workflow, error) {
-	return FindUnscopedWorkflowInTransaction(database.Conn(), id)
+func FindUnscopedCanvas(id uuid.UUID) (*Canvas, error) {
+	return FindUnscopedCanvasInTransaction(database.Conn(), id)
 }
 
-func FindUnscopedWorkflowInTransaction(tx *gorm.DB, id uuid.UUID) (*Workflow, error) {
-	var workflow Workflow
+func FindUnscopedCanvasInTransaction(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
+	var canvas Canvas
 	err := tx.
 		Unscoped().
 		Where("id = ?", id).
-		First(&workflow).
+		First(&canvas).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &workflow, nil
+	return &canvas, nil
 }
 
-func ListWorkflows(orgID string, includeTemplates bool) ([]Workflow, error) {
-	var workflows []Workflow
+func ListCanvases(orgID string, includeTemplates bool) ([]Canvas, error) {
+	var canvases []Canvas
 	var query *gorm.DB
 	if includeTemplates {
 		query = database.Conn().Where(
@@ -210,69 +214,69 @@ func ListWorkflows(orgID string, includeTemplates bool) ([]Workflow, error) {
 
 	err := query.
 		Order("name ASC").
-		Find(&workflows).
+		Find(&canvases).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return workflows, nil
+	return canvases, nil
 }
 
-func FindWorkflowTemplate(id uuid.UUID) (*Workflow, error) {
-	return FindWorkflowTemplateInTransaction(database.Conn(), id)
+func FindCanvasTemplate(id uuid.UUID) (*Canvas, error) {
+	return FindCanvasTemplateInTransaction(database.Conn(), id)
 }
 
-func FindWorkflowTemplateInTransaction(tx *gorm.DB, id uuid.UUID) (*Workflow, error) {
-	var workflow Workflow
+func FindCanvasTemplateInTransaction(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
+	var canvas Canvas
 	err := tx.
 		Where("id = ?", id).
 		Where("is_template = ?", true).
-		First(&workflow).
+		First(&canvas).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &workflow, nil
+	return &canvas, nil
 }
 
-func ListDeletedWorkflows() ([]Workflow, error) {
-	var workflows []Workflow
+func ListDeletedCanvases() ([]Canvas, error) {
+	var canvases []Canvas
 	err := database.Conn().
 		Unscoped().
 		Where("deleted_at IS NOT NULL").
-		Find(&workflows).
+		Find(&canvases).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return workflows, nil
+	return canvases, nil
 }
 
-func LockWorkflow(tx *gorm.DB, id uuid.UUID) (*Workflow, error) {
-	var workflow Workflow
+func LockCanvas(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
+	var canvas Canvas
 
 	err := tx.
 		Unscoped().
 		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 		Where("id = ?", id).
 		Where("deleted_at IS NOT NULL").
-		First(&workflow).
+		First(&canvas).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &workflow, nil
+	return &canvas, nil
 }
 
-func CountWorkflowsByOrganizationIDs(orgIDs []string) (map[string]int64, error) {
+func CountCanvasesByOrganizationIDs(orgIDs []string) (map[string]int64, error) {
 	counts := make(map[string]int64)
 	if len(orgIDs) == 0 {
 		return counts, nil

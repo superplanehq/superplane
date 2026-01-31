@@ -16,19 +16,19 @@ import (
 	"gorm.io/gorm"
 )
 
-func UpdateNodePause(ctx context.Context, registry *registry.Registry, workflowID, nodeID string, paused bool) (*pb.UpdateNodePauseResponse, error) {
-	workflowUUID, err := uuid.Parse(workflowID)
+func UpdateNodePause(ctx context.Context, registry *registry.Registry, canvasID, nodeID string, paused bool) (*pb.UpdateNodePauseResponse, error) {
+	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid workflow_id")
+		return nil, status.Error(codes.InvalidArgument, "invalid canvas_id")
 	}
 
 	if nodeID == "" {
 		return nil, status.Error(codes.InvalidArgument, "node_id is required")
 	}
 
-	var workflowNode *models.WorkflowNode
+	var canvasNode *models.CanvasNode
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		lockedNode, err := models.LockWorkflowNodeForUpdate(tx, workflowUUID, nodeID)
+		lockedNode, err := models.LockCanvasNodeForUpdate(tx, canvasUUID, nodeID)
 		if err != nil {
 			return err
 		}
@@ -39,17 +39,17 @@ func UpdateNodePause(ctx context.Context, registry *registry.Registry, workflowI
 
 		if paused {
 			switch lockedNode.State {
-			case models.WorkflowNodeStateError:
+			case models.CanvasNodeStateError:
 				return status.Error(codes.FailedPrecondition, "node is in error state")
-			case models.WorkflowNodeStatePaused:
+			case models.CanvasNodeStatePaused:
 				// no-op
 			default:
-				lockedNode.State = models.WorkflowNodeStatePaused
-				if err := lockedNode.UpdateState(tx, models.WorkflowNodeStatePaused); err != nil {
+				lockedNode.State = models.CanvasNodeStatePaused
+				if err := lockedNode.UpdateState(tx, models.CanvasNodeStatePaused); err != nil {
 					return err
 				}
 			}
-		} else if lockedNode.State == models.WorkflowNodeStatePaused {
+		} else if lockedNode.State == models.CanvasNodeStatePaused {
 			nextState, err := models.ResumeStateForNodeInTransaction(tx, lockedNode.WorkflowID, lockedNode.NodeID)
 			if err != nil {
 				return err
@@ -60,17 +60,17 @@ func UpdateNodePause(ctx context.Context, registry *registry.Registry, workflowI
 			}
 		}
 
-		workflowNode = lockedNode
+		canvasNode = lockedNode
 		return nil
 	})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Error(codes.NotFound, "workflow node not found")
+			return nil, status.Error(codes.NotFound, "canvas node not found")
 		}
 		return nil, err
 	}
 
-	serializedNode, err := serializeWorkflowNode(workflowNode)
+	serializedNode, err := serializeCanvasNode(canvasNode)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func UpdateNodePause(ctx context.Context, registry *registry.Registry, workflowI
 	}, nil
 }
 
-func serializeWorkflowNode(node *models.WorkflowNode) (*compb.Node, error) {
+func serializeCanvasNode(node *models.CanvasNode) (*compb.Node, error) {
 	var integrationID *string
 	if node.AppInstallationID != nil {
 		id := node.AppInstallationID.String()
@@ -104,6 +104,6 @@ func serializeWorkflowNode(node *models.WorkflowNode) (*compb.Node, error) {
 		return nil, status.Error(codes.Internal, "failed to serialize node")
 	}
 
-	serialized[0].Paused = node.State == models.WorkflowNodeStatePaused
+	serialized[0].Paused = node.State == models.CanvasNodeStatePaused
 	return serialized[0], nil
 }

@@ -13,7 +13,7 @@ import (
 type IntegrationSubscriptionContext struct {
 	tx             *gorm.DB
 	registry       *registry.Registry
-	node           *models.WorkflowNode
+	node           *models.CanvasNode
 	integration    *models.Integration
 	subscription   *models.NodeSubscription
 	integrationCtx *IntegrationContext
@@ -23,7 +23,7 @@ func NewIntegrationSubscriptionContext(
 	tx *gorm.DB,
 	registry *registry.Registry,
 	subscription *models.NodeSubscription,
-	node *models.WorkflowNode,
+	node *models.CanvasNode,
 	integration *models.Integration,
 	integrationCtx *IntegrationContext,
 ) core.IntegrationSubscriptionContext {

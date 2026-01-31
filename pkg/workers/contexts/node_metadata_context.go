@@ -10,10 +10,10 @@ import (
 
 type NodeMetadataContext struct {
 	tx   *gorm.DB
-	node *models.WorkflowNode
+	node *models.CanvasNode
 }
 
-func NewNodeMetadataContext(tx *gorm.DB, node *models.WorkflowNode) *NodeMetadataContext {
+func NewNodeMetadataContext(tx *gorm.DB, node *models.CanvasNode) *NodeMetadataContext {
 	return &NodeMetadataContext{tx: tx, node: node}
 }
 

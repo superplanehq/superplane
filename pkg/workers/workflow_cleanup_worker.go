@@ -39,27 +39,27 @@ func (w *WorkflowCleanupWorker) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			tickStart := time.Now()
-			workflows, err := models.ListDeletedWorkflows()
+			canvases, err := models.ListDeletedCanvases()
 			if err != nil {
 				w.logger.Errorf("Error finding deleted workflows: %v", err)
 				continue
 			}
 
-			telemetry.RecordWorkflowCleanupWorkerWorkflowsCount(context.Background(), len(workflows))
+			telemetry.RecordWorkflowCleanupWorkerCanvasesCount(context.Background(), len(canvases))
 
-			for _, workflow := range workflows {
+			for _, canvas := range canvases {
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
 					w.logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
 				}
 
-				go func(workflow models.Workflow) {
+				go func(canvas models.Canvas) {
 					defer w.semaphore.Release(1)
 
-					if err := w.LockAndProcessWorkflow(workflow); err != nil {
-						w.logger.Errorf("Error processing workflow %s: %v", workflow.ID, err)
+					if err := w.LockAndProcessCanvas(canvas); err != nil {
+						w.logger.Errorf("Error processing canvas %s: %v", canvas.ID, err)
 					}
-				}(workflow)
+				}(canvas)
 			}
 
 			telemetry.RecordWorkflowCleanupWorkerTickDuration(context.Background(), time.Since(tickStart))
@@ -67,27 +67,27 @@ func (w *WorkflowCleanupWorker) Start(ctx context.Context) {
 	}
 }
 
-func (w *WorkflowCleanupWorker) LockAndProcessWorkflow(workflow models.Workflow) error {
+func (w *WorkflowCleanupWorker) LockAndProcessCanvas(canvas models.Canvas) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		lockedWorkflow, err := models.LockWorkflow(tx, workflow.ID)
+		lockedCanvas, err := models.LockCanvas(tx, canvas.ID)
 		if err != nil {
-			w.logger.Infof("Workflow %s already being processed - skipping", workflow.ID)
+			w.logger.Infof("Canvas %s already being processed - skipping", canvas.ID)
 			return nil
 		}
 
-		w.logger.Infof("Processing deleted workflow %s", lockedWorkflow.ID)
-		return w.processWorkflow(tx, *lockedWorkflow)
+		w.logger.Infof("Processing deleted canvas %s", lockedCanvas.ID)
+		return w.processCanvas(tx, *lockedCanvas)
 	})
 }
 
-func (w *WorkflowCleanupWorker) processWorkflow(tx *gorm.DB, workflow models.Workflow) error {
-	if !workflow.DeletedAt.Valid {
-		w.logger.Infof("Skipping non-deleted workflow %s", workflow.ID)
+func (w *WorkflowCleanupWorker) processCanvas(tx *gorm.DB, canvas models.Canvas) error {
+	if !canvas.DeletedAt.Valid {
+		w.logger.Infof("Skipping non-deleted canvas %s", canvas.ID)
 		return nil
 	}
 
-	var nodes []models.WorkflowNode
-	err := tx.Unscoped().Where("workflow_id = ?", workflow.ID).Find(&nodes).Error
+	var nodes []models.CanvasNode
+	err := tx.Unscoped().Where("workflow_id = ?", canvas.ID).Find(&nodes).Error
 	if err != nil {
 		return fmt.Errorf("failed to find workflow nodes: %w", err)
 	}
@@ -101,7 +101,7 @@ func (w *WorkflowCleanupWorker) processWorkflow(tx *gorm.DB, workflow models.Wor
 			break
 		}
 
-		resourcesDeleted, allResourcesDeleted, err := w.deleteNodeResourcesBatched(tx, workflow.ID, node.NodeID, w.maxResourcesPerTick-totalResourcesDeleted)
+		resourcesDeleted, allResourcesDeleted, err := w.deleteNodeResourcesBatched(tx, canvas.ID, node.NodeID, w.maxResourcesPerTick-totalResourcesDeleted)
 		if err != nil {
 			return fmt.Errorf("failed to delete resources for node %s: %w", node.NodeID, err)
 		}
@@ -109,61 +109,61 @@ func (w *WorkflowCleanupWorker) processWorkflow(tx *gorm.DB, workflow models.Wor
 		totalResourcesDeleted += resourcesDeleted
 
 		if !allResourcesDeleted {
-			w.logger.Infof("Partially cleaned node %s from workflow %s (deleted %d resources, more remain)", node.NodeID, workflow.ID, resourcesDeleted)
+			w.logger.Infof("Partially cleaned node %s from canvas %s (deleted %d resources, more remain)", node.NodeID, canvas.ID, resourcesDeleted)
 			nodesProcessed++
 
 			continue
 		}
 
-		if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", workflow.ID, node.NodeID).Delete(&models.WorkflowNode{}).Error; err != nil {
-			return fmt.Errorf("failed to delete workflow node %s: %w", node.NodeID, err)
+		if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", canvas.ID, node.NodeID).Delete(&models.CanvasNode{}).Error; err != nil {
+			return fmt.Errorf("failed to delete canvas node %s: %w", node.NodeID, err)
 		}
 
-		w.logger.Infof("Deleted node %s from workflow %s (deleted %d resources)", node.NodeID, workflow.ID, resourcesDeleted)
+		w.logger.Infof("Deleted node %s from canvas %s (deleted %d resources)", node.NodeID, canvas.ID, resourcesDeleted)
 		nodesProcessed++
 	}
 
 	//
-	// Check if all nodes are gone, then delete the workflow
+	// Check if all nodes are gone, then delete the canvas
 	//
 	var remainingNodesCount int64
-	err = tx.Unscoped().Model(&models.WorkflowNode{}).Where("workflow_id = ?", workflow.ID).Count(&remainingNodesCount).Error
+	err = tx.Unscoped().Model(&models.CanvasNode{}).Where("workflow_id = ?", canvas.ID).Count(&remainingNodesCount).Error
 	if err != nil {
-		return fmt.Errorf("failed to check remaining workflow nodes: %w", err)
+		return fmt.Errorf("failed to check remaining canvas nodes: %w", err)
 	}
 
 	if remainingNodesCount > 0 {
-		w.logger.Infof("Processed %d nodes from workflow %s (deleted %d resources, %d nodes remaining)", nodesProcessed, workflow.ID, totalResourcesDeleted, remainingNodesCount)
+		w.logger.Infof("Processed %d nodes from canvas %s (deleted %d resources, %d nodes remaining)", nodesProcessed, canvas.ID, totalResourcesDeleted, remainingNodesCount)
 		return nil
 	}
 
-	w.logger.Infof("Processed %d nodes from workflow %s (deleted %d resources, %d nodes remaining)", nodesProcessed, workflow.ID, totalResourcesDeleted, remainingNodesCount)
-	if err := tx.Unscoped().Delete(&workflow).Error; err != nil {
-		return fmt.Errorf("failed to delete workflow: %w", err)
+	w.logger.Infof("Processed %d nodes from canvas %s (deleted %d resources, %d nodes remaining)", nodesProcessed, canvas.ID, totalResourcesDeleted, remainingNodesCount)
+	if err := tx.Unscoped().Delete(&canvas).Error; err != nil {
+		return fmt.Errorf("failed to delete canvas: %w", err)
 	}
 
-	w.logger.Infof("Successfully cleaned up workflow %s (deleted %d resources total)", workflow.ID, totalResourcesDeleted)
+	w.logger.Infof("Successfully cleaned up canvas %s (deleted %d resources total)", canvas.ID, totalResourcesDeleted)
 	return nil
 }
 
-func (w *WorkflowCleanupWorker) deleteNodeResources(tx *gorm.DB, workflowID uuid.UUID, nodeID string) error {
-	if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).Delete(&models.WorkflowNodeRequest{}).Error; err != nil {
+func (w *WorkflowCleanupWorker) deleteNodeResources(tx *gorm.DB, canvasID uuid.UUID, nodeID string) error {
+	if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", canvasID, nodeID).Delete(&models.CanvasNodeRequest{}).Error; err != nil {
 		return fmt.Errorf("failed to delete node requests: %w", err)
 	}
 
-	if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).Delete(&models.WorkflowNodeExecutionKV{}).Error; err != nil {
+	if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", canvasID, nodeID).Delete(&models.CanvasNodeExecutionKV{}).Error; err != nil {
 		return fmt.Errorf("failed to delete node execution KVs: %w", err)
 	}
 
-	if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).Delete(&models.WorkflowNodeExecution{}).Error; err != nil {
+	if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", canvasID, nodeID).Delete(&models.CanvasNodeExecution{}).Error; err != nil {
 		return fmt.Errorf("failed to delete node executions: %w", err)
 	}
 
-	if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).Delete(&models.WorkflowNodeQueueItem{}).Error; err != nil {
+	if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", canvasID, nodeID).Delete(&models.CanvasNodeQueueItem{}).Error; err != nil {
 		return fmt.Errorf("failed to delete node queue items: %w", err)
 	}
 
-	if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).Delete(&models.WorkflowEvent{}).Error; err != nil {
+	if err := tx.Unscoped().Where("workflow_id = ? AND node_id = ?", canvasID, nodeID).Delete(&models.CanvasEvent{}).Error; err != nil {
 		return fmt.Errorf("failed to delete workflow events: %w", err)
 	}
 
@@ -175,11 +175,11 @@ func (w *WorkflowCleanupWorker) deleteNodeResourcesBatched(tx *gorm.DB, workflow
 		model     interface{}
 		tableName string
 	}{
-		{&models.WorkflowNodeRequest{}, "workflow_node_requests"},
-		{&models.WorkflowNodeExecutionKV{}, "workflow_node_execution_kvs"},
-		{&models.WorkflowNodeExecution{}, "workflow_node_executions"},
-		{&models.WorkflowNodeQueueItem{}, "workflow_node_queue_items"},
-		{&models.WorkflowEvent{}, "workflow_events"},
+		{&models.CanvasNodeRequest{}, "canvas_node_requests"},
+		{&models.CanvasNodeExecutionKV{}, "canvas_node_execution_kvs"},
+		{&models.CanvasNodeExecution{}, "canvas_node_executions"},
+		{&models.CanvasNodeQueueItem{}, "canvas_node_queue_items"},
+		{&models.CanvasEvent{}, "canvas_events"},
 	}
 
 	totalDeleted := 0

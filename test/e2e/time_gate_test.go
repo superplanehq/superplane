@@ -170,7 +170,7 @@ func (s *TimeGateSteps) runManualTrigger() {
 	s.canvas.RunManualTrigger("Start")
 	s.canvas.WaitForExecutionInStates(
 		"timeGate",
-		[]string{models.WorkflowNodeExecutionStateStarted, models.WorkflowNodeExecutionStatePending},
+		[]string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted},
 		10*time.Second,
 	)
 }
@@ -184,7 +184,7 @@ func (s *TimeGateSteps) pushThroughFirstItemFromSidebar() {
 	s.session.HoverOver(eventItem)
 	s.session.Click(q.Locator("h2:has-text('Latest') ~ div button[aria-label='Open actions']"))
 	s.session.Click(q.TestID("push-through-item"))
-	s.canvas.WaitForExecution("Output", models.WorkflowNodeExecutionStateFinished, 15*time.Second)
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 15*time.Second)
 }
 
 func (s *TimeGateSteps) assertTimeGateExecutionFinishedAndOutputNodeProcessed() {
@@ -194,8 +194,8 @@ func (s *TimeGateSteps) assertTimeGateExecutionFinishedAndOutputNodeProcessed() 
 	require.Len(s.t, timeGateExecs, 1, "expected one execution for time gate node")
 	require.Len(s.t, outputExecs, 1, "expected one execution for output node")
 
-	require.Equal(s.t, models.WorkflowNodeExecutionStateFinished, timeGateExecs[0].State)
-	require.Equal(s.t, models.WorkflowNodeExecutionStateFinished, outputExecs[0].State)
+	require.Equal(s.t, models.CanvasNodeExecutionStateFinished, timeGateExecs[0].State)
+	require.Equal(s.t, models.CanvasNodeExecutionStateFinished, outputExecs[0].State)
 }
 
 func dayString(weekday time.Weekday) string {

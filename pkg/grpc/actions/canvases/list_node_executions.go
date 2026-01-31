@@ -26,10 +26,10 @@ func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workfl
 		return nil, err
 	}
 
-	workflowNode, err := models.FindWorkflowNode(database.Conn(), wfID, nodeID)
+	workflowNode, err := models.FindCanvasNode(database.Conn(), wfID, nodeID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Error(codes.NotFound, "workflow node not found")
+			return nil, status.Error(codes.NotFound, "canvas node not found")
 		}
 
 		return nil, err
@@ -74,9 +74,9 @@ func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workfl
 	}, nil
 }
 
-func SerializeNodeExecutionsForSingleNode(node *models.WorkflowNode, executions []models.WorkflowNodeExecution) ([]*pb.CanvasNodeExecution, error) {
+func SerializeNodeExecutionsForSingleNode(node *models.CanvasNode, executions []models.CanvasNodeExecution) ([]*pb.CanvasNodeExecution, error) {
 	if node.Type != models.NodeTypeBlueprint {
-		return SerializeNodeExecutions(executions, []models.WorkflowNodeExecution{})
+		return SerializeNodeExecutions(executions, []models.CanvasNodeExecution{})
 	}
 
 	childExecutions, err := models.FindChildExecutionsForMultiple(executionIDs(executions))
@@ -87,8 +87,8 @@ func SerializeNodeExecutionsForSingleNode(node *models.WorkflowNode, executions 
 	return SerializeNodeExecutions(executions, childExecutions)
 }
 
-func SerializeNodeExecutions(executions []models.WorkflowNodeExecution, childExecutions []models.WorkflowNodeExecution) ([]*pb.CanvasNodeExecution, error) {
-	var rootEvents, inputEvents, outputEvents []models.WorkflowEvent
+func SerializeNodeExecutions(executions []models.CanvasNodeExecution, childExecutions []models.CanvasNodeExecution) ([]*pb.CanvasNodeExecution, error) {
+	var rootEvents, inputEvents, outputEvents []models.CanvasEvent
 	var rootEventsErr, inputEventsErr, outputEventsErr error
 	var cancelledByUsers []models.User
 	var cancelledByUsersErr error
@@ -104,7 +104,7 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution, childExe
 	//
 	go func() {
 		defer wg.Done()
-		rootEvents, rootEventsErr = models.FindWorkflowEvents(rootEventIDs(executions))
+		rootEvents, rootEventsErr = models.FindCanvasEvents(rootEventIDs(executions))
 	}()
 
 	//
@@ -112,7 +112,7 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution, childExe
 	//
 	go func() {
 		defer wg.Done()
-		inputEvents, inputEventsErr = models.FindWorkflowEvents(eventIDs(executions))
+		inputEvents, inputEventsErr = models.FindCanvasEvents(eventIDs(executions))
 	}()
 
 	//
@@ -120,7 +120,7 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution, childExe
 	//
 	go func() {
 		defer wg.Done()
-		outputEvents, outputEventsErr = models.FindWorkflowEventsForExecutions(executionIDs(executions))
+		outputEvents, outputEventsErr = models.FindCanvasEventsForExecutions(executionIDs(executions))
 	}()
 
 	//
@@ -208,7 +208,7 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution, childExe
 		}
 
 		children := filterChildrenForParent(execution.ID, childExecutions)
-		childExecutions, err := SerializeNodeExecutions(children, []models.WorkflowNodeExecution{})
+		childExecutions, err := SerializeNodeExecutions(children, []models.CanvasNodeExecution{})
 		if err != nil {
 			return nil, err
 		}
@@ -220,8 +220,8 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution, childExe
 	return result, nil
 }
 
-func filterChildrenForParent(parentExecutionID uuid.UUID, childExecutions []models.WorkflowNodeExecution) []models.WorkflowNodeExecution {
-	children := []models.WorkflowNodeExecution{}
+func filterChildrenForParent(parentExecutionID uuid.UUID, childExecutions []models.CanvasNodeExecution) []models.CanvasNodeExecution {
+	children := []models.CanvasNodeExecution{}
 	for _, child := range childExecutions {
 		if child.ParentExecutionID.String() == parentExecutionID.String() {
 			children = append(children, child)
@@ -268,11 +268,11 @@ func validateExecutionResults(in []pb.CanvasNodeExecution_Result) ([]string, err
 func ProtoToNodeExecutionState(state pb.CanvasNodeExecution_State) (string, error) {
 	switch state {
 	case pb.CanvasNodeExecution_STATE_PENDING:
-		return models.WorkflowNodeExecutionStatePending, nil
+		return models.CanvasNodeExecutionStatePending, nil
 	case pb.CanvasNodeExecution_STATE_STARTED:
-		return models.WorkflowNodeExecutionStateStarted, nil
+		return models.CanvasNodeExecutionStateStarted, nil
 	case pb.CanvasNodeExecution_STATE_FINISHED:
-		return models.WorkflowNodeExecutionStateFinished, nil
+		return models.CanvasNodeExecutionStateFinished, nil
 	default:
 		return "", status.Errorf(codes.InvalidArgument, "invalid execution state: %v", state)
 	}
@@ -281,9 +281,9 @@ func ProtoToNodeExecutionState(state pb.CanvasNodeExecution_State) (string, erro
 func ProtoToNodeExecutionResult(result pb.CanvasNodeExecution_Result) (string, error) {
 	switch result {
 	case pb.CanvasNodeExecution_RESULT_PASSED:
-		return models.WorkflowNodeExecutionResultPassed, nil
+		return models.CanvasNodeExecutionResultPassed, nil
 	case pb.CanvasNodeExecution_RESULT_FAILED:
-		return models.WorkflowNodeExecutionResultFailed, nil
+		return models.CanvasNodeExecutionResultFailed, nil
 	default:
 		return "", status.Errorf(codes.InvalidArgument, "invalid execution result: %v", result)
 	}
@@ -291,11 +291,11 @@ func ProtoToNodeExecutionResult(result pb.CanvasNodeExecution_Result) (string, e
 
 func NodeExecutionStateToProto(state string) pb.CanvasNodeExecution_State {
 	switch state {
-	case models.WorkflowNodeExecutionStatePending:
+	case models.CanvasNodeExecutionStatePending:
 		return pb.CanvasNodeExecution_STATE_PENDING
-	case models.WorkflowNodeExecutionStateStarted:
+	case models.CanvasNodeExecutionStateStarted:
 		return pb.CanvasNodeExecution_STATE_STARTED
-	case models.WorkflowNodeExecutionStateFinished:
+	case models.CanvasNodeExecutionStateFinished:
 		return pb.CanvasNodeExecution_STATE_FINISHED
 	default:
 		return pb.CanvasNodeExecution_STATE_UNKNOWN
@@ -304,11 +304,11 @@ func NodeExecutionStateToProto(state string) pb.CanvasNodeExecution_State {
 
 func NodeExecutionResultToProto(result string) pb.CanvasNodeExecution_Result {
 	switch result {
-	case models.WorkflowNodeExecutionResultPassed:
+	case models.CanvasNodeExecutionResultPassed:
 		return pb.CanvasNodeExecution_RESULT_PASSED
-	case models.WorkflowNodeExecutionResultFailed:
+	case models.CanvasNodeExecutionResultFailed:
 		return pb.CanvasNodeExecution_RESULT_FAILED
-	case models.WorkflowNodeExecutionResultCancelled:
+	case models.CanvasNodeExecutionResultCancelled:
 		return pb.CanvasNodeExecution_RESULT_CANCELLED
 	default:
 		return pb.CanvasNodeExecution_RESULT_UNKNOWN
@@ -317,18 +317,18 @@ func NodeExecutionResultToProto(result string) pb.CanvasNodeExecution_Result {
 
 func NodeExecutionResultReasonToProto(reason string) pb.CanvasNodeExecution_ResultReason {
 	switch reason {
-	case models.WorkflowNodeExecutionResultReasonOk:
+	case models.CanvasNodeExecutionResultReasonOk:
 		return pb.CanvasNodeExecution_RESULT_REASON_OK
-	case models.WorkflowNodeExecutionResultReasonError:
+	case models.CanvasNodeExecutionResultReasonError:
 		return pb.CanvasNodeExecution_RESULT_REASON_ERROR
-	case models.WorkflowNodeExecutionResultReasonErrorResolved:
+	case models.CanvasNodeExecutionResultReasonErrorResolved:
 		return pb.CanvasNodeExecution_RESULT_REASON_ERROR_RESOLVED
 	default:
 		return pb.CanvasNodeExecution_RESULT_REASON_OK
 	}
 }
 
-func getLastExecutionTimestamp(executions []models.WorkflowNodeExecution) *timestamppb.Timestamp {
+func getLastExecutionTimestamp(executions []models.CanvasNodeExecution) *timestamppb.Timestamp {
 	if len(executions) > 0 {
 		return timestamppb.New(*executions[len(executions)-1].CreatedAt)
 	}
@@ -354,7 +354,7 @@ func hasNextPage(numResults, limit int, totalCount int64) bool {
 	return int64(numResults) >= int64(limit) && int64(numResults) < totalCount
 }
 
-func executionIDs(executions []models.WorkflowNodeExecution) []string {
+func executionIDs(executions []models.CanvasNodeExecution) []string {
 	ids := make([]string, len(executions))
 	for i, execution := range executions {
 		ids[i] = execution.ID.String()
@@ -362,7 +362,7 @@ func executionIDs(executions []models.WorkflowNodeExecution) []string {
 	return ids
 }
 
-func cancelledByIDs(executions []models.WorkflowNodeExecution) []uuid.UUID {
+func cancelledByIDs(executions []models.CanvasNodeExecution) []uuid.UUID {
 	idsMap := make(map[uuid.UUID]struct{})
 	for _, execution := range executions {
 		if execution.CancelledBy == nil {
@@ -379,7 +379,7 @@ func cancelledByIDs(executions []models.WorkflowNodeExecution) []uuid.UUID {
 	return ids
 }
 
-func eventIDs(executions []models.WorkflowNodeExecution) []string {
+func eventIDs(executions []models.CanvasNodeExecution) []string {
 	ids := make([]string, len(executions))
 	for i, execution := range executions {
 		ids[i] = execution.EventID.String()
@@ -388,7 +388,7 @@ func eventIDs(executions []models.WorkflowNodeExecution) []string {
 	return ids
 }
 
-func rootEventIDs(executions []models.WorkflowNodeExecution) []string {
+func rootEventIDs(executions []models.CanvasNodeExecution) []string {
 	ids := make([]string, len(executions))
 	for i, execution := range executions {
 		ids[i] = execution.RootEventID.String()
@@ -411,7 +411,7 @@ func cancelledByRef(id *uuid.UUID, users map[uuid.UUID]models.User) *pb.UserRef 
 	return &pb.UserRef{Id: id.String(), Name: name}
 }
 
-func getInputForExecution(execution models.WorkflowNodeExecution, events []models.WorkflowEvent) (*structpb.Struct, error) {
+func getInputForExecution(execution models.CanvasNodeExecution, events []models.CanvasEvent) (*structpb.Struct, error) {
 	for _, event := range events {
 		if event.ID.String() == execution.EventID.String() {
 			eventData, ok := event.Data.Data().(map[string]any)
@@ -431,7 +431,7 @@ func getInputForExecution(execution models.WorkflowNodeExecution, events []model
 	return nil, fmt.Errorf("input not found for execution %s", execution.ID.String())
 }
 
-func getRootEventForExecution(execution models.WorkflowNodeExecution, rootEvents []models.WorkflowEvent) (*pb.CanvasEvent, error) {
+func getRootEventForExecution(execution models.CanvasNodeExecution, rootEvents []models.CanvasEvent) (*pb.CanvasEvent, error) {
 	for _, rootEvent := range rootEvents {
 		if rootEvent.ID.String() == execution.RootEventID.String() {
 			data, ok := rootEvent.Data.Data().(map[string]any)
@@ -459,7 +459,7 @@ func getRootEventForExecution(execution models.WorkflowNodeExecution, rootEvents
 	return nil, fmt.Errorf("input not found for execution %s", execution.ID.String())
 }
 
-func getOutputsForExecution(execution models.WorkflowNodeExecution, events []models.WorkflowEvent) (*structpb.Struct, error) {
+func getOutputsForExecution(execution models.CanvasNodeExecution, events []models.CanvasEvent) (*structpb.Struct, error) {
 	outputMap := map[string][]any{}
 	for _, event := range events {
 		if event.ExecutionID.String() == execution.ID.String() {

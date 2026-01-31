@@ -70,7 +70,7 @@ func (w *WorkflowNodeExecutor) Start(ctx context.Context) {
 
 				messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).Publish()
 
-				go func(execution models.WorkflowNodeExecution) {
+				go func(execution models.CanvasNodeExecution) {
 					defer w.semaphore.Release(1)
 
 					err := w.LockAndProcessNodeExecution(execution.ID)
@@ -94,7 +94,7 @@ func (w *WorkflowNodeExecutor) Start(ctx context.Context) {
 
 func (w *WorkflowNodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		var execution models.WorkflowNodeExecution
+		var execution models.CanvasNodeExecution
 
 		//
 		// Try to lock the execution record for update.
@@ -118,7 +118,7 @@ func (w *WorkflowNodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		err := tx.
 			Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 			Where("id = ?", id).
-			Where("state = ?", models.WorkflowNodeExecutionStatePending).
+			Where("state = ?", models.CanvasNodeExecutionStatePending).
 			First(&execution).
 			Error
 
@@ -131,8 +131,8 @@ func (w *WorkflowNodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	})
 }
 
-func (w *WorkflowNodeExecutor) processNodeExecution(tx *gorm.DB, execution *models.WorkflowNodeExecution) error {
-	node, err := models.FindWorkflowNode(tx, execution.WorkflowID, execution.NodeID)
+func (w *WorkflowNodeExecutor) processNodeExecution(tx *gorm.DB, execution *models.CanvasNodeExecution) error {
+	node, err := models.FindCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
 		return err
 	}
@@ -144,11 +144,11 @@ func (w *WorkflowNodeExecutor) processNodeExecution(tx *gorm.DB, execution *mode
 	return w.executeComponentNode(tx, execution, node)
 }
 
-func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.WorkflowNodeExecution, node *models.WorkflowNode) error {
+func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode) error {
 	ref := node.Ref.Data()
 	blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, ref.Blueprint.ID)
 	if err != nil {
-		return execution.FailInTransaction(tx, models.WorkflowNodeExecutionResultReasonError, "failed to find blueprint")
+		return execution.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, "failed to find blueprint")
 	}
 
 	firstNode := blueprint.FindRootNode()
@@ -161,7 +161,7 @@ func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *mode
 		return fmt.Errorf("error finding input: %v", err)
 	}
 
-	inputEvent, err := models.FindWorkflowEventInTransaction(tx, execution.EventID)
+	inputEvent, err := models.FindCanvasEventInTransaction(tx, execution.EventID)
 	if err != nil {
 		return fmt.Errorf("error finding input event: %v", err)
 	}
@@ -183,7 +183,7 @@ func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *mode
 	if err != nil {
 		err = execution.FailInTransaction(
 			tx,
-			models.WorkflowNodeExecutionResultReasonError,
+			models.CanvasNodeExecutionResultReasonError,
 			fmt.Sprintf("error resolving configuration schema for execution of node %s: %v", firstNode.ID, err),
 		)
 		return nil
@@ -197,7 +197,7 @@ func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *mode
 	if err != nil {
 		err = execution.FailInTransaction(
 			tx,
-			models.WorkflowNodeExecutionResultReasonError,
+			models.CanvasNodeExecutionResultReasonError,
 			fmt.Sprintf("error building configuration for execution of node %s: %v", firstNode.ID, err),
 		)
 
@@ -239,7 +239,7 @@ func (w *WorkflowNodeExecutor) configurationFieldsForBlueprintNode(tx *gorm.DB, 
 	}
 }
 
-func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.WorkflowNodeExecution, node *models.WorkflowNode) error {
+func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode) error {
 	logger := logging.WithExecution(
 		logging.WithNode(w.logger, *node),
 		execution,
@@ -259,7 +259,7 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		return fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
 	}
 
-	inputEvent, err := models.FindWorkflowEventInTransaction(tx, execution.EventID)
+	inputEvent, err := models.FindCanvasEventInTransaction(tx, execution.EventID)
 	if err != nil {
 		logger.Errorf("failed to find input event: %v", err)
 		return fmt.Errorf("failed to find input event: %w", err)
@@ -267,7 +267,7 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 
 	input := inputEvent.Data.Data()
 
-	workflow, err := models.FindWorkflowWithoutOrgScopeInTransaction(tx, node.WorkflowID)
+	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, node.WorkflowID)
 	if err != nil {
 		logger.Errorf("failed to find workflow: %v", err)
 		return fmt.Errorf("failed to find workflow: %v", err)
@@ -306,7 +306,7 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				logger.Errorf("integration %s not found", *node.AppInstallationID)
-				return execution.FailInTransaction(tx, models.WorkflowNodeExecutionResultReasonError, "integration not found")
+				return execution.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, "integration not found")
 			}
 
 			logger.Errorf("failed to find integration: %v", err)
@@ -320,7 +320,7 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 	ctx.Logger = logger
 	if err := component.Execute(ctx); err != nil {
 		logger.Errorf("failed to execute component: %v", err)
-		err = execution.FailInTransaction(tx, models.WorkflowNodeExecutionResultReasonError, err.Error())
+		err = execution.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, err.Error())
 		return err
 	}
 

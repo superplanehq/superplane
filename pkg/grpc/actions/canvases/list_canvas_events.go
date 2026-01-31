@@ -12,20 +12,20 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func ListCanvasEvents(ctx context.Context, registry *registry.Registry, workflowID uuid.UUID, limit uint32, before *timestamppb.Timestamp) (*pb.ListCanvasEventsResponse, error) {
+func ListCanvasEvents(ctx context.Context, registry *registry.Registry, canvasID uuid.UUID, limit uint32, before *timestamppb.Timestamp) (*pb.ListCanvasEventsResponse, error) {
 	limit = getLimit(limit)
 	beforeTime := getBefore(before)
-	events, err := models.ListRootWorkflowEvents(workflowID, int(limit), beforeTime)
+	events, err := models.ListRootCanvasEvents(canvasID, int(limit), beforeTime)
 	if err != nil {
 		return nil, err
 	}
 
-	count, err := models.CountRootWorkflowEvents(workflowID)
+	count, err := models.CountRootCanvasEvents(canvasID)
 	if err != nil {
 		return nil, err
 	}
 
-	executionsByEventID, childExecutionsByEventID, err := listExecutionsForWorkflowEvents(events)
+	executionsByEventID, childExecutionsByEventID, err := listExecutionsForCanvasEvents(events)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func ListCanvasEvents(ctx context.Context, registry *registry.Registry, workflow
 	}, nil
 }
 
-func SerializeCanvasEvents(events []models.WorkflowEvent) ([]*pb.CanvasEvent, error) {
+func SerializeCanvasEvents(events []models.CanvasEvent) ([]*pb.CanvasEvent, error) {
 	result := make([]*pb.CanvasEvent, 0, len(events))
 
 	for _, event := range events {
@@ -57,7 +57,7 @@ func SerializeCanvasEvents(events []models.WorkflowEvent) ([]*pb.CanvasEvent, er
 	return result, nil
 }
 
-func SerializeCanvasEventsWithExecutions(events []models.WorkflowEvent, executionsByEventID map[string][]models.WorkflowNodeExecution, childExecutionsByEventID map[string][]models.WorkflowNodeExecution) ([]*pb.CanvasEventWithExecutions, error) {
+func SerializeCanvasEventsWithExecutions(events []models.CanvasEvent, executionsByEventID map[string][]models.CanvasNodeExecution, childExecutionsByEventID map[string][]models.CanvasNodeExecution) ([]*pb.CanvasEventWithExecutions, error) {
 	result := make([]*pb.CanvasEventWithExecutions, 0, len(events))
 
 	for _, event := range events {
@@ -71,7 +71,7 @@ func SerializeCanvasEventsWithExecutions(events []models.WorkflowEvent, executio
 	return result, nil
 }
 
-func SerializeCanvasEvent(event models.WorkflowEvent) (*pb.CanvasEvent, error) {
+func SerializeCanvasEvent(event models.CanvasEvent) (*pb.CanvasEvent, error) {
 	data, ok := event.Data.Data().(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("event data is not a map[string]any")
@@ -93,7 +93,7 @@ func SerializeCanvasEvent(event models.WorkflowEvent) (*pb.CanvasEvent, error) {
 	}, nil
 }
 
-func SerializeCanvasEventWithExecutions(event models.WorkflowEvent, executions []models.WorkflowNodeExecution, childExecutions []models.WorkflowNodeExecution) (*pb.CanvasEventWithExecutions, error) {
+func SerializeCanvasEventWithExecutions(event models.CanvasEvent, executions []models.CanvasNodeExecution, childExecutions []models.CanvasNodeExecution) (*pb.CanvasEventWithExecutions, error) {
 	data, ok := event.Data.Data().(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("event data is not a map[string]any")
@@ -129,16 +129,16 @@ func valueOrEmpty(value *string) string {
 	return *value
 }
 
-func getLastEventTimestamp(events []models.WorkflowEvent) *timestamppb.Timestamp {
+func getLastEventTimestamp(events []models.CanvasEvent) *timestamppb.Timestamp {
 	if len(events) > 0 {
 		return timestamppb.New(*events[len(events)-1].CreatedAt)
 	}
 	return nil
 }
 
-func listExecutionsForWorkflowEvents(events []models.WorkflowEvent) (map[string][]models.WorkflowNodeExecution, map[string][]models.WorkflowNodeExecution, error) {
+func listExecutionsForCanvasEvents(events []models.CanvasEvent) (map[string][]models.CanvasNodeExecution, map[string][]models.CanvasNodeExecution, error) {
 	if len(events) == 0 {
-		return map[string][]models.WorkflowNodeExecution{}, map[string][]models.WorkflowNodeExecution{}, nil
+		return map[string][]models.CanvasNodeExecution{}, map[string][]models.CanvasNodeExecution{}, nil
 	}
 
 	eventIDs := make([]uuid.UUID, len(events))
@@ -151,8 +151,8 @@ func listExecutionsForWorkflowEvents(events []models.WorkflowEvent) (map[string]
 		return nil, nil, err
 	}
 
-	parentExecutionsByEventID := make(map[string][]models.WorkflowNodeExecution, len(eventIDs))
-	parentExecutions := []models.WorkflowNodeExecution{}
+	parentExecutionsByEventID := make(map[string][]models.CanvasNodeExecution, len(eventIDs))
+	parentExecutions := []models.CanvasNodeExecution{}
 	for _, execution := range executions {
 		if execution.ParentExecutionID == nil {
 			parentExecutions = append(parentExecutions, execution)
@@ -162,7 +162,7 @@ func listExecutionsForWorkflowEvents(events []models.WorkflowEvent) (map[string]
 	}
 
 	if len(parentExecutions) == 0 {
-		return parentExecutionsByEventID, map[string][]models.WorkflowNodeExecution{}, nil
+		return parentExecutionsByEventID, map[string][]models.CanvasNodeExecution{}, nil
 	}
 
 	childExecutions, err := models.FindChildExecutionsForMultiple(executionIDs(parentExecutions))
@@ -170,7 +170,7 @@ func listExecutionsForWorkflowEvents(events []models.WorkflowEvent) (map[string]
 		return nil, nil, err
 	}
 
-	childExecutionsByEventID := make(map[string][]models.WorkflowNodeExecution, len(eventIDs))
+	childExecutionsByEventID := make(map[string][]models.CanvasNodeExecution, len(eventIDs))
 	for _, execution := range childExecutions {
 		eventID := execution.RootEventID.String()
 		childExecutionsByEventID[eventID] = append(childExecutionsByEventID[eventID], execution)

@@ -32,15 +32,15 @@ func Test__WorkflowNodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
 	defer queueConsumedConsumer.Stop()
 
 	//
-	// Create a simple workflow with a trigger and a component node.
+	// Create a simple canvas with a trigger and a component node.
 	//
 	triggerNode := "trigger-1"
 	componentNode := "component-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Type:   models.NodeTypeTrigger,
@@ -60,17 +60,17 @@ func Test__WorkflowNodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
 	//
 	// Create a root event and a queue item for the component node.
 	//
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, triggerNode, "default", nil)
-	support.CreateWorkflowQueueItem(t, workflow.ID, componentNode, rootEvent.ID, rootEvent.ID)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	support.CreateQueueItem(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
 
 	//
 	// Verify initial state - node should be ready and queue should have 1 item.
 	//
-	node, err := models.FindWorkflowNode(database.Conn(), workflow.ID, componentNode)
+	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeStateReady, node.State)
+	assert.Equal(t, models.CanvasNodeStateReady, node.State)
 
-	queueItems, err := models.ListNodeQueueItems(workflow.ID, componentNode, 10, nil)
+	queueItems, err := models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, queueItems, 1)
 
@@ -84,20 +84,20 @@ func Test__WorkflowNodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify execution was created with pending state
-	executions, err := models.ListNodeExecutions(workflow.ID, componentNode, nil, nil, 10, nil)
+	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, executions, 1)
-	assert.Equal(t, models.WorkflowNodeExecutionStatePending, executions[0].State)
+	assert.Equal(t, models.CanvasNodeExecutionStatePending, executions[0].State)
 	assert.Equal(t, rootEvent.ID, executions[0].EventID)
 	assert.Equal(t, rootEvent.ID, executions[0].RootEventID)
 
 	// Verify node state was updated to processing
-	node, err = models.FindWorkflowNode(database.Conn(), workflow.ID, componentNode)
+	node, err = models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeStateProcessing, node.State)
+	assert.Equal(t, models.CanvasNodeStateProcessing, node.State)
 
 	// Verify queue item was deleted
-	queueItems, err = models.ListNodeQueueItems(workflow.ID, componentNode, 10, nil)
+	queueItems, err = models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, queueItems, 0)
 
@@ -152,11 +152,11 @@ func Test__WorkflowNodeQueueWorker_BlueprintNodeQueueIsProcessed(t *testing.T) {
 	//
 	triggerNode := "trigger-1"
 	blueprintNode := "blueprint-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Type:   models.NodeTypeTrigger,
@@ -176,17 +176,17 @@ func Test__WorkflowNodeQueueWorker_BlueprintNodeQueueIsProcessed(t *testing.T) {
 	//
 	// Create a root event and a queue item for the blueprint node.
 	//
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, triggerNode, "default", nil)
-	support.CreateWorkflowQueueItem(t, workflow.ID, blueprintNode, rootEvent.ID, rootEvent.ID)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	support.CreateQueueItem(t, canvas.ID, blueprintNode, rootEvent.ID, rootEvent.ID)
 
 	//
 	// Verify initial state - node should be ready and queue should have 1 item.
 	//
-	node, err := models.FindWorkflowNode(database.Conn(), workflow.ID, blueprintNode)
+	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, blueprintNode)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeStateReady, node.State)
+	assert.Equal(t, models.CanvasNodeStateReady, node.State)
 
-	queueItems, err := models.ListNodeQueueItems(workflow.ID, blueprintNode, 10, nil)
+	queueItems, err := models.ListNodeQueueItems(canvas.ID, blueprintNode, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, queueItems, 1)
 
@@ -201,20 +201,20 @@ func Test__WorkflowNodeQueueWorker_BlueprintNodeQueueIsProcessed(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify execution was created with pending state
-	executions, err := models.ListNodeExecutions(workflow.ID, blueprintNode, nil, nil, 10, nil)
+	executions, err := models.ListNodeExecutions(canvas.ID, blueprintNode, nil, nil, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, executions, 1)
-	assert.Equal(t, models.WorkflowNodeExecutionStatePending, executions[0].State)
+	assert.Equal(t, models.CanvasNodeExecutionStatePending, executions[0].State)
 	assert.Equal(t, rootEvent.ID, executions[0].EventID)
 	assert.Equal(t, rootEvent.ID, executions[0].RootEventID)
 
 	// Verify node state was updated to processing
-	node, err = models.FindWorkflowNode(database.Conn(), workflow.ID, blueprintNode)
+	node, err = models.FindCanvasNode(database.Conn(), canvas.ID, blueprintNode)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeStateProcessing, node.State)
+	assert.Equal(t, models.CanvasNodeStateProcessing, node.State)
 
 	// Verify queue item was deleted
-	queueItems, err = models.ListNodeQueueItems(workflow.ID, blueprintNode, 10, nil)
+	queueItems, err = models.ListNodeQueueItems(canvas.ID, blueprintNode, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, queueItems, 0)
 
@@ -237,15 +237,15 @@ func Test__WorkflowNodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
 	defer queueConsumedConsumer.Stop()
 
 	//
-	// Create a simple workflow with a trigger and a component node.
+	// Create a simple canvas with a trigger and a component node.
 	//
 	triggerNode := "trigger-1"
 	componentNode := "component-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{NodeID: triggerNode, Type: models.NodeTypeTrigger},
 			{NodeID: componentNode, Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})},
 		},
@@ -262,30 +262,30 @@ func Test__WorkflowNodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
 	midTime := time.Now().Add(-5 * time.Minute)
 	newTime := time.Now()
 
-	oldEvent := support.EmitWorkflowEventForNode(t, workflow.ID, triggerNode, "default", nil)
-	midEvent := support.EmitWorkflowEventForNode(t, workflow.ID, triggerNode, "default", nil)
-	newEvent := support.EmitWorkflowEventForNode(t, workflow.ID, triggerNode, "default", nil)
+	oldEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	midEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	newEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
 
 	// Create queue items with specific timestamps
-	oldQueueItem := models.WorkflowNodeQueueItem{
+	oldQueueItem := models.CanvasNodeQueueItem{
 		ID:          uuid.New(),
-		WorkflowID:  workflow.ID,
+		WorkflowID:  canvas.ID,
 		NodeID:      componentNode,
 		RootEventID: oldEvent.ID,
 		EventID:     oldEvent.ID,
 		CreatedAt:   &oldTime,
 	}
-	midQueueItem := models.WorkflowNodeQueueItem{
+	midQueueItem := models.CanvasNodeQueueItem{
 		ID:          uuid.New(),
-		WorkflowID:  workflow.ID,
+		WorkflowID:  canvas.ID,
 		NodeID:      componentNode,
 		RootEventID: midEvent.ID,
 		EventID:     midEvent.ID,
 		CreatedAt:   &midTime,
 	}
-	newQueueItem := models.WorkflowNodeQueueItem{
+	newQueueItem := models.CanvasNodeQueueItem{
 		ID:          uuid.New(),
-		WorkflowID:  workflow.ID,
+		WorkflowID:  canvas.ID,
 		NodeID:      componentNode,
 		RootEventID: newEvent.ID,
 		EventID:     newEvent.ID,
@@ -299,20 +299,20 @@ func Test__WorkflowNodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
 	//
 	// Process the node and verify that the oldest queue item was picked.
 	//
-	node, err := models.FindWorkflowNode(database.Conn(), workflow.ID, componentNode)
+	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
 	require.NoError(t, err)
 
 	err = worker.LockAndProcessNode(logger, *node)
 	require.NoError(t, err)
 
 	// Verify the execution was created with the oldest event
-	executions, err := models.ListNodeExecutions(workflow.ID, componentNode, nil, nil, 10, nil)
+	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, executions, 1)
 	assert.Equal(t, oldEvent.ID, executions[0].EventID)
 
 	// Verify the oldest queue item was deleted, but the other two remain
-	queueItems, err := models.ListNodeQueueItems(workflow.ID, componentNode, 10, nil)
+	queueItems, err := models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, queueItems, 2)
 
@@ -341,15 +341,15 @@ func Test__WorkflowNodeQueueWorker_EmptyQueue(t *testing.T) {
 	defer queueConsumedConsumer.Stop()
 
 	//
-	// Create a simple workflow with a trigger and a component node.
+	// Create a simple canvas with a trigger and a component node.
 	//
 	triggerNode := "trigger-1"
 	componentNode := "noop"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{NodeID: triggerNode, Type: models.NodeTypeTrigger},
 			{NodeID: componentNode, Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})},
 		},
@@ -361,7 +361,7 @@ func Test__WorkflowNodeQueueWorker_EmptyQueue(t *testing.T) {
 	//
 	// Don't create any queue items - the queue is empty.
 	//
-	node, err := models.FindWorkflowNode(database.Conn(), workflow.ID, componentNode)
+	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
 	require.NoError(t, err)
 
 	//
@@ -371,14 +371,14 @@ func Test__WorkflowNodeQueueWorker_EmptyQueue(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify no executions were created
-	executions, err := models.ListNodeExecutions(workflow.ID, componentNode, nil, nil, 10, nil)
+	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, executions, 0)
 
 	// Verify node state is still ready
-	node, err = models.FindWorkflowNode(database.Conn(), workflow.ID, componentNode)
+	node, err = models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeStateReady, node.State)
+	assert.Equal(t, models.CanvasNodeStateReady, node.State)
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
 	assert.False(t, queueConsumedConsumer.HasReceivedMessage())
@@ -397,15 +397,15 @@ func Test__WorkflowNodeQueueWorker_PreventsConcurrentProcessing(t *testing.T) {
 	defer queueConsumedConsumer.Stop()
 
 	//
-	// Create a simple workflow with a trigger and a component node.
+	// Create a simple canvas with a trigger and a component node.
 	//
 	triggerNode := "trigger-1"
 	componentNode := "noop"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{NodeID: triggerNode, Type: models.NodeTypeTrigger},
 			{NodeID: componentNode, Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})},
 		},
@@ -417,10 +417,10 @@ func Test__WorkflowNodeQueueWorker_PreventsConcurrentProcessing(t *testing.T) {
 	//
 	// Create a root event and a queue item for the component node.
 	//
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, triggerNode, "default", nil)
-	support.CreateWorkflowQueueItem(t, workflow.ID, componentNode, rootEvent.ID, rootEvent.ID)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	support.CreateQueueItem(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
 
-	node, err := models.FindWorkflowNode(database.Conn(), workflow.ID, componentNode)
+	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
 	require.NoError(t, err)
 
 	//
@@ -455,14 +455,14 @@ func Test__WorkflowNodeQueueWorker_PreventsConcurrentProcessing(t *testing.T) {
 	// Verify only one execution was created (not two).
 	// This proves that only one worker actually processed the node.
 	//
-	executions, err := models.ListNodeExecutions(workflow.ID, componentNode, nil, nil, 10, nil)
+	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, executions, 1, "Only one execution should be created, not two")
 
 	//
 	// Verify the queue item was deleted.
 	//
-	queueItems, err := models.ListNodeQueueItems(workflow.ID, componentNode, 10, nil)
+	queueItems, err := models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, queueItems, 0, "Queue item should be deleted")
 
@@ -482,16 +482,16 @@ func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure(t *testing.T) {
 	defer executionConsumer.Stop()
 
 	//
-	// Create a simple workflow with a trigger and a component node.
+	// Create a simple canvas with a trigger and a component node.
 	// The component node will have a configuration with an invalid expression.
 	//
 	triggerNode := "trigger-1"
 	componentNode := "component-1"
-	workflow, nodes := support.CreateWorkflow(
+	canvas, nodes := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Type:   models.NodeTypeTrigger,
@@ -515,17 +515,17 @@ func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure(t *testing.T) {
 	//
 	// Create a root event and a queue item for the component node.
 	//
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, triggerNode, "default", nil)
-	support.CreateWorkflowQueueItem(t, workflow.ID, componentNode, rootEvent.ID, rootEvent.ID)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	support.CreateQueueItem(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
 
 	//
 	// Verify initial state - node should be ready and queue should have 1 item.
 	//
-	node, err := models.FindWorkflowNode(database.Conn(), workflow.ID, componentNode)
+	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeStateReady, node.State)
+	assert.Equal(t, models.CanvasNodeStateReady, node.State)
 
-	queueItems, err := models.ListNodeQueueItems(workflow.ID, componentNode, 10, nil)
+	queueItems, err := models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, queueItems, 1)
 
@@ -539,24 +539,24 @@ func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify execution was created with finished state and failed result
-	executions, err := models.ListNodeExecutions(workflow.ID, componentNode, nil, nil, 10, nil)
+	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, executions, 1)
-	assert.Equal(t, models.WorkflowNodeExecutionStateFinished, executions[0].State)
-	assert.Equal(t, models.WorkflowNodeExecutionResultFailed, executions[0].Result)
-	assert.Equal(t, models.WorkflowNodeExecutionResultReasonError, executions[0].ResultReason)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, executions[0].State)
+	assert.Equal(t, models.CanvasNodeExecutionResultFailed, executions[0].Result)
+	assert.Equal(t, models.CanvasNodeExecutionResultReasonError, executions[0].ResultReason)
 	assert.Contains(t, executions[0].ResultMessage, "field")
 	assert.Equal(t, rootEvent.ID, executions[0].EventID)
 	assert.Equal(t, rootEvent.ID, executions[0].RootEventID)
 	assert.Equal(t, nodes[1].Configuration, executions[0].Configuration)
 
 	// Verify node state is still ready (not updated to processing)
-	node, err = models.FindWorkflowNode(database.Conn(), workflow.ID, componentNode)
+	node, err = models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeStateReady, node.State)
+	assert.Equal(t, models.CanvasNodeStateReady, node.State)
 
 	// Verify queue item was deleted
-	queueItems, err = models.ListNodeQueueItems(workflow.ID, componentNode, 10, nil)
+	queueItems, err = models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, queueItems, 0)
 
@@ -579,17 +579,17 @@ func Test__WorkflowNodeQueueWorker_MergeComponentReturnsNilExecution(t *testing.
 	defer queueConsumedConsumer.Stop()
 
 	//
-	// Create a workflow with two source nodes feeding into a merge node.
+	// Create a canvas with two source nodes feeding into a merge node.
 	// This simulates a scenario where merge needs to wait for multiple inputs.
 	//
 	source1Node := "source-1"
 	source2Node := "source-2"
 	mergeNode := "merge-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: source1Node,
 				Type:   models.NodeTypeTrigger,
@@ -616,17 +616,17 @@ func Test__WorkflowNodeQueueWorker_MergeComponentReturnsNilExecution(t *testing.
 	// Create a root event and queue item for the merge node from only one source.
 	// Since merge expects 2 inputs but only gets 1, it should return nil execution.
 	//
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, source1Node, "default", nil)
-	support.CreateWorkflowQueueItem(t, workflow.ID, mergeNode, rootEvent.ID, rootEvent.ID)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, source1Node, "default", nil)
+	support.CreateQueueItem(t, canvas.ID, mergeNode, rootEvent.ID, rootEvent.ID)
 
 	//
 	// Verify initial state - node should be ready and queue should have 1 item.
 	//
-	node, err := models.FindWorkflowNode(database.Conn(), workflow.ID, mergeNode)
+	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, mergeNode)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeStateReady, node.State)
+	assert.Equal(t, models.CanvasNodeStateReady, node.State)
 
-	queueItems, err := models.ListNodeQueueItems(workflow.ID, mergeNode, 10, nil)
+	queueItems, err := models.ListNodeQueueItems(canvas.ID, mergeNode, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, queueItems, 1)
 
@@ -636,11 +636,11 @@ func Test__WorkflowNodeQueueWorker_MergeComponentReturnsNilExecution(t *testing.
 	err = worker.LockAndProcessNode(logger, *node)
 	require.NoError(t, err)
 
-	node, err = models.FindWorkflowNode(database.Conn(), workflow.ID, mergeNode)
+	node, err = models.FindCanvasNode(database.Conn(), canvas.ID, mergeNode)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeStateReady, node.State)
+	assert.Equal(t, models.CanvasNodeStateReady, node.State)
 
-	queueItems, err = models.ListNodeQueueItems(workflow.ID, mergeNode, 10, nil)
+	queueItems, err = models.ListNodeQueueItems(canvas.ID, mergeNode, 10, nil)
 	require.NoError(t, err)
 	assert.Len(t, queueItems, 0, "Queue item should be processed even when returning nil execution")
 
@@ -696,15 +696,15 @@ func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure_PropagateToParent(t
 	)
 
 	//
-	// Create a workflow with the blueprint node.
+	// Create a canvas with the blueprint node.
 	//
 	triggerNode := "trigger-1"
 	blueprintNode := "blueprint-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Type:   models.NodeTypeTrigger,
@@ -724,21 +724,21 @@ func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure_PropagateToParent(t
 	//
 	// Create a root event and process the blueprint node to create a parent execution.
 	//
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, triggerNode, "default", nil)
-	support.CreateWorkflowQueueItem(t, workflow.ID, blueprintNode, rootEvent.ID, rootEvent.ID)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	support.CreateQueueItem(t, canvas.ID, blueprintNode, rootEvent.ID, rootEvent.ID)
 
-	node, err := models.FindWorkflowNode(database.Conn(), workflow.ID, blueprintNode)
+	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, blueprintNode)
 	require.NoError(t, err)
 
 	err = worker.LockAndProcessNode(logger, *node)
 	require.NoError(t, err)
 
 	// Get the parent execution that was created
-	parentExecutions, err := models.ListNodeExecutions(workflow.ID, blueprintNode, nil, nil, 10, nil)
+	parentExecutions, err := models.ListNodeExecutions(canvas.ID, blueprintNode, nil, nil, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, parentExecutions, 1)
 	parentExecution := parentExecutions[0]
-	assert.Equal(t, models.WorkflowNodeExecutionStatePending, parentExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionStatePending, parentExecution.State)
 
 	//
 	// Now we need to simulate the first child node (noop1) executing successfully.
@@ -766,9 +766,9 @@ func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure_PropagateToParent(t
 	// during configuration build.
 	//
 	secondChildNodeID := blueprintNode + ":noop2"
-	support.CreateWorkflowQueueItem(t, workflow.ID, secondChildNodeID, rootEvent.ID, firstChildEvent.ID)
+	support.CreateQueueItem(t, canvas.ID, secondChildNodeID, rootEvent.ID, firstChildEvent.ID)
 
-	childNode, err := models.FindWorkflowNode(database.Conn(), workflow.ID, secondChildNodeID)
+	childNode, err := models.FindCanvasNode(database.Conn(), canvas.ID, secondChildNodeID)
 	require.NoError(t, err)
 
 	//
@@ -784,14 +784,14 @@ func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure_PropagateToParent(t
 	// - Finished state and failed result
 	// - ParentExecutionID pointing to the parent execution
 	//
-	childExecutions, err := models.ListNodeExecutions(workflow.ID, secondChildNodeID, nil, nil, 10, nil)
+	childExecutions, err := models.ListNodeExecutions(canvas.ID, secondChildNodeID, nil, nil, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, childExecutions, 1)
 	childExecution := childExecutions[0]
 
-	assert.Equal(t, models.WorkflowNodeExecutionStateFinished, childExecution.State)
-	assert.Equal(t, models.WorkflowNodeExecutionResultFailed, childExecution.Result)
-	assert.Equal(t, models.WorkflowNodeExecutionResultReasonError, childExecution.ResultReason)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, childExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultFailed, childExecution.Result)
+	assert.Equal(t, models.CanvasNodeExecutionResultReasonError, childExecution.ResultReason)
 	assert.Contains(t, childExecution.ResultMessage, "field")
 	require.NotNil(t, childExecution.ParentExecutionID, "Child execution should have ParentExecutionID set")
 	assert.Equal(t, parentExecution.ID, *childExecution.ParentExecutionID)
@@ -799,9 +799,9 @@ func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure_PropagateToParent(t
 	//
 	// Verify the parent execution was also failed (propagated from child).
 	//
-	updatedParent, err := models.FindNodeExecution(workflow.ID, parentExecution.ID)
+	updatedParent, err := models.FindNodeExecution(canvas.ID, parentExecution.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeExecutionStateFinished, updatedParent.State)
-	assert.Equal(t, models.WorkflowNodeExecutionResultFailed, updatedParent.Result)
-	assert.Equal(t, models.WorkflowNodeExecutionResultReasonError, updatedParent.ResultReason)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedParent.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultFailed, updatedParent.Result)
+	assert.Equal(t, models.CanvasNodeExecutionResultReasonError, updatedParent.ResultReason)
 }

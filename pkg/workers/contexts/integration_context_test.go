@@ -114,7 +114,7 @@ func Test__IntegrationContext_RequestWebhook_ReplacesWebhookOnConfigChange(t *te
 	}
 	require.NoError(t, database.Conn().Create(&webhook).Error)
 
-	inputNode := models.WorkflowNode{
+	inputNode := models.CanvasNode{
 		NodeID:        "node-1",
 		Name:          "Node 1",
 		Type:          models.NodeTypeTrigger,
@@ -124,8 +124,8 @@ func Test__IntegrationContext_RequestWebhook_ReplacesWebhookOnConfigChange(t *te
 		Position:      datatypes.NewJSONType(models.Position{}),
 	}
 
-	workflow, nodes := support.CreateWorkflow(t, r.Organization.ID, r.User, []models.WorkflowNode{inputNode}, nil)
-	require.NotNil(t, workflow)
+	canvas, nodes := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{inputNode}, nil)
+	require.NotNil(t, canvas)
 	require.Len(t, nodes, 1)
 
 	node := nodes[0]

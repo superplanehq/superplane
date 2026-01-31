@@ -15,11 +15,11 @@ import (
 func Test__CancelExecution__CancelsExecutionSuccessfully(t *testing.T) {
 	r := support.Setup(t)
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
@@ -32,27 +32,27 @@ func Test__CancelExecution__CancelsExecutionSuccessfully(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
-	execution := support.CreateWorkflowNodeExecution(t, workflow.ID, "node-1", rootEvent.ID, rootEvent.ID, nil)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID, nil)
 
-	response, err := CancelExecution(context.Background(), r.AuthService, r.Encryptor, r.Organization.ID.String(), r.Registry, workflow.ID, execution.ID)
+	response, err := CancelExecution(context.Background(), r.AuthService, r.Encryptor, r.Organization.ID.String(), r.Registry, canvas.ID, execution.ID)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 
-	updatedExecution, err := models.FindNodeExecution(workflow.ID, execution.ID)
+	updatedExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeExecutionStateFinished, updatedExecution.State)
-	assert.Equal(t, models.WorkflowNodeExecutionResultCancelled, updatedExecution.Result)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultCancelled, updatedExecution.Result)
 }
 
 func Test__CancelExecution__ReturnsNotFoundForNonExistentExecution(t *testing.T) {
 	r := support.Setup(t)
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
@@ -66,18 +66,18 @@ func Test__CancelExecution__ReturnsNotFoundForNonExistentExecution(t *testing.T)
 	)
 
 	nonExistentID := uuid.New()
-	_, err := CancelExecution(context.Background(), r.AuthService, r.Encryptor, r.Organization.ID.String(), r.Registry, workflow.ID, nonExistentID)
+	_, err := CancelExecution(context.Background(), r.AuthService, r.Encryptor, r.Organization.ID.String(), r.Registry, canvas.ID, nonExistentID)
 	require.Error(t, err)
 }
 
 func Test__CancelExecution__ReturnsErrorWhenCancellingChild(t *testing.T) {
 	r := support.Setup(t)
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
@@ -90,35 +90,35 @@ func Test__CancelExecution__ReturnsErrorWhenCancellingChild(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
-	parentExecution := support.CreateWorkflowNodeExecution(t, workflow.ID, "node-1", rootEvent.ID, rootEvent.ID, nil)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	parentExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID, nil)
 
-	childEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "child-node-1", "default", nil)
-	childExecution := support.CreateWorkflowNodeExecution(t, workflow.ID, "child-node-1", rootEvent.ID, childEvent.ID, &parentExecution.ID)
+	childEvent := support.EmitCanvasEventForNode(t, canvas.ID, "child-node-1", "default", nil)
+	childExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "child-node-1", rootEvent.ID, childEvent.ID, &parentExecution.ID)
 
-	_, err := CancelExecution(context.Background(), r.AuthService, r.Encryptor, r.Organization.ID.String(), r.Registry, workflow.ID, childExecution.ID)
+	_, err := CancelExecution(context.Background(), r.AuthService, r.Encryptor, r.Organization.ID.String(), r.Registry, canvas.ID, childExecution.ID)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot cancel child execution directly")
 
-	updatedChildExecution, err := models.FindNodeExecution(workflow.ID, childExecution.ID)
+	updatedChildExecution, err := models.FindNodeExecution(canvas.ID, childExecution.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeExecutionStatePending, updatedChildExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionStatePending, updatedChildExecution.State)
 	assert.Equal(t, "", updatedChildExecution.Result)
 
-	updatedParentExecution, err := models.FindNodeExecution(workflow.ID, parentExecution.ID)
+	updatedParentExecution, err := models.FindNodeExecution(canvas.ID, parentExecution.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeExecutionStatePending, updatedParentExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionStatePending, updatedParentExecution.State)
 	assert.Equal(t, "", updatedParentExecution.Result)
 }
 
 func Test__CancelExecution__CancelsAllChildrenWhenCancellingParent(t *testing.T) {
 	r := support.Setup(t)
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
@@ -131,31 +131,31 @@ func Test__CancelExecution__CancelsAllChildrenWhenCancellingParent(t *testing.T)
 		[]models.Edge{},
 	)
 
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
-	parentExecution := support.CreateWorkflowNodeExecution(t, workflow.ID, "node-1", rootEvent.ID, rootEvent.ID, nil)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	parentExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID, nil)
 
-	childEvent1 := support.EmitWorkflowEventForNode(t, workflow.ID, "child-node-1", "default", nil)
-	childEvent2 := support.EmitWorkflowEventForNode(t, workflow.ID, "child-node-2", "default", nil)
+	childEvent1 := support.EmitCanvasEventForNode(t, canvas.ID, "child-node-1", "default", nil)
+	childEvent2 := support.EmitCanvasEventForNode(t, canvas.ID, "child-node-2", "default", nil)
 
-	childExecution1 := support.CreateWorkflowNodeExecution(t, workflow.ID, "child-node-1", rootEvent.ID, childEvent1.ID, &parentExecution.ID)
-	childExecution2 := support.CreateWorkflowNodeExecution(t, workflow.ID, "child-node-2", rootEvent.ID, childEvent2.ID, &parentExecution.ID)
+	childExecution1 := support.CreateCanvasNodeExecution(t, canvas.ID, "child-node-1", rootEvent.ID, childEvent1.ID, &parentExecution.ID)
+	childExecution2 := support.CreateCanvasNodeExecution(t, canvas.ID, "child-node-2", rootEvent.ID, childEvent2.ID, &parentExecution.ID)
 
-	response, err := CancelExecution(context.Background(), r.AuthService, r.Encryptor, r.Organization.ID.String(), r.Registry, workflow.ID, parentExecution.ID)
+	response, err := CancelExecution(context.Background(), r.AuthService, r.Encryptor, r.Organization.ID.String(), r.Registry, canvas.ID, parentExecution.ID)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 
-	updatedParentExecution, err := models.FindNodeExecution(workflow.ID, parentExecution.ID)
+	updatedParentExecution, err := models.FindNodeExecution(canvas.ID, parentExecution.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeExecutionStateFinished, updatedParentExecution.State)
-	assert.Equal(t, models.WorkflowNodeExecutionResultCancelled, updatedParentExecution.Result)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedParentExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultCancelled, updatedParentExecution.Result)
 
-	updatedChildExecution1, err := models.FindNodeExecution(workflow.ID, childExecution1.ID)
+	updatedChildExecution1, err := models.FindNodeExecution(canvas.ID, childExecution1.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeExecutionStateFinished, updatedChildExecution1.State)
-	assert.Equal(t, models.WorkflowNodeExecutionResultCancelled, updatedChildExecution1.Result)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedChildExecution1.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultCancelled, updatedChildExecution1.Result)
 
-	updatedChildExecution2, err := models.FindNodeExecution(workflow.ID, childExecution2.ID)
+	updatedChildExecution2, err := models.FindNodeExecution(canvas.ID, childExecution2.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeExecutionStateFinished, updatedChildExecution2.State)
-	assert.Equal(t, models.WorkflowNodeExecutionResultCancelled, updatedChildExecution2.Result)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedChildExecution2.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultCancelled, updatedChildExecution2.Result)
 }

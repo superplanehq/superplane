@@ -11,16 +11,16 @@ import (
 
 func ListChildExecutions(ctx context.Context, registry *registry.Registry, workflowID, executionID uuid.UUID) (*pb.ListChildExecutionsResponse, error) {
 	executions, err := models.FindChildExecutions(executionID, []string{
-		models.WorkflowNodeExecutionStatePending,
-		models.WorkflowNodeExecutionStateStarted,
-		models.WorkflowNodeExecutionStateFinished,
+		models.CanvasNodeExecutionStatePending,
+		models.CanvasNodeExecutionStateStarted,
+		models.CanvasNodeExecutionStateFinished,
 	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	serialized, err := SerializeNodeExecutions(executions, []models.WorkflowNodeExecution{})
+	serialized, err := SerializeNodeExecutions(executions, []models.CanvasNodeExecution{})
 	if err != nil {
 		return nil, err
 	}

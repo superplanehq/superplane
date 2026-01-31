@@ -16,11 +16,11 @@ import (
 func Test__ListCanvasEvents__ReturnsEventsWithExecutions(t *testing.T) {
 	r := support.Setup(t)
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
@@ -33,16 +33,16 @@ func Test__ListCanvasEvents__ReturnsEventsWithExecutions(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	rootEvent1 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
-	rootEvent2 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
+	rootEvent1 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	rootEvent2 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 	customName := "Custom Run Name"
 	rootEvent1.CustomName = &customName
 	require.NoError(t, database.Conn().Save(rootEvent1).Error)
 
-	parentExecution := support.CreateWorkflowNodeExecution(t, workflow.ID, "node-1", rootEvent1.ID, rootEvent1.ID, nil)
-	nextExecution := support.CreateNextNodeExecution(t, workflow.ID, "node-1", rootEvent1.ID, rootEvent1.ID, &parentExecution.ID)
+	parentExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, rootEvent1.ID, nil)
+	nextExecution := support.CreateNextNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, rootEvent1.ID, &parentExecution.ID)
 
-	response, err := ListCanvasEvents(context.Background(), r.Registry, workflow.ID, 0, nil)
+	response, err := ListCanvasEvents(context.Background(), r.Registry, canvas.ID, 0, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Events, 2)
@@ -54,7 +54,7 @@ func Test__ListCanvasEvents__ReturnsEventsWithExecutions(t *testing.T) {
 
 	parent := findCanvasNodeExecution(event1.Executions, parentExecution.ID.String())
 	require.NotNil(t, parent)
-	assert.Equal(t, workflow.ID.String(), parent.CanvasId)
+	assert.Equal(t, canvas.ID.String(), parent.CanvasId)
 	assert.Equal(t, "node-1", parent.NodeId)
 	assert.Empty(t, parent.ParentExecutionId)
 	assert.Empty(t, parent.PreviousExecutionId)
@@ -62,7 +62,7 @@ func Test__ListCanvasEvents__ReturnsEventsWithExecutions(t *testing.T) {
 
 	next := findCanvasNodeExecution(event1.Executions, nextExecution.ID.String())
 	require.NotNil(t, next)
-	assert.Equal(t, workflow.ID.String(), next.CanvasId)
+	assert.Equal(t, canvas.ID.String(), next.CanvasId)
 	assert.Equal(t, "node-1", next.NodeId)
 	assert.Empty(t, next.ParentExecutionId)
 	assert.Equal(t, parentExecution.ID.String(), next.PreviousExecutionId)

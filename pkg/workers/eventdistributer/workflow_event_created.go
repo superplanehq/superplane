@@ -14,12 +14,12 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type WorkflowEventWebsocketEvent struct {
+type CanvasEventWebsocketEvent struct {
 	Event   string          `json:"event"`
 	Payload json.RawMessage `json:"payload"`
 }
 
-func HandleWorkflowEventCreated(messageBody []byte, wsHub *ws.Hub) error {
+func HandleCanvasEventCreated(messageBody []byte, wsHub *ws.Hub) error {
 	log.Debugf("Received execution_created event")
 
 	pbMsg := &pb.CanvasNodeEventMessage{}
@@ -41,22 +41,22 @@ func handleWorkflowEventState(canvasID string, eventID string, wsHub *ws.Hub, ev
 		return fmt.Errorf("failed to parse event id: %w", err)
 	}
 
-	event, err := models.FindWorkflowEventForWorkflow(canvasUUID, eventUUID)
+	event, err := models.FindCanvasEventForCanvas(canvasUUID, eventUUID)
 	if err != nil {
-		return fmt.Errorf("failed to find execution: %w", err)
+		return fmt.Errorf("failed to find event: %w", err)
 	}
 
 	serializedEvent, err := canvases.SerializeCanvasEvent(*event)
 	if err != nil {
-		return fmt.Errorf("failed to serialize execution: %w", err)
+		return fmt.Errorf("failed to serialize event: %w", err)
 	}
 
 	serializedEventJSON, err := protojson.Marshal(serializedEvent)
 	if err != nil {
-		return fmt.Errorf("failed to marshal execution: %w", err)
+		return fmt.Errorf("failed to marshal event: %w", err)
 	}
 
-	wsEvent, err := json.Marshal(WorkflowEventWebsocketEvent{
+	wsEvent, err := json.Marshal(CanvasEventWebsocketEvent{
 		Event:   eventName,
 		Payload: json.RawMessage(serializedEventJSON),
 	})

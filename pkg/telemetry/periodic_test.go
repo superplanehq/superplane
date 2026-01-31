@@ -20,7 +20,7 @@ func TestCountStuckQueueNodes_NodeWithQueueAndNoExecutionsIsCounted(t *testing.T
 
 	db := database.Conn()
 
-	queueItem := &models.WorkflowNodeQueueItem{
+	queueItem := &models.CanvasNodeQueueItem{
 		WorkflowID:  steps.workflow.ID,
 		NodeID:      steps.node.NodeID,
 		RootEventID: steps.rootEvent.ID,
@@ -44,7 +44,7 @@ func TestCountStuckQueueNodes_NodeWithOnlyFinishedExecutionsIsCounted(t *testing
 
 	db := database.Conn()
 
-	queueItem := &models.WorkflowNodeQueueItem{
+	queueItem := &models.CanvasNodeQueueItem{
 		WorkflowID:  steps.workflow.ID,
 		NodeID:      steps.node.NodeID,
 		RootEventID: steps.rootEvent.ID,
@@ -53,12 +53,12 @@ func TestCountStuckQueueNodes_NodeWithOnlyFinishedExecutionsIsCounted(t *testing
 
 	require.NoError(t, db.Create(queueItem).Error)
 
-	exec := &models.WorkflowNodeExecution{
+	exec := &models.CanvasNodeExecution{
 		WorkflowID:  steps.workflow.ID,
 		NodeID:      steps.node.NodeID,
 		RootEventID: steps.rootEvent.ID,
 		EventID:     steps.rootEvent.ID,
-		State:       models.WorkflowNodeExecutionStateFinished,
+		State:       models.CanvasNodeExecutionStateFinished,
 	}
 
 	require.NoError(t, db.Create(exec).Error)
@@ -78,7 +78,7 @@ func TestCountStuckQueueNodes_NodeWithNonFinishedExecutionIsNotCounted(t *testin
 
 	db := database.Conn()
 
-	queueItem := &models.WorkflowNodeQueueItem{
+	queueItem := &models.CanvasNodeQueueItem{
 		WorkflowID:  steps.workflow.ID,
 		NodeID:      steps.node.NodeID,
 		RootEventID: steps.rootEvent.ID,
@@ -87,12 +87,12 @@ func TestCountStuckQueueNodes_NodeWithNonFinishedExecutionIsNotCounted(t *testin
 
 	require.NoError(t, db.Create(queueItem).Error)
 
-	exec := &models.WorkflowNodeExecution{
+	exec := &models.CanvasNodeExecution{
 		WorkflowID:  steps.workflow.ID,
 		NodeID:      steps.node.NodeID,
 		RootEventID: steps.rootEvent.ID,
 		EventID:     steps.rootEvent.ID,
-		State:       models.WorkflowNodeExecutionStateStarted,
+		State:       models.CanvasNodeExecutionStateStarted,
 	}
 
 	require.NoError(t, db.Create(exec).Error)
@@ -104,13 +104,13 @@ func TestCountStuckQueueNodes_NodeWithNonFinishedExecutionIsNotCounted(t *testin
 
 type stuckQueueItemsTestSteps struct {
 	t         *testing.T
-	workflow  *models.Workflow
-	node      *models.WorkflowNode
-	rootEvent *models.WorkflowEvent
+	workflow  *models.Canvas
+	node      *models.CanvasNode
+	rootEvent *models.CanvasEvent
 }
 
 func (s *stuckQueueItemsTestSteps) CreateWorkflow() {
-	s.workflow = &models.Workflow{
+	s.workflow = &models.Canvas{
 		OrganizationID: uuid.New(),
 		Name:           "Test Workflow",
 		Description:    "This is a test workflow",
@@ -120,7 +120,7 @@ func (s *stuckQueueItemsTestSteps) CreateWorkflow() {
 }
 
 func (s *stuckQueueItemsTestSteps) CreateWorkflowNode() {
-	s.node = &models.WorkflowNode{
+	s.node = &models.CanvasNode{
 		WorkflowID: s.workflow.ID,
 		NodeID:     "node-1",
 	}
@@ -129,12 +129,12 @@ func (s *stuckQueueItemsTestSteps) CreateWorkflowNode() {
 }
 
 func (s *stuckQueueItemsTestSteps) CreateRootEvent() {
-	s.rootEvent = &models.WorkflowEvent{
+	s.rootEvent = &models.CanvasEvent{
 		WorkflowID: s.workflow.ID,
 		NodeID:     s.node.NodeID,
 		Channel:    "default",
 		Data:       datatypes.JSONType[any]{},
-		State:      models.WorkflowEventStatePending,
+		State:      models.CanvasEventStatePending,
 	}
 
 	require.NoError(s.t, database.Conn().Create(s.rootEvent).Error)

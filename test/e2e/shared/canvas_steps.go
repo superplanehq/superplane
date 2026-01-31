@@ -34,7 +34,7 @@ func (s *CanvasSteps) Create() {
 	s.session.Click(q.Text("Create canvas"))
 	s.session.Sleep(500)
 
-	wf, err := models.FindWorkflowByName(s.CanvasName, s.session.OrgID)
+	wf, err := models.FindCanvasByName(s.CanvasName, s.session.OrgID)
 	require.NoError(s.t, err)
 	s.WorkflowID = wf.ID
 }
@@ -261,7 +261,7 @@ func (s *CanvasSteps) RenameNode(name string, newName string) {
 	node := s.GetNodeFromDB(name)
 
 	query := database.Conn().
-		Model(&models.WorkflowNode{}).
+		Model(&models.CanvasNode{}).
 		Where("workflow_id = ?", s.WorkflowID).
 		Where("node_id = ?", node.NodeID).
 		Update("name", newName)
@@ -270,18 +270,18 @@ func (s *CanvasSteps) RenameNode(name string, newName string) {
 	require.NoError(s.t, err)
 }
 
-func (s *CanvasSteps) GetWorkflowFromDB() *models.Workflow {
-	workflow, err := models.FindWorkflow(s.session.OrgID, s.WorkflowID)
+func (s *CanvasSteps) GetWorkflowFromDB() *models.Canvas {
+	workflow, err := models.FindCanvas(s.session.OrgID, s.WorkflowID)
 	require.NoError(s.t, err)
 
 	return workflow
 }
 
-func (s *CanvasSteps) GetNodeFromDB(name string) *models.WorkflowNode {
-	canvas, err := models.FindWorkflow(s.session.OrgID, s.WorkflowID)
+func (s *CanvasSteps) GetNodeFromDB(name string) *models.CanvasNode {
+	canvas, err := models.FindCanvas(s.session.OrgID, s.WorkflowID)
 	require.NoError(s.t, err)
 
-	nodes, err := models.FindWorkflowNodes(canvas.ID)
+	nodes, err := models.FindCanvasNodes(canvas.ID)
 	require.NoError(s.t, err)
 
 	nodeID := ""
@@ -297,16 +297,16 @@ func (s *CanvasSteps) GetNodeFromDB(name string) *models.WorkflowNode {
 		return nil
 	}
 
-	node, err := models.FindWorkflowNode(database.Conn(), s.WorkflowID, nodeID)
+	node, err := models.FindCanvasNode(database.Conn(), s.WorkflowID, nodeID)
 	require.NoError(s.t, err)
 
 	return node
 }
 
-func (s *CanvasSteps) GetExecutionsForNode(name string) []models.WorkflowNodeExecution {
+func (s *CanvasSteps) GetExecutionsForNode(name string) []models.CanvasNodeExecution {
 	node := s.GetNodeFromDB(name)
 
-	var executions []models.WorkflowNodeExecution
+	var executions []models.CanvasNodeExecution
 
 	query := database.Conn().
 		Where("workflow_id = ?", s.WorkflowID).
@@ -319,10 +319,10 @@ func (s *CanvasSteps) GetExecutionsForNode(name string) []models.WorkflowNodeExe
 	return executions
 }
 
-func (s *CanvasSteps) GetExecutionsForNodeInState(name string, state string) []models.WorkflowNodeExecution {
+func (s *CanvasSteps) GetExecutionsForNodeInState(name string, state string) []models.CanvasNodeExecution {
 	node := s.GetNodeFromDB(name)
 
-	var executions []models.WorkflowNodeExecution
+	var executions []models.CanvasNodeExecution
 
 	query := database.Conn().
 		Where("workflow_id = ?", s.WorkflowID).
@@ -336,10 +336,10 @@ func (s *CanvasSteps) GetExecutionsForNodeInState(name string, state string) []m
 	return executions
 }
 
-func (s *CanvasSteps) GetExecutionsForNodeInStates(name string, states []string) []models.WorkflowNodeExecution {
+func (s *CanvasSteps) GetExecutionsForNodeInStates(name string, states []string) []models.CanvasNodeExecution {
 	node := s.GetNodeFromDB(name)
 
-	var executions []models.WorkflowNodeExecution
+	var executions []models.CanvasNodeExecution
 
 	query := database.Conn().
 		Where("workflow_id = ?", s.WorkflowID).

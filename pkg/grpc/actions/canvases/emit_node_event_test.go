@@ -34,11 +34,11 @@ func Test__EmitNodeEvent(t *testing.T) {
 	})
 
 	t.Run("node not found -> error", func(t *testing.T) {
-		workflow, _ := support.CreateWorkflow(
+		canvas, _ := support.CreateCanvas(
 			t,
 			r.Organization.ID,
 			r.User,
-			[]models.WorkflowNode{
+			[]models.CanvasNode{
 				{
 					NodeID: "node-1",
 					Name:   "First Node",
@@ -54,7 +54,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 		_, err := EmitNodeEvent(
 			ctx,
 			r.Organization.ID,
-			workflow.ID,
+			canvas.ID,
 			"non-existent-node",
 			"default",
 			map[string]any{"test": "data"},
@@ -64,11 +64,11 @@ func Test__EmitNodeEvent(t *testing.T) {
 	})
 
 	t.Run("successful event emission creates database record", func(t *testing.T) {
-		workflow, _ := support.CreateWorkflow(
+		canvas, _ := support.CreateCanvas(
 			t,
 			r.Organization.ID,
 			r.User,
-			[]models.WorkflowNode{
+			[]models.CanvasNode{
 				{
 					NodeID: "node-1",
 					Name:   "Test Node",
@@ -89,7 +89,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 		response, err := EmitNodeEvent(
 			ctx,
 			r.Organization.ID,
-			workflow.ID,
+			canvas.ID,
 			"node-1",
 			"test-channel",
 			testData,
@@ -102,13 +102,13 @@ func Test__EmitNodeEvent(t *testing.T) {
 		eventID, err := uuid.Parse(response.EventId)
 		require.NoError(t, err)
 
-		event, err := models.FindWorkflowEvent(eventID)
+		event, err := models.FindCanvasEvent(eventID)
 		require.NoError(t, err)
 
-		assert.Equal(t, workflow.ID, event.WorkflowID)
+		assert.Equal(t, canvas.ID, event.WorkflowID)
 		assert.Equal(t, "node-1", event.NodeID)
 		assert.Equal(t, "test-channel", event.Channel)
-		assert.Equal(t, models.WorkflowEventStatePending, event.State)
+		assert.Equal(t, models.CanvasEventStatePending, event.State)
 		assert.NotNil(t, event.CreatedAt)
 
 		eventData := event.Data.Data()
@@ -119,11 +119,11 @@ func Test__EmitNodeEvent(t *testing.T) {
 	})
 
 	t.Run("custom name is resolved from node configuration", func(t *testing.T) {
-		workflow, _ := support.CreateWorkflow(
+		canvas, _ := support.CreateCanvas(
 			t,
 			r.Organization.ID,
 			r.User,
-			[]models.WorkflowNode{
+			[]models.CanvasNode{
 				{
 					NodeID: "node-1",
 					Name:   "node-1",
@@ -136,7 +136,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 			[]models.Edge{},
 		)
 
-		node, err := workflow.FindNode("node-1")
+		node, err := canvas.FindNode("node-1")
 		require.NoError(t, err)
 		node.Configuration = datatypes.NewJSONType(map[string]any{
 			"customName": "Run: {{ $[\"node-1\"].message }}",
@@ -146,7 +146,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 		response, err := EmitNodeEvent(
 			ctx,
 			r.Organization.ID,
-			workflow.ID,
+			canvas.ID,
 			"node-1",
 			"default",
 			map[string]any{"message": "hello"},
@@ -156,7 +156,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 		eventID, err := uuid.Parse(response.EventId)
 		require.NoError(t, err)
 
-		event, err := models.FindWorkflowEvent(eventID)
+		event, err := models.FindCanvasEvent(eventID)
 		require.NoError(t, err)
 		require.NotNil(t, event.CustomName)
 		assert.Equal(t, "Run: hello", *event.CustomName)
@@ -168,11 +168,11 @@ func Test__EmitNodeEvent(t *testing.T) {
 		testconsumer.Start()
 		defer testconsumer.Stop()
 
-		workflow, _ := support.CreateWorkflow(
+		canvas, _ := support.CreateCanvas(
 			t,
 			r.Organization.ID,
 			r.User,
-			[]models.WorkflowNode{
+			[]models.CanvasNode{
 				{
 					NodeID: "node-1",
 					Name:   "Test Node",
@@ -188,7 +188,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 		_, err := EmitNodeEvent(
 			ctx,
 			r.Organization.ID,
-			workflow.ID,
+			canvas.ID,
 			"node-1",
 			"default",
 			map[string]any{"test": "data"},
@@ -213,11 +213,11 @@ func Test__EmitNodeEvent(t *testing.T) {
 	})
 
 	t.Run("empty node ID -> error", func(t *testing.T) {
-		workflow, _ := support.CreateWorkflow(
+		canvas, _ := support.CreateCanvas(
 			t,
 			r.Organization.ID,
 			r.User,
-			[]models.WorkflowNode{
+			[]models.CanvasNode{
 				{
 					NodeID: "node-1",
 					Name:   "Test Node",
@@ -233,7 +233,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 		_, err := EmitNodeEvent(
 			ctx,
 			r.Organization.ID,
-			workflow.ID,
+			canvas.ID,
 			"",
 			"default",
 			map[string]any{"test": "data"},
@@ -243,11 +243,11 @@ func Test__EmitNodeEvent(t *testing.T) {
 	})
 
 	t.Run("nil data map is handled gracefully", func(t *testing.T) {
-		workflow, _ := support.CreateWorkflow(
+		canvas, _ := support.CreateCanvas(
 			t,
 			r.Organization.ID,
 			r.User,
-			[]models.WorkflowNode{
+			[]models.CanvasNode{
 				{
 					NodeID: "node-1",
 					Name:   "Test Node",
@@ -263,7 +263,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 		response, err := EmitNodeEvent(
 			ctx,
 			r.Organization.ID,
-			workflow.ID,
+			canvas.ID,
 			"node-1",
 			"default",
 			nil,
@@ -276,7 +276,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 		eventID, err := uuid.Parse(response.EventId)
 		require.NoError(t, err)
 
-		event, err := models.FindWorkflowEvent(eventID)
+		event, err := models.FindCanvasEvent(eventID)
 		require.NoError(t, err)
 
 		eventData := event.Data.Data()

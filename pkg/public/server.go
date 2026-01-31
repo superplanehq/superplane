@@ -664,7 +664,7 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 		orgIDs = append(orgIDs, organization.ID.String())
 	}
 
-	canvasCounts, err := models.CountWorkflowsByOrganizationIDs(orgIDs)
+	canvasCounts, err := models.CountCanvasesByOrganizationIDs(orgIDs)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -771,7 +771,7 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.WorkflowNode) (int, error) {
+func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode) (int, error) {
 	if node.Type == models.NodeTypeTrigger {
 		return s.executeTriggerNode(ctx, body, headers, node)
 	}
@@ -779,7 +779,7 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 	return s.executeComponentNode(ctx, body, headers, node)
 }
 
-func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.WorkflowNode) (int, error) {
+func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode) (int, error) {
 	ref := node.Ref.Data()
 	trigger, err := s.registry.GetTrigger(ref.Trigger.Name)
 	if err != nil {
@@ -798,7 +798,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 	})
 }
 
-func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers http.Header, node models.WorkflowNode) (int, error) {
+func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode) (int, error) {
 	ref := node.Ref.Data()
 	component, err := s.registry.GetComponent(ref.Component.Name)
 	if err != nil {
@@ -856,9 +856,9 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = models.FindWorkflow(user.OrganizationID, parsedWorkflowID)
+	_, err = models.FindCanvas(user.OrganizationID, parsedWorkflowID)
 	if err != nil {
-		http.Error(w, "workflow not found", http.StatusNotFound)
+		http.Error(w, "canvas not found", http.StatusNotFound)
 		return
 	}
 

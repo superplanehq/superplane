@@ -74,7 +74,7 @@ func handleQueueItemState(workflowID string, queueItemID string, nodeID string, 
 			return fmt.Errorf("failed to find queue item: %w", err)
 		}
 
-		serializedQueueItems, err := canvases.SerializeNodeQueueItems([]models.WorkflowNodeQueueItem{*queueItem})
+		serializedQueueItems, err := canvases.SerializeNodeQueueItems([]models.CanvasNodeQueueItem{*queueItem})
 		if err != nil {
 			return fmt.Errorf("failed to serialize queue item: %w", err)
 		}

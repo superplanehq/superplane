@@ -31,11 +31,11 @@ func Test__ListCanvases__ReturnsAllCanvasesForAnOrganization(t *testing.T) {
 	//
 	// Create multiple canvases
 	//
-	workflow1, _ := support.CreateWorkflow(
+	canvas1, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
@@ -48,11 +48,11 @@ func Test__ListCanvases__ReturnsAllCanvasesForAnOrganization(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	workflow2, _ := support.CreateWorkflow(
+	canvas2, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-2",
 				Name:   "Node 2",
@@ -77,8 +77,8 @@ func Test__ListCanvases__ReturnsAllCanvasesForAnOrganization(t *testing.T) {
 	// Verify both canvases are returned
 	//
 	canvasIDs := []string{response.Canvases[0].Metadata.Id, response.Canvases[1].Metadata.Id}
-	assert.Contains(t, canvasIDs, workflow1.ID.String())
-	assert.Contains(t, canvasIDs, workflow2.ID.String())
+	assert.Contains(t, canvasIDs, canvas1.ID.String())
+	assert.Contains(t, canvasIDs, canvas2.ID.String())
 
 	//
 	// List of canvases returned is ordered by name
@@ -97,11 +97,11 @@ func Test__ListCanvases__DoesNotReturnCanvasesFromOtherOrganizations(t *testing.
 	//
 	// Create canvas in the test organization
 	//
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
@@ -118,11 +118,11 @@ func Test__ListCanvases__DoesNotReturnCanvasesFromOtherOrganizations(t *testing.
 	// Create another organization and workflow
 	//
 	otherOrg := support.CreateOrganization(t, r, r.User)
-	otherWorkflow, _ := support.CreateWorkflow(
+	otherCanvas, _ := support.CreateCanvas(
 		t,
 		otherOrg.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "other-node",
 				Name:   "Other Node",
@@ -146,9 +146,9 @@ func Test__ListCanvases__DoesNotReturnCanvasesFromOtherOrganizations(t *testing.
 	// Should only return the canvas from the original organization
 	//
 	assert.Len(t, response.Canvases, 1)
-	assert.Equal(t, workflow.ID.String(), response.Canvases[0].Metadata.Id)
+	assert.Equal(t, canvas.ID.String(), response.Canvases[0].Metadata.Id)
 	assert.Equal(t, r.Organization.ID.String(), response.Canvases[0].Metadata.OrganizationId)
-	assert.NotEqual(t, otherWorkflow.ID.String(), response.Canvases[0].Metadata.Id)
+	assert.NotEqual(t, otherCanvas.ID.String(), response.Canvases[0].Metadata.Id)
 }
 
 func Test__ListCanvases__ReturnsCanvasesWithoutStatusInformation(t *testing.T) {
@@ -157,11 +157,11 @@ func Test__ListCanvases__ReturnsCanvasesWithoutStatusInformation(t *testing.T) {
 	//
 	// Create canvas with nodes
 	//
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
@@ -177,10 +177,10 @@ func Test__ListCanvases__ReturnsCanvasesWithoutStatusInformation(t *testing.T) {
 	//
 	// Create executions and queue items
 	//
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
-	event := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
-	support.CreateWorkflowNodeExecution(t, workflow.ID, "node-1", rootEvent.ID, event.ID, nil)
-	support.CreateWorkflowQueueItem(t, workflow.ID, "node-1", rootEvent.ID, event.ID)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	event := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, event.ID, nil)
+	support.CreateQueueItem(t, canvas.ID, "node-1", rootEvent.ID, event.ID)
 
 	//
 	// List canvases
@@ -202,11 +202,11 @@ func Test__ListCanvases__ReturnsCanvasesWithMetadataAndSpec(t *testing.T) {
 	//
 	// Create canvas with nodes and edges
 	//
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "First Node",
@@ -247,10 +247,10 @@ func Test__ListCanvases__ReturnsCanvasesWithMetadataAndSpec(t *testing.T) {
 	// Verify metadata is present
 	//
 	require.NotNil(t, listedCanvas.Metadata)
-	assert.Equal(t, workflow.ID.String(), listedCanvas.Metadata.Id)
-	assert.Equal(t, workflow.OrganizationID.String(), listedCanvas.Metadata.OrganizationId)
-	assert.Equal(t, workflow.Name, listedCanvas.Metadata.Name)
-	assert.Equal(t, workflow.Description, listedCanvas.Metadata.Description)
+	assert.Equal(t, canvas.ID.String(), listedCanvas.Metadata.Id)
+	assert.Equal(t, r.Organization.ID.String(), listedCanvas.Metadata.OrganizationId)
+	assert.Equal(t, canvas.Name, listedCanvas.Metadata.Name)
+	assert.Equal(t, canvas.Description, listedCanvas.Metadata.Description)
 	assert.NotNil(t, listedCanvas.Metadata.CreatedAt)
 	assert.NotNil(t, listedCanvas.Metadata.UpdatedAt)
 	assert.NotNil(t, listedCanvas.Metadata.CreatedBy)
@@ -279,11 +279,11 @@ func Test__ListCanvases__ReturnsCanvasesWithMetadataAndSpec(t *testing.T) {
 func Test__ListCanvases__DoesNotReturnSoftDeletedCanvasesWhenIncludingTemplates(t *testing.T) {
 	r := support.Setup(t)
 
-	activeWorkflow, _ := support.CreateWorkflow(
+	activeCanvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "Node 1",
@@ -296,11 +296,11 @@ func Test__ListCanvases__DoesNotReturnSoftDeletedCanvasesWhenIncludingTemplates(
 		[]models.Edge{},
 	)
 
-	deletedWorkflow, _ := support.CreateWorkflow(
+	deletedCanvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-2",
 				Name:   "Node 2",
@@ -313,10 +313,10 @@ func Test__ListCanvases__DoesNotReturnSoftDeletedCanvasesWhenIncludingTemplates(
 		[]models.Edge{},
 	)
 
-	require.NoError(t, deletedWorkflow.SoftDelete())
+	require.NoError(t, deletedCanvas.SoftDelete())
 
 	now := time.Now()
-	templateWorkflow := &models.Workflow{
+	templateCanvas := &models.Canvas{
 		ID:             uuid.New(),
 		OrganizationID: models.TemplateOrganizationID,
 		IsTemplate:     true,
@@ -327,7 +327,7 @@ func Test__ListCanvases__DoesNotReturnSoftDeletedCanvasesWhenIncludingTemplates(
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
 	}
-	require.NoError(t, database.Conn().Create(templateWorkflow).Error)
+	require.NoError(t, database.Conn().Create(templateCanvas).Error)
 
 	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), true)
 	require.NoError(t, err)
@@ -338,7 +338,7 @@ func Test__ListCanvases__DoesNotReturnSoftDeletedCanvasesWhenIncludingTemplates(
 		canvasIDs[i] = canvas.Metadata.Id
 	}
 
-	assert.True(t, slices.Contains(canvasIDs, activeWorkflow.ID.String()))
-	assert.True(t, slices.Contains(canvasIDs, templateWorkflow.ID.String()))
-	assert.False(t, slices.Contains(canvasIDs, deletedWorkflow.ID.String()))
+	assert.True(t, slices.Contains(canvasIDs, activeCanvas.ID.String()))
+	assert.True(t, slices.Contains(canvasIDs, templateCanvas.ID.String()))
+	assert.False(t, slices.Contains(canvasIDs, deletedCanvas.ID.String()))
 }

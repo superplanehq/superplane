@@ -21,7 +21,7 @@ func DeleteNodeQueueItem(ctx context.Context, registry *registry.Registry, workf
 	}
 
 	// Ensure we only delete the item that belongs to this workflow and node
-	if err := database.Conn().Where("id = ? AND workflow_id = ? AND node_id = ?", qID, wfID, nodeID).Delete(&models.WorkflowNodeQueueItem{}).Error; err != nil {
+	if err := database.Conn().Where("id = ? AND workflow_id = ? AND node_id = ?", qID, wfID, nodeID).Delete(&models.CanvasNodeQueueItem{}).Error; err != nil {
 		return nil, err
 	}
 

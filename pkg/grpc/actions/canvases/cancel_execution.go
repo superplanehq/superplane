@@ -42,7 +42,7 @@ func CancelExecution(ctx context.Context, authService authorization.Authorizatio
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		node, err := models.FindWorkflowNode(tx, workflowID, execution.NodeID)
+		node, err := models.FindCanvasNode(tx, workflowID, execution.NodeID)
 
 		if err != nil {
 			return status.Error(codes.NotFound, "Node not found for execution")
@@ -64,7 +64,7 @@ func CancelExecution(ctx context.Context, authService authorization.Authorizatio
 	return &pb.CancelExecutionResponse{}, nil
 }
 
-func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authorization, encryptor crypto.Encryptor, organizationID string, registry *registry.Registry, execution *models.WorkflowNodeExecution, node *models.WorkflowNode, user *models.User) error {
+func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authorization, encryptor crypto.Encryptor, organizationID string, registry *registry.Registry, execution *models.CanvasNodeExecution, node *models.CanvasNode, user *models.User) error {
 	if node.Type == models.NodeTypeBlueprint {
 		err := cancelChildExecutions(tx, authService, organizationID, encryptor, registry, execution, user)
 		if err != nil {
@@ -128,13 +128,13 @@ func cancelChildExecutions(
 	organizationID string,
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
-	parentExecution *models.WorkflowNodeExecution,
+	parentExecution *models.CanvasNodeExecution,
 	user *models.User,
 ) error {
 	childExecutions, err := models.FindChildExecutionsInTransaction(
 		tx,
 		parentExecution.ID,
-		[]string{models.WorkflowNodeExecutionStatePending, models.WorkflowNodeExecutionStateStarted},
+		[]string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted},
 	)
 
 	if err != nil {
@@ -155,12 +155,12 @@ func cancelChildExecutions(
 		nodeIDs = append(nodeIDs, nodeID)
 	}
 
-	nodes, err := models.FindWorkflowNodesByIDs(tx, parentExecution.WorkflowID, nodeIDs)
+	nodes, err := models.FindCanvasNodesByIDs(tx, parentExecution.WorkflowID, nodeIDs)
 	if err != nil {
 		return err
 	}
 
-	nodeMap := make(map[string]*models.WorkflowNode)
+	nodeMap := make(map[string]*models.CanvasNode)
 	for i := range nodes {
 		nodeMap[nodes[i].NodeID] = &nodes[i]
 	}

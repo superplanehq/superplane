@@ -38,11 +38,11 @@ func HandleWorkflowExecution(messageBody []byte, wsHub *ws.Hub) error {
 
 func workflowExecutionStateToWsEvent(workflowState string) string {
 	switch workflowState {
-	case models.WorkflowNodeExecutionStatePending:
+	case models.CanvasNodeExecutionStatePending:
 		return ExecutionCreatedEvent
-	case models.WorkflowNodeExecutionStateFinished:
+	case models.CanvasNodeExecutionStateFinished:
 		return ExecutionFinishedEvent
-	case models.WorkflowNodeExecutionStateStarted:
+	case models.CanvasNodeExecutionStateStarted:
 		return ExecutionStartedEvent
 	default:
 		return ""
@@ -70,7 +70,7 @@ func handleExecutionState(workflowID string, executionID string, wsHub *ws.Hub) 
 		return fmt.Errorf("unknown execution state: %s", execution.State)
 	}
 
-	serializedExecutions, err := canvases.SerializeNodeExecutions([]models.WorkflowNodeExecution{*execution}, []models.WorkflowNodeExecution{})
+	serializedExecutions, err := canvases.SerializeNodeExecutions([]models.CanvasNodeExecution{*execution}, []models.CanvasNodeExecution{})
 	if err != nil {
 		return fmt.Errorf("failed to serialize execution: %w", err)
 	}

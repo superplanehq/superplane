@@ -19,28 +19,28 @@ import (
 func EmitNodeEvent(
 	ctx context.Context,
 	orgID uuid.UUID,
-	workflowID uuid.UUID,
+	canvasID uuid.UUID,
 	nodeID string,
 	channel string,
 	data map[string]any,
 ) (*pb.EmitNodeEventResponse, error) {
-	workflow, err := models.FindWorkflow(orgID, workflowID)
+	canvas, err := models.FindCanvas(orgID, canvasID)
 	if err != nil {
-		return nil, fmt.Errorf("workflow not found: %w", err)
+		return nil, fmt.Errorf("canvas not found: %w", err)
 	}
 
-	node, err := workflow.FindNode(nodeID)
+	node, err := canvas.FindNode(nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("node not found: %w", err)
 	}
 
 	now := time.Now()
-	event := models.WorkflowEvent{
-		WorkflowID: workflow.ID,
+	event := models.CanvasEvent{
+		WorkflowID: canvas.ID,
 		NodeID:     nodeID,
 		Channel:    channel,
 		Data:       datatypes.NewJSONType[any](data),
-		State:      models.WorkflowEventStatePending,
+		State:      models.CanvasEventStatePending,
 		CreatedAt:  &now,
 	}
 
@@ -54,7 +54,7 @@ func EmitNodeEvent(
 		return nil, fmt.Errorf("failed to create workflow event: %w", err)
 	}
 
-	err = messages.NewCanvasEventCreatedMessage(workflowID.String(), &event).Publish()
+	err = messages.NewCanvasEventCreatedMessage(canvasID.String(), &event).Publish()
 
 	if err != nil {
 		log.Errorf("failed to publish workflow event RabbitMQ message: %v", err)
@@ -65,7 +65,7 @@ func EmitNodeEvent(
 	}, nil
 }
 
-func resolveCustomName(node *models.WorkflowNode, payload map[string]any) (*string, error) {
+func resolveCustomName(node *models.CanvasNode, payload map[string]any) (*string, error) {
 	config := node.Configuration.Data()
 	if config == nil {
 		return nil, nil

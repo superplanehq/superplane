@@ -8,16 +8,16 @@ import (
 )
 
 type ExecutionStateContext struct {
-	execution *models.WorkflowNodeExecution
+	execution *models.CanvasNodeExecution
 	tx        *gorm.DB
 }
 
-func NewExecutionStateContext(tx *gorm.DB, execution *models.WorkflowNodeExecution) *ExecutionStateContext {
+func NewExecutionStateContext(tx *gorm.DB, execution *models.CanvasNodeExecution) *ExecutionStateContext {
 	return &ExecutionStateContext{tx: tx, execution: execution}
 }
 
 func (s *ExecutionStateContext) IsFinished() bool {
-	return s.execution.State == models.WorkflowNodeExecutionStateFinished
+	return s.execution.State == models.CanvasNodeExecutionStateFinished
 }
 
 func (s *ExecutionStateContext) Pass() error {
@@ -56,5 +56,5 @@ func (s *ExecutionStateContext) Fail(reason, message string) error {
 }
 
 func (s *ExecutionStateContext) SetKV(key, value string) error {
-	return models.CreateWorkflowNodeExecutionKVInTransaction(s.tx, s.execution.WorkflowID, s.execution.NodeID, s.execution.ID, key, value)
+	return models.CreateNodeExecutionKVInTransaction(s.tx, s.execution.WorkflowID, s.execution.NodeID, s.execution.ID, key, value)
 }

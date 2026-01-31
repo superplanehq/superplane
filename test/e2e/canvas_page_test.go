@@ -222,10 +222,10 @@ func (s *CanvasPageSteps) assertNodeDeletedInDB(nodeName string) {
 	deadline := time.Now().Add(2 * time.Second)
 
 	for {
-		wf, err := models.FindWorkflow(s.session.OrgID, s.canvas.WorkflowID)
+		canvas, err := models.FindCanvas(s.session.OrgID, s.canvas.WorkflowID)
 		require.NoError(s.t, err)
 
-		nodes, err := models.FindWorkflowNodes(wf.ID)
+		nodes, err := models.FindCanvasNodes(canvas.ID)
 		require.NoError(s.t, err)
 
 		exists := false
@@ -294,13 +294,13 @@ func (s *CanvasPageSteps) assertAutocompleteNodeSuggestionVisible() {
 }
 
 func (s *CanvasPageSteps) assertQueuedItemsCount(nodeName string, expected int) {
-	canvas, err := models.FindWorkflow(s.session.OrgID, s.canvas.WorkflowID)
+	canvas, err := models.FindCanvas(s.session.OrgID, s.canvas.WorkflowID)
 	require.NoError(s.t, err)
 
-	nodes, err := models.FindWorkflowNodes(canvas.ID)
+	nodes, err := models.FindCanvasNodes(canvas.ID)
 	require.NoError(s.t, err)
 
-	var waitNode *models.WorkflowNode
+	var waitNode *models.CanvasNode
 	for _, n := range nodes {
 		if n.Name == nodeName {
 			waitNode = &n
@@ -316,13 +316,13 @@ func (s *CanvasPageSteps) assertQueuedItemsCount(nodeName string, expected int) 
 }
 
 func (s *CanvasPageSteps) assertRunningItemsCount(nodeName string, expected int) {
-	canvas, err := models.FindWorkflow(s.session.OrgID, s.canvas.WorkflowID)
+	canvas, err := models.FindCanvas(s.session.OrgID, s.canvas.WorkflowID)
 	require.NoError(s.t, err)
 
-	nodes, err := models.FindWorkflowNodes(canvas.ID)
+	nodes, err := models.FindCanvasNodes(canvas.ID)
 	require.NoError(s.t, err)
 
-	var waitNode *models.WorkflowNode
+	var waitNode *models.CanvasNode
 	for _, n := range nodes {
 		if n.Name == nodeName {
 			waitNode = &n
@@ -331,7 +331,7 @@ func (s *CanvasPageSteps) assertRunningItemsCount(nodeName string, expected int)
 	}
 	require.NotNil(s.t, waitNode, nodeName+" node not found")
 
-	var executions []models.WorkflowNodeExecution
+	var executions []models.CanvasNodeExecution
 	query := database.Conn().
 		Where("workflow_id = ?", waitNode.WorkflowID).
 		Where("node_id = ?", waitNode.NodeID).
@@ -376,7 +376,7 @@ func (s *CanvasPageSteps) assertExecutionWasCancelled(nodeName string) {
 	require.Greater(s.t, len(executions), 0, "expected at least one execution")
 
 	execution := executions[0]
-	require.Equal(s.t, models.WorkflowNodeExecutionResultCancelled, execution.Result, "expected execution to be cancelled")
+	require.Equal(s.t, models.CanvasNodeExecutionResultCancelled, execution.Result, "expected execution to be cancelled")
 }
 
 func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName string) {

@@ -20,13 +20,13 @@ import (
 
 type IntegrationContext struct {
 	tx          *gorm.DB
-	node        *models.WorkflowNode
+	node        *models.CanvasNode
 	integration *models.Integration
 	encryptor   crypto.Encryptor
 	registry    *registry.Registry
 }
 
-func NewIntegrationContext(tx *gorm.DB, node *models.WorkflowNode, integration *models.Integration, encryptor crypto.Encryptor, registry *registry.Registry) *IntegrationContext {
+func NewIntegrationContext(tx *gorm.DB, node *models.CanvasNode, integration *models.Integration, encryptor crypto.Encryptor, registry *registry.Registry) *IntegrationContext {
 	return &IntegrationContext{
 		tx:          tx,
 		node:        node,
@@ -353,7 +353,7 @@ func (c *IntegrationContext) ListSubscriptions() ([]core.IntegrationSubscription
 
 	contexts := []core.IntegrationSubscriptionContext{}
 	for _, subscription := range subscriptions {
-		node, err := models.FindWorkflowNode(c.tx, subscription.WorkflowID, subscription.NodeID)
+		node, err := models.FindCanvasNode(c.tx, subscription.WorkflowID, subscription.NodeID)
 		if err != nil {
 			return nil, err
 		}

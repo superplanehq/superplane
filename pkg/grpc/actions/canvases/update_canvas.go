@@ -31,10 +31,10 @@ func UpdateCanvas(ctx context.Context, encryptor crypto.Encryptor, registry *reg
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
 	}
 
-	existingCanvas, err := models.FindWorkflow(uuid.MustParse(organizationID), canvasID)
+	existingCanvas, err := models.FindCanvas(uuid.MustParse(organizationID), canvasID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			if _, templateErr := models.FindWorkflowTemplate(canvasID); templateErr == nil {
+			if _, templateErr := models.FindCanvasTemplate(canvasID); templateErr == nil {
 				return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 			}
 		}
@@ -50,7 +50,7 @@ func UpdateCanvas(ctx context.Context, encryptor crypto.Encryptor, registry *reg
 		return nil, actions.ToStatus(err)
 	}
 
-	existingNodesUnscoped, err := models.FindWorkflowNodesUnscoped(canvasID)
+	existingNodesUnscoped, err := models.FindCanvasNodesUnscoped(canvasID)
 	if err != nil {
 		return nil, actions.ToStatus(err)
 	}
@@ -71,15 +71,15 @@ func UpdateCanvas(ctx context.Context, encryptor crypto.Encryptor, registry *reg
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		//
-		// Update the workflow node records
+		// Update the canvas node records
 		//
-		existingNodes, err := models.FindWorkflowNodesInTransaction(tx, existingCanvas.ID)
+		existingNodes, err := models.FindCanvasNodesInTransaction(tx, existingCanvas.ID)
 		if err != nil {
 			return err
 		}
 
 		//
-		// Go through each node in the new workflow, creating / updating it,
+		// Go through each node in the new canvas, creating / updating it,
 		// and tracking which nodes we've seen, to delete nodes that are no longer in the workflow at the end.
 		//
 		for _, node := range expandedNodes {
@@ -93,10 +93,10 @@ func UpdateCanvas(ctx context.Context, encryptor crypto.Encryptor, registry *reg
 				return err
 			}
 
-			if workflowNode.State == models.WorkflowNodeStateReady {
+			if workflowNode.State == models.CanvasNodeStateReady {
 				err = setupNode(ctx, tx, encryptor, registry, workflowNode, webhookBaseURL)
 				if err != nil {
-					workflowNode.State = models.WorkflowNodeStateError
+					workflowNode.State = models.CanvasNodeStateError
 					errorMsg := err.Error()
 					workflowNode.StateReason = &errorMsg
 					if saveErr := tx.Save(workflowNode).Error; saveErr != nil {
@@ -163,7 +163,7 @@ func UpdateCanvas(ctx context.Context, encryptor crypto.Encryptor, registry *reg
 func remapNodeIDsForConflicts(
 	nodes []models.Node,
 	edges []models.Edge,
-	existingNodes []models.WorkflowNode,
+	existingNodes []models.CanvasNode,
 ) ([]models.Node, []models.Edge, map[string]string) {
 	reservedIDs := make(map[string]bool, len(existingNodes))
 	deletedIDs := make(map[string]bool, len(existingNodes))
@@ -204,7 +204,7 @@ func remapNodeIDsForConflicts(
 	return nodes, edges, remappedIDs
 }
 
-func findNode(nodes []models.WorkflowNode, nodeID string) *models.WorkflowNode {
+func findNode(nodes []models.CanvasNode, nodeID string) *models.CanvasNode {
 	for _, node := range nodes {
 		if node.NodeID == nodeID {
 			return &node
@@ -213,7 +213,7 @@ func findNode(nodes []models.WorkflowNode, nodeID string) *models.WorkflowNode {
 	return nil
 }
 
-func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.Node, workflowID uuid.UUID) (*models.WorkflowNode, error) {
+func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node, workflowID uuid.UUID) (*models.CanvasNode, error) {
 	now := time.Now()
 
 	var appInstallationID *uuid.UUID
@@ -239,10 +239,10 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 		existingNode.AppInstallationID = appInstallationID
 
 		if node.ErrorMessage != nil && *node.ErrorMessage != "" {
-			existingNode.State = models.WorkflowNodeStateError
+			existingNode.State = models.CanvasNodeStateError
 			existingNode.StateReason = node.ErrorMessage
-		} else if existingNode.State == models.WorkflowNodeStateError {
-			existingNode.State = models.WorkflowNodeStateReady
+		} else if existingNode.State == models.CanvasNodeStateError {
+			existingNode.State = models.CanvasNodeStateReady
 			existingNode.StateReason = nil
 		}
 
@@ -273,15 +273,15 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 		parentNodeID = &parent
 	}
 
-	initialState := models.WorkflowNodeStateReady
+	initialState := models.CanvasNodeStateReady
 	var stateReason *string
 
 	if node.ErrorMessage != nil && *node.ErrorMessage != "" {
-		initialState = models.WorkflowNodeStateError
+		initialState = models.CanvasNodeStateError
 		stateReason = node.ErrorMessage
 	}
 
-	workflowNode := models.WorkflowNode{
+	canvasNode := models.CanvasNode{
 		WorkflowID:        workflowID,
 		NodeID:            node.ID,
 		ParentNodeID:      parentNodeID,
@@ -299,15 +299,15 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 		UpdatedAt:         &now,
 	}
 
-	err := tx.Create(&workflowNode).Error
+	err := tx.Create(&canvasNode).Error
 	if err != nil {
 		return nil, err
 	}
 
-	return &workflowNode, nil
+	return &canvasNode, nil
 }
 
-func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.WorkflowNode, webhookBaseURL string) error {
+func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.CanvasNode, webhookBaseURL string) error {
 	switch node.Type {
 	case models.NodeTypeTrigger:
 		return setupTrigger(ctx, tx, encryptor, registry, node, webhookBaseURL)
@@ -321,7 +321,7 @@ func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, reg
 	return nil
 }
 
-func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.WorkflowNode, webhookBaseURL string) error {
+func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.CanvasNode, webhookBaseURL string) error {
 	ref := node.Ref.Data()
 	trigger, err := registry.GetTrigger(ref.Trigger.Name)
 	if err != nil {
@@ -363,7 +363,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 	return tx.Save(node).Error
 }
 
-func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.WorkflowNode) error {
+func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.CanvasNode) error {
 	ref := node.Ref.Data()
 	component, err := registry.GetComponent(ref.Component.Name)
 	if err != nil {
@@ -403,10 +403,10 @@ func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.
 	return tx.Save(node).Error
 }
 
-func deleteNodes(tx *gorm.DB, existingNodes []models.WorkflowNode, newNodes []models.Node) error {
+func deleteNodes(tx *gorm.DB, existingNodes []models.CanvasNode, newNodes []models.Node) error {
 	for _, existingNode := range existingNodes {
 		if !slices.ContainsFunc(newNodes, func(n models.Node) bool { return n.ID == existingNode.NodeID }) {
-			err := models.DeleteWorkflowNode(tx, existingNode)
+			err := models.DeleteCanvasNode(tx, existingNode)
 			if err != nil {
 				return err
 			}

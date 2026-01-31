@@ -17,17 +17,17 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func SerializeCanvas(workflow *models.Workflow, includeStatus bool) (*pb.Canvas, error) {
-	serializedNodes, err := serializeCanvasNodes(workflow)
+func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, error) {
+	serializedNodes, err := serializeCanvasNodes(canvas)
 	if err != nil {
 		return nil, err
 	}
 
 	var createdBy *pb.UserRef
-	if workflow.CreatedBy != nil {
-		idStr := workflow.CreatedBy.String()
+	if canvas.CreatedBy != nil {
+		idStr := canvas.CreatedBy.String()
 		name := ""
-		if user, err := models.FindMaybeDeletedUserByID(workflow.OrganizationID.String(), idStr); err == nil && user != nil {
+		if user, err := models.FindMaybeDeletedUserByID(canvas.OrganizationID.String(), idStr); err == nil && user != nil {
 			name = user.Name
 		}
 		createdBy = &pb.UserRef{Id: idStr, Name: name}
@@ -36,25 +36,25 @@ func SerializeCanvas(workflow *models.Workflow, includeStatus bool) (*pb.Canvas,
 	if !includeStatus {
 		return &pb.Canvas{
 			Metadata: &pb.Canvas_Metadata{
-				Id:             workflow.ID.String(),
-				OrganizationId: workflow.OrganizationID.String(),
-				Name:           workflow.Name,
-				Description:    workflow.Description,
-				CreatedAt:      timestamppb.New(*workflow.CreatedAt),
-				UpdatedAt:      timestamppb.New(*workflow.UpdatedAt),
+				Id:             canvas.ID.String(),
+				OrganizationId: canvas.OrganizationID.String(),
+				Name:           canvas.Name,
+				Description:    canvas.Description,
+				CreatedAt:      timestamppb.New(*canvas.CreatedAt),
+				UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 				CreatedBy:      createdBy,
-				IsTemplate:     workflow.IsTemplate,
+				IsTemplate:     canvas.IsTemplate,
 			},
 			Spec: &pb.Canvas_Spec{
 				Nodes: serializedNodes,
-				Edges: actions.EdgesToProto(workflow.Edges),
+				Edges: actions.EdgesToProto(canvas.Edges),
 			},
 			Status: nil,
 		}, nil
 	}
 
 	// Fetch last executions per node
-	lastExecutions, err := models.FindLastExecutionPerNode(workflow.ID)
+	lastExecutions, err := models.FindLastExecutionPerNode(canvas.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func SerializeCanvas(workflow *models.Workflow, includeStatus bool) (*pb.Canvas,
 	}
 
 	// Fetch next queue items per node
-	nextQueueItems, err := models.FindNextQueueItemPerNode(workflow.ID)
+	nextQueueItems, err := models.FindNextQueueItemPerNode(canvas.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func SerializeCanvas(workflow *models.Workflow, includeStatus bool) (*pb.Canvas,
 	}
 
 	// Fetch last events per node
-	lastEvents, err := models.FindLastEventPerNode(workflow.ID)
+	lastEvents, err := models.FindLastEventPerNode(canvas.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -98,18 +98,18 @@ func SerializeCanvas(workflow *models.Workflow, includeStatus bool) (*pb.Canvas,
 
 	return &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Id:             workflow.ID.String(),
-			OrganizationId: workflow.OrganizationID.String(),
-			Name:           workflow.Name,
-			Description:    workflow.Description,
-			CreatedAt:      timestamppb.New(*workflow.CreatedAt),
-			UpdatedAt:      timestamppb.New(*workflow.UpdatedAt),
+			Id:             canvas.ID.String(),
+			OrganizationId: canvas.OrganizationID.String(),
+			Name:           canvas.Name,
+			Description:    canvas.Description,
+			CreatedAt:      timestamppb.New(*canvas.CreatedAt),
+			UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 			CreatedBy:      createdBy,
-			IsTemplate:     workflow.IsTemplate,
+			IsTemplate:     canvas.IsTemplate,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: serializedNodes,
-			Edges: actions.EdgesToProto(workflow.Edges),
+			Edges: actions.EdgesToProto(canvas.Edges),
 		},
 		Status: &pb.Canvas_Status{
 			LastExecutions: serializedExecutions,
@@ -119,20 +119,20 @@ func SerializeCanvas(workflow *models.Workflow, includeStatus bool) (*pb.Canvas,
 	}, nil
 }
 
-func serializeCanvasNodes(canvas *models.Workflow) ([]*compb.Node, error) {
+func serializeCanvasNodes(canvas *models.Canvas) ([]*compb.Node, error) {
 	serialized := actions.NodesToProto(canvas.Nodes)
 	if len(serialized) == 0 {
 		return serialized, nil
 	}
 
-	workflowNodes, err := models.FindWorkflowNodes(canvas.ID)
+	canvasNodes, err := models.FindCanvasNodes(canvas.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	pausedByID := make(map[string]bool, len(workflowNodes))
-	for _, node := range workflowNodes {
-		pausedByID[node.NodeID] = node.State == models.WorkflowNodeStatePaused
+	pausedByID := make(map[string]bool, len(canvasNodes))
+	for _, node := range canvasNodes {
+		pausedByID[node.NodeID] = node.State == models.CanvasNodeStatePaused
 	}
 
 	for _, node := range serialized {

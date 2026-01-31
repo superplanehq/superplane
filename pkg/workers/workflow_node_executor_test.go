@@ -15,15 +15,15 @@ func Test__WorkflowNodeExecutor_PreventsConcurrentProcessing(t *testing.T) {
 	r := support.Setup(t)
 
 	//
-	// Create a simple workflow with a trigger and a component node.
+	// Create a simple canvas with a trigger and a component node.
 	//
 	triggerNode := "trigger-1"
 	componentNode := "component-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Type:   models.NodeTypeTrigger,
@@ -43,8 +43,8 @@ func Test__WorkflowNodeExecutor_PreventsConcurrentProcessing(t *testing.T) {
 	//
 	// Create a root event and a pending execution for the component node.
 	//
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, triggerNode, "default", nil)
-	execution := support.CreateWorkflowNodeExecution(t, workflow.ID, componentNode, rootEvent.ID, rootEvent.ID, nil)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, nil)
 
 	//
 	// Have two workers call LockAndProcessNodeExecution concurrently on the same execution.
@@ -78,10 +78,10 @@ func Test__WorkflowNodeExecutor_PreventsConcurrentProcessing(t *testing.T) {
 	// Verify the execution was started and finished (since noop completes immediately).
 	// If both workers processed it, we would see inconsistent state or errors.
 	//
-	updatedExecution, err := models.FindNodeExecution(workflow.ID, execution.ID)
+	updatedExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeExecutionStateFinished, updatedExecution.State)
-	assert.Equal(t, models.WorkflowNodeExecutionResultPassed, updatedExecution.Result)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultPassed, updatedExecution.Result)
 }
 
 func Test__WorkflowNodeExecutor_BlueprintNodeExecution(t *testing.T) {
@@ -111,15 +111,15 @@ func Test__WorkflowNodeExecutor_BlueprintNodeExecution(t *testing.T) {
 	)
 
 	//
-	// Create a workflow with a trigger and a blueprint node.
+	// Create a canvas with a trigger and a blueprint node.
 	//
 	triggerNode := "trigger-1"
 	blueprintNode := "blueprint-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Type:   models.NodeTypeTrigger,
@@ -139,8 +139,8 @@ func Test__WorkflowNodeExecutor_BlueprintNodeExecution(t *testing.T) {
 	//
 	// Create a root event and a pending execution for the blueprint node.
 	//
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, triggerNode, "default", nil)
-	execution := support.CreateWorkflowNodeExecution(t, workflow.ID, blueprintNode, rootEvent.ID, rootEvent.ID, nil)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, blueprintNode, rootEvent.ID, rootEvent.ID, nil)
 
 	//
 	// Process the execution and verify the blueprint node creates a child execution
@@ -151,20 +151,20 @@ func Test__WorkflowNodeExecutor_BlueprintNodeExecution(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify parent execution moved to started state
-	parentExecution, err := models.FindNodeExecution(workflow.ID, execution.ID)
+	parentExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeExecutionStateStarted, parentExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionStateStarted, parentExecution.State)
 
 	// Verify child execution was created with pending state
 	childExecutions, err := models.FindChildExecutions(execution.ID, []string{
-		models.WorkflowNodeExecutionStatePending,
-		models.WorkflowNodeExecutionStateStarted,
-		models.WorkflowNodeExecutionStateFinished,
+		models.CanvasNodeExecutionStatePending,
+		models.CanvasNodeExecutionStateStarted,
+		models.CanvasNodeExecutionStateFinished,
 	})
 
 	require.NoError(t, err)
 	require.Len(t, childExecutions, 1)
-	assert.Equal(t, models.WorkflowNodeExecutionStatePending, childExecutions[0].State)
+	assert.Equal(t, models.CanvasNodeExecutionStatePending, childExecutions[0].State)
 	assert.Equal(t, rootEvent.ID, childExecutions[0].RootEventID)
 	assert.Equal(t, &execution.ID, childExecutions[0].ParentExecutionID)
 }
@@ -173,7 +173,7 @@ func Test__WorkflowNodeExecutor_ComponentNodeWithoutStateChange(t *testing.T) {
 	r := support.Setup(t)
 
 	//
-	// Create a simple workflow with a trigger and an approval component node.
+	// Create a simple canvas with a trigger and an approval component node.
 	// The approval component does NOT change state on Execute() - it just sets metadata.
 	//
 	triggerNode := "trigger-1"
@@ -187,11 +187,11 @@ func Test__WorkflowNodeExecutor_ComponentNodeWithoutStateChange(t *testing.T) {
 		},
 	}
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Type:   models.NodeTypeTrigger,
@@ -209,7 +209,7 @@ func Test__WorkflowNodeExecutor_ComponentNodeWithoutStateChange(t *testing.T) {
 		},
 	)
 
-	nodes, err := models.FindWorkflowNodes(workflow.ID)
+	nodes, err := models.FindCanvasNodes(canvas.ID)
 	require.NoError(t, err)
 
 	log.Printf("nodes: %v", nodes)
@@ -217,8 +217,8 @@ func Test__WorkflowNodeExecutor_ComponentNodeWithoutStateChange(t *testing.T) {
 	//
 	// Create a root event and a pending execution for the approval node.
 	//
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, triggerNode, "default", nil)
-	execution := support.CreateNodeExecutionWithConfiguration(t, workflow.ID, approvalNode, rootEvent.ID, rootEvent.ID, nil, approvalConfiguration)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, approvalNode, rootEvent.ID, rootEvent.ID, nil)
 
 	//
 	// Process the execution and verify the execution is started but NOT finished.
@@ -230,9 +230,9 @@ func Test__WorkflowNodeExecutor_ComponentNodeWithoutStateChange(t *testing.T) {
 
 	// Verify execution moved to started state but not finished,
 	// and metadata is updated.
-	updatedExecution, err := models.FindNodeExecution(workflow.ID, execution.ID)
+	updatedExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeExecutionStateStarted, updatedExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionStateStarted, updatedExecution.State)
 	assert.Equal(t, "", updatedExecution.Result)
 	assert.Equal(t, map[string]any{
 		"result": "pending",
@@ -255,16 +255,16 @@ func Test__WorkflowNodeExecutor_ComponentNodeWithStateChange(t *testing.T) {
 	r := support.Setup(t)
 
 	//
-	// Create a simple workflow with a trigger and a noop component node.
+	// Create a simple canvas with a trigger and a noop component node.
 	// The noop component DOES change state on Execute() - it calls Pass() immediately.
 	//
 	triggerNode := "trigger-1"
 	noopNode := "noop-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Type:   models.NodeTypeTrigger,
@@ -284,8 +284,8 @@ func Test__WorkflowNodeExecutor_ComponentNodeWithStateChange(t *testing.T) {
 	//
 	// Create a root event and a pending execution for the noop node.
 	//
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, triggerNode, "default", nil)
-	execution := support.CreateWorkflowNodeExecution(t, workflow.ID, noopNode, rootEvent.ID, rootEvent.ID, nil)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, noopNode, rootEvent.ID, rootEvent.ID, nil)
 
 	//
 	// Process the execution and verify the execution is both started AND finished.
@@ -296,10 +296,10 @@ func Test__WorkflowNodeExecutor_ComponentNodeWithStateChange(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify execution moved to finished state with passed result
-	updatedExecution, err := models.FindNodeExecution(workflow.ID, execution.ID)
+	updatedExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeExecutionStateFinished, updatedExecution.State)
-	assert.Equal(t, models.WorkflowNodeExecutionResultPassed, updatedExecution.Result)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultPassed, updatedExecution.Result)
 }
 
 func Test__WorkflowNodeExecutor_BlueprintNodeExecutionFailsWhenConfigurationCannotBeBuilt(t *testing.T) {
@@ -336,15 +336,15 @@ func Test__WorkflowNodeExecutor_BlueprintNodeExecutionFailsWhenConfigurationCann
 	)
 
 	//
-	// Create a workflow with a trigger and a blueprint node.
+	// Create a canvas with a trigger and a blueprint node.
 	//
 	triggerNode := "trigger-1"
 	blueprintNode := "blueprint-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Type:   models.NodeTypeTrigger,
@@ -364,8 +364,8 @@ func Test__WorkflowNodeExecutor_BlueprintNodeExecutionFailsWhenConfigurationCann
 	//
 	// Create a root event and a pending execution for the blueprint node.
 	//
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, triggerNode, "default", nil)
-	execution := support.CreateWorkflowNodeExecution(t, workflow.ID, blueprintNode, rootEvent.ID, rootEvent.ID, nil)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, blueprintNode, rootEvent.ID, rootEvent.ID, nil)
 
 	//
 	// Process the execution and verify it fails due to configuration build error.
@@ -379,10 +379,10 @@ func Test__WorkflowNodeExecutor_BlueprintNodeExecutionFailsWhenConfigurationCann
 	//
 	// Verify the execution was marked as failed with an error reason.
 	//
-	failedExecution, err := models.FindNodeExecution(workflow.ID, execution.ID)
+	failedExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.WorkflowNodeExecutionStateFinished, failedExecution.State)
-	assert.Equal(t, models.WorkflowNodeExecutionResultReasonError, failedExecution.ResultReason)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, failedExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultReasonError, failedExecution.ResultReason)
 	assert.Contains(t, failedExecution.ResultMessage, "error building configuration for execution of node")
 }
 

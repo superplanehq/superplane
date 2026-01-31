@@ -17,12 +17,12 @@ func ListNodeEvents(ctx context.Context, registry *registry.Registry, workflowID
 	//
 	// List and count events
 	//
-	events, err := models.ListWorkflowEvents(workflowID, nodeID, int(limit), beforeTime)
+	events, err := models.ListCanvasEvents(workflowID, nodeID, int(limit), beforeTime)
 	if err != nil {
 		return nil, err
 	}
 
-	totalCount, err := models.CountWorkflowEvents(workflowID, nodeID)
+	totalCount, err := models.CountCanvasEvents(workflowID, nodeID)
 	if err != nil {
 		return nil, err
 	}

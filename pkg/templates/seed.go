@@ -104,7 +104,7 @@ func deleteAllTemplateWorkflows(tx *gorm.DB) error {
 
 	err = tx.
 		Unscoped().
-		Model(&models.Workflow{}).
+		Model(&models.Canvas{}).
 		Where("organization_id = ?", models.TemplateOrganizationID).
 		Where("is_template = ?", true).
 		Pluck("id", &workflowIDs).Error
@@ -115,9 +115,9 @@ func deleteAllTemplateWorkflows(tx *gorm.DB) error {
 
 	err = tx.
 		Unscoped().
-		Model(&models.WorkflowNode{}).
+		Model(&models.CanvasNode{}).
 		Where("workflow_id IN (?)", workflowIDs).
-		Delete(&models.WorkflowNode{}).Error
+		Delete(&models.CanvasNode{}).Error
 
 	if err != nil {
 		return err
@@ -125,10 +125,10 @@ func deleteAllTemplateWorkflows(tx *gorm.DB) error {
 
 	err = tx.
 		Unscoped().
-		Model(&models.Workflow{}).
+		Model(&models.Canvas{}).
 		Where("organization_id = ?", models.TemplateOrganizationID).
 		Where("is_template = ?", true).
-		Delete(&models.Workflow{}).Error
+		Delete(&models.Canvas{}).Error
 
 	if err != nil {
 		return err
@@ -150,7 +150,7 @@ func createTemplateCanvas(tx *gorm.DB, registry *registry.Registry, template *pb
 	}
 
 	now := time.Now()
-	workflow := models.Workflow{
+	canvas := models.Canvas{
 		ID:             uuid.New(),
 		OrganizationID: models.TemplateOrganizationID,
 		IsTemplate:     true,
@@ -162,7 +162,7 @@ func createTemplateCanvas(tx *gorm.DB, registry *registry.Registry, template *pb
 		Nodes:          datatypes.NewJSONSlice(expandedNodes),
 	}
 
-	if err := tx.Create(&workflow).Error; err != nil {
+	if err := tx.Create(&canvas).Error; err != nil {
 		return err
 	}
 
@@ -173,12 +173,12 @@ func createTemplateCanvas(tx *gorm.DB, registry *registry.Registry, template *pb
 			parentNodeID = &parent
 		}
 
-		workflowNode := models.WorkflowNode{
-			WorkflowID:    workflow.ID,
+		canvasNode := models.CanvasNode{
+			WorkflowID:    canvas.ID,
 			NodeID:        node.ID,
 			ParentNodeID:  parentNodeID,
 			Name:          node.Name,
-			State:         models.WorkflowNodeStateReady,
+			State:         models.CanvasNodeStateReady,
 			Type:          node.Type,
 			Ref:           datatypes.NewJSONType(node.Ref),
 			Configuration: datatypes.NewJSONType(node.Configuration),
@@ -187,7 +187,7 @@ func createTemplateCanvas(tx *gorm.DB, registry *registry.Registry, template *pb
 			UpdatedAt:     &now,
 		}
 
-		if err := tx.Create(&workflowNode).Error; err != nil {
+		if err := tx.Create(&canvasNode).Error; err != nil {
 			return err
 		}
 	}

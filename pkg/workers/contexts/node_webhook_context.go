@@ -15,11 +15,11 @@ type NodeWebhookContext struct {
 	tx        *gorm.DB
 	ctx       context.Context
 	encryptor crypto.Encryptor
-	node      *models.WorkflowNode
+	node      *models.CanvasNode
 	baseURL   string
 }
 
-func NewNodeWebhookContext(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, node *models.WorkflowNode, baseURL string) *NodeWebhookContext {
+func NewNodeWebhookContext(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, node *models.CanvasNode, baseURL string) *NodeWebhookContext {
 	return &NodeWebhookContext{
 		tx:        tx,
 		ctx:       ctx,

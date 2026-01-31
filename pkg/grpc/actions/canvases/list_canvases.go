@@ -12,15 +12,15 @@ import (
 )
 
 func ListCanvases(ctx context.Context, registry *registry.Registry, organizationID string, includeTemplates bool) (*pb.ListCanvasesResponse, error) {
-	workflows, err := models.ListWorkflows(organizationID, includeTemplates)
+	canvases, err := models.ListCanvases(organizationID, includeTemplates)
 	if err != nil {
 		log.Errorf("failed to list canvases for organization %s: %v", organizationID, err)
 		return nil, status.Error(codes.Internal, "failed to list canvases")
 	}
 
-	protoCanvases := make([]*pb.Canvas, len(workflows))
-	for i, workflow := range workflows {
-		protoCanvas, err := SerializeCanvas(&workflow, false)
+	protoCanvases := make([]*pb.Canvas, len(canvases))
+	for i, canvas := range canvases {
+		protoCanvas, err := SerializeCanvas(&canvas, false)
 		if err != nil {
 			return nil, err
 		}

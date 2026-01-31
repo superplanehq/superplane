@@ -26,7 +26,7 @@ func InvokeNodeTriggerAction(
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
 	orgID uuid.UUID,
-	workflowID uuid.UUID,
+	canvasID uuid.UUID,
 	nodeID string,
 	actionName string,
 	parameters map[string]any,
@@ -37,12 +37,12 @@ func InvokeNodeTriggerAction(
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	workflow, err := models.FindWorkflow(orgID, workflowID)
+	canvas, err := models.FindCanvas(orgID, canvasID)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "workflow not found: %v", err)
+		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
 
-	node, err := workflow.FindNode(nodeID)
+	node, err := canvas.FindNode(nodeID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "node not found: %v", err)
 	}

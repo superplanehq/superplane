@@ -27,7 +27,7 @@ func InvokeNodeExecutionAction(
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
 	orgID uuid.UUID,
-	workflowID uuid.UUID,
+	canvasID uuid.UUID,
 	executionID uuid.UUID,
 	actionName string,
 	parameters map[string]any,
@@ -37,17 +37,17 @@ func InvokeNodeExecutionAction(
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	workflow, err := models.FindWorkflow(orgID, workflowID)
+	canvas, err := models.FindCanvas(orgID, canvasID)
 	if err != nil {
-		return nil, fmt.Errorf("workflow not found: %w", err)
+		return nil, fmt.Errorf("canvas not found: %w", err)
 	}
 
-	execution, err := models.FindNodeExecution(workflow.ID, executionID)
+	execution, err := models.FindNodeExecution(canvas.ID, executionID)
 	if err != nil {
 		return nil, fmt.Errorf("execution not found: %w", err)
 	}
 
-	node, err := workflow.FindNode(execution.NodeID)
+	node, err := canvas.FindNode(execution.NodeID)
 	if err != nil {
 		return nil, fmt.Errorf("node not found: %w", err)
 	}
@@ -90,7 +90,7 @@ func InvokeNodeExecutionAction(
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution),
 		Auth:           contexts.NewAuthContext(tx, orgID, authService, user),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
-		Notifications:  contexts.NewNotificationContext(tx, orgID, workflow.ID),
+		Notifications:  contexts.NewNotificationContext(tx, orgID, canvas.ID),
 	}
 
 	if node.AppInstallationID != nil {

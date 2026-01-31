@@ -11,11 +11,11 @@ import (
 )
 
 const (
-	WorkflowEventStatePending = "pending"
-	WorkflowEventStateRouted  = "routed"
+	CanvasEventStatePending = "pending"
+	CanvasEventStateRouted  = "routed"
 )
 
-type WorkflowEvent struct {
+type CanvasEvent struct {
 	ID          uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
 	WorkflowID  uuid.UUID
 	NodeID      string
@@ -27,8 +27,12 @@ type WorkflowEvent struct {
 	CreatedAt   *time.Time
 }
 
-func FindWorkflowEvents(ids []string) ([]WorkflowEvent, error) {
-	var events []WorkflowEvent
+func (e *CanvasEvent) TableName() string {
+	return "workflow_events"
+}
+
+func FindCanvasEvents(ids []string) ([]CanvasEvent, error) {
+	var events []CanvasEvent
 	err := database.Conn().
 		Where("id IN ?", ids).
 		Find(&events).
@@ -41,8 +45,8 @@ func FindWorkflowEvents(ids []string) ([]WorkflowEvent, error) {
 	return events, nil
 }
 
-func FindWorkflowEventsForExecutions(executionIDs []string) ([]WorkflowEvent, error) {
-	var events []WorkflowEvent
+func FindCanvasEventsForExecutions(executionIDs []string) ([]CanvasEvent, error) {
+	var events []CanvasEvent
 	err := database.Conn().
 		Where("execution_id IN ?", executionIDs).
 		Find(&events).
@@ -55,10 +59,10 @@ func FindWorkflowEventsForExecutions(executionIDs []string) ([]WorkflowEvent, er
 	return events, nil
 }
 
-func FindWorkflowEventForWorkflow(workflowID uuid.UUID, id uuid.UUID) (*WorkflowEvent, error) {
-	var event WorkflowEvent
+func FindCanvasEventForCanvas(canvasID uuid.UUID, id uuid.UUID) (*CanvasEvent, error) {
+	var event CanvasEvent
 	err := database.Conn().
-		Where("workflow_id = ?", workflowID).
+		Where("workflow_id = ?", canvasID).
 		Where("id = ?", id).
 		First(&event).
 		Error
@@ -70,12 +74,12 @@ func FindWorkflowEventForWorkflow(workflowID uuid.UUID, id uuid.UUID) (*Workflow
 	return &event, nil
 }
 
-func FindWorkflowEvent(id uuid.UUID) (*WorkflowEvent, error) {
-	return FindWorkflowEventInTransaction(database.Conn(), id)
+func FindCanvasEvent(id uuid.UUID) (*CanvasEvent, error) {
+	return FindCanvasEventInTransaction(database.Conn(), id)
 }
 
-func FindWorkflowEventInTransaction(tx *gorm.DB, id uuid.UUID) (*WorkflowEvent, error) {
-	var event WorkflowEvent
+func FindCanvasEventInTransaction(tx *gorm.DB, id uuid.UUID) (*CanvasEvent, error) {
+	var event CanvasEvent
 	err := tx.
 		Where("id = ?", id).
 		First(&event).
@@ -88,10 +92,10 @@ func FindWorkflowEventInTransaction(tx *gorm.DB, id uuid.UUID) (*WorkflowEvent, 
 	return &event, nil
 }
 
-func ListWorkflowEvents(workflowID uuid.UUID, nodeID string, limit int, before *time.Time) ([]WorkflowEvent, error) {
-	var events []WorkflowEvent
+func ListCanvasEvents(canvasID uuid.UUID, nodeID string, limit int, before *time.Time) ([]CanvasEvent, error) {
+	var events []CanvasEvent
 	query := database.Conn().
-		Where("workflow_id = ?", workflowID).
+		Where("workflow_id = ?", canvasID).
 		Where("node_id = ?", nodeID)
 
 	if limit > 0 {
@@ -110,12 +114,12 @@ func ListWorkflowEvents(workflowID uuid.UUID, nodeID string, limit int, before *
 	return events, nil
 }
 
-func CountWorkflowEvents(workflowID uuid.UUID, nodeID string) (int64, error) {
+func CountCanvasEvents(canvasID uuid.UUID, nodeID string) (int64, error) {
 	var count int64
 
 	err := database.Conn().
-		Model(&WorkflowEvent{}).
-		Where("workflow_id = ?", workflowID).
+		Model(&CanvasEvent{}).
+		Where("workflow_id = ?", canvasID).
 		Where("node_id = ?", nodeID).
 		Count(&count).
 		Error
@@ -127,10 +131,10 @@ func CountWorkflowEvents(workflowID uuid.UUID, nodeID string) (int64, error) {
 	return count, nil
 }
 
-func ListRootWorkflowEvents(workflowID uuid.UUID, limit int, before *time.Time) ([]WorkflowEvent, error) {
-	var events []WorkflowEvent
+func ListRootCanvasEvents(canvasID uuid.UUID, limit int, before *time.Time) ([]CanvasEvent, error) {
+	var events []CanvasEvent
 	query := database.Conn().
-		Where("workflow_id = ?", workflowID).
+		Where("workflow_id = ?", canvasID).
 		Where("execution_id IS NULL")
 
 	if limit > 0 {
@@ -149,12 +153,12 @@ func ListRootWorkflowEvents(workflowID uuid.UUID, limit int, before *time.Time) 
 	return events, nil
 }
 
-func CountRootWorkflowEvents(workflowID uuid.UUID) (int64, error) {
+func CountRootCanvasEvents(canvasID uuid.UUID) (int64, error) {
 	var count int64
 
 	err := database.Conn().
-		Model(&WorkflowEvent{}).
-		Where("workflow_id = ?", workflowID).
+		Model(&CanvasEvent{}).
+		Where("workflow_id = ?", canvasID).
 		Where("execution_id IS NULL").
 		Count(&count).
 		Error
@@ -166,11 +170,11 @@ func CountRootWorkflowEvents(workflowID uuid.UUID) (int64, error) {
 	return count, nil
 }
 
-func ListPendingWorkflowEvents() ([]WorkflowEvent, error) {
-	var events []WorkflowEvent
+func ListPendingCanvasEvents() ([]CanvasEvent, error) {
+	var events []CanvasEvent
 	err := database.Conn().
 		Joins("JOIN workflows ON workflow_events.workflow_id = workflows.id").
-		Where("workflow_events.state = ?", WorkflowEventStatePending).
+		Where("workflow_events.state = ?", CanvasEventStatePending).
 		Where("workflows.deleted_at IS NULL").
 		Find(&events).
 		Error
@@ -182,13 +186,13 @@ func ListPendingWorkflowEvents() ([]WorkflowEvent, error) {
 	return events, nil
 }
 
-func LockWorkflowEvent(tx *gorm.DB, id uuid.UUID) (*WorkflowEvent, error) {
-	var event WorkflowEvent
+func LockCanvasEvent(tx *gorm.DB, id uuid.UUID) (*CanvasEvent, error) {
+	var event CanvasEvent
 
 	err := tx.
 		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 		Where("id = ?", id).
-		Where("state = ?", WorkflowEventStatePending).
+		Where("state = ?", CanvasEventStatePending).
 		First(&event).
 		Error
 
@@ -199,20 +203,20 @@ func LockWorkflowEvent(tx *gorm.DB, id uuid.UUID) (*WorkflowEvent, error) {
 	return &event, nil
 }
 
-func (e *WorkflowEvent) Routed() error {
+func (e *CanvasEvent) Routed() error {
 	return e.RoutedInTransaction(database.Conn())
 }
 
-func (e *WorkflowEvent) RoutedInTransaction(tx *gorm.DB) error {
-	e.State = WorkflowEventStateRouted
+func (e *CanvasEvent) RoutedInTransaction(tx *gorm.DB) error {
+	e.State = CanvasEventStateRouted
 	return tx.Save(e).Error
 }
 
 // FindLastEventPerNode finds the most recent event for each node in a workflow
 // using DISTINCT ON to get one event per node_id, ordered by created_at DESC
 // Only returns events for nodes that have not been deleted
-func FindLastEventPerNode(workflowID uuid.UUID) ([]WorkflowEvent, error) {
-	var events []WorkflowEvent
+func FindLastEventPerNode(canvasID uuid.UUID) ([]CanvasEvent, error) {
+	var events []CanvasEvent
 	err := database.Conn().
 		Raw(`
 			SELECT DISTINCT ON (we.node_id) we.*
@@ -223,7 +227,7 @@ func FindLastEventPerNode(workflowID uuid.UUID) ([]WorkflowEvent, error) {
 			WHERE we.workflow_id = ?
 			AND wn.deleted_at IS NULL
 			ORDER BY we.node_id, we.created_at DESC
-		`, workflowID).
+		`, canvasID).
 		Scan(&events).
 		Error
 
