@@ -141,7 +141,7 @@ func Test__AppInstallationRequestWorker_InvokeAction(t *testing.T) {
 	//
 	runAt := time.Now().Add(-time.Second)
 	require.NoError(t, installation.CreateActionRequest(database.Conn(), "test", nil, &runAt))
-	requests, err := installation.ListRequests(models.AppInstallationRequestTypeSync)
+	requests, err := installation.ListRequests(models.AppInstallationRequestTypeInvokeAction)
 	require.NoError(t, err)
 	require.Len(t, requests, 1)
 	request := &requests[0]
@@ -192,7 +192,7 @@ func Test__AppInstallationRequestWorker_InvokeActionError(t *testing.T) {
 	//
 	runAt := time.Now().Add(-time.Second)
 	require.NoError(t, installation.CreateActionRequest(database.Conn(), "test", nil, &runAt))
-	requests, err := installation.ListRequests(models.AppInstallationRequestTypeSync)
+	requests, err := installation.ListRequests(models.AppInstallationRequestTypeInvokeAction)
 	require.NoError(t, err)
 	require.Len(t, requests, 1)
 	request := &requests[0]

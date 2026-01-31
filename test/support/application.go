@@ -10,6 +10,8 @@ import (
 //
 
 type DummyIntegration struct {
+	actions                []core.Action
+	handleAction           func(ctx core.IntegrationActionContext) error
 	onSync                 func(ctx core.SyncContext) error
 	onCompareWebhookConfig func(a, b any) (bool, error)
 	onSetupWebhook         func(ctx core.SetupWebhookContext) (any, error)
@@ -29,6 +31,8 @@ func NewDummyIntegration(
 	options DummyIntegrationOptions,
 ) *DummyIntegration {
 	return &DummyIntegration{
+		actions:                options.Actions,
+		handleAction:           options.HandleAction,
 		onSync:                 options.OnSync,
 		onCompareWebhookConfig: options.OnCompareWebhookConfig,
 		onSetupWebhook:         options.OnSetupWebhook,
@@ -69,14 +73,14 @@ func (t *DummyIntegration) Triggers() []core.Trigger {
 }
 
 func (t *DummyIntegration) Actions() []core.Action {
-	return t.Actions()
+	return t.actions
 }
 
 func (t *DummyIntegration) HandleAction(ctx core.IntegrationActionContext) error {
-	if t.HandleAction == nil {
+	if t.handleAction == nil {
 		return nil
 	}
-	return t.HandleAction(ctx)
+	return t.handleAction(ctx)
 }
 
 func (t *DummyIntegration) Sync(ctx core.SyncContext) error {
