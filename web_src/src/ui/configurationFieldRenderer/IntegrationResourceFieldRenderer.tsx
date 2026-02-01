@@ -158,7 +158,7 @@ export const IntegrationResourceFieldRenderer = ({
 
     const selectedValue =
       useNameAsValue && typeof value === "string" && value
-        ? (resources.find((resource) => resource.id === value)?.name ?? value)
+        ? (resources.find((r) => r.id === value)?.name ?? value)
         : typeof value === "string"
           ? value
           : "";

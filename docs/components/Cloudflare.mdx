@@ -11,6 +11,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Update DNS Record" href="#update-dns-record" description="Update an existing DNS record in a Cloudflare zone" />
   <LinkCard title="Update Redirect Rule" href="#update-redirect-rule" description="Update a redirect rule in a Cloudflare zone" />
 </CardGrid>
 
@@ -26,11 +27,52 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
    - **Permissions** (click "+ Add more" to add each):
      - Zone / Zone / Read
      - Zone / Dynamic Redirect / Edit
+     - Zone / DNS / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
 5. Click **Continue to summary**, then **Create Token**
 6. Copy the token and paste it below
 
 > **Note**: The token is only shown once. Store it securely if needed elsewhere.
+
+<a id="update-dns-record"></a>
+
+## Update DNS Record
+
+The Update DNS Record component updates an existing DNS record in a Cloudflare zone.
+
+### Use Cases
+
+- **Infrastructure changes**: Update record content when an IP or target changes
+- **Release automation**: Switch a record to proxied or adjust TTL during a migration
+- **Verification**: Update TXT records for ownership verification as part of workflows
+
+### Configuration
+
+- **Record**: DNS record to update (e.g. zone-id/record-id or app.example.com)
+- **Content**: New record value
+- **TTL**: TTL in seconds (default 360)
+- **Proxied**: Whether Cloudflare should proxy traffic for this record
+
+### Output
+
+Emits the updated DNS record (id, type, name, content, proxied, ttl) on the default channel. If the update fails (e.g. record not found, invalid update), the component goes to an error state and does not emit.
+
+### Example Output
+
+```json
+{
+  "record": {
+    "content": "203.0.113.10",
+    "id": "record_abc123",
+    "name": "app.example.com",
+    "proxied": true,
+    "ttl": 1,
+    "type": "A"
+  },
+  "recordId": "record_abc123",
+  "zoneId": "zone_xyz789"
+}
+```
 
 <a id="update-redirect-rule"></a>
 
