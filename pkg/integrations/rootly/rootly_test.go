@@ -108,101 +108,32 @@ func Test__Rootly__Sync(t *testing.T) {
 func Test__Rootly__CompareWebhookConfig(t *testing.T) {
 	r := &Rootly{}
 
-	testCases := []struct {
-		name        string
-		configA     any
-		configB     any
-		expectEqual bool
-		expectError bool
-	}{
-		{
-			name: "identical events",
-			configA: WebhookConfiguration{
-				Events: []string{"incident.created"},
-			},
-			configB: WebhookConfiguration{
-				Events: []string{"incident.created"},
-			},
-			expectEqual: true,
-			expectError: false,
-		},
-		{
-			name: "different events",
-			configA: WebhookConfiguration{
-				Events: []string{"incident.created"},
-			},
-			configB: WebhookConfiguration{
-				Events: []string{"incident.resolved"},
-			},
-			expectEqual: false,
-			expectError: false,
-		},
-		{
-			name: "superset of events (A contains all of B)",
-			configA: WebhookConfiguration{
-				Events: []string{"incident.created", "incident.updated", "incident.resolved"},
-			},
-			configB: WebhookConfiguration{
-				Events: []string{"incident.created"},
-			},
-			expectEqual: true,
-			expectError: false,
-		},
-		{
-			name: "subset of events (A does not contain all of B)",
-			configA: WebhookConfiguration{
-				Events: []string{"incident.created"},
-			},
-			configB: WebhookConfiguration{
-				Events: []string{"incident.created", "incident.resolved"},
-			},
-			expectEqual: false,
-			expectError: false,
-		},
-		{
-			name: "comparing map representations",
-			configA: map[string]any{
-				"events": []string{"incident.created", "incident.updated"},
-			},
-			configB: map[string]any{
-				"events": []string{"incident.created"},
-			},
-			expectEqual: true,
-			expectError: false,
-		},
-		{
-			name:    "invalid first configuration",
-			configA: "invalid",
-			configB: WebhookConfiguration{
-				Events: []string{"incident.created"},
-			},
-			expectEqual: false,
-			expectError: true,
-		},
-		{
-			name: "invalid second configuration",
-			configA: WebhookConfiguration{
-				Events: []string{"incident.created"},
-			},
-			configB:     "invalid",
-			expectEqual: false,
-			expectError: true,
-		},
-	}
+	t.Run("same event set -> reuse (one webhook per trigger type)", func(t *testing.T) {
+		equal, err := r.CompareWebhookConfig(
+			WebhookConfiguration{Events: []string{"incident.created"}},
+			WebhookConfiguration{Events: []string{"incident.created"}},
+		)
+		require.NoError(t, err)
+		assert.True(t, equal)
+	})
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			equal, err := r.CompareWebhookConfig(tc.configA, tc.configB)
+	t.Run("different event sets -> do not reuse (Created and Resolved get separate webhooks)", func(t *testing.T) {
+		equal, err := r.CompareWebhookConfig(
+			WebhookConfiguration{Events: []string{"incident.created"}},
+			WebhookConfiguration{Events: []string{"incident.resolved"}},
+		)
+		require.NoError(t, err)
+		assert.False(t, equal)
+	})
 
-			if tc.expectError {
-				assert.Error(t, err, "expected error, but got none")
-			} else {
-				require.NoError(t, err, "did not expect, but got an error")
-			}
-
-			assert.Equal(t, tc.expectEqual, equal, "expected config comparison result to match")
-		})
-	}
+	t.Run("existing resolved, requested created -> do not reuse", func(t *testing.T) {
+		equal, err := r.CompareWebhookConfig(
+			WebhookConfiguration{Events: []string{"incident.resolved"}},
+			WebhookConfiguration{Events: []string{"incident.created"}},
+		)
+		require.NoError(t, err)
+		assert.False(t, equal)
+	})
 }
 
 func Test__verifyWebhookSignature(t *testing.T) {

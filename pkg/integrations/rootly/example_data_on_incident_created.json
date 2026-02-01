@@ -1,5 +1,5 @@
 {
-    "type": "rootly.onIncident",
+    "type": "rootly.onIncidentCreated",
     "data": {
         "event": "incident.created",
         "incident": {

@@ -68,7 +68,7 @@ func (r *Rootly) Components() []core.Component {
 
 func (r *Rootly) Triggers() []core.Trigger {
 	return []core.Trigger{
-		&OnIncident{},
+		&OnIncidentCreated{},
 		&OnIncidentResolved{},
 	}
 }
@@ -119,23 +119,24 @@ func (r *Rootly) CompareWebhookConfig(a, b any) (bool, error) {
 	configA := WebhookConfiguration{}
 	configB := WebhookConfiguration{}
 
-	err := mapstructure.Decode(a, &configA)
-	if err != nil {
+	if err := mapstructure.Decode(a, &configA); err != nil {
+		return false, err
+	}
+	if err := mapstructure.Decode(b, &configB); err != nil {
 		return false, err
 	}
 
-	err = mapstructure.Decode(b, &configB)
-	if err != nil {
-		return false, err
+	// Reuse only when event sets are identical (e.g. two "On Incident Created" nodes share one webhook).
+	// Different triggers (Created vs Resolved) have different event sets, so we create a new webhook
+	// and both endpoints appear in Rootly.
+	if len(configA.Events) != len(configB.Events) {
+		return false, nil
 	}
-
-	// Check if A contains all events from B (A is superset of B)
-	for _, eventB := range configB.Events {
-		if !slices.Contains(configA.Events, eventB) {
+	for _, e := range configB.Events {
+		if !slices.Contains(configA.Events, e) {
 			return false, nil
 		}
 	}
-
 	return true, nil
 }
 
@@ -151,7 +152,9 @@ func (r *Rootly) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 		return nil, fmt.Errorf("error decoding webhook configuration: %v", err)
 	}
 
-	endpoint, err := client.CreateWebhookEndpoint(ctx.Webhook.GetURL(), config.Events)
+	// Rootly requires a unique name per endpoint; use webhook ID so multiple triggers get separate endpoints.
+	name := "SuperPlane " + ctx.Webhook.GetID()
+	endpoint, err := client.CreateWebhookEndpoint(name, ctx.Webhook.GetURL(), config.Events)
 	if err != nil {
 		return nil, fmt.Errorf("error creating webhook endpoint: %v", err)
 	}
@@ -168,9 +171,15 @@ func (r *Rootly) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 
 func (r *Rootly) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 	metadata := WebhookMetadata{}
-	err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &metadata)
-	if err != nil {
-		return fmt.Errorf("error decoding webhook metadata: %v", err)
+	if ctx.Webhook.GetMetadata() != nil {
+		if err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &metadata); err != nil {
+			return fmt.Errorf("error decoding webhook metadata: %v", err)
+		}
+	}
+
+	// Nothing to delete if we never got an endpoint ID (e.g. webhook was never provisioned or is old).
+	if metadata.EndpointID == "" {
+		return nil
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)

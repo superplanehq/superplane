@@ -7,34 +7,17 @@ import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import { Incident } from "./types";
 import { getDetailsForIncident } from "./base";
 
-// Map event values to display labels (matching backend configuration)
-const eventLabels: Record<string, string> = {
-  "incident.created": "Created",
-  "incident.updated": "Updated",
-  "incident.mitigated": "Mitigated",
-  "incident.resolved": "Resolved",
-  "incident.cancelled": "Cancelled",
-  "incident.deleted": "Deleted",
-};
-
-function formatEventLabel(event: string): string {
-  return (
-    eventLabels[event] ||
-    event.replace("incident.", "").charAt(0).toUpperCase() + event.replace("incident.", "").slice(1)
-  );
-}
-
-interface OnIncidentEventData {
+interface OnIncidentCreatedEventData {
   event?: string;
   incident?: Incident;
 }
 
 /**
- * Renderer for the "rootly.onIncident" trigger type
+ * Renderer for the "rootly.onIncidentCreated" trigger type
  */
-export const onIncidentTriggerRenderer: TriggerRenderer = {
+export const onIncidentCreatedTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as OnIncidentEventData;
+    const eventData = event.data?.data as OnIncidentCreatedEventData;
     const incident = eventData?.incident;
     const contentParts = [incident?.severity?.name, incident?.status].filter(Boolean).join(" · ");
     const subtitle = buildSubtitle(contentParts, event.createdAt);
@@ -46,20 +29,26 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (lastEvent: CanvasesCanvasEvent): Record<string, string> => {
-    const eventData = lastEvent.data?.data as OnIncidentEventData;
+    const eventData = lastEvent.data?.data as OnIncidentCreatedEventData;
     return getDetailsForIncident(eventData?.incident!);
   },
 
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
-    const configuration = node.configuration as { events?: string[] };
-    const metadataItems = [];
+    const configuration = node.configuration as {
+      severityFilter?: string[];
+      serviceFilter?: string[];
+      teamFilter?: string[];
+    } | undefined;
 
-    if (configuration?.events) {
-      const formattedEvents = configuration.events.map(formatEventLabel).join(", ");
-      metadataItems.push({
-        icon: "funnel",
-        label: `Events: ${formattedEvents}`,
-      });
+    const metadataItems = [];
+    if (configuration?.severityFilter?.length) {
+      metadataItems.push({ icon: "funnel", label: `Severities: ${configuration.severityFilter.length}` });
+    }
+    if (configuration?.serviceFilter?.length) {
+      metadataItems.push({ icon: "funnel", label: `Services: ${configuration.serviceFilter.length}` });
+    }
+    if (configuration?.teamFilter?.length) {
+      metadataItems.push({ icon: "funnel", label: `Teams: ${configuration.teamFilter.length}` });
     }
 
     const props: TriggerProps = {
@@ -70,7 +59,7 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as OnIncidentEventData;
+      const eventData = lastEvent.data?.data as OnIncidentCreatedEventData;
       const incident = eventData?.incident;
       const contentParts = [incident?.severity?.name, incident?.status].filter(Boolean).join(" · ");
       const subtitle = buildSubtitle(contentParts, lastEvent.createdAt);

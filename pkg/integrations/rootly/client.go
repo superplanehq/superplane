@@ -440,12 +440,15 @@ type CreateWebhookEndpointAttributes struct {
 	SigningEnabled bool     `json:"signing_enabled"`
 }
 
-func (c *Client) CreateWebhookEndpoint(url string, events []string) (*WebhookEndpoint, error) {
+func (c *Client) CreateWebhookEndpoint(name, url string, events []string) (*WebhookEndpoint, error) {
+	if name == "" {
+		name = "SuperPlane"
+	}
 	request := CreateWebhookEndpointRequest{
 		Data: CreateWebhookEndpointData{
 			Type: "webhooks_endpoints",
 			Attributes: CreateWebhookEndpointAttributes{
-				Name:           "SuperPlane",
+				Name:           name,
 				URL:            url,
 				EventTypes:     events,
 				Enabled:        true,
@@ -479,6 +482,9 @@ func (c *Client) CreateWebhookEndpoint(url string, events []string) (*WebhookEnd
 }
 
 func (c *Client) DeleteWebhookEndpoint(id string) error {
+	if id == "" {
+		return nil
+	}
 	url := fmt.Sprintf("%s/webhooks/endpoints/%s", c.BaseURL, id)
 	_, err := c.execRequest(http.MethodDelete, url, nil)
 	return err

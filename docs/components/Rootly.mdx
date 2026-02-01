@@ -9,7 +9,7 @@ Manage and react to incidents in Rootly
 ## Triggers
 
 <CardGrid>
-  <LinkCard title="On Incident" href="#on-incident" description="Listen to incident events" />
+  <LinkCard title="On Incident Created" href="#on-incident-created" description="Listen to incident created events" />
   <LinkCard title="On Incident Resolved" href="#on-incident-resolved" description="Listen to incident resolved events" />
 </CardGrid>
 
@@ -21,27 +21,28 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in Rootly" />
 </CardGrid>
 
-<a id="on-incident"></a>
+<a id="on-incident-created"></a>
 
-## On Incident
+## On Incident Created
 
-The On Incident trigger starts a workflow execution when Rootly incident events occur.
+The On Incident Created trigger starts a workflow execution when a Rootly incident is created.
 
 ### Use Cases
 
-- **Incident automation**: Automate responses to incident events
-- **Notification workflows**: Send notifications when incidents are created or resolved
-- **Integration workflows**: Sync incidents with external systems
-- **Post-incident actions**: Trigger follow-up workflows when incidents are mitigated or resolved
+- **Incident automation**: Automate responses when new incidents are created
+- **Notification workflows**: Send notifications when incidents are created
+- **Integration workflows**: Sync new incidents with external systems
 
 ### Configuration
 
-- **Events**: Select which incident events to listen for (created, updated, mitigated, resolved, cancelled, deleted)
+- **Severity Filter** (optional): Only trigger for incidents with specific severity
+- **Service Filter** (optional): Only trigger for incidents attached to specific Rootly services
+- **Team Filter** (optional): Only trigger for incidents attached to specific Rootly teams
 
 ### Event Data
 
-Each incident event includes:
-- **event**: Event type (incident.created, incident.updated, etc.)
+Each incident created event includes:
+- **event**: incident.created
 - **incident**: Complete incident information including title, summary, severity, status
 
 ### Webhook Setup
@@ -67,7 +68,7 @@ This trigger automatically sets up a Rootly webhook endpoint when configured. Th
     }
   },
   "timestamp": "2026-01-19T12:00:00Z",
-  "type": "rootly.onIncident"
+  "type": "rootly.onIncidentCreated"
 }
 ```
 
