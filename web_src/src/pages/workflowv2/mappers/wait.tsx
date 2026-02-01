@@ -387,8 +387,8 @@ export const waitCustomFieldRenderer: CustomFieldRenderer = {
             examples={[
               '{{ $["Node Name"].data.wait_seconds }}',
               "{{ root().data.policy.delay_minutes }}",
-              "{{ previous().data.data.retry_after_seconds }}",
-              "{{ previous(2).data.data.backoff_seconds }}",
+              "{{ previous().data.retry_after_seconds }}",
+              "{{ previous(2).data.backoff_seconds }}",
               '{{ $["Node Name"].data.priority == "urgent" ? 0 : 30 }}',
               '{{ int($["Node Name"].data.delay_seconds) }}',
             ]}
