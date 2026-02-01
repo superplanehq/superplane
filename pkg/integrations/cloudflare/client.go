@@ -231,6 +231,31 @@ type DNSRecord struct {
 	Proxied bool   `json:"proxied"`
 }
 
+// ListDNSRecords retrieves all DNS records for a zone
+func (c *Client) ListDNSRecords(zoneID string) ([]DNSRecord, error) {
+	url := fmt.Sprintf("%s/zones/%s/dns_records", c.BaseURL, zoneID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool        `json:"success"`
+		Result  []DNSRecord `json:"result"`
+	}
+
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return response.Result, nil
+}
+
 // GetDNSRecord retrieves a DNS record by ID from a zone
 func (c *Client) GetDNSRecord(zoneID, recordID string) (*DNSRecord, error) {
 	url := fmt.Sprintf("%s/zones/%s/dns_records/%s", c.BaseURL, zoneID, recordID)

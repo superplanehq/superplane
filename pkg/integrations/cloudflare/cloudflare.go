@@ -158,6 +158,34 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 		}
 		return resources, nil
 
+	case "dns_record":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		metadata := Metadata{}
+		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+			return nil, fmt.Errorf("failed to decode application metadata: %w", err)
+		}
+
+		var resources []core.IntegrationResource
+		for _, zone := range metadata.Zones {
+			records, err := client.ListDNSRecords(zone.ID)
+			if err != nil {
+				continue
+			}
+
+			for _, record := range records {
+				resources = append(resources, core.IntegrationResource{
+					Type: resourceType,
+					Name: fmt.Sprintf("%s (%s)", record.Name, record.Type),
+					ID:   fmt.Sprintf("%s/%s", zone.ID, record.ID),
+				})
+			}
+		}
+		return resources, nil
+
 	default:
 		return []core.IntegrationResource{}, nil
 	}

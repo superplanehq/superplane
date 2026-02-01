@@ -300,6 +300,7 @@ export const ConfigurationFieldRenderer = ({
             autocompleteExampleObj={autocompleteExampleObj}
             labelRightRef={allowExpressions ? labelRightRef : undefined}
             labelRightReady={allowExpressions ? labelRightReady : false}
+            allValues={allValues}
           />
         );
 

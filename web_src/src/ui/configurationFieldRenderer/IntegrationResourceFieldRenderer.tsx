@@ -19,6 +19,8 @@ interface IntegrationResourceFieldRendererProps {
   autocompleteExampleObj?: Record<string, unknown> | null;
   labelRightRef?: RefObject<HTMLDivElement | null>;
   labelRightReady?: boolean;
+  /** Current values of sibling fields (e.g. zone); used to filter resources (e.g. dns_record by zone). */
+  allValues?: Record<string, unknown>;
 }
 
 type SelectOption = {
@@ -51,6 +53,7 @@ export const IntegrationResourceFieldRenderer = ({
   autocompleteExampleObj = null,
   labelRightRef,
   labelRightReady = false,
+  allValues = {},
 }: IntegrationResourceFieldRendererProps) => {
   const resourceType = field.typeOptions?.resource?.type;
   const useNameAsValue = field.typeOptions?.resource?.useNameAsValue ?? false;
@@ -67,11 +70,21 @@ export const IntegrationResourceFieldRenderer = ({
     error: resourcesError,
   } = useIntegrationResources(organizationId ?? "", integrationId ?? "", resourceType ?? "");
 
+  // Filter resources by zone when this is a dns_record field and zone is selected (Cloudflare record IDs are "zoneId/recordId")
+  const filteredResources = useMemo(() => {
+    if (!resources || resources.length === 0) return resources ?? [];
+    if (resourceType !== "dns_record") return resources;
+    const zoneValue = allValues["zone"];
+    const zoneId = typeof zoneValue === "string" ? zoneValue.trim() : "";
+    if (!zoneId) return [];
+    return resources.filter((r) => r.id != null && r.id.startsWith(zoneId + "/"));
+  }, [resources, resourceType, allValues]);
+
   // All hooks must be called before any early returns
   // Multi-select options (always compute, even if not used)
   const multiSelectOptions: SelectOption[] = useMemo(() => {
-    if (!resources || resources.length === 0) return [];
-    return resources
+    if (!filteredResources || filteredResources.length === 0) return [];
+    return filteredResources
       .map((resource) => {
         const optionValue = useNameAsValue
           ? (resource.name ?? resource.id ?? "")
@@ -81,7 +94,7 @@ export const IntegrationResourceFieldRenderer = ({
         return { id: optionValue, label: optionLabel, value: optionValue };
       })
       .filter((option): option is SelectOption => option !== null);
-  }, [resources, useNameAsValue]);
+  }, [filteredResources, useNameAsValue]);
 
   // Parse current value - handle both string (JSON) and array formats (always compute)
   const currentValue = useMemo(() => {
@@ -133,11 +146,17 @@ export const IntegrationResourceFieldRenderer = ({
     return <div className="text-sm text-red-500 dark:text-red-400">Failed to load resources</div>;
   }
 
-  if (!resources || resources.length === 0) {
+  if (!resources || resources.length === 0 || filteredResources.length === 0) {
     return (
       <Select disabled>
         <SelectTrigger className="w-full">
-          <SelectValue placeholder="No resources available" />
+          <SelectValue
+            placeholder={
+              resourceType === "dns_record" && !(typeof allValues["zone"] === "string" && allValues["zone"].trim())
+                ? "Select a zone first"
+                : "No resources available"
+            }
+          />
         </SelectTrigger>
       </Select>
     );
@@ -145,7 +164,7 @@ export const IntegrationResourceFieldRenderer = ({
 
   // Single select mode
   if (!isMulti) {
-    const options: AutoCompleteOption[] = resources
+    const options: AutoCompleteOption[] = filteredResources
       .map((resource) => {
         const optionValue = useNameAsValue
           ? (resource.name ?? resource.id ?? "")
@@ -158,7 +177,7 @@ export const IntegrationResourceFieldRenderer = ({
 
     const selectedValue =
       useNameAsValue && typeof value === "string" && value
-        ? (resources.find((resource) => resource.id === value)?.name ?? value)
+        ? (resources.find((r) => r.id === value)?.name ?? value)
         : typeof value === "string"
           ? value
           : "";

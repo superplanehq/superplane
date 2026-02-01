@@ -11,8 +11,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
-  <LinkCard title="Update Redirect Rule" href="#update-redirect-rule" description="Update a redirect rule in a Cloudflare zone" />
   <LinkCard title="Update DNS Record" href="#update-dns-record" description="Update an existing DNS record in a Cloudflare zone" />
+  <LinkCard title="Update Redirect Rule" href="#update-redirect-rule" description="Update a redirect rule in a Cloudflare zone" />
 </CardGrid>
 
 ## Instructions
@@ -33,6 +33,47 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 6. Copy the token and paste it below
 
 > **Note**: The token is only shown once. Store it securely if needed elsewhere.
+
+<a id="update-dns-record"></a>
+
+## Update DNS Record
+
+The Update DNS Record component updates an existing DNS record in a Cloudflare zone.
+
+### Use Cases
+
+- **Infrastructure changes**: Update record content when an IP or target changes
+- **Release automation**: Switch a record to proxied or adjust TTL during a migration
+- **Verification**: Update TXT records for ownership verification as part of workflows
+
+### Configuration
+
+- **Zone**: Zone ID or domain name (recommended: select a zone from the integration)
+- **Record**: DNS record to update (select from the list)
+- **Content**: New record value
+- **TTL**: TTL in seconds (default 360)
+- **Proxied**: Whether Cloudflare should proxy traffic for this record
+
+### Output
+
+Emits the updated DNS record (id, type, name, content, proxied, ttl) on the default channel. If the update fails (e.g. record not found, invalid update), the component goes to an error state and does not emit.
+
+### Example Output
+
+```json
+{
+  "record": {
+    "content": "203.0.113.10",
+    "id": "record_abc123",
+    "name": "app.example.com",
+    "proxied": true,
+    "ttl": 1,
+    "type": "A"
+  },
+  "recordId": "record_abc123",
+  "zoneId": "zone_xyz789"
+}
+```
 
 <a id="update-redirect-rule"></a>
 
@@ -87,49 +128,6 @@ Returns the updated redirect rule with all current configuration.
   },
   "ruleId": "rule_abc123",
   "zoneId": "zone_xyz789"
-}
-```
-
-<a id="update-dns-record"></a>
-
-## Update DNS Record
-
-The Update DNS Record component updates an existing DNS record in a Cloudflare zone.
-
-### Use Cases
-
-- **Infrastructure changes**: Update record content when an IP or target changes
-- **Release automation**: Switch a record to proxied or adjust TTL during a migration
-- **Verification**: Update TXT records for ownership verification as part of workflows
-
-### Configuration
-
-- **Zone**: Zone ID or domain name (recommended: select a zone from the integration)
-- **Record ID**: DNS record ID to update
-- **Content**: New record value (optional)
-- **TTL**: New TTL in seconds or 1 for auto (optional)
-- **Proxied**: Proxy through Cloudflare (optional)
-- **Name**: New record name (optional)
-
-### Output Channels
-
-- **Success**: Emits the updated DNS record (id, type, name, content, proxied, ttl)
-- **Failed**: Emits an error payload when the record cannot be updated (not found, invalid update, etc.)
-
-### Example Output
-
-```json
-{
-  "zoneId": "zone_xyz789",
-  "recordId": "record_abc123",
-  "record": {
-    "id": "record_abc123",
-    "type": "A",
-    "name": "app.example.com",
-    "content": "203.0.113.10",
-    "proxied": true,
-    "ttl": 1
-  }
 }
 ```
 

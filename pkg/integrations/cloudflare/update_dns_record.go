@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -11,11 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const (
-	DNSRecordPayloadType          = "cloudflare.dnsRecord"
-	DNSRecordSuccessOutputChannel = "success"
-	DNSRecordFailedOutputChannel  = "failed"
-)
+const DNSRecordPayloadType = "cloudflare.dnsRecord"
 
 type UpdateDNSRecord struct{}
 
@@ -23,10 +20,9 @@ type UpdateDNSRecordSpec struct {
 	Zone     string `json:"zone"`
 	RecordID string `json:"recordId"`
 
-	Content *string `json:"content,omitempty"`
-	TTL     *int    `json:"ttl,omitempty"`
-	Proxied *bool   `json:"proxied,omitempty"`
-	Name    *string `json:"name,omitempty"`
+	Content string `json:"content"`
+	TTL     int    `json:"ttl"`
+	Proxied bool   `json:"proxied"`
 }
 
 func (c *UpdateDNSRecord) Name() string {
@@ -53,16 +49,14 @@ func (c *UpdateDNSRecord) Documentation() string {
 ## Configuration
 
 - **Zone**: Zone ID or domain name (recommended: select a zone from the integration)
-- **Record ID**: DNS record ID to update
-- **Content**: New record value (optional)
-- **TTL**: New TTL in seconds or 1 for auto (optional)
-- **Proxied**: Proxy through Cloudflare (optional)
-- **Name**: New record name (optional)
+- **Record**: DNS record to update (select from the list)
+- **Content**: New record value
+- **TTL**: TTL in seconds (default 360)
+- **Proxied**: Whether Cloudflare should proxy traffic for this record
 
-## Output Channels
+## Output
 
-- **Success**: Emits the updated DNS record (id, type, name, content, proxied, ttl)
-- **Failed**: Emits an error payload when the record cannot be updated (not found, invalid update, etc.)`
+Emits the updated DNS record (id, type, name, content, proxied, ttl) on the default channel. If the update fails (e.g. record not found, invalid update), the component goes to an error state and does not emit.`
 }
 
 func (c *UpdateDNSRecord) Icon() string {
@@ -74,16 +68,7 @@ func (c *UpdateDNSRecord) Color() string {
 }
 
 func (c *UpdateDNSRecord) OutputChannels(configuration any) []core.OutputChannel {
-	return []core.OutputChannel{
-		{
-			Name:  DNSRecordSuccessOutputChannel,
-			Label: "Success",
-		},
-		{
-			Name:  DNSRecordFailedOutputChannel,
-			Label: "Failed",
-		},
-	}
+	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
 func (c *UpdateDNSRecord) Configuration() []configuration.Field {
@@ -103,17 +88,22 @@ func (c *UpdateDNSRecord) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "recordId",
-			Label:       "Record ID",
-			Type:        configuration.FieldTypeString,
+			Label:       "Record",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The ID of the DNS record to update",
+			Description: "The DNS record to update",
+			Placeholder: "Select a record",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "dns_record",
+				},
+			},
 		},
 		{
 			Name:        "content",
 			Label:       "Content",
 			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Togglable:   true,
+			Required:    true,
 			Description: "New record value (e.g. IP address for A record, hostname for CNAME)",
 			Placeholder: "1.2.3.4",
 		},
@@ -121,9 +111,9 @@ func (c *UpdateDNSRecord) Configuration() []configuration.Field {
 			Name:        "ttl",
 			Label:       "TTL",
 			Type:        configuration.FieldTypeNumber,
-			Required:    false,
-			Togglable:   true,
-			Description: "TTL in seconds, or 1 for auto",
+			Required:    true,
+			Default:     360,
+			Description: "TTL in seconds",
 			TypeOptions: &configuration.TypeOptions{
 				Number: &configuration.NumberTypeOptions{
 					Min: func() *int { min := 1; return &min }(),
@@ -134,18 +124,9 @@ func (c *UpdateDNSRecord) Configuration() []configuration.Field {
 			Name:        "proxied",
 			Label:       "Proxied",
 			Type:        configuration.FieldTypeBool,
-			Required:    false,
-			Togglable:   true,
+			Required:    true,
+			Default:     false,
 			Description: "Whether Cloudflare should proxy traffic for this record",
-		},
-		{
-			Name:        "name",
-			Label:       "Name",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Togglable:   true,
-			Description: "New record name (e.g. subdomain or full record name)",
-			Placeholder: "www.example.com",
 		},
 	}
 }
@@ -165,15 +146,11 @@ func (c *UpdateDNSRecord) Setup(ctx core.SetupContext) error {
 		return errors.New("recordId is required")
 	}
 
-	if spec.Content != nil && *spec.Content == "" {
-		return errors.New("content cannot be empty when provided")
+	if spec.Content == "" {
+		return errors.New("content is required")
 	}
 
-	if spec.Name != nil && *spec.Name == "" {
-		return errors.New("name cannot be empty when provided")
-	}
-
-	if spec.TTL != nil && *spec.TTL < 1 {
+	if spec.TTL < 1 {
 		return errors.New("ttl must be >= 1")
 	}
 
@@ -187,22 +164,16 @@ func (c *UpdateDNSRecord) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	zoneID := c.resolveZoneID(spec.Zone, ctx.Integration.GetMetadata())
+	zoneID, recordID := c.parseZoneAndRecordID(spec.RecordID, spec.Zone, ctx.Integration.GetMetadata())
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	existing, err := client.GetDNSRecord(zoneID, spec.RecordID)
+	existing, err := client.GetDNSRecord(zoneID, recordID)
 	if err != nil {
-		return ctx.ExecutionState.Emit(DNSRecordFailedOutputChannel, DNSRecordPayloadType, []any{
-			map[string]any{
-				"error":    err.Error(),
-				"zoneId":   zoneID,
-				"recordId": spec.RecordID,
-			},
-		})
+		return fmt.Errorf("get DNS record: %w", err)
 	}
 
 	updateReq := UpdateDNSRecordRequest{
@@ -213,37 +184,32 @@ func (c *UpdateDNSRecord) Execute(ctx core.ExecutionContext) error {
 		Proxied: existing.Proxied,
 	}
 
-	if spec.Content != nil {
-		updateReq.Content = *spec.Content
-	}
-	if spec.TTL != nil {
-		updateReq.TTL = *spec.TTL
-	}
-	if spec.Proxied != nil {
-		updateReq.Proxied = *spec.Proxied
-	}
-	if spec.Name != nil {
-		updateReq.Name = *spec.Name
-	}
+	updateReq.Content = spec.Content
+	updateReq.TTL = spec.TTL
+	updateReq.Proxied = spec.Proxied
 
-	updated, err := client.UpdateDNSRecord(zoneID, spec.RecordID, updateReq)
+	updated, err := client.UpdateDNSRecord(zoneID, recordID, updateReq)
 	if err != nil {
-		return ctx.ExecutionState.Emit(DNSRecordFailedOutputChannel, DNSRecordPayloadType, []any{
-			map[string]any{
-				"error":    err.Error(),
-				"zoneId":   zoneID,
-				"recordId": spec.RecordID,
-			},
-		})
+		return fmt.Errorf("update DNS record: %w", err)
 	}
 
-	return ctx.ExecutionState.Emit(DNSRecordSuccessOutputChannel, DNSRecordPayloadType, []any{
+	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, DNSRecordPayloadType, []any{
 		map[string]any{
 			"zoneId":   zoneID,
 			"recordId": updated.ID,
 			"record":   updated,
 		},
 	})
+}
+
+// parseZoneAndRecordID returns zoneID and recordID. If recordIDValue contains "/" (from
+// integration resource selection), it is split into zone and record ID; otherwise zone
+// is resolved from zoneValue and recordIDValue is used as the record ID (backward compat).
+func (c *UpdateDNSRecord) parseZoneAndRecordID(recordIDValue, zoneValue string, integrationMetadata any) (zoneID, recordID string) {
+	if zonePart, recordPart, ok := strings.Cut(recordIDValue, "/"); ok && zonePart != "" && recordPart != "" {
+		return zonePart, recordPart
+	}
+	return c.resolveZoneID(zoneValue, integrationMetadata), recordIDValue
 }
 
 func (c *UpdateDNSRecord) resolveZoneID(zone string, integrationMetadata any) string {
@@ -280,4 +246,3 @@ func (c *UpdateDNSRecord) HandleAction(ctx core.ActionContext) error {
 func (c *UpdateDNSRecord) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
-

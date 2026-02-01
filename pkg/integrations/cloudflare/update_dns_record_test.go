@@ -40,12 +40,29 @@ func Test__UpdateDNSRecord__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "recordId is required")
 	})
 
+	t.Run("missing content returns error", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{
+				"zone":     "zone123",
+				"recordId": "record123",
+				"content":  "",
+				"ttl":      360,
+				"proxied":  false,
+			},
+		}
+
+		err := component.Setup(ctx)
+		require.ErrorContains(t, err, "content is required")
+	})
+
 	t.Run("ttl < 1 returns error", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"zone":     "zone123",
 				"recordId": "record123",
+				"content":  "1.2.3.4",
 				"ttl":      0,
+				"proxied":  false,
 			},
 		}
 
@@ -59,9 +76,8 @@ func Test__UpdateDNSRecord__Setup(t *testing.T) {
 				"zone":     "zone123",
 				"recordId": "record123",
 				"content":  "1.2.3.4",
-				"ttl":      1,
+				"ttl":      360,
 				"proxied":  true,
-				"name":     "app.example.com",
 			},
 		}
 
@@ -145,7 +161,7 @@ func Test__UpdateDNSRecord__Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.True(t, execState.Passed)
-		assert.Equal(t, DNSRecordSuccessOutputChannel, execState.Channel)
+		assert.Equal(t, core.DefaultOutputChannel.Name, execState.Channel)
 		assert.Equal(t, DNSRecordPayloadType, execState.Type)
 		assert.Len(t, execState.Payloads, 1)
 
@@ -168,7 +184,7 @@ func Test__UpdateDNSRecord__Execute(t *testing.T) {
 		assert.Equal(t, true, req["proxied"])
 	})
 
-	t.Run("record lookup error emits failed channel", func(t *testing.T) {
+	t.Run("record lookup error returns error and does not emit", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -192,6 +208,9 @@ func Test__UpdateDNSRecord__Execute(t *testing.T) {
 			Configuration: map[string]any{
 				"zone":     "zone123",
 				"recordId": "record123",
+				"content":  "1.2.3.4",
+				"ttl":      360,
+				"proxied":  false,
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -199,11 +218,10 @@ func Test__UpdateDNSRecord__Execute(t *testing.T) {
 		}
 
 		err := component.Execute(ctx)
-		require.NoError(t, err)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "get DNS record")
 
-		assert.True(t, execState.Passed)
-		assert.Equal(t, DNSRecordFailedOutputChannel, execState.Channel)
-		assert.Equal(t, DNSRecordPayloadType, execState.Type)
+		assert.False(t, execState.Passed)
+		assert.Empty(t, execState.Channel)
 	})
 }
-
