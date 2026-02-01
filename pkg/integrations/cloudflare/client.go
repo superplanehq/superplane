@@ -18,6 +18,21 @@ type Client struct {
 	BaseURL string
 }
 
+type CloudflareError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+type CloudflareAPIError struct {
+	StatusCode int
+	Errors     []CloudflareError
+	Body       []byte
+}
+
+func (e *CloudflareAPIError) Error() string {
+	return fmt.Sprintf("request got %d code: %s", e.StatusCode, string(e.Body))
+}
+
 func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
 	apiToken, err := ctx.GetConfig("apiToken")
 	if err != nil {
@@ -32,9 +47,22 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 }
 
 func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error) {
+	statusCode, responseBody, err := c.execRequestRaw(method, url, body)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode < 200 || statusCode >= 300 {
+		return nil, newCloudflareAPIError(statusCode, responseBody)
+	}
+
+	return responseBody, nil
+}
+
+func (c *Client) execRequestRaw(method, url string, body io.Reader) (int, []byte, error) {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
-		return nil, fmt.Errorf("error building request: %v", err)
+		return 0, nil, fmt.Errorf("error building request: %v", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -42,20 +70,33 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 
 	res, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error executing request: %v", err)
+		return 0, nil, fmt.Errorf("error executing request: %v", err)
 	}
 	defer res.Body.Close()
 
 	responseBody, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading body: %v", err)
+		return res.StatusCode, nil, fmt.Errorf("error reading body: %v", err)
 	}
 
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+	return res.StatusCode, responseBody, nil
+}
+
+func newCloudflareAPIError(statusCode int, responseBody []byte) *CloudflareAPIError {
+	apiError := &CloudflareAPIError{
+		StatusCode: statusCode,
+		Body:       responseBody,
 	}
 
-	return responseBody, nil
+	var payload struct {
+		Errors []CloudflareError `json:"errors"`
+	}
+
+	if err := json.Unmarshal(responseBody, &payload); err == nil {
+		apiError.Errors = payload.Errors
+	}
+
+	return apiError
 }
 
 // Zone represents a Cloudflare zone
@@ -223,12 +264,13 @@ func (c *Client) GetRulesetForPhase(zoneID, phase string) (*Ruleset, error) {
 
 // DNSRecord represents a Cloudflare DNS record
 type DNSRecord struct {
-	ID      string `json:"id"`
-	Type    string `json:"type"`
-	Name    string `json:"name"`
-	Content string `json:"content"`
-	TTL     int    `json:"ttl"`
-	Proxied bool   `json:"proxied"`
+	ID       string `json:"id"`
+	Type     string `json:"type"`
+	Name     string `json:"name"`
+	Content  string `json:"content"`
+	TTL      int    `json:"ttl"`
+	Proxied  bool   `json:"proxied"`
+	Priority *int   `json:"priority,omitempty"`
 }
 
 // ListDNSRecords retrieves all DNS records for a zone
@@ -365,4 +407,48 @@ func (c *Client) CreateRedirectRule(zoneID, rulesetID string, req CreateRedirect
 	}
 
 	return nil, fmt.Errorf("created rule not found in response")
+}
+
+type CreateDNSRecordRequest struct {
+	Type     string `json:"type"`
+	Name     string `json:"name"`
+	Content  string `json:"content"`
+	TTL      *int   `json:"ttl,omitempty"`
+	Proxied  *bool  `json:"proxied,omitempty"`
+	Priority *int   `json:"priority,omitempty"`
+}
+
+func (c *Client) CreateDNSRecord(zoneID string, req CreateDNSRecordRequest) (*DNSRecord, error) {
+	url := fmt.Sprintf("%s/zones/%s/dns_records", c.BaseURL, zoneID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool              `json:"success"`
+		Result  DNSRecord         `json:"result"`
+		Errors  []CloudflareError `json:"errors"`
+	}
+
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, &CloudflareAPIError{
+			StatusCode: http.StatusOK,
+			Errors:     response.Errors,
+			Body:       responseBody,
+		}
+	}
+
+	return &response.Result, nil
 }

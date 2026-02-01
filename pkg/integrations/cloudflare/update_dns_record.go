@@ -12,8 +12,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const DNSRecordPayloadType = "cloudflare.dnsRecord"
-
 type UpdateDNSRecord struct{}
 
 type UpdateDNSRecordSpec struct {
