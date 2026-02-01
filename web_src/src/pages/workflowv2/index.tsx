@@ -3038,10 +3038,10 @@ function prepareTriggerNode(
   const triggerMetadata = triggers.find((t) => t.name === node.trigger?.name);
   const renderer = getTriggerRenderer(node.trigger?.name || "");
   const lastEvent = nodeEventsMap[node.id!]?.[0];
-  const triggerProps = renderer.getTriggerProps(node, triggerMetadata!, lastEvent);
+  const triggerProps = renderer.getTriggerProps(node, triggerMetadata || {}, lastEvent);
 
   // Use node name if available, otherwise fall back to trigger label (from metadata)
-  const displayLabel = node.name || triggerMetadata?.label!;
+  const displayLabel = node.name || triggerMetadata?.label || node.trigger?.name || "Trigger";
 
   return {
     id: node.id!,
