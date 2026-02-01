@@ -13,10 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const (
-	CreateDNSRecordFailedOutputChannel = "failed"
-	DNSRecordPayloadType               = "cloudflare.dnsRecord"
-)
+const DNSRecordPayloadType = "cloudflare.dnsRecord"
 
 var (
 	allowedDNSRecordTypes   = []string{"A", "AAAA", "CAA", "CNAME", "MX", "NS", "SRV", "TXT"}
@@ -67,10 +64,9 @@ func (c *CreateDNSRecord) Documentation() string {
 - **Proxied**: Proxy through Cloudflare (A, AAAA, CNAME only)
 - **Priority**: Priority value (MX or SRV only)
 
-## Output Channels
+## Output
 
-- **Success**: Emits the created DNS record
-- **Failed**: Emits when the zone is not found, the record is invalid, or a duplicate exists`
+Emits the created DNS record on the default channel. If the zone is not found, the record is invalid, or a duplicate exists, the run fails.`
 }
 
 func (c *CreateDNSRecord) Icon() string {
@@ -85,11 +81,7 @@ func (c *CreateDNSRecord) OutputChannels(configuration any) []core.OutputChannel
 	return []core.OutputChannel{
 		{
 			Name:  core.DefaultOutputChannel.Name,
-			Label: "Success",
-		},
-		{
-			Name:  CreateDNSRecordFailedOutputChannel,
-			Label: "Failed",
+			Label: core.DefaultOutputChannel.Label,
 		},
 	}
 }
@@ -148,10 +140,11 @@ func (c *CreateDNSRecord) Configuration() []configuration.Field {
 			Label:       "TTL",
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
-			Description: "TTL in seconds (use 1 for auto)",
+			Description: "TTL in seconds (1 for automatic, or 60–86400)",
 			TypeOptions: &configuration.TypeOptions{
 				Number: &configuration.NumberTypeOptions{
 					Min: func() *int { min := 1; return &min }(),
+					Max: func() *int { max := 86400; return &max }(),
 				},
 			},
 		},
@@ -206,8 +199,11 @@ func (c *CreateDNSRecord) Setup(ctx core.SetupContext) error {
 	if spec.Content == "" {
 		return errors.New("content is required")
 	}
-	if spec.TTL != nil && *spec.TTL < 1 {
-		return errors.New("ttl must be greater than 0")
+	if spec.TTL != nil {
+		ttl := *spec.TTL
+		if ttl != 1 && (ttl < 60 || ttl > 86400) {
+			return errors.New("TTL must be 1 (automatic) or between 60 and 86400 seconds")
+		}
 	}
 	if spec.Proxied != nil && *spec.Proxied && !slices.Contains(proxyableDNSRecordTypes, recordType) {
 		return errors.New("proxied is only supported for A, AAAA, and CNAME records")
@@ -223,6 +219,13 @@ func (c *CreateDNSRecord) Execute(ctx core.ExecutionContext) error {
 	spec := CreateDNSRecordSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("error decoding configuration: %v", err)
+	}
+
+	if spec.TTL != nil {
+		ttl := *spec.TTL
+		if ttl != 1 && (ttl < 60 || ttl > 86400) {
+			return fmt.Errorf("TTL must be 1 (automatic) or between 60 and 86400 seconds, got %d", ttl)
+		}
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -254,15 +257,7 @@ func (c *CreateDNSRecord) Execute(ctx core.ExecutionContext) error {
 
 	record, err := client.CreateDNSRecord(zoneID, req)
 	if err != nil {
-		var apiErr *CloudflareAPIError
-		if errors.As(err, &apiErr) && shouldEmitDNSRecordFailure(apiErr) {
-			return ctx.ExecutionState.Emit(
-				CreateDNSRecordFailedOutputChannel,
-				DNSRecordPayloadType,
-				[]any{dnsRecordFailurePayload(apiErr)},
-			)
-		}
-		return fmt.Errorf("failed to create DNS record: %v", err)
+		return fmt.Errorf("failed to create DNS record: %w", err)
 	}
 
 	return ctx.ExecutionState.Emit(
@@ -313,40 +308,6 @@ func resolveZoneID(value string, integration core.IntegrationContext) string {
 	}
 
 	return value
-}
-
-func shouldEmitDNSRecordFailure(err *CloudflareAPIError) bool {
-	switch err.StatusCode {
-	case http.StatusBadRequest, http.StatusNotFound, http.StatusConflict, http.StatusUnprocessableEntity:
-		return true
-	default:
-		return false
-	}
-}
-
-func dnsRecordFailurePayload(err *CloudflareAPIError) map[string]any {
-	message := err.Error()
-	if len(err.Errors) > 0 {
-		message = err.Errors[0].Message
-	}
-
-	payload := map[string]any{
-		"error":      message,
-		"statusCode": err.StatusCode,
-	}
-
-	if len(err.Errors) > 0 {
-		errorItems := make([]map[string]any, 0, len(err.Errors))
-		for _, e := range err.Errors {
-			errorItems = append(errorItems, map[string]any{
-				"code":    e.Code,
-				"message": e.Message,
-			})
-		}
-		payload["errors"] = errorItems
-	}
-
-	return payload
 }
 
 func dnsRecordToMap(record *DNSRecord) map[string]any {

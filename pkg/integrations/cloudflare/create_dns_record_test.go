@@ -116,7 +116,7 @@ func Test__CreateDNSRecord__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "priority is only supported")
 	})
 
-	t.Run("ttl below 1 returns error", func(t *testing.T) {
+	t.Run("ttl 0 returns error", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"zone":    "zone123",
@@ -128,7 +128,69 @@ func Test__CreateDNSRecord__Setup(t *testing.T) {
 		}
 
 		err := component.Setup(ctx)
-		require.ErrorContains(t, err, "ttl must be greater than 0")
+		require.ErrorContains(t, err, "TTL must be 1 (automatic) or between 60 and 86400 seconds")
+	})
+
+	t.Run("ttl between 2 and 59 returns error", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{
+				"zone":    "zone123",
+				"type":    "A",
+				"name":    "api",
+				"content": "192.0.2.1",
+				"ttl":     50,
+			},
+		}
+
+		err := component.Setup(ctx)
+		require.ErrorContains(t, err, "TTL must be 1 (automatic) or between 60 and 86400 seconds")
+	})
+
+	t.Run("ttl above 86400 returns error", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{
+				"zone":    "zone123",
+				"type":    "A",
+				"name":    "api",
+				"content": "192.0.2.1",
+				"ttl":     90000,
+			},
+		}
+
+		err := component.Setup(ctx)
+		require.ErrorContains(t, err, "TTL must be 1 (automatic) or between 60 and 86400 seconds")
+	})
+
+	t.Run("ttl 1 is valid", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{
+				"zone":    "zone123",
+				"type":    "A",
+				"name":    "api",
+				"content": "192.0.2.1",
+				"ttl":     1,
+			},
+		}
+
+		err := component.Setup(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("ttl 60 and 86400 are valid", func(t *testing.T) {
+		for _, ttl := range []int{60, 86400} {
+			ctx := core.SetupContext{
+				Configuration: map[string]any{
+					"zone":    "zone123",
+					"type":    "A",
+					"name":    "api",
+					"content": "192.0.2.1",
+					"ttl":     ttl,
+				},
+			}
+
+			err := component.Setup(ctx)
+			require.NoError(t, err, "TTL %d should be valid", ttl)
+		}
 	})
 
 	t.Run("valid configuration passes", func(t *testing.T) {
@@ -230,7 +292,7 @@ func Test__CreateDNSRecord__Execute(t *testing.T) {
 		assert.Equal(t, "api.example.com", data["name"])
 	})
 
-	t.Run("validation error emits failed channel", func(t *testing.T) {
+	t.Run("validation error fails run", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -264,16 +326,8 @@ func Test__CreateDNSRecord__Execute(t *testing.T) {
 
 		err := component.Execute(ctx)
 
-		require.NoError(t, err)
-		assert.True(t, execState.Passed)
-		assert.Equal(t, CreateDNSRecordFailedOutputChannel, execState.Channel)
-		assert.Equal(t, DNSRecordPayloadType, execState.Type)
-		assert.Len(t, execState.Payloads, 1)
-
-		output := execState.Payloads[0].(map[string]any)
-		data := output["data"].(map[string]any)
-		assert.Equal(t, "DNS record is invalid", data["error"])
-		assert.Equal(t, http.StatusBadRequest, data["statusCode"])
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create DNS record")
 	})
 
 	t.Run("unauthorized error returns error", func(t *testing.T) {

@@ -58,10 +58,9 @@ The Create DNS Record component creates a DNS record in a Cloudflare zone.
 - **Proxied**: Proxy through Cloudflare (A, AAAA, CNAME only)
 - **Priority**: Priority value (MX or SRV only)
 
-### Output Channels
+### Output
 
-- **Success**: Emits the created DNS record
-- **Failed**: Emits when the zone is not found, the record is invalid, or a duplicate exists
+Emits the created DNS record on the default channel. If the zone is not found, the record is invalid, or a duplicate exists, the run fails.
 
 ### Example Output
 
