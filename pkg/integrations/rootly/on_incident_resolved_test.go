@@ -128,4 +128,3 @@ func Test__OnIncidentResolved__Setup(t *testing.T) {
 	webhookConfig := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
 	assert.Equal(t, []string{"incident.resolved"}, webhookConfig.Events)
 }
-

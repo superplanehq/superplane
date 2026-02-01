@@ -86,12 +86,14 @@ The On Incident Resolved trigger starts a workflow execution when a Rootly incid
 ### Configuration
 
 - **Severity Filter** (optional): Only trigger for incidents with specific severity
-- **Service Filter** (optional): Only trigger for incidents attached to specific Rootly service(s)
-- **Team Filter** (optional): Only trigger for incidents attached to specific Rootly team(s)
+- **Service Filter** (optional): Only trigger for incidents attached to specific Rootly services
+- **Team Filter** (optional): Only trigger for incidents attached to specific Rootly teams
 
 ### Event Data
 
-Each resolved incident event includes an `incident` object with fields like `id`, `sequential_id`, `title`, `slug`, `status`, `resolution_message`, `resolved_at`, `resolved_by`, and `url`.
+The emitted payload includes the resolved incident data. At minimum, it includes:
+- **event**: `incident.resolved`
+- **incident**: A map containing fields like id, sequential_id, title, slug, status, resolution_message, resolved_at, resolved_by, url
 
 ### Webhook Setup
 
@@ -104,21 +106,21 @@ This trigger automatically sets up a Rootly webhook endpoint when configured. Th
   "data": {
     "event": "incident.resolved",
     "event_id": "evt-123",
-    "issued_at": "2026-01-19T12:45:00Z",
     "incident": {
       "id": "abc123-def456",
-      "sequential_id": 42,
-      "title": "API latency spike detected",
-      "slug": "api-latency-spike-detected",
-      "status": "resolved",
       "resolution_message": "The issue was caused by a bad deploy; rollback restored normal latency.",
       "resolved_at": "2026-01-19T12:44:30Z",
       "resolved_by": {
         "id": "usr-123",
         "name": "Jane Doe"
       },
+      "sequential_id": 42,
+      "slug": "api-latency-spike-detected",
+      "status": "resolved",
+      "title": "API latency spike detected",
       "url": "https://app.rootly.com/incidents/abc123-def456"
-    }
+    },
+    "issued_at": "2026-01-19T12:45:00Z"
   },
   "timestamp": "2026-01-19T12:45:00Z",
   "type": "rootly.onIncidentResolved"

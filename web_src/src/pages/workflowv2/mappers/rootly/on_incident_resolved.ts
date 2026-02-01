@@ -97,4 +97,3 @@ function buildSubtitle(content: string, createdAt?: string): string {
 
   return content || timeAgo;
 }
-
