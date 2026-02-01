@@ -1,0 +1,23 @@
+{
+  "type": "rootly.onIncidentResolved",
+  "data": {
+    "event": "incident.resolved",
+    "event_id": "evt-123",
+    "issued_at": "2026-01-19T12:45:00Z",
+    "incident": {
+      "id": "abc123-def456",
+      "sequential_id": 42,
+      "title": "API latency spike detected",
+      "slug": "api-latency-spike-detected",
+      "status": "resolved",
+      "resolution_message": "The issue was caused by a bad deploy; rollback restored normal latency.",
+      "resolved_at": "2026-01-19T12:44:30Z",
+      "resolved_by": {
+        "id": "usr-123",
+        "name": "Jane Doe"
+      },
+      "url": "https://app.rootly.com/incidents/abc123-def456"
+    }
+  },
+  "timestamp": "2026-01-19T12:45:00Z"
+}

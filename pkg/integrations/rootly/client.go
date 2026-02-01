@@ -136,6 +136,62 @@ func (c *Client) GetService(id string) (*Service, error) {
 	}, nil
 }
 
+// Team represents a Rootly team
+type Team struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Slug        string `json:"slug"`
+	Description string `json:"description"`
+}
+
+// TeamResponse represents the JSON:API response for a team
+type TeamResponse struct {
+	Data TeamData `json:"data"`
+}
+
+type TeamData struct {
+	ID         string         `json:"id"`
+	Type       string         `json:"type"`
+	Attributes TeamAttributes `json:"attributes"`
+}
+
+type TeamAttributes struct {
+	Name        string `json:"name"`
+	Slug        string `json:"slug"`
+	Description string `json:"description"`
+}
+
+// TeamsResponse represents the JSON:API response for listing teams
+type TeamsResponse struct {
+	Data []TeamData `json:"data"`
+}
+
+func (c *Client) ListTeams() ([]Team, error) {
+	url := fmt.Sprintf("%s/teams", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response TeamsResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	teams := make([]Team, 0, len(response.Data))
+	for _, data := range response.Data {
+		teams = append(teams, Team{
+			ID:          data.ID,
+			Name:        data.Attributes.Name,
+			Slug:        data.Attributes.Slug,
+			Description: data.Attributes.Description,
+		})
+	}
+
+	return teams, nil
+}
+
 // Severity represents a Rootly severity level
 type Severity struct {
 	ID          string `json:"id"`

@@ -1,5 +1,6 @@
 import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { onIncidentTriggerRenderer } from "./on_incident";
+import { onIncidentResolvedTriggerRenderer } from "./on_incident_resolved";
 import { createIncidentMapper } from "./create_incident";
 import { buildActionStateRegistry } from "../github/utils";
 
@@ -9,6 +10,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
   onIncident: onIncidentTriggerRenderer,
+  onIncidentResolved: onIncidentResolvedTriggerRenderer,
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {

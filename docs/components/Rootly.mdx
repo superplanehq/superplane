@@ -10,6 +10,7 @@ Manage and react to incidents in Rootly
 
 <CardGrid>
   <LinkCard title="On Incident" href="#on-incident" description="Listen to incident events" />
+  <LinkCard title="On Incident Resolved" href="#on-incident-resolved" description="Listen to incident resolved events" />
 </CardGrid>
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
@@ -67,6 +68,60 @@ This trigger automatically sets up a Rootly webhook endpoint when configured. Th
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "rootly.onIncident"
+}
+```
+
+<a id="on-incident-resolved"></a>
+
+## On Incident Resolved
+
+The On Incident Resolved trigger starts a workflow execution when a Rootly incident is resolved.
+
+### Use Cases
+
+- **Close tickets**: Close linked Jira/ServiceNow tickets when the Rootly incident is resolved
+- **Status updates**: Post to a status page or Slack when resolution is recorded
+- **Post-incident steps**: Trigger retros, follow-ups, or action item syncs
+
+### Configuration
+
+- **Severity Filter** (optional): Only trigger for incidents with specific severity
+- **Service Filter** (optional): Only trigger for incidents attached to specific Rootly service(s)
+- **Team Filter** (optional): Only trigger for incidents attached to specific Rootly team(s)
+
+### Event Data
+
+Each resolved incident event includes an `incident` object with fields like `id`, `sequential_id`, `title`, `slug`, `status`, `resolution_message`, `resolved_at`, `resolved_by`, and `url`.
+
+### Webhook Setup
+
+This trigger automatically sets up a Rootly webhook endpoint when configured. The endpoint is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "event": "incident.resolved",
+    "event_id": "evt-123",
+    "issued_at": "2026-01-19T12:45:00Z",
+    "incident": {
+      "id": "abc123-def456",
+      "sequential_id": 42,
+      "title": "API latency spike detected",
+      "slug": "api-latency-spike-detected",
+      "status": "resolved",
+      "resolution_message": "The issue was caused by a bad deploy; rollback restored normal latency.",
+      "resolved_at": "2026-01-19T12:44:30Z",
+      "resolved_by": {
+        "id": "usr-123",
+        "name": "Jane Doe"
+      },
+      "url": "https://app.rootly.com/incidents/abc123-def456"
+    }
+  },
+  "timestamp": "2026-01-19T12:45:00Z",
+  "type": "rootly.onIncidentResolved"
 }
 ```
 
