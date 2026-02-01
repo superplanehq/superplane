@@ -75,7 +75,14 @@ type IntegrationContext struct {
 	Secrets          map[string]core.IntegrationSecret
 	WebhookRequests  []any
 	ResyncRequests   []time.Duration
+	ActionRequests   []ActionRequest
 	Subscriptions    []Subscription
+}
+
+type ActionRequest struct {
+	ActionName string
+	Parameters any
+	Interval   time.Duration
 }
 
 type Subscription struct {
@@ -155,6 +162,11 @@ func (c *IntegrationContext) RequestWebhook(configuration any) error {
 
 func (c *IntegrationContext) ScheduleResync(interval time.Duration) error {
 	c.ResyncRequests = append(c.ResyncRequests, interval)
+	return nil
+}
+
+func (c *IntegrationContext) ScheduleActionCall(actionName string, parameters any, interval time.Duration) error {
+	c.ActionRequests = append(c.ActionRequests, ActionRequest{ActionName: actionName, Parameters: parameters, Interval: interval})
 	return nil
 }
 

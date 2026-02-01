@@ -4,14 +4,14 @@ import { useParams } from "react-router-dom";
 import { BlueprintsBlueprint, ComponentsComponent, ComponentsEdge, ComponentsNode } from "@/api-client";
 import { useBlueprint, useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useChildExecutions, useWorkflow } from "@/hooks/useWorkflowData";
+import { useChildExecutions, useCanvas } from "@/hooks/useCanvasData";
 import { getTriggerRenderer } from "@/pages/workflowv2/mappers";
 import { CanvasEdge, CanvasNode, CanvasPage } from "@/ui/CanvasPage";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 
 export function NodeRunPage() {
   const { organizationId, workflowId, nodeId, executionId } = useParams();
-  const { data: workflow } = useWorkflow(organizationId!, workflowId!);
+  const { data: workflow } = useCanvas(organizationId!, workflowId!);
 
   usePageTitle([workflow?.metadata?.name]);
 
@@ -171,7 +171,7 @@ function friendlyChildLabel(ce: any, nodes: ComponentsNode[]) {
 
 function useBreadcrumbs() {
   const { organizationId, workflowId, nodeId, executionId } = useParams();
-  const { data: workflow } = useWorkflow(organizationId || "", workflowId || "");
+  const { data: workflow } = useCanvas(organizationId || "", workflowId || "");
   const { data: childExecsResp } = useChildExecutions(workflowId || "", executionId || null);
   const { data: blueprints = [] } = useBlueprints(organizationId || "");
   const { data: components = [] } = useComponents(organizationId || "");
@@ -208,7 +208,7 @@ function useBreadcrumbs() {
 
   return [
     { label: "Canvases", href: `/${organizationId}` },
-    { label: workflow?.metadata?.name || "Workflow", href: `/${organizationId}/workflows/${workflowId}` },
+    { label: workflow?.metadata?.name || "Workflow", href: `/${organizationId}/canvases/${workflowId}` },
     {
       label: nodeName,
       iconSlug: iconSlug || "boxes",

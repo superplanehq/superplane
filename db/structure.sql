@@ -95,7 +95,8 @@ CREATE TABLE public.app_installation_requests (
     type character varying(32) NOT NULL,
     run_at timestamp without time zone NOT NULL,
     created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    spec jsonb
 );
 
 
@@ -1496,7 +1497,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260121233727	f
+20260131134819	f
 \.
 
 

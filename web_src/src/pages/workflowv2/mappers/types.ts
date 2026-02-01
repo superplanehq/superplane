@@ -2,9 +2,9 @@ import {
   ComponentsComponent,
   ComponentsNode,
   TriggersTrigger,
-  WorkflowsWorkflowEvent,
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
+  CanvasesCanvasEvent,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseProps, EventState, EventStateMap } from "@/ui/componentBase";
 import { TriggerProps } from "@/ui/trigger";
@@ -35,7 +35,7 @@ export interface TriggerRenderer {
    * @param event The root event from the backend
    * @returns The values to display (can include timeline arrays for special rendering)
    */
-  getRootEventValues: (event: WorkflowsWorkflowEvent) => Record<string, any>;
+  getRootEventValues: (event: CanvasesCanvasEvent) => Record<string, any>;
 
   /**
    * Get the title and subtitle for the trigger.
@@ -43,7 +43,7 @@ export interface TriggerRenderer {
    * @param trigger The trigger metadata from the backend
    * @returns The title and subtitle to display
    */
-  getTitleAndSubtitle: (event: WorkflowsWorkflowEvent) => { title: string; subtitle: string };
+  getTitleAndSubtitle: (event: CanvasesCanvasEvent) => { title: string; subtitle: string };
 }
 
 export interface ComponentBaseMapper {
@@ -51,19 +51,19 @@ export interface ComponentBaseMapper {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
-    nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
+    lastExecutions: CanvasesCanvasNodeExecution[],
+    nodeQueueItems?: CanvasesCanvasNodeQueueItem[],
     additionalData?: unknown,
   ): ComponentBaseProps;
 
   subtitle(
     node: ComponentsNode,
-    execution: WorkflowsWorkflowNodeExecution,
+    execution: CanvasesCanvasNodeExecution,
     additionalData?: unknown,
   ): string | React.ReactNode;
 
   getExecutionDetails(
-    execution: WorkflowsWorkflowNodeExecution,
+    execution: CanvasesCanvasNodeExecution,
     node: ComponentsNode,
     nodes?: ComponentsNode[],
   ): Record<string, any>;
@@ -78,7 +78,7 @@ export interface ComponentAdditionalDataBuilder {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
+    lastExecutions: CanvasesCanvasNodeExecution[],
     workflowId: string,
     queryClient: QueryClient,
     organizationId?: string,
@@ -89,7 +89,7 @@ export interface ComponentAdditionalDataBuilder {
 /**
  * A state function that determines the current state based on execution data
  */
-export type StateFunction = (execution: WorkflowsWorkflowNodeExecution) => EventState;
+export type StateFunction = (execution: CanvasesCanvasNodeExecution) => EventState;
 
 /**
  * Event state registry for components with custom state logic and styling

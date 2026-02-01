@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -42,7 +43,10 @@ func TestTimeGateComponent(t *testing.T) {
 
 	t.Run("push through the time gate item", func(t *testing.T) {
 		steps.start()
-		steps.givenACanvasWithManualTriggerTimeGateAndOutput()
+		now := time.Now().UTC()
+		tomorrow := now.Add(24 * time.Hour)
+		activeDay := dayString(tomorrow.Weekday())
+		steps.givenACanvasWithManualTriggerTimeGateAndOutput([]string{activeDay}, "00:00-23:59", "0")
 		steps.runManualTrigger()
 		steps.openSidebarForNode("timeGate")
 		steps.pushThroughFirstItemFromSidebar()
@@ -139,7 +143,7 @@ func (s *TimeGateSteps) saveCanvas() {
 	s.canvas.Save()
 }
 
-func (s *TimeGateSteps) givenACanvasWithManualTriggerTimeGateAndOutput() {
+func (s *TimeGateSteps) givenACanvasWithManualTriggerTimeGateAndOutput(days []string, timeRange string, timezone string) {
 	s.canvas = shared.NewCanvasSteps("Time Gate Push Through", s.t, s.session)
 
 	s.canvas.Create()
@@ -148,9 +152,12 @@ func (s *TimeGateSteps) givenACanvasWithManualTriggerTimeGateAndOutput() {
 	s.canvas.AddNoop("Output", models.Position{X: 1400, Y: 200})
 
 	s.openNodeSettings("timeGate")
-	s.setDaysTo([]string{"saturday", "sunday"})
-	s.setTimeWindow("00:00", "23:59")
-	s.setTimezone("0")
+	s.setDaysTo(days)
+	parts := strings.SplitN(timeRange, "-", 2)
+	if len(parts) == 2 {
+		s.setTimeWindow(strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
+	}
+	s.setTimezone(timezone)
 	s.saveTimeGate()
 
 	s.canvas.Connect("Start", "timeGate")
@@ -163,7 +170,7 @@ func (s *TimeGateSteps) runManualTrigger() {
 	s.canvas.RunManualTrigger("Start")
 	s.canvas.WaitForExecutionInStates(
 		"timeGate",
-		[]string{models.WorkflowNodeExecutionStateStarted, models.WorkflowNodeExecutionStatePending},
+		[]string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted},
 		10*time.Second,
 	)
 }
@@ -177,7 +184,7 @@ func (s *TimeGateSteps) pushThroughFirstItemFromSidebar() {
 	s.session.HoverOver(eventItem)
 	s.session.Click(q.Locator("h2:has-text('Latest') ~ div button[aria-label='Open actions']"))
 	s.session.Click(q.TestID("push-through-item"))
-	s.canvas.WaitForExecution("Output", models.WorkflowNodeExecutionStateFinished, 15*time.Second)
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 15*time.Second)
 }
 
 func (s *TimeGateSteps) assertTimeGateExecutionFinishedAndOutputNodeProcessed() {
@@ -187,6 +194,20 @@ func (s *TimeGateSteps) assertTimeGateExecutionFinishedAndOutputNodeProcessed() 
 	require.Len(s.t, timeGateExecs, 1, "expected one execution for time gate node")
 	require.Len(s.t, outputExecs, 1, "expected one execution for output node")
 
-	require.Equal(s.t, models.WorkflowNodeExecutionStateFinished, timeGateExecs[0].State)
-	require.Equal(s.t, models.WorkflowNodeExecutionStateFinished, outputExecs[0].State)
+	require.Equal(s.t, models.CanvasNodeExecutionStateFinished, timeGateExecs[0].State)
+	require.Equal(s.t, models.CanvasNodeExecutionStateFinished, outputExecs[0].State)
+}
+
+func dayString(weekday time.Weekday) string {
+	days := map[time.Weekday]string{
+		time.Sunday:    "sunday",
+		time.Monday:    "monday",
+		time.Tuesday:   "tuesday",
+		time.Wednesday: "wednesday",
+		time.Thursday:  "thursday",
+		time.Friday:    "friday",
+		time.Saturday:  "saturday",
+	}
+
+	return days[weekday]
 }

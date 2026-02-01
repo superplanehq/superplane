@@ -13,7 +13,7 @@ import { Input } from "../../components/Input/input";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/AccountContext";
 import { useBlueprints, useDeleteBlueprint } from "../../hooks/useBlueprintData";
-import { useDeleteWorkflow, useWorkflows, workflowKeys } from "../../hooks/useWorkflowData";
+import { useDeleteCanvas, useCanvases, canvasKeys } from "../../hooks/useCanvasData";
 import { resolveIcon } from "../../lib/utils";
 import { isCustomComponentsEnabled } from "../../lib/env";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
@@ -33,12 +33,12 @@ interface BlueprintCardData {
   createdBy?: { id?: string; name?: string };
 }
 
-interface WorkflowCardData {
+interface CanvasCardData {
   id: string;
   name: string;
   description?: string;
   createdAt: string;
-  type: "workflow";
+  type: "canvases";
   createdBy?: { id?: string; name?: string };
   nodes?: ComponentsNode[];
   edges?: ComponentsEdge[];
@@ -65,13 +65,13 @@ const HomePage = () => {
   } = isCustomComponentsEnabled() ? blueprintsQuery : { data: [], isLoading: false, error: null };
 
   const {
-    data: workflowsData = [],
-    isLoading: workflowsLoading,
-    error: workflowApiError,
-  } = useWorkflows(organizationId || "");
+    data: canvasesData = [],
+    isLoading: canvasesLoading,
+    error: canvasesApiError,
+  } = useCanvases(organizationId || "");
 
   const blueprintError = blueprintApiError ? "Failed to fetch Bundles. Please try again later." : null;
-  const workflowError = workflowApiError ? "Failed to fetch workflows. Please try again later." : null;
+  const canvasError = canvasesApiError ? "Failed to fetch canvases. Please try again later." : null;
 
   const formatDate = (value?: string) => {
     if (!value) return "Unknown";
@@ -87,15 +87,15 @@ const HomePage = () => {
     createdBy: blueprint.createdBy,
   }));
 
-  const workflows: WorkflowCardData[] = (workflowsData || []).map((workflow: any) => ({
-    id: workflow.metadata?.id!,
-    name: workflow.metadata?.name!,
-    description: workflow.metadata?.description,
-    createdAt: formatDate(workflow.metadata?.createdAt),
-    type: "workflow" as const,
-    createdBy: workflow.metadata?.createdBy,
-    nodes: workflow.spec?.nodes || [],
-    edges: workflow.spec?.edges || [],
+  const canvases: CanvasCardData[] = (canvasesData || []).map((canvas: any) => ({
+    id: canvas.metadata?.id!,
+    name: canvas.metadata?.name!,
+    description: canvas.metadata?.description,
+    createdAt: formatDate(canvas.metadata?.createdAt),
+    type: "canvases" as const,
+    createdBy: canvas.metadata?.createdBy,
+    nodes: canvas.spec?.nodes || [],
+    edges: canvas.spec?.edges || [],
   }));
 
   const filteredBlueprints = blueprints.filter((blueprint) => {
@@ -105,15 +105,15 @@ const HomePage = () => {
     return matchesSearch;
   });
 
-  const filteredWorkflows = workflows.filter((workflow) => {
+  const filteredCanvases = canvases.filter((canvas) => {
     const matchesSearch =
-      workflow.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      workflow.description?.toLowerCase().includes(searchQuery.toLowerCase());
+      canvas.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      canvas.description?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSearch;
   });
 
   const isLoading =
-    (activeTab === "custom-components" && blueprintsLoading) || (activeTab === "canvases" && workflowsLoading);
+    (activeTab === "custom-components" && blueprintsLoading) || (activeTab === "canvases" && canvasesLoading);
 
   if (isLoading) {
     return (
@@ -132,7 +132,7 @@ const HomePage = () => {
     );
   }
 
-  const error = activeTab === "custom-components" ? blueprintError : workflowError;
+  const error = activeTab === "custom-components" ? blueprintError : canvasError;
 
   const onNewClick = () => {
     if (activeTab === "custom-components" && isCustomComponentsEnabled()) {
@@ -151,18 +151,18 @@ const HomePage = () => {
       <main className="w-full h-full flex flex-column flex-grow-1">
         <div className="bg-slate-100 w-full flex-grow-1">
           <div className="p-8">
-            {!(activeTab === "canvases" && workflows.length === 0 && !searchQuery) && (
+            {!(activeTab === "canvases" && canvases.length === 0 && !searchQuery) && (
               <PageHeader activeTab={activeTab} onNewClick={onNewClick} />
             )}
 
-            {!(activeTab === "canvases" && workflows.length === 0 && !searchQuery) && (
+            {!(activeTab === "canvases" && canvases.length === 0 && !searchQuery) && (
               <>
                 {showTabs && (
                   <Tabs
                     activeTab={activeTab}
                     setActiveTab={setActiveTab}
                     blueprints={filteredBlueprints}
-                    workflows={filteredWorkflows}
+                    canvases={filteredCanvases}
                   />
                 )}
 
@@ -180,10 +180,10 @@ const HomePage = () => {
               <Content
                 activeTab={activeTab}
                 filteredBlueprints={filteredBlueprints}
-                filteredWorkflows={filteredWorkflows}
+                filteredCanvases={filteredCanvases}
                 organizationId={organizationId}
                 searchQuery={searchQuery}
-                onEditWorkflow={canvasModalState.onOpenEdit}
+                onEditCanvas={canvasModalState.onOpenEdit}
                 onNewClick={onNewClick}
               />
             )}
@@ -205,10 +205,10 @@ interface TabsProps {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
   blueprints: BlueprintCardData[];
-  workflows: WorkflowCardData[];
+  canvases: CanvasCardData[];
 }
 
-function Tabs({ activeTab, setActiveTab, blueprints, workflows }: TabsProps) {
+function Tabs({ activeTab, setActiveTab, blueprints, canvases }: TabsProps) {
   return (
     <div className="flex border-b border-border dark:border-gray-700 mb-6">
       <button
@@ -219,7 +219,7 @@ function Tabs({ activeTab, setActiveTab, blueprints, workflows }: TabsProps) {
             : "border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
         }`}
       >
-        Canvases ({workflows.length})
+        Canvases ({canvases.length})
       </button>
 
       {isCustomComponentsEnabled() && (
@@ -313,31 +313,27 @@ function ErrorState({ error }: { error: string }) {
 function Content({
   activeTab,
   filteredBlueprints,
-  filteredWorkflows,
+  filteredCanvases,
   organizationId,
   searchQuery,
-  onEditWorkflow,
+  onEditCanvas,
   onNewClick,
 }: {
   activeTab: TabType;
   filteredBlueprints: BlueprintCardData[];
-  filteredWorkflows: WorkflowCardData[];
+  filteredCanvases: CanvasCardData[];
   organizationId: string;
   searchQuery: string;
-  onEditWorkflow: (workflow: WorkflowCardData) => void;
+  onEditCanvas: (canvas: CanvasCardData) => void;
   onNewClick: () => void;
 }) {
   if (activeTab === "canvases") {
-    if (filteredWorkflows.length === 0) {
+    if (filteredCanvases.length === 0) {
       return <CanvasesEmptyState searchQuery={searchQuery} onNewClick={onNewClick} />;
     }
 
     return (
-      <WorkflowGridView
-        filteredWorkflows={filteredWorkflows}
-        organizationId={organizationId}
-        onEditWorkflow={onEditWorkflow}
-      />
+      <CanvasGridView filteredCanvases={filteredCanvases} organizationId={organizationId} onEditCanvas={onEditCanvas} />
     );
   } else if (activeTab === "custom-components") {
     if (filteredBlueprints.length === 0) {
@@ -391,45 +387,45 @@ function CanvasesEmptyState({ searchQuery, onNewClick }: { searchQuery: string; 
   );
 }
 
-interface WorkflowGridViewProps {
-  filteredWorkflows: WorkflowCardData[];
+interface CanvasGridViewProps {
+  filteredCanvases: CanvasCardData[];
   organizationId: string;
-  onEditWorkflow: (workflow: WorkflowCardData) => void;
+  onEditCanvas: (canvas: CanvasCardData) => void;
 }
 
-function WorkflowGridView({ filteredWorkflows, organizationId, onEditWorkflow }: WorkflowGridViewProps) {
+function CanvasGridView({ filteredCanvases, organizationId, onEditCanvas }: CanvasGridViewProps) {
   const navigate = useNavigate();
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      {filteredWorkflows.map((workflow) => (
-        <WorkflowCard
-          key={workflow.id}
-          workflow={workflow}
+      {filteredCanvases.map((canvas) => (
+        <CanvasCard
+          key={canvas.id}
+          canvas={canvas}
           organizationId={organizationId}
           navigate={navigate}
-          onEdit={onEditWorkflow}
+          onEdit={onEditCanvas}
         />
       ))}
     </div>
   );
 }
 
-interface WorkflowCardProps {
-  workflow: WorkflowCardData;
+interface CanvasCardProps {
+  canvas: CanvasCardData;
   organizationId: string;
   navigate: any;
-  onEdit: (workflow: WorkflowCardData) => void;
+  onEdit: (canvas: CanvasCardData) => void;
 }
 
-function WorkflowCard({ workflow, organizationId, navigate, onEdit }: WorkflowCardProps) {
-  const handleNavigate = () => navigate(`/${organizationId}/workflows/${workflow.id}`);
-  const previewNodes = workflow.nodes || [];
-  const previewEdges = workflow.edges || [];
+function CanvasCard({ canvas, organizationId, navigate, onEdit }: CanvasCardProps) {
+  const handleNavigate = () => navigate(`/${organizationId}/canvases/${canvas.id}`);
+  const previewNodes = canvas.nodes || [];
+  const previewEdges = canvas.edges || [];
 
   return (
     <div
-      key={workflow.id}
+      key={canvas.id}
       role="button"
       tabIndex={0}
       onClick={(event) => {
@@ -454,28 +450,28 @@ function WorkflowCard({ workflow, organizationId, navigate, onEdit }: WorkflowCa
                 level={3}
                 className="!text-base font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
               >
-                <span className="truncate">{workflow.name}</span>
+                <span className="truncate">{canvas.name}</span>
               </Heading>
             </div>
-            <WorkflowActionsMenu workflow={workflow} organizationId={organizationId} onEdit={onEdit} />
+            <CanvasActionsMenu canvas={canvas} organizationId={organizationId} onEdit={onEdit} />
           </div>
 
-          {workflow.description ? (
+          {canvas.description ? (
             <div className="mb-4">
               <Text className="text-[13px] !leading-normal text-left text-gray-800 dark:text-gray-400 line-clamp-3">
-                {workflow.description}
+                {canvas.description}
               </Text>
             </div>
           ) : null}
 
           <div className="flex justify-between items-center">
             <p className="text-xs text-gray-500 dark:text-gray-400 leading-none text-left mt-1">
-              {workflow.createdBy?.name ? (
+              {canvas.createdBy?.name ? (
                 <>
-                  Created by {workflow.createdBy.name}, on {workflow.createdAt}
+                  Created by {canvas.createdBy.name}, on {canvas.createdAt}
                 </>
               ) : (
-                <>Created on {workflow.createdAt}</>
+                <>Created on {canvas.createdAt}</>
               )}
             </p>
           </div>
@@ -577,15 +573,15 @@ function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
   );
 }
 
-interface WorkflowActionsMenuProps {
-  workflow: WorkflowCardData;
+interface CanvasActionsMenuProps {
+  canvas: CanvasCardData;
   organizationId: string;
-  onEdit: (workflow: WorkflowCardData) => void;
+  onEdit: (canvas: CanvasCardData) => void;
 }
 
-function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActionsMenuProps) {
+function CanvasActionsMenu({ canvas, organizationId, onEdit }: CanvasActionsMenuProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const deleteWorkflowMutation = useDeleteWorkflow(organizationId);
+  const deleteCanvasMutation = useDeleteCanvas(organizationId);
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -602,16 +598,16 @@ function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActio
   const handleDelete = async () => {
     // If we're currently viewing this workflow, navigate immediately and remove from cache to prevent 404
     const currentPath = location.pathname;
-    const workflowPath = `/${organizationId}/workflows/${workflow.id}`;
-    const isViewingWorkflow = currentPath === workflowPath || currentPath.startsWith(`${workflowPath}/`);
+    const canvasPath = `/${organizationId}/canvases/${canvas.id}`;
+    const isViewingCanvas = currentPath === canvasPath || currentPath.startsWith(`${canvasPath}/`);
 
-    if (isViewingWorkflow) {
+    if (isViewingCanvas) {
       // Remove from cache FIRST to prevent any queries from running
-      queryClient.removeQueries({ queryKey: workflowKeys.detail(organizationId, workflow.id) });
+      queryClient.removeQueries({ queryKey: canvasKeys.detail(organizationId, canvas.id) });
       // Navigate immediately with replace to avoid back button issues and prevent 404 flash
       navigate(`/${organizationId}`, { replace: true });
       // Then delete (fire and forget)
-      deleteWorkflowMutation.mutate(workflow.id, {
+      deleteCanvasMutation.mutate(canvas.id, {
         onSuccess: () => {
           showSuccessToast("Canvas deleted successfully");
           closeDialog();
@@ -624,7 +620,7 @@ function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActio
     }
 
     try {
-      await deleteWorkflowMutation.mutateAsync(workflow.id);
+      await deleteCanvasMutation.mutateAsync(canvas.id);
       showSuccessToast("Canvas deleted successfully");
       closeDialog();
     } catch (error) {
@@ -640,7 +636,7 @@ function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActio
             <button
               className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Canvas actions"
-              disabled={deleteWorkflowMutation.isPending}
+              disabled={deleteCanvasMutation.isPending}
             >
               <MoreVertical size={16} />
             </button>
@@ -649,7 +645,7 @@ function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActio
             <DropdownMenuItem
               onClick={(event: MouseEvent<HTMLElement>) => {
                 event.stopPropagation();
-                onEdit(workflow);
+                onEdit(canvas);
               }}
             >
               <Pencil size={16} />
@@ -667,7 +663,7 @@ function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActio
       </div>
 
       <Dialog open={isDialogOpen} onClose={closeDialog} size="lg" className="text-left">
-        <DialogTitle className="text-gray-800 dark:text-red-100">Delete "{workflow.name}"?</DialogTitle>
+        <DialogTitle className="text-gray-800 dark:text-red-100">Delete "{canvas.name}"?</DialogTitle>
         <DialogDescription className="text-sm text-gray-800 dark:text-gray-400">
           This cannot be undone. Are you sure you want to continue?
         </DialogDescription>
@@ -675,11 +671,11 @@ function WorkflowActionsMenu({ workflow, organizationId, onEdit }: WorkflowActio
           <Button
             variant="destructive"
             onClick={handleDelete}
-            disabled={deleteWorkflowMutation.isPending}
+            disabled={deleteCanvasMutation.isPending}
             className="flex items-center gap-2"
           >
             <Trash2 size={16} />
-            {deleteWorkflowMutation.isPending ? "Deleting..." : "Delete"}
+            {deleteCanvasMutation.isPending ? "Deleting..." : "Delete"}
           </Button>
           <Button
             variant="outline"

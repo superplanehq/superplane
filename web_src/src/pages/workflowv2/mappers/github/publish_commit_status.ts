@@ -1,8 +1,8 @@
 import {
   ComponentsNode,
   ComponentsComponent,
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseProps } from "@/ui/componentBase";
 import { ComponentBaseMapper, OutputPayload } from "../types";
@@ -27,16 +27,16 @@ export const publishCommitStatusMapper: ComponentBaseMapper = {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
-    queueItems: WorkflowsWorkflowNodeQueueItem[],
+    lastExecutions: CanvasesCanvasNodeExecution[],
+    queueItems: CanvasesCanvasNodeQueueItem[],
   ): ComponentBaseProps {
     return baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
   },
-  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
     return buildGithubExecutionSubtitle(execution);
   },
 
-  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, string> {
+  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
     let details: Record<string, string> = {};
 

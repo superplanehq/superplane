@@ -167,19 +167,19 @@ func TestGetRedirectURL(t *testing.T) {
 	})
 
 	t.Run("should return redirect URL from redirect parameter", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", "/login?redirect=%2Fworkflows", nil)
+		req, _ := http.NewRequest("GET", "/login?redirect=%2Fcanvases", nil)
 
 		redirectURL := getRedirectURL(req)
 
-		assert.Equal(t, "/workflows", redirectURL)
+		assert.Equal(t, "/canvases", redirectURL)
 	})
 
 	t.Run("should return redirect URL from state parameter", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", "/callback?state=%2Fworkflows%2F123", nil)
+		req, _ := http.NewRequest("GET", "/callback?state=%2Fcanvases%2F123", nil)
 
 		redirectURL := getRedirectURL(req)
 
-		assert.Equal(t, "/workflows/123", redirectURL)
+		assert.Equal(t, "/canvases/123", redirectURL)
 	})
 
 	t.Run("should reject absolute URLs", func(t *testing.T) {

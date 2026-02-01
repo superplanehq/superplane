@@ -109,6 +109,10 @@ func (d *Dash0) Sync(ctx core.SyncContext) error {
 	return nil
 }
 
+func (d *Dash0) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (d *Dash0) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	if resourceType != "check-rule" {
 		return []core.IntegrationResource{}, nil
@@ -150,5 +154,13 @@ func (d *Dash0) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 }
 
 func (d *Dash0) CleanupWebhook(ctx core.CleanupWebhookContext) error {
+	return nil
+}
+
+func (d *Dash0) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (d *Dash0) HandleAction(ctx core.IntegrationActionContext) error {
 	return nil
 }

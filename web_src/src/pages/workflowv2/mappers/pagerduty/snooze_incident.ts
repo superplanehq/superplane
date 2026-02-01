@@ -1,8 +1,8 @@
 import {
   ComponentsNode,
   ComponentsComponent,
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass } from "@/utils/colors";
@@ -25,8 +25,8 @@ export const snoozeIncidentMapper: ComponentBaseMapper = {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
-    _?: WorkflowsWorkflowNodeQueueItem[],
+    lastExecutions: CanvasesCanvasNodeExecution[],
+    _?: CanvasesCanvasNodeQueueItem[],
   ): ComponentBaseProps {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
     const componentName = componentDefinition.name!;
@@ -43,10 +43,10 @@ export const snoozeIncidentMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _: ComponentsNode): Record<string, any> {
+  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _: ComponentsNode): Record<string, any> {
     return buildIncidentExecutionDetails(execution);
   },
-  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
     if (!execution.createdAt) return "";
     return formatTimeAgo(new Date(execution.createdAt));
   },
@@ -70,7 +70,7 @@ function metadataList(node: ComponentsNode): MetadataItem[] {
 
 function baseEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
   componentName: string,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);

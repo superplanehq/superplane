@@ -170,6 +170,10 @@ func (p *PagerDuty) Triggers() []core.Trigger {
 	}
 }
 
+func (p *PagerDuty) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (p *PagerDuty) Sync(ctx core.SyncContext) error {
 	configuration := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &configuration)
@@ -446,5 +450,13 @@ func (p *PagerDuty) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 		return fmt.Errorf("error deleting webhook subscription: %v", err)
 	}
 
+	return nil
+}
+
+func (p *PagerDuty) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (p *PagerDuty) HandleAction(ctx core.IntegrationActionContext) error {
 	return nil
 }

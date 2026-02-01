@@ -18,7 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ConfigurationField,
-  WorkflowsWorkflowNodeExecution,
+  CanvasesCanvasNodeExecution,
   ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
@@ -232,7 +232,7 @@ export interface CanvasPageProps {
   // State registry function for determining execution states
   getExecutionState?: (
     nodeId: string,
-    execution: WorkflowsWorkflowNodeExecution,
+    execution: CanvasesCanvasNodeExecution,
   ) => { map: EventStateMap; state: EventState };
 
   // Workflow metadata for ExecutionChainPage
@@ -1003,7 +1003,7 @@ function Sidebar({
   loadExecutionChain?: (eventId: string) => Promise<any[]>;
   getExecutionState?: (
     nodeId: string,
-    execution: WorkflowsWorkflowNodeExecution,
+    execution: CanvasesCanvasNodeExecution,
   ) => { map: EventStateMap; state: EventState };
   onSidebarClose?: () => void;
   editingNodeData?: NodeEditData | null;

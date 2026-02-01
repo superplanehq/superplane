@@ -96,12 +96,12 @@ func FindWebhookInTransaction(tx *gorm.DB, id uuid.UUID) (*Webhook, error) {
 	return &webhook, nil
 }
 
-func FindWebhookNodes(webhookID uuid.UUID) ([]WorkflowNode, error) {
+func FindWebhookNodes(webhookID uuid.UUID) ([]CanvasNode, error) {
 	return FindWebhookNodesInTransaction(database.Conn(), webhookID)
 }
 
-func FindWebhookNodesInTransaction(tx *gorm.DB, webhookID uuid.UUID) ([]WorkflowNode, error) {
-	var nodes []WorkflowNode
+func FindWebhookNodesInTransaction(tx *gorm.DB, webhookID uuid.UUID) ([]CanvasNode, error) {
+	var nodes []CanvasNode
 	err := tx.
 		Where("webhook_id = ?", webhookID).
 		Where("deleted_at IS NULL").

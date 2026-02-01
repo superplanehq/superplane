@@ -50,6 +50,7 @@ func (c *Cloudflare) Instructions() string {
    - **Permissions** (click "+ Add more" to add each):
      - Zone / Zone / Read
      - Zone / Dynamic Redirect / Edit
+     - Zone / DNS / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
 5. Click **Continue to summary**, then **Create Token**
 6. Copy the token and paste it below
@@ -73,6 +74,7 @@ func (c *Cloudflare) Configuration() []configuration.Field {
 func (c *Cloudflare) Components() []core.Component {
 	return []core.Component{
 		&UpdateRedirectRule{},
+		&UpdateDNSRecord{},
 	}
 }
 
@@ -103,6 +105,10 @@ func (c *Cloudflare) Sync(ctx core.SyncContext) error {
 
 	ctx.Integration.SetMetadata(Metadata{Zones: zones})
 	ctx.Integration.Ready()
+	return nil
+}
+
+func (c *Cloudflare) Cleanup(ctx core.IntegrationCleanupContext) error {
 	return nil
 }
 
@@ -152,6 +158,34 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 		}
 		return resources, nil
 
+	case "dns_record":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		metadata := Metadata{}
+		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+			return nil, fmt.Errorf("failed to decode application metadata: %w", err)
+		}
+
+		var resources []core.IntegrationResource
+		for _, zone := range metadata.Zones {
+			records, err := client.ListDNSRecords(zone.ID)
+			if err != nil {
+				continue
+			}
+
+			for _, record := range records {
+				resources = append(resources, core.IntegrationResource{
+					Type: resourceType,
+					Name: fmt.Sprintf("%s (%s)", record.Name, record.Type),
+					ID:   fmt.Sprintf("%s/%s", zone.ID, record.ID),
+				})
+			}
+		}
+		return resources, nil
+
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -170,5 +204,13 @@ func (c *Cloudflare) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 }
 
 func (c *Cloudflare) CleanupWebhook(ctx core.CleanupWebhookContext) error {
+	return nil
+}
+
+func (c *Cloudflare) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (c *Cloudflare) HandleAction(ctx core.IntegrationActionContext) error {
 	return nil
 }

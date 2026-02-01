@@ -1,8 +1,8 @@
 import {
   ComponentsComponent,
   ComponentsNode,
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper, EventStateRegistry, OutputPayload, StateFunction } from "./types";
 import {
@@ -35,7 +35,7 @@ export const FILTER_STATE_MAP: EventStateMap = {
   },
 };
 
-export const filterStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
+export const filterStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
   if (!execution) return "neutral";
 
   if (
@@ -75,8 +75,8 @@ export const filterMapper: ComponentBaseMapper = {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
-    _queueItems: WorkflowsWorkflowNodeQueueItem[],
+    lastExecutions: CanvasesCanvasNodeExecution[],
+    _queueItems: CanvasesCanvasNodeQueueItem[],
   ): ComponentBaseProps {
     const componentName = componentDefinition.name || "filter";
     // Prefer expression from execution metadata (stored at execution time)
@@ -110,7 +110,7 @@ export const filterMapper: ComponentBaseMapper = {
     if (!execution?.createdAt) return "";
     return formatTimeAgo(new Date(execution.createdAt));
   },
-  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, node: ComponentsNode): Record<string, any> {
+  getExecutionDetails(execution: CanvasesCanvasNodeExecution, node: ComponentsNode): Record<string, any> {
     const details: Record<string, any> = {};
 
     // Evaluated at
@@ -212,7 +212,7 @@ export const filterMapper: ComponentBaseMapper = {
 
 function getfilterEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
   componentName: string,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);

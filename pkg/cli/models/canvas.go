@@ -12,10 +12,10 @@ const (
 )
 
 type Canvas struct {
-	APIVersion string                                    `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string                                    `json:"kind" yaml:"kind"`
-	Metadata   *openapi_client.WorkflowsWorkflowMetadata `json:"metadata" yaml:"metadata"`
-	Spec       *openapi_client.WorkflowsWorkflowSpec     `json:"spec,omitempty" yaml:"spec,omitempty"`
+	APIVersion string                                 `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string                                 `json:"kind" yaml:"kind"`
+	Metadata   *openapi_client.CanvasesCanvasMetadata `json:"metadata" yaml:"metadata"`
+	Spec       *openapi_client.CanvasesCanvasSpec     `json:"spec,omitempty" yaml:"spec,omitempty"`
 }
 
 func ParseCanvas(raw []byte) (*Canvas, error) {
@@ -39,38 +39,24 @@ func ParseCanvas(raw []byte) (*Canvas, error) {
 	return &resource, nil
 }
 
-func WorkflowFromCanvas(resource Canvas) openapi_client.WorkflowsWorkflow {
-	workflow := openapi_client.WorkflowsWorkflow{}
-	metadata := openapi_client.WorkflowsWorkflowMetadata{}
-	metadata.SetName(*resource.Metadata.Name)
-	if resource.Metadata.Description != nil {
-		metadata.SetDescription(*resource.Metadata.Description)
-	}
-	if resource.Metadata.Id != nil {
-		metadata.SetId(*resource.Metadata.Id)
-	}
-
-	workflow.SetMetadata(metadata)
-	if resource.Spec != nil {
-		workflow.SetSpec(*resource.Spec)
-	} else {
-		workflow.SetSpec(*EmptyWorkflowSpec())
-	}
-
-	return workflow
+func CanvasFromCanvas(resource Canvas) openapi_client.CanvasesCanvas {
+	canvas := openapi_client.CanvasesCanvas{}
+	canvas.SetMetadata(*resource.Metadata)
+	canvas.SetSpec(*resource.Spec)
+	return canvas
 }
 
-func CanvasResourceFromWorkflow(workflow openapi_client.WorkflowsWorkflow) Canvas {
+func CanvasResourceFromCanvas(canvas openapi_client.CanvasesCanvas) Canvas {
 	return Canvas{
 		APIVersion: "v1",
 		Kind:       CanvasKind,
-		Metadata:   workflow.Metadata,
-		Spec:       workflow.Spec,
+		Metadata:   canvas.Metadata,
+		Spec:       canvas.Spec,
 	}
 }
 
-func EmptyWorkflowSpec() *openapi_client.WorkflowsWorkflowSpec {
-	return &openapi_client.WorkflowsWorkflowSpec{
+func EmptyCanvasSpec() *openapi_client.CanvasesCanvasSpec {
+	return &openapi_client.CanvasesCanvasSpec{
 		Nodes: []openapi_client.ComponentsNode{},
 		Edges: []openapi_client.ComponentsEdge{},
 	}

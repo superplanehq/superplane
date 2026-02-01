@@ -1,4 +1,4 @@
-import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
+import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
@@ -20,7 +20,7 @@ interface OnPullRequestReviewCommentEventData {
  * Renderer for the "github.onPullRequestReviewComment" trigger
  */
 export const onPullRequestReviewCommentTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
     const eventData = event.data?.data as OnPullRequestReviewCommentEventData;
     const prNumber = eventData?.issue?.number || "";
     const fileName = eventData?.comment?.path || "";
@@ -32,7 +32,7 @@ export const onPullRequestReviewCommentTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
+  getRootEventValues: (lastEvent: CanvasesCanvasEvent): Record<string, string> => {
     const eventData = lastEvent.data?.data as OnPullRequestReviewCommentEventData;
 
     const rootValues: Record<string, string> = {
@@ -55,7 +55,7 @@ export const onPullRequestReviewCommentTriggerRenderer: TriggerRenderer = {
     return rootValues;
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
+  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
     const metadata = node.metadata as unknown as BaseNodeMetadata;
     const configuration = node.configuration as unknown as OnPullRequestReviewCommentConfiguration;
     const metadataItems = [];

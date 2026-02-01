@@ -78,19 +78,19 @@ func (w *WebhookProvisioner) LockAndProcessWebhook(webhook models.Webhook) error
 
 func (w *WebhookProvisioner) processWebhook(tx *gorm.DB, webhook *models.Webhook) error {
 	if webhook.AppInstallationID != nil {
-		return w.processAppInstallationWebhook(tx, webhook)
+		return w.processIntegrationWebhook(tx, webhook)
 	}
 
 	return webhook.Ready(tx)
 }
 
-func (w *WebhookProvisioner) processAppInstallationWebhook(tx *gorm.DB, webhook *models.Webhook) error {
-	appInstallation, err := models.FindUnscopedAppInstallationInTransaction(tx, *webhook.AppInstallationID)
+func (w *WebhookProvisioner) processIntegrationWebhook(tx *gorm.DB, webhook *models.Webhook) error {
+	instance, err := models.FindUnscopedIntegrationInTransaction(tx, *webhook.AppInstallationID)
 	if err != nil {
 		return w.handleWebhookError(tx, webhook, err)
 	}
 
-	integration, err := w.registry.GetIntegration(appInstallation.AppName)
+	integration, err := w.registry.GetIntegration(instance.AppName)
 	if err != nil {
 		return w.handleWebhookError(tx, webhook, err)
 	}
@@ -98,7 +98,7 @@ func (w *WebhookProvisioner) processAppInstallationWebhook(tx *gorm.DB, webhook 
 	webhookMetadata, err := integration.SetupWebhook(core.SetupWebhookContext{
 		HTTP:        contexts.NewHTTPContext(w.registry.GetHTTPClient()),
 		Webhook:     contexts.NewWebhookContext(tx, webhook, w.encryptor, w.baseURL),
-		Integration: contexts.NewIntegrationContext(tx, nil, appInstallation, w.encryptor, w.registry),
+		Integration: contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry),
 	})
 
 	if err != nil {

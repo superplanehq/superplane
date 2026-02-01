@@ -180,18 +180,18 @@ type MergeTestSteps struct {
 	t  *testing.T
 	Tx *gorm.DB
 
-	Wf           *models.Workflow
-	StartNode    *models.WorkflowNode
-	ProcessNode1 *models.WorkflowNode
-	ProcessNode2 *models.WorkflowNode
-	MergeNode    *models.WorkflowNode
+	Wf           *models.Canvas
+	StartNode    *models.CanvasNode
+	ProcessNode1 *models.CanvasNode
+	ProcessNode2 *models.CanvasNode
+	MergeNode    *models.CanvasNode
 
-	RootEvent     *models.WorkflowEvent
-	Process1Event *models.WorkflowEvent
-	Process2Event *models.WorkflowEvent
+	RootEvent     *models.CanvasEvent
+	Process1Event *models.CanvasEvent
+	Process2Event *models.CanvasEvent
 
-	QueureItem1 *models.WorkflowNodeQueueItem
-	QueureItem2 *models.WorkflowNodeQueueItem
+	QueureItem1 *models.CanvasNodeQueueItem
+	QueureItem2 *models.CanvasNodeQueueItem
 }
 
 func NewMergeTestSteps(t *testing.T) *MergeTestSteps {
@@ -203,17 +203,17 @@ func NewMergeTestSteps(t *testing.T) *MergeTestSteps {
 }
 
 /*
-* Creates a workflow with the following structure:
+* Creates a canvas with the following structure:
 *
 *   (start) +--> (n1) \
 *           |           -> (merge)
 *           +--> (n2) /
  */
 func (s *MergeTestSteps) CreateWorkflow() {
-	wf := &models.Workflow{ID: uuid.New()}
+	wf := &models.Canvas{ID: uuid.New()}
 	require.NoError(s.t, s.Tx.Create(wf).Error)
 
-	n1 := &models.WorkflowNode{
+	n1 := &models.CanvasNode{
 		WorkflowID: wf.ID,
 		NodeID:     "start-node",
 		Name:       "start-node",
@@ -222,7 +222,7 @@ func (s *MergeTestSteps) CreateWorkflow() {
 	}
 	require.NoError(s.t, s.Tx.Create(n1).Error)
 
-	n2 := &models.WorkflowNode{
+	n2 := &models.CanvasNode{
 		WorkflowID: wf.ID,
 		NodeID:     "process-1",
 		Name:       "process-1",
@@ -231,7 +231,7 @@ func (s *MergeTestSteps) CreateWorkflow() {
 	}
 	require.NoError(s.t, s.Tx.Create(n2).Error)
 
-	n3 := &models.WorkflowNode{
+	n3 := &models.CanvasNode{
 		WorkflowID: wf.ID,
 		NodeID:     "process-3",
 		Name:       "process-3",
@@ -240,7 +240,7 @@ func (s *MergeTestSteps) CreateWorkflow() {
 	}
 	require.NoError(s.t, s.Tx.Create(n3).Error)
 
-	n4 := &models.WorkflowNode{
+	n4 := &models.CanvasNode{
 		WorkflowID: wf.ID,
 		NodeID:     "merge-node",
 		Name:       "merge-node",
@@ -281,14 +281,14 @@ func (s *MergeTestSteps) CreateWorkflow() {
 	s.MergeNode = n4
 }
 
-// Create a workflow where a single upstream node connects to the merge node
+// Create a canvas where a single upstream node connects to the merge node
 // via two separate edges/channels. With the updated semantics, the merge should
 // require only one event (distinct source) to finish.
 func (s *MergeTestSteps) CreateWorkflowSingleSourceMultipleEdges() {
-	wf := &models.Workflow{ID: uuid.New()}
+	wf := &models.Canvas{ID: uuid.New()}
 	require.NoError(s.t, s.Tx.Create(wf).Error)
 
-	n1 := &models.WorkflowNode{
+	n1 := &models.CanvasNode{
 		WorkflowID: wf.ID,
 		NodeID:     "start-node",
 		Name:       "start-node",
@@ -297,7 +297,7 @@ func (s *MergeTestSteps) CreateWorkflowSingleSourceMultipleEdges() {
 	}
 	require.NoError(s.t, s.Tx.Create(n1).Error)
 
-	n2 := &models.WorkflowNode{
+	n2 := &models.CanvasNode{
 		WorkflowID: wf.ID,
 		NodeID:     "process-1",
 		Name:       "process-1",
@@ -306,7 +306,7 @@ func (s *MergeTestSteps) CreateWorkflowSingleSourceMultipleEdges() {
 	}
 	require.NoError(s.t, s.Tx.Create(n2).Error)
 
-	n4 := &models.WorkflowNode{
+	n4 := &models.CanvasNode{
 		WorkflowID: wf.ID,
 		NodeID:     "merge-node",
 		Name:       "merge-node",
@@ -335,7 +335,7 @@ func (s *MergeTestSteps) SetMergeConfiguration(cfg map[string]any) {
 }
 
 func (s *MergeTestSteps) CreateEvents() {
-	rootEvent := &models.WorkflowEvent{
+	rootEvent := &models.CanvasEvent{
 		WorkflowID: s.Wf.ID,
 		NodeID:     "start-node",
 		Channel:    "default",
@@ -343,7 +343,7 @@ func (s *MergeTestSteps) CreateEvents() {
 	}
 	require.NoError(s.t, s.Tx.Create(rootEvent).Error)
 
-	event1 := &models.WorkflowEvent{
+	event1 := &models.CanvasEvent{
 		WorkflowID: s.Wf.ID,
 		NodeID:     s.ProcessNode1.NodeID,
 		Channel:    "default",
@@ -351,7 +351,7 @@ func (s *MergeTestSteps) CreateEvents() {
 	}
 	require.NoError(s.t, s.Tx.Create(event1).Error)
 
-	event2 := &models.WorkflowEvent{
+	event2 := &models.CanvasEvent{
 		WorkflowID: s.Wf.ID,
 		NodeID:     s.ProcessNode2.NodeID,
 		Channel:    "default",
@@ -365,7 +365,7 @@ func (s *MergeTestSteps) CreateEvents() {
 }
 
 func (s *MergeTestSteps) CreateSingleEventForProcess1() {
-	rootEvent := &models.WorkflowEvent{
+	rootEvent := &models.CanvasEvent{
 		WorkflowID: s.Wf.ID,
 		NodeID:     "start-node",
 		Channel:    "default",
@@ -373,7 +373,7 @@ func (s *MergeTestSteps) CreateSingleEventForProcess1() {
 	}
 	require.NoError(s.t, s.Tx.Create(rootEvent).Error)
 
-	event1 := &models.WorkflowEvent{
+	event1 := &models.CanvasEvent{
 		WorkflowID: s.Wf.ID,
 		NodeID:     s.ProcessNode1.NodeID,
 		Channel:    "default",
@@ -386,7 +386,7 @@ func (s *MergeTestSteps) CreateSingleEventForProcess1() {
 }
 
 func (s *MergeTestSteps) CreateEventsWithData(data1 any, data2 any) {
-	rootEvent := &models.WorkflowEvent{
+	rootEvent := &models.CanvasEvent{
 		WorkflowID: s.Wf.ID,
 		NodeID:     "start-node",
 		Channel:    "default",
@@ -394,7 +394,7 @@ func (s *MergeTestSteps) CreateEventsWithData(data1 any, data2 any) {
 	}
 	require.NoError(s.t, s.Tx.Create(rootEvent).Error)
 
-	event1 := &models.WorkflowEvent{
+	event1 := &models.CanvasEvent{
 		WorkflowID: s.Wf.ID,
 		NodeID:     s.ProcessNode1.NodeID,
 		Channel:    "default",
@@ -402,7 +402,7 @@ func (s *MergeTestSteps) CreateEventsWithData(data1 any, data2 any) {
 	}
 	require.NoError(s.t, s.Tx.Create(event1).Error)
 
-	event2 := &models.WorkflowEvent{
+	event2 := &models.CanvasEvent{
 		WorkflowID: s.Wf.ID,
 		NodeID:     s.ProcessNode2.NodeID,
 		Channel:    "default",
@@ -416,7 +416,7 @@ func (s *MergeTestSteps) CreateEventsWithData(data1 any, data2 any) {
 }
 
 func (s *MergeTestSteps) CreateQueueItems() {
-	queueItem1 := &models.WorkflowNodeQueueItem{
+	queueItem1 := &models.CanvasNodeQueueItem{
 		WorkflowID:  s.Wf.ID,
 		NodeID:      s.ProcessNode1.NodeID,
 		EventID:     s.Process1Event.ID,
@@ -424,7 +424,7 @@ func (s *MergeTestSteps) CreateQueueItems() {
 	}
 	require.NoError(s.t, s.Tx.Create(queueItem1).Error)
 
-	queueItem2 := &models.WorkflowNodeQueueItem{
+	queueItem2 := &models.CanvasNodeQueueItem{
 		WorkflowID:  s.Wf.ID,
 		NodeID:      s.ProcessNode2.NodeID,
 		EventID:     s.Process2Event.ID,
@@ -437,7 +437,7 @@ func (s *MergeTestSteps) CreateQueueItems() {
 }
 
 func (s *MergeTestSteps) CreateSingleQueueItemForProcess1() {
-	queueItem1 := &models.WorkflowNodeQueueItem{
+	queueItem1 := &models.CanvasNodeQueueItem{
 		WorkflowID:  s.Wf.ID,
 		NodeID:      s.ProcessNode1.NodeID,
 		EventID:     s.Process1Event.ID,
@@ -495,41 +495,41 @@ func (s *MergeTestSteps) ProcessSecondEventExpectNoFinish(m *Merge) {
 }
 
 func (s *MergeTestSteps) AssertNodeExecutionCount(expectedCount int) {
-	var executions []models.WorkflowNodeExecution
+	var executions []models.CanvasNodeExecution
 	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).Find(&executions).Error)
 	assert.Equal(s.t, expectedCount, len(executions))
 }
 
 func (s *MergeTestSteps) AssertExecutionFinished() {
-	var execution models.WorkflowNodeExecution
+	var execution models.CanvasNodeExecution
 	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
-	assert.Equal(s.t, models.WorkflowNodeExecutionStateFinished, execution.State)
+	assert.Equal(s.t, models.CanvasNodeExecutionStateFinished, execution.State)
 }
 
 // AssertExecutionFailed checks that the execution finished and emitted to the fail channel.
 // Note: With output channels, conditional stop "passes" the execution but routes to the
 // "fail" channel, similar to how the `if` component routes to true/false channels.
 func (s *MergeTestSteps) AssertExecutionFailed() {
-	var execution models.WorkflowNodeExecution
+	var execution models.CanvasNodeExecution
 	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
-	assert.Equal(s.t, models.WorkflowNodeExecutionStateFinished, execution.State)
-	assert.Equal(s.t, models.WorkflowNodeExecutionResultPassed, execution.Result)
+	assert.Equal(s.t, models.CanvasNodeExecutionStateFinished, execution.State)
+	assert.Equal(s.t, models.CanvasNodeExecutionResultPassed, execution.Result)
 }
 
 func (s *MergeTestSteps) AssertExecutionPending() {
-	var execution models.WorkflowNodeExecution
+	var execution models.CanvasNodeExecution
 	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
-	assert.Equal(s.t, models.WorkflowNodeExecutionStatePending, execution.State)
+	assert.Equal(s.t, models.CanvasNodeExecutionStatePending, execution.State)
 }
 
 func (s *MergeTestSteps) AssertQueueIsEmpty() {
 	var count int64
-	require.NoError(s.t, s.Tx.Model(&models.WorkflowNodeQueueItem{}).Where("node_id = ?", s.MergeNode.NodeID).Count(&count).Error)
+	require.NoError(s.t, s.Tx.Model(&models.CanvasNodeQueueItem{}).Where("node_id = ?", s.MergeNode.NodeID).Count(&count).Error)
 	assert.Equal(s.t, int64(0), count)
 }
 
 func (s *MergeTestSteps) AssertNodeIsAllowedToProcessNextQueueItem() {
-	var node models.WorkflowNode
+	var node models.CanvasNode
 	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&node).Error)
-	assert.Equal(s.t, models.WorkflowNodeStateReady, node.State)
+	assert.Equal(s.t, models.CanvasNodeStateReady, node.State)
 }

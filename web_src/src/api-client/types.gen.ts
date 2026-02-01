@@ -52,6 +52,237 @@ export type BlueprintsUpdateBlueprintResponse = {
   blueprint?: BlueprintsBlueprint;
 };
 
+export type CanvasNodeExecutionResult = "RESULT_UNKNOWN" | "RESULT_PASSED" | "RESULT_FAILED" | "RESULT_CANCELLED";
+
+export type CanvasNodeExecutionResultReason =
+  | "RESULT_REASON_OK"
+  | "RESULT_REASON_ERROR"
+  | "RESULT_REASON_ERROR_RESOLVED";
+
+export type CanvasNodeExecutionState = "STATE_UNKNOWN" | "STATE_PENDING" | "STATE_STARTED" | "STATE_FINISHED";
+
+export type CanvasesCancelExecutionBody = {
+  [key: string]: unknown;
+};
+
+export type CanvasesCancelExecutionResponse = {
+  [key: string]: unknown;
+};
+
+export type CanvasesCanvas = {
+  metadata?: CanvasesCanvasMetadata;
+  spec?: CanvasesCanvasSpec;
+  status?: CanvasesCanvasStatus;
+};
+
+export type CanvasesCanvasEvent = {
+  id?: string;
+  canvasId?: string;
+  nodeId?: string;
+  channel?: string;
+  customName?: string;
+  data?: {
+    [key: string]: unknown;
+  };
+  createdAt?: string;
+};
+
+export type CanvasesCanvasEventWithExecutions = {
+  id?: string;
+  canvasId?: string;
+  nodeId?: string;
+  channel?: string;
+  data?: {
+    [key: string]: unknown;
+  };
+  createdAt?: string;
+  executions?: Array<CanvasesCanvasNodeExecution>;
+  customName?: string;
+};
+
+export type CanvasesCanvasMetadata = {
+  id?: string;
+  organizationId?: string;
+  name?: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: SuperplaneCanvasesUserRef;
+  isTemplate?: boolean;
+};
+
+export type CanvasesCanvasNodeExecution = {
+  id?: string;
+  canvasId?: string;
+  nodeId?: string;
+  parentExecutionId?: string;
+  previousExecutionId?: string;
+  state?: CanvasNodeExecutionState;
+  result?: CanvasNodeExecutionResult;
+  resultReason?: CanvasNodeExecutionResultReason;
+  resultMessage?: string;
+  input?: {
+    [key: string]: unknown;
+  };
+  outputs?: {
+    [key: string]: unknown;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+  metadata?: {
+    [key: string]: unknown;
+  };
+  configuration?: {
+    [key: string]: unknown;
+  };
+  childExecutions?: Array<CanvasesCanvasNodeExecution>;
+  rootEvent?: CanvasesCanvasEvent;
+  cancelledBy?: SuperplaneCanvasesUserRef;
+};
+
+export type CanvasesCanvasNodeQueueItem = {
+  id?: string;
+  canvasId?: string;
+  nodeId?: string;
+  input?: {
+    [key: string]: unknown;
+  };
+  rootEvent?: CanvasesCanvasEvent;
+  createdAt?: string;
+};
+
+export type CanvasesCanvasSpec = {
+  nodes?: Array<ComponentsNode>;
+  edges?: Array<ComponentsEdge>;
+};
+
+export type CanvasesCanvasStatus = {
+  lastExecutions?: Array<CanvasesCanvasNodeExecution>;
+  nextQueueItems?: Array<CanvasesCanvasNodeQueueItem>;
+  lastEvents?: Array<CanvasesCanvasEvent>;
+};
+
+export type CanvasesCreateCanvasRequest = {
+  canvas?: CanvasesCanvas;
+};
+
+export type CanvasesCreateCanvasResponse = {
+  canvas?: CanvasesCanvas;
+};
+
+export type CanvasesDeleteCanvasResponse = {
+  [key: string]: unknown;
+};
+
+export type CanvasesDeleteNodeQueueItemResponse = {
+  [key: string]: unknown;
+};
+
+export type CanvasesDescribeCanvasResponse = {
+  canvas?: CanvasesCanvas;
+};
+
+export type CanvasesEmitNodeEventBody = {
+  channel?: string;
+  data?: {
+    [key: string]: unknown;
+  };
+};
+
+export type CanvasesEmitNodeEventResponse = {
+  eventId?: string;
+};
+
+export type CanvasesInvokeNodeExecutionActionBody = {
+  parameters?: {
+    [key: string]: unknown;
+  };
+};
+
+export type CanvasesInvokeNodeExecutionActionResponse = {
+  [key: string]: unknown;
+};
+
+export type CanvasesInvokeNodeTriggerActionBody = {
+  parameters?: {
+    [key: string]: unknown;
+  };
+};
+
+export type CanvasesInvokeNodeTriggerActionResponse = {
+  result?: {
+    [key: string]: unknown;
+  };
+};
+
+export type CanvasesListCanvasEventsResponse = {
+  events?: Array<CanvasesCanvasEventWithExecutions>;
+  totalCount?: number;
+  hasNextPage?: boolean;
+  lastTimestamp?: string;
+};
+
+export type CanvasesListCanvasesResponse = {
+  canvases?: Array<CanvasesCanvas>;
+};
+
+export type CanvasesListChildExecutionsBody = {
+  [key: string]: unknown;
+};
+
+export type CanvasesListChildExecutionsResponse = {
+  executions?: Array<CanvasesCanvasNodeExecution>;
+};
+
+export type CanvasesListEventExecutionsResponse = {
+  executions?: Array<CanvasesCanvasNodeExecution>;
+};
+
+export type CanvasesListNodeEventsResponse = {
+  events?: Array<CanvasesCanvasEvent>;
+  totalCount?: number;
+  hasNextPage?: boolean;
+  lastTimestamp?: string;
+};
+
+export type CanvasesListNodeExecutionsResponse = {
+  executions?: Array<CanvasesCanvasNodeExecution>;
+  totalCount?: number;
+  hasNextPage?: boolean;
+  lastTimestamp?: string;
+};
+
+export type CanvasesListNodeQueueItemsResponse = {
+  items?: Array<CanvasesCanvasNodeQueueItem>;
+  totalCount?: number;
+  hasNextPage?: boolean;
+  lastTimestamp?: string;
+};
+
+export type CanvasesResolveExecutionErrorsBody = {
+  executionIds?: Array<string>;
+};
+
+export type CanvasesResolveExecutionErrorsResponse = {
+  [key: string]: unknown;
+};
+
+export type CanvasesUpdateCanvasBody = {
+  canvas?: CanvasesCanvas;
+};
+
+export type CanvasesUpdateCanvasResponse = {
+  canvas?: CanvasesCanvas;
+};
+
+export type CanvasesUpdateNodePauseBody = {
+  paused?: boolean;
+};
+
+export type CanvasesUpdateNodePauseResponse = {
+  node?: ComponentsNode;
+};
+
 export type ComponentsComponent = {
   name?: string;
   label?: string;
@@ -657,6 +888,11 @@ export type SuperplaneBlueprintsUserRef = {
   name?: string;
 };
 
+export type SuperplaneCanvasesUserRef = {
+  id?: string;
+  name?: string;
+};
+
 export type SuperplaneComponentsOutputChannel = {
   name?: string;
   label?: string;
@@ -683,11 +919,6 @@ export type SuperplaneUsersUser = {
   metadata?: UsersUserMetadata;
   spec?: UsersUserSpec;
   status?: UsersUserStatus;
-};
-
-export type SuperplaneWorkflowsUserRef = {
-  id?: string;
-  name?: string;
 };
 
 export type TriggersDescribeTriggerResponse = {
@@ -778,237 +1009,6 @@ export type WidgetsWidget = {
   icon?: string;
   color?: string;
   configuration?: Array<ConfigurationField>;
-};
-
-export type WorkflowNodeExecutionResult = "RESULT_UNKNOWN" | "RESULT_PASSED" | "RESULT_FAILED" | "RESULT_CANCELLED";
-
-export type WorkflowNodeExecutionResultReason =
-  | "RESULT_REASON_OK"
-  | "RESULT_REASON_ERROR"
-  | "RESULT_REASON_ERROR_RESOLVED";
-
-export type WorkflowNodeExecutionState = "STATE_UNKNOWN" | "STATE_PENDING" | "STATE_STARTED" | "STATE_FINISHED";
-
-export type WorkflowsCancelExecutionBody = {
-  [key: string]: unknown;
-};
-
-export type WorkflowsCancelExecutionResponse = {
-  [key: string]: unknown;
-};
-
-export type WorkflowsCreateWorkflowRequest = {
-  workflow?: WorkflowsWorkflow;
-};
-
-export type WorkflowsCreateWorkflowResponse = {
-  workflow?: WorkflowsWorkflow;
-};
-
-export type WorkflowsDeleteNodeQueueItemResponse = {
-  [key: string]: unknown;
-};
-
-export type WorkflowsDeleteWorkflowResponse = {
-  [key: string]: unknown;
-};
-
-export type WorkflowsDescribeWorkflowResponse = {
-  workflow?: WorkflowsWorkflow;
-};
-
-export type WorkflowsEmitNodeEventBody = {
-  channel?: string;
-  data?: {
-    [key: string]: unknown;
-  };
-};
-
-export type WorkflowsEmitNodeEventResponse = {
-  eventId?: string;
-};
-
-export type WorkflowsInvokeNodeExecutionActionBody = {
-  parameters?: {
-    [key: string]: unknown;
-  };
-};
-
-export type WorkflowsInvokeNodeExecutionActionResponse = {
-  [key: string]: unknown;
-};
-
-export type WorkflowsInvokeNodeTriggerActionBody = {
-  parameters?: {
-    [key: string]: unknown;
-  };
-};
-
-export type WorkflowsInvokeNodeTriggerActionResponse = {
-  result?: {
-    [key: string]: unknown;
-  };
-};
-
-export type WorkflowsListChildExecutionsBody = {
-  [key: string]: unknown;
-};
-
-export type WorkflowsListChildExecutionsResponse = {
-  executions?: Array<WorkflowsWorkflowNodeExecution>;
-};
-
-export type WorkflowsListEventExecutionsResponse = {
-  executions?: Array<WorkflowsWorkflowNodeExecution>;
-};
-
-export type WorkflowsListNodeEventsResponse = {
-  events?: Array<WorkflowsWorkflowEvent>;
-  totalCount?: number;
-  hasNextPage?: boolean;
-  lastTimestamp?: string;
-};
-
-export type WorkflowsListNodeExecutionsResponse = {
-  executions?: Array<WorkflowsWorkflowNodeExecution>;
-  totalCount?: number;
-  hasNextPage?: boolean;
-  lastTimestamp?: string;
-};
-
-export type WorkflowsListNodeQueueItemsResponse = {
-  items?: Array<WorkflowsWorkflowNodeQueueItem>;
-  totalCount?: number;
-  hasNextPage?: boolean;
-  lastTimestamp?: string;
-};
-
-export type WorkflowsListWorkflowEventsResponse = {
-  events?: Array<WorkflowsWorkflowEventWithExecutions>;
-  totalCount?: number;
-  hasNextPage?: boolean;
-  lastTimestamp?: string;
-};
-
-export type WorkflowsListWorkflowsResponse = {
-  workflows?: Array<WorkflowsWorkflow>;
-};
-
-export type WorkflowsResolveExecutionErrorsBody = {
-  executionIds?: Array<string>;
-};
-
-export type WorkflowsResolveExecutionErrorsResponse = {
-  [key: string]: unknown;
-};
-
-export type WorkflowsUpdateNodePauseBody = {
-  paused?: boolean;
-};
-
-export type WorkflowsUpdateNodePauseResponse = {
-  node?: ComponentsNode;
-};
-
-export type WorkflowsUpdateWorkflowBody = {
-  workflow?: WorkflowsWorkflow;
-};
-
-export type WorkflowsUpdateWorkflowResponse = {
-  workflow?: WorkflowsWorkflow;
-};
-
-export type WorkflowsWorkflow = {
-  metadata?: WorkflowsWorkflowMetadata;
-  spec?: WorkflowsWorkflowSpec;
-  status?: WorkflowsWorkflowStatus;
-};
-
-export type WorkflowsWorkflowEvent = {
-  id?: string;
-  workflowId?: string;
-  nodeId?: string;
-  channel?: string;
-  customName?: string;
-  data?: {
-    [key: string]: unknown;
-  };
-  createdAt?: string;
-};
-
-export type WorkflowsWorkflowEventWithExecutions = {
-  id?: string;
-  workflowId?: string;
-  nodeId?: string;
-  channel?: string;
-  data?: {
-    [key: string]: unknown;
-  };
-  createdAt?: string;
-  executions?: Array<WorkflowsWorkflowNodeExecution>;
-  customName?: string;
-};
-
-export type WorkflowsWorkflowMetadata = {
-  id?: string;
-  organizationId?: string;
-  name?: string;
-  description?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  createdBy?: SuperplaneWorkflowsUserRef;
-  isTemplate?: boolean;
-};
-
-export type WorkflowsWorkflowNodeExecution = {
-  id?: string;
-  workflowId?: string;
-  nodeId?: string;
-  parentExecutionId?: string;
-  previousExecutionId?: string;
-  state?: WorkflowNodeExecutionState;
-  result?: WorkflowNodeExecutionResult;
-  resultReason?: WorkflowNodeExecutionResultReason;
-  resultMessage?: string;
-  input?: {
-    [key: string]: unknown;
-  };
-  outputs?: {
-    [key: string]: unknown;
-  };
-  createdAt?: string;
-  updatedAt?: string;
-  metadata?: {
-    [key: string]: unknown;
-  };
-  configuration?: {
-    [key: string]: unknown;
-  };
-  childExecutions?: Array<WorkflowsWorkflowNodeExecution>;
-  rootEvent?: WorkflowsWorkflowEvent;
-  cancelledBy?: SuperplaneWorkflowsUserRef;
-};
-
-export type WorkflowsWorkflowNodeQueueItem = {
-  id?: string;
-  workflowId?: string;
-  nodeId?: string;
-  input?: {
-    [key: string]: unknown;
-  };
-  rootEvent?: WorkflowsWorkflowEvent;
-  createdAt?: string;
-};
-
-export type WorkflowsWorkflowSpec = {
-  nodes?: Array<ComponentsNode>;
-  edges?: Array<ComponentsEdge>;
-};
-
-export type WorkflowsWorkflowStatus = {
-  lastExecutions?: Array<WorkflowsWorkflowNodeExecution>;
-  nextQueueItems?: Array<WorkflowsWorkflowNodeQueueItem>;
-  lastEvents?: Array<WorkflowsWorkflowEvent>;
 };
 
 export type GooglerpcStatus = {
@@ -1168,6 +1168,533 @@ export type BlueprintsUpdateBlueprintResponses = {
 
 export type BlueprintsUpdateBlueprintResponse2 =
   BlueprintsUpdateBlueprintResponses[keyof BlueprintsUpdateBlueprintResponses];
+
+export type CanvasesListCanvasesData = {
+  body?: never;
+  path?: never;
+  query?: {
+    includeTemplates?: boolean;
+  };
+  url: "/api/v1/canvases";
+};
+
+export type CanvasesListCanvasesErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesListCanvasesError = CanvasesListCanvasesErrors[keyof CanvasesListCanvasesErrors];
+
+export type CanvasesListCanvasesResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesListCanvasesResponse;
+};
+
+export type CanvasesListCanvasesResponse2 = CanvasesListCanvasesResponses[keyof CanvasesListCanvasesResponses];
+
+export type CanvasesCreateCanvasData = {
+  body: CanvasesCreateCanvasRequest;
+  path?: never;
+  query?: never;
+  url: "/api/v1/canvases";
+};
+
+export type CanvasesCreateCanvasErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesCreateCanvasError = CanvasesCreateCanvasErrors[keyof CanvasesCreateCanvasErrors];
+
+export type CanvasesCreateCanvasResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesCreateCanvasResponse;
+};
+
+export type CanvasesCreateCanvasResponse2 = CanvasesCreateCanvasResponses[keyof CanvasesCreateCanvasResponses];
+
+export type CanvasesListCanvasEventsData = {
+  body?: never;
+  path: {
+    canvasId: string;
+  };
+  query?: {
+    limit?: number;
+    before?: string;
+  };
+  url: "/api/v1/canvases/{canvasId}/events";
+};
+
+export type CanvasesListCanvasEventsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesListCanvasEventsError = CanvasesListCanvasEventsErrors[keyof CanvasesListCanvasEventsErrors];
+
+export type CanvasesListCanvasEventsResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesListCanvasEventsResponse;
+};
+
+export type CanvasesListCanvasEventsResponse2 =
+  CanvasesListCanvasEventsResponses[keyof CanvasesListCanvasEventsResponses];
+
+export type CanvasesListEventExecutionsData = {
+  body?: never;
+  path: {
+    canvasId: string;
+    eventId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/events/{eventId}/executions";
+};
+
+export type CanvasesListEventExecutionsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesListEventExecutionsError =
+  CanvasesListEventExecutionsErrors[keyof CanvasesListEventExecutionsErrors];
+
+export type CanvasesListEventExecutionsResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesListEventExecutionsResponse;
+};
+
+export type CanvasesListEventExecutionsResponse2 =
+  CanvasesListEventExecutionsResponses[keyof CanvasesListEventExecutionsResponses];
+
+export type CanvasesResolveExecutionErrorsData = {
+  body: CanvasesResolveExecutionErrorsBody;
+  path: {
+    canvasId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/executions/resolve";
+};
+
+export type CanvasesResolveExecutionErrorsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesResolveExecutionErrorsError =
+  CanvasesResolveExecutionErrorsErrors[keyof CanvasesResolveExecutionErrorsErrors];
+
+export type CanvasesResolveExecutionErrorsResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesResolveExecutionErrorsResponse;
+};
+
+export type CanvasesResolveExecutionErrorsResponse2 =
+  CanvasesResolveExecutionErrorsResponses[keyof CanvasesResolveExecutionErrorsResponses];
+
+export type CanvasesInvokeNodeExecutionActionData = {
+  body: CanvasesInvokeNodeExecutionActionBody;
+  path: {
+    canvasId: string;
+    executionId: string;
+    actionName: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/executions/{executionId}/actions/{actionName}";
+};
+
+export type CanvasesInvokeNodeExecutionActionErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesInvokeNodeExecutionActionError =
+  CanvasesInvokeNodeExecutionActionErrors[keyof CanvasesInvokeNodeExecutionActionErrors];
+
+export type CanvasesInvokeNodeExecutionActionResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesInvokeNodeExecutionActionResponse;
+};
+
+export type CanvasesInvokeNodeExecutionActionResponse2 =
+  CanvasesInvokeNodeExecutionActionResponses[keyof CanvasesInvokeNodeExecutionActionResponses];
+
+export type CanvasesCancelExecutionData = {
+  body: CanvasesCancelExecutionBody;
+  path: {
+    canvasId: string;
+    executionId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/executions/{executionId}/cancel";
+};
+
+export type CanvasesCancelExecutionErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesCancelExecutionError = CanvasesCancelExecutionErrors[keyof CanvasesCancelExecutionErrors];
+
+export type CanvasesCancelExecutionResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesCancelExecutionResponse;
+};
+
+export type CanvasesCancelExecutionResponse2 = CanvasesCancelExecutionResponses[keyof CanvasesCancelExecutionResponses];
+
+export type CanvasesListChildExecutionsData = {
+  body: CanvasesListChildExecutionsBody;
+  path: {
+    canvasId: string;
+    executionId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/executions/{executionId}/children";
+};
+
+export type CanvasesListChildExecutionsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesListChildExecutionsError =
+  CanvasesListChildExecutionsErrors[keyof CanvasesListChildExecutionsErrors];
+
+export type CanvasesListChildExecutionsResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesListChildExecutionsResponse;
+};
+
+export type CanvasesListChildExecutionsResponse2 =
+  CanvasesListChildExecutionsResponses[keyof CanvasesListChildExecutionsResponses];
+
+export type CanvasesListNodeEventsData = {
+  body?: never;
+  path: {
+    canvasId: string;
+    nodeId: string;
+  };
+  query?: {
+    limit?: number;
+    before?: string;
+  };
+  url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/events";
+};
+
+export type CanvasesListNodeEventsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesListNodeEventsError = CanvasesListNodeEventsErrors[keyof CanvasesListNodeEventsErrors];
+
+export type CanvasesListNodeEventsResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesListNodeEventsResponse;
+};
+
+export type CanvasesListNodeEventsResponse2 = CanvasesListNodeEventsResponses[keyof CanvasesListNodeEventsResponses];
+
+export type CanvasesEmitNodeEventData = {
+  body: CanvasesEmitNodeEventBody;
+  path: {
+    canvasId: string;
+    nodeId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/events";
+};
+
+export type CanvasesEmitNodeEventErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesEmitNodeEventError = CanvasesEmitNodeEventErrors[keyof CanvasesEmitNodeEventErrors];
+
+export type CanvasesEmitNodeEventResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesEmitNodeEventResponse;
+};
+
+export type CanvasesEmitNodeEventResponse2 = CanvasesEmitNodeEventResponses[keyof CanvasesEmitNodeEventResponses];
+
+export type CanvasesListNodeExecutionsData = {
+  body?: never;
+  path: {
+    canvasId: string;
+    nodeId: string;
+  };
+  query?: {
+    states?: Array<"STATE_UNKNOWN" | "STATE_PENDING" | "STATE_STARTED" | "STATE_FINISHED">;
+    results?: Array<"RESULT_UNKNOWN" | "RESULT_PASSED" | "RESULT_FAILED" | "RESULT_CANCELLED">;
+    limit?: number;
+    before?: string;
+  };
+  url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/executions";
+};
+
+export type CanvasesListNodeExecutionsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesListNodeExecutionsError = CanvasesListNodeExecutionsErrors[keyof CanvasesListNodeExecutionsErrors];
+
+export type CanvasesListNodeExecutionsResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesListNodeExecutionsResponse;
+};
+
+export type CanvasesListNodeExecutionsResponse2 =
+  CanvasesListNodeExecutionsResponses[keyof CanvasesListNodeExecutionsResponses];
+
+export type CanvasesUpdateNodePauseData = {
+  body: CanvasesUpdateNodePauseBody;
+  path: {
+    canvasId: string;
+    nodeId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/pause";
+};
+
+export type CanvasesUpdateNodePauseErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesUpdateNodePauseError = CanvasesUpdateNodePauseErrors[keyof CanvasesUpdateNodePauseErrors];
+
+export type CanvasesUpdateNodePauseResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesUpdateNodePauseResponse;
+};
+
+export type CanvasesUpdateNodePauseResponse2 = CanvasesUpdateNodePauseResponses[keyof CanvasesUpdateNodePauseResponses];
+
+export type CanvasesListNodeQueueItemsData = {
+  body?: never;
+  path: {
+    canvasId: string;
+    nodeId: string;
+  };
+  query?: {
+    limit?: number;
+    before?: string;
+  };
+  url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/queue";
+};
+
+export type CanvasesListNodeQueueItemsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesListNodeQueueItemsError = CanvasesListNodeQueueItemsErrors[keyof CanvasesListNodeQueueItemsErrors];
+
+export type CanvasesListNodeQueueItemsResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesListNodeQueueItemsResponse;
+};
+
+export type CanvasesListNodeQueueItemsResponse2 =
+  CanvasesListNodeQueueItemsResponses[keyof CanvasesListNodeQueueItemsResponses];
+
+export type CanvasesDeleteNodeQueueItemData = {
+  body?: never;
+  path: {
+    canvasId: string;
+    nodeId: string;
+    itemId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/queue/{itemId}";
+};
+
+export type CanvasesDeleteNodeQueueItemErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesDeleteNodeQueueItemError =
+  CanvasesDeleteNodeQueueItemErrors[keyof CanvasesDeleteNodeQueueItemErrors];
+
+export type CanvasesDeleteNodeQueueItemResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesDeleteNodeQueueItemResponse;
+};
+
+export type CanvasesDeleteNodeQueueItemResponse2 =
+  CanvasesDeleteNodeQueueItemResponses[keyof CanvasesDeleteNodeQueueItemResponses];
+
+export type CanvasesInvokeNodeTriggerActionData = {
+  body: CanvasesInvokeNodeTriggerActionBody;
+  path: {
+    canvasId: string;
+    nodeId: string;
+    actionName: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/triggers/{nodeId}/actions/{actionName}";
+};
+
+export type CanvasesInvokeNodeTriggerActionErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesInvokeNodeTriggerActionError =
+  CanvasesInvokeNodeTriggerActionErrors[keyof CanvasesInvokeNodeTriggerActionErrors];
+
+export type CanvasesInvokeNodeTriggerActionResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesInvokeNodeTriggerActionResponse;
+};
+
+export type CanvasesInvokeNodeTriggerActionResponse2 =
+  CanvasesInvokeNodeTriggerActionResponses[keyof CanvasesInvokeNodeTriggerActionResponses];
+
+export type CanvasesDeleteCanvasData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{id}";
+};
+
+export type CanvasesDeleteCanvasErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesDeleteCanvasError = CanvasesDeleteCanvasErrors[keyof CanvasesDeleteCanvasErrors];
+
+export type CanvasesDeleteCanvasResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesDeleteCanvasResponse;
+};
+
+export type CanvasesDeleteCanvasResponse2 = CanvasesDeleteCanvasResponses[keyof CanvasesDeleteCanvasResponses];
+
+export type CanvasesDescribeCanvasData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{id}";
+};
+
+export type CanvasesDescribeCanvasErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesDescribeCanvasError = CanvasesDescribeCanvasErrors[keyof CanvasesDescribeCanvasErrors];
+
+export type CanvasesDescribeCanvasResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesDescribeCanvasResponse;
+};
+
+export type CanvasesDescribeCanvasResponse2 = CanvasesDescribeCanvasResponses[keyof CanvasesDescribeCanvasResponses];
+
+export type CanvasesUpdateCanvasData = {
+  body: CanvasesUpdateCanvasBody;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{id}";
+};
+
+export type CanvasesUpdateCanvasErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesUpdateCanvasError = CanvasesUpdateCanvasErrors[keyof CanvasesUpdateCanvasErrors];
+
+export type CanvasesUpdateCanvasResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesUpdateCanvasResponse;
+};
+
+export type CanvasesUpdateCanvasResponse2 = CanvasesUpdateCanvasResponses[keyof CanvasesUpdateCanvasResponses];
 
 export type ComponentsListComponentsData = {
   body?: never;
@@ -2560,539 +3087,6 @@ export type WidgetsDescribeWidgetResponses = {
 };
 
 export type WidgetsDescribeWidgetResponse2 = WidgetsDescribeWidgetResponses[keyof WidgetsDescribeWidgetResponses];
-
-export type WorkflowsListWorkflowsData = {
-  body?: never;
-  path?: never;
-  query?: {
-    includeTemplates?: boolean;
-  };
-  url: "/api/v1/workflows";
-};
-
-export type WorkflowsListWorkflowsErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type WorkflowsListWorkflowsError = WorkflowsListWorkflowsErrors[keyof WorkflowsListWorkflowsErrors];
-
-export type WorkflowsListWorkflowsResponses = {
-  /**
-   * A successful response.
-   */
-  200: WorkflowsListWorkflowsResponse;
-};
-
-export type WorkflowsListWorkflowsResponse2 = WorkflowsListWorkflowsResponses[keyof WorkflowsListWorkflowsResponses];
-
-export type WorkflowsCreateWorkflowData = {
-  body: WorkflowsCreateWorkflowRequest;
-  path?: never;
-  query?: never;
-  url: "/api/v1/workflows";
-};
-
-export type WorkflowsCreateWorkflowErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type WorkflowsCreateWorkflowError = WorkflowsCreateWorkflowErrors[keyof WorkflowsCreateWorkflowErrors];
-
-export type WorkflowsCreateWorkflowResponses = {
-  /**
-   * A successful response.
-   */
-  200: WorkflowsCreateWorkflowResponse;
-};
-
-export type WorkflowsCreateWorkflowResponse2 = WorkflowsCreateWorkflowResponses[keyof WorkflowsCreateWorkflowResponses];
-
-export type WorkflowsDeleteWorkflowData = {
-  body?: never;
-  path: {
-    id: string;
-  };
-  query?: never;
-  url: "/api/v1/workflows/{id}";
-};
-
-export type WorkflowsDeleteWorkflowErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type WorkflowsDeleteWorkflowError = WorkflowsDeleteWorkflowErrors[keyof WorkflowsDeleteWorkflowErrors];
-
-export type WorkflowsDeleteWorkflowResponses = {
-  /**
-   * A successful response.
-   */
-  200: WorkflowsDeleteWorkflowResponse;
-};
-
-export type WorkflowsDeleteWorkflowResponse2 = WorkflowsDeleteWorkflowResponses[keyof WorkflowsDeleteWorkflowResponses];
-
-export type WorkflowsDescribeWorkflowData = {
-  body?: never;
-  path: {
-    id: string;
-  };
-  query?: never;
-  url: "/api/v1/workflows/{id}";
-};
-
-export type WorkflowsDescribeWorkflowErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type WorkflowsDescribeWorkflowError = WorkflowsDescribeWorkflowErrors[keyof WorkflowsDescribeWorkflowErrors];
-
-export type WorkflowsDescribeWorkflowResponses = {
-  /**
-   * A successful response.
-   */
-  200: WorkflowsDescribeWorkflowResponse;
-};
-
-export type WorkflowsDescribeWorkflowResponse2 =
-  WorkflowsDescribeWorkflowResponses[keyof WorkflowsDescribeWorkflowResponses];
-
-export type WorkflowsUpdateWorkflowData = {
-  body: WorkflowsUpdateWorkflowBody;
-  path: {
-    id: string;
-  };
-  query?: never;
-  url: "/api/v1/workflows/{id}";
-};
-
-export type WorkflowsUpdateWorkflowErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type WorkflowsUpdateWorkflowError = WorkflowsUpdateWorkflowErrors[keyof WorkflowsUpdateWorkflowErrors];
-
-export type WorkflowsUpdateWorkflowResponses = {
-  /**
-   * A successful response.
-   */
-  200: WorkflowsUpdateWorkflowResponse;
-};
-
-export type WorkflowsUpdateWorkflowResponse2 = WorkflowsUpdateWorkflowResponses[keyof WorkflowsUpdateWorkflowResponses];
-
-export type WorkflowsListWorkflowEventsData = {
-  body?: never;
-  path: {
-    workflowId: string;
-  };
-  query?: {
-    limit?: number;
-    before?: string;
-  };
-  url: "/api/v1/workflows/{workflowId}/events";
-};
-
-export type WorkflowsListWorkflowEventsErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type WorkflowsListWorkflowEventsError =
-  WorkflowsListWorkflowEventsErrors[keyof WorkflowsListWorkflowEventsErrors];
-
-export type WorkflowsListWorkflowEventsResponses = {
-  /**
-   * A successful response.
-   */
-  200: WorkflowsListWorkflowEventsResponse;
-};
-
-export type WorkflowsListWorkflowEventsResponse2 =
-  WorkflowsListWorkflowEventsResponses[keyof WorkflowsListWorkflowEventsResponses];
-
-export type WorkflowsListEventExecutionsData = {
-  body?: never;
-  path: {
-    workflowId: string;
-    eventId: string;
-  };
-  query?: never;
-  url: "/api/v1/workflows/{workflowId}/events/{eventId}/executions";
-};
-
-export type WorkflowsListEventExecutionsErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type WorkflowsListEventExecutionsError =
-  WorkflowsListEventExecutionsErrors[keyof WorkflowsListEventExecutionsErrors];
-
-export type WorkflowsListEventExecutionsResponses = {
-  /**
-   * A successful response.
-   */
-  200: WorkflowsListEventExecutionsResponse;
-};
-
-export type WorkflowsListEventExecutionsResponse2 =
-  WorkflowsListEventExecutionsResponses[keyof WorkflowsListEventExecutionsResponses];
-
-export type WorkflowsResolveExecutionErrorsData = {
-  body: WorkflowsResolveExecutionErrorsBody;
-  path: {
-    workflowId: string;
-  };
-  query?: never;
-  url: "/api/v1/workflows/{workflowId}/executions/resolve";
-};
-
-export type WorkflowsResolveExecutionErrorsErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type WorkflowsResolveExecutionErrorsError =
-  WorkflowsResolveExecutionErrorsErrors[keyof WorkflowsResolveExecutionErrorsErrors];
-
-export type WorkflowsResolveExecutionErrorsResponses = {
-  /**
-   * A successful response.
-   */
-  200: WorkflowsResolveExecutionErrorsResponse;
-};
-
-export type WorkflowsResolveExecutionErrorsResponse2 =
-  WorkflowsResolveExecutionErrorsResponses[keyof WorkflowsResolveExecutionErrorsResponses];
-
-export type WorkflowsInvokeNodeExecutionActionData = {
-  body: WorkflowsInvokeNodeExecutionActionBody;
-  path: {
-    workflowId: string;
-    executionId: string;
-    actionName: string;
-  };
-  query?: never;
-  url: "/api/v1/workflows/{workflowId}/executions/{executionId}/actions/{actionName}";
-};
-
-export type WorkflowsInvokeNodeExecutionActionErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type WorkflowsInvokeNodeExecutionActionError =
-  WorkflowsInvokeNodeExecutionActionErrors[keyof WorkflowsInvokeNodeExecutionActionErrors];
-
-export type WorkflowsInvokeNodeExecutionActionResponses = {
-  /**
-   * A successful response.
-   */
-  200: WorkflowsInvokeNodeExecutionActionResponse;
-};
-
-export type WorkflowsInvokeNodeExecutionActionResponse2 =
-  WorkflowsInvokeNodeExecutionActionResponses[keyof WorkflowsInvokeNodeExecutionActionResponses];
-
-export type WorkflowsCancelExecutionData = {
-  body: WorkflowsCancelExecutionBody;
-  path: {
-    workflowId: string;
-    executionId: string;
-  };
-  query?: never;
-  url: "/api/v1/workflows/{workflowId}/executions/{executionId}/cancel";
-};
-
-export type WorkflowsCancelExecutionErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type WorkflowsCancelExecutionError = WorkflowsCancelExecutionErrors[keyof WorkflowsCancelExecutionErrors];
-
-export type WorkflowsCancelExecutionResponses = {
-  /**
-   * A successful response.
-   */
-  200: WorkflowsCancelExecutionResponse;
-};
-
-export type WorkflowsCancelExecutionResponse2 =
-  WorkflowsCancelExecutionResponses[keyof WorkflowsCancelExecutionResponses];
-
-export type WorkflowsListChildExecutionsData = {
-  body: WorkflowsListChildExecutionsBody;
-  path: {
-    workflowId: string;
-    executionId: string;
-  };
-  query?: never;
-  url: "/api/v1/workflows/{workflowId}/executions/{executionId}/children";
-};
-
-export type WorkflowsListChildExecutionsErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type WorkflowsListChildExecutionsError =
-  WorkflowsListChildExecutionsErrors[keyof WorkflowsListChildExecutionsErrors];
-
-export type WorkflowsListChildExecutionsResponses = {
-  /**
-   * A successful response.
-   */
-  200: WorkflowsListChildExecutionsResponse;
-};
-
-export type WorkflowsListChildExecutionsResponse2 =
-  WorkflowsListChildExecutionsResponses[keyof WorkflowsListChildExecutionsResponses];
-
-export type WorkflowsListNodeEventsData = {
-  body?: never;
-  path: {
-    workflowId: string;
-    nodeId: string;
-  };
-  query?: {
-    limit?: number;
-    before?: string;
-  };
-  url: "/api/v1/workflows/{workflowId}/nodes/{nodeId}/events";
-};
-
-export type WorkflowsListNodeEventsErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type WorkflowsListNodeEventsError = WorkflowsListNodeEventsErrors[keyof WorkflowsListNodeEventsErrors];
-
-export type WorkflowsListNodeEventsResponses = {
-  /**
-   * A successful response.
-   */
-  200: WorkflowsListNodeEventsResponse;
-};
-
-export type WorkflowsListNodeEventsResponse2 = WorkflowsListNodeEventsResponses[keyof WorkflowsListNodeEventsResponses];
-
-export type WorkflowsEmitNodeEventData = {
-  body: WorkflowsEmitNodeEventBody;
-  path: {
-    workflowId: string;
-    nodeId: string;
-  };
-  query?: never;
-  url: "/api/v1/workflows/{workflowId}/nodes/{nodeId}/events";
-};
-
-export type WorkflowsEmitNodeEventErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type WorkflowsEmitNodeEventError = WorkflowsEmitNodeEventErrors[keyof WorkflowsEmitNodeEventErrors];
-
-export type WorkflowsEmitNodeEventResponses = {
-  /**
-   * A successful response.
-   */
-  200: WorkflowsEmitNodeEventResponse;
-};
-
-export type WorkflowsEmitNodeEventResponse2 = WorkflowsEmitNodeEventResponses[keyof WorkflowsEmitNodeEventResponses];
-
-export type WorkflowsListNodeExecutionsData = {
-  body?: never;
-  path: {
-    workflowId: string;
-    nodeId: string;
-  };
-  query?: {
-    states?: Array<"STATE_UNKNOWN" | "STATE_PENDING" | "STATE_STARTED" | "STATE_FINISHED">;
-    results?: Array<"RESULT_UNKNOWN" | "RESULT_PASSED" | "RESULT_FAILED" | "RESULT_CANCELLED">;
-    limit?: number;
-    before?: string;
-  };
-  url: "/api/v1/workflows/{workflowId}/nodes/{nodeId}/executions";
-};
-
-export type WorkflowsListNodeExecutionsErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type WorkflowsListNodeExecutionsError =
-  WorkflowsListNodeExecutionsErrors[keyof WorkflowsListNodeExecutionsErrors];
-
-export type WorkflowsListNodeExecutionsResponses = {
-  /**
-   * A successful response.
-   */
-  200: WorkflowsListNodeExecutionsResponse;
-};
-
-export type WorkflowsListNodeExecutionsResponse2 =
-  WorkflowsListNodeExecutionsResponses[keyof WorkflowsListNodeExecutionsResponses];
-
-export type WorkflowsUpdateNodePauseData = {
-  body: WorkflowsUpdateNodePauseBody;
-  path: {
-    workflowId: string;
-    nodeId: string;
-  };
-  query?: never;
-  url: "/api/v1/workflows/{workflowId}/nodes/{nodeId}/pause";
-};
-
-export type WorkflowsUpdateNodePauseErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type WorkflowsUpdateNodePauseError = WorkflowsUpdateNodePauseErrors[keyof WorkflowsUpdateNodePauseErrors];
-
-export type WorkflowsUpdateNodePauseResponses = {
-  /**
-   * A successful response.
-   */
-  200: WorkflowsUpdateNodePauseResponse;
-};
-
-export type WorkflowsUpdateNodePauseResponse2 =
-  WorkflowsUpdateNodePauseResponses[keyof WorkflowsUpdateNodePauseResponses];
-
-export type WorkflowsListNodeQueueItemsData = {
-  body?: never;
-  path: {
-    workflowId: string;
-    nodeId: string;
-  };
-  query?: {
-    limit?: number;
-    before?: string;
-  };
-  url: "/api/v1/workflows/{workflowId}/nodes/{nodeId}/queue";
-};
-
-export type WorkflowsListNodeQueueItemsErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type WorkflowsListNodeQueueItemsError =
-  WorkflowsListNodeQueueItemsErrors[keyof WorkflowsListNodeQueueItemsErrors];
-
-export type WorkflowsListNodeQueueItemsResponses = {
-  /**
-   * A successful response.
-   */
-  200: WorkflowsListNodeQueueItemsResponse;
-};
-
-export type WorkflowsListNodeQueueItemsResponse2 =
-  WorkflowsListNodeQueueItemsResponses[keyof WorkflowsListNodeQueueItemsResponses];
-
-export type WorkflowsDeleteNodeQueueItemData = {
-  body?: never;
-  path: {
-    workflowId: string;
-    nodeId: string;
-    itemId: string;
-  };
-  query?: never;
-  url: "/api/v1/workflows/{workflowId}/nodes/{nodeId}/queue/{itemId}";
-};
-
-export type WorkflowsDeleteNodeQueueItemErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type WorkflowsDeleteNodeQueueItemError =
-  WorkflowsDeleteNodeQueueItemErrors[keyof WorkflowsDeleteNodeQueueItemErrors];
-
-export type WorkflowsDeleteNodeQueueItemResponses = {
-  /**
-   * A successful response.
-   */
-  200: WorkflowsDeleteNodeQueueItemResponse;
-};
-
-export type WorkflowsDeleteNodeQueueItemResponse2 =
-  WorkflowsDeleteNodeQueueItemResponses[keyof WorkflowsDeleteNodeQueueItemResponses];
-
-export type WorkflowsInvokeNodeTriggerActionData = {
-  body: WorkflowsInvokeNodeTriggerActionBody;
-  path: {
-    workflowId: string;
-    nodeId: string;
-    actionName: string;
-  };
-  query?: never;
-  url: "/api/v1/workflows/{workflowId}/triggers/{nodeId}/actions/{actionName}";
-};
-
-export type WorkflowsInvokeNodeTriggerActionErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type WorkflowsInvokeNodeTriggerActionError =
-  WorkflowsInvokeNodeTriggerActionErrors[keyof WorkflowsInvokeNodeTriggerActionErrors];
-
-export type WorkflowsInvokeNodeTriggerActionResponses = {
-  /**
-   * A successful response.
-   */
-  200: WorkflowsInvokeNodeTriggerActionResponse;
-};
-
-export type WorkflowsInvokeNodeTriggerActionResponse2 =
-  WorkflowsInvokeNodeTriggerActionResponses[keyof WorkflowsInvokeNodeTriggerActionResponses];
 
 export type ClientOptions = {
   baseUrl: `http://${string}` | `https://${string}` | (string & {});

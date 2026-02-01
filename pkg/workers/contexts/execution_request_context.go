@@ -10,10 +10,10 @@ import (
 
 type ExecutionRequestContext struct {
 	tx        *gorm.DB
-	execution *models.WorkflowNodeExecution
+	execution *models.CanvasNodeExecution
 }
 
-func NewExecutionRequestContext(tx *gorm.DB, execution *models.WorkflowNodeExecution) *ExecutionRequestContext {
+func NewExecutionRequestContext(tx *gorm.DB, execution *models.CanvasNodeExecution) *ExecutionRequestContext {
 	return &ExecutionRequestContext{tx: tx, execution: execution}
 }
 

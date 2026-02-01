@@ -10,50 +10,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/configuration"
-	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
-
-type testIntegration struct {
-	compare func(a, b any) (bool, error)
-}
-
-func (t *testIntegration) Name() string { return "dummy" }
-
-func (t *testIntegration) Label() string { return "test integration" }
-
-func (t *testIntegration) Icon() string { return "test" }
-
-func (t *testIntegration) Description() string { return "test integration" }
-
-func (t *testIntegration) Instructions() string { return "test integration" }
-
-func (t *testIntegration) Configuration() []configuration.Field { return nil }
-
-func (t *testIntegration) Components() []core.Component { return nil }
-
-func (t *testIntegration) Triggers() []core.Trigger { return nil }
-
-func (t *testIntegration) Sync(ctx core.SyncContext) error { return nil }
-
-func (t *testIntegration) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	return nil, nil
-}
-
-func (t *testIntegration) HandleRequest(ctx core.HTTPRequestContext) {}
-
-func (t *testIntegration) CompareWebhookConfig(a, b any) (bool, error) {
-	return t.compare(a, b)
-}
-
-func (t *testIntegration) SetupWebhook(ctx core.SetupWebhookContext) (any, error) { return nil, nil }
-
-func (t *testIntegration) CleanupWebhook(ctx core.CleanupWebhookContext) error { return nil }
 
 func Test__IntegrationContext_ScheduleResync(t *testing.T) {
 	r := support.Setup(t)
@@ -62,7 +24,7 @@ func Test__IntegrationContext_ScheduleResync(t *testing.T) {
 	//
 	// Create app installation
 	//
-	installation, err := models.CreateAppInstallation(
+	integration, err := models.CreateIntegration(
 		uuid.New(),
 		r.Organization.ID,
 		"dummy",
@@ -71,7 +33,7 @@ func Test__IntegrationContext_ScheduleResync(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx := NewIntegrationContext(database.Conn(), nil, installation, r.Encryptor, r.Registry)
+	ctx := NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry)
 
 	t.Run("rejects short interval", func(t *testing.T) {
 		err = ctx.ScheduleResync(500 * time.Millisecond)
@@ -84,8 +46,8 @@ func Test__IntegrationContext_ScheduleResync(t *testing.T) {
 		// Create previous request
 		//
 		now := time.Now()
-		require.NoError(t, installation.CreateSyncRequest(database.Conn(), &now))
-		requests, err := installation.ListRequests(models.AppInstallationRequestTypeSync)
+		require.NoError(t, integration.CreateSyncRequest(database.Conn(), &now))
+		requests, err := integration.ListRequests(models.IntegrationRequestTypeSync)
 		require.NoError(t, err)
 		require.Len(t, requests, 1)
 		previousRequest := &requests[0]
@@ -98,19 +60,19 @@ func Test__IntegrationContext_ScheduleResync(t *testing.T) {
 		//
 		// Verify previous request was completed.
 		//
-		previousRequest, err = installation.GetRequest(previousRequest.ID.String())
+		previousRequest, err = integration.GetRequest(previousRequest.ID.String())
 		require.NoError(t, err)
-		require.Equal(t, models.AppInstallationRequestStateCompleted, previousRequest.State)
+		require.Equal(t, models.IntegrationRequestStateCompleted, previousRequest.State)
 
 		//
 		// Verify new one was created
 		//
-		requests, err = installation.ListRequests(models.AppInstallationRequestTypeSync)
+		requests, err = integration.ListRequests(models.IntegrationRequestTypeSync)
 		require.NoError(t, err)
 		require.Len(t, requests, 2)
-		newRequestIndex := slices.IndexFunc(requests, func(r models.AppInstallationRequest) bool { return r.ID.String() != previousRequest.ID.String() })
+		newRequestIndex := slices.IndexFunc(requests, func(r models.IntegrationRequest) bool { return r.ID.String() != previousRequest.ID.String() })
 		newRequest := requests[newRequestIndex]
-		require.Equal(t, models.AppInstallationRequestStatePending, newRequest.State)
+		require.Equal(t, models.IntegrationRequestStatePending, newRequest.State)
 	})
 }
 
@@ -118,13 +80,13 @@ func Test__IntegrationContext_RequestWebhook_ReplacesWebhookOnConfigChange(t *te
 	r := support.Setup(t)
 	defer r.Close()
 
-	r.Registry.Integrations["dummy"] = &testIntegration{
-		compare: func(a, b any) (bool, error) {
+	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+		OnCompareWebhookConfig: func(a, b any) (bool, error) {
 			return reflect.DeepEqual(a, b), nil
 		},
-	}
+	})
 
-	installation, err := models.CreateAppInstallation(
+	integration, err := models.CreateIntegration(
 		uuid.New(),
 		r.Organization.ID,
 		"dummy",
@@ -147,12 +109,12 @@ func Test__IntegrationContext_RequestWebhook_ReplacesWebhookOnConfigChange(t *te
 		Secret:            encryptedKey,
 		Configuration:     datatypes.NewJSONType[any](oldConfig),
 		Metadata:          datatypes.NewJSONType[any](map[string]any{}),
-		AppInstallationID: &installation.ID,
+		AppInstallationID: &integration.ID,
 		CreatedAt:         &now,
 	}
 	require.NoError(t, database.Conn().Create(&webhook).Error)
 
-	inputNode := models.WorkflowNode{
+	inputNode := models.CanvasNode{
 		NodeID:        "node-1",
 		Name:          "Node 1",
 		Type:          models.NodeTypeTrigger,
@@ -162,16 +124,16 @@ func Test__IntegrationContext_RequestWebhook_ReplacesWebhookOnConfigChange(t *te
 		Position:      datatypes.NewJSONType(models.Position{}),
 	}
 
-	workflow, nodes := support.CreateWorkflow(t, r.Organization.ID, r.User, []models.WorkflowNode{inputNode}, nil)
-	require.NotNil(t, workflow)
+	canvas, nodes := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{inputNode}, nil)
+	require.NotNil(t, canvas)
 	require.Len(t, nodes, 1)
 
 	node := nodes[0]
-	node.AppInstallationID = &installation.ID
+	node.AppInstallationID = &integration.ID
 	node.WebhookID = &webhookID
 	require.NoError(t, database.Conn().Save(&node).Error)
 
-	ctx := NewIntegrationContext(database.Conn(), &node, installation, r.Encryptor, r.Registry)
+	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry)
 	require.NoError(t, ctx.RequestWebhook(newConfig))
 
 	require.NotNil(t, node.WebhookID)
