@@ -17,8 +17,7 @@ const DNSRecordPayloadType = "cloudflare.dnsRecord"
 type UpdateDNSRecord struct{}
 
 type UpdateDNSRecordSpec struct {
-	Zone     string `json:"zone"`
-	RecordID string `json:"recordId"`
+	Record string `json:"record"`
 
 	Content string `json:"content"`
 	TTL     int    `json:"ttl"`
@@ -48,8 +47,7 @@ func (c *UpdateDNSRecord) Documentation() string {
 
 ## Configuration
 
-- **Zone**: Zone ID or domain name (recommended: select a zone from the integration)
-- **Record**: DNS record to update (select from the list)
+- **Record**: DNS record to update (e.g. zone-id/record-id or app.example.com)
 - **Content**: New record value
 - **TTL**: TTL in seconds (default 360)
 - **Proxied**: Whether Cloudflare should proxy traffic for this record
@@ -74,20 +72,7 @@ func (c *UpdateDNSRecord) OutputChannels(configuration any) []core.OutputChannel
 func (c *UpdateDNSRecord) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "zone",
-			Label:       "Zone",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
-			Description: "The Cloudflare zone containing the DNS record",
-			Placeholder: "Select a zone",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: "zone",
-				},
-			},
-		},
-		{
-			Name:        "recordId",
+			Name:        "record",
 			Label:       "Record",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -138,12 +123,8 @@ func (c *UpdateDNSRecord) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	if spec.Zone == "" {
-		return errors.New("zone is required")
-	}
-
-	if spec.RecordID == "" {
-		return errors.New("recordId is required")
+	if spec.Record == "" {
+		return errors.New("record is required")
 	}
 
 	if spec.Content == "" {
@@ -164,11 +145,26 @@ func (c *UpdateDNSRecord) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	zoneID, recordID := c.parseZoneAndRecordID(spec.RecordID, spec.Zone, ctx.Integration.GetMetadata())
-
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
+	}
+
+	var zoneID, recordID string
+	if strings.Contains(spec.Record, "/") {
+		zoneFromConfig := ""
+		if m, ok := ctx.Configuration.(map[string]any); ok {
+			if z, ok := m["zone"]; ok && z != nil {
+				zoneFromConfig = fmt.Sprint(z)
+			}
+		}
+		zoneID, recordID = c.parseZoneAndRecordID(spec.Record, zoneFromConfig, ctx.Integration.GetMetadata())
+	} else {
+		var resolveErr error
+		zoneID, recordID, resolveErr = c.resolveRecordName(spec.Record, client, ctx.Integration.GetMetadata())
+		if resolveErr != nil {
+			return fmt.Errorf("resolve record by name: %w", resolveErr)
+		}
 	}
 
 	existing, err := client.GetDNSRecord(zoneID, recordID)
@@ -210,6 +206,32 @@ func (c *UpdateDNSRecord) parseZoneAndRecordID(recordIDValue, zoneValue string, 
 		return zonePart, recordPart
 	}
 	return c.resolveZoneID(zoneValue, integrationMetadata), recordIDValue
+}
+
+// resolveRecordName finds a DNS record by name across zones and returns zoneID and recordID.
+// Name matching is case-insensitive and ignores a trailing dot (Cloudflare may return FQDN with or without it).
+func (c *UpdateDNSRecord) resolveRecordName(recordName string, client *Client, integrationMetadata any) (zoneID, recordID string, err error) {
+	metadata := Metadata{}
+	if decodeErr := mapstructure.Decode(integrationMetadata, &metadata); decodeErr != nil {
+		return "", "", fmt.Errorf("failed to decode integration metadata: %w", decodeErr)
+	}
+
+	want := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(recordName)), ".")
+
+	for _, zone := range metadata.Zones {
+		records, listErr := client.ListDNSRecords(zone.ID)
+		if listErr != nil {
+			continue
+		}
+		for _, rec := range records {
+			got := strings.TrimSuffix(strings.ToLower(rec.Name), ".")
+			if got == want {
+				return zone.ID, rec.ID, nil
+			}
+		}
+	}
+
+	return "", "", fmt.Errorf("no DNS record found with name %q in any zone", recordName)
 }
 
 func (c *UpdateDNSRecord) resolveZoneID(zone string, integrationMetadata any) string {

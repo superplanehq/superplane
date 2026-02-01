@@ -16,38 +16,24 @@ import (
 func Test__UpdateDNSRecord__Setup(t *testing.T) {
 	component := &UpdateDNSRecord{}
 
-	t.Run("missing zone returns error", func(t *testing.T) {
+	t.Run("missing record returns error", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
-				"zone":     "",
-				"recordId": "record123",
+				"record": "",
 			},
 		}
 
 		err := component.Setup(ctx)
-		require.ErrorContains(t, err, "zone is required")
-	})
-
-	t.Run("missing recordId returns error", func(t *testing.T) {
-		ctx := core.SetupContext{
-			Configuration: map[string]any{
-				"zone":     "zone123",
-				"recordId": "",
-			},
-		}
-
-		err := component.Setup(ctx)
-		require.ErrorContains(t, err, "recordId is required")
+		require.ErrorContains(t, err, "record is required")
 	})
 
 	t.Run("missing content returns error", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
-				"zone":     "zone123",
-				"recordId": "record123",
-				"content":  "",
-				"ttl":      360,
-				"proxied":  false,
+				"record":  "zone123/record123",
+				"content": "",
+				"ttl":     360,
+				"proxied": false,
 			},
 		}
 
@@ -58,11 +44,10 @@ func Test__UpdateDNSRecord__Setup(t *testing.T) {
 	t.Run("ttl < 1 returns error", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
-				"zone":     "zone123",
-				"recordId": "record123",
-				"content":  "1.2.3.4",
-				"ttl":      0,
-				"proxied":  false,
+				"record":  "zone123/record123",
+				"content": "1.2.3.4",
+				"ttl":     0,
+				"proxied": false,
 			},
 		}
 
@@ -73,11 +58,10 @@ func Test__UpdateDNSRecord__Setup(t *testing.T) {
 	t.Run("valid configuration passes", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
-				"zone":     "zone123",
-				"recordId": "record123",
-				"content":  "1.2.3.4",
-				"ttl":      360,
-				"proxied":  true,
+				"record":  "zone123/record123",
+				"content": "1.2.3.4",
+				"ttl":     360,
+				"proxied": true,
 			},
 		}
 
@@ -146,11 +130,10 @@ func Test__UpdateDNSRecord__Execute(t *testing.T) {
 
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
-				"zone":     "example.com", // ensure domain name resolves to zone id
-				"recordId": "record123",
-				"content":  "2.2.2.2",
-				"ttl":      1,
-				"proxied":  true,
+				"record":  "zone123/record123",
+				"content": "2.2.2.2",
+				"ttl":     1,
+				"proxied": true,
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -206,11 +189,10 @@ func Test__UpdateDNSRecord__Execute(t *testing.T) {
 
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
-				"zone":     "zone123",
-				"recordId": "record123",
-				"content":  "1.2.3.4",
-				"ttl":      360,
-				"proxied":  false,
+				"record":  "zone123/record123",
+				"content": "1.2.3.4",
+				"ttl":     360,
+				"proxied": false,
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -223,5 +205,71 @@ func Test__UpdateDNSRecord__Execute(t *testing.T) {
 
 		assert.False(t, execState.Passed)
 		assert.Empty(t, execState.Channel)
+	})
+
+	t.Run("record by name resolves and updates", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				// ListDNSRecords (resolve name to zone/record id)
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"success": true,
+							"result": [
+								{"id": "record456", "type": "A", "name": "app.example.com", "content": "1.1.1.1", "ttl": 120, "proxied": false}
+							]
+						}
+					`)),
+				},
+				// GetDNSRecord
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{"success": true, "result": {"id": "record456", "type": "A", "name": "app.example.com", "content": "1.1.1.1", "ttl": 120, "proxied": false}}
+					`)),
+				},
+				// UpdateDNSRecord
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{"success": true, "result": {"id": "record456", "type": "A", "name": "app.example.com", "content": "2.2.2.2", "ttl": 360, "proxied": true}}
+					`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "token123"},
+			Metadata: Metadata{
+				Zones: []Zone{{ID: "zone789", Name: "example.com", Status: "active"}},
+			},
+		}
+
+		execState := &contexts.ExecutionStateContext{KVs: make(map[string]string)}
+
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"record":  "app.example.com",
+				"content": "2.2.2.2",
+				"ttl":     360,
+				"proxied": true,
+			},
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
+			ExecutionState: execState,
+		}
+
+		err := component.Execute(ctx)
+		require.NoError(t, err)
+		assert.True(t, execState.Passed)
+		require.Len(t, httpContext.Requests, 3)
+		// First: list records for zone
+		assert.Equal(t, "https://api.cloudflare.com/client/v4/zones/zone789/dns_records", httpContext.Requests[0].URL.String())
+		// Second: get record
+		assert.Equal(t, "https://api.cloudflare.com/client/v4/zones/zone789/dns_records/record456", httpContext.Requests[1].URL.String())
+		// Third: update record
+		assert.Equal(t, http.MethodPut, httpContext.Requests[2].Method)
+		assert.Equal(t, "https://api.cloudflare.com/client/v4/zones/zone789/dns_records/record456", httpContext.Requests[2].URL.String())
 	})
 }
