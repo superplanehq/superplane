@@ -1,0 +1,73 @@
+---
+description: When creating or editing SuperPlane integration issue content (base or component issues), or when working in tmp/integrations_pm or integration PM workflow.
+globs:
+  - "tmp/integrations_pm/**"
+  - "**/integrations_pm/**"
+alwaysApply: false
+---
+
+# SuperPlane Integration Issue Conventions
+
+Apply these conventions whenever creating or editing integration base issues or component (trigger/action) issues for SuperPlane.
+
+## Template format: IMPORTANT block at top
+
+Every issue body must start with the appropriate IMPORTANT block (then a blank line, then the rest of the content).
+
+**Base issues** — use this block at the very top:
+
+```markdown
+> 🚨 **IMPORTANT (critical)**
+>
+> This content has **not** passed detailed review yet.
+> Review and rethink the suggested connection method before implementing.
+> If unsure, reach out on **Discord** first.
+```
+
+**Component issues (triggers and actions)** — use this block at the very top:
+
+```markdown
+> 🚨 **IMPORTANT (critical)**
+>
+> This content has **not** passed detailed review yet.
+> Review and rethink configuration options and output channels before implementing.
+> If unsure, reach out on **Discord** first.
+```
+
+For child issues, the parent reference line (`**Parent (base integration):** #N`) comes **after** this block, then the rest of the content.
+
+## Hierarchy and ordering
+
+- **Base issue first**: One base integration issue per tool (e.g. `[GitHub] Base`). All component issues (triggers and actions) are children of that base.
+- **Child issues**: One issue per component. Each child must include `**Parent (base integration):** #BASE_ISSUE_NUMBER` (replace with the actual base issue number) immediately after the IMPORTANT block (see Template format above).
+
+## Title format
+
+- **Base**: `[{Integration Name}] Base` (e.g. `[GitHub] Base`, `[ArgoCD] Base`).
+- **Actions**: `[{Integration Name}] {Operation Name}` in Title Case (e.g. `[GitHub] Get Issue`, `[Slack] Archive Channel`).
+- **Triggers**: `[{Integration Name}] On {Event}` in Title Case (e.g. `[GitHub] On Deployment`, `[GitHub] On Pull Request`).
+
+## Configuration: Triggers vs Actions
+
+- **Actions** (execute operations): Configuration fields must be **execution parameters** — what resource to operate on, how to perform the operation, what data to send. Not filters.
+- **Triggers** (listen for events): Configuration fields must be **filters** — what events to listen for, what values to match (repository, status, labels). Not execution parameters.
+
+Example: A trigger `[ArgoCD] On Sync Completed` should have config like "Application Filter", "Sync Status", not "Revision" or "Prune" (those belong to the Sync action).
+
+## Output channels
+
+- **Triggers**: Use a single **default** channel (events are emitted; outcomes determined downstream).
+- **Actions**: It depends on what the component does and whether the user would want to model different paths in the workflow.
+  - **Multiple channels** when the action produces a result that should branch: e.g. `success` / `failed`, or `clear` / `degraded` / `critical` (e.g. listIssues by highest urgency), or `approved` / `rejected`.
+  - **Single default channel** when there is one logical outcome stream, or when "success" varies by user (e.g. HTTP status 200 vs 201 vs 404 might all be valid). Do not force success/failure channels on every action.
+
+## Use cases and descriptions
+
+- **Description**: 1–2 sentences explaining **what the component does to external systems**, not just that it exists. Avoid "Enable X to Y as part of SuperPlane workflows."
+- **Use cases**: 2–3 **specific, realistic scenarios** (e.g. "Send Slack notification when production deployment pipeline completes"). Avoid generic patterns like "Automate {operation} within a CI/CD workflow."
+
+## When creating issues on GitHub
+
+- Create the **base issue first**, then create **one child issue per component**.
+- Put `**Parent (base integration):** #BASE_ISSUE_NUMBER` immediately after the IMPORTANT block in each child issue body.
+- Attach child issues as **sub-issues** of the base. Create issues **sequentially** to avoid API rate limiting.
