@@ -12,7 +12,7 @@ import { CanvasesCanvasNodeExecution, ComponentsNode, CanvasesCanvasEvent } from
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { formatTimeAgo } from "@/utils/date";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { getComponentBaseMapper } from "@/pages/workflowv2/mappers";
 
 export interface ChildExecution {
@@ -984,6 +984,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
           <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <DialogTitle>Payload</DialogTitle>
+              <DialogDescription className="sr-only">Expanded payload viewer.</DialogDescription>
               <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy"} hideOnClick={false}>
                 <button
                   onClick={(e) => {
