@@ -2,7 +2,7 @@ import React from "react";
 import Editor from "@monaco-editor/react";
 import { FieldRendererProps } from "./types";
 import { resolveIcon } from "@/lib/utils";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
 
@@ -117,6 +117,9 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
         <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between">
             <DialogTitle>{field.label || field.name}</DialogTitle>
+            <DialogDescription className="sr-only">
+              Expanded XML editor for {field.label || field.name}.
+            </DialogDescription>
             <SimpleTooltip content={copied ? "Copied!" : "Copy"} hideOnClick={false}>
               <button
                 onClick={(e) => {
