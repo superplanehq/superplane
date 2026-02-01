@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "hostname": "production-server-01",
+    "os": "Linux production-server-01 5.15.0-91-generic #101-Ubuntu SMP",
+    "kernel": "5.15.0-91-generic",
+    "architecture": "x86_64",
+    "uptime": "up 45 days, 12:30,  2 users,  load average: 0.25, 0.18, 0.15",
+    "diskUsage": "Filesystem      Size  Used Avail Use% Mounted on\n/dev/sda1        50G   15G   33G  32% /\n/dev/sda2       200G   45G  145G  24% /data",
+    "memoryInfo": "              total        used        free      shared  buff/cache   available\nMem:          15964        3245        1023         234       11696       12045\nSwap:          2048           0        2048"
+  }
+}
