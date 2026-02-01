@@ -11,6 +11,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record in a Cloudflare zone" />
   <LinkCard title="Update DNS Record" href="#update-dns-record" description="Update an existing DNS record in a Cloudflare zone" />
   <LinkCard title="Update Redirect Rule" href="#update-redirect-rule" description="Update a redirect rule in a Cloudflare zone" />
 </CardGrid>
@@ -26,6 +27,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
    - **Token name**: SuperPlane Integration
    - **Permissions** (click "+ Add more" to add each):
      - Zone / Zone / Read
+     - Zone / DNS / Edit
      - Zone / Dynamic Redirect / Edit
      - Zone / DNS / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
@@ -33,6 +35,45 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 6. Copy the token and paste it below
 
 > **Note**: The token is only shown once. Store it securely if needed elsewhere.
+
+<a id="create-dns-record"></a>
+
+## Create DNS Record
+
+The Create DNS Record component creates a DNS record in a Cloudflare zone.
+
+### Use Cases
+
+- **Provisioning**: Add records when new environments are created
+- **Verification**: Create TXT or CNAME records for domain ownership checks
+- **Releases**: Add or update canary or migration records
+
+### Configuration
+
+- **Zone**: Select the Cloudflare zone or enter a domain name
+- **Type**: DNS record type (A, AAAA, CNAME, MX, TXT, NS, etc.)
+- **Name**: Record name (e.g., `www`, `api`, or `@` for apex)
+- **Content**: Record value (IP, hostname, or text)
+- **TTL**: Time-to-live in seconds (use `1` for auto)
+- **Proxied**: Proxy through Cloudflare (A, AAAA, CNAME only)
+- **Priority**: Priority value (MX or SRV only)
+
+### Output
+
+Emits the created DNS record on the default channel. If the zone is not found, the record is invalid, or a duplicate exists, the run fails.
+
+### Example Output
+
+```json
+{
+  "content": "192.0.2.1",
+  "id": "record_abc123",
+  "name": "api.example.com",
+  "proxied": false,
+  "ttl": 1,
+  "type": "A"
+}
+```
 
 <a id="update-dns-record"></a>
 
