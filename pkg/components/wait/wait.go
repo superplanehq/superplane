@@ -135,6 +135,7 @@ func (w *Wait) Configuration() []configuration.Field {
 			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "mode", Values: []string{ModeInterval}},
 			},
+			Default: "10",
 		},
 		{
 			Name:        "unit",
