@@ -57,15 +57,15 @@ func (f *Filter) Documentation() string {
 ## Expression Environment
 
 The expression has access to:
-- **$**: The current event data
+- **$**: The run context data
 - **root()**: Access to the root event data
 - **previous()**: Access to previous node outputs (optionally with depth parameter)
 
 ## Examples
 
-- ` + "`$.status == \"active\"`" + `: Only forward events where status is "active"
-- ` + "`$.amount > 1000`" + `: Filter events with amount greater than 1000
-- ` + "`$.user.role == \"admin\" && $.action == \"delete\"`" + `: Complex condition checking multiple fields`
+- ` + "`$[\"Node Name\"].status == \"active\"`" + `: Only forward events where status is "active"
+- ` + "`$[\"Node Name\"].amount > 1000`" + `: Filter events with amount greater than 1000
+- ` + "`$[\"Node Name\"].user.role == \"admin\" && $[\"Node Name\"].action == \"delete\"`" + `: Complex condition checking multiple fields`
 }
 
 func (f *Filter) OutputChannels(configuration any) []core.OutputChannel {
