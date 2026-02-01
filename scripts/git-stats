@@ -2,7 +2,7 @@
 
 require 'date'
 
-FIRST_COLUMN_WIDTH = 12
+MIN_FIRST_COLUMN_WIDTH = 12
 
 class GitLogs
   def self.load
@@ -60,7 +60,8 @@ class GitLog
   attr_reader :commit_hash, :author, :timestamp, :message
 
   def initialize(raw_data)
-    @commit_hash, @author, @timestamp, @message = raw_data.strip.split(',')
+    # Commit messages can contain commas, so only split the first 3 separators.
+    @commit_hash, @author, @timestamp, @message = raw_data.strip.split(',', 4)
   end
 
   def week
@@ -112,36 +113,49 @@ class GitStats
     puts header()
     puts separator()
 
-    @logs.authors.each do |author|
-      show_numbers(short_name(author), @weeks.map { |w| w.total_by_author(author) })
+    authors_sorted_by_commits.each do |author|
+      show_numbers(author, @weeks.map { |w| w.total_by_author(author) }, first_column_width)
     end
 
     puts separator()
 
-    show_numbers("Throughput", @weeks.map { |w| w.total_commits })
-    show_numbers("Velocity", @weeks.map { |w| w.total_feat })
-    show_numbers("Fixes", @weeks.map { |w| w.total_bugfixes })
-    show_numbers("Chores", @weeks.map { |w| w.total_chore })
-    show_numbers("Docs", @weeks.map { |w| w.total_docs })
+    show_numbers("Throughput", @weeks.map { |w| w.total_commits }, first_column_width)
+    show_numbers("Velocity", @weeks.map { |w| w.total_feat }, first_column_width)
+    show_numbers("Fixes", @weeks.map { |w| w.total_bugfixes }, first_column_width)
+    show_numbers("Chores", @weeks.map { |w| w.total_chore }, first_column_width)
+    show_numbers("Docs", @weeks.map { |w| w.total_docs }, first_column_width)
 
     puts separator()
   end
 
-  def short_name(author)
-    author.split(" ")[0]
+  def authors_sorted_by_commits
+    @logs.authors.sort do |a, b|
+      diff = @logs.total_commits_for_author(b) <=> @logs.total_commits_for_author(a)
+      diff.zero? ? a <=> b : diff
+    end
   end
 
   def header
-    @header ||= "WEEK".ljust(FIRST_COLUMN_WIDTH + 1) + @weeks.map { |w| w.week.to_s.ljust(3) }.join(' ')
+    @header ||= "WEEK".ljust(first_column_width + 1) + @weeks.map { |w| w.week.to_s.ljust(3) }.join(' ')
   end
 
   def separator
     @separator ||= "-" * header.length
   end
+
+  def first_column_width
+    @first_column_width ||= begin
+      labels = ["WEEK", "Throughput", "Velocity", "Fixes", "Chores", "Docs"]
+      max_label = labels.map(&:length).max || 0
+      max_author = (@logs.authors.map(&:length).max || 0)
+      [MIN_FIRST_COLUMN_WIDTH, max_label, max_author].max
+    end
+  end
 end
 
-def show_numbers(label, numbers)
-  str = label.ljust(FIRST_COLUMN_WIDTH)
+def show_numbers(label, numbers, first_column_width)
+  # Add one extra space so the first number never touches the label.
+  str = label.ljust(first_column_width + 1)
 
   str += numbers.map do |n|
     if n == 0
@@ -152,7 +166,9 @@ def show_numbers(label, numbers)
   end.join(' ')
 
   str += "   = #{numbers.sum.to_s.rjust(4)}"
-  str += " (avg: #{(numbers.sum.to_f / numbers.select { |n| n > 0 }.count).round(1).to_s.rjust(4)})"
+  nonzero_weeks = numbers.count { |n| n > 0 }
+  avg = nonzero_weeks.zero? ? 0.0 : (numbers.sum.to_f / nonzero_weeks)
+  str += " (avg: #{avg.round(1).to_s.rjust(4)})"
 
   puts str
 end
