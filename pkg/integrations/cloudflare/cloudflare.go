@@ -77,6 +77,7 @@ func (c *Cloudflare) Components() []core.Component {
 		&CreateDNSRecord{},
 		&UpdateRedirectRule{},
 		&UpdateDNSRecord{},
+		&DeleteDNSRecord{},
 	}
 }
 

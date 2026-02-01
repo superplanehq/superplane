@@ -12,6 +12,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record in a Cloudflare zone" />
+  <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a Cloudflare zone" />
   <LinkCard title="Update DNS Record" href="#update-dns-record" description="Update an existing DNS record in a Cloudflare zone" />
   <LinkCard title="Update Redirect Rule" href="#update-redirect-rule" description="Update a redirect rule in a Cloudflare zone" />
 </CardGrid>
@@ -72,6 +73,43 @@ Emits the created DNS record on the default channel. If the zone is not found, t
   "proxied": false,
   "ttl": 1,
   "type": "A"
+}
+```
+
+<a id="delete-dns-record"></a>
+
+## Delete DNS Record
+
+The Delete DNS Record component removes a DNS record from a Cloudflare zone.
+
+### Use Cases
+
+- **Deprovisioning**: Remove DNS records when services or environments are torn down
+- **Cleanup**: Delete temporary verification records (e.g. migration or certificate validation)
+- **Maintenance**: Remove stale or incorrect records as part of workflow automation
+
+### Configuration
+
+- **Record**: Select the DNS record to delete (e.g. zone-id/record-id or record name)
+
+### Output
+
+Emits the deleted DNS record (zoneId, recordId, record) on the default channel. If the record is not found or deletion fails, the component goes to an error state and does not emit.
+
+### Example Output
+
+```json
+{
+  "record": {
+    "content": "example.com",
+    "id": "record_abc123",
+    "name": "app.example.com",
+    "proxied": false,
+    "ttl": 360,
+    "type": "CNAME"
+  },
+  "recordId": "record_abc123",
+  "zoneId": "zone_xyz789"
 }
 ```
 
