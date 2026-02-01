@@ -36,3 +36,13 @@ var exampleOutputUpdateDNSRecord map[string]any
 func (c *UpdateDNSRecord) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateDNSRecordOnce, exampleOutputUpdateDNSRecordBytes, &exampleOutputUpdateDNSRecord)
 }
+
+//go:embed example_output_delete_dns_record.json
+var exampleOutputDeleteDNSRecordBytes []byte
+
+var exampleOutputDeleteDNSRecordOnce sync.Once
+var exampleOutputDeleteDNSRecord map[string]any
+
+func (c *DeleteDNSRecord) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteDNSRecordOnce, exampleOutputDeleteDNSRecordBytes, &exampleOutputDeleteDNSRecord)
+}

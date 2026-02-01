@@ -131,6 +131,31 @@ func (c *Client) ListZones() ([]Zone, error) {
 	return response.Result, nil
 }
 
+// DeleteDNSRecord deletes a DNS record by its ID within a zone.
+// It returns the deleted DNS record (Cloudflare API returns it in result).
+func (c *Client) DeleteDNSRecord(zoneID, recordID string) (*DNSRecord, error) {
+	url := fmt.Sprintf("%s/zones/%s/dns_records/%s", c.BaseURL, zoneID, recordID)
+	responseBody, err := c.execRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool      `json:"success"`
+		Result  DNSRecord `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
 // RedirectRule represents a single redirect rule in a ruleset
 type RedirectRule struct {
 	ID          string              `json:"id,omitempty"`
