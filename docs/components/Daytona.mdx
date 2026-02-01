@@ -1,0 +1,194 @@
+---
+title: "Daytona"
+sidebar:
+  order: 6
+---
+
+Execute code in isolated sandbox environments
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Sandbox" href="#create-sandbox" description="Create an isolated sandbox environment for code execution" />
+  <LinkCard title="Delete Sandbox" href="#delete-sandbox" description="Delete a sandbox environment" />
+  <LinkCard title="Execute Code" href="#execute-code" description="Execute code in a sandbox environment" />
+  <LinkCard title="Execute Command" href="#execute-command" description="Run a shell command in a sandbox environment" />
+</CardGrid>
+
+<a id="create-sandbox"></a>
+
+## Create Sandbox
+
+The Create Sandbox component creates an isolated environment for executing code safely.
+
+### Use Cases
+
+- **AI code execution**: Run AI-generated code in a secure sandbox
+- **Code testing**: Test untrusted code without affecting your infrastructure
+- **Development environments**: Create ephemeral development environments
+
+### Configuration
+
+- **Snapshot**: Base environment snapshot (optional, uses default if not specified)
+- **Target**: Target region for the sandbox (optional)
+- **Auto Stop Interval**: Time in minutes before the sandbox auto-stops
+- **Environment Variables**: Key-value pairs to set as environment variables in the sandbox
+
+### Output
+
+Returns the sandbox information including:
+- **id**: The unique sandbox identifier (use this in subsequent execute/delete operations)
+- **state**: The current state of the sandbox (e.g., "started")
+
+### Notes
+
+- Sandboxes are created in sub-90ms
+- Each sandbox is fully isolated
+- Remember to delete sandboxes when done to free resources
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "sandbox-abc123def456",
+    "state": "started"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "daytona.sandbox"
+}
+```
+
+<a id="delete-sandbox"></a>
+
+## Delete Sandbox
+
+The Delete Sandbox component removes an existing Daytona sandbox.
+
+### Use Cases
+
+- **Resource cleanup**: Delete sandboxes after code execution is complete
+- **Cost management**: Remove unused sandboxes to free resources
+- **Workflow cleanup**: Clean up sandboxes at the end of automation workflows
+
+### Configuration
+
+- **Sandbox**: The ID or name of the sandbox to delete (from createSandbox output)
+- **Force**: Optional flag to force deletion even if sandbox is running
+
+### Output
+
+Returns deletion confirmation including:
+- **deleted**: Boolean indicating successful deletion
+- **id**: The ID of the deleted sandbox
+
+### Notes
+
+- Always delete sandboxes when they are no longer needed
+- Sandboxes will auto-stop after the configured interval, but explicit deletion frees resources immediately
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "id": "sandbox-abc123def456"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "daytona.delete.response"
+}
+```
+
+<a id="execute-code"></a>
+
+## Execute Code
+
+The Execute Code component runs code in an existing Daytona sandbox.
+
+### Use Cases
+
+- **AI code execution**: Run AI-generated code safely
+- **Code testing**: Execute untrusted code in isolation
+- **Script automation**: Run Python, TypeScript, or JavaScript scripts
+- **Data processing**: Execute data transformation scripts
+
+### Configuration
+
+- **Sandbox ID**: The ID of the sandbox (from createSandbox output)
+- **Code**: The code to execute (supports expressions)
+- **Language**: The programming language (python, typescript, javascript)
+- **Timeout**: Optional execution timeout in milliseconds
+
+### Output
+
+Returns the execution result including:
+- **exitCode**: The process exit code (0 for success)
+- **result**: The stdout/output from the code execution
+
+### Notes
+
+- The sandbox must be created first using createSandbox
+- Code output is captured from stdout
+- Non-zero exit codes indicate execution errors
+
+### Example Output
+
+```json
+{
+  "data": {
+    "exitCode": 0,
+    "result": "Hello, World!\n"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "daytona.execute.response"
+}
+```
+
+<a id="execute-command"></a>
+
+## Execute Command
+
+The Execute Command component runs shell commands in an existing Daytona sandbox.
+
+### Use Cases
+
+- **Package installation**: Install dependencies (pip install, npm install)
+- **File operations**: Create, move, or delete files in the sandbox
+- **System commands**: Run any shell command in the isolated environment
+- **Build processes**: Execute build scripts or compilation commands
+
+### Configuration
+
+- **Sandbox ID**: The ID of the sandbox (from createSandbox output)
+- **Command**: The shell command to execute
+- **Working Directory**: Optional working directory for the command
+- **Timeout**: Optional execution timeout in seconds
+
+### Output
+
+Returns the command result including:
+- **exitCode**: The process exit code (0 for success)
+- **result**: The stdout/output from the command execution
+
+### Notes
+
+- The sandbox must be created first using createSandbox
+- Commands run in a shell environment
+- Non-zero exit codes indicate command failures
+
+### Example Output
+
+```json
+{
+  "data": {
+    "exitCode": 0,
+    "result": "Successfully installed requests-2.31.0\n"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "daytona.command.response"
+}
+```
+

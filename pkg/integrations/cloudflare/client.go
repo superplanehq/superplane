@@ -264,12 +264,13 @@ func (c *Client) GetRulesetForPhase(zoneID, phase string) (*Ruleset, error) {
 
 // DNSRecord represents a Cloudflare DNS record
 type DNSRecord struct {
-	ID      string `json:"id"`
-	Type    string `json:"type"`
-	Name    string `json:"name"`
-	Content string `json:"content"`
-	TTL     int    `json:"ttl"`
-	Proxied bool   `json:"proxied"`
+	ID       string `json:"id"`
+	Type     string `json:"type"`
+	Name     string `json:"name"`
+	Content  string `json:"content"`
+	TTL      int    `json:"ttl"`
+	Proxied  bool   `json:"proxied"`
+	Priority *int   `json:"priority,omitempty"`
 }
 
 // ListDNSRecords retrieves all DNS records for a zone
@@ -408,16 +409,6 @@ func (c *Client) CreateRedirectRule(zoneID, rulesetID string, req CreateRedirect
 	return nil, fmt.Errorf("created rule not found in response")
 }
 
-type DNSRecord struct {
-	ID       string `json:"id"`
-	Type     string `json:"type"`
-	Name     string `json:"name"`
-	Content  string `json:"content"`
-	TTL      int    `json:"ttl"`
-	Proxied  bool   `json:"proxied"`
-	Priority *int   `json:"priority,omitempty"`
-}
-
 type CreateDNSRecordRequest struct {
 	Type     string `json:"type"`
 	Name     string `json:"name"`
@@ -441,8 +432,8 @@ func (c *Client) CreateDNSRecord(zoneID string, req CreateDNSRecordRequest) (*DN
 	}
 
 	var response struct {
-		Success bool             `json:"success"`
-		Result  DNSRecord        `json:"result"`
+		Success bool              `json:"success"`
+		Result  DNSRecord         `json:"result"`
 		Errors  []CloudflareError `json:"errors"`
 	}
 

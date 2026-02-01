@@ -29,6 +29,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
      - Zone / Zone / Read
      - Zone / DNS / Edit
      - Zone / Dynamic Redirect / Edit
+     - Zone / DNS / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
 5. Click **Continue to summary**, then **Create Token**
 6. Copy the token and paste it below
@@ -43,35 +44,35 @@ The Create DNS Record component creates a DNS record in a Cloudflare zone.
 
 ### Use Cases
 
-- **Provisioning**: Add a record when a new service or environment is provisioned
-- **Verification**: Create TXT or CNAME records for certificates or domain ownership
-- **Releases**: Add or update DNS records during canary rollouts or migrations
+- **Provisioning**: Add records when new environments are created
+- **Verification**: Create TXT or CNAME records for domain ownership checks
+- **Releases**: Add or update canary or migration records
 
 ### Configuration
 
-- **Zone**: Zone ID or domain name (e.g., `example.com`)
-- **Type**: Record type (A, AAAA, CNAME, MX, TXT, NS, etc.)
+- **Zone**: Select the Cloudflare zone or enter a domain name
+- **Type**: DNS record type (A, AAAA, CNAME, MX, TXT, NS, etc.)
 - **Name**: Record name (e.g., `www`, `api`, or `@` for apex)
 - **Content**: Record value (IP, hostname, or text)
-- **TTL**: TTL in seconds (use `1` for auto)
+- **TTL**: Time-to-live in seconds (use `1` for auto)
 - **Proxied**: Proxy through Cloudflare (A, AAAA, CNAME only)
-- **Priority**: MX or SRV priority (optional)
+- **Priority**: Priority value (MX or SRV only)
 
-### Output
+### Output Channels
 
-**Success channel**: Emits the created DNS record (id, type, name, content, proxied, ttl)  
-**Failed channel**: Emits when the zone is not found, the record is invalid, or a duplicate exists
+- **Success**: Emits the created DNS record
+- **Failed**: Emits when the zone is not found, the record is invalid, or a duplicate exists
 
 ### Example Output
 
 ```json
 {
-  "id": "record_abc123",
-  "type": "A",
-  "name": "api.example.com",
   "content": "192.0.2.1",
+  "id": "record_abc123",
+  "name": "api.example.com",
   "proxied": false,
-  "ttl": 1
+  "ttl": 1,
+  "type": "A"
 }
 ```
 
@@ -170,3 +171,4 @@ Returns the updated redirect rule with all current configuration.
   "zoneId": "zone_xyz789"
 }
 ```
+

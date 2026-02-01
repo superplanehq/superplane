@@ -1,0 +1,154 @@
+---
+title: "Dash0"
+sidebar:
+  order: 4
+---
+
+Connect to Dash0 to query data using Prometheus API
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="List Issues" href="#list-issues" description="Query Dash0 to get a list of all current issues using the metric dash0.issue.status" />
+  <LinkCard title="Query Prometheus" href="#query-prometheus" description="Execute a PromQL query against Dash0 Prometheus API and return the response data" />
+</CardGrid>
+
+<a id="list-issues"></a>
+
+## List Issues
+
+The List Issues component queries Dash0 to retrieve all current issues and routes execution based on issue severity.
+
+### Use Cases
+
+- **Health monitoring**: Check system health and route based on issue severity
+- **Alert routing**: Route alerts to different channels based on issue status
+- **Issue tracking**: Monitor and process active issues
+- **Automated remediation**: Trigger remediation workflows based on issues
+
+### Configuration
+
+- **Check Rules**: Optional list of check rules to filter issues (leave empty to get all issues)
+
+### Output Channels
+
+- **Clear**: No active issues detected
+- **Degraded**: One or more degraded issues detected
+- **Critical**: One or more critical issues detected
+
+### Output
+
+Returns a list of issues with:
+- **check_rule**: The check rule that generated the issue
+- **status**: Issue status (clear, degraded, critical)
+- **labels**: Metric labels associated with the issue
+- **metadata**: Additional issue metadata
+
+### Example Output
+
+```json
+{
+  "data": {
+    "data": {
+      "result": [
+        {
+          "metric": {
+            "service_name": "test"
+          },
+          "value": [
+            1234567890,
+            "1"
+          ],
+          "values": [
+            [
+              1234567890,
+              "1"
+            ],
+            [
+              1234567900,
+              "2"
+            ]
+          ]
+        }
+      ],
+      "resultType": "vector"
+    },
+    "status": "success"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "dash0.issues.list"
+}
+```
+
+<a id="query-prometheus"></a>
+
+## Query Prometheus
+
+The Query Prometheus component executes PromQL queries against the Dash0 Prometheus API.
+
+### Use Cases
+
+- **Metrics monitoring**: Query application and infrastructure metrics
+- **Alerting**: Check metric thresholds and trigger alerts
+- **Data analysis**: Analyze time-series data from your applications
+- **Performance monitoring**: Monitor system performance metrics
+
+### Configuration
+
+- **PromQL Query**: The Prometheus Query Language query to execute (supports expressions)
+- **Dataset**: The dataset to query (default: "default")
+- **Query Type**: 
+  - **Instant**: Query a single point in time
+  - **Range**: Query a time range with optional start, end, and step parameters
+
+### Output
+
+Returns the Prometheus query response including:
+- **status**: Query status (success or error)
+- **data**: Query results with metric labels and values
+- **dataType**: Result type (vector, matrix, scalar, or string)
+
+### Notes
+
+- Requires Dash0 API token and base URL configured in application settings
+- Supports all standard PromQL functions and operators
+- Range queries require start, end, and step parameters
+
+### Example Output
+
+```json
+{
+  "data": {
+    "data": {
+      "result": [
+        {
+          "metric": {
+            "service_name": "test"
+          },
+          "value": [
+            1234567890,
+            "1"
+          ],
+          "values": [
+            [
+              1234567890,
+              "1"
+            ],
+            [
+              1234567900,
+              "2"
+            ]
+          ]
+        }
+      ],
+      "resultType": "vector"
+    },
+    "status": "success"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "dash0.prometheus.response"
+}
+```
+

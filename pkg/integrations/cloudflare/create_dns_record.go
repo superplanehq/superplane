@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	allowedDNSRecordTypes  = []string{"A", "AAAA", "CAA", "CNAME", "MX", "NS", "SRV", "TXT"}
+	allowedDNSRecordTypes   = []string{"A", "AAAA", "CAA", "CNAME", "MX", "NS", "SRV", "TXT"}
 	proxyableDNSRecordTypes = []string{"A", "AAAA", "CNAME"}
 	priorityDNSRecordTypes  = []string{"MX", "SRV"}
 )
