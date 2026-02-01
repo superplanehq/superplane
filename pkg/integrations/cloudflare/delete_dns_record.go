@@ -12,17 +12,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const (
-	DNSRecordPayloadType          = "cloudflare.dnsRecord"
-	DNSRecordDeleteSuccessChannel = "success"
-	DNSRecordDeleteFailedChannel  = "failed"
-)
-
 type DeleteDNSRecord struct{}
 
 type DeleteDNSRecordSpec struct {
-	Zone     string `json:"zone"`
-	RecordID string `json:"recordId"`
+	Record string `json:"record"`
 }
 
 func (c *DeleteDNSRecord) Name() string {
@@ -48,13 +41,11 @@ func (c *DeleteDNSRecord) Documentation() string {
 
 ## Configuration
 
-- **Zone**: Cloudflare zone (zone ID or domain name)
-- **Record ID**: DNS record ID to delete
+- **Record**: Select the DNS record to delete (e.g. zone-id/record-id or record name)
 
-## Output Channels
+## Output
 
-- **Success**: Emitted when the DNS record is deleted
-- **Failed**: Emitted when the zone/record is not found or when deletion fails`
+Emits the deleted DNS record (zoneId, recordId, record) on the default channel. If the record is not found or deletion fails, the component goes to an error state and does not emit.`
 }
 
 func (c *DeleteDNSRecord) Icon() string {
@@ -66,40 +57,23 @@ func (c *DeleteDNSRecord) Color() string {
 }
 
 func (c *DeleteDNSRecord) OutputChannels(configuration any) []core.OutputChannel {
-	return []core.OutputChannel{
-		{
-			Name:  DNSRecordDeleteSuccessChannel,
-			Label: "Success",
-		},
-		{
-			Name:  DNSRecordDeleteFailedChannel,
-			Label: "Failed",
-		},
-	}
+	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
 func (c *DeleteDNSRecord) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "zone",
-			Label:       "Zone",
+			Name:        "record",
+			Label:       "Record",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The Cloudflare zone (zone ID or domain name)",
-			Placeholder: "Select a zone",
+			Description: "The DNS record to delete",
+			Placeholder: "{{ $['cloudflare.createDnsRecord'].data.id }}",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type:           "zone",
-					UseNameAsValue: true,
+					Type: "dns_record",
 				},
 			},
-		},
-		{
-			Name:        "recordId",
-			Label:       "Record ID",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "The DNS record ID to delete",
 		},
 	}
 }
@@ -110,12 +84,8 @@ func (c *DeleteDNSRecord) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	if strings.TrimSpace(spec.Zone) == "" {
-		return errors.New("zone is required")
-	}
-
-	if strings.TrimSpace(spec.RecordID) == "" {
-		return errors.New("recordId is required")
+	if strings.TrimSpace(spec.Record) == "" {
+		return errors.New("record is required")
 	}
 
 	return nil
@@ -131,91 +101,128 @@ func (c *DeleteDNSRecord) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	zoneID, resolved := resolveZoneIDFromMetadata(ctx.Integration, spec.Zone)
-	if !resolved && strings.Contains(spec.Zone, ".") {
-		return ctx.ExecutionState.Emit(
-			DNSRecordDeleteFailedChannel,
-			DNSRecordPayloadType,
-			[]any{
-				map[string]any{
-					"success":  false,
-					"zone":     spec.Zone,
-					"recordId": spec.RecordID,
-					"error":    "zone not found in integration metadata",
-				},
-			},
-		)
-	}
-
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	result, err := client.DeleteDNSRecord(zoneID, spec.RecordID)
-	if err != nil {
-		statusCode := 0
-		if apiErr := (*APIError)(nil); errors.As(err, &apiErr) {
-			statusCode = apiErr.StatusCode
+	var zoneID, recordID string
+	if strings.Contains(spec.Record, "/") {
+		zoneFromConfig := ""
+		if m, ok := ctx.Configuration.(map[string]any); ok {
+			if z, ok := m["zone"]; ok && z != nil {
+				zoneFromConfig = fmt.Sprint(z)
+			}
 		}
-
-		message := "failed to delete DNS record"
-		if statusCode == http.StatusNotFound {
-			message = "zone or DNS record not found"
+		zoneID, recordID = c.parseZoneAndRecordID(spec.Record, zoneFromConfig, ctx.Integration.GetMetadata())
+	} else {
+		recordValue := strings.TrimSpace(spec.Record)
+		nameErr := error(nil)
+		zoneID, recordID, nameErr = c.resolveRecordName(recordValue, client, ctx.Integration.GetMetadata())
+		if nameErr != nil {
+			// Fall back to resolving by record ID (e.g. from createDnsRecord.data.id)
+			idErr := error(nil)
+			zoneID, recordID, idErr = c.resolveRecordByID(recordValue, client, ctx.Integration.GetMetadata())
+			if idErr != nil {
+				return fmt.Errorf("resolve record by name: %w", nameErr)
+			}
 		}
-
-		return ctx.ExecutionState.Emit(
-			DNSRecordDeleteFailedChannel,
-			DNSRecordPayloadType,
-			[]any{
-				map[string]any{
-					"success":    false,
-					"zone":       spec.Zone,
-					"zoneId":     zoneID,
-					"recordId":   spec.RecordID,
-					"error":      message,
-					"statusCode": statusCode,
-					"details":    err.Error(),
-				},
-			},
-		)
 	}
 
-	return ctx.ExecutionState.Emit(
-		DNSRecordDeleteSuccessChannel,
-		DNSRecordPayloadType,
-		[]any{
-			map[string]any{
-				"success":  true,
-				"message":  "DNS record deleted",
-				"zone":     spec.Zone,
-				"zoneId":   zoneID,
-				"recordId": spec.RecordID,
-				"record":   result,
-			},
+	deleted, err := client.DeleteDNSRecord(zoneID, recordID)
+	if err != nil {
+		if apiErr := (*CloudflareAPIError)(nil); errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
+			return fmt.Errorf("zone or DNS record not found: %w", err)
+		}
+		return fmt.Errorf("failed to delete DNS record: %w", err)
+	}
+
+	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, DNSRecordPayloadType, []any{
+		map[string]any{
+			"zoneId":   zoneID,
+			"recordId": deleted.ID,
+			"record":   deleted,
 		},
-	)
+	})
 }
 
-func resolveZoneIDFromMetadata(integration core.IntegrationContext, zone string) (string, bool) {
-	// Best effort: if metadata exists and has a matching zone by name or id, map to ID.
-	metadataRaw := integration.GetMetadata()
-	if metadataRaw == nil {
-		return zone, false
+// parseZoneAndRecordID returns zoneID and recordID. If recordIDValue contains "/" (from
+// integration resource selection), it is split into zone and record ID; otherwise zone
+// is resolved from zoneValue and recordIDValue is used as the record ID (backward compat).
+func (c *DeleteDNSRecord) parseZoneAndRecordID(recordIDValue, zoneValue string, integrationMetadata any) (zoneID, recordID string) {
+	if zonePart, recordPart, ok := strings.Cut(recordIDValue, "/"); ok && zonePart != "" && recordPart != "" {
+		return zonePart, recordPart
+	}
+	return c.resolveZoneID(zoneValue, integrationMetadata), recordIDValue
+}
+
+// resolveRecordName finds a DNS record by name across zones and returns zoneID and recordID.
+// Name matching is case-insensitive and ignores a trailing dot (Cloudflare may return FQDN with or without it).
+func (c *DeleteDNSRecord) resolveRecordName(recordName string, client *Client, integrationMetadata any) (zoneID, recordID string, err error) {
+	metadata := Metadata{}
+	if decodeErr := mapstructure.Decode(integrationMetadata, &metadata); decodeErr != nil {
+		return "", "", fmt.Errorf("failed to decode integration metadata: %w", decodeErr)
 	}
 
+	want := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(recordName)), ".")
+
+	for _, zone := range metadata.Zones {
+		records, listErr := client.ListDNSRecords(zone.ID)
+		if listErr != nil {
+			continue
+		}
+		for _, rec := range records {
+			got := strings.TrimSuffix(strings.ToLower(rec.Name), ".")
+			if got == want {
+				return zone.ID, rec.ID, nil
+			}
+		}
+	}
+
+	return "", "", fmt.Errorf("no DNS record found with name %q in any zone", recordName)
+}
+
+// resolveRecordByID finds a DNS record by ID across zones and returns zoneID and recordID.
+// This supports expressions like {{ createDnsRecord.data.id }} when the record has no "/".
+func (c *DeleteDNSRecord) resolveRecordByID(recordID string, client *Client, integrationMetadata any) (zoneID, foundRecordID string, err error) {
 	metadata := Metadata{}
-	if err := mapstructure.Decode(metadataRaw, &metadata); err != nil {
-		return zone, false
+	if decodeErr := mapstructure.Decode(integrationMetadata, &metadata); decodeErr != nil {
+		return "", "", fmt.Errorf("failed to decode integration metadata: %w", decodeErr)
+	}
+
+	want := strings.TrimSpace(recordID)
+	if want == "" {
+		return "", "", fmt.Errorf("record ID is empty")
+	}
+
+	for _, zone := range metadata.Zones {
+		records, listErr := client.ListDNSRecords(zone.ID)
+		if listErr != nil {
+			continue
+		}
+		for _, rec := range records {
+			if rec.ID == want {
+				return zone.ID, rec.ID, nil
+			}
+		}
+	}
+
+	return "", "", fmt.Errorf("no DNS record found with ID %q in any zone", recordID)
+}
+
+func (c *DeleteDNSRecord) resolveZoneID(zone string, integrationMetadata any) string {
+	metadata := Metadata{}
+	if err := mapstructure.Decode(integrationMetadata, &metadata); err != nil {
+		return zone
 	}
 
 	for _, z := range metadata.Zones {
-		if z.ID == zone || strings.EqualFold(z.Name, zone) {
-			return z.ID, true
+		if z.ID == zone || z.Name == zone {
+			return z.ID
 		}
 	}
 
-	return zone, false
+	return zone
 }
 
 func (c *DeleteDNSRecord) Cancel(ctx core.ExecutionContext) error {
@@ -233,4 +240,3 @@ func (c *DeleteDNSRecord) HandleAction(ctx core.ActionContext) error {
 func (c *DeleteDNSRecord) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
-
