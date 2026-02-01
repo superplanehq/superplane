@@ -180,7 +180,7 @@ export function useCanvasWebsocket(
 
   useWebSocket(`${SOCKET_SERVER_URL}${canvasId}?organization_id=${organizationId}`, {
     shouldReconnect: () => true,
-    reconnectAttempts: 10,
+    reconnectAttempts: Number.POSITIVE_INFINITY,
     heartbeat: false,
     reconnectInterval: 3000,
     onOpen: () => {},
