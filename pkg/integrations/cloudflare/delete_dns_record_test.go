@@ -153,11 +153,7 @@ func Test__DeleteDNSRecord__Execute(t *testing.T) {
 	})
 
 	t.Run("record ID only (e.g. from createDnsRecord.data.id) -> resolved by ID and deleted", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body: io.NopCloser(strings.NewReader(`
+		listResponseBody := `
 						{
 							"success": true,
 							"result": [
@@ -171,7 +167,16 @@ func Test__DeleteDNSRecord__Execute(t *testing.T) {
 								}
 							]
 						}
-					`)),
+					`
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(listResponseBody)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(listResponseBody)),
 				},
 				{
 					StatusCode: http.StatusOK,
@@ -217,8 +222,9 @@ func Test__DeleteDNSRecord__Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, execState.Passed)
 		assert.Equal(t, core.DefaultOutputChannel.Name, execState.Channel)
-		require.Len(t, httpContext.Requests, 2)
+		require.Len(t, httpContext.Requests, 3)
 		assert.Contains(t, httpContext.Requests[0].URL.String(), "/zones/zone123/dns_records")
-		assert.Equal(t, "https://api.cloudflare.com/client/v4/zones/zone123/dns_records/6810f944d5310fa0d710f5c13f45ce5a", httpContext.Requests[1].URL.String())
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "/zones/zone123/dns_records")
+		assert.Equal(t, "https://api.cloudflare.com/client/v4/zones/zone123/dns_records/6810f944d5310fa0d710f5c13f45ce5a", httpContext.Requests[2].URL.String())
 	})
 }
