@@ -16,19 +16,20 @@ func Test_DeleteRole(t *testing.T) {
 	r := support.Setup(t)
 	ctx := context.Background()
 	orgID := r.Organization.ID.String()
+	canvasPath := "canvases"
 
 	customRoleDef := &authorization.RoleDefinition{
 		Name:       "test-custom-role-to-delete",
 		DomainType: models.DomainTypeOrganization,
 		Permissions: []*authorization.Permission{
 			{
-				Resource:   "canvas",
+				Resource:   canvasPath,
 				Action:     "read",
 				DomainType: models.DomainTypeOrganization,
 			},
 			{
-				Resource:   "canvas",
-				Action:     "write",
+				Resource:   canvasPath,
+				Action:     "update",
 				DomainType: models.DomainTypeOrganization,
 			},
 		},
@@ -86,7 +87,7 @@ func Test_DeleteRole(t *testing.T) {
 			DomainType: models.DomainTypeOrganization,
 			Permissions: []*authorization.Permission{
 				{
-					Resource:   "canvas",
+					Resource:   canvasPath,
 					Action:     "read",
 					DomainType: models.DomainTypeOrganization,
 				},
