@@ -157,18 +157,18 @@ func (p *OnImageScan) Setup(ctx core.TriggerContext) error {
 	ruleMetadata, err := eventbridge.CreateRule(
 		ctx.Integration,
 		ctx.HTTP,
-		integrationMetadata.Session.AccountID,
+		integrationMetadata.IAM.TargetDestinationRoleArn,
 		config.Region,
 		apiDestination.ApiDestinationArn,
-		p.eventPattern(),
 		integrationMetadata.Tags,
+		p.rulePattern(),
 	)
 
 	if err != nil {
 		return fmt.Errorf("failed to create rule and subscribe: %w", err)
 	}
 
-	subscriptionID, err := ctx.Integration.Subscribe(p.eventPattern())
+	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(config.Region))
 	if err != nil {
 		return fmt.Errorf("failed to subscribe: %w", err)
 	}
@@ -181,8 +181,19 @@ func (p *OnImageScan) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (p *OnImageScan) eventPattern() *common.EventBridgeEvent {
+func (p *OnImageScan) rulePattern() map[string]any {
+	return map[string]any{
+		"detail-type": []string{"ECR Image Scan"},
+		"source":      []string{"aws.ecr"},
+		"detail": map[string]any{
+			"scan-status": []string{"COMPLETE"},
+		},
+	}
+}
+
+func (p *OnImageScan) subscriptionPattern(region string) *common.EventBridgeEvent {
 	return &common.EventBridgeEvent{
+		Region:     region,
 		DetailType: "ECR Image Scan",
 		Source:     "aws.ecr",
 		Detail: map[string]any{
@@ -231,18 +242,18 @@ func (p *OnImageScan) checkDestinationAvailability(ctx core.TriggerActionContext
 	ruleMetadata, err := eventbridge.CreateRule(
 		ctx.Integration,
 		ctx.HTTP,
-		integrationMetadata.Session.AccountID,
+		integrationMetadata.IAM.TargetDestinationRoleArn,
 		metadata.Region,
 		apiDestination.ApiDestinationArn,
-		p.eventPattern(),
 		integrationMetadata.Tags,
+		p.rulePattern(),
 	)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rule: %w", err)
 	}
 
-	subscriptionID, err := ctx.Integration.Subscribe(p.eventPattern())
+	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(metadata.Region))
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe: %w", err)
 	}

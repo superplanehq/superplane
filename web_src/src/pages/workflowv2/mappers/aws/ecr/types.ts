@@ -33,7 +33,7 @@ export interface EcrEventBase {
   region?: string;
   time?: string;
   "detail-type"?: string;
-  detail?: Record<string, unknown>;
+  detail?: EcrImageScanDetail | EcrImagePushDetail;
 }
 
 export interface EcrImageScanEvent extends EcrEventBase {

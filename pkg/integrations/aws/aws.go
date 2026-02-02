@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ecr"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/eventbridge"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/iam"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/lambda"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -150,6 +151,7 @@ func (a *AWS) Sync(ctx core.SyncContext) error {
 		return a.showBrowserAction(ctx)
 	}
 
+	metadata.Tags = common.NormalizeTags(config.Tags)
 	accountID, err := common.AccountIDFromRoleArn(config.RoleArn)
 	if err != nil {
 		return fmt.Errorf("failed to get account ID from role ARN: %v", err)
@@ -158,6 +160,11 @@ func (a *AWS) Sync(ctx core.SyncContext) error {
 	err = a.generateCredentials(ctx, config, accountID, &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to generate credentials: %v", err)
+	}
+
+	err = a.configureRole(ctx, &metadata)
+	if err != nil {
+		return fmt.Errorf("failed to configure IAM role: %w", err)
 	}
 
 	err = a.configureEventBridge(ctx, config, &metadata)
@@ -191,7 +198,9 @@ func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 - Go to AWS IAM Console → Roles → Create role
 - Choose "Web identity" as trusted entity type
 - Select the identity provider created in step 1
-- Add the permissions to the role
+- Add permissions for the integration to manage EventBridge connections, API destinations, and rules. To get started, you can use the **AmazonEventBridgeFullAccess** managed policy
+- Add permissions for the integration manage IAM roles needed for itself. To get started, you can use the **IAMFullAccess** managed policy
+- Depending on the SuperPlane actions and triggers you will use, different permissions will be needed. Include the ones you need
 - Give it a name and description, and create it
 
 **3. Complete the installation setup**
@@ -210,11 +219,7 @@ func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration, ac
 		durationSeconds = defaultSessionDurationSecs
 	}
 
-	subject := fmt.Sprintf("app-installation:%s", ctx.InstallationID)
-	if strings.TrimSpace(ctx.InstallationID) == "" {
-		subject = fmt.Sprintf("app-installation:%s", ctx.Integration.ID())
-	}
-
+	subject := fmt.Sprintf("app-installation:%s", ctx.Integration.ID())
 	oidcToken, err := ctx.OIDC.Sign(subject, 5*time.Minute, ctx.Integration.ID().String(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to generate OIDC token: %w", err)
@@ -253,30 +258,24 @@ func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration, ac
 
 func (a *AWS) configureEventBridge(ctx core.SyncContext, config Configuration, metadata *common.IntegrationMetadata) error {
 	//
-	// If event bridge is already configured, do not do anything.
+	// If event bridge metadata is already configured, do nothing.
 	//
 	if metadata.EventBridge != nil {
 		return nil
 	}
 
+	//
+	// If the region is not set, do nothing.
+	//
 	region := strings.TrimSpace(common.RegionFromInstallation(ctx.Integration))
 	if region == "" {
-		return fmt.Errorf("region is required")
+		return nil
 	}
 
 	tags := common.NormalizeTags(config.Tags)
-
-	//
-	// Generate a random string for the connection secret.
-	//
-	secret, err := crypto.Base64String(32)
+	secret, err := a.destinationSecret(ctx.Integration)
 	if err != nil {
-		return fmt.Errorf("failed to generate random string for connection secret: %w", err)
-	}
-
-	err = ctx.Integration.SetSecret(EventBridgeConnectionSecretName, []byte(secret))
-	if err != nil {
-		return fmt.Errorf("failed to save connection secret: %w", err)
+		return fmt.Errorf("failed to get connection secret: %w", err)
 	}
 
 	//
@@ -287,6 +286,8 @@ func (a *AWS) configureEventBridge(ctx core.SyncContext, config Configuration, m
 		return fmt.Errorf("failed to create API destination: %w", err)
 	}
 
+	ctx.Logger.Infof("Created API destination %s for region %s", apiDestination.ApiDestinationArn, region)
+
 	metadata.EventBridge = &common.EventBridgeMetadata{
 		APIDestinations: map[string]common.APIDestinationMetadata{
 			region: *apiDestination,
@@ -294,6 +295,101 @@ func (a *AWS) configureEventBridge(ctx core.SyncContext, config Configuration, m
 	}
 
 	return nil
+}
+
+/*
+ * In order to create and point EventBridge rules to the API destinations,
+ * we need a specific IAM role which has the necessary permissions to do so.
+ * This role will be used by the SuperPlane triggers created to listen to AWS events.
+ */
+func (a *AWS) configureRole(ctx core.SyncContext, metadata *common.IntegrationMetadata) error {
+
+	//
+	// If the IAM metadata is already configured, do nothing.
+	//
+	if metadata.IAM != nil {
+		return nil
+	}
+
+	//
+	// Otherwise, create IAM role.
+	//
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to get AWS credentials: %w", err)
+	}
+
+	client := iam.NewClient(ctx.HTTP, creds)
+	roleName := a.roleName(ctx.Integration)
+	roleArn := ""
+
+	trustPolicy, err := json.Marshal(map[string]any{
+		"Version": "2012-10-17",
+		"Statement": []map[string]any{
+			{
+				"Effect": "Allow",
+				"Principal": map[string]any{
+					"Service": "events.amazonaws.com",
+				},
+				"Action": "sts:AssumeRole",
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal event bridge trust policy: %w", err)
+	}
+
+	roleArn, err = client.CreateRole(roleName, string(trustPolicy), metadata.Tags)
+	if err != nil {
+		if !iam.IsEntityAlreadyExistsErr(err) {
+			return fmt.Errorf("failed to create event bridge role: %w", err)
+		}
+
+		roleArn, err = client.GetRole(roleName)
+		if err != nil {
+			return fmt.Errorf("failed to fetch event bridge role: %w", err)
+		}
+	}
+
+	//
+	// Attach policy to the role to allow it to invoke the API destinations.
+	//
+	policyDocument, err := json.Marshal(map[string]any{
+		"Version": "2012-10-17",
+		"Statement": []map[string]any{
+			{
+				"Effect":   "Allow",
+				"Action":   "events:InvokeApiDestination",
+				"Resource": fmt.Sprintf("arn:aws:events:*:%s:api-destination/*", metadata.Session.AccountID),
+			},
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to marshal event bridge role policy: %w", err)
+	}
+
+	err = client.PutRolePolicy(roleName, "invoke-api-destination", string(policyDocument))
+	if err != nil {
+		return fmt.Errorf("failed to attach event bridge policy: %w", err)
+	}
+
+	ctx.Logger.Infof("Created IAM role %s", roleArn)
+
+	metadata.IAM = &common.IAMMetadata{
+		TargetDestinationRoleArn: roleArn,
+	}
+
+	return nil
+}
+
+/*
+ * AWS IAM role names must be at most 64 characters long,
+ * so we only use the last part of the integration ID.
+ */
+func (a *AWS) roleName(integration core.IntegrationContext) string {
+	idParts := strings.Split(integration.ID().String(), "-")
+	return fmt.Sprintf("superplane-destination-invoker-%s", idParts[len(idParts)-1])
 }
 
 func (a *AWS) createAPIDestination(
@@ -337,9 +433,6 @@ func (a *AWS) createAPIDestination(
 func (a *AWS) ensureConnection(client *eventbridge.Client, name string, secret []byte, tags []common.Tag) (string, error) {
 	connectionArn, err := client.CreateConnection(name, APIKeyHeaderName, string(secret), tags)
 	if err == nil {
-		if err := client.TagResource(connectionArn, tags); err != nil {
-			return "", err
-		}
 		return connectionArn, nil
 	}
 
@@ -352,19 +445,12 @@ func (a *AWS) ensureConnection(client *eventbridge.Client, name string, secret [
 		return "", err
 	}
 
-	if err := client.TagResource(connectionArn, tags); err != nil {
-		return "", err
-	}
-
 	return connectionArn, nil
 }
 
 func (a *AWS) ensureApiDestination(client *eventbridge.Client, name, connectionArn, url string, tags []common.Tag) (string, error) {
 	apiDestinationArn, err := client.CreateApiDestination(name, connectionArn, url, tags)
 	if err == nil {
-		if err := client.TagResource(apiDestinationArn, tags); err != nil {
-			return "", err
-		}
 		return apiDestinationArn, nil
 	}
 
@@ -377,11 +463,32 @@ func (a *AWS) ensureApiDestination(client *eventbridge.Client, name, connectionA
 		return "", err
 	}
 
-	if err := client.TagResource(apiDestinationArn, tags); err != nil {
+	return apiDestinationArn, nil
+}
+
+func (a *AWS) destinationSecret(integration core.IntegrationContext) (string, error) {
+	secrets, err := integration.GetSecrets()
+	if err != nil {
 		return "", err
 	}
 
-	return apiDestinationArn, nil
+	for _, secret := range secrets {
+		if secret.Name == EventBridgeConnectionSecretName {
+			return string(secret.Value), nil
+		}
+	}
+
+	secret, err := crypto.Base64String(32)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random string for connection secret: %w", err)
+	}
+
+	err = integration.SetSecret(EventBridgeConnectionSecretName, []byte(secret))
+	if err != nil {
+		return "", fmt.Errorf("failed to save connection secret: %w", err)
+	}
+
+	return secret, nil
 }
 
 func (a *AWS) HandleRequest(ctx core.HTTPRequestContext) {
@@ -497,60 +604,11 @@ func (a *AWS) CompareWebhookConfig(aConfig, bConfig any) (bool, error) {
 func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
 	case "lambda.function":
-		creds, err := common.CredentialsFromInstallation(ctx.Integration)
-		if err != nil {
-			return nil, err
-		}
-
-		region := common.RegionFromInstallation(ctx.Integration)
-		if strings.TrimSpace(region) == "" {
-			return nil, fmt.Errorf("region is required")
-		}
-
-		client := lambda.NewClient(ctx.HTTP, creds, region)
-		functions, err := client.ListFunctions()
-		if err != nil {
-			return nil, fmt.Errorf("failed to list lambda functions: %w", err)
-		}
-
-		resources := make([]core.IntegrationResource, 0, len(functions))
-		for _, function := range functions {
-			resources = append(resources, core.IntegrationResource{
-				Type: resourceType,
-				Name: function.FunctionName,
-				ID:   function.FunctionArn,
-			})
-		}
-
-		return resources, nil
+		return lambda.ListFunctions(ctx, resourceType)
 
 	case "ecr.repository":
-		creds, err := common.CredentialsFromInstallation(ctx.Integration)
-		if err != nil {
-			return nil, err
-		}
-
-		region := common.RegionFromInstallation(ctx.Integration)
-		if strings.TrimSpace(region) == "" {
-			return nil, fmt.Errorf("region is required")
-		}
-
-		client := ecr.NewClient(ctx.HTTP, creds, region)
-		repositories, err := client.ListRepositories()
-		if err != nil {
-			return nil, fmt.Errorf("failed to list ECR repositories: %w", err)
-		}
-
-		resources := make([]core.IntegrationResource, 0, len(repositories))
-		for _, repository := range repositories {
-			resources = append(resources, core.IntegrationResource{
-				Type: resourceType,
-				Name: repository.RepositoryName,
-				ID:   repository.RepositoryArn,
-			})
-		}
-
-		return resources, nil
+		ctx.Logger.Infof("listing ECR repositories")
+		return ecr.ListRepositories(ctx, resourceType)
 
 	default:
 		return []core.IntegrationResource{}, nil
@@ -632,6 +690,8 @@ func (a *AWS) provisionDestination(ctx core.IntegrationActionContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to create API destination: %w", err)
 	}
+
+	ctx.Logger.Infof("Created API destination %s for region %s", apiDestination.ApiDestinationArn, config.Region)
 
 	metadata.EventBridge.APIDestinations[config.Region] = *apiDestination
 	ctx.Integration.SetMetadata(metadata)

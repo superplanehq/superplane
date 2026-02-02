@@ -17,11 +17,11 @@ type RuleMetadata struct {
 func CreateRule(
 	integration core.IntegrationContext,
 	http core.HTTPContext,
-	accountID string,
+	targetRoleArn string,
 	region string,
 	destinationArn string,
-	eventPattern *common.EventBridgeEvent,
 	tags []common.Tag,
+	eventPattern map[string]any,
 ) (*RuleMetadata, error) {
 	creds, err := common.CredentialsFromInstallation(integration)
 	if err != nil {
@@ -34,28 +34,22 @@ func CreateRule(
 		return nil, fmt.Errorf("failed to marshal event pattern: %w", err)
 	}
 
-	targetID := uuid.NewString()
 	ruleName := fmt.Sprintf("superplane-%s", uuid.NewString())
 	ruleArn, err := client.PutRule(ruleName, string(pattern), tags)
 	if err != nil {
 		return nil, fmt.Errorf("error creating EventBridge rule: %v", err)
 	}
 
-	if err := client.TagResource(ruleArn, tags); err != nil {
-		return nil, fmt.Errorf("error tagging EventBridge rule: %v", err)
+	if targetRoleArn == "" {
+		return nil, fmt.Errorf("event bridge target role is missing")
 	}
 
-	/*
-	 * We need to use the AWSServiceRoleForAmazonEventBridgeApiDestinations role
-	 * to allow the EventBridge service to invoke the API destination.
-	 * That role is created automatically when the API destination is created.
-	 * See: https://docs.aws.amazon.com/eventbridge/latest/userguide/using-service-linked-roles-service-action-1.html
-	 */
+	targetID := uuid.NewString()
 	err = client.PutTargets(ruleName, []Target{
 		{
 			ID:      targetID,
 			Arn:     destinationArn,
-			RoleArn: fmt.Sprintf("arn:aws:iam::%s:role/AWSServiceRoleForAmazonEventBridgeApiDestinations", accountID),
+			RoleArn: targetRoleArn,
 		},
 	})
 

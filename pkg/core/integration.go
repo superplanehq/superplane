@@ -167,6 +167,7 @@ type WebhookOptions struct {
 }
 
 type SyncContext struct {
+	Logger          *logrus.Entry
 	Configuration   any
 	BaseURL         string
 	WebhooksBaseURL string

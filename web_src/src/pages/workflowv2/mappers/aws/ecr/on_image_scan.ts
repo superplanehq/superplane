@@ -1,4 +1,4 @@
-import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
+import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../../types";
 import { TriggerProps } from "@/ui/trigger";
@@ -18,7 +18,7 @@ import {
  * Renderer for the "aws.ecr.onImageScan" trigger
  */
 export const onImageScanTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
     const eventData = event.data?.data as EcrImageScanEvent;
     const detail = eventData?.detail;
     const repository = getRepositoryLabel(undefined, undefined, detail?.["repository-name"]);
@@ -31,7 +31,7 @@ export const onImageScanTriggerRenderer: TriggerRenderer = {
     return { title, subtitle };
   },
 
-  getRootEventValues: (event: WorkflowsWorkflowEvent): Record<string, string> => {
+  getRootEventValues: (event: CanvasesCanvasEvent): Record<string, string> => {
     const eventData = event.data?.data as EcrImageScanEvent;
     const detail = eventData?.detail;
 
@@ -46,7 +46,7 @@ export const onImageScanTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
+  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
     const metadata = node.metadata as EcrTriggerMetadata | undefined;
     const configuration = node.configuration as EcrTriggerConfiguration | undefined;
     const metadataItems = buildRepositoryMetadataItems(metadata, configuration);

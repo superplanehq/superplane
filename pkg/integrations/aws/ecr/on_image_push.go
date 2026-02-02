@@ -151,18 +151,18 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 	ruleMetadata, err := eventbridge.CreateRule(
 		ctx.Integration,
 		ctx.HTTP,
-		integrationMetadata.Session.AccountID,
+		integrationMetadata.IAM.TargetDestinationRoleArn,
 		config.Region,
 		apiDestination.ApiDestinationArn,
-		p.eventPattern(),
 		integrationMetadata.Tags,
+		p.rulePattern(),
 	)
 
 	if err != nil {
 		return fmt.Errorf("failed to create rule and subscribe: %w", err)
 	}
 
-	subscriptionID, err := ctx.Integration.Subscribe(p.eventPattern())
+	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(config.Region))
 	if err != nil {
 		return fmt.Errorf("failed to subscribe: %w", err)
 	}
@@ -175,11 +175,25 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-// NOTE: we intentionally do not include the repository-name
-// in the event pattern to allow the user to change the repository,
-// without us having to update the rule.
-func (p *OnImagePush) eventPattern() *common.EventBridgeEvent {
+func (p *OnImagePush) rulePattern() map[string]any {
+	//
+	// NOTE: we intentionally do not include the repository-name
+	// in the event pattern to allow the user to change the repository,
+	// without us having to update the rule.
+	//
+	return map[string]any{
+		"detail-type": []string{"ECR Image Action"},
+		"source":      []string{"aws.ecr"},
+		"detail": map[string]any{
+			"action-type": []string{"PUSH"},
+			"result":      []string{"SUCCESS"},
+		},
+	}
+}
+
+func (p *OnImagePush) subscriptionPattern(region string) *common.EventBridgeEvent {
 	return &common.EventBridgeEvent{
+		Region:     region,
 		DetailType: "ECR Image Action",
 		Source:     "aws.ecr",
 		Detail: map[string]any{
@@ -239,29 +253,39 @@ func (p *OnImagePush) checkDestinationAvailability(ctx core.TriggerActionContext
 		return nil, fmt.Errorf("failed to decode integration metadata: %w", err)
 	}
 
+	//
+	// If destination does not yet exist, check again in 10 seconds.
+	//
 	apiDestination, ok := integrationMetadata.EventBridge.APIDestinations[metadata.Region]
 	if !ok {
-		return nil, fmt.Errorf("API destination not found for region: %s", metadata.Region)
+		ctx.Logger.Infof("API destination not found for region: %s, checking again in 10 seconds", metadata.Region)
+		return nil, ctx.Requests.ScheduleActionCall(
+			"checkDestinationAvailability",
+			map[string]any{},
+			10*time.Second,
+		)
 	}
 
 	ruleMetadata, err := eventbridge.CreateRule(
 		ctx.Integration,
 		ctx.HTTP,
-		integrationMetadata.Session.AccountID,
+		integrationMetadata.IAM.TargetDestinationRoleArn,
 		metadata.Region,
 		apiDestination.ApiDestinationArn,
-		p.eventPattern(),
 		integrationMetadata.Tags,
+		p.rulePattern(),
 	)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rule: %w", err)
 	}
 
-	subscriptionID, err := ctx.Integration.Subscribe(p.eventPattern())
+	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(metadata.Region))
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe: %w", err)
 	}
+
+	ctx.Logger.Infof("Created rule %s for region %s", ruleMetadata.RuleArn, metadata.Region)
 
 	metadata.SubscriptionID = subscriptionID.String()
 	metadata.Rule = ruleMetadata
@@ -292,6 +316,7 @@ func (p *OnImagePush) OnIntegrationMessage(ctx core.IntegrationMessageContext) e
 	}
 
 	if r != metadata.Repository.RepositoryName {
+		ctx.Logger.Infof("Skipping event for repository %s, expected %s", r, metadata.Repository.RepositoryName)
 		return nil
 	}
 

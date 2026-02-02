@@ -16,6 +16,7 @@ const (
 
 type IntegrationMetadata struct {
 	Session     *SessionMetadata     `json:"session" mapstructure:"session"`
+	IAM         *IAMMetadata         `json:"iam" mapstructure:"iam"`
 	EventBridge *EventBridgeMetadata `json:"eventBridge" mapstructure:"eventBridge"`
 	Tags        []Tag                `json:"tags" mapstructure:"tags"`
 }
@@ -28,10 +29,25 @@ type SessionMetadata struct {
 }
 
 /*
- * Since we need to support multiple regions,
- * the integration needs to maintain one connection/destination per region.
+ * IAM metadata for the integration.
+ */
+type IAMMetadata struct {
+
+	/*
+	 * The role ARN of the role that will be used to invoke the EventBridge API destinations.
+	 */
+	TargetDestinationRoleArn string `json:"targetDestinationRoleArn" mapstructure:"targetDestinationRoleArn"`
+}
+
+/*
+ * EventBridge metadata for the integration.
  */
 type EventBridgeMetadata struct {
+
+	/*
+	 * Since we need to support multiple regions,
+	 * the integration needs to maintain one connection/destination per region.
+	 */
 	APIDestinations map[string]APIDestinationMetadata `json:"apiDestinations" mapstructure:"apiDestinations"`
 }
 
@@ -45,6 +61,7 @@ type ProvisionDestinationParameters struct {
 }
 
 type EventBridgeEvent struct {
+	Region     string         `json:"region"`
 	DetailType string         `json:"detail-type"`
 	Source     string         `json:"source"`
 	Detail     map[string]any `json:"detail"`
@@ -53,6 +70,17 @@ type EventBridgeEvent struct {
 type Tag struct {
 	Key   string `json:"key" mapstructure:"key"`
 	Value string `json:"value" mapstructure:"value"`
+}
+
+func TagsForAPI(tags []Tag) []any {
+	apiTags := make([]any, len(tags))
+	for i, tag := range tags {
+		apiTags[i] = map[string]string{
+			"Key":   tag.Key,
+			"Value": tag.Value,
+		}
+	}
+	return apiTags
 }
 
 func CredentialsFromInstallation(ctx core.IntegrationContext) (aws.Credentials, error) {

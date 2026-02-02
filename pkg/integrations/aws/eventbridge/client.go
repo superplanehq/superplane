@@ -55,8 +55,8 @@ func (c *Client) CreateConnection(name, apiKeyHeader, apiKeyValue string, tags [
 		},
 	}
 
-	if tagPayload := common.NormalizeTags(tags); len(tagPayload) > 0 {
-		payload["Tags"] = tagPayload
+	if len(tags) > 0 {
+		payload["Tags"] = common.TagsForAPI(tags)
 	}
 
 	var response struct {
@@ -98,8 +98,8 @@ func (c *Client) CreateApiDestination(name, connectionArn, url string, tags []co
 		"InvocationRateLimitPerSecond": 10,
 	}
 
-	if tagPayload := common.NormalizeTags(tags); len(tagPayload) > 0 {
-		payload["Tags"] = tagPayload
+	if len(tags) > 0 {
+		payload["Tags"] = common.TagsForAPI(tags)
 	}
 
 	var response struct {
@@ -138,8 +138,8 @@ func (c *Client) PutRule(name, pattern string, tags []common.Tag) (string, error
 		"State":        "ENABLED",
 	}
 
-	if tagPayload := common.NormalizeTags(tags); len(tagPayload) > 0 {
-		payload["Tags"] = tagPayload
+	if len(tags) > 0 {
+		payload["Tags"] = common.TagsForAPI(tags)
 	}
 
 	var response struct {
@@ -177,20 +177,6 @@ func (c *Client) DeleteRule(rule string) error {
 	}
 
 	return c.postJSON("DeleteRule", payload, nil)
-}
-
-func (c *Client) TagResource(resourceArn string, tags []common.Tag) error {
-	tagPayload := common.NormalizeTags(tags)
-	if len(tagPayload) == 0 {
-		return nil
-	}
-
-	payload := map[string]any{
-		"ResourceARN": resourceArn,
-		"Tags":        tagPayload,
-	}
-
-	return c.postJSON("TagResource", payload, nil)
 }
 
 func (c *Client) postJSON(action string, payload any, out any) error {

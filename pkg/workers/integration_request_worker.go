@@ -107,6 +107,7 @@ func (w *IntegrationRequestWorker) syncIntegration(tx *gorm.DB, request *models.
 
 	integrationCtx := contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry)
 	syncErr := integration.Sync(core.SyncContext{
+		Logger:          logging.ForIntegration(*instance),
 		HTTP:            contexts.NewHTTPContext(w.registry.GetHTTPClient()),
 		Integration:     integrationCtx,
 		Configuration:   instance.Configuration.Data(),
@@ -158,6 +159,12 @@ func (w *IntegrationRequestWorker) invokeIntegrationAction(tx *gorm.DB, request 
 	err = integrationImpl.HandleAction(actionCtx)
 	if err != nil {
 		logger.Errorf("error handling action: %v", err)
+	}
+
+	err = tx.Save(integration).Error
+	if err != nil {
+		logger.Errorf("failed to save integration %s: %v", integration.ID, err)
+		return fmt.Errorf("failed to save integration: %w", err)
 	}
 
 	return request.Complete(tx)
