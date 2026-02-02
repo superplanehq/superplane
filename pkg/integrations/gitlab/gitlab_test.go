@@ -223,7 +223,6 @@ func Test__GitLab__Sync(t *testing.T) {
 				},
 			}
 			
-			// Refresh OK, Verify Fails
 			mockHTTP := &contexts.HTTPContext{
 				Responses: []*http.Response{
 					GitlabMockResponse(http.StatusOK, `{"access_token": "ok"}`),
@@ -332,7 +331,7 @@ func Test__GitLab__HandleRequest(t *testing.T) {
 				Request:     req,
 				Response:    recorder,
 				Integration: ctx, 
-				HTTP:        mockHTTP, // Use global mock
+				HTTP:        mockHTTP,
 				Logger:      logger,
 			})
 			

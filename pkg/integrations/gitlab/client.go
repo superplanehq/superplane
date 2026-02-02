@@ -14,7 +14,7 @@ type Client struct {
 	baseURL    string
 	token      string
 	authType   string
-	groupID    string // Required for all auth types
+	groupID    string
 	httpClient core.HTTPContext
 }
 

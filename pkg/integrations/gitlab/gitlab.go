@@ -369,7 +369,6 @@ func (g *GitLab) handleCallback(ctx core.HTTPRequestContext, config *Configurati
 		return
 	}
 
-	// Success - Save Tokens
 	if tokenResponse.AccessToken != "" {
 		if err := ctx.Integration.SetSecret(OAuthAccessToken, []byte(tokenResponse.AccessToken)); err != nil {
 			ctx.Response.WriteHeader(http.StatusInternalServerError)

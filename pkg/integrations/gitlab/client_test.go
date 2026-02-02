@@ -47,7 +47,7 @@ func Test__Client__NewClient(t *testing.T) {
 		client, err := NewClient(mockClient, ctx)
 		require.NoError(t, err)
 		assert.NotNil(t, client)
-		assert.Equal(t, "https://gitlab.com", client.baseURL) // Default
+		assert.Equal(t, "https://gitlab.com", client.baseURL)
 		assert.Equal(t, "oauth-token-123", client.token)
 		assert.Equal(t, AuthTypeAppOAuth, client.authType)
 		assert.Equal(t, "group-456", client.groupID)

@@ -88,7 +88,7 @@ func Test__AuthService__RefreshToken(t *testing.T) {
 }
 
 func Test__AuthService__HandleCallback(t *testing.T) {
-	// Re-using mock client with default response
+
 	mock := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			GitlabMockResponse(http.StatusOK, `{"access_token": "ok"}`),
