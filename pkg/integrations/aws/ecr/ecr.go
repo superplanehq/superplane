@@ -9,6 +9,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 )
 
+const (
+	Source                   = "aws.ecr"
+	DetailTypeECRImageScan   = "ECR Image Scan"
+	DetailTypeECRImageAction = "ECR Image Action"
+)
+
 type Repository struct {
 	RepositoryName string `json:"repositoryName" mapstructure:"repositoryName"`
 	RepositoryArn  string `json:"repositoryArn" mapstructure:"repositoryArn"`
@@ -24,12 +30,12 @@ func validateRepository(ctx core.TriggerContext, region string, repositoryRef st
 		return existing, nil
 	}
 
-	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	credentials, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get AWS credentials: %w", err)
 	}
 
-	client := NewClient(ctx.HTTP, creds, region)
+	client := NewClient(ctx.HTTP, credentials, region)
 	repositoryName, err := repositoryNameFromRef(repositoryRef)
 	if err != nil {
 		return nil, err

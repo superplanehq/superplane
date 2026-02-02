@@ -16,7 +16,13 @@ export interface EcrImageScanDetail {
   "repository-name"?: string;
   "image-digest"?: string;
   "image-tags"?: string[];
-  "finding-severity-counts"?: Record<string, number>;
+  "finding-severity-counts"?: {
+    CRITICAL?: number;
+    HIGH?: number;
+    MEDIUM?: number;
+    LOW?: number;
+    UNDEFINED?: number;
+  };
 }
 
 export interface EcrImagePushDetail {

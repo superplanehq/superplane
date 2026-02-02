@@ -6,13 +6,14 @@ import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import { EcrImageScanEvent, EcrTriggerConfiguration, EcrTriggerMetadata } from "./types";
 import {
   buildRepositoryMetadataItems,
-  buildSubtitle,
-  formatSeverityCounts,
   formatTagLabel,
   formatTags,
   getRepositoryLabel,
+  numberOrZero,
   stringOrDash,
 } from "./utils";
+import { formatTimeAgo } from "@/utils/date";
+import { EcrImageScanDetail } from "./types";
 
 /**
  * Renderer for the "aws.ecr.onImageScan" trigger
@@ -25,25 +26,33 @@ export const onImageScanTriggerRenderer: TriggerRenderer = {
     const tagLabel = formatTagLabel(detail?.["image-tags"]);
 
     const title = repository ? `${repository}${tagLabel ? `:${tagLabel}` : ""}` : "ECR image scan";
-    const scanStatus = detail?.["scan-status"];
-    const subtitle = buildSubtitle([scanStatus ? `Scan ${scanStatus}` : undefined], event.createdAt);
+    const subtitle = event.createdAt ? formatTimeAgo(new Date(event.createdAt)) : "";
 
     return { title, subtitle };
   },
 
   getRootEventValues: (event: CanvasesCanvasEvent): Record<string, string> => {
     const eventData = event.data?.data as EcrImageScanEvent;
-    const detail = eventData?.detail;
+    const detail = eventData?.detail as EcrImageScanDetail;
 
-    return {
+    let values: Record<string, string> = {
       Repository: stringOrDash(getRepositoryLabel(undefined, undefined, detail?.["repository-name"])),
       "Image Tags": formatTags(detail?.["image-tags"]),
       "Image Digest": stringOrDash(detail?.["image-digest"]),
       "Scan Status": stringOrDash(detail?.["scan-status"]),
-      "Severity Counts": formatSeverityCounts(detail?.["finding-severity-counts"]),
       Region: stringOrDash(eventData?.region),
       Account: stringOrDash(eventData?.account),
     };
+
+    const severityCounts = detail["finding-severity-counts"];
+    if (severityCounts) {
+      values["Critical"] = numberOrZero(severityCounts.CRITICAL).toString();
+      values["High"] = numberOrZero(severityCounts.HIGH).toString();
+      values["Medium"] = numberOrZero(severityCounts.MEDIUM).toString();
+      values["Low"] = numberOrZero(severityCounts.LOW).toString();
+    }
+
+    return values;
   },
 
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {

@@ -28,18 +28,18 @@ const (
 )
 
 type Client struct {
-	http   core.HTTPContext
-	region string
-	creds  aws.Credentials
-	signer *v4.Signer
+	http        core.HTTPContext
+	region      string
+	credentials *aws.Credentials
+	signer      *v4.Signer
 }
 
-func NewClient(httpCtx core.HTTPContext, creds aws.Credentials) *Client {
+func NewClient(httpCtx core.HTTPContext, credentials *aws.Credentials) *Client {
 	return &Client{
-		http:   httpCtx,
-		region: defaultRegion,
-		creds:  creds,
-		signer: v4.NewSigner(),
+		http:        httpCtx,
+		region:      defaultRegion,
+		credentials: credentials,
+		signer:      v4.NewSigner(),
 	}
 }
 
@@ -180,7 +180,7 @@ func (c *Client) postForm(action string, params map[string]string, out any) erro
 func (c *Client) signRequest(req *http.Request, payload []byte) error {
 	hash := sha256.Sum256(payload)
 	payloadHash := hex.EncodeToString(hash[:])
-	return c.signer.SignHTTP(context.Background(), c.creds, req, payloadHash, serviceName, c.region, time.Now())
+	return c.signer.SignHTTP(context.Background(), *c.credentials, req, payloadHash, serviceName, c.region, time.Now())
 }
 
 func parseError(body []byte) *common.Error {

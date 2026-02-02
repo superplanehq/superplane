@@ -9,7 +9,7 @@ import (
 )
 
 func ListFunctions(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
-	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	credentials, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
@@ -19,7 +19,7 @@ func ListFunctions(ctx core.ListResourcesContext, resourceType string) ([]core.I
 		return nil, fmt.Errorf("region is required")
 	}
 
-	client := NewClient(ctx.HTTP, creds, region)
+	client := NewClient(ctx.HTTP, credentials, region)
 	functions, err := client.ListFunctions()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list lambda functions: %w", err)

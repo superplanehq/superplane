@@ -3,13 +3,13 @@ package ecr
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
-	"github.com/superplanehq/superplane/pkg/integrations/aws/eventbridge"
 )
 
 type OnImagePush struct{}
@@ -20,10 +20,9 @@ type OnImagePushConfiguration struct {
 }
 
 type OnImagePushMetadata struct {
-	Region         string                    `json:"region" mapstructure:"region"`
-	SubscriptionID string                    `json:"subscriptionId" mapstructure:"subscriptionId"`
-	Repository     *Repository               `json:"repository" mapstructure:"repository"`
-	Rule           *eventbridge.RuleMetadata `json:"rule" mapstructure:"rule"`
+	Region         string      `json:"region" mapstructure:"region"`
+	SubscriptionID string      `json:"subscriptionId" mapstructure:"subscriptionId"`
+	Repository     *Repository `json:"repository" mapstructure:"repository"`
 }
 
 func (p *OnImagePush) Name() string {
@@ -113,7 +112,7 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 	//
 	// EventBridge rule and target have been setup already.
 	//
-	if metadata.Repository != nil && metadata.Rule != nil && repositoryMatchesRef(metadata.Repository, config.Repository) {
+	if metadata.Repository != nil && repositoryMatchesRef(metadata.Repository, config.Repository) {
 		return nil
 	}
 
@@ -127,11 +126,11 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 	}
 
 	//
-	// If an API destination does not yet exist in the region,
+	// If an EventBridge rule does not yet exist yet in this region, for this source,
 	// we ask the integration to provision it for us.
 	//
-	apiDestination, ok := integrationMetadata.EventBridge.APIDestinations[config.Region]
-	if !ok {
+	rule, ok := integrationMetadata.EventBridge.Rules[Source]
+	if !ok || !slices.Contains(rule.DetailTypes, DetailTypeECRImageAction) {
 		err = ctx.Metadata.Set(OnImagePushMetadata{
 			Region:     config.Region,
 			Repository: repository,
@@ -141,27 +140,12 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 			return fmt.Errorf("failed to set metadata: %w", err)
 		}
 
-		return p.provisionDestination(ctx.Integration, ctx.Requests, config.Region)
+		return p.provisionRule(ctx.Integration, ctx.Requests, config.Region)
 	}
 
 	//
-	// If an API destination exists in the region,
-	// we can use it to subscribe to ECR image push events.
+	// If the rule exists, subscribe to the integration with the proper pattern.
 	//
-	ruleMetadata, err := eventbridge.CreateRule(
-		ctx.Integration,
-		ctx.HTTP,
-		integrationMetadata.IAM.TargetDestinationRoleArn,
-		config.Region,
-		apiDestination.ApiDestinationArn,
-		integrationMetadata.Tags,
-		p.rulePattern(),
-	)
-
-	if err != nil {
-		return fmt.Errorf("failed to create rule and subscribe: %w", err)
-	}
-
 	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(config.Region))
 	if err != nil {
 		return fmt.Errorf("failed to subscribe: %w", err)
@@ -171,31 +155,14 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 		Region:         config.Region,
 		SubscriptionID: subscriptionID.String(),
 		Repository:     repository,
-		Rule:           ruleMetadata,
 	})
-}
-
-func (p *OnImagePush) rulePattern() map[string]any {
-	//
-	// NOTE: we intentionally do not include the repository-name
-	// in the event pattern to allow the user to change the repository,
-	// without us having to update the rule.
-	//
-	return map[string]any{
-		"detail-type": []string{"ECR Image Action"},
-		"source":      []string{"aws.ecr"},
-		"detail": map[string]any{
-			"action-type": []string{"PUSH"},
-			"result":      []string{"SUCCESS"},
-		},
-	}
 }
 
 func (p *OnImagePush) subscriptionPattern(region string) *common.EventBridgeEvent {
 	return &common.EventBridgeEvent{
 		Region:     region,
-		DetailType: "ECR Image Action",
-		Source:     "aws.ecr",
+		DetailType: DetailTypeECRImageAction,
+		Source:     Source,
 		Detail: map[string]any{
 			"action-type": "PUSH",
 			"result":      "SUCCESS",
@@ -203,19 +170,23 @@ func (p *OnImagePush) subscriptionPattern(region string) *common.EventBridgeEven
 	}
 }
 
-func (p *OnImagePush) provisionDestination(integration core.IntegrationContext, requests core.RequestContext, region string) error {
+func (p *OnImagePush) provisionRule(integration core.IntegrationContext, requests core.RequestContext, region string) error {
 	err := integration.ScheduleActionCall(
-		"provisionDestination",
-		common.ProvisionDestinationParameters{Region: region},
+		"provisionRule",
+		common.ProvisionRuleParameters{
+			Region:     region,
+			Source:     Source,
+			DetailType: DetailTypeECRImageAction,
+		},
 		time.Second,
 	)
 
 	if err != nil {
-		return fmt.Errorf("failed to provision API destination: %w", err)
+		return fmt.Errorf("failed to schedule rule provisioning for integration: %w", err)
 	}
 
 	return requests.ScheduleActionCall(
-		"checkDestinationAvailability",
+		"checkRuleAvailability",
 		map[string]any{},
 		5*time.Second,
 	)
@@ -224,23 +195,23 @@ func (p *OnImagePush) provisionDestination(integration core.IntegrationContext, 
 func (p *OnImagePush) Actions() []core.Action {
 	return []core.Action{
 		{
-			Name:        "checkDestinationAvailability",
-			Description: "Check if an API destination is available",
+			Name:        "checkRuleAvailability",
+			Description: "Check if the EventBridge rule is available",
 		},
 	}
 }
 
 func (p *OnImagePush) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
 	switch ctx.Name {
-	case "checkDestinationAvailability":
-		return p.checkDestinationAvailability(ctx)
+	case "checkRuleAvailability":
+		return p.checkRuleAvailability(ctx)
 
 	default:
 		return nil, fmt.Errorf("unknown action: %s", ctx.Name)
 	}
 }
 
-func (p *OnImagePush) checkDestinationAvailability(ctx core.TriggerActionContext) (map[string]any, error) {
+func (p *OnImagePush) checkRuleAvailability(ctx core.TriggerActionContext) (map[string]any, error) {
 	metadata := OnImagePushMetadata{}
 	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
@@ -254,41 +225,39 @@ func (p *OnImagePush) checkDestinationAvailability(ctx core.TriggerActionContext
 	}
 
 	//
-	// If destination does not yet exist, check again in 10 seconds.
+	// If the rule was not provisioned yet, check again in 10 seconds.
 	//
-	apiDestination, ok := integrationMetadata.EventBridge.APIDestinations[metadata.Region]
+	rule, ok := integrationMetadata.EventBridge.Rules[Source]
 	if !ok {
-		ctx.Logger.Infof("API destination not found for region: %s, checking again in 10 seconds", metadata.Region)
+		ctx.Logger.Info("Rule not found for source aws.ecr - checking again in 10 seconds")
 		return nil, ctx.Requests.ScheduleActionCall(
-			"checkDestinationAvailability",
+			"checkRuleAvailability",
 			map[string]any{},
 			10*time.Second,
 		)
 	}
 
-	ruleMetadata, err := eventbridge.CreateRule(
-		ctx.Integration,
-		ctx.HTTP,
-		integrationMetadata.IAM.TargetDestinationRoleArn,
-		metadata.Region,
-		apiDestination.ApiDestinationArn,
-		integrationMetadata.Tags,
-		p.rulePattern(),
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create rule: %w", err)
+	//
+	// If the rule does not have the detail type we are interested in, check again in 10 seconds.
+	//
+	if !slices.Contains(rule.DetailTypes, DetailTypeECRImageAction) {
+		ctx.Logger.Infof("Rule does not have detail type '%s' - checking again in 10 seconds", DetailTypeECRImageAction)
+		return nil, ctx.Requests.ScheduleActionCall(
+			"checkRuleAvailability",
+			map[string]any{},
+			10*time.Second,
+		)
 	}
 
+	//
+	// Rule is available, subscribe to the integration with the proper pattern.
+	//
 	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(metadata.Region))
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe: %w", err)
 	}
 
-	ctx.Logger.Infof("Created rule %s for region %s", ruleMetadata.RuleArn, metadata.Region)
-
 	metadata.SubscriptionID = subscriptionID.String()
-	metadata.Rule = ruleMetadata
 	return nil, ctx.Metadata.Set(metadata)
 }
 

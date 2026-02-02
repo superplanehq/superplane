@@ -49,15 +49,31 @@ type EventBridgeMetadata struct {
 	 * the integration needs to maintain one connection/destination per region.
 	 */
 	APIDestinations map[string]APIDestinationMetadata `json:"apiDestinations" mapstructure:"apiDestinations"`
+
+	/*
+	 * List of EventBridge rules created by the integration.
+	 * This ensures that we reuse the same rule for the same source, e.g., aws.codeartifact, aws.ecr, etc.
+	 */
+	Rules map[string]EventBridgeRuleMetadata `json:"rules" mapstructure:"rules"`
+}
+
+type EventBridgeRuleMetadata struct {
+	Source      string   `json:"source"`
+	Region      string   `json:"region"`
+	RuleArn     string   `json:"ruleArn" mapstructure:"ruleArn"`
+	DetailTypes []string `json:"detailTypes" mapstructure:"detailTypes"`
 }
 
 type APIDestinationMetadata struct {
+	Region            string `json:"region"`
 	ConnectionArn     string `json:"connectionArn"`
 	ApiDestinationArn string `json:"apiDestinationArn"`
 }
 
-type ProvisionDestinationParameters struct {
-	Region string `json:"region"`
+type ProvisionRuleParameters struct {
+	Region     string `json:"region"`
+	Source     string `json:"source"`
+	DetailType string `json:"detailType"`
 }
 
 type EventBridgeEvent struct {
@@ -83,10 +99,10 @@ func TagsForAPI(tags []Tag) []any {
 	return apiTags
 }
 
-func CredentialsFromInstallation(ctx core.IntegrationContext) (aws.Credentials, error) {
+func CredentialsFromInstallation(ctx core.IntegrationContext) (*aws.Credentials, error) {
 	secrets, err := ctx.GetSecrets()
 	if err != nil {
-		return aws.Credentials{}, fmt.Errorf("failed to get AWS session secrets: %w", err)
+		return nil, fmt.Errorf("failed to get AWS session secrets: %w", err)
 	}
 
 	var accessKeyID string
@@ -105,10 +121,10 @@ func CredentialsFromInstallation(ctx core.IntegrationContext) (aws.Credentials, 
 	}
 
 	if strings.TrimSpace(accessKeyID) == "" || strings.TrimSpace(secretAccessKey) == "" || strings.TrimSpace(sessionToken) == "" {
-		return aws.Credentials{}, fmt.Errorf("AWS session credentials are missing")
+		return nil, fmt.Errorf("AWS session credentials are missing")
 	}
 
-	return aws.Credentials{
+	return &aws.Credentials{
 		AccessKeyID:     accessKeyID,
 		SecretAccessKey: secretAccessKey,
 		SessionToken:    sessionToken,

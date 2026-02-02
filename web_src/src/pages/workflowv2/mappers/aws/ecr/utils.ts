@@ -1,19 +1,5 @@
-import { formatTimeAgo } from "@/utils/date";
 import { MetadataItem } from "@/ui/metadataList";
 import { EcrTriggerConfiguration, EcrTriggerMetadata } from "./types";
-
-const SEVERITY_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFORMATIONAL", "UNDEFINED"];
-
-export function buildSubtitle(contentParts: Array<string | undefined>, createdAt?: string): string {
-  const content = contentParts.filter(Boolean).join(" · ");
-  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
-
-  if (content && timeAgo) {
-    return `${content} · ${timeAgo}`;
-  }
-
-  return content || timeAgo;
-}
 
 export function getRepositoryLabel(
   metadata?: EcrTriggerMetadata,
@@ -67,29 +53,6 @@ export function formatTagLabel(tags?: string[]): string | undefined {
   return `${tags[0]} +${tags.length - 1}`;
 }
 
-export function formatSeverityCounts(counts?: Record<string, number>): string {
-  if (!counts || Object.keys(counts).length === 0) {
-    return "-";
-  }
-
-  const entries = Object.entries(counts);
-  const orderedEntries = entries.sort((a, b) => {
-    const aIndex = SEVERITY_ORDER.indexOf(a[0]);
-    const bIndex = SEVERITY_ORDER.indexOf(b[0]);
-
-    if (aIndex === -1 && bIndex === -1) {
-      return a[0].localeCompare(b[0]);
-    }
-
-    if (aIndex === -1) return 1;
-    if (bIndex === -1) return -1;
-
-    return aIndex - bIndex;
-  });
-
-  return orderedEntries.map(([severity, count]) => `${severity}: ${count}`).join(", ");
-}
-
 export function buildRepositoryMetadataItems(
   metadata?: EcrTriggerMetadata,
   configuration?: EcrTriggerConfiguration,
@@ -106,6 +69,14 @@ export function buildRepositoryMetadataItems(
       label: repositoryLabel,
     },
   ];
+}
+
+export function numberOrZero(value?: number): number {
+  if (value === undefined || value === null) {
+    return 0;
+  }
+
+  return value;
 }
 
 export function stringOrDash(value?: unknown): string {

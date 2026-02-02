@@ -4,7 +4,8 @@ import { TriggerRenderer } from "../../types";
 import { TriggerProps } from "@/ui/trigger";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import { EcrImagePushEvent, EcrTriggerConfiguration, EcrTriggerMetadata } from "./types";
-import { buildRepositoryMetadataItems, buildSubtitle, getRepositoryLabel, stringOrDash } from "./utils";
+import { buildRepositoryMetadataItems, getRepositoryLabel, stringOrDash } from "./utils";
+import { formatTimeAgo } from "@/utils/date";
 
 /**
  * Renderer for the "aws.ecr.onImagePush" trigger
@@ -17,7 +18,7 @@ export const onImagePushTriggerRenderer: TriggerRenderer = {
     const tag = detail?.["image-tag"];
 
     const title = repository ? `${repository}${tag ? `:${tag}` : ""}` : "ECR image push";
-    const subtitle = buildSubtitle([detail?.["action-type"], detail?.result], event.createdAt);
+    const subtitle = event.createdAt ? formatTimeAgo(new Date(event.createdAt)) : "";
 
     return { title, subtitle };
   },

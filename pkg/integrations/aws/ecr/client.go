@@ -20,18 +20,18 @@ import (
 const targetPrefix = "AmazonEC2ContainerRegistry_V20150921."
 
 type Client struct {
-	http   core.HTTPContext
-	region string
-	creds  aws.Credentials
-	signer *v4.Signer
+	http        core.HTTPContext
+	region      string
+	credentials *aws.Credentials
+	signer      *v4.Signer
 }
 
-func NewClient(httpCtx core.HTTPContext, creds aws.Credentials, region string) *Client {
+func NewClient(httpCtx core.HTTPContext, credentials *aws.Credentials, region string) *Client {
 	return &Client{
-		http:   httpCtx,
-		region: region,
-		creds:  creds,
-		signer: v4.NewSigner(),
+		http:        httpCtx,
+		region:      region,
+		credentials: credentials,
+		signer:      v4.NewSigner(),
 	}
 }
 
@@ -137,5 +137,5 @@ func (c *Client) postJSON(action string, payload any, out any) error {
 func (c *Client) signRequest(req *http.Request, payload []byte) error {
 	hash := sha256.Sum256(payload)
 	payloadHash := hex.EncodeToString(hash[:])
-	return c.signer.SignHTTP(context.Background(), c.creds, req, payloadHash, "ecr", c.region, time.Now())
+	return c.signer.SignHTTP(context.Background(), *c.credentials, req, payloadHash, "ecr", c.region, time.Now())
 }

@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/mitchellh/mapstructure"
+	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -158,17 +161,17 @@ func (a *AWS) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to get account ID from role ARN: %v", err)
 	}
 
-	err = a.generateCredentials(ctx, config, accountID, &metadata)
+	credentials, err := a.generateCredentials(ctx, config, accountID, &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to generate credentials: %v", err)
 	}
 
-	err = a.configureRole(ctx, &metadata)
+	err = a.configureRole(ctx, &metadata, credentials)
 	if err != nil {
 		return fmt.Errorf("failed to configure IAM role: %w", err)
 	}
 
-	err = a.configureEventBridge(ctx, config, &metadata)
+	err = a.configureEventBridge(ctx, config, &metadata, credentials)
 	if err != nil {
 		return fmt.Errorf("failed to configure event bridge: %v", err)
 	}
@@ -266,7 +269,7 @@ func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 	return nil
 }
 
-func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration, accountID string, metadata *common.IntegrationMetadata) error {
+func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration, accountID string, metadata *common.IntegrationMetadata) (*aws.Credentials, error) {
 	durationSeconds := config.SessionDurationSeconds
 	if durationSeconds <= 0 {
 		durationSeconds = defaultSessionDurationSecs
@@ -275,26 +278,26 @@ func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration, ac
 	subject := fmt.Sprintf("app-installation:%s", ctx.Integration.ID())
 	oidcToken, err := ctx.OIDC.Sign(subject, 5*time.Minute, ctx.Integration.ID().String(), nil)
 	if err != nil {
-		return fmt.Errorf("failed to generate OIDC token: %w", err)
+		return nil, fmt.Errorf("failed to generate OIDC token: %w", err)
 	}
 
 	sessionName := fmt.Sprintf("SuperPlane-%s", ctx.Integration.ID())
-	credentials, err := assumeRoleWithWebIdentity(ctx.HTTP, config.Region, config.RoleArn, sessionName, oidcToken, durationSeconds)
+	stsCredentials, err := assumeRoleWithWebIdentity(ctx.HTTP, config.Region, config.RoleArn, sessionName, oidcToken, durationSeconds)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to assume role: %w", err)
 	}
 
-	if err := ctx.Integration.SetSecret("accessKeyId", []byte(credentials.AccessKeyID)); err != nil {
-		return err
+	if err := ctx.Integration.SetSecret("accessKeyId", []byte(stsCredentials.AccessKeyID)); err != nil {
+		return nil, fmt.Errorf("failed to set access key ID secret: %w", err)
 	}
-	if err := ctx.Integration.SetSecret("secretAccessKey", []byte(credentials.SecretAccessKey)); err != nil {
-		return err
+	if err := ctx.Integration.SetSecret("secretAccessKey", []byte(stsCredentials.SecretAccessKey)); err != nil {
+		return nil, fmt.Errorf("failed to set secret access key secret: %w", err)
 	}
-	if err := ctx.Integration.SetSecret("sessionToken", []byte(credentials.SessionToken)); err != nil {
-		return err
+	if err := ctx.Integration.SetSecret("sessionToken", []byte(stsCredentials.SessionToken)); err != nil {
+		return nil, fmt.Errorf("failed to set session token secret: %w", err)
 	}
 
-	refreshAfter := time.Until(credentials.Expiration) / 2
+	refreshAfter := time.Until(stsCredentials.Expiration) / 2
 	if refreshAfter < time.Minute {
 		refreshAfter = time.Minute
 	}
@@ -303,13 +306,18 @@ func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration, ac
 		RoleArn:   config.RoleArn,
 		AccountID: accountID,
 		Region:    strings.TrimSpace(config.Region),
-		ExpiresAt: credentials.Expiration.Format(time.RFC3339),
+		ExpiresAt: stsCredentials.Expiration.Format(time.RFC3339),
 	}
 
-	return ctx.Integration.ScheduleResync(refreshAfter)
+	credentials, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get AWS credentials: %w", err)
+	}
+
+	return credentials, ctx.Integration.ScheduleResync(refreshAfter)
 }
 
-func (a *AWS) configureEventBridge(ctx core.SyncContext, config Configuration, metadata *common.IntegrationMetadata) error {
+func (a *AWS) configureEventBridge(ctx core.SyncContext, config Configuration, metadata *common.IntegrationMetadata, credentials *aws.Credentials) error {
 	//
 	// If event bridge metadata is already configured, do nothing.
 	//
@@ -334,7 +342,7 @@ func (a *AWS) configureEventBridge(ctx core.SyncContext, config Configuration, m
 	//
 	// Create API destination
 	//
-	apiDestination, err := a.createAPIDestination(ctx.Integration, ctx.HTTP, ctx.WebhooksBaseURL, region, tags, secret)
+	apiDestination, err := a.createAPIDestination(credentials, ctx.Integration, ctx.HTTP, ctx.WebhooksBaseURL, region, tags, secret)
 	if err != nil {
 		return fmt.Errorf("failed to create API destination: %w", err)
 	}
@@ -355,7 +363,7 @@ func (a *AWS) configureEventBridge(ctx core.SyncContext, config Configuration, m
  * we need a specific IAM role which has the necessary permissions to do so.
  * This role will be used by the SuperPlane triggers created to listen to AWS events.
  */
-func (a *AWS) configureRole(ctx core.SyncContext, metadata *common.IntegrationMetadata) error {
+func (a *AWS) configureRole(ctx core.SyncContext, metadata *common.IntegrationMetadata, credentials *aws.Credentials) error {
 
 	//
 	// If the IAM metadata is already configured, do nothing.
@@ -367,12 +375,7 @@ func (a *AWS) configureRole(ctx core.SyncContext, metadata *common.IntegrationMe
 	//
 	// Otherwise, create IAM role.
 	//
-	creds, err := common.CredentialsFromInstallation(ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to get AWS credentials: %w", err)
-	}
-
-	client := iam.NewClient(ctx.HTTP, creds)
+	client := iam.NewClient(ctx.HTTP, credentials)
 	roleName := a.roleName(ctx.Integration)
 	roleArn := ""
 
@@ -472,6 +475,7 @@ func roleNameFromArn(arn string) (string, bool) {
 }
 
 func (a *AWS) createAPIDestination(
+	credentials *aws.Credentials,
 	integration core.IntegrationContext,
 	http core.HTTPContext,
 	baseURL string,
@@ -479,12 +483,7 @@ func (a *AWS) createAPIDestination(
 	tags []common.Tag,
 	secret string,
 ) (*common.APIDestinationMetadata, error) {
-	creds, err := common.CredentialsFromInstallation(integration)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get AWS credentials: %w", err)
-	}
-
-	client := eventbridge.NewClient(http, creds, region)
+	client := eventbridge.NewClient(http, credentials, region)
 	name := fmt.Sprintf("superplane-%s", integration.ID().String())
 	connectionArn, err := a.ensureConnection(client, name, []byte(secret), tags)
 	if err != nil {
@@ -504,6 +503,7 @@ func (a *AWS) createAPIDestination(
 	}
 
 	return &common.APIDestinationMetadata{
+		Region:            region,
 		ConnectionArn:     connectionArn,
 		ApiDestinationArn: apiDestinationArn,
 	}, nil
@@ -697,8 +697,8 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 func (a *AWS) Actions() []core.Action {
 	return []core.Action{
 		{
-			Name:        "provisionDestination",
-			Description: "Provision an API destination for EventBridge",
+			Name:        "provisionRule",
+			Description: "Provision an EventBridge rule",
 			Parameters: []configuration.Field{
 				{
 					Name:        "region",
@@ -707,6 +707,20 @@ func (a *AWS) Actions() []core.Action {
 					Required:    true,
 					Description: "The region to provision the API destination in",
 				},
+				{
+					Name:        "source",
+					Label:       "Source",
+					Type:        configuration.FieldTypeString,
+					Required:    true,
+					Description: "The source to provision the rule for",
+				},
+				{
+					Name:        "detailType",
+					Label:       "Detail Type",
+					Type:        configuration.FieldTypeString,
+					Required:    true,
+					Description: "The detail type to provision the rule for",
+				},
 			},
 		},
 	}
@@ -714,16 +728,16 @@ func (a *AWS) Actions() []core.Action {
 
 func (a *AWS) HandleAction(ctx core.IntegrationActionContext) error {
 	switch ctx.Name {
-	case "provisionDestination":
-		return a.provisionDestination(ctx)
+	case "provisionRule":
+		return a.handleProvisionRule(ctx)
 
 	default:
 		return fmt.Errorf("unknown action: %s", ctx.Name)
 	}
 }
 
-func (a *AWS) provisionDestination(ctx core.IntegrationActionContext) error {
-	config := common.ProvisionDestinationParameters{}
+func (a *AWS) handleProvisionRule(ctx core.IntegrationActionContext) error {
+	config := common.ProvisionRuleParameters{}
 	if err := mapstructure.Decode(ctx.Parameters, &config); err != nil {
 		return fmt.Errorf("failed to decode parameters: %v", err)
 	}
@@ -737,17 +751,37 @@ func (a *AWS) provisionDestination(ctx core.IntegrationActionContext) error {
 		return fmt.Errorf("failed to decode metadata: %v", err)
 	}
 
+	credentials, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to get AWS credentials: %w", err)
+	}
+
 	//
 	// If destination already exists, do nothing.
 	//
-	_, ok := metadata.EventBridge.APIDestinations[config.Region]
-	if ok {
-		return nil
+	destination, err := a.provisionDestination(credentials, ctx.Logger, ctx.Integration, ctx.HTTP, ctx.WebhooksBaseURL, &metadata, config.Region)
+	if err != nil {
+		return fmt.Errorf("failed to provision destination: %w", err)
 	}
 
-	secrets, err := ctx.Integration.GetSecrets()
+	err = a.provisionRule(credentials, ctx.Logger, ctx.Integration, ctx.HTTP, &metadata, destination, config.Source, config.DetailType)
 	if err != nil {
-		return fmt.Errorf("failed to get integration secrets: %w", err)
+		return fmt.Errorf("failed to provision rule: %w", err)
+	}
+
+	ctx.Integration.SetMetadata(metadata)
+	return nil
+}
+
+func (a *AWS) provisionDestination(credentials *aws.Credentials, logger *logrus.Entry, ctx core.IntegrationContext, http core.HTTPContext, webhooksBaseURL string, metadata *common.IntegrationMetadata, region string) (*common.APIDestinationMetadata, error) {
+	v, ok := metadata.EventBridge.APIDestinations[region]
+	if ok {
+		return &v, nil
+	}
+
+	secrets, err := ctx.GetSecrets()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get integration secrets: %w", err)
 	}
 
 	var secret string
@@ -759,21 +793,125 @@ func (a *AWS) provisionDestination(ctx core.IntegrationActionContext) error {
 	}
 
 	if secret == "" {
-		return fmt.Errorf("connection secret not found")
+		return nil, fmt.Errorf("connection secret not found")
 	}
 
 	//
 	// Create API destination
 	//
-	apiDestination, err := a.createAPIDestination(ctx.Integration, ctx.HTTP, ctx.WebhooksBaseURL, config.Region, []common.Tag{}, secret)
+	newDestination, err := a.createAPIDestination(credentials, ctx, http, webhooksBaseURL, region, metadata.Tags, secret)
 	if err != nil {
-		return fmt.Errorf("failed to create API destination: %w", err)
+		return nil, fmt.Errorf("failed to create API destination: %w", err)
 	}
 
-	ctx.Logger.Infof("Created API destination %s for region %s", apiDestination.ApiDestinationArn, config.Region)
+	logger.Infof("Created API destination %s for region %s", newDestination.ApiDestinationArn, region)
+	metadata.EventBridge.APIDestinations[region] = *newDestination
+	return newDestination, nil
+}
 
-	metadata.EventBridge.APIDestinations[config.Region] = *apiDestination
-	ctx.Integration.SetMetadata(metadata)
+func (a *AWS) provisionRule(credentials *aws.Credentials, logger *logrus.Entry, integration core.IntegrationContext, http core.HTTPContext, metadata *common.IntegrationMetadata, destination *common.APIDestinationMetadata, source string, detailType string) error {
+	//
+	// If the rule does not exist yet, we create it.
+	//
+	rule, ok := metadata.EventBridge.Rules[source]
+	if !ok {
+		return a.createRule(credentials, logger, integration, http, metadata, destination, source, []string{detailType})
+	}
+
+	//
+	// If rule already exists, and already has the detail type we are interested in, do nothing.
+	//
+	if slices.Contains(rule.DetailTypes, detailType) {
+		return nil
+	}
+
+	//
+	// Otherwise, update the detail types for the rule.
+	//
+	newDetailTypes := append(rule.DetailTypes, detailType)
+	return a.updateRule(credentials, logger, integration, http, metadata, &rule, newDetailTypes)
+}
+
+func (a *AWS) updateRule(credentials *aws.Credentials, logger *logrus.Entry, integration core.IntegrationContext, http core.HTTPContext, metadata *common.IntegrationMetadata, rule *common.EventBridgeRuleMetadata, detailTypes []string) error {
+	client := eventbridge.NewClient(http, credentials, rule.Region)
+	pattern, err := json.Marshal(map[string]any{
+		"source":      []string{rule.Source},
+		"detail-type": detailTypes,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to marshal event pattern: %w", err)
+	}
+
+	ruleName := fmt.Sprintf("superplane-%s-%s", integration.ID().String(), rule.Source)
+	_, err = client.PutRule(ruleName, string(pattern), metadata.Tags)
+	if err != nil {
+		return fmt.Errorf("error updating EventBridge rule %s: %v", rule.RuleArn, err)
+	}
+
+	metadata.EventBridge.Rules[rule.Source] = common.EventBridgeRuleMetadata{
+		Source:      rule.Source,
+		Region:      rule.Region,
+		RuleArn:     rule.RuleArn,
+		DetailTypes: detailTypes,
+	}
+
+	logger.Infof("Updated EventBridge rule %s: %v", rule.RuleArn, detailTypes)
+
+	return nil
+}
+
+func (a *AWS) createRule(
+	credentials *aws.Credentials,
+	logger *logrus.Entry,
+	integration core.IntegrationContext,
+	http core.HTTPContext,
+	metadata *common.IntegrationMetadata,
+	destination *common.APIDestinationMetadata,
+	source string,
+	detailTypes []string,
+) error {
+	client := eventbridge.NewClient(http, credentials, destination.Region)
+	pattern, err := json.Marshal(map[string]any{
+		"source":      []string{source},
+		"detail-type": detailTypes,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to marshal event pattern: %w", err)
+	}
+
+	ruleName := fmt.Sprintf("superplane-%s-%s", integration.ID().String(), source)
+	ruleArn, err := client.PutRule(ruleName, string(pattern), metadata.Tags)
+	if err != nil {
+		return fmt.Errorf("error creating EventBridge rule for %s: %v", source, err)
+	}
+
+	err = client.PutTargets(ruleName, []eventbridge.Target{
+		{
+			ID:      "api-destination",
+			Arn:     destination.ApiDestinationArn,
+			RoleArn: metadata.IAM.TargetDestinationRoleArn,
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("error creating EventBridge target: %v", err)
+	}
+
+	if metadata.EventBridge.Rules == nil {
+		metadata.EventBridge.Rules = make(map[string]common.EventBridgeRuleMetadata)
+	}
+
+	metadata.EventBridge.Rules[source] = common.EventBridgeRuleMetadata{
+		Source:      source,
+		Region:      destination.Region,
+		RuleArn:     ruleArn,
+		DetailTypes: detailTypes,
+	}
+
+	logger.Infof("Created EventBridge rule %s: %v", ruleArn, detailTypes)
+
 	return nil
 }
 
