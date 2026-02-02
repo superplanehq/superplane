@@ -11,7 +11,36 @@ func boolPtr(b bool) *bool {
 	return &b
 }
 
-func TestRunWorkflow__ValidateBranchRestriction__DefaultBehavior(t *testing.T) {
+func TestRunWorkflow__ValidateBranchRestriction__DefaultBehavior_NoEnforcement(t *testing.T) {
+	r := &RunWorkflow{}
+
+	// When EnforceBranchRestriction is not set (nil), all branches should be allowed
+	// This is opt-in security to avoid breaking existing workflows
+	tests := []struct {
+		name string
+		ref  string
+	}{
+		{"main branch", "main"},
+		{"develop branch", "develop"},
+		{"feature branch", "feature/my-feature"},
+		{"random branch", "my-random-branch"},
+		{"commit SHA", "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := RunWorkflowSpec{
+				Ref: tt.ref,
+				// No EnforceBranchRestriction set - should not enforce
+			}
+
+			err := r.validateBranchRestriction(spec)
+			assert.NoError(t, err, "expected all refs to be allowed when enforcement is not enabled")
+		})
+	}
+}
+
+func TestRunWorkflow__ValidateBranchRestriction__EnforcedWithDefaults(t *testing.T) {
 	r := &RunWorkflow{}
 
 	tests := []struct {
@@ -37,8 +66,8 @@ func TestRunWorkflow__ValidateBranchRestriction__DefaultBehavior(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			spec := RunWorkflowSpec{
-				Ref: tt.ref,
-				// No AllowedBranches or EnforceBranchRestriction set - use defaults
+				Ref:                      tt.ref,
+				EnforceBranchRestriction: boolPtr(true), // Explicitly enable enforcement
 			}
 
 			err := r.validateBranchRestriction(spec)
@@ -56,8 +85,9 @@ func TestRunWorkflow__ValidateBranchRestriction__CustomAllowedBranches(t *testin
 	r := &RunWorkflow{}
 
 	spec := RunWorkflowSpec{
-		Ref:             "develop",
-		AllowedBranches: []string{"develop", "feature/*"},
+		Ref:                      "develop",
+		AllowedBranches:          []string{"develop", "feature/*"},
+		EnforceBranchRestriction: boolPtr(true), // Must enable enforcement
 	}
 
 	// develop should be allowed
@@ -95,8 +125,9 @@ func TestRunWorkflow__ValidateBranchRestriction__WildcardPatterns(t *testing.T) 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			spec := RunWorkflowSpec{
-				Ref:             tt.ref,
-				AllowedBranches: []string{tt.allowedPattern},
+				Ref:                      tt.ref,
+				AllowedBranches:          []string{tt.allowedPattern},
+				EnforceBranchRestriction: boolPtr(true), // Must enable enforcement
 			}
 
 			err := r.validateBranchRestriction(spec)
@@ -127,8 +158,9 @@ func TestRunWorkflow__ValidateBranchRestriction__BlocksCommitSHAs(t *testing.T) 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			spec := RunWorkflowSpec{
-				Ref:             tt.ref,
-				AllowedBranches: []string{tt.ref}, // Add to allowed list to isolate SHA check
+				Ref:                      tt.ref,
+				AllowedBranches:          []string{tt.ref}, // Add to allowed list to isolate SHA check
+				EnforceBranchRestriction: boolPtr(true),    // Must enable enforcement
 			}
 
 			err := r.validateBranchRestriction(spec)
@@ -160,8 +192,9 @@ func TestRunWorkflow__ValidateBranchRestriction__BlocksPullRequestRefs(t *testin
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			spec := RunWorkflowSpec{
-				Ref:             tt.ref,
-				AllowedBranches: []string{tt.ref}, // Add to allowed list to isolate PR check
+				Ref:                      tt.ref,
+				AllowedBranches:          []string{tt.ref}, // Add to allowed list to isolate PR check
+				EnforceBranchRestriction: boolPtr(true),    // Must enable enforcement
 			}
 
 			err := r.validateBranchRestriction(spec)
@@ -219,19 +252,28 @@ func TestRunWorkflow__ValidateBranchRestriction__EnforceBranchRestrictionTrue(t 
 func TestRunWorkflow__ValidateBranchRestriction__EnforceBranchRestrictionNil(t *testing.T) {
 	r := &RunWorkflow{}
 
-	// When EnforceBranchRestriction is nil (not set), should use secure defaults
-	spec := RunWorkflowSpec{
-		Ref:                      "main",
-		EnforceBranchRestriction: nil,
+	// When EnforceBranchRestriction is nil (not set), should NOT enforce (opt-in security)
+	// All branches should be allowed
+	tests := []struct {
+		name string
+		ref  string
+	}{
+		{"main branch", "main"},
+		{"develop branch", "develop"},
+		{"feature branch", "feature/my-feature"},
 	}
 
-	err := r.validateBranchRestriction(spec)
-	assert.NoError(t, err, "main should be allowed with defaults")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := RunWorkflowSpec{
+				Ref:                      tt.ref,
+				EnforceBranchRestriction: nil,
+			}
 
-	// develop is not in defaults
-	spec.Ref = "develop"
-	err = r.validateBranchRestriction(spec)
-	assert.Error(t, err, "develop should not be allowed with defaults")
+			err := r.validateBranchRestriction(spec)
+			assert.NoError(t, err, "all branches should be allowed when enforcement is nil (opt-in)")
+		})
+	}
 }
 
 func TestRunWorkflow__ValidateBranchRestriction__CustomBranchesWithEnforceTrue(t *testing.T) {

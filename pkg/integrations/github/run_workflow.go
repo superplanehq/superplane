@@ -644,9 +644,9 @@ func (r *RunWorkflow) buildInputs(ctx core.ExecutionContext, inputs []Input) map
 // validateBranchRestriction checks if the ref is an allowed branch.
 // This prevents triggering workflows on unreviewed branches/PRs which could contain malicious code.
 func (r *RunWorkflow) validateBranchRestriction(spec RunWorkflowSpec) error {
-	// If EnforceBranchRestriction is explicitly set to false, skip all validation
-	// This allows users to opt out of branch restrictions when needed
-	if spec.EnforceBranchRestriction != nil && !*spec.EnforceBranchRestriction {
+	// Branch restriction is opt-in: only enforce if explicitly enabled
+	// This avoids breaking existing workflows while allowing security-conscious users to enable it
+	if spec.EnforceBranchRestriction == nil || !*spec.EnforceBranchRestriction {
 		return nil
 	}
 
