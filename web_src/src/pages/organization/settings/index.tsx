@@ -177,7 +177,7 @@ export function OrganizationSettings() {
     },
     secrets: {
       title: "Secrets",
-      description: "Manage environment variables and sensitive data securely.",
+      description: "Store and manage secrets.",
     },
     profile: {
       title: "Profile",
