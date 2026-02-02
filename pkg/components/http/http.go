@@ -836,3 +836,7 @@ func (e *HTTP) Cancel(ctx core.ExecutionContext) error {
 func (e *HTTP) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
+
+func (e *HTTP) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

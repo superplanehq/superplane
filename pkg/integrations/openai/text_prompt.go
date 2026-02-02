@@ -213,3 +213,7 @@ func extractResponseText(response *OpenAIResponse) string {
 
 	return builder.String()
 }
+
+func (c *CreateResponse) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

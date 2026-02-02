@@ -187,3 +187,7 @@ func (p *OnPipelineDone) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 
 	return http.StatusOK, nil
 }
+
+func (p *OnPipelineDone) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}

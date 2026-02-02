@@ -435,3 +435,7 @@ func (c *CreateRelease) HandleAction(ctx core.ActionContext) error {
 func (c *CreateRelease) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
+
+func (c *CreateRelease) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

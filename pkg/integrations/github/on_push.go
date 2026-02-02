@@ -200,3 +200,7 @@ func isBranchDeletionEvent(data map[string]any) bool {
 
 	return deleted
 }
+
+func (p *OnPush) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}

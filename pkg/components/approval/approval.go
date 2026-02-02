@@ -795,3 +795,7 @@ func mapKeys(input map[string]struct{}) []string {
 	}
 	return result
 }
+
+func (a *Approval) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

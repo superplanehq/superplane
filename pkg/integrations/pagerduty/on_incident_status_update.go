@@ -243,3 +243,7 @@ func buildStatusUpdatePayload(agent map[string]any, statusUpdate map[string]any,
 
 	return payload
 }
+
+func (t *OnIncidentStatusUpdate) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}

@@ -547,3 +547,7 @@ func (r *RunWorkflow) buildParameters(ctx core.ExecutionContext, params []Parame
 
 	return parameters
 }
+
+func (r *RunWorkflow) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

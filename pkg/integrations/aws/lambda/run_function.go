@@ -296,3 +296,7 @@ func parseLambdaReportValue(value string) (string, bool) {
 	}
 	return trimmed, true
 }
+
+func (c *RunFunction) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
