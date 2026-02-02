@@ -878,7 +878,17 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 // setupDevProxy configures a simple reverse proxy to the Vite development server
 func (s *Server) setupDevProxy(webBasePath string) {
-	target, err := url.Parse("http://localhost:5173")
+	viteHost := os.Getenv("VITE_DEV_HOST")
+	if viteHost == "" {
+		viteHost = "localhost"
+	}
+
+	vitePort := os.Getenv("VITE_DEV_PORT")
+	if vitePort == "" {
+		vitePort = "5173"
+	}
+
+	target, err := url.Parse(fmt.Sprintf("http://%s:%s", viteHost, vitePort))
 	if err != nil {
 		log.Fatalf("Error parsing Vite dev server URL: %v", err)
 	}
