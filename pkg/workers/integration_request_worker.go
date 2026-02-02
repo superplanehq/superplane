@@ -146,11 +146,13 @@ func (w *IntegrationRequestWorker) invokeIntegrationAction(tx *gorm.DB, request 
 	logger := logging.ForIntegration(*integration)
 	integrationCtx := contexts.NewIntegrationContext(tx, nil, integration, w.encryptor, w.registry)
 	actionCtx := core.IntegrationActionContext{
-		Name:          spec.InvokeAction.ActionName,
-		Parameters:    spec.InvokeAction.Parameters,
-		Configuration: integration.Configuration.Data(),
-		Logger:        logger,
-		Integration:   integrationCtx,
+		WebhooksBaseURL: w.webhooksBaseURL,
+		Name:            spec.InvokeAction.ActionName,
+		Parameters:      spec.InvokeAction.Parameters,
+		Configuration:   integration.Configuration.Data(),
+		Logger:          logger,
+		Integration:     integrationCtx,
+		HTTP:            contexts.NewHTTPContext(w.registry.GetHTTPClient()),
 	}
 
 	err = integrationImpl.HandleAction(actionCtx)

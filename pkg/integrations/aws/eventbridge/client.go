@@ -131,12 +131,11 @@ func (c *Client) DeleteApiDestination(name string) error {
 	return c.postJSON("DeleteApiDestination", payload, nil)
 }
 
-func (c *Client) PutRule(name, pattern, description string, tags []common.Tag) (string, error) {
+func (c *Client) PutRule(name, pattern string, tags []common.Tag) (string, error) {
 	payload := map[string]any{
 		"Name":         name,
 		"EventPattern": pattern,
 		"State":        "ENABLED",
-		"Description":  description,
 	}
 
 	if tagPayload := common.NormalizeTags(tags); len(tagPayload) > 0 {

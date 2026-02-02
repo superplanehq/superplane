@@ -20,7 +20,9 @@ import (
 )
 
 const (
-	defaultSessionDurationSecs = 3600
+	defaultSessionDurationSecs      = 3600
+	APIKeyHeaderName                = "X-Superplane-Secret"
+	EventBridgeConnectionSecretName = "eventbridge.connection.secret"
 )
 
 func init() {
@@ -244,18 +246,23 @@ func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration, me
 }
 
 func (a *AWS) configureEventBridge(ctx core.SyncContext, config Configuration, metadata *common.IntegrationMetadata) error {
+	//
+	// If event bridge is already configured, do not do anything.
+	//
+	if metadata.EventBridge != nil {
+		return nil
+	}
+
 	region := strings.TrimSpace(common.RegionFromInstallation(ctx.Integration))
 	if region == "" {
 		return fmt.Errorf("region is required")
 	}
 
 	tags := common.NormalizeTags(config.Tags)
-	creds, err := common.CredentialsFromInstallation(ctx.Integration)
-	if err != nil {
-		return err
-	}
 
-	client := eventbridge.NewClient(ctx.HTTP, creds, region)
+	//
+	// Generate a random string for the connection secret.
+	//
 	secret, err := crypto.Base64String(32)
 	if err != nil {
 		return fmt.Errorf("failed to generate random string for connection secret: %w", err)
@@ -266,34 +273,109 @@ func (a *AWS) configureEventBridge(ctx core.SyncContext, config Configuration, m
 		return fmt.Errorf("failed to save connection secret: %w", err)
 	}
 
-	name := fmt.Sprintf("superplane-%s", ctx.Integration.ID().String())
-	connectionArn, err := ensureConnection(client, name, []byte(secret), tags)
+	//
+	// Create API destination
+	//
+	apiDestination, err := a.createAPIDestination(ctx.Integration, ctx.HTTP, ctx.WebhooksBaseURL, region, tags, secret)
 	if err != nil {
-		return err
-	}
-
-	apiDestinationArn, err := ensureApiDestination(
-		client,
-		fmt.Sprintf("superplane-%s", ctx.Integration.ID().String()),
-		connectionArn,
-		ctx.WebhooksBaseURL+"/api/v1/integrations/"+ctx.Integration.ID().String()+"/events",
-		tags,
-	)
-
-	if err != nil {
-		return err
+		return fmt.Errorf("failed to create API destination: %w", err)
 	}
 
 	metadata.EventBridge = &common.EventBridgeMetadata{
 		APIDestinations: map[string]common.APIDestinationMetadata{
-			region: {
-				ConnectionArn:     connectionArn,
-				ApiDestinationArn: apiDestinationArn,
-			},
+			region: *apiDestination,
 		},
 	}
 
 	return nil
+}
+
+func (a *AWS) createAPIDestination(
+	integration core.IntegrationContext,
+	http core.HTTPContext,
+	baseURL string,
+	region string,
+	tags []common.Tag,
+	secret string,
+) (*common.APIDestinationMetadata, error) {
+	creds, err := common.CredentialsFromInstallation(integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get AWS credentials: %w", err)
+	}
+
+	client := eventbridge.NewClient(http, creds, region)
+	name := fmt.Sprintf("superplane-%s", integration.ID().String())
+	connectionArn, err := a.ensureConnection(client, name, []byte(secret), tags)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connection: %w", err)
+	}
+
+	apiDestinationArn, err := a.ensureApiDestination(
+		client,
+		fmt.Sprintf("superplane-%s", integration.ID().String()),
+		connectionArn,
+		baseURL+"/api/v1/integrations/"+integration.ID().String()+"/events",
+		tags,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create API destination: %w", err)
+	}
+
+	return &common.APIDestinationMetadata{
+		ConnectionArn:     connectionArn,
+		ApiDestinationArn: apiDestinationArn,
+	}, nil
+}
+
+func (a *AWS) ensureConnection(client *eventbridge.Client, name string, secret []byte, tags []common.Tag) (string, error) {
+	connectionArn, err := client.CreateConnection(name, APIKeyHeaderName, string(secret), tags)
+	if err == nil {
+		if err := client.TagResource(connectionArn, tags); err != nil {
+			return "", err
+		}
+		return connectionArn, nil
+	}
+
+	if !common.IsAlreadyExistsErr(err) {
+		return "", err
+	}
+
+	connectionArn, err = client.DescribeConnection(name)
+	if err != nil {
+		return "", err
+	}
+
+	if err := client.TagResource(connectionArn, tags); err != nil {
+		return "", err
+	}
+
+	return connectionArn, nil
+}
+
+func (a *AWS) ensureApiDestination(client *eventbridge.Client, name, connectionArn, url string, tags []common.Tag) (string, error) {
+	apiDestinationArn, err := client.CreateApiDestination(name, connectionArn, url, tags)
+	if err == nil {
+		if err := client.TagResource(apiDestinationArn, tags); err != nil {
+			return "", err
+		}
+		return apiDestinationArn, nil
+	}
+
+	if !common.IsAlreadyExistsErr(err) {
+		return "", err
+	}
+
+	apiDestinationArn, err = client.DescribeApiDestination(name)
+	if err != nil {
+		return "", err
+	}
+
+	if err := client.TagResource(apiDestinationArn, tags); err != nil {
+		return "", err
+	}
+
+	return apiDestinationArn, nil
 }
 
 func (a *AWS) HandleRequest(ctx core.HTTPRequestContext) {
@@ -469,69 +551,96 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	}
 }
 
+func (a *AWS) Actions() []core.Action {
+	return []core.Action{
+		{
+			Name:        "provisionDestination",
+			Description: "Provision an API destination for EventBridge",
+			Parameters: []configuration.Field{
+				{
+					Name:        "region",
+					Label:       "Region",
+					Type:        configuration.FieldTypeString,
+					Required:    true,
+					Description: "The region to provision the API destination in",
+				},
+			},
+		},
+	}
+}
+
+func (a *AWS) HandleAction(ctx core.IntegrationActionContext) error {
+	switch ctx.Name {
+	case "provisionDestination":
+		return a.provisionDestination(ctx)
+
+	default:
+		return fmt.Errorf("unknown action: %s", ctx.Name)
+	}
+}
+
+func (a *AWS) provisionDestination(ctx core.IntegrationActionContext) error {
+	config := common.ProvisionDestinationParameters{}
+	if err := mapstructure.Decode(ctx.Parameters, &config); err != nil {
+		return fmt.Errorf("failed to decode parameters: %v", err)
+	}
+
+	if config.Region == "" {
+		return fmt.Errorf("region is required")
+	}
+
+	metadata := common.IntegrationMetadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %v", err)
+	}
+
+	//
+	// If destination already exists, do nothing.
+	//
+	_, ok := metadata.EventBridge.APIDestinations[config.Region]
+	if ok {
+		return nil
+	}
+
+	secrets, err := ctx.Integration.GetSecrets()
+	if err != nil {
+		return fmt.Errorf("failed to get integration secrets: %w", err)
+	}
+
+	var secret string
+	for _, s := range secrets {
+		if s.Name == EventBridgeConnectionSecretName {
+			secret = string(s.Value)
+			break
+		}
+	}
+
+	if secret == "" {
+		return fmt.Errorf("connection secret not found")
+	}
+
+	//
+	// Create API destination
+	//
+	apiDestination, err := a.createAPIDestination(ctx.Integration, ctx.HTTP, ctx.WebhooksBaseURL, config.Region, []common.Tag{}, secret)
+	if err != nil {
+		return fmt.Errorf("failed to create API destination: %w", err)
+	}
+
+	metadata.EventBridge.APIDestinations[config.Region] = *apiDestination
+	ctx.Integration.SetMetadata(metadata)
+	return nil
+}
+
+/*
+ * No additional webhook endpoints are used for AWS triggers.
+ * Events from AWS are received through the API destinations configured
+ * in the integration itself, using the integration HTTP URL.
+ */
 func (a *AWS) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	// no-op
 	return nil, nil
 }
 
 func (a *AWS) CleanupWebhook(ctx core.CleanupWebhookContext) error {
-	// no-op
-	return nil
-}
-
-// func CleanupWebhook(ctx core.CleanupWebhookContext) error {
-// 	metadata := WebhookMetadata{}
-// 	if err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &metadata); err != nil {
-// 		return fmt.Errorf("error decoding webhook metadata: %w", err)
-// 	}
-
-// 	creds, err := common.CredentialsFromInstallation(ctx.Integration)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	region := strings.TrimSpace(common.RegionFromInstallation(ctx.Integration))
-// 	if region == "" {
-// 		return fmt.Errorf("region is required")
-// 	}
-
-// 	client := eventbridge.NewClient(ctx.HTTP, creds, region)
-
-// 	if metadata.RuleName != "" && metadata.TargetID != "" {
-// 		err := client.RemoveTargets(metadata.RuleName, []string{metadata.TargetID})
-// 		if err != nil && !common.IsNotFoundErr(err) {
-// 			return err
-// 		}
-// 	}
-
-// 	if metadata.RuleName != "" {
-// 		err := client.DeleteRule(metadata.RuleName)
-// 		if err != nil && !common.IsNotFoundErr(err) {
-// 			return err
-// 		}
-// 	}
-
-// 	if metadata.ApiDestinationName != "" {
-// 		err := client.DeleteApiDestination(metadata.ApiDestinationName)
-// 		if err != nil && !common.IsNotFoundErr(err) {
-// 			return err
-// 		}
-// 	}
-
-// 	if metadata.ConnectionName != "" {
-// 		err := client.DeleteConnection(metadata.ConnectionName)
-// 		if err != nil && !common.IsNotFoundErr(err) {
-// 			return err
-// 		}
-// 	}
-
-// 	return nil
-// }
-
-func (a *AWS) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (a *AWS) HandleAction(ctx core.IntegrationActionContext) error {
 	return nil
 }

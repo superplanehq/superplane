@@ -1,13 +1,10 @@
 package ecr
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -23,11 +20,10 @@ type OnImageScanConfiguration struct {
 }
 
 type OnImageScanMetadata struct {
-	Region         string      `json:"region" mapstructure:"region"`
-	Repository     *Repository `json:"repository" mapstructure:"repository"`
-	SubscriptionID string      `json:"subscriptionId" mapstructure:"subscriptionId"`
-	RuleArn        string      `json:"ruleArn" mapstructure:"ruleArn"`
-	TargetID       string      `json:"targetId" mapstructure:"targetId"`
+	Region         string                    `json:"region" mapstructure:"region"`
+	SubscriptionID string                    `json:"subscriptionId" mapstructure:"subscriptionId"`
+	Repository     *Repository               `json:"repository" mapstructure:"repository"`
+	Rule           *eventbridge.RuleMetadata `json:"rule" mapstructure:"rule"`
 }
 
 func (p *OnImageScan) Name() string {
@@ -122,7 +118,7 @@ func (p *OnImageScan) Setup(ctx core.TriggerContext) error {
 	//
 	// EventBridge rule and target have been setup already.
 	//
-	if metadata.Repository != nil && metadata.RuleArn != "" && repositoryMatchesRef(metadata.Repository, config.Repository) {
+	if metadata.Repository != nil && metadata.Rule != nil && repositoryMatchesRef(metadata.Repository, config.Repository) {
 		return nil
 	}
 
@@ -134,18 +130,6 @@ func (p *OnImageScan) Setup(ctx core.TriggerContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to decode integration metadata: %w", err)
 	}
-
-	region := strings.TrimSpace(common.RegionFromInstallation(ctx.Integration))
-	if region == "" {
-		return fmt.Errorf("region is required")
-	}
-
-	creds, err := common.CredentialsFromInstallation(ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to get AWS credentials: %w", err)
-	}
-
-	client := eventbridge.NewClient(ctx.HTTP, creds, region)
 
 	//
 	// If an API destination does not yet exist in the region,
@@ -170,11 +154,40 @@ func (p *OnImageScan) Setup(ctx core.TriggerContext) error {
 		)
 	}
 
-	//
-	// If an API destination exists in the region,
-	// we can use it to subscribe to ECR image scan events.
-	//
-	return p.createSubscription(ctx.Integration, ctx.Metadata, client, apiDestination.ApiDestinationArn, repository)
+	ruleMetadata, err := eventbridge.CreateRule(
+		ctx.Integration,
+		ctx.HTTP,
+		config.Region,
+		apiDestination.ApiDestinationArn,
+		p.eventPattern(),
+		integrationMetadata.Tags,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to create rule and subscribe: %w", err)
+	}
+
+	subscriptionID, err := ctx.Integration.Subscribe(p.eventPattern())
+	if err != nil {
+		return fmt.Errorf("failed to subscribe: %w", err)
+	}
+
+	return ctx.Metadata.Set(OnImageScanMetadata{
+		Region:         config.Region,
+		SubscriptionID: subscriptionID.String(),
+		Repository:     repository,
+		Rule:           ruleMetadata,
+	})
+}
+
+func (p *OnImageScan) eventPattern() *common.EventBridgeEvent {
+	return &common.EventBridgeEvent{
+		DetailType: "ECR Image Scan",
+		Source:     "aws.ecr",
+		Detail: map[string]any{
+			"scan-status": "COMPLETE",
+		},
+	}
 }
 
 func (p *OnImageScan) Actions() []core.Action {
@@ -196,81 +209,6 @@ func (p *OnImageScan) HandleAction(ctx core.TriggerActionContext) (map[string]an
 	}
 }
 
-func (p *OnImageScan) createSubscription(
-	integrationCtx core.IntegrationContext,
-	metadataCtx core.MetadataContext,
-	client *eventbridge.Client,
-	apiDestinationArn string,
-	repository *Repository,
-) error {
-	integrationMetadata := common.IntegrationMetadata{}
-	err := mapstructure.Decode(integrationCtx.GetMetadata(), &integrationMetadata)
-	if err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
-	}
-
-	//
-	// NOTE: we intentionally do not include the repository-name
-	// in the event pattern to allow the user to change the repository,
-	// without us having to update the rule.
-	//
-	eventPattern, err := json.Marshal(map[string]any{
-		"source":      []string{"aws.ecr"},
-		"detail-type": []string{"ECR Image Scan"},
-		"detail": map[string]any{
-			"scan-status": []string{"COMPLETE"},
-		},
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to marshal event pattern: %w", err)
-	}
-
-	targetID := uuid.NewString()
-	ruleName := fmt.Sprintf("superplane-%s", uuid.NewString())
-	ruleArn, err := client.PutRule(ruleName, string(eventPattern), "SuperPlane ECR webhook rule", integrationMetadata.Tags)
-	if err != nil {
-		return fmt.Errorf("error creating EventBridge rule: %v", err)
-	}
-
-	if err := client.TagResource(ruleArn, integrationMetadata.Tags); err != nil {
-		return fmt.Errorf("error tagging EventBridge rule: %v", err)
-	}
-
-	err = client.PutTargets(ruleName, []eventbridge.Target{
-		{
-			ID:  targetID,
-			Arn: apiDestinationArn,
-		},
-	})
-
-	if err != nil {
-		return fmt.Errorf("error creating EventBridge target: %v", err)
-	}
-
-	subscriptionID, err := integrationCtx.Subscribe(
-		common.EventBridgeEvent{
-			DetailType: "ECR Image Scan",
-			Source:     "aws.ecr",
-			Detail: map[string]any{
-				"scan-status":     "COMPLETE",
-				"repository-name": repository.RepositoryName,
-			},
-		},
-	)
-
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to ECR image scan events: %w", err)
-	}
-
-	return metadataCtx.Set(OnImageScanMetadata{
-		SubscriptionID: subscriptionID.String(),
-		Repository:     repository,
-		RuleArn:        ruleArn,
-		TargetID:       targetID,
-	})
-}
-
 func (p *OnImageScan) checkDestinationAvailability(ctx core.TriggerActionContext) (map[string]any, error) {
 	metadata := OnImageScanMetadata{}
 	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
@@ -289,18 +227,27 @@ func (p *OnImageScan) checkDestinationAvailability(ctx core.TriggerActionContext
 		return nil, fmt.Errorf("API destination not found for region: %s", metadata.Region)
 	}
 
-	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	ruleMetadata, err := eventbridge.CreateRule(
+		ctx.Integration,
+		ctx.HTTP,
+		metadata.Region,
+		apiDestination.ApiDestinationArn,
+		p.eventPattern(),
+		integrationMetadata.Tags,
+	)
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to get AWS credentials: %w", err)
+		return nil, fmt.Errorf("failed to create rule: %w", err)
 	}
 
-	return nil, p.createSubscription(
-		ctx.Integration,
-		ctx.Metadata,
-		eventbridge.NewClient(ctx.HTTP, creds, metadata.Region),
-		apiDestination.ApiDestinationArn,
-		metadata.Repository,
-	)
+	subscriptionID, err := ctx.Integration.Subscribe(p.eventPattern())
+	if err != nil {
+		return nil, fmt.Errorf("failed to subscribe: %w", err)
+	}
+
+	metadata.Rule = ruleMetadata
+	metadata.SubscriptionID = subscriptionID.String()
+	return nil, ctx.Metadata.Set(metadata)
 }
 
 func (p *OnImageScan) OnIntegrationMessage(ctx core.IntegrationMessageContext) error {

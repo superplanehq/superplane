@@ -72,6 +72,7 @@ func (c *IntegrationSubscriptionContext) sendMessageToComponent(message any) err
 
 	return integrationComponent.OnIntegrationMessage(core.IntegrationMessageContext{
 		Configuration: c.node.Configuration.Data(),
+		NodeMetadata:  NewNodeMetadataContext(c.tx, c.node),
 		Integration:   c.integrationCtx,
 		Events:        NewEventContext(c.tx, c.node),
 		Message:       message,
@@ -98,6 +99,7 @@ func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error
 
 	return integrationTrigger.OnIntegrationMessage(core.IntegrationMessageContext{
 		Configuration: c.node.Configuration.Data(),
+		NodeMetadata:  NewNodeMetadataContext(c.tx, c.node),
 		Integration:   c.integrationCtx,
 		Message:       message,
 		Events:        NewEventContext(c.tx, c.node),
