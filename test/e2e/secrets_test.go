@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
@@ -95,8 +96,16 @@ func (s *SecretsSteps) visitSecretsPage() {
 }
 
 func (s *SecretsSteps) clickCreateSecret() {
-	createButton := q.Text("Create Secret")
-	s.session.Click(createButton)
+	// Try to find either "Create Secret" or "Create your first secret" button
+	// First try "Create Secret", then fall back to "Create your first secret"
+	page := s.session.Page()
+	createButtonLocator := page.Locator("text=Create Secret")
+	if count, _ := createButtonLocator.Count(); count == 0 {
+		createButtonLocator = page.Locator("text=Create your first secret")
+	}
+	if err := createButtonLocator.First().Click(); err != nil {
+		s.t.Fatalf("clicking create secret button: %v", err)
+	}
 	s.session.Sleep(500)
 }
 
@@ -145,9 +154,36 @@ func (s *SecretsSteps) removeKeyValuePair(index int) {
 }
 
 func (s *SecretsSteps) submitCreateSecret() {
-	createButton := q.Text("Create Secret")
-	s.session.Click(createButton)
-	s.session.Sleep(1000)
+	// Find the button within the modal - wait for it to be visible
+	page := s.session.Page()
+	createButton := page.Locator("button:has-text('Create Secret')")
+
+	// Wait for the button to be visible
+	if err := createButton.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible}); err != nil {
+		s.t.Fatalf("waiting for create secret button: %v", err)
+	}
+
+	// Wait a bit for any form validation to complete
+	s.session.Sleep(300)
+
+	// Click the button
+	if err := createButton.First().Click(); err != nil {
+		s.t.Fatalf("clicking submit create secret button: %v", err)
+	}
+
+	// Wait for the modal to close (indicating success) or for an error message
+	// The modal has class "fixed inset-0", so we wait for it to disappear
+	modal := page.Locator(".fixed.inset-0")
+	if err := modal.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateHidden, Timeout: pw.Float(5000)}); err != nil {
+		// Modal didn't close - check for error message
+		errorMsg := page.Locator("text=/Failed to create secret/")
+		if count, _ := errorMsg.Count(); count > 0 {
+			s.t.Fatalf("secret creation failed with error message")
+		}
+		s.t.Fatalf("modal did not close after submitting: %v", err)
+	}
+
+	s.session.Sleep(500)
 }
 
 func (s *SecretsSteps) submitUpdateSecret() {
