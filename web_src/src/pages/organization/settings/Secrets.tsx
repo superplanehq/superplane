@@ -1,24 +1,22 @@
 import { Icon } from "@/components/Icon";
 import { PermissionTooltip } from "@/components/PermissionGate";
+import { Link } from "@/components/Link/link";
 import { Textarea } from "@/components/Textarea/textarea";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/Table/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { getApiErrorMessage } from "@/utils/errors";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
-import { Edit2, Eye, EyeOff, Key, Loader2, Plus, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import type { SecretsSecret } from "../../../api-client/types.gen";
+import { Key, Loader2, Plus, Trash2 } from "lucide-react";
+import { useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   useCreateSecret,
-  useDeleteSecret,
-  useSecret,
   useSecrets,
-  useUpdateSecret,
   type CreateSecretParams,
-  type UpdateSecretParams,
-} from "../../../hooks/useSecrets";
+} from "@/hooks/useSecrets";
 
 interface SecretsProps {
   organizationId: string;
@@ -30,41 +28,16 @@ interface KeyValuePair {
 }
 
 export function Secrets({ organizationId }: SecretsProps) {
+  const navigate = useNavigate();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [editingSecret, setEditingSecret] = useState<SecretsSecret | null>(null);
   const [secretName, setSecretName] = useState("");
   const [keyValuePairs, setKeyValuePairs] = useState<KeyValuePair[]>([{ name: "", value: "" }]);
-  const [visibleValues, setVisibleValues] = useState<Set<string>>(new Set());
   const canCreateSecrets = canAct("secrets", "create");
-  const canUpdateSecrets = canAct("secrets", "update");
-  const canDeleteSecrets = canAct("secrets", "delete");
-  const modalContentRef = useRef<HTMLDivElement>(null);
+  const modalContentRef = useRef<HTMLFormElement>(null);
 
   const { data: secrets = [], isLoading } = useSecrets(organizationId, "DOMAIN_TYPE_ORGANIZATION");
-  const editingSecretId = editingSecret?.metadata?.id ?? "";
-  const { data: editingSecretDetail } = useSecret(
-    organizationId,
-    "DOMAIN_TYPE_ORGANIZATION",
-    editingSecretId,
-  );
   const createSecretMutation = useCreateSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION");
-  const deleteSecretMutation = useDeleteSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION");
-  const updateSecretMutation = useUpdateSecret(
-    organizationId,
-    "DOMAIN_TYPE_ORGANIZATION",
-    editingSecretId,
-  );
-  const canWriteSecrets = editingSecret ? canUpdateSecrets : canCreateSecrets;
-
-  // When Edit modal opens, populate form from DescribeSecret so we always have keys (and masked values)
-  useEffect(() => {
-    if (!editingSecretId || !editingSecretDetail) return;
-    const secretData = editingSecretDetail.spec?.local?.data || {};
-    const pairs = Object.entries(secretData).map(([name, value]) => ({ name, value }));
-    setSecretName(editingSecretDetail.metadata?.name || "");
-    setKeyValuePairs(pairs.length > 0 ? pairs : [{ name: "", value: "" }]);
-  }, [editingSecretId, editingSecretDetail]);
 
   const handleCreateClick = () => {
     if (!canCreateSecrets) return;
@@ -73,30 +46,18 @@ export function Secrets({ organizationId }: SecretsProps) {
     setIsCreateModalOpen(true);
   };
 
-  const handleEditClick = (secret: SecretsSecret) => {
-    if (!canUpdateSecrets) return;
-    const secretData = secret.spec?.local?.data || {};
-    const pairs = Object.entries(secretData).map(([name, value]) => ({ name, value }));
-    setSecretName(secret.metadata?.name || "");
-    setKeyValuePairs(pairs.length > 0 ? pairs : [{ name: "", value: "" }]);
-    setEditingSecret(secret);
-  };
-
-  const handleCloseModal = () => {
+  const handleCloseCreateModal = () => {
     setIsCreateModalOpen(false);
-    setEditingSecret(null);
     setSecretName("");
     setKeyValuePairs([{ name: "", value: "" }]);
     createSecretMutation.reset();
   };
 
-  // Read current key/value pairs from the DOM so submission reflects what's visible
-  // (e.g. when automation fills inputs without triggering React's onChange).
   const getKeyValuePairsFromForm = (): KeyValuePair[] => {
-    const container = modalContentRef.current;
-    if (!container) return keyValuePairs;
-    const keyInputs = container.querySelectorAll<HTMLInputElement>('input[placeholder="Key"]');
-    const valueInputs = container.querySelectorAll<HTMLTextAreaElement>('textarea[placeholder="Value"]');
+    const form = modalContentRef.current;
+    if (!form) return keyValuePairs;
+    const keyInputs = form.querySelectorAll<HTMLInputElement>('input[placeholder="Key"]');
+    const valueInputs = form.querySelectorAll<HTMLTextAreaElement>('textarea[placeholder="Value"]');
     const pairs: KeyValuePair[] = [];
     const len = Math.min(keyInputs.length, valueInputs.length);
     for (let i = 0; i < len; i++) {
@@ -111,91 +72,31 @@ export function Secrets({ organizationId }: SecretsProps) {
       showErrorToast("Secret name is required");
       return;
     }
-
     const formPairs = getKeyValuePairsFromForm();
-    const validPairs = formPairs.filter((pair) => pair.name.trim() && pair.value.trim());
+    const validPairs = formPairs.filter((p) => p.name.trim() && p.value.trim());
     if (validPairs.length === 0) {
       showErrorToast("At least one key-value pair is required");
       return;
     }
-
-    // Check for duplicate keys
-    const keys = validPairs.map((pair) => pair.name.trim());
+    const keys = validPairs.map((p) => p.name.trim());
     if (new Set(keys).size !== keys.length) {
       showErrorToast("Duplicate key names are not allowed");
       return;
     }
-
     try {
       const params: CreateSecretParams = {
         name: secretName.trim(),
-        environmentVariables: validPairs.map((pair) => ({
-          name: pair.name.trim(),
-          value: pair.value.trim(),
-        })),
+        environmentVariables: validPairs.map((p) => ({ name: p.name.trim(), value: p.value.trim() })),
       };
-      await createSecretMutation.mutateAsync(params);
+      const result = await createSecretMutation.mutateAsync(params);
       showSuccessToast("Secret created successfully");
-      handleCloseModal();
+      handleCloseCreateModal();
+      const newSecretId = result?.data?.secret?.metadata?.id;
+      if (newSecretId) {
+        navigate(`/${organizationId}/settings/secrets/${newSecretId}`);
+      }
     } catch (error) {
       showErrorToast(`Failed to create secret: ${getApiErrorMessage(error)}`);
-    }
-  };
-
-  const handleUpdate = async () => {
-    if (!canUpdateSecrets) return;
-    if (!editingSecret || !secretName?.trim()) {
-      showErrorToast("Secret name is required");
-      return;
-    }
-
-    const formPairs = getKeyValuePairsFromForm();
-    const validPairs = formPairs.filter((pair) => pair.name.trim() && pair.value.trim());
-    if (validPairs.length === 0) {
-      showErrorToast("At least one key-value pair is required");
-      return;
-    }
-
-    // Check for duplicate keys
-    const keys = validPairs.map((pair) => pair.name.trim());
-    if (new Set(keys).size !== keys.length) {
-      showErrorToast("Duplicate key names are not allowed");
-      return;
-    }
-
-    try {
-      const params: UpdateSecretParams = {
-        name: secretName.trim(),
-        environmentVariables: validPairs.map((pair) => ({
-          name: pair.name.trim(),
-          value: pair.value.trim(),
-        })),
-        // Resend the secret's provider (fallback to LOCAL since UI only supports local secrets)
-        provider: editingSecret.spec?.provider ?? "PROVIDER_LOCAL",
-      };
-      await updateSecretMutation.mutateAsync(params);
-      showSuccessToast("Secret updated successfully");
-      handleCloseModal();
-    } catch (error) {
-      showErrorToast(`Failed to update secret: ${getApiErrorMessage(error)}`);
-    }
-  };
-
-  const handleDelete = async (secret: SecretsSecret) => {
-    if (!canDeleteSecrets) return;
-    if (!secret.metadata?.id) return;
-
-    if (
-      !confirm(`Are you sure you want to delete the secret "${secret.metadata.name}"? This action cannot be undone.`)
-    ) {
-      return;
-    }
-
-    try {
-      await deleteSecretMutation.mutateAsync(secret.metadata.id);
-      showSuccessToast("Secret deleted successfully");
-    } catch (error) {
-      showErrorToast(`Failed to delete secret: ${getApiErrorMessage(error)}`);
     }
   };
 
@@ -207,306 +108,222 @@ export function Secrets({ organizationId }: SecretsProps) {
     setKeyValuePairs(keyValuePairs.filter((_, i) => i !== index));
   };
 
-  const updateKeyValuePair = (index: number, field: "name" | "value", value: string) => {
-    const updated = [...keyValuePairs];
-    updated[index] = { ...updated[index], [field]: value };
-    setKeyValuePairs(updated);
-  };
-
-  const toggleValueVisibility = (secretId: string) => {
-    const newVisible = new Set(visibleValues);
-    if (newVisible.has(secretId)) {
-      newVisible.delete(secretId);
-    } else {
-      newVisible.add(secretId);
-    }
-    setVisibleValues(newVisible);
-  };
+  const getSecretDetailPath = (id: string) => `/${organizationId}/settings/secrets/${id}`;
 
   if (isLoading) {
     return (
-      <div className="pt-6">
-        <div className="flex justify-center items-center h-32">
-          <p className="text-gray-500 dark:text-gray-400">Loading secrets...</p>
+      <div className="space-y-6 pt-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
+          <div className="px-6 pb-6 min-h-96 flex justify-center items-center">
+            <p className="text-gray-500 dark:text-gray-400">Loading secrets...</p>
+          </div>
         </div>
       </div>
     );
   }
 
+  const sortedSecrets = [...secrets].sort((a, b) =>
+    (a.metadata?.name || "").localeCompare(b.metadata?.name || ""),
+  );
+
   return (
-    <div className="pt-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-lg font-medium mb-2">Secrets</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Manage key-value pairs and sensitive data for your organization.
-          </p>
-        </div>
-        {secrets.length > 0 && (
-          <PermissionTooltip
-            allowed={canCreateSecrets || permissionsLoading}
-            message="You don't have permission to create secrets."
-          >
-            <Button
-              color="blue"
-              onClick={handleCreateClick}
-              className="flex items-center gap-2"
-              disabled={!canCreateSecrets}
+    <div className="space-y-6 pt-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
+        {sortedSecrets.length > 0 && (
+          <div className="px-6 pt-6 pb-4 flex items-center justify-start">
+            <PermissionTooltip
+              allowed={canCreateSecrets || permissionsLoading}
+              message="You don't have permission to create secrets."
             >
-              <Plus className="w-4 h-4" />
-              Create Secret
-            </Button>
-          </PermissionTooltip>
+              <Button
+                className="flex items-center"
+                onClick={handleCreateClick}
+                disabled={!canCreateSecrets}
+              >
+                <Icon name="plus" />
+                Create Secret
+              </Button>
+            </PermissionTooltip>
+          </div>
         )}
+        <div className="px-6 pb-6 min-h-96">
+          {sortedSecrets.length === 0 ? (
+            <div className="flex min-h-96 flex-col items-center justify-center text-center">
+              <div className="flex justify-center items-center text-gray-800">
+                <Icon name="key" size="xl" />
+              </div>
+              <p className="mt-3 text-sm text-gray-800">Create your first secret</p>
+              <PermissionTooltip
+                allowed={canCreateSecrets || permissionsLoading}
+                message="You don't have permission to create secrets."
+              >
+                <Button
+                  className="mt-4 flex items-center"
+                  onClick={handleCreateClick}
+                  disabled={!canCreateSecrets}
+                >
+                  <Icon name="plus" />
+                  Create Secret
+                </Button>
+              </PermissionTooltip>
+            </div>
+          ) : (
+            <Table dense>
+              <TableHead>
+                <TableRow>
+                  <TableHeader>Secret name</TableHeader>
+                  <TableHeader>Keys</TableHeader>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {sortedSecrets.map((secret) => {
+                  const secretId = secret.metadata?.id || "";
+                  const secretData = secret.spec?.local?.data || {};
+                  const keyCount = Object.keys(secretData).length;
+                  return (
+                    <TableRow key={secretId} className="last:[&>td]:border-b-0">
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Icon name="key" size="sm" className="text-gray-800" />
+                          <Link
+                            href={getSecretDetailPath(secretId)}
+                            className="cursor-pointer text-sm !font-semibold text-gray-800 !underline underline-offset-2"
+                          >
+                            {secret.metadata?.name || "Unnamed Secret"}
+                          </Link>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                          {keyCount} key{keyCount === 1 ? "" : "s"}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </div>
       </div>
 
-      {secrets.length === 0 ? (
-        <div className="text-center py-12 bg-white border border-gray-300 dark:border-gray-700 rounded-md">
-          <Key className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">No secrets found</p>
-          <PermissionTooltip
-            allowed={canCreateSecrets || permissionsLoading}
-            message="You don't have permission to create secrets."
-          >
-            <Button
-              color="blue"
-              onClick={handleCreateClick}
-              className="flex items-center gap-2 mx-auto"
-              disabled={!canCreateSecrets}
-            >
-              <Plus className="w-4 h-4" />
-              Create your first secret
-            </Button>
-          </PermissionTooltip>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {secrets
-            .sort((a, b) => (a.metadata?.name || "").localeCompare(b.metadata?.name || ""))
-            .map((secret) => {
-              const secretId = secret.metadata?.id || "";
-              const secretData = secret.spec?.local?.data || {};
-              const isVisible = visibleValues.has(secretId);
-              const envVarCount = Object.keys(secretData).length;
-
-              return (
-                <div key={secretId} className="bg-white border border-gray-300 dark:border-gray-700 rounded-md p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Key className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                          {secret.metadata?.name || "Unnamed Secret"}
-                        </h3>
-                      </div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                        {envVarCount} key-value pair{envVarCount !== 1 ? "s" : ""}
-                      </p>
-                      {isVisible && (
-                        <div className="space-y-2 mt-3">
-                          {Object.entries(secretData).map(([key, value]) => (
-                            <div key={key} className="text-xs font-mono bg-gray-50 dark:bg-gray-800 rounded p-2">
-                              <span className="text-gray-600 dark:text-gray-400">{key}:</span>{" "}
-                              <span className="text-gray-800 dark:text-gray-200">{value}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => toggleValueVisibility(secretId)}
-                        className="text-xs"
-                        title={isVisible ? "Hide values" : "Show values"}
-                      >
-                        {isVisible ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                      </Button>
-                      <PermissionTooltip
-                        allowed={canUpdateSecrets || permissionsLoading}
-                        message="You don't have permission to update secrets."
-                      >
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditClick(secret)}
-                          className="text-xs"
-                          title="Edit secret"
-                          disabled={!canUpdateSecrets}
-                        >
-                          <Edit2 className="w-3 h-3" />
-                        </Button>
-                      </PermissionTooltip>
-                      <PermissionTooltip
-                        allowed={canDeleteSecrets || permissionsLoading}
-                        message="You don't have permission to delete secrets."
-                      >
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(secret)}
-                          className="text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                          title="Delete secret"
-                          disabled={deleteSecretMutation.isPending || !canDeleteSecrets}
-                        >
-                          {deleteSecretMutation.isPending ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-3 h-3" />
-                          )}
-                        </Button>
-                      </PermissionTooltip>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-        </div>
-      )}
-
-      {/* Create/Edit Modal */}
-      {(isCreateModalOpen || editingSecret) && (
+      {/* Create modal */}
+      {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-            <div className="p-6" ref={modalContentRef}>
+            <form
+              ref={modalContentRef}
+              className="p-6"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleCreate();
+              }}
+            >
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                   <Key className="w-6 h-6 text-gray-500 dark:text-gray-400" />
                   <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">
-                    {editingSecret ? "Edit Secret" : "Create Secret"}
+                    Create Secret
                   </h3>
                 </div>
                 <button
-                  onClick={handleCloseModal}
+                  type="button"
+                  onClick={handleCloseCreateModal}
                   className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
-                  disabled={createSecretMutation.isPending || updateSecretMutation.isPending}
+                  disabled={createSecretMutation.isPending}
                 >
                   <Icon name="x" size="sm" />
                 </button>
               </div>
 
               <div className="space-y-4">
-                {/* Secret Name Field */}
                 <div>
                   <Label className="text-gray-800 dark:text-gray-100 mb-2">
-                    Secret Name
-                    <span className="text-red-500 ml-1">*</span>
+                    Secret Name <span className="text-red-500">*</span>
                   </Label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">A unique name for this secret</p>
                   <Input
                     type="text"
                     value={secretName}
                     onChange={(e) => setSecretName(e.target.value)}
                     placeholder="e.g., production-api-keys"
                     required
-                    disabled={!canWriteSecrets}
+                    disabled={!canCreateSecrets}
                   />
                 </div>
-
-                {/* Key-Value Pairs */}
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-                  <div className="mb-4">
-                    <Label className="text-gray-800 dark:text-gray-100">
-                      Key-Value Pairs
-                      <span className="text-red-500 ml-1">*</span>
-                    </Label>
-                  </div>
+                  <Label className="text-gray-800 dark:text-gray-100 mb-2 block">
+                    Key-Value Pairs <span className="text-red-500">*</span>
+                  </Label>
                   <div className="space-y-3">
-                    {keyValuePairs.map((pair, index) => {
-                      return (
-                        <div key={index} className="flex gap-2 items-start">
-                          <div className="flex-1">
-                            <Input
-                              type="text"
-                              defaultValue={pair.name}
-                              placeholder="Key"
-                              className="mb-2"
-                              disabled={!canWriteSecrets}
-                            />
-                            <Textarea
-                              defaultValue={pair.value}
-                              placeholder="Value"
-                              rows={4}
-                              className="font-mono text-sm"
-                              disabled={!canWriteSecrets}
-                            />
-                          </div>
-                          {keyValuePairs.length > 1 && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => removeKeyValuePair(index)}
-                              className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 mt-0"
-                              title="Remove pair"
-                              disabled={!canWriteSecrets}
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          )}
+                    {keyValuePairs.map((pair, index) => (
+                      <div key={index} className="flex gap-2 items-start">
+                        <div className="flex-1">
+                          <Input
+                            type="text"
+                            defaultValue={pair.name}
+                            placeholder="Key"
+                            className="mb-2"
+                            disabled={!canCreateSecrets}
+                          />
+                          <Textarea
+                            defaultValue={pair.value}
+                            placeholder="Value"
+                            rows={3}
+                            className="font-mono text-sm"
+                            disabled={!canCreateSecrets}
+                          />
                         </div>
-                      );
-                    })}
+                        {keyValuePairs.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeKeyValuePair(index)}
+                            className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 mt-0"
+                            title="Remove pair"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  <div className="mt-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={addKeyValuePair}
-                      className="text-xs"
-                      disabled={!canWriteSecrets}
-                    >
-                      <Plus className="w-3 h-3 mr-1" />
-                      Add Pair
-                    </Button>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                    Add key-value pairs that will be stored securely
-                  </p>
+                  <Button type="button" variant="outline" size="sm" onClick={addKeyValuePair} className="mt-3 text-xs" disabled={!canCreateSecrets}>
+                    <Plus className="w-3 h-3 mr-1" />
+                    Add Pair
+                  </Button>
                 </div>
               </div>
 
               <div className="flex justify-start gap-3 mt-6">
                 <Button
+                  type="submit"
                   color="blue"
-                  onClick={editingSecret ? handleUpdate : handleCreate}
-                  disabled={
-                    createSecretMutation.isPending ||
-                    updateSecretMutation.isPending ||
-                    !secretName?.trim() ||
-                    !canWriteSecrets
-                  }
+                  disabled={createSecretMutation.isPending || !secretName?.trim() || !canCreateSecrets}
                   className="flex items-center gap-2"
                 >
-                  {createSecretMutation.isPending || updateSecretMutation.isPending ? (
+                  {createSecretMutation.isPending ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      {editingSecret ? "Updating..." : "Creating..."}
+                      Creating...
                     </>
-                  ) : editingSecret ? (
-                    "Update Secret"
                   ) : (
                     "Create Secret"
                   )}
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleCloseModal}
-                  disabled={createSecretMutation.isPending || updateSecretMutation.isPending}
-                >
+                <Button type="button" variant="outline" onClick={handleCloseCreateModal} disabled={createSecretMutation.isPending}>
                   Cancel
                 </Button>
               </div>
 
-              {(createSecretMutation.isError || updateSecretMutation.isError) && (
+              {createSecretMutation.isError && (
                 <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
                   <p className="text-sm text-red-800 dark:text-red-200">
-                    {editingSecret ? "Failed to update secret" : "Failed to create secret"}:{" "}
-                    {getApiErrorMessage(createSecretMutation.error || updateSecretMutation.error)}
+                    Failed to create secret: {getApiErrorMessage(createSecretMutation.error)}
                   </p>
                 </div>
               )}
-            </div>
+            </form>
           </div>
         </div>
       )}
