@@ -34,6 +34,10 @@ func DeleteIntegration(ctx context.Context, orgID string, ID string) (*pb.Delete
 	// and delete its webhooks before we delete the integration itself.
 	//
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := models.CreateCleanupRequestsForIntegrationNodes(tx, integration.ID); err != nil {
+			return status.Error(codes.Internal, "failed to create cleanup requests")
+		}
+
 		webhooks, err := models.ListIntegrationWebhooks(tx, integration.ID)
 		if err != nil {
 			return status.Error(codes.Internal, "failed to list integration webhooks")

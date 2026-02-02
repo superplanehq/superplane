@@ -114,6 +114,13 @@ func randomNodeSuffix(length int) string {
 }
 
 func DeleteCanvasNode(tx *gorm.DB, node CanvasNode) error {
+	if node.Type == NodeTypeComponent || node.Type == NodeTypeTrigger {
+		runAt := time.Now()
+		if err := node.CreateRequest(tx, NodeRequestTypeCleanup, NodeExecutionRequestSpec{}, &runAt); err != nil {
+			return err
+		}
+	}
+
 	err := tx.Delete(&node).Error
 	if err != nil {
 		return err

@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
 
@@ -24,16 +25,20 @@ import (
 )
 
 type NodeRequestWorker struct {
-	semaphore *semaphore.Weighted
-	registry  *registry.Registry
-	encryptor crypto.Encryptor
+	logger         *logrus.Entry
+	semaphore      *semaphore.Weighted
+	registry       *registry.Registry
+	encryptor      crypto.Encryptor
+	webhookBaseURL string
 }
 
-func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry) *NodeRequestWorker {
+func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry, webhookBaseURL string) *NodeRequestWorker {
 	return &NodeRequestWorker{
-		encryptor: encryptor,
-		registry:  registry,
-		semaphore: semaphore.NewWeighted(25),
+		encryptor:      encryptor,
+		registry:       registry,
+		webhookBaseURL: webhookBaseURL,
+		semaphore:      semaphore.NewWeighted(25),
+		logger:         logrus.WithFields(logrus.Fields{"worker": "NodeRequestWorker"}),
 	}
 }
 
@@ -50,14 +55,14 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 
 			requests, err := models.ListNodeRequests()
 			if err != nil {
-				w.log("Error finding workflow nodes ready to be processed: %v", err)
+				w.logger.Errorf("Error finding workflow nodes ready to be processed: %v", err)
 			}
 
 			telemetry.RecordNodeRequestWorkerRequestsCount(context.Background(), len(requests))
 
 			for _, request := range requests {
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
-					w.log("Error acquiring semaphore: %v", err)
+					w.logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
 				}
 
@@ -65,7 +70,7 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 					defer w.semaphore.Release(1)
 
 					if err := w.LockAndProcessRequest(request); err != nil {
-						w.log("Error processing request %s: %v", request.ID, err)
+						w.logger.Errorf("Error processing request %s: %v", request.ID, err)
 					}
 
 					if request.ExecutionID != nil {
@@ -83,7 +88,7 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		r, err := models.LockNodeRequest(tx, request.ID)
 		if err != nil {
-			w.log("Request %s already being processed - skipping", request.ID)
+			w.logger.Infof("Request %s already being processed - skipping", request.ID)
 			return nil
 		}
 
@@ -95,9 +100,124 @@ func (w *NodeRequestWorker) processRequest(tx *gorm.DB, request *models.CanvasNo
 	switch request.Type {
 	case models.NodeRequestTypeInvokeAction:
 		return w.invokeAction(tx, request)
+	case models.NodeRequestTypeCleanup:
+		return w.cleanupNode(tx, request)
 	}
 
 	return fmt.Errorf("unsupported node execution request type %s", request.Type)
+}
+
+func (w *NodeRequestWorker) cleanupNode(tx *gorm.DB, request *models.CanvasNodeRequest) error {
+	node, err := models.FindCanvasNode(tx, request.WorkflowID, request.NodeID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return request.Complete(tx)
+		}
+
+		return fmt.Errorf("node not found: %w", err)
+	}
+
+	logger := logging.WithNode(w.logger, *node)
+
+	switch node.Type {
+	case models.NodeTypeComponent:
+		return w.cleanupComponent(tx, logger, request, node)
+
+	case models.NodeTypeTrigger:
+		return w.cleanupTrigger(tx, logger, request, node)
+	}
+
+	return request.Complete(tx)
+}
+
+func (w *NodeRequestWorker) cleanupComponent(tx *gorm.DB, logger *log.Entry, request *models.CanvasNodeRequest, node *models.CanvasNode) error {
+	ref := node.Ref.Data()
+	if ref.Component == nil {
+		logger.Infof("component reference missing for node %s - completing request", node.NodeID)
+		return request.Complete(tx)
+	}
+
+	component, err := w.registry.GetComponent(ref.Component.Name)
+	if err != nil {
+		logger.Errorf("component %s not found - completing request", ref.Component.Name)
+		return request.Complete(tx)
+	}
+
+	cleanupCtx := core.SetupContext{
+		Configuration: node.Configuration.Data(),
+		Logger:        logger,
+		HTTP:          contexts.NewHTTPContext(w.registry.GetHTTPClient()),
+		Metadata:      contexts.NewNodeMetadataContext(tx, node),
+		Requests:      contexts.NewNodeRequestContext(tx, node),
+	}
+
+	if node.AppInstallationID != nil {
+		instance, err := models.FindMaybeDeletedIntegrationInTransaction(tx, *node.AppInstallationID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				logger.Infof("integration %s not found - completing request", *node.AppInstallationID)
+				return request.Complete(tx)
+			}
+
+			return fmt.Errorf("failed to find integration: %v", err)
+		}
+
+		cleanupCtx.Logger = logging.WithIntegration(logger, *instance)
+		cleanupCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry)
+	}
+
+	err = component.Cleanup(cleanupCtx)
+	if err != nil {
+		return fmt.Errorf("cleanup failed: %w", err)
+	}
+
+	return request.Complete(tx)
+}
+
+func (w *NodeRequestWorker) cleanupTrigger(tx *gorm.DB, logger *log.Entry, request *models.CanvasNodeRequest, node *models.CanvasNode) error {
+	ref := node.Ref.Data()
+	if ref.Trigger == nil {
+		logger.Infof("trigger reference missing for node %s - completing request", node.NodeID)
+		return request.Complete(tx)
+	}
+
+	trigger, err := w.registry.GetTrigger(ref.Trigger.Name)
+	if err != nil {
+		logger.Errorf("trigger %s not found - completing request", ref.Trigger.Name)
+		return request.Complete(tx)
+	}
+
+	cleanupCtx := core.TriggerContext{
+		Configuration: node.Configuration.Data(),
+		Logger:        logger,
+		HTTP:          contexts.NewHTTPContext(w.registry.GetHTTPClient()),
+		Metadata:      contexts.NewNodeMetadataContext(tx, node),
+		Requests:      contexts.NewNodeRequestContext(tx, node),
+		Events:        contexts.NewEventContext(tx, node),
+		Webhook:       contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
+	}
+
+	if node.AppInstallationID != nil {
+		instance, err := models.FindMaybeDeletedIntegrationInTransaction(tx, *node.AppInstallationID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				logger.Infof("integration %s not found - completing request", *node.AppInstallationID)
+				return request.Complete(tx)
+			}
+
+			return fmt.Errorf("failed to find integration: %v", err)
+		}
+
+		cleanupCtx.Logger = logging.WithIntegration(logger, *instance)
+		cleanupCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry)
+	}
+
+	err = trigger.Cleanup(cleanupCtx)
+	if err != nil {
+		return fmt.Errorf("cleanup failed: %w", err)
+	}
+
+	return request.Complete(tx)
 }
 
 func (w *NodeRequestWorker) invokeAction(tx *gorm.DB, request *models.CanvasNodeRequest) error {
@@ -145,7 +265,7 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Can
 		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				w.log("integration %s not found - completing request", *node.AppInstallationID)
+				w.logger.Warnf("integration %s not found - completing request", *node.AppInstallationID)
 				return request.Complete(tx)
 			}
 
@@ -300,10 +420,6 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request 
 	}
 
 	return request.Complete(tx)
-}
-
-func (w *NodeRequestWorker) log(format string, v ...any) {
-	log.Printf("[NodeRequestWorker] "+format, v...)
 }
 
 func findAction(actions []core.Action, actionName string) *core.Action {

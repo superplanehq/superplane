@@ -89,6 +89,16 @@ func (w *IntegrationCleanupWorker) processIntegration(tx *gorm.DB, integration *
 		return nil
 	}
 
+	pendingCleanupCount, err := models.CountPendingCleanupRequestsForIntegrationNodes(tx, integration.ID)
+	if err != nil {
+		return err
+	}
+
+	if pendingCleanupCount > 0 {
+		w.log("Integration %s still has %d pending cleanup requests - skipping", integration.ID, pendingCleanupCount)
+		return nil
+	}
+
 	w.log("Cleaning up app installation %s", integration.ID)
 	impl, err := w.registry.GetIntegration(integration.AppName)
 	if err != nil {

@@ -113,6 +113,57 @@ func ListUnscopedIntegrationWebhooks(tx *gorm.DB, integrationID uuid.UUID) ([]We
 	return webhooks, nil
 }
 
+func CreateCleanupRequestsForIntegrationNodes(tx *gorm.DB, integrationID uuid.UUID) error {
+	var nodes []CanvasNode
+	err := tx.
+		Where("app_installation_id = ?", integrationID).
+		Where("type IN ?", []string{NodeTypeComponent, NodeTypeTrigger}).
+		Find(&nodes).
+		Error
+	if err != nil {
+		return err
+	}
+
+	if len(nodes) == 0 {
+		return nil
+	}
+
+	runAt := time.Now()
+	requests := make([]CanvasNodeRequest, 0, len(nodes))
+	for _, node := range nodes {
+		requests = append(requests, CanvasNodeRequest{
+			ID:         uuid.New(),
+			WorkflowID: node.WorkflowID,
+			NodeID:     node.NodeID,
+			State:      NodeExecutionRequestStatePending,
+			Type:       NodeRequestTypeCleanup,
+			Spec:       datatypes.NewJSONType(NodeExecutionRequestSpec{}),
+			RunAt:      runAt,
+			CreatedAt:  runAt,
+			UpdatedAt:  runAt,
+		})
+	}
+
+	return tx.Create(&requests).Error
+}
+
+func CountPendingCleanupRequestsForIntegrationNodes(tx *gorm.DB, integrationID uuid.UUID) (int64, error) {
+	var count int64
+	err := tx.Unscoped().
+		Table("workflow_node_requests").
+		Joins("JOIN workflow_nodes ON workflow_node_requests.workflow_id = workflow_nodes.workflow_id AND workflow_node_requests.node_id = workflow_nodes.node_id").
+		Where("workflow_nodes.app_installation_id = ?", integrationID).
+		Where("workflow_node_requests.state = ?", NodeExecutionRequestStatePending).
+		Where("workflow_node_requests.type = ?", NodeRequestTypeCleanup).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 type WorkflowNodeReference struct {
 	WorkflowID   uuid.UUID
 	WorkflowName string

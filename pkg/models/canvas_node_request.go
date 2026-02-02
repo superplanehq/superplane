@@ -12,6 +12,7 @@ import (
 
 const (
 	NodeRequestTypeInvokeAction = "invoke-action"
+	NodeRequestTypeCleanup      = "cleanup"
 
 	NodeExecutionRequestStatePending   = "pending"
 	NodeExecutionRequestStateCompleted = "completed"
@@ -68,7 +69,7 @@ func ListNodeRequests() ([]CanvasNodeRequest, error) {
 		Joins("JOIN workflows ON workflow_node_requests.workflow_id = workflows.id").
 		Where("workflow_node_requests.state = ?", NodeExecutionRequestStatePending).
 		Where("workflow_node_requests.run_at <= ?", now).
-		Where("workflow_nodes.deleted_at IS NULL").
+		Where("workflow_node_requests.type = ? OR workflow_nodes.deleted_at IS NULL", NodeRequestTypeCleanup).
 		Where("workflows.deleted_at IS NULL").
 		Find(&requests).
 		Error
