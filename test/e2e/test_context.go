@@ -80,19 +80,23 @@ func (s *TestContext) launchBrowser() {
 		panic("browser launch: " + err.Error())
 	}
 
-	c, err := b.NewContext(pw.BrowserNewContextOptions{
+	contextOptions := pw.BrowserNewContextOptions{
 		Viewport: &pw.Size{
 			Width:  2560,
 			Height: 1440,
 		},
-		RecordVideo: &pw.RecordVideo{
+	}
+	if os.Getenv("CI") == "" {
+		contextOptions.RecordVideo = &pw.RecordVideo{
 			Dir: "/app/tmp/videos",
 			Size: &pw.Size{
 				Width:  2560,
 				Height: 1440,
 			},
-		},
-	})
+		}
+	}
+
+	c, err := b.NewContext(contextOptions)
 	if err != nil {
 		panic("browser context: " + err.Error())
 	}
