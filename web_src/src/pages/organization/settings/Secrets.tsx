@@ -339,7 +339,6 @@ export function Secrets({ organizationId }: SecretsProps) {
                   </div>
                   <div className="space-y-3">
                     {keyValuePairs.map((pair, index) => {
-                      const isValueVisible = visibleEditValues.has(index);
                       return (
                         <div key={index} className="flex gap-2 items-start">
                           <div className="flex-1">
