@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -22,47 +21,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-// Blocked hosts for SSRF protection
-var blockedHosts = []string{
-	"metadata.google.internal",
-	"metadata.goog",
-	"169.254.169.254",
-	"fd00:ec2::254",
-	"[fd00:ec2::254]",
-	"localhost",
-	"127.0.0.1",
-	"[::1]",
-	"0.0.0.0",
-}
-
-// Private IP ranges that should be blocked
-var privateIPRanges = []string{
-	"10.0.0.0/8",
-	"172.16.0.0/12",
-	"192.168.0.0/16",
-	"127.0.0.0/8",
-	"169.254.0.0/16",
-	"::1/128",
-	"fc00::/7",
-	"fe80::/10",
-}
-
-var parsedPrivateRanges []*net.IPNet
-
-// DisableSSRFProtection can be set to true in tests to allow requests to localhost
-// This should NEVER be set to true in production code
-var DisableSSRFProtection = false
-
 func init() {
 	registry.RegisterComponent("http", &HTTP{})
-
-	// Parse private IP ranges for SSRF protection
-	for _, cidr := range privateIPRanges {
-		_, ipNet, err := net.ParseCIDR(cidr)
-		if err == nil {
-			parsedPrivateRanges = append(parsedPrivateRanges, ipNet)
-		}
-	}
 }
 
 type Header struct {
@@ -617,60 +577,6 @@ func (e *HTTP) calculateTimeoutForAttempt(strategy string, timeoutSeconds int, a
 	return baseTimeout
 }
 
-// validateURLForSSRF checks if the URL targets a blocked host or private IP
-func (e *HTTP) validateURLForSSRF(targetURL string) error {
-	// Allow bypass for testing only
-	if DisableSSRFProtection {
-		return nil
-	}
-
-	parsedURL, err := url.Parse(targetURL)
-	if err != nil {
-		return fmt.Errorf("invalid URL: %w", err)
-	}
-
-	host := parsedURL.Hostname()
-	if host == "" {
-		return fmt.Errorf("URL must have a host")
-	}
-
-	// Check against blocked hosts list
-	hostLower := strings.ToLower(host)
-	for _, blocked := range blockedHosts {
-		if hostLower == blocked || strings.HasSuffix(hostLower, "."+blocked) {
-			return fmt.Errorf("access to %s is not allowed for security reasons", host)
-		}
-	}
-
-	// Check if host is an IP address
-	ip := net.ParseIP(host)
-	if ip != nil {
-		// Check against private IP ranges
-		for _, ipNet := range parsedPrivateRanges {
-			if ipNet.Contains(ip) {
-				return fmt.Errorf("access to private IP addresses is not allowed for security reasons")
-			}
-		}
-	} else {
-		// Host is a domain name - resolve it and check the IPs
-		ips, err := net.LookupIP(host)
-		if err != nil {
-			// If DNS lookup fails, allow the request (let it fail at HTTP level)
-			return nil
-		}
-
-		for _, ip := range ips {
-			for _, ipNet := range parsedPrivateRanges {
-				if ipNet.Contains(ip) {
-					return fmt.Errorf("access to %s is not allowed: resolves to private IP address", host)
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
 func (e *HTTP) executeRequest(spec Spec, timeout time.Duration) (*http.Response, error) {
 	var body io.Reader
 	var contentType string
@@ -699,11 +605,6 @@ func (e *HTTP) executeRequest(spec Spec, timeout time.Duration) (*http.Response,
 
 		parsedURL.RawQuery = query.Encode()
 		requestURL = parsedURL.String()
-	}
-
-	// Validate URL for SSRF before making request
-	if err := e.validateURLForSSRF(requestURL); err != nil {
-		return nil, fmt.Errorf("SSRF protection: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(reqCtx, spec.Method, requestURL, body)
