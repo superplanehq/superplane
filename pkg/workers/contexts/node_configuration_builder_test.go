@@ -1,13 +1,16 @@
 package contexts
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
@@ -1250,4 +1253,67 @@ func Test_NodeConfigurationBuilder_DisallowExpression_ListItems(t *testing.T) {
 	item := items[0].(map[string]any)
 	assert.Equal(t, "resolved", item["allowed"])
 	assert.Equal(t, "{{ $[\"node-1\"].disallowed }}", item["disallowed"])
+}
+
+func Test_NodeConfigurationBuilder_Secret(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{},
+	)
+
+	encryptor := &crypto.NoOpEncryptor{}
+	secretData := map[string]string{"api_key": "sk-secret-value", "url": "https://api.example.com"}
+	data, err := json.Marshal(secretData)
+	require.NoError(t, err)
+	_, err = models.CreateSecret("my-api-secret", secrets.ProviderLocal, r.User.String(), models.DomainTypeOrganization, r.Organization.ID, data)
+	require.NoError(t, err)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{"node-1": map[string]any{"id": "123"}}).
+		WithOrganizationID(canvas.OrganizationID).
+		WithEncryptor(encryptor)
+
+	configuration := map[string]any{
+		"token": "{{ secret(\"my-api-secret\", \"api_key\") }}",
+	}
+	result, err := builder.Build(configuration)
+	require.NoError(t, err)
+	assert.Equal(t, "sk-secret-value", result["token"])
+}
+
+func Test_NodeConfigurationBuilder_Secret_WithoutOrgOrEncryptor_CompileFails(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{})
+
+	configuration := map[string]any{
+		"token": "{{ secret(\"my-api-secret\", \"api_key\") }}",
+	}
+	_, err := builder.Build(configuration)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "secret")
 }

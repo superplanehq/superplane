@@ -363,6 +363,10 @@ Makes a field optional with an explicit on/off toggle. When toggled off, the fie
 | Integrations | Advanced filters, service options | Power user features |
 | Triggers | Optional filtering criteria | Start simple, add filtering later |
 
+#### Expression language: `secret()`
+
+Configuration values can reference organization secrets so sensitive data (API keys, tokens) is not stored in the canvas. Use the expr function `secret("name", "key")` inside `{{ }}` to resolve a secret key’s value (e.g. `{{ secret("my-api", "api_key") }}`). Secrets are resolved at execution time and are scoped to the organization. If the builder has no secret context (e.g. some gRPC paths), expressions that use `secret()` will fail to compile.
+
 #### Disabling Expressions (`DisallowExpression: true`)
 
 Prevents users from using `{{ }}` expressions in a field. The field will only accept static values.

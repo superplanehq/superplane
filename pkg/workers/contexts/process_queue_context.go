@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
@@ -30,10 +31,19 @@ func (e *ConfigurationBuildError) Unwrap() error {
 	return e.Err
 }
 
-func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models.CanvasNode, queueItem *models.CanvasNodeQueueItem, configFields []configuration.Field) (*core.ProcessQueueContext, error) {
+func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models.CanvasNode, queueItem *models.CanvasNodeQueueItem, configFields []configuration.Field, encryptor crypto.Encryptor) (*core.ProcessQueueContext, error) {
 	event, err := models.FindCanvasEventInTransaction(tx, queueItem.EventID)
 	if err != nil {
 		return nil, err
+	}
+
+	var workflow *models.Canvas
+	if encryptor != nil {
+		w, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, queueItem.WorkflowID)
+		if err != nil {
+			return nil, err
+		}
+		workflow = w
 	}
 
 	configBuilder := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
@@ -43,6 +53,9 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 		WithInput(map[string]any{event.NodeID: event.Data.Data()})
 	if len(configFields) > 0 {
 		configBuilder = configBuilder.WithConfigurationFields(configFields)
+	}
+	if workflow != nil {
+		configBuilder = configBuilder.WithOrganizationID(workflow.OrganizationID).WithEncryptor(encryptor)
 	}
 
 	if node.ParentNodeID != nil {
@@ -81,6 +94,9 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 			WithInput(map[string]any{event.NodeID: event.Data.Data()})
 		if event.ExecutionID != nil {
 			builder = builder.WithPreviousExecution(event.ExecutionID)
+		}
+		if workflow != nil {
+			builder = builder.WithOrganizationID(workflow.OrganizationID).WithEncryptor(encryptor)
 		}
 		return builder.BuildExpressionEnv(expression)
 	}

@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"sort"
@@ -13,7 +14,9 @@ import (
 	"github.com/expr-lang/expr/parser"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/secrets"
 	"gorm.io/gorm"
 )
 
@@ -29,6 +32,8 @@ type NodeConfigurationBuilder struct {
 	input               any
 	parentBlueprintNode *models.CanvasNode
 	configurationFields []configuration.Field
+	orgID               *uuid.UUID
+	encryptor           crypto.Encryptor
 }
 
 func NewNodeConfigurationBuilder(tx *gorm.DB, workflowID uuid.UUID) *NodeConfigurationBuilder {
@@ -65,6 +70,16 @@ func (b *NodeConfigurationBuilder) WithInput(input any) *NodeConfigurationBuilde
 
 func (b *NodeConfigurationBuilder) WithConfigurationFields(fields []configuration.Field) *NodeConfigurationBuilder {
 	b.configurationFields = fields
+	return b
+}
+
+func (b *NodeConfigurationBuilder) WithOrganizationID(orgID uuid.UUID) *NodeConfigurationBuilder {
+	b.orgID = &orgID
+	return b
+}
+
+func (b *NodeConfigurationBuilder) WithEncryptor(encryptor crypto.Encryptor) *NodeConfigurationBuilder {
+	b.encryptor = encryptor
 	return b
 }
 
@@ -334,6 +349,12 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 		}),
 	}
 
+	if b.orgID != nil && b.encryptor != nil {
+		exprOptions = append(exprOptions, expr.Function("secret", func(params ...any) (any, error) {
+			return b.resolveSecret(params)
+		}))
+	}
+
 	vm, err := expr.Compile(expression, exprOptions...)
 	if err != nil {
 		return "", err
@@ -345,6 +366,32 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 	}
 
 	return output, nil
+}
+
+func (b *NodeConfigurationBuilder) resolveSecret(params []any) (any, error) {
+	if len(params) != 2 {
+		return nil, fmt.Errorf("secret() requires two arguments: secret(name, key)")
+	}
+	name, ok := params[0].(string)
+	if !ok {
+		return nil, fmt.Errorf("secret name must be a string")
+	}
+	key, ok := params[1].(string)
+	if !ok {
+		return nil, fmt.Errorf("secret key must be a string")
+	}
+	provider, err := secrets.NewProvider(b.tx, b.encryptor, name, models.DomainTypeOrganization, *b.orgID)
+	if err != nil {
+		return nil, fmt.Errorf("secret %q: %w", name, err)
+	}
+	values, err := provider.Load(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("secret %q: %w", name, err)
+	}
+	if v, ok := values[key]; ok {
+		return v, nil
+	}
+	return nil, fmt.Errorf("secret %q has no key %q", name, key)
 }
 
 func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (map[string]any, error) {

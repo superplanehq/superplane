@@ -451,7 +451,7 @@ func (s *MergeTestSteps) CreateSingleQueueItemForProcess1() {
 func (s *MergeTestSteps) ProcessFirstEvent(m *Merge) {
 	fmt.Println("Processing first event")
 
-	ctx1, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem1, nil)
+	ctx1, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem1, nil, nil)
 	assert.NoError(s.t, err)
 
 	execution, err := m.ProcessQueueItem(*ctx1)
@@ -464,7 +464,7 @@ func (s *MergeTestSteps) ProcessFirstEvent(m *Merge) {
 func (s *MergeTestSteps) ProcessFirstEventExpectFinish(m *Merge) {
 	fmt.Println("Processing first event (expect finish)")
 
-	ctx1, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem1, nil)
+	ctx1, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem1, nil, nil)
 	assert.NoError(s.t, err)
 
 	execution, err := m.ProcessQueueItem(*ctx1)
@@ -475,7 +475,7 @@ func (s *MergeTestSteps) ProcessFirstEventExpectFinish(m *Merge) {
 func (s *MergeTestSteps) ProcessSecondEvent(m *Merge) {
 	fmt.Println("Processing second event")
 
-	ctx2, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem2, nil)
+	ctx2, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem2, nil, nil)
 	assert.NoError(s.t, err)
 
 	execution, err := m.ProcessQueueItem(*ctx2)
@@ -486,7 +486,7 @@ func (s *MergeTestSteps) ProcessSecondEvent(m *Merge) {
 func (s *MergeTestSteps) ProcessSecondEventExpectNoFinish(m *Merge) {
 	fmt.Println("Processing second event")
 
-	ctx2, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem2, nil)
+	ctx2, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem2, nil, nil)
 	assert.NoError(s.t, err)
 
 	execution, err := m.ProcessQueueItem(*ctx2)

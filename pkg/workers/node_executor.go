@@ -172,12 +172,18 @@ func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.Canva
 	// since this means the first node has improper configuration,
 	// and the user should be aware of this.
 	//
+	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID)
+	if err != nil {
+		return fmt.Errorf("error finding workflow: %w", err)
+	}
 	configBuilder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&execution.RootEventID).
 		WithPreviousExecution(&execution.ID).
 		ForBlueprintNode(node).
-		WithInput(map[string]any{inputEvent.NodeID: input})
+		WithInput(map[string]any{inputEvent.NodeID: input}).
+		WithOrganizationID(workflow.OrganizationID).
+		WithEncryptor(w.encryptor)
 
 	configFields, err := w.configurationFieldsForBlueprintNode(tx, *firstNode)
 	if err != nil {
@@ -294,7 +300,9 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
 			WithNodeID(node.NodeID).
 			WithRootEvent(&execution.RootEventID).
-			WithInput(map[string]any{inputEvent.NodeID: input})
+			WithInput(map[string]any{inputEvent.NodeID: input}).
+			WithOrganizationID(workflow.OrganizationID).
+			WithEncryptor(w.encryptor)
 		if execution.PreviousExecutionID != nil {
 			builder = builder.WithPreviousExecution(execution.PreviousExecutionID)
 		}
