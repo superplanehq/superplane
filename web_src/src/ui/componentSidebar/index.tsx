@@ -1,17 +1,42 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { resolveIcon } from "@/lib/utils";
-import { Check, Copy, X } from "lucide-react";
+import { Check, Copy, Loader2, X } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
+import discordIcon from "@/assets/icons/integrations/discord.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
+import smtpIcon from "@/assets/icons/integrations/smtp.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useAvailableIntegrations,
+  useCreateIntegration,
+  useIntegration,
+  useUpdateIntegration,
+} from "@/hooks/useIntegrations";
+import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
+import { getApiErrorMessage } from "@/utils/errors";
+import { showErrorToast } from "@/utils/toast";
 import { ChildEventsState } from "../composite";
 import { TabData } from "./SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "./types";
@@ -48,6 +73,38 @@ const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
     lambda: awsLambdaIcon,
   },
 };
+
+const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
+  aws: awsIcon,
+  dash0: dash0Icon,
+  daytona: daytonaIcon,
+  discord: discordIcon,
+  github: githubIcon,
+  openai: openAiIcon,
+  "open-ai": openAiIcon,
+  pagerduty: pagerDutyIcon,
+  rootly: rootlyIcon,
+  semaphore: SemaphoreLogo,
+  slack: slackIcon,
+  smtp: smtpIcon,
+};
+
+function renderIntegrationIcon(
+  slug: string | undefined,
+  appName: string | undefined,
+  className: string,
+): React.ReactNode {
+  const logo = appName ? INTEGRATION_APP_LOGO_MAP[appName] : undefined;
+  if (logo) {
+    return (
+      <span className={className}>
+        <img src={logo} alt="" className="h-full w-full object-contain" />
+      </span>
+    );
+  }
+  const IconComponent = resolveIcon(slug);
+  return <IconComponent className={className} />;
+}
 
 interface ComponentSidebarProps {
   isOpen?: boolean;
@@ -250,8 +307,42 @@ export const ComponentSidebar = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ChildEventsState | "all">("all");
   const [justCopied, setJustCopied] = useState(false);
+  const [isCreateIntegrationDialogOpen, setIsCreateIntegrationDialogOpen] = useState(false);
+  const [createIntegrationName, setCreateIntegrationName] = useState("");
+  const [createIntegrationConfig, setCreateIntegrationConfig] = useState<Record<string, unknown>>({});
+  const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
   // Use autocompleteExampleObj directly - current node is already filtered out upstream
   const resolvedAutocompleteExampleObj = autocompleteExampleObj ?? null;
+
+  const { data: availableIntegrationDefinitions = [] } = useAvailableIntegrations();
+  const createIntegrationMutation = useCreateIntegration(domainId ?? "");
+  const { data: configureIntegration, isLoading: configureIntegrationLoading } = useIntegration(
+    domainId ?? "",
+    configureIntegrationId ?? "",
+  );
+  const updateIntegrationMutation = useUpdateIntegration(
+    domainId ?? "",
+    configureIntegrationId ?? "",
+  );
+  const configureIntegrationDefinition = useMemo(
+    () =>
+      configureIntegration?.spec?.integrationName
+        ? availableIntegrationDefinitions.find(
+            (d) => d.name === configureIntegration.spec?.integrationName,
+          )
+        : undefined,
+    [availableIntegrationDefinitions, configureIntegration?.spec?.integrationName],
+  );
+  const [configureIntegrationConfig, setConfigureIntegrationConfig] = useState<Record<string, unknown>>({});
+  const createIntegrationDefinition = useMemo(
+    () => (integrationName ? availableIntegrationDefinitions.find((d) => d.name === integrationName) : undefined),
+    [availableIntegrationDefinitions, integrationName],
+  );
+  const selectedIntegrationForDialog = isCreateIntegrationDialogOpen ? createIntegrationDefinition : undefined;
+  const selectedInstructions = selectedIntegrationForDialog?.instructions?.trim();
+  const resolvedIntegration = integrationRef
+    ? (integrations ?? []).find((i) => i.metadata?.id === integrationRef.id)
+    : undefined;
 
   const handleCopyNodeId = useCallback(async () => {
     if (nodeId) {
@@ -260,6 +351,72 @@ export const ComponentSidebar = ({
       setTimeout(() => setJustCopied(false), 1000);
     }
   }, [nodeId]);
+
+  const handleOpenCreateIntegrationDialog = useCallback(() => {
+    setCreateIntegrationName(createIntegrationDefinition?.name ?? "");
+    setCreateIntegrationConfig({});
+    setIsCreateIntegrationDialogOpen(true);
+  }, [createIntegrationDefinition?.name]);
+
+  const handleCloseCreateIntegrationDialog = useCallback(() => {
+    setIsCreateIntegrationDialogOpen(false);
+    setCreateIntegrationName("");
+    setCreateIntegrationConfig({});
+    createIntegrationMutation.reset();
+  }, [createIntegrationMutation]);
+
+  const handleCreateIntegrationSubmit = useCallback(async () => {
+    if (!selectedIntegrationForDialog?.name || !domainId) return;
+    try {
+      await createIntegrationMutation.mutateAsync({
+        integrationName: selectedIntegrationForDialog.name,
+        name: createIntegrationName.trim(),
+        configuration: createIntegrationConfig,
+      });
+      handleCloseCreateIntegrationDialog();
+    } catch (_error) {
+      showErrorToast("Failed to create integration");
+    }
+  }, [
+    selectedIntegrationForDialog?.name,
+    domainId,
+    createIntegrationName,
+    createIntegrationConfig,
+    createIntegrationMutation,
+    handleCloseCreateIntegrationDialog,
+  ]);
+
+  const handleOpenConfigureIntegrationDialog = useCallback((integrationId: string) => {
+    setConfigureIntegrationId(integrationId);
+  }, []);
+
+  const handleCloseConfigureIntegrationDialog = useCallback(() => {
+    setConfigureIntegrationId(null);
+    setConfigureIntegrationConfig({});
+    updateIntegrationMutation.reset();
+  }, [updateIntegrationMutation]);
+
+  const handleConfigureIntegrationSubmit = useCallback(async () => {
+    if (!configureIntegrationId || !domainId) return;
+    try {
+      await updateIntegrationMutation.mutateAsync(configureIntegrationConfig);
+      handleCloseConfigureIntegrationDialog();
+    } catch (_error) {
+      showErrorToast("Failed to update configuration");
+    }
+  }, [
+    configureIntegrationId,
+    domainId,
+    configureIntegrationConfig,
+    updateIntegrationMutation,
+    handleCloseConfigureIntegrationDialog,
+  ]);
+
+  useEffect(() => {
+    if (configureIntegration?.spec?.configuration) {
+      setConfigureIntegrationConfig(configureIntegration.spec.configuration);
+    }
+  }, [configureIntegration?.spec?.configuration]);
 
   // Seed open ids from incoming props (without closing already open ones)
   useEffect(() => {
@@ -564,6 +721,53 @@ export const ComponentSidebar = ({
             isDetailView ? "-translate-x-full" : "translate-x-0"
           } ${isDetailView ? "pointer-events-none" : "pointer-events-auto"}`}
         >
+          {integrationName && integrationRef && resolvedIntegration && (
+            <div className="border-border border-b-1 px-4 py-3 flex-shrink-0">
+              <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {renderIntegrationIcon(
+                      createIntegrationDefinition?.icon,
+                      resolvedIntegration.spec?.integrationName,
+                      "h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400",
+                    )}
+                    <span className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
+                      {resolvedIntegration.metadata?.name ||
+                        getIntegrationTypeDisplayName(
+                          undefined,
+                          resolvedIntegration.spec?.integrationName,
+                        ) ||
+                        "Integration"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        resolvedIntegration.status?.state === "ready"
+                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                          : resolvedIntegration.status?.state === "error"
+                            ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                            : "bg-orange-100 text-yellow-800 dark:text-yellow-900/30 dark:text-yellow-400"
+                      }`}
+                    >
+                      {resolvedIntegration.status?.state
+                        ? resolvedIntegration.status.state.charAt(0).toUpperCase() +
+                          resolvedIntegration.status.state.slice(1)
+                        : "Unknown"}
+                    </span>
+                    {domainId && resolvedIntegration.metadata?.id && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-sm py-1.5"
+                          onClick={() => handleOpenConfigureIntegrationDialog(resolvedIntegration.metadata!.id!)}
+                        >
+                          Configure...
+                        </Button>
+                    )}
+                  </div>
+                </div>
+            </div>
+          )}
           <Tabs
             value={activeTab}
             onValueChange={(value) => onTabChange?.(value as "latest" | "settings")}
@@ -647,7 +851,10 @@ export const ComponentSidebar = ({
                   integrationName={integrationName}
                   integrationRef={integrationRef}
                   integrations={integrations}
+                  integrationDefinition={createIntegrationDefinition}
                   autocompleteExampleObj={resolvedAutocompleteExampleObj}
+                  onOpenCreateIntegrationDialog={handleOpenCreateIntegrationDialog}
+                  onOpenConfigureIntegrationDialog={handleOpenConfigureIntegrationDialog}
                 />
               </TabsContent>
             )}
@@ -748,6 +955,211 @@ export const ComponentSidebar = ({
           )}
         </div>
       </div>
+
+      <Dialog open={isCreateIntegrationDialogOpen} onOpenChange={(open) => !open && handleCloseCreateIntegrationDialog()}>
+        <DialogContent
+          className="sm:max-w-2xl max-h-[80vh] overflow-y-auto"
+          showCloseButton={!createIntegrationMutation.isPending}
+        >
+          {selectedIntegrationForDialog && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-3">
+                  {renderIntegrationIcon(
+                    selectedIntegrationForDialog.icon,
+                    selectedIntegrationForDialog.name,
+                    "h-6 w-6 text-gray-500 dark:text-gray-400",
+                  )}
+                  <DialogTitle>
+                    Connect{" "}
+                    {getIntegrationTypeDisplayName(
+                      undefined,
+                      selectedIntegrationForDialog.name,
+                    ) || selectedIntegrationForDialog.name}
+                  </DialogTitle>
+                </div>
+                {selectedInstructions && (
+                  <DialogDescription asChild>
+                    <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-100 [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:space-y-1 mt-2">
+                      <ReactMarkdown>{selectedInstructions}</ReactMarkdown>
+                    </div>
+                  </DialogDescription>
+                )}
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-gray-800 dark:text-gray-100 mb-2">
+                    Integration Name
+                    <span className="text-gray-800 ml-1">*</span>
+                  </Label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    A unique name for this integration
+                  </p>
+                  <Input
+                    type="text"
+                    value={createIntegrationName}
+                    onChange={(e) => setCreateIntegrationName(e.target.value)}
+                    placeholder="e.g., my-app-integration"
+                  />
+                </div>
+                {selectedIntegrationForDialog.configuration &&
+                  selectedIntegrationForDialog.configuration.length > 0 && (
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
+                      {selectedIntegrationForDialog.configuration.map((field) => {
+                        if (!field.name) return null;
+                        return (
+                          <ConfigurationFieldRenderer
+                            key={field.name}
+                            field={field}
+                            value={createIntegrationConfig[field.name]}
+                            onChange={(value) =>
+                              setCreateIntegrationConfig((prev) => ({ ...prev, [field.name || ""]: value }))
+                            }
+                            allValues={createIntegrationConfig}
+                            domainId={domainId ?? ""}
+                            domainType="DOMAIN_TYPE_ORGANIZATION"
+                            organizationId={domainId ?? ""}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+              </div>
+              <DialogFooter className="gap-2 sm:justify-start mt-6">
+                <Button
+                  color="blue"
+                  onClick={() => void handleCreateIntegrationSubmit()}
+                  disabled={createIntegrationMutation.isPending || !createIntegrationName?.trim()}
+                  className="flex items-center gap-2"
+                >
+                  {createIntegrationMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Connecting...
+                    </>
+                  ) : (
+                    "Connect"
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleCloseCreateIntegrationDialog}
+                  disabled={createIntegrationMutation.isPending}
+                >
+                  Cancel
+                </Button>
+              </DialogFooter>
+              {createIntegrationMutation.isError && (
+                <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                  <p className="text-sm text-red-800 dark:text-red-200">
+                    Failed to create integration: {getApiErrorMessage(createIntegrationMutation.error)}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!configureIntegrationId}
+        onOpenChange={(open) => !open && handleCloseConfigureIntegrationDialog()}
+      >
+        <DialogContent
+          className="sm:max-w-2xl max-h-[80vh] overflow-y-auto"
+          showCloseButton={!updateIntegrationMutation.isPending}
+        >
+          {configureIntegrationLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-gray-500 dark:text-gray-400" />
+            </div>
+          ) : configureIntegrationId && configureIntegration ? (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-3">
+                  {renderIntegrationIcon(
+                    configureIntegrationDefinition?.icon,
+                    configureIntegration.spec?.integrationName,
+                    "h-6 w-6 text-gray-500 dark:text-gray-400",
+                  )}
+                  <DialogTitle>
+                    Configure{" "}
+                    {configureIntegration.metadata?.name ||
+                      getIntegrationTypeDisplayName(
+                        undefined,
+                        configureIntegration.spec?.integrationName,
+                      ) ||
+                      configureIntegration.spec?.integrationName}
+                  </DialogTitle>
+                </div>
+              </DialogHeader>
+              {configureIntegrationDefinition?.configuration &&
+              configureIntegrationDefinition.configuration.length > 0 ? (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void handleConfigureIntegrationSubmit();
+                  }}
+                  className="space-y-4"
+                >
+                  {configureIntegrationDefinition.configuration.map((field) => {
+                    if (!field.name) return null;
+                    return (
+                      <ConfigurationFieldRenderer
+                        key={field.name}
+                        field={field}
+                        value={configureIntegrationConfig[field.name]}
+                        onChange={(value) =>
+                          setConfigureIntegrationConfig((prev) => ({ ...prev, [field.name || ""]: value }))
+                        }
+                        allValues={configureIntegrationConfig}
+                        domainId={domainId ?? ""}
+                        domainType="DOMAIN_TYPE_ORGANIZATION"
+                        organizationId={domainId ?? ""}
+                        appInstallationId={configureIntegration.metadata?.id}
+                      />
+                    );
+                  })}
+                  <DialogFooter className="gap-2 sm:justify-start pt-4">
+                    <Button
+                      type="submit"
+                      color="blue"
+                      disabled={updateIntegrationMutation.isPending}
+                      className="flex items-center gap-2"
+                    >
+                      {updateIntegrationMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save Configuration"
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleCloseConfigureIntegrationDialog}
+                      disabled={updateIntegrationMutation.isPending}
+                    >
+                      Cancel
+                    </Button>
+                  </DialogFooter>
+                  {updateIntegrationMutation.isError && (
+                    <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                      <p className="text-sm text-red-800 dark:text-red-200">
+                        Failed to update configuration: {getApiErrorMessage(updateIntegrationMutation.error)}
+                      </p>
+                    </div>
+                  )}
+                </form>
+              ) : (
+                <p className="text-sm text-gray-500 dark:text-gray-400">No configuration fields available.</p>
+              )}
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

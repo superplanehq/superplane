@@ -1,0 +1,22 @@
+---
+description: Use shadcn (components/ui) for all forms; prefer existing shadcn components over custom ones
+globs:
+  - "web_src/**/*.tsx"
+  - "web_src/**/*.ts"
+alwaysApply: false
+---
+
+# UI: shadcn for Forms and Components
+
+## Forms — always use shadcn
+
+- **All form UI** must use components from `@/components/ui` (this project's shadcn primitives).
+- Use `Input`, `Label`, `Select`, `SelectContent`, `SelectItem`, `SelectTrigger`, `SelectValue`, `Textarea`, `Checkbox`, `Switch`, `Button` from `@/components/ui` — do **not** use raw `<input>`, `<select>`, `<textarea>`, or ad‑hoc form controls when an equivalent exists in `@/components/ui`.
+- Pair inputs with `Label` and proper `htmlFor` / `id` for accessibility.
+- For dialogs/modals that contain forms, use `Dialog`, `DialogContent`, `DialogHeader`, `DialogTitle`, `DialogDescription`, `DialogFooter` from `@/components/ui`.
+
+## New patterns — check shadcn first
+
+- **Before adding a new UI element or pattern**, check whether `web_src/src/components/ui/` already provides a suitable component (e.g. button, input, label, select, dialog, tabs, tooltip, badge, separator, scroll-area, command, slider, textarea).
+- **Prefer composing or customizing** an existing shadcn component over building a custom component from scratch.
+- Only introduce a new custom component when no existing `@/components/ui` (or other design-system) component fits the use case.
