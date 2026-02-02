@@ -45,7 +45,9 @@ Use this skill when creating integration issues on GitHub from prepared template
    - **Body**: IMPORTANT block, Description, Suggested Connection Method, Acceptance Criteria, Follow up tasks, Reference — **no** `### Title` or backtick title line; **no** `### Priority` or priority value line (Priority is set via Board).
 3. **Create the issue** via GitHub MCP with title and body as above.
 4. **Labels**: Add `integration` and `refinement` to the issue.
-5. **SuperPlane Board** (via MCP projects): Add issue to the SuperPlane Board project; set **Integration Status** = `Backlog`; set **Priority** to the agreed value (P1–P4) for the base.
+5. **SuperPlane Board** (via MCP projects):
+   - **Add** the issue to the SuperPlane Board project (`add_project_item` with owner, project_number 2, item_owner, item_repo, item_type `issue`, issue_number).
+   - **Set Board fields** (required — do not skip): Adding an issue does **not** set Integration Status or Priority. Get the new item's numeric id via `list_project_items` (e.g. query `title:*[IntegrationName]*`), find the item whose Title matches the issue you just created; then call `update_project_item` twice for that item — once Integration Status = Backlog (field id and Backlog option id from `list_project_fields`), once Priority = agreed P1–P4 (field id and P1/P2/P3/P4 option id from `list_project_fields`). Field ids in `updated_field` must be **numbers**.
 6. **Note the base issue number** (e.g. `#1912`) and write it in the progress doc. You need it for every child issue body and for linking sub-issues.
 
 ---
@@ -59,7 +61,7 @@ Use this skill when creating integration issues on GitHub from prepared template
      - **Body**: First line must be `**Parent (base integration):** #BASE_ISSUE_NUMBER`, then a blank line, then the rest of the file content **without** the `### Title` and backtick title line and **without** the `### Priority` and priority value line (Priority is set via Board). Include IMPORTANT block, Description, Use Cases, Configuration, Outputs, Acceptance Criteria, Reference.
    - **Create the issue** via MCP with this title and body.
    - **Labels**: Add `integration` and `refinement`.
-   - **SuperPlane Board**: Add to project; set **Integration Status** = `Backlog`; set **Priority** from the agreed P1–P4 for that component.
+   - **SuperPlane Board**: Add to project with `add_project_item`. Then **set Board fields** (required — do not skip): get the new item's numeric id via `list_project_items` (e.g. query `title:*[IntegrationName]*`), then call `update_project_item` twice for that item — once Integration Status = Backlog (field id and Backlog option id from `list_project_fields`), once Priority = agreed P1–P4 (field id and P1/P2/P3/P4 option id from `list_project_fields`). Field ids in `updated_field` must be numbers.
    - **Sub-issue link** (via MCP projects): Attach this issue as a **sub-issue of the base issue** so the Board shows the hierarchy. The parent reference in the body is also required.
    - **Update progress doc** with this child issue number, then proceed to the next component.
 3. Create issues **sequentially**; do not batch many creates in parallel to avoid GitHub API rate limits.
@@ -83,7 +85,7 @@ Use this skill when creating integration issues on GitHub from prepared template
 ## Summary checklist (per integration)
 
 - [ ] Create/update progress doc in `tmp/integrations_pm/` before starting.
-- [ ] Create **one base issue** first; exclude `### Title` and `### Priority` from body; add labels `integration`, `refinement`; set Board **Integration Status** = `Backlog`, **Priority** = agreed P1–P4.
-- [ ] Create **one child issue** per component **sequentially**; body starts with `**Parent (base integration):** #BASE_ISSUE_NUMBER`; exclude `### Title` and `### Priority` from body; same labels and Board fields; attach as sub-issue of base via MCP (projects).
+- [ ] Create **one base issue** first; exclude `### Title` and `### Priority` from body; add labels `integration`, `refinement`; add to Board then **set Board fields** via `update_project_item` (Integration Status = Backlog, Priority = agreed P1–P4) — get item id from `list_project_items`; do not skip this.
+- [ ] Create **one child issue** per component **sequentially**; body starts with `**Parent (base integration):** #BASE_ISSUE_NUMBER`; exclude `### Title` and `### Priority` from body; same labels; add to Board then **set Board fields** via `update_project_item` for that item; attach as sub-issue of base via MCP (projects).
 - [ ] After each issue, update progress doc; then update `list.md` checkboxes if the file exists.
 - [ ] Ask user to review on GitHub; after confirmation, remove progress doc and other tmp files created for this run.
