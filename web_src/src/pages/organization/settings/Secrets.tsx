@@ -32,7 +32,6 @@ export function Secrets({ organizationId }: SecretsProps) {
   const [secretName, setSecretName] = useState("");
   const [keyValuePairs, setKeyValuePairs] = useState<KeyValuePair[]>([{ name: "", value: "" }]);
   const [visibleValues, setVisibleValues] = useState<Set<string>>(new Set());
-  const [visibleEditValues, setVisibleEditValues] = useState<Set<number>>(new Set());
 
   const { data: secrets = [], isLoading } = useSecrets(organizationId, "DOMAIN_TYPE_ORGANIZATION");
   const createSecretMutation = useCreateSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION");
@@ -46,7 +45,6 @@ export function Secrets({ organizationId }: SecretsProps) {
   const handleCreateClick = () => {
     setSecretName("");
     setKeyValuePairs([{ name: "", value: "" }]);
-    setVisibleEditValues(new Set([0])); // Show first value by default
     setIsCreateModalOpen(true);
   };
 
@@ -55,8 +53,6 @@ export function Secrets({ organizationId }: SecretsProps) {
     const pairs = Object.entries(secretData).map(([name, value]) => ({ name, value }));
     setSecretName(secret.metadata?.name || "");
     setKeyValuePairs(pairs.length > 0 ? pairs : [{ name: "", value: "" }]);
-    // Show all values by default when editing
-    setVisibleEditValues(new Set(pairs.map((_, index) => index)));
     setEditingSecret(secret);
   };
 
@@ -65,7 +61,6 @@ export function Secrets({ organizationId }: SecretsProps) {
     setEditingSecret(null);
     setSecretName("");
     setKeyValuePairs([{ name: "", value: "" }]);
-    setVisibleEditValues(new Set());
     createSecretMutation.reset();
   };
 
