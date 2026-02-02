@@ -318,3 +318,7 @@ func (c *UpdateRelease) HandleAction(ctx core.ActionContext) error {
 func (c *UpdateRelease) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
+
+func (c *UpdateRelease) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

@@ -180,3 +180,7 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 
 	return http.StatusOK, nil
 }
+
+func (i *OnIssue) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}

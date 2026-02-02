@@ -326,3 +326,7 @@ func dnsRecordToMap(record *DNSRecord) map[string]any {
 
 	return payload
 }
+
+func (c *CreateDNSRecord) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

@@ -291,3 +291,7 @@ func parseHexColor(hex string) (int, error) {
 
 	return int(value), nil
 }
+
+func (c *SendTextMessage) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

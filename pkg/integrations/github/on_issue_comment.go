@@ -193,3 +193,7 @@ func (i *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 
 	return http.StatusOK, nil
 }
+
+func (i *OnIssueComment) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}

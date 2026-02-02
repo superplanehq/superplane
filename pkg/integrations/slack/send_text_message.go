@@ -178,3 +178,7 @@ func (c *SendTextMessage) HandleAction(ctx core.ActionContext) error {
 func (c *SendTextMessage) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
+
+func (c *SendTextMessage) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

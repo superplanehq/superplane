@@ -185,3 +185,7 @@ func whitelistedAction(data map[string]any, allowed []string) bool {
 
 	return slices.Contains(allowed, action.(string))
 }
+
+func (p *OnPullRequest) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}

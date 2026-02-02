@@ -235,3 +235,7 @@ func matchesWorkflowFile(data map[string]any, allowedWorkflowFiles []string) boo
 
 	return slices.Contains(allowedWorkflowFiles, path)
 }
+
+func (w *OnWorkflowRun) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}

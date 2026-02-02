@@ -251,3 +251,7 @@ func (c *DeleteRelease) HandleAction(ctx core.ActionContext) error {
 func (c *DeleteRelease) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
+
+func (c *DeleteRelease) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

@@ -228,3 +228,7 @@ func (p *OnPRComment) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 
 	return http.StatusOK, nil
 }
+
+func (p *OnPRComment) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}

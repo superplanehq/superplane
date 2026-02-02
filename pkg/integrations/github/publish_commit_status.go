@@ -234,3 +234,7 @@ func (c *PublishCommitStatus) HandleAction(ctx core.ActionContext) error {
 func (c *PublishCommitStatus) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
+
+func (c *PublishCommitStatus) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
