@@ -171,3 +171,7 @@ func (r *OnRelease) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 
 	return http.StatusOK, nil
 }
+
+func (r *OnRelease) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}

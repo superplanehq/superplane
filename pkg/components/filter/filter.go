@@ -274,3 +274,7 @@ func (f *Filter) Cancel(ctx core.ExecutionContext) error {
 func (f *Filter) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
+
+func (f *Filter) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

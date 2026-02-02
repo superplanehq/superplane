@@ -73,6 +73,12 @@ type Trigger interface {
 	 * Execution a custom action - defined in Actions() for a trigger.
 	 */
 	HandleAction(ctx TriggerActionContext) (map[string]any, error)
+
+	/*
+	 * Cleanup allows triggers to clean up resources after being removed from a canvas.
+	 * Default behavior does nothing. Triggers can override to perform cleanup.
+	 */
+	Cleanup(ctx TriggerContext) error
 }
 
 type TriggerContext struct {
