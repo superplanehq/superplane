@@ -39,13 +39,18 @@ type WorkflowRunMetadata struct {
 }
 
 type RunWorkflowSpec struct {
-	Repository             string   `json:"repository"`
-	WorkflowFile           string   `json:"workflowFile"`
-	Ref                    string   `json:"ref"`
-	Inputs                 []Input  `json:"inputs"`
-	// Security settings for branch restriction
-	AllowedBranches        []string `json:"allowedBranches,omitempty"`
-	RequireProtectedBranch bool     `json:"requireProtectedBranch,omitempty"`
+	Repository      string   `json:"repository"`
+	WorkflowFile    string   `json:"workflowFile"`
+	Ref             string   `json:"ref"`
+	Inputs          []Input  `json:"inputs"`
+	// AllowedBranches specifies which branches can trigger workflows.
+	// If empty and EnforceBranchRestriction is not false, defaults are used.
+	AllowedBranches []string `json:"allowedBranches,omitempty"`
+	// EnforceBranchRestriction controls branch restriction behavior:
+	//   - nil (not set): Use secure defaults (main, master, release, production, staging)
+	//   - true: Enforce branch restrictions with AllowedBranches or defaults
+	//   - false: Disable branch restrictions (allow any branch) - USE WITH CAUTION
+	EnforceBranchRestriction *bool `json:"enforceBranchRestriction,omitempty"`
 }
 
 // Default allowed branches (protected branches)
@@ -636,17 +641,18 @@ func (r *RunWorkflow) buildInputs(ctx core.ExecutionContext, inputs []Input) map
 	return result
 }
 
-// validateBranchRestriction checks if the ref is an allowed branch
-// This prevents triggering workflows on unreviewed branches/PRs which could contain malicious code
+// validateBranchRestriction checks if the ref is an allowed branch.
+// This prevents triggering workflows on unreviewed branches/PRs which could contain malicious code.
 func (r *RunWorkflow) validateBranchRestriction(spec RunWorkflowSpec) error {
-	// If RequireProtectedBranch is explicitly set to false, skip validation
-	// Note: default behavior is to require protected branches for security
-	if !spec.RequireProtectedBranch && len(spec.AllowedBranches) == 0 {
-		// Use default allowed branches for security
-		spec.AllowedBranches = defaultAllowedBranches
+	// If EnforceBranchRestriction is explicitly set to false, skip all validation
+	// This allows users to opt out of branch restrictions when needed
+	if spec.EnforceBranchRestriction != nil && !*spec.EnforceBranchRestriction {
+		return nil
 	}
 
-	// Get the list of allowed branches
+	// Determine allowed branches:
+	// 1. Use user-specified AllowedBranches if provided
+	// 2. Otherwise use secure defaults
 	allowedBranches := spec.AllowedBranches
 	if len(allowedBranches) == 0 {
 		allowedBranches = defaultAllowedBranches
@@ -655,7 +661,7 @@ func (r *RunWorkflow) validateBranchRestriction(spec RunWorkflowSpec) error {
 	ref := spec.Ref
 
 	// Check if ref is a commit SHA (40 hex characters)
-	// Commit SHAs are blocked by default as they could reference unreviewed code
+	// Commit SHAs are blocked as they could reference unreviewed code
 	if len(ref) == 40 && isHexString(ref) {
 		return fmt.Errorf("direct commit SHA references are not allowed for security reasons; use a branch name instead")
 	}
