@@ -2,6 +2,7 @@ package aws
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -180,7 +181,59 @@ func (a *AWS) Sync(ctx core.SyncContext) error {
 }
 
 func (a *AWS) Cleanup(ctx core.IntegrationCleanupContext) error {
-	return nil
+	metadata := common.IntegrationMetadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %v", err)
+	}
+
+	if metadata.EventBridge == nil && metadata.IAM == nil {
+		return nil
+	}
+
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to get AWS credentials: %w", err)
+	}
+
+	var cleanupErr error
+	destinationName := fmt.Sprintf("superplane-%s", ctx.Integration.ID().String())
+
+	if metadata.EventBridge != nil {
+		for region := range metadata.EventBridge.APIDestinations {
+			client := eventbridge.NewClient(ctx.HTTP, creds, region)
+
+			err := client.DeleteApiDestination(destinationName)
+			if err != nil && !common.IsNotFoundErr(err) {
+				cleanupErr = errors.Join(cleanupErr, fmt.Errorf("failed to delete API destination in region %s: %w", region, err))
+			}
+
+			err = client.DeleteConnection(destinationName)
+			if err != nil && !common.IsNotFoundErr(err) {
+				cleanupErr = errors.Join(cleanupErr, fmt.Errorf("failed to delete connection in region %s: %w", region, err))
+			}
+		}
+	}
+
+	if metadata.IAM != nil {
+		client := iam.NewClient(ctx.HTTP, creds)
+		roleName := a.roleName(ctx.Integration)
+
+		if parsedRoleName, ok := roleNameFromArn(metadata.IAM.TargetDestinationRoleArn); ok {
+			roleName = parsedRoleName
+		}
+
+		err := client.DeleteRolePolicy(roleName, "invoke-api-destination")
+		if err != nil && !iam.IsNoSuchEntityErr(err) {
+			cleanupErr = errors.Join(cleanupErr, fmt.Errorf("failed to delete IAM role policy for %s: %w", roleName, err))
+		}
+
+		err = client.DeleteRole(roleName)
+		if err != nil && !iam.IsNoSuchEntityErr(err) {
+			cleanupErr = errors.Join(cleanupErr, fmt.Errorf("failed to delete IAM role %s: %w", roleName, err))
+		}
+	}
+
+	return cleanupErr
 }
 
 func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
@@ -390,6 +443,32 @@ func (a *AWS) configureRole(ctx core.SyncContext, metadata *common.IntegrationMe
 func (a *AWS) roleName(integration core.IntegrationContext) string {
 	idParts := strings.Split(integration.ID().String(), "-")
 	return fmt.Sprintf("superplane-destination-invoker-%s", idParts[len(idParts)-1])
+}
+
+func roleNameFromArn(arn string) (string, bool) {
+	arn = strings.TrimSpace(arn)
+	if arn == "" {
+		return "", false
+	}
+
+	index := strings.LastIndex(arn, "role/")
+	if index == -1 {
+		return "", false
+	}
+
+	name := strings.TrimSpace(arn[index+len("role/"):])
+	if name == "" {
+		return "", false
+	}
+
+	if lastSlash := strings.LastIndex(name, "/"); lastSlash != -1 {
+		name = strings.TrimSpace(name[lastSlash+1:])
+		if name == "" {
+			return "", false
+		}
+	}
+
+	return name, true
 }
 
 func (a *AWS) createAPIDestination(

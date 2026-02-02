@@ -51,6 +51,14 @@ func IsEntityAlreadyExistsErr(err error) bool {
 	return false
 }
 
+func IsNoSuchEntityErr(err error) bool {
+	var awsErr *common.Error
+	if errors.As(err, &awsErr) {
+		return strings.Contains(awsErr.Code, "NoSuchEntity")
+	}
+	return false
+}
+
 func (c *Client) CreateRole(name, assumeRolePolicy string, tags []common.Tag) (string, error) {
 	params := map[string]string{
 		"RoleName":                 name,
@@ -100,6 +108,23 @@ func (c *Client) PutRolePolicy(roleName, policyName, policyDocument string) erro
 	}
 
 	return c.postForm("PutRolePolicy", params, nil)
+}
+
+func (c *Client) DeleteRolePolicy(roleName, policyName string) error {
+	params := map[string]string{
+		"RoleName":   roleName,
+		"PolicyName": policyName,
+	}
+
+	return c.postForm("DeleteRolePolicy", params, nil)
+}
+
+func (c *Client) DeleteRole(name string) error {
+	params := map[string]string{
+		"RoleName": name,
+	}
+
+	return c.postForm("DeleteRole", params, nil)
 }
 
 func (c *Client) postForm(action string, params map[string]string, out any) error {
