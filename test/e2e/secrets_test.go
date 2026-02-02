@@ -6,7 +6,6 @@ import (
 	"os"
 	"sort"
 	"testing"
-	"fmt"
 
 	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/require"
@@ -31,10 +30,10 @@ func TestSecrets(t *testing.T) {
 		steps.start()
 		steps.visitSecretsPage()
 		steps.givenASecretExists("E2E Test Secret 2", map[string]string{"KEY1": "value1"})
-		steps.clickEditSecret("E2E Test Secret 2")
-		steps.clickAddPair()
-		steps.fillKeyValuePair(1, "KEY2", "value2")
-		steps.submitUpdateSecret()
+		// After create we're on the secret detail page
+		steps.clickAddKey()
+		steps.fillAddKeyForm("KEY2", "value2")
+		steps.submitAddKey()
 		steps.assertSecretSavedInDB("E2E Test Secret 2", map[string]string{"KEY1": "value1", "KEY2": "value2"})
 	})
 
@@ -144,6 +143,44 @@ func (s *SecretsSteps) clickAddPair() {
 	s.session.Sleep(300)
 }
 
+// clickAddKey clicks "Add key" on the secret detail page to show the add-key form.
+func (s *SecretsSteps) clickAddKey() {
+	page := s.session.Page()
+	addKeyBtn := page.Locator("button:has-text('Add key')")
+	if err := addKeyBtn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible}); err != nil {
+		s.t.Fatalf("waiting for Add key button: %v", err)
+	}
+	if err := addKeyBtn.Click(); err != nil {
+		s.t.Fatalf("clicking Add key button: %v", err)
+	}
+	s.session.Sleep(300)
+}
+
+// fillAddKeyForm fills the key name and value in the add-key form on the secret detail page.
+func (s *SecretsSteps) fillAddKeyForm(key, value string) {
+	page := s.session.Page()
+	keyInput := page.Locator(`input[placeholder="Key name"]`)
+	valueTextarea := page.Locator(`textarea[placeholder="Value"]`)
+	if err := keyInput.First().Fill(key); err != nil {
+		s.t.Fatalf("filling add-key form key: %v", err)
+	}
+	s.session.Sleep(200)
+	if err := valueTextarea.First().Fill(value); err != nil {
+		s.t.Fatalf("filling add-key form value: %v", err)
+	}
+	s.session.Sleep(200)
+}
+
+// submitAddKey clicks Save in the add-key form on the secret detail page.
+func (s *SecretsSteps) submitAddKey() {
+	page := s.session.Page()
+	saveBtn := page.Locator("button:has-text('Save')")
+	if err := saveBtn.First().Click(); err != nil {
+		s.t.Fatalf("clicking Save in add-key form: %v", err)
+	}
+	s.session.Sleep(500)
+}
+
 func (s *SecretsSteps) removeKeyValuePair(index int) {
 	// Find all delete buttons (trash icons)
 	deleteButtons := s.session.Page().Locator(`button[title="Remove pair"]`)
@@ -192,7 +229,6 @@ func (s *SecretsSteps) submitCreateSecret() {
 func (s *SecretsSteps) submitUpdateSecret() {
 	page := s.session.Page()
 	s.session.Click(q.Text("Update Secret"))
-	// Wait for the modal to close (success) or fail on error
 	modal := page.Locator(".fixed.inset-0")
 	if err := modal.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateHidden, Timeout: pw.Float(5000)}); err != nil {
 		errorMsg := page.Locator("text=/Failed to update secret/")
@@ -205,25 +241,20 @@ func (s *SecretsSteps) submitUpdateSecret() {
 }
 
 func (s *SecretsSteps) clickEditSecret(secretName string) {
-	// Find the secret card by name, then find the edit button within it
-	// The secret name is in a heading, we need to find the parent card and then the edit button
-	secretNameLocator := s.session.Page().Locator("text=" + secretName)
-	secretCard := secretNameLocator.Locator("xpath=ancestor::div[contains(@class, 'rounded-md')]")
-	editButton := secretCard.Locator(`button[title="Edit secret"]`)
-
-	if err := editButton.Click(); err != nil {
-		s.t.Fatalf("clicking edit button for secret %q: %v", secretName, err)
+	s.visitSecretsPage()
+	page := s.session.Page()
+	link := page.Locator("a:has-text(\"" + secretName + "\")")
+	if err := link.Click(); err != nil {
+		s.t.Fatalf("clicking secret link for %q: %v", secretName, err)
 	}
 	s.session.Sleep(500)
 }
 
 func (s *SecretsSteps) clickDeleteSecret(secretName string) {
-	// Find the secret card by name, then find the delete button within it
-	secretNameLocator := s.session.Page().Locator("text=" + secretName)
-	secretCard := secretNameLocator.Locator("xpath=ancestor::div[contains(@class, 'rounded-md')]")
-	deleteButton := secretCard.Locator(`button[title="Delete secret"]`)
-
-	if err := deleteButton.Click(); err != nil {
+	s.clickEditSecret(secretName)
+	page := s.session.Page()
+	deleteBtn := page.Locator("button:has-text('Delete secret')")
+	if err := deleteBtn.Click(); err != nil {
 		s.t.Fatalf("clicking delete button for secret %q: %v", secretName, err)
 	}
 	s.session.Sleep(500)
@@ -242,7 +273,6 @@ func (s *SecretsSteps) assertSecretSavedInDB(name string, expectedData map[strin
 	require.NoError(s.t, err)
 	var secretData map[string]string
 	err = json.Unmarshal(decrypted, &secretData)
-	fmt.Printf("Decrypted secret data: %+v\n", secretData)
 	require.NoError(s.t, err)
 	require.Equal(s.t, expectedData, secretData)
 }
@@ -254,6 +284,7 @@ func (s *SecretsSteps) assertSecretDeletedFromDB(name string) {
 }
 
 func (s *SecretsSteps) assertSecretVisibleInList(name string) {
+	s.visitSecretsPage()
 	s.session.AssertText(name)
 }
 
