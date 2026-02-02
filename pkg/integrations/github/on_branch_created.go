@@ -195,3 +195,7 @@ func (t *OnBranchCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 
 	return http.StatusOK, nil
 }
+
+func (t *OnBranchCreated) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}

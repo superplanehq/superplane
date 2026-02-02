@@ -155,3 +155,7 @@ func (d *DeleteSandbox) HandleAction(ctx core.ActionContext) error {
 func (d *DeleteSandbox) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
+
+func (d *DeleteSandbox) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

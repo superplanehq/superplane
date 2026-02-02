@@ -180,3 +180,7 @@ func (c *SnoozeIncident) HandleAction(ctx core.ActionContext) error {
 func (c *SnoozeIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
+
+func (c *SnoozeIncident) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

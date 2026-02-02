@@ -221,3 +221,7 @@ func (c *CreateSandbox) HandleAction(ctx core.ActionContext) error {
 func (c *CreateSandbox) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
+
+func (c *CreateSandbox) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

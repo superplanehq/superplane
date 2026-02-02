@@ -199,3 +199,7 @@ func (t *OnAppMention) OnIntegrationMessage(ctx core.IntegrationMessageContext) 
 	//
 	return ctx.Events.Emit("slack.app.mention", ctx.Message)
 }
+
+func (t *OnAppMention) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}

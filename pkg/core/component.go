@@ -112,6 +112,12 @@ type Component interface {
 	 * cleanup or cancel external resources.
 	 */
 	Cancel(ctx ExecutionContext) error
+
+	/*
+	 * Cleanup allows components to clean up resources after being removed from a canvas.
+	 * Default behavior does nothing. Components can override to perform cleanup.
+	 */
+	Cleanup(ctx SetupContext) error
 }
 
 type OutputChannel struct {

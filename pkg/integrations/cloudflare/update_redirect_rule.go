@@ -335,3 +335,7 @@ func (c *UpdateRedirectRule) HandleAction(ctx core.ActionContext) error {
 func (c *UpdateRedirectRule) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
+
+func (c *UpdateRedirectRule) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
