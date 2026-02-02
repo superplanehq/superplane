@@ -37,6 +37,7 @@ func (p *panickingComponent) HandleWebhook(ctx core.WebhookRequestContext) (int,
 	panic("handle webhook panic")
 }
 func (p *panickingComponent) Cancel(ctx core.ExecutionContext) error { panic("cancel panic") }
+func (p *panickingComponent) Cleanup(ctx core.SetupContext) error    { panic("cleanup panic") }
 
 func TestPanicableComponent_Setup_CatchesPanic(t *testing.T) {
 	comp := &panickingComponent{name: "panicking-comp"}
@@ -119,4 +120,18 @@ func TestPanicableComponent_Cancel_CatchesPanic(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "panicking-comp panicked in Cancel()")
 	assert.Contains(t, err.Error(), "cancel panic")
+}
+
+func TestPanicableComponent_Cleanup_CatchesPanic(t *testing.T) {
+	comp := &panickingComponent{name: "panicking-comp"}
+	panicable := NewPanicableComponent(comp)
+	ctx := core.SetupContext{
+		Logger: log.NewEntry(log.StandardLogger()),
+	}
+
+	err := panicable.Cleanup(ctx)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "panicking-comp panicked in Cleanup()")
+	assert.Contains(t, err.Error(), "cleanup panic")
 }
