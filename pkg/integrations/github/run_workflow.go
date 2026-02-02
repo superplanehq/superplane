@@ -195,11 +195,20 @@ func (r *RunWorkflow) Configuration() []configuration.Field {
 		},
 		// Security configuration for branch restrictions
 		{
+			Name:        "enforceBranchRestriction",
+			Label:       "Restrict allowed branches",
+			Type:        configuration.FieldTypeBool,
+			Description: "When enabled, only specified branches (or defaults: main, master, release, production, staging) can trigger this workflow. Blocks commit SHAs and PR references.",
+			Togglable:   true,
+		},
+		{
 			Name:        "allowedBranches",
 			Label:       "Allowed Branches",
 			Type:        configuration.FieldTypeList,
-			Description: "List of branch names or patterns (e.g., main, release/*) allowed for workflow execution. Defaults to main, master, release, production, staging.",
-			Togglable:   true,
+			Description: "Branch names or patterns (e.g., main, release/*) allowed for workflow execution.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "enforceBranchRestriction", Values: []string{"true"}},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Branch",
