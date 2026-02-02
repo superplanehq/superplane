@@ -8,6 +8,7 @@ import {
   ArrowRightLeft,
   ChevronDown,
   CircleUser,
+  Key,
   LogOut,
   Settings,
   Shield,
@@ -95,6 +96,11 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
       label: "Integrations",
       href: organizationId ? `/${organizationId}/settings/integrations` : "#",
       Icon: AppWindow,
+    },
+    {
+      label: "Secrets",
+      href: organizationId ? `/${organizationId}/settings/secrets` : "#",
+      Icon: Key,
     },
     { label: "Change Organization", href: "/", Icon: ArrowRightLeft },
   ];
