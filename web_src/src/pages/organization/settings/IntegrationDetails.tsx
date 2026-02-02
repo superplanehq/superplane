@@ -17,6 +17,7 @@ import { showErrorToast } from "@/utils/toast";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
+import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
@@ -46,6 +47,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
     aws: awsIcon,
     dash0: dash0Icon,
     github: githubIcon,
+    gitlab: gitlabIcon,
     openai: openAiIcon,
     daytona: daytonaIcon,
     "open-ai": openAiIcon,

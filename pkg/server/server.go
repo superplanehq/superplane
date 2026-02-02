@@ -37,6 +37,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/daytona"
 	_ "github.com/superplanehq/superplane/pkg/integrations/discord"
 	_ "github.com/superplanehq/superplane/pkg/integrations/github"
+	_ "github.com/superplanehq/superplane/pkg/integrations/gitlab"
 	_ "github.com/superplanehq/superplane/pkg/integrations/openai"
 	_ "github.com/superplanehq/superplane/pkg/integrations/pagerduty"
 	_ "github.com/superplanehq/superplane/pkg/integrations/rootly"
