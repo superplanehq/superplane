@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [ -f ".env" ]; then
+  set -a
+  . ./.env
+  set +a
+fi
+
+PORT="${PUBLIC_API_PORT:-8000}"
+HOST="${WAIT_FOR_APP_HOST:-localhost}"
+TIMEOUT_SECONDS="${WAIT_FOR_APP_TIMEOUT_SECONDS:-60}"
+INTERVAL_SECONDS="${WAIT_FOR_APP_INTERVAL_SECONDS:-2}"
+
+url="http://${HOST}:${PORT}/health"
+start_epoch="$(date +%s)"
+
+echo "Waiting for app health at ${url} (timeout ${TIMEOUT_SECONDS}s)..."
+
+while true; do
+  if curl -fsS "${url}" >/dev/null 2>&1; then
+    echo "App is healthy."
+    break
+  fi
+
+  now_epoch="$(date +%s)"
+  elapsed="$((now_epoch - start_epoch))"
+
+  if [ "${elapsed}" -ge "${TIMEOUT_SECONDS}" ]; then
+    echo "Timed out waiting for app health at ${url}." >&2
+    exit 1
+  fi
+
+  sleep "${INTERVAL_SECONDS}"
+done
+
+port="${PUBLIC_API_PORT:-8000}"
+echo ""
+echo "Open http://localhost:${port} in your browser."
