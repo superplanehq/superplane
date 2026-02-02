@@ -112,3 +112,7 @@ func (s *Start) Actions() []core.Action {
 func (s *Start) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
 	return nil, nil
 }
+
+func (s *Start) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}

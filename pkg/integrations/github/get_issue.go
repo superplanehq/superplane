@@ -169,3 +169,7 @@ func (c *GetIssue) HandleAction(ctx core.ActionContext) error {
 func (c *GetIssue) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
+
+func (c *GetIssue) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
