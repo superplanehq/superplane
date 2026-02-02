@@ -3,12 +3,12 @@ package gitlab
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 const apiVersion = "v4"
-const DefaultBaseURL = "https://gitlab.com"
 
 type Client struct {
 	baseURL    string
@@ -89,8 +89,8 @@ func (c *Client) Verify() error {
 		return fmt.Errorf("groupID is missing") 	
 	}
 
-	url := fmt.Sprintf("%s/api/%s/groups/%s", c.baseURL, apiVersion, c.groupID)
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	apiURL := fmt.Sprintf("%s/api/%s/groups/%s", c.baseURL, apiVersion, url.PathEscape(c.groupID))
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
 	if err != nil {
 		return err
 	}
