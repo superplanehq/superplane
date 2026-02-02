@@ -8,11 +8,12 @@ import { usePermissions } from "@/contexts/PermissionsContext";
 import { getApiErrorMessage } from "@/utils/errors";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { Edit2, Eye, EyeOff, Key, Loader2, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SecretsSecret } from "../../../api-client/types.gen";
 import {
   useCreateSecret,
   useDeleteSecret,
+  useSecret,
   useSecrets,
   useUpdateSecret,
   type CreateSecretParams,
@@ -38,16 +39,32 @@ export function Secrets({ organizationId }: SecretsProps) {
   const canCreateSecrets = canAct("secrets", "create");
   const canUpdateSecrets = canAct("secrets", "update");
   const canDeleteSecrets = canAct("secrets", "delete");
+  const modalContentRef = useRef<HTMLDivElement>(null);
 
   const { data: secrets = [], isLoading } = useSecrets(organizationId, "DOMAIN_TYPE_ORGANIZATION");
+  const editingSecretId = editingSecret?.metadata?.id ?? "";
+  const { data: editingSecretDetail } = useSecret(
+    organizationId,
+    "DOMAIN_TYPE_ORGANIZATION",
+    editingSecretId,
+  );
   const createSecretMutation = useCreateSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION");
   const deleteSecretMutation = useDeleteSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION");
   const updateSecretMutation = useUpdateSecret(
     organizationId,
     "DOMAIN_TYPE_ORGANIZATION",
-    editingSecret?.metadata?.id || "",
+    editingSecretId,
   );
   const canWriteSecrets = editingSecret ? canUpdateSecrets : canCreateSecrets;
+
+  // When Edit modal opens, populate form from DescribeSecret so we always have keys (and masked values)
+  useEffect(() => {
+    if (!editingSecretId || !editingSecretDetail) return;
+    const secretData = editingSecretDetail.spec?.local?.data || {};
+    const pairs = Object.entries(secretData).map(([name, value]) => ({ name, value }));
+    setSecretName(editingSecretDetail.metadata?.name || "");
+    setKeyValuePairs(pairs.length > 0 ? pairs : [{ name: "", value: "" }]);
+  }, [editingSecretId, editingSecretDetail]);
 
   const handleCreateClick = () => {
     if (!canCreateSecrets) return;
@@ -73,6 +90,21 @@ export function Secrets({ organizationId }: SecretsProps) {
     createSecretMutation.reset();
   };
 
+  // Read current key/value pairs from the DOM so submission reflects what's visible
+  // (e.g. when automation fills inputs without triggering React's onChange).
+  const getKeyValuePairsFromForm = (): KeyValuePair[] => {
+    const container = modalContentRef.current;
+    if (!container) return keyValuePairs;
+    const keyInputs = container.querySelectorAll<HTMLInputElement>('input[placeholder="Key"]');
+    const valueInputs = container.querySelectorAll<HTMLTextAreaElement>('textarea[placeholder="Value"]');
+    const pairs: KeyValuePair[] = [];
+    const len = Math.min(keyInputs.length, valueInputs.length);
+    for (let i = 0; i < len; i++) {
+      pairs.push({ name: keyInputs[i].value ?? "", value: valueInputs[i].value ?? "" });
+    }
+    return pairs.length ? pairs : keyValuePairs;
+  };
+
   const handleCreate = async () => {
     if (!canCreateSecrets) return;
     if (!secretName?.trim()) {
@@ -80,7 +112,8 @@ export function Secrets({ organizationId }: SecretsProps) {
       return;
     }
 
-    const validPairs = keyValuePairs.filter((pair) => pair.name.trim() && pair.value.trim());
+    const formPairs = getKeyValuePairsFromForm();
+    const validPairs = formPairs.filter((pair) => pair.name.trim() && pair.value.trim());
     if (validPairs.length === 0) {
       showErrorToast("At least one key-value pair is required");
       return;
@@ -116,7 +149,8 @@ export function Secrets({ organizationId }: SecretsProps) {
       return;
     }
 
-    const validPairs = keyValuePairs.filter((pair) => pair.name.trim() && pair.value.trim());
+    const formPairs = getKeyValuePairsFromForm();
+    const validPairs = formPairs.filter((pair) => pair.name.trim() && pair.value.trim());
     if (validPairs.length === 0) {
       showErrorToast("At least one key-value pair is required");
       return;
@@ -136,6 +170,8 @@ export function Secrets({ organizationId }: SecretsProps) {
           name: pair.name.trim(),
           value: pair.value.trim(),
         })),
+        // Resend the secret's provider (fallback to LOCAL since UI only supports local secrets)
+        provider: editingSecret.spec?.provider ?? "PROVIDER_LOCAL",
       };
       await updateSecretMutation.mutateAsync(params);
       showSuccessToast("Secret updated successfully");
@@ -333,7 +369,7 @@ export function Secrets({ organizationId }: SecretsProps) {
       {(isCreateModalOpen || editingSecret) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-            <div className="p-6">
+            <div className="p-6" ref={modalContentRef}>
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                   <Key className="w-6 h-6 text-gray-500 dark:text-gray-400" />
@@ -383,15 +419,13 @@ export function Secrets({ organizationId }: SecretsProps) {
                           <div className="flex-1">
                             <Input
                               type="text"
-                              value={pair.name}
-                              onChange={(e) => updateKeyValuePair(index, "name", e.target.value)}
+                              defaultValue={pair.name}
                               placeholder="Key"
                               className="mb-2"
                               disabled={!canWriteSecrets}
                             />
                             <Textarea
-                              value={pair.value}
-                              onChange={(e) => updateKeyValuePair(index, "value", e.target.value)}
+                              defaultValue={pair.value}
                               placeholder="Value"
                               rows={4}
                               className="font-mono text-sm"

@@ -107,6 +107,8 @@ export const useCreateSecret = (domainId: string, domainType: AuthorizationDomai
 export interface UpdateSecretParams {
   name: string;
   environmentVariables: Array<{ name: string; value: string }>;
+  /** Resend the secret's provider so the backend accepts the update (required for PATCH). */
+  provider?: "PROVIDER_UNKNOWN" | "PROVIDER_LOCAL";
 }
 
 export const useUpdateSecret = (domainId: string, domainType: AuthorizationDomainType, secretId: string) => {
@@ -129,7 +131,8 @@ export const useUpdateSecret = (domainId: string, domainType: AuthorizationDomai
             createdAt: new Date().toISOString(),
           },
           spec: {
-            provider: "PROVIDER_LOCAL",
+            // Always send provider so backend accepts update (required for PATCH)
+            provider: params.provider ?? "PROVIDER_LOCAL",
             local: {
               data,
             },
