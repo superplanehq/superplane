@@ -22,6 +22,7 @@ type IntegrationMetadata struct {
 
 type SessionMetadata struct {
 	RoleArn   string `json:"roleArn"`
+	AccountID string `json:"accountId"`
 	Region    string `json:"region"`
 	ExpiresAt string `json:"expiresAt"`
 }
@@ -122,4 +123,27 @@ func NormalizeTags(tags []Tag) []Tag {
 	}
 
 	return normalized
+}
+
+/*
+ * Extract the account ID from an IAM role ARN.
+ *
+ * Expected format: arn:aws:iam::<account-id>:role/<role-name>
+ */
+func AccountIDFromRoleArn(roleArn string) (string, error) {
+	roleArn = strings.TrimSpace(roleArn)
+	if roleArn == "" {
+		return "", fmt.Errorf("role ARN is empty")
+	}
+
+	parts := strings.Split(roleArn, ":")
+	if len(parts) < 6 {
+		return "", fmt.Errorf("role ARN is invalid")
+	}
+
+	if parts[0] != "arn" {
+		return "", fmt.Errorf("role ARN is invalid")
+	}
+
+	return strings.TrimSpace(parts[4]), nil
 }

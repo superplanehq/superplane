@@ -151,6 +151,7 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 	ruleMetadata, err := eventbridge.CreateRule(
 		ctx.Integration,
 		ctx.HTTP,
+		integrationMetadata.Session.AccountID,
 		config.Region,
 		apiDestination.ApiDestinationArn,
 		p.eventPattern(),
@@ -246,6 +247,7 @@ func (p *OnImagePush) checkDestinationAvailability(ctx core.TriggerActionContext
 	ruleMetadata, err := eventbridge.CreateRule(
 		ctx.Integration,
 		ctx.HTTP,
+		integrationMetadata.Session.AccountID,
 		metadata.Region,
 		apiDestination.ApiDestinationArn,
 		p.eventPattern(),

@@ -90,6 +90,7 @@ func Test__AWS__Sync(t *testing.T) {
 		metadata, ok := integrationCtx.Metadata.(common.IntegrationMetadata)
 		require.True(t, ok)
 		assert.Equal(t, "arn:aws:iam::123456789012:role/test-role", metadata.Session.RoleArn)
+		assert.Equal(t, "123456789012", metadata.Session.AccountID)
 		assert.Equal(t, "us-east-1", metadata.Session.Region)
 		assert.Equal(t, expiration, metadata.Session.ExpiresAt)
 

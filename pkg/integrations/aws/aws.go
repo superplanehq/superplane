@@ -150,7 +150,12 @@ func (a *AWS) Sync(ctx core.SyncContext) error {
 		return a.showBrowserAction(ctx)
 	}
 
-	err := a.generateCredentials(ctx, config, &metadata)
+	accountID, err := common.AccountIDFromRoleArn(config.RoleArn)
+	if err != nil {
+		return fmt.Errorf("failed to get account ID from role ARN: %v", err)
+	}
+
+	err = a.generateCredentials(ctx, config, accountID, &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to generate credentials: %v", err)
 	}
@@ -199,7 +204,7 @@ func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 	return nil
 }
 
-func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration, metadata *common.IntegrationMetadata) error {
+func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration, accountID string, metadata *common.IntegrationMetadata) error {
 	durationSeconds := config.SessionDurationSeconds
 	if durationSeconds <= 0 {
 		durationSeconds = defaultSessionDurationSecs
@@ -238,6 +243,7 @@ func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration, me
 
 	metadata.Session = &common.SessionMetadata{
 		RoleArn:   config.RoleArn,
+		AccountID: accountID,
 		Region:    strings.TrimSpace(config.Region),
 		ExpiresAt: credentials.Expiration.Format(time.RFC3339),
 	}

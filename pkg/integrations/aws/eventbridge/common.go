@@ -17,6 +17,7 @@ type RuleMetadata struct {
 func CreateRule(
 	integration core.IntegrationContext,
 	http core.HTTPContext,
+	accountID string,
 	region string,
 	destinationArn string,
 	eventPattern *common.EventBridgeEvent,
@@ -44,10 +45,17 @@ func CreateRule(
 		return nil, fmt.Errorf("error tagging EventBridge rule: %v", err)
 	}
 
+	/*
+	 * We need to use the AWSServiceRoleForAmazonEventBridgeApiDestinations role
+	 * to allow the EventBridge service to invoke the API destination.
+	 * That role is created automatically when the API destination is created.
+	 * See: https://docs.aws.amazon.com/eventbridge/latest/userguide/using-service-linked-roles-service-action-1.html
+	 */
 	err = client.PutTargets(ruleName, []Target{
 		{
-			ID:  targetID,
-			Arn: destinationArn,
+			ID:      targetID,
+			Arn:     destinationArn,
+			RoleArn: fmt.Sprintf("arn:aws:iam::%s:role/AWSServiceRoleForAmazonEventBridgeApiDestinations", accountID),
 		},
 	})
 
