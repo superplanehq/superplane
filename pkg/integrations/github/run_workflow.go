@@ -601,3 +601,7 @@ func (r *RunWorkflow) buildInputs(ctx core.ExecutionContext, inputs []Input) map
 
 	return result
 }
+
+func (r *RunWorkflow) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

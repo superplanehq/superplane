@@ -538,3 +538,7 @@ func durationFrom(value int, unit string) time.Duration {
 		return 0
 	}
 }
+
+func (m *Merge) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

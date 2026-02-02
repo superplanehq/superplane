@@ -322,3 +322,7 @@ func buildAnnotatedPayload(agent map[string]any, incident map[string]any, annota
 
 	return payload
 }
+
+func (t *OnIncidentAnnotated) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}

@@ -322,3 +322,7 @@ func parseEmailList(emails string) ([]string, error) {
 
 	return result, nil
 }
+
+func (c *SendEmail) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
