@@ -11,8 +11,10 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ecr"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/eventbridge"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/lambda"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -137,11 +139,30 @@ func (a *AWS) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
 
+	metadata := common.IntegrationMetadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %v", err)
+	}
+
 	if config.RoleArn == "" {
 		return a.showBrowserAction(ctx)
 	}
 
-	return a.generateCredentials(ctx, config)
+	err := a.generateCredentials(ctx, config, &metadata)
+	if err != nil {
+		return fmt.Errorf("failed to generate credentials: %v", err)
+	}
+
+	err = a.configureEventBridge(ctx, config, &metadata)
+	if err != nil {
+		return fmt.Errorf("failed to configure event bridge: %v", err)
+	}
+
+	ctx.Integration.SetMetadata(metadata)
+	ctx.Integration.Ready()
+	ctx.Integration.RemoveBrowserAction()
+
+	return nil
 }
 
 func (a *AWS) Cleanup(ctx core.IntegrationCleanupContext) error {
@@ -176,7 +197,7 @@ func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 	return nil
 }
 
-func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration) error {
+func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration, metadata *common.IntegrationMetadata) error {
 	durationSeconds := config.SessionDurationSeconds
 	if durationSeconds <= 0 {
 		durationSeconds = defaultSessionDurationSecs
@@ -208,31 +229,71 @@ func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration) er
 		return err
 	}
 
-	tags := common.NormalizeTags(config.Tags)
-	apiDestination, err := CreateAPIDestination(ctx, tags)
-	if err != nil {
-		return err
-	}
-
-	ctx.Integration.SetMetadata(common.IntegrationMetadata{
-		APIDestination: apiDestination,
-		Session: &common.SessionMetadata{
-			RoleArn:   config.RoleArn,
-			Region:    strings.TrimSpace(config.Region),
-			ExpiresAt: credentials.Expiration.Format(time.RFC3339),
-		},
-		Tags: tags,
-	})
-
-	ctx.Integration.Ready()
-	ctx.Integration.RemoveBrowserAction()
-
 	refreshAfter := time.Until(credentials.Expiration) / 2
 	if refreshAfter < time.Minute {
 		refreshAfter = time.Minute
 	}
 
+	metadata.Session = &common.SessionMetadata{
+		RoleArn:   config.RoleArn,
+		Region:    strings.TrimSpace(config.Region),
+		ExpiresAt: credentials.Expiration.Format(time.RFC3339),
+	}
+
 	return ctx.Integration.ScheduleResync(refreshAfter)
+}
+
+func (a *AWS) configureEventBridge(ctx core.SyncContext, config Configuration, metadata *common.IntegrationMetadata) error {
+	region := strings.TrimSpace(common.RegionFromInstallation(ctx.Integration))
+	if region == "" {
+		return fmt.Errorf("region is required")
+	}
+
+	tags := common.NormalizeTags(config.Tags)
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	client := eventbridge.NewClient(ctx.HTTP, creds, region)
+	secret, err := crypto.Base64String(32)
+	if err != nil {
+		return fmt.Errorf("failed to generate random string for connection secret: %w", err)
+	}
+
+	err = ctx.Integration.SetSecret(EventBridgeConnectionSecretName, []byte(secret))
+	if err != nil {
+		return fmt.Errorf("failed to save connection secret: %w", err)
+	}
+
+	name := fmt.Sprintf("superplane-%s", ctx.Integration.ID().String())
+	connectionArn, err := ensureConnection(client, name, []byte(secret), tags)
+	if err != nil {
+		return err
+	}
+
+	apiDestinationArn, err := ensureApiDestination(
+		client,
+		fmt.Sprintf("superplane-%s", ctx.Integration.ID().String()),
+		connectionArn,
+		ctx.WebhooksBaseURL+"/api/v1/integrations/"+ctx.Integration.ID().String()+"/events",
+		tags,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	metadata.EventBridge = &common.EventBridgeMetadata{
+		APIDestinations: map[string]common.APIDestinationMetadata{
+			region: {
+				ConnectionArn:     connectionArn,
+				ApiDestinationArn: apiDestinationArn,
+			},
+		},
+	}
+
+	return nil
 }
 
 func (a *AWS) HandleRequest(ctx core.HTTPRequestContext) {

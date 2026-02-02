@@ -15,9 +15,9 @@ const (
 )
 
 type IntegrationMetadata struct {
-	Session        *SessionMetadata        `json:"session" mapstructure:"session"`
-	APIDestination *APIDestinationMetadata `json:"apiDestination" mapstructure:"apiDestination"`
-	Tags           []Tag                   `json:"tags" mapstructure:"tags"`
+	Session     *SessionMetadata     `json:"session" mapstructure:"session"`
+	EventBridge *EventBridgeMetadata `json:"eventBridge" mapstructure:"eventBridge"`
+	Tags        []Tag                `json:"tags" mapstructure:"tags"`
 }
 
 type SessionMetadata struct {
@@ -26,9 +26,21 @@ type SessionMetadata struct {
 	ExpiresAt string `json:"expiresAt"`
 }
 
+/*
+ * Since we need to support multiple regions,
+ * the integration needs to maintain one connection/destination per region.
+ */
+type EventBridgeMetadata struct {
+	APIDestinations map[string]APIDestinationMetadata `json:"apiDestinations" mapstructure:"apiDestinations"`
+}
+
 type APIDestinationMetadata struct {
 	ConnectionArn     string `json:"connectionArn"`
 	ApiDestinationArn string `json:"apiDestinationArn"`
+}
+
+type ProvisionDestinationParameters struct {
+	Region string `json:"region"`
 }
 
 type EventBridgeEvent struct {

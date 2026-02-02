@@ -14,7 +14,7 @@ type Repository struct {
 	RepositoryArn  string `json:"repositoryArn" mapstructure:"repositoryArn"`
 }
 
-func validateRepository(ctx core.TriggerContext, repositoryRef string, existing *Repository) (*Repository, error) {
+func validateRepository(ctx core.TriggerContext, region string, repositoryRef string, existing *Repository) (*Repository, error) {
 	repositoryRef = strings.TrimSpace(repositoryRef)
 	if repositoryRef == "" {
 		return nil, fmt.Errorf("repository is required")
@@ -27,11 +27,6 @@ func validateRepository(ctx core.TriggerContext, repositoryRef string, existing 
 	creds, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get AWS credentials: %w", err)
-	}
-
-	region := strings.TrimSpace(common.RegionFromInstallation(ctx.Integration))
-	if region == "" {
-		return nil, fmt.Errorf("region is required")
 	}
 
 	client := NewClient(ctx.HTTP, creds, region)

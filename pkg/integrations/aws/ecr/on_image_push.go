@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -17,10 +18,12 @@ import (
 type OnImagePush struct{}
 
 type OnImagePushConfiguration struct {
+	Region     string `json:"region" mapstructure:"region"`
 	Repository string `json:"repository" mapstructure:"repository"`
 }
 
 type OnImagePushMetadata struct {
+	Region         string      `json:"region" mapstructure:"region"`
 	Repository     *Repository `json:"repository" mapstructure:"repository"`
 	SubscriptionID string      `json:"subscriptionId" mapstructure:"subscriptionId"`
 	RuleArn        string      `json:"ruleArn" mapstructure:"ruleArn"`
@@ -73,6 +76,13 @@ func (p *OnImagePush) Color() string {
 func (p *OnImagePush) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:     "region",
+			Label:    "Region",
+			Type:     configuration.FieldTypeString,
+			Required: true,
+			Default:  "us-east-1",
+		},
+		{
 			Name:        "repository",
 			Label:       "Repository",
 			Type:        configuration.FieldTypeIntegrationResource,
@@ -99,7 +109,7 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	repository, err := validateRepository(ctx, config.Repository, metadata.Repository)
+	repository, err := validateRepository(ctx, config.Region, config.Repository, metadata.Repository)
 	if err != nil {
 		return fmt.Errorf("failed to validate repository: %w", err)
 	}
@@ -133,6 +143,50 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 	client := eventbridge.NewClient(ctx.HTTP, creds, region)
 
 	//
+	// If an API destination does not yet exist in the region,
+	// we ask the integration to provision it for us.
+	//
+	apiDestination, ok := integrationMetadata.EventBridge.APIDestinations[config.Region]
+	if !ok {
+		err = ctx.Integration.ScheduleActionCall(
+			"provisionDestination",
+			common.ProvisionDestinationParameters{Region: config.Region},
+			time.Second,
+		)
+
+		if err != nil {
+			return fmt.Errorf("failed to provision API destination: %w", err)
+		}
+
+		return ctx.Requests.ScheduleActionCall(
+			"checkDestinationAvailability",
+			map[string]any{},
+			5*time.Second,
+		)
+	}
+
+	//
+	// If an API destination exists in the region,
+	// we can use it to subscribe to ECR image push events.
+	//
+	return p.createSubscription(ctx.Integration, ctx.Metadata, client, apiDestination.ApiDestinationArn, repository)
+}
+
+func (p *OnImagePush) createSubscription(
+	integrationCtx core.IntegrationContext,
+	metadataCtx core.MetadataContext,
+	client *eventbridge.Client,
+	apiDestinationArn string,
+	repository *Repository,
+) error {
+
+	integrationMetadata := common.IntegrationMetadata{}
+	err := mapstructure.Decode(integrationCtx.GetMetadata(), &integrationMetadata)
+	if err != nil {
+		return fmt.Errorf("failed to decode integration metadata: %w", err)
+	}
+
+	//
 	// NOTE: we intentionally do not include the repository-name
 	// in the event pattern to allow the user to change the repository,
 	// without us having to update the rule.
@@ -150,7 +204,6 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to marshal event pattern: %w", err)
 	}
 
-	// TODO: use a more meaningful names and IDs
 	targetID := uuid.NewString()
 	ruleName := fmt.Sprintf("superplane-%s", uuid.NewString())
 	ruleArn, err := client.PutRule(ruleName, string(eventPattern), "SuperPlane ECR webhook rule", integrationMetadata.Tags)
@@ -165,7 +218,7 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 	err = client.PutTargets(ruleName, []eventbridge.Target{
 		{
 			ID:  targetID,
-			Arn: integrationMetadata.APIDestination.ApiDestinationArn,
+			Arn: apiDestinationArn,
 		},
 	})
 
@@ -173,7 +226,7 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("error creating EventBridge target: %v", err)
 	}
 
-	subscriptionID, err := ctx.Integration.Subscribe(
+	subscriptionID, err := integrationCtx.Subscribe(
 		common.EventBridgeEvent{
 			DetailType: "ECR Image Action",
 			Source:     "aws.ecr",
@@ -189,7 +242,7 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to subscribe to ECR image push events: %w", err)
 	}
 
-	return ctx.Metadata.Set(OnImagePushMetadata{
+	return metadataCtx.Set(OnImagePushMetadata{
 		SubscriptionID: subscriptionID.String(),
 		Repository:     repository,
 		RuleArn:        ruleArn,
@@ -198,11 +251,54 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 }
 
 func (p *OnImagePush) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		{
+			Name:        "checkDestinationAvailability",
+			Description: "Check if an API destination is available",
+		},
+	}
 }
 
 func (p *OnImagePush) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
-	return nil, nil
+	switch ctx.Name {
+	case "checkDestinationAvailability":
+		return p.checkDestinationAvailability(ctx)
+
+	default:
+		return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+	}
+}
+
+func (p *OnImagePush) checkDestinationAvailability(ctx core.TriggerActionContext) (map[string]any, error) {
+	metadata := OnImagePushMetadata{}
+	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	integrationMetadata := common.IntegrationMetadata{}
+	err = mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode integration metadata: %w", err)
+	}
+
+	apiDestination, ok := integrationMetadata.EventBridge.APIDestinations[metadata.Region]
+	if !ok {
+		return nil, fmt.Errorf("API destination not found for region: %s", metadata.Region)
+	}
+
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get AWS credentials: %w", err)
+	}
+
+	return nil, p.createSubscription(
+		ctx.Integration,
+		ctx.Metadata,
+		eventbridge.NewClient(ctx.HTTP, creds, metadata.Region),
+		apiDestination.ApiDestinationArn,
+		metadata.Repository,
+	)
 }
 
 func (p *OnImagePush) OnIntegrationMessage(ctx core.IntegrationMessageContext) error {
