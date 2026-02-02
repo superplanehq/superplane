@@ -13,14 +13,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
+import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
+import discordIcon from "@/assets/icons/integrations/discord.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import smtpIcon from "@/assets/icons/integrations/smtp.svg";
+import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
@@ -341,9 +344,11 @@ function CategorySection({
 
   // Determine category icon
   const appLogoMap: Record<string, string | Record<string, string>> = {
+    cloudflare: cloudflareIcon,
     dash0: dash0Icon,
     datadog: datadogIcon,
     daytona: daytonaIcon,
+    discord: discordIcon,
     github: githubIcon,
     openai: openAiIcon,
     "open-ai": openAiIcon,
@@ -361,7 +366,8 @@ function CategorySection({
   const firstBlock = allBlocks[0];
   const integrationName = firstBlock?.integrationName || category.name.toLowerCase();
   const appLogo = appLogoMap[integrationName];
-  const categoryIconSrc = typeof appLogo === "string" ? appLogo : undefined;
+  const categoryIconSrc =
+    typeof appLogo === "string" ? appLogo : integrationName === "aws" ? awsIcon : undefined;
 
   // Determine icon for special categories
   let CategoryIcon: React.ComponentType<{ size?: number; className?: string }> | null = null;
@@ -402,9 +408,11 @@ function CategorySection({
 
           // Use SVG icons for application components/triggers
           const appLogoMap: Record<string, string | Record<string, string>> = {
+            cloudflare: cloudflareIcon,
             dash0: dash0Icon,
             daytona: daytonaIcon,
             datadog: datadogIcon,
+            discord: discordIcon,
             github: githubIcon,
             openai: openAiIcon,
             "open-ai": openAiIcon,

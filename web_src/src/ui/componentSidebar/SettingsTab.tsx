@@ -5,11 +5,10 @@ import {
   OrganizationsIntegration,
 } from "@/api-client";
 import { useCallback, useEffect, useMemo, useState, ReactNode } from "react";
-import { resolveIcon } from "@/lib/utils";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
@@ -272,12 +271,11 @@ export function SettingsTab({
               /* No integration: Connect XYZ — always use helper so "github" shows as "GitHub" */
               <div className="bg-orange-50 dark:bg-orange-950/30 border border-black/10 rounded-md p-3 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex h-4 w-4 items-center justify-center flex-shrink-0 text-gray-500 dark:text-gray-400">
-                    {(() => {
-                      const IconComponent = resolveIcon(integrationDefinition?.icon);
-                      return <IconComponent className="h-4 w-4" />;
-                    })()}
-                  </div>
+                  <IntegrationIcon
+                    integrationName={integrationName}
+                    iconSlug={integrationDefinition?.icon}
+                    className="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400"
+                  />
                   <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
                     Connect{" "}
                     {getIntegrationTypeDisplayName(undefined, integrationName) || integrationName}
@@ -329,12 +327,11 @@ export function SettingsTab({
                 {selectedIntegrationFull && (
                   <div className="mt-3 bg-white border border-gray-300 dark:border-gray-700 rounded-md p-3 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="mt-0.5 flex h-4 w-4 items-center justify-center flex-shrink-0 text-gray-500 dark:text-gray-400">
-                        {(() => {
-                          const IconComponent = resolveIcon(integrationDefinition?.icon);
-                          return <IconComponent className="h-4 w-4" />;
-                        })()}
-                      </div>
+                      <IntegrationIcon
+                        integrationName={selectedIntegrationFull.spec?.integrationName}
+                        iconSlug={integrationDefinition?.icon}
+                        className="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400"
+                      />
                       <div className="min-w-0">
                         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
                           {getIntegrationTypeDisplayName(

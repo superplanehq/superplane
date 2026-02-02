@@ -12,21 +12,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfigurationFieldRenderer } from "../../../ui/configurationFieldRenderer";
 import type { IntegrationsIntegrationDefinition } from "../../../api-client/types.gen";
-import { resolveIcon } from "@/lib/utils";
 import { getApiErrorMessage } from "@/utils/errors";
 import { Icon } from "@/components/Icon";
 import { showErrorToast } from "@/utils/toast";
-import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
-import discordIcon from "@/assets/icons/integrations/discord.svg";
-import githubIcon from "@/assets/icons/integrations/github.svg";
-import openAiIcon from "@/assets/icons/integrations/openai.svg";
-import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
-import slackIcon from "@/assets/icons/integrations/slack.svg";
-import smtpIcon from "@/assets/icons/integrations/smtp.svg";
-import awsIcon from "@/assets/icons/integrations/aws.svg";
-import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
-import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 
 interface IntegrationsProps {
   organizationId: string;
@@ -47,34 +36,6 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   const selectedInstructions = useMemo(() => {
     return selectedIntegration?.instructions?.trim();
   }, [selectedIntegration?.instructions]);
-  const appLogoMap: Record<string, string> = {
-    aws: awsIcon,
-    dash0: dash0Icon,
-    daytona: daytonaIcon,
-    discord: discordIcon,
-    github: githubIcon,
-    openai: openAiIcon,
-    "open-ai": openAiIcon,
-    pagerduty: pagerDutyIcon,
-    rootly: rootlyIcon,
-    semaphore: SemaphoreLogo,
-    slack: slackIcon,
-    smtp: smtpIcon,
-  };
-
-  const renderAppIcon = (slug: string | undefined, appName: string | undefined, className: string) => {
-    const logo = appName ? appLogoMap[appName] : undefined;
-    if (logo) {
-      return (
-        <span className={className}>
-          <img src={logo} alt="" className="h-full w-full object-contain" />
-        </span>
-      );
-    }
-    const Icon = resolveIcon(slug);
-    return <Icon className={className} />;
-  };
-
   const handleConnectClick = (integration: IntegrationsIntegrationDefinition) => {
     setSelectedIntegration(integration);
     setIntegrationName(integration.name || "");
@@ -148,11 +109,11 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                   >
                     <div className="flex items-start gap-3">
                       <div className="mt-0.5 flex h-4 w-4 items-center justify-center">
-                        {renderAppIcon(
-                          integrationDefinition?.icon,
-                          integrationName,
-                          "w-4 h-4 text-gray-500 dark:text-gray-400",
-                        )}
+                        <IntegrationIcon
+                          integrationName={integrationName}
+                          iconSlug={integrationDefinition?.icon}
+                          className="w-4 h-4 text-gray-500 dark:text-gray-400"
+                        />
                       </div>
                       <div>
                         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
@@ -223,7 +184,11 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                     >
                       <div className="flex items-start gap-3">
                         <div className="mt-0.5 flex h-4 w-4 items-center justify-center">
-                          {renderAppIcon(app.icon, appName, "w-4 h-4 text-gray-500 dark:text-gray-400")}
+                          <IntegrationIcon
+                            integrationName={appName}
+                            iconSlug={app.icon}
+                            className="w-4 h-4 text-gray-500 dark:text-gray-400"
+                          />
                         </div>
                         <div>
                           <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
@@ -261,11 +226,11 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
-                      {renderAppIcon(
-                        selectedIntegration.icon,
-                        integrationName,
-                        "w-6 h-6 text-gray-500 dark:text-gray-400",
-                      )}
+                      <IntegrationIcon
+                        integrationName={integrationName}
+                        iconSlug={selectedIntegration.icon}
+                        className="w-6 h-6 text-gray-500 dark:text-gray-400"
+                      />
                       <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">
                         Connect {selectedIntegration.label || selectedIntegration.name}
                       </h3>

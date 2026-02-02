@@ -15,19 +15,8 @@ import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { resolveIcon } from "@/lib/utils";
 import { Check, Copy, Loader2, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
-import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
-import discordIcon from "@/assets/icons/integrations/discord.svg";
-import githubIcon from "@/assets/icons/integrations/github.svg";
-import openAiIcon from "@/assets/icons/integrations/openai.svg";
-import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
-import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
-import slackIcon from "@/assets/icons/integrations/slack.svg";
-import smtpIcon from "@/assets/icons/integrations/smtp.svg";
-import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
-import awsIcon from "@/assets/icons/integrations/aws.svg";
-import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getHeaderIconSrc, IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import {
   useAvailableIntegrations,
   useCreateIntegration,
@@ -58,53 +47,6 @@ import { EventState, EventStateMap } from "../componentBase";
 import { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
-
-const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
-  dash0: dash0Icon,
-  daytona: daytonaIcon,
-  github: githubIcon,
-  openai: openAiIcon,
-  "open-ai": openAiIcon,
-  pagerduty: pagerDutyIcon,
-  rootly: rootlyIcon,
-  semaphore: SemaphoreLogo,
-  slack: slackIcon,
-  aws: {
-    lambda: awsLambdaIcon,
-  },
-};
-
-const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
-  aws: awsIcon,
-  dash0: dash0Icon,
-  daytona: daytonaIcon,
-  discord: discordIcon,
-  github: githubIcon,
-  openai: openAiIcon,
-  "open-ai": openAiIcon,
-  pagerduty: pagerDutyIcon,
-  rootly: rootlyIcon,
-  semaphore: SemaphoreLogo,
-  slack: slackIcon,
-  smtp: smtpIcon,
-};
-
-function renderIntegrationIcon(
-  slug: string | undefined,
-  appName: string | undefined,
-  className: string,
-): React.ReactNode {
-  const logo = appName ? INTEGRATION_APP_LOGO_MAP[appName] : undefined;
-  if (logo) {
-    return (
-      <span className={className}>
-        <img src={logo} alt="" className="h-full w-full object-contain" />
-      </span>
-    );
-  }
-  const IconComponent = resolveIcon(slug);
-  return <IconComponent className={className} />;
-}
 
 interface ComponentSidebarProps {
   isOpen?: boolean;
@@ -651,9 +593,7 @@ export const ComponentSidebar = ({
   }, [onHighlightedNodesChange]);
 
   const isDetailView = page !== "overview";
-  const nameParts = blockName?.split(".") ?? [];
-  const appLogo = nameParts[0] ? APP_LOGO_MAP[nameParts[0]] : undefined;
-  const appIconSrc = typeof appLogo === "string" ? appLogo : nameParts[1] ? appLogo?.[nameParts[1]] : undefined;
+  const appIconSrc = getHeaderIconSrc(blockName);
   const headerIconSrc = iconSrc ?? appIconSrc;
 
   if (!isOpen) return null;
@@ -725,11 +665,11 @@ export const ComponentSidebar = ({
             <div className="border-border border-b-1 px-4 py-3 flex-shrink-0">
               <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 min-w-0">
-                    {renderIntegrationIcon(
-                      createIntegrationDefinition?.icon,
-                      resolvedIntegration.spec?.integrationName,
-                      "h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400",
-                    )}
+                    <IntegrationIcon
+                      integrationName={resolvedIntegration.spec?.integrationName}
+                      iconSlug={createIntegrationDefinition?.icon}
+                      className="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400"
+                    />
                     <span className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
                       {resolvedIntegration.metadata?.name ||
                         getIntegrationTypeDisplayName(
@@ -965,11 +905,11 @@ export const ComponentSidebar = ({
             <>
               <DialogHeader>
                 <div className="flex items-center gap-3">
-                  {renderIntegrationIcon(
-                    selectedIntegrationForDialog.icon,
-                    selectedIntegrationForDialog.name,
-                    "h-6 w-6 text-gray-500 dark:text-gray-400",
-                  )}
+                  <IntegrationIcon
+                    integrationName={selectedIntegrationForDialog.name}
+                    iconSlug={selectedIntegrationForDialog.icon}
+                    className="h-6 w-6 text-gray-500 dark:text-gray-400"
+                  />
                   <DialogTitle>
                     Connect{" "}
                     {getIntegrationTypeDisplayName(
@@ -1077,11 +1017,11 @@ export const ComponentSidebar = ({
             <>
               <DialogHeader>
                 <div className="flex items-center gap-3">
-                  {renderIntegrationIcon(
-                    configureIntegrationDefinition?.icon,
-                    configureIntegration.spec?.integrationName,
-                    "h-6 w-6 text-gray-500 dark:text-gray-400",
-                  )}
+                  <IntegrationIcon
+                    integrationName={configureIntegration.spec?.integrationName}
+                    iconSlug={configureIntegrationDefinition?.icon}
+                    className="h-6 w-6 text-gray-500 dark:text-gray-400"
+                  />
                   <DialogTitle>
                     Configure{" "}
                     {configureIntegration.metadata?.name ||

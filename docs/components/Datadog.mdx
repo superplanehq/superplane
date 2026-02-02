@@ -1,33 +1,33 @@
 ---
-title: "Datadog"
+title: "DataDog"
 sidebar:
   order: 5
 ---
 
-Create events in Datadog
+Create events in DataDog
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Actions
 
 <CardGrid>
-  <LinkCard title="Create Event" href="#create-event" description="Create a new event in Datadog" />
+  <LinkCard title="Create Event" href="#create-event" description="Create a new event in DataDog" />
 </CardGrid>
 
 ## Instructions
 
-To configure Datadog to work with SuperPlane:
+To configure DataDog to work with SuperPlane:
 
-1. **Get API Keys**: In Datadog, go to Organization Settings > API Keys to get your API Key
+1. **Get API Keys**: In DataDog, go to Organization Settings > API Keys to get your API Key
 2. **Get Application Key**: Go to Organization Settings > Application Keys to create an Application Key
-3. **Select Site**: Choose the Datadog site that matches your account (US1, US3, US5, EU, or AP1)
+3. **Select Site**: Choose the DataDog site that matches your account (US1, US3, US5, EU, or AP1)
 4. **Enter Credentials**: Provide your API Key, Application Key, and Site in the integration configuration
 
 <a id="create-event"></a>
 
 ## Create Event
 
-The Create Event component creates a new event in Datadog.
+The Create Event component creates a new event in DataDog.
 
 ### Use Cases
 
@@ -45,7 +45,7 @@ The component emits an event containing:
 - `alert_type`: The severity level (info, warning, error, success)
 - `priority`: Event priority (normal, low)
 - `tags`: Array of tags attached to the event
-- `url`: Link to view the event in Datadog
+- `url`: Link to view the event in DataDog
 
 ### Example Output
 

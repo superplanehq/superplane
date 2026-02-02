@@ -8,7 +8,7 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   pagerduty: "PagerDuty",
   slack: "Slack",
   discord: "Discord",
-  datadog: "Datadog",
+  datadog: "DataDog",
   cloudflare: "Cloudflare",
   semaphore: "Semaphore",
   rootly: "Rootly",

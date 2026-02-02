@@ -12,18 +12,8 @@ import { Button } from "@/components/ui/button";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
 import { Alert, AlertDescription } from "@/ui/alert";
-import { resolveIcon } from "@/lib/utils";
 import { showErrorToast } from "@/utils/toast";
-import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
-import githubIcon from "@/assets/icons/integrations/github.svg";
-import openAiIcon from "@/assets/icons/integrations/openai.svg";
-import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
-import slackIcon from "@/assets/icons/integrations/slack.svg";
-import smtpIcon from "@/assets/icons/integrations/smtp.svg";
-import awsIcon from "@/assets/icons/integrations/aws.svg";
-import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
-import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 
 interface IntegrationDetailsProps {
   organizationId: string;
@@ -42,32 +32,6 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
   const integrationDef = integration
     ? availableIntegrations.find((i) => i.name === integration.spec?.integrationName)
     : undefined;
-  const appLogoMap: Record<string, string> = {
-    aws: awsIcon,
-    dash0: dash0Icon,
-    github: githubIcon,
-    openai: openAiIcon,
-    daytona: daytonaIcon,
-    "open-ai": openAiIcon,
-    pagerduty: pagerDutyIcon,
-    rootly: rootlyIcon,
-    semaphore: SemaphoreLogo,
-    slack: slackIcon,
-    smtp: smtpIcon,
-  };
-
-  const renderAppIcon = (slug: string | undefined, appName: string | undefined, className: string) => {
-    const logo = appName ? appLogoMap[appName] : undefined;
-    if (logo) {
-      return (
-        <span className={className}>
-          <img src={logo} alt="" className="h-full w-full object-contain" />
-        </span>
-      );
-    }
-    const IconComponent = resolveIcon(slug);
-    return <IconComponent className={className} />;
-  };
 
   const updateMutation = useUpdateIntegration(organizationId, integrationId || "");
   const deleteMutation = useDeleteIntegration(organizationId, integrationId || "");
@@ -204,8 +168,11 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        {integrationDef?.icon &&
-          renderAppIcon(integrationDef.icon, integrationDef.name || integration?.spec?.integrationName, "w-6 h-6")}
+        <IntegrationIcon
+          integrationName={integration?.spec?.integrationName}
+          iconSlug={integrationDef?.icon}
+          className="w-6 h-6"
+        />
         <div className="flex-1">
           <h4 className="text-2xl font-semibold">{integration.metadata?.name || integration.spec?.integrationName}</h4>
           {integration.spec?.integrationName && integration.metadata?.name !== integration.spec?.integrationName && (
