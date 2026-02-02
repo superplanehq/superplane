@@ -113,4 +113,63 @@ func Test_DeleteRole(t *testing.T) {
 			assert.NotEqual(t, "test-role-with-users", role.Name)
 		}
 	})
+
+	t.Run("delete role removes users with only that role from org", func(t *testing.T) {
+		customRoleOnly := &authorization.RoleDefinition{
+			Name:       "test-role-only-users",
+			DomainType: models.DomainTypeOrganization,
+			Permissions: []*authorization.Permission{
+				{
+					Resource:   canvasPath,
+					Action:     "read",
+					DomainType: models.DomainTypeOrganization,
+				},
+			},
+		}
+		err = r.AuthService.CreateCustomRole(orgID, customRoleOnly)
+		require.NoError(t, err)
+
+		account, err := models.CreateAccount("only-role-user", "only-role-user@test.com")
+		require.NoError(t, err)
+		user, err := models.CreateUser(r.Organization.ID, account.ID, account.Name, account.Email)
+		require.NoError(t, err)
+
+		err = r.AuthService.AssignRole(user.ID.String(), "test-role-only-users", orgID, models.DomainTypeOrganization)
+		require.NoError(t, err)
+
+		resp, err := DeleteRole(ctx, models.DomainTypeOrganization, orgID, "test-role-only-users", r.AuthService)
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+
+		_, err = models.FindActiveUserByID(orgID, user.ID.String())
+		assert.Error(t, err)
+	})
+
+	t.Run("delete role reassigns groups to viewer role", func(t *testing.T) {
+		customRoleForGroup := &authorization.RoleDefinition{
+			Name:       "test-role-for-group",
+			DomainType: models.DomainTypeOrganization,
+			Permissions: []*authorization.Permission{
+				{
+					Resource:   canvasPath,
+					Action:     "read",
+					DomainType: models.DomainTypeOrganization,
+				},
+			},
+		}
+		err = r.AuthService.CreateCustomRole(orgID, customRoleForGroup)
+		require.NoError(t, err)
+
+		groupName := "test-group-role-reassign"
+		err = r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, groupName, "test-role-for-group", "Test Group", "Test Group")
+		require.NoError(t, err)
+
+		resp, err := DeleteRole(ctx, models.DomainTypeOrganization, orgID, "test-role-for-group", r.AuthService)
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+
+		groupRole, err := r.AuthService.GetGroupRole(orgID, models.DomainTypeOrganization, groupName)
+		require.NoError(t, err)
+		assert.Equal(t, models.RoleOrgViewer, groupRole)
+	})
 }
