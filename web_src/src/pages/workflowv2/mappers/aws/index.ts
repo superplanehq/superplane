@@ -6,6 +6,7 @@ import { getImageMapper } from "./ecr/get_image";
 import { getImageScanFindingsMapper } from "./ecr/get_image_scan_findings";
 import { buildActionStateRegistry } from "../utils";
 import { scanImageMapper } from "./ecr/scan_image";
+import { onPackageVersionTriggerRenderer } from "./codeartifact/on_package_version";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   "lambda.runFunction": runFunctionMapper,
@@ -15,6 +16,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
+  "codeArtifact.onPackageVersion": onPackageVersionTriggerRenderer,
   "ecr.onImagePush": onImagePushTriggerRenderer,
   "ecr.onImageScan": onImageScanTriggerRenderer,
 };

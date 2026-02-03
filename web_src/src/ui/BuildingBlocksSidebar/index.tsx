@@ -22,6 +22,7 @@ import slackIcon from "@/assets/icons/integrations/slack.svg";
 import smtpIcon from "@/assets/icons/integrations/smtp.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
+import awsIcon from "@/assets/icons/integrations/aws.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
@@ -353,6 +354,7 @@ function CategorySection({
     slack: slackIcon,
     smtp: smtpIcon,
     aws: {
+      codeArtifact: awsIcon,
       lambda: awsLambdaIcon,
       ecr: awsEcrIcon,
     },
@@ -415,6 +417,7 @@ function CategorySection({
             slack: slackIcon,
             smtp: smtpIcon,
             aws: {
+              codeArtifact: awsIcon,
               ecr: awsEcrIcon,
               lambda: awsLambdaIcon,
             },

@@ -2531,6 +2531,23 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         icon: "cloud",
         color: "orange",
       },
+      {
+        name: "aws-codeartifact-package-version-trigger",
+        label: "CodeArtifact Package Version Trigger",
+        description: "Trigger when a CodeArtifact package version changes state",
+        type: "trigger",
+        outputChannels: [{ id: "packageVersion", label: "PackageVersion" } as any],
+        configuration: [
+          { key: "region", label: "Region", type: "string", required: true },
+          { key: "domainName", label: "Domain Name", type: "string", required: false },
+          { key: "repositoryName", label: "Repository Name", type: "string", required: false },
+          { key: "packageFormat", label: "Package Format", type: "string", required: false },
+          { key: "packageName", label: "Package Name", type: "string", required: false },
+          { key: "packageVersionState", label: "Package Version State", type: "string", required: false },
+        ],
+        icon: "cloud",
+        color: "orange",
+      },
     ],
   },
   {
