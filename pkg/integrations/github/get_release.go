@@ -192,14 +192,14 @@ func (c *GetRelease) Execute(ctx core.ExecutionContext) error {
 	//
 	// Fetch the release based on the selected strategy
 	//
-	var releaseData map[string]any
+	var release any
 
 	if config.ReleaseStrategy == "byId" {
 		if config.ReleaseID == nil {
 			return fmt.Errorf("release ID is required when using byId strategy")
 		}
 		// Fetch by release ID
-		release, _, err := client.Repositories.GetRelease(
+		r, _, err := client.Repositories.GetRelease(
 			context.Background(),
 			appMetadata.Owner,
 			config.Repository,
@@ -208,18 +208,18 @@ func (c *GetRelease) Execute(ctx core.ExecutionContext) error {
 		if err != nil {
 			return fmt.Errorf("failed to get release with ID %d: %w", *config.ReleaseID, err)
 		}
-		releaseData = buildReleaseData(release)
+		release = r
 	} else {
 		// Use the common helper for tag-based strategies
 		tagName := ""
 		if config.TagName != nil {
 			tagName = *config.TagName
 		}
-		release, err := fetchReleaseByStrategy(client, appMetadata.Owner, config.Repository, config.ReleaseStrategy, tagName)
+		r, err := fetchReleaseByStrategy(client, appMetadata.Owner, config.Repository, config.ReleaseStrategy, tagName)
 		if err != nil {
 			return err
 		}
-		releaseData = buildReleaseData(release)
+		release = r
 	}
 
 	//
@@ -228,7 +228,7 @@ func (c *GetRelease) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"github.release",
-		[]any{releaseData},
+		[]any{release},
 	)
 }
 
