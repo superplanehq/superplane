@@ -233,9 +233,12 @@ func buildWorkflowUsageData(workflow *github.Workflow, usage *github.WorkflowUsa
 		billableData := make(map[string]any)
 
 		// WorkflowBillMap is map[string]*WorkflowBill
+		// GitHub API returns keys in UPPERCASE (UBUNTU, MACOS, WINDOWS)
+		// Normalize to lowercase for frontend consistency
 		for runnerType, bill := range *billable {
 			if bill != nil {
-				billableData[runnerType] = map[string]any{
+				normalizedType := strings.ToLower(runnerType)
+				billableData[normalizedType] = map[string]any{
 					"total_ms": bill.GetTotalMS(),
 				}
 			}
