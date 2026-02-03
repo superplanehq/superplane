@@ -27,22 +27,24 @@ yellow "Current timestamp (UTC): $current_timestamp"
 yellow ""
 
 # Find all migration files and extract their timestamps
-migration_dir="db/migrations"
+migration_dirs=("db/migrations" "db/data_migrations")
 future_migrations=()
+files=()
 
-# Check if migration directory exists
-if [ ! -d "$migration_dir" ]; then
-  red "Error: Migration directory '$migration_dir' does not exist"
-  exit 1
-fi
+for migration_dir in "${migration_dirs[@]}"; do
+  if [ ! -d "$migration_dir" ]; then
+    red "Error: Migration directory '$migration_dir' does not exist"
+    exit 1
+  fi
 
-# Use nullglob to handle case when no .sql files exist
-shopt -s nullglob
-files=("$migration_dir"/*.sql)
-shopt -u nullglob
+  shopt -s nullglob
+  dir_files=("$migration_dir"/*.sql)
+  shopt -u nullglob
+  files+=("${dir_files[@]}")
+done
 
 if [ ${#files[@]} -eq 0 ]; then
-  yellow "No migration files found in $migration_dir"
+  yellow "No migration files found in ${migration_dirs[*]}"
   green "✓ No migrations to check"
   exit 0
 fi
