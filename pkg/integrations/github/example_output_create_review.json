@@ -1,0 +1,21 @@
+{
+  "data": [
+    {
+      "id": 987654321,
+      "node_id": "PRR_kwDOExample123",
+      "state": "APPROVED",
+      "body": "LGTM! All tests pass and code follows our style guidelines.",
+      "html_url": "https://github.com/acme/widgets/pull/42#pullrequestreview-987654321",
+      "pull_request": "https://api.github.com/repos/acme/widgets/pulls/42",
+      "submitted_at": "2026-01-16T19:00:00Z",
+      "user": {
+        "login": "superplane-bot",
+        "id": 12345678,
+        "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+        "html_url": "https://github.com/superplane-bot"
+      }
+    }
+  ],
+  "timestamp": "2026-01-16T19:00:00.123456789Z",
+  "type": "github.pullRequestReview"
+}
