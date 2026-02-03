@@ -181,3 +181,7 @@ func buildIncidentPayload(webhook WebhookPayload) map[string]any {
 
 	return payload
 }
+
+func (t *OnIncident) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}

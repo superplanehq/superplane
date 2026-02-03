@@ -815,3 +815,7 @@ func formatTimezone(loc *time.Location) string {
 
 	return fmt.Sprintf("%s (UTC%s%02d:%02d)", loc.String(), sign, hours, minutes)
 }
+
+func (s *Schedule) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}

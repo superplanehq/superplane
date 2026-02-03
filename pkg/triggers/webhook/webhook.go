@@ -265,3 +265,7 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 
 	return http.StatusOK, nil
 }
+
+func (w *Webhook) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}

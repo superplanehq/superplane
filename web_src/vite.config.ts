@@ -25,13 +25,14 @@ const setHmrPortFromPortPlugin = {
 // https://vite.dev/config/
 export default defineConfig(({ command }: { command: string }) => {
   const isDev = command !== "build";
-  const apiPort = process.env.API_PORT || "8000";
+  const apiPort = process.env.API_PORT || process.env.PUBLIC_API_PORT || "8000";
+  const devPort = Number.parseInt(process.env.VITE_DEV_PORT || "5173", 10);
 
   return {
     plugins: [react(), tailwindcss(), setHmrPortFromPortPlugin],
     base: "/",
     server: {
-      port: 5173,
+      port: devPort,
       strictPort: true,
       host: true,
       watch: {

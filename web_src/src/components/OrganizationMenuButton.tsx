@@ -7,6 +7,7 @@ import {
   ArrowRightLeft,
   ChevronDown,
   CircleUser,
+  Key,
   LogOut,
   Plug,
   Settings,
@@ -95,6 +96,11 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
       label: "Integrations",
       href: organizationId ? `/${organizationId}/settings/integrations` : "#",
       Icon: Plug,
+    },
+    {
+      label: "Secrets",
+      href: organizationId ? `/${organizationId}/settings/secrets` : "#",
+      Icon: Key,
     },
     { label: "Change Organization", href: "/", Icon: ArrowRightLeft },
   ];

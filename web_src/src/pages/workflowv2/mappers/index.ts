@@ -63,7 +63,11 @@ import {
   triggerRenderers as rootlyTriggerRenderers,
   eventStateRegistry as rootlyEventStateRegistry,
 } from "./rootly/index";
-import { componentMappers as awsComponentMappers, triggerRenderers as awsTriggerRenderers } from "./aws";
+import {
+  componentMappers as awsComponentMappers,
+  triggerRenderers as awsTriggerRenderers,
+  eventStateRegistry as awsEventStateRegistry,
+} from "./aws";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
 import {
   componentMappers as discordComponentMappers,
@@ -148,6 +152,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   discord: discordEventStateRegistry,
   rootly: rootlyEventStateRegistry,
   openai: openaiEventStateRegistry,
+  aws: awsEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {

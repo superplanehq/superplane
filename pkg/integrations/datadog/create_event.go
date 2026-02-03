@@ -224,3 +224,7 @@ func parseTags(tags string) []string {
 	}
 	return result
 }
+
+func (c *CreateEvent) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

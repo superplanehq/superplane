@@ -14,6 +14,16 @@ import { Label } from "@/components/ui/label";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { resolveIcon } from "@/lib/utils";
 import { Check, Copy, Loader2, X } from "lucide-react";
+import dash0Icon from "@/assets/icons/integrations/dash0.svg";
+import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
+import githubIcon from "@/assets/icons/integrations/github.svg";
+import openAiIcon from "@/assets/icons/integrations/openai.svg";
+import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
+import slackIcon from "@/assets/icons/integrations/slack.svg";
+import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
+import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getHeaderIconSrc, IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import {
@@ -47,6 +57,22 @@ import { EventState, EventStateMap } from "../componentBase";
 import { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
+
+const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
+  dash0: dash0Icon,
+  daytona: daytonaIcon,
+  github: githubIcon,
+  openai: openAiIcon,
+  "open-ai": openAiIcon,
+  pagerduty: pagerDutyIcon,
+  rootly: rootlyIcon,
+  semaphore: SemaphoreLogo,
+  slack: slackIcon,
+  aws: {
+    ecr: awsEcrIcon,
+    lambda: awsLambdaIcon,
+  },
+};
 
 interface ComponentSidebarProps {
   isOpen?: boolean;

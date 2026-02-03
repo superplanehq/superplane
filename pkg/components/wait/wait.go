@@ -445,3 +445,7 @@ func (w *Wait) Cancel(ctx core.ExecutionContext) error {
 		},
 	)
 }
+
+func (w *Wait) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

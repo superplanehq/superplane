@@ -211,3 +211,7 @@ func (c *CreateIssue) HandleAction(ctx core.ActionContext) error {
 func (c *CreateIssue) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
+
+func (c *CreateIssue) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

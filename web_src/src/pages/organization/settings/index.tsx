@@ -13,12 +13,14 @@ import { useParams } from "react-router-dom";
 import { Members } from "./Members";
 import { Integrations } from "./Integrations";
 import { IntegrationDetails } from "./IntegrationDetails";
+import { Secrets } from "./Secrets";
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { cn } from "@/lib/utils";
 import {
   ArrowRightLeft,
   CircleUser,
   Home,
+  Key,
   LogOut,
   Plug,
   Settings,
@@ -80,7 +82,7 @@ export function OrganizationSettings() {
     Icon: LucideIcon;
   };
 
-  const sectionIds = ["profile", "general", "members", "groups", "roles", "integrations"];
+  const sectionIds = ["profile", "general", "members", "groups", "roles", "integrations", "secrets"];
   const pathSegments = location.pathname?.split("/").filter(Boolean) || [];
   const settingsIndex = pathSegments.indexOf("settings");
   const segmentsAfterSettings = settingsIndex >= 0 ? pathSegments.slice(settingsIndex + 1) : [];
@@ -106,6 +108,7 @@ export function OrganizationSettings() {
       ? [{ id: "roles", label: "Roles", href: `/${organizationId}/settings/roles`, Icon: Shield }]
       : []),
     { id: "integrations", label: "Integrations", href: `/${organizationId}/settings/integrations`, Icon: Plug },
+    { id: "secrets", label: "Secrets", href: `/${organizationId}/settings/secrets`, Icon: Key },
     { id: "change-org", label: "Change Organization", href: "/", Icon: ArrowRightLeft },
   ];
 
@@ -139,6 +142,9 @@ export function OrganizationSettings() {
     if (link.id === "integrations" && currentSection === "integrations") {
       return true;
     }
+    if (link.id === "secrets" && currentSection === "secrets") {
+      return true;
+    }
     return currentSection === link.id;
   };
 
@@ -168,6 +174,10 @@ export function OrganizationSettings() {
     integrations: {
       title: "Integrations",
       description: "Connect external tools and services to extend SuperPlane.",
+    },
+    secrets: {
+      title: "Secrets",
+      description: "Store and manage secrets.",
     },
     profile: {
       title: "Profile",
@@ -293,6 +303,7 @@ export function OrganizationSettings() {
               path="integrations/:integrationId"
               element={<IntegrationDetails organizationId={organizationId || ""} />}
             />
+            <Route path="secrets" element={<Secrets organizationId={organizationId || ""} />} />
             <Route path="groups/:groupName/members" element={<GroupMembersPage />} />
             <Route path="create-group" element={<CreateGroupPage />} />
             <Route path="create-role" element={<CreateRolePage />} />

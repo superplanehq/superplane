@@ -98,6 +98,8 @@ func (s *PanicableIntegration) Cleanup(ctx core.IntegrationCleanupContext) (err 
 func (s *PanicableIntegration) HandleAction(ctx core.IntegrationActionContext) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
+			ctx.Logger.Errorf("Component %s panicked in HandleAction(): %v\nStack: %s",
+				s.underlying.Name(), r, debug.Stack())
 			err = fmt.Errorf("integration %s panicked in HandleAction(): %v",
 				s.underlying.Name(), r)
 		}

@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -61,6 +62,7 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 	)
 
 	syncErr := integration.Sync(core.SyncContext{
+		Logger:          logging.ForIntegration(*newIntegration),
 		HTTP:            contexts.NewHTTPContext(registry.GetHTTPClient()),
 		Integration:     integrationCtx,
 		Configuration:   newIntegration.Configuration.Data(),

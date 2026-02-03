@@ -221,3 +221,7 @@ func (l *ListIncidents) HandleAction(ctx core.ActionContext) error {
 func (l *ListIncidents) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
+
+func (l *ListIncidents) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
