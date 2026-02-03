@@ -4,12 +4,7 @@ import { TriggerRenderer } from "../../types";
 import { TriggerProps } from "@/ui/trigger";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import { EcrImageScanEvent, EcrTriggerConfiguration, EcrTriggerMetadata } from "./types";
-import {
-  buildRepositoryMetadataItems,
-  formatTagLabel,
-  formatTags,
-  getRepositoryLabel,
-} from "./utils";
+import { buildRepositoryMetadataItems, formatTagLabel, formatTags, getRepositoryLabel } from "./utils";
 import { formatTimeAgo } from "@/utils/date";
 import { EcrImageScanDetail } from "./types";
 import { numberOrZero, stringOrDash } from "../../utils";
