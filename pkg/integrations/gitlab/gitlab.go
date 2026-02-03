@@ -266,6 +266,10 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 
 	if err != nil {
 		ctx.Integration.Error(fmt.Sprintf("Failed to refresh token: %v", err))
+		
+		// This will force re-authentication on the next sync
+		_ = ctx.Integration.SetSecret(OAuthRefreshToken, []byte(""))
+		_ = ctx.Integration.SetSecret(OAuthAccessToken, []byte(""))
 		return nil
 	}
 
