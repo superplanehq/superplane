@@ -24,17 +24,29 @@ func Test_ListUserPermissions(t *testing.T) {
 		assert.NotEmpty(t, resp.Permissions)
 
 		hasReadPermission := false
-		hasWritePermission := false
+		hasCreatePermission := false
+		hasUpdatePermission := false
+		hasDeletePermission := false
 		for _, perm := range resp.Permissions {
 			if perm.Action == "read" {
 				hasReadPermission = true
 			}
 
-			if perm.Action == "write" {
-				hasWritePermission = true
+			if perm.Action == "create" {
+				hasCreatePermission = true
+			}
+
+			if perm.Action == "update" {
+				hasUpdatePermission = true
+			}
+
+			if perm.Action == "delete" {
+				hasDeletePermission = true
 			}
 		}
 		assert.True(t, hasReadPermission)
-		assert.False(t, hasWritePermission)
+		assert.False(t, hasCreatePermission)
+		assert.False(t, hasUpdatePermission)
+		assert.False(t, hasDeletePermission)
 	})
 }
