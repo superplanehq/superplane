@@ -1,7 +1,7 @@
 import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { onAppMentionTriggerRenderer } from "./on_app_mention";
 import { sendTextMessageMapper } from "./send_text_message";
-import { buildActionStateRegistry } from "../github/utils";
+import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   sendTextMessage: sendTextMessageMapper,

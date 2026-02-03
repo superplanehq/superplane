@@ -6,21 +6,321 @@ sidebar:
 
 Manage resources and execute AWS commands in workflows
 
+## Triggers
+
+<CardGrid>
+  <LinkCard title="ECR • On Image Push" href="#ecr-•-on-image-push" description="Listen to AWS ECR image push events" />
+  <LinkCard title="ECR • On Image Scan" href="#ecr-•-on-image-scan" description="Listen to AWS ECR image scan events" />
+</CardGrid>
+
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Actions
 
 <CardGrid>
-  <LinkCard title="Lambda - Run Function" href="#lambda---run-function" description="Invoke a Lambda function, optionally creating it from inline JavaScript" />
+  <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
+  <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
+  <LinkCard title="ECR • Scan Image" href="#ecr-•-scan-image" description="Scan an ECR image for vulnerabilities" />
+  <LinkCard title="Lambda • Run Function" href="#lambda-•-run-function" description="Invoke a Lambda function, optionally creating it from inline JavaScript" />
 </CardGrid>
 
 ## Instructions
 
 Initially, you can leave the **"IAM Role ARN"** field empty, as you will be guided through the identity provider and IAM role creation process.
 
-<a id="lambda---run-function"></a>
+<a id="ecr-•-on-image-push"></a>
 
-## Lambda - Run Function
+## ECR • On Image Push
+
+The On Image Push trigger starts a workflow execution when an image is pushed to an ECR repository.
+
+### Use Cases
+
+- **Build pipelines**: Trigger builds and deployments on container pushes
+- **Security automation**: Kick off scans or alerts for newly pushed images
+- **Release workflows**: Promote artifacts when a tag is published
+
+### Configuration
+
+- **Repositories**: Optional filters for ECR repository names
+- **Image Tags**: Optional filters for image tags (for example: `latest` or `^v[0-9]+`)
+
+### Event Data
+
+Each image push event includes:
+- **detail.repository-name**: ECR repository name
+- **detail.image-tag**: Tag that was pushed
+- **detail.image-digest**: Digest of the image
+
+### Example Data
+
+```json
+{
+  "data": {
+    "account": "123456789012",
+    "detail": {
+      "action-type": "PUSH",
+      "image-digest": "sha256:2c26b46b68ffc68ff99b453c1d30413413422f1642f0e2b8c7b8a0b8a96a909e",
+      "image-tag": "latest",
+      "repository-arn": "arn:aws:ecr:us-east-1:123456789012:repository/my-repo",
+      "repository-name": "my-repo",
+      "result": "SUCCESS"
+    },
+    "detail-type": "ECR Image Action",
+    "id": "c1b45a2c-9c3f-4c52-bc98-5ea31ce17692",
+    "region": "us-east-1",
+    "resources": [
+      "arn:aws:ecr:us-east-1:123456789012:repository/my-repo"
+    ],
+    "source": "aws.ecr",
+    "time": "2024-01-01T12:00:00Z",
+    "version": "0"
+  },
+  "timestamp": "2026-02-03T12:00:00Z",
+  "type": "aws.ecr.image.push"
+}
+```
+
+<a id="ecr-•-on-image-scan"></a>
+
+## ECR • On Image Scan
+
+The On Image Scan trigger starts a workflow execution when an ECR image scan completes.
+
+### Use Cases
+
+- **Security automation**: Notify teams or open issues on new findings
+- **Compliance checks**: Gate promotions based on severity thresholds
+- **Reporting**: Aggregate scan findings across repositories
+
+### Configuration
+
+- **Repositories**: Optional filters for ECR repository names
+
+### Notes
+
+- **Enhanced scanning**: Enhanced scanning events are sent by Amazon Inspector (aws.inspector2)
+
+### Event Data
+
+Each image scan event includes:
+- **detail.scan-status**: Scan status (for example: COMPLETE)
+- **detail.repository-name**: ECR repository name
+- **detail.image-digest**: Digest of the image
+- **detail.image-tags**: Tags associated with the image
+- **detail.finding-severity-counts**: Counts per severity level (if any)
+
+### Example Data
+
+```json
+{
+  "data": {
+    "account": "123456789012",
+    "detail": {
+      "finding-severity-counts": {
+        "CRITICAL": 10,
+        "MEDIUM": 9
+      },
+      "image-digest": "sha256:7f5b2640fe6fb4f46592dfd3410c4a79dac4f89e4782432e0378abcd1234",
+      "image-tags": [],
+      "repository-name": "my-repo",
+      "scan-status": "COMPLETE"
+    },
+    "detail-type": "ECR Image Scan",
+    "id": "df8b66c7-62c7-4b8a-9a6b-6ad7d6d8b3a2",
+    "region": "us-east-1",
+    "resources": [
+      "arn:aws:ecr:us-east-1:123456789012:repository/my-repo"
+    ],
+    "source": "aws.ecr",
+    "time": "2024-01-01T12:00:00Z",
+    "version": "0"
+  },
+  "timestamp": "2026-03-10T14:25:30.31254162Z",
+  "type": "aws.ecr.image.scan"
+}
+```
+
+<a id="ecr-•-get-image"></a>
+
+## ECR • Get Image
+
+The Get Image component retrieves image metadata from an ECR repository by digest, tag, or both.
+
+### Use Cases
+
+- **Release automation**: Fetch image details before deployment
+- **Audit trails**: Resolve digests and tags for traceability
+- **Security workflows**: Enrich findings with image metadata
+
+### Configuration
+
+- **Region**: AWS region of the ECR repository
+- **Repository**: ECR repository name or ARN
+- **Image Digest**: Digest of the image (optional)
+- **Image Tag**: Tag of the image (optional)
+
+At least one of **Image Digest** or **Image Tag** is required. If both are provided, the request includes both.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "artifactMediaType": "application/vnd.docker.container.image.v1+json",
+    "imageDigest": "sha256:8f1d3e4f5a6b7c8d9e0f11121314151617181920212223242526272829303132",
+    "imageManifestMediaType": "application/vnd.docker.distribution.manifest.v2+json",
+    "imagePushedAt": "2026-02-03T12:00:00Z",
+    "imageSizeInBytes": 48273912,
+    "imageTags": [
+      "latest",
+      "v1.2.3"
+    ],
+    "registryId": "123456789012",
+    "repositoryName": "my-repo"
+  },
+  "timestamp": "2026-02-03T12:00:00Z",
+  "type": "aws.ecr.image"
+}
+```
+
+<a id="ecr-•-get-image-scan-findings"></a>
+
+## ECR • Get Image Scan Findings
+
+The Get Image Scan Findings component retrieves vulnerability scan results for an ECR image.
+
+### Use Cases
+
+- **Security automation**: Pull scan findings to drive alerting or approvals
+- **Compliance checks**: Validate images against severity thresholds
+- **Reporting**: Capture scan summaries and findings for audits
+
+### Configuration
+
+- **Region**: AWS region of the ECR repository
+- **Repository**: ECR repository name or ARN
+- **Image Digest**: Digest of the image (optional)
+- **Image Tag**: Tag of the image (optional)
+
+At least one of **Image Digest** or **Image Tag** is required. If both are provided, the request includes both.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "imageId": {
+      "imageDigest": "sha256:8f1d3e4f5a6b7c8d9e0f11121314151617181920212223242526272829303132",
+      "imageTag": "latest"
+    },
+    "imageScanFindings": {
+      "findingSeverityCounts": {
+        "HIGH": 1
+      },
+      "findings": [
+        {
+          "attributes": [
+            {
+              "key": "package_name",
+              "value": "openssl"
+            },
+            {
+              "key": "package_version",
+              "value": "1.1.1k"
+            }
+          ],
+          "description": "Example vulnerability in a package.",
+          "name": "CVE-2024-12345",
+          "severity": "HIGH",
+          "uri": "https://example.com/cve-2024-12345"
+        }
+      ],
+      "imageScanCompletedAt": "2026-02-03T12:05:00Z",
+      "vulnerabilitySourceUpdatedAt": "2026-02-03T00:00:00Z"
+    },
+    "imageScanStatus": {
+      "description": "Scan completed",
+      "status": "COMPLETE"
+    },
+    "registryId": "123456789012",
+    "repositoryName": "my-repo"
+  },
+  "timestamp": "2026-02-03T12:05:00Z",
+  "type": "aws.ecr.image.scanFindings"
+}
+```
+
+<a id="ecr-•-scan-image"></a>
+
+## ECR • Scan Image
+
+The Scan Image component scans an ECR image for vulnerabilities.
+
+### Use Cases
+
+- **Security automation**: Scan images for vulnerabilities
+- **Compliance checks**: Validate images against severity thresholds
+- **Reporting**: Capture scan summaries and findings for audits
+
+### Configuration
+
+- **Region**: AWS region of the ECR repository
+- **Repository**: ECR repository name or ARN
+- **Image Digest**: Digest of the image (optional)
+- **Image Tag**: Tag of the image (optional)
+
+At least one of **Image Digest** or **Image Tag** is required. If both are provided, the request includes both.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "imageId": {
+      "imageDigest": "sha256:8f1d3e4f5a6b7c8d9e0f11121314151617181920212223242526272829303132",
+      "imageTag": "latest"
+    },
+    "imageScanFindings": {
+      "findingSeverityCounts": {
+        "HIGH": 1
+      },
+      "findings": [
+        {
+          "attributes": [
+            {
+              "key": "package_name",
+              "value": "openssl"
+            },
+            {
+              "key": "package_version",
+              "value": "1.1.1k"
+            }
+          ],
+          "description": "Example vulnerability in a package.",
+          "name": "CVE-2024-12345",
+          "severity": "HIGH",
+          "uri": "https://example.com/cve-2024-12345"
+        }
+      ],
+      "imageScanCompletedAt": "2026-02-03T12:05:00Z",
+      "vulnerabilitySourceUpdatedAt": "2026-02-03T00:00:00Z"
+    },
+    "imageScanStatus": {
+      "description": "Scan completed",
+      "status": "COMPLETE"
+    },
+    "registryId": "123456789012",
+    "repositoryName": "my-repo"
+  },
+  "timestamp": "2026-02-03T12:05:00Z",
+  "type": "aws.ecr.image.scanFindings"
+}
+```
+
+<a id="lambda-•-run-function"></a>
+
+## Lambda • Run Function
 
 The Run Lambda component invokes a Lambda function.
 
