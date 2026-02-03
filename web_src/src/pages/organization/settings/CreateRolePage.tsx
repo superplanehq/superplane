@@ -1,4 +1,6 @@
 import { Heading } from "@/components/Heading/heading";
+import { NotFoundPage } from "@/components/NotFoundPage";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -332,6 +334,7 @@ export function CreateRolePage() {
   const { organizationId } = useParams<{ organizationId: string }>();
   const orgId = organizationId;
   const isEditMode = !!roleNameParam;
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
 
   const [roleName, setRoleName] = useState("");
   const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(new Set());
@@ -343,8 +346,31 @@ export function CreateRolePage() {
 
   const isSubmitting = createRoleMutation.isPending || updateRoleMutation.isPending;
   const isReadOnly = isDefaultRole(roleNameParam);
+  const canReadRoles = canAct("roles", "read");
+  const canCreateRoles = canAct("roles", "create");
+  const canUpdateRoles = canAct("roles", "update");
 
   usePageTitle([isReadOnly ? "View Role" : isEditMode ? "Edit Role" : "Create Role"]);
+
+  if (permissionsLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[40vh]">
+        <p className="text-gray-500">Checking permissions...</p>
+      </div>
+    );
+  }
+
+  if (!canReadRoles) {
+    return <NotFoundPage />;
+  }
+
+  if (isEditMode && !isReadOnly && !canUpdateRoles) {
+    return <NotFoundPage />;
+  }
+
+  if (!isEditMode && !canCreateRoles) {
+    return <NotFoundPage />;
+  }
 
   const handleCategoryToggle = (permissions: Permission[]) => {
     if (isReadOnly) return;
@@ -392,6 +418,8 @@ export function CreateRolePage() {
   const handleSubmitRole = async () => {
     if (isReadOnly) return;
     if (!roleName.trim() || selectedPermissions.size === 0 || !orgId) return;
+    if (isEditMode && !canUpdateRoles) return;
+    if (!isEditMode && !canCreateRoles) return;
 
     try {
       // Convert selected permissions to the protobuf format

@@ -10,6 +10,7 @@ import AuthGuard from "./components/AuthGuard";
 import { AccountProvider } from "./contexts/AccountContext";
 import { useAccount } from "./contexts/AccountContext";
 import { PermissionsProvider } from "./contexts/PermissionsContext";
+import { RequirePermission } from "./components/PermissionGate";
 import { isCustomComponentsEnabled } from "./lib/env";
 import { Login } from "./pages/auth/Login";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
@@ -37,6 +38,14 @@ const queryClient = new QueryClient({
 const withAuthOnly = (Component: React.ComponentType) => (
   <AuthGuard>
     <Component />
+  </AuthGuard>
+);
+
+const withAuthAndPermission = (Component: React.ComponentType, resource: string, action: string) => (
+  <AuthGuard>
+    <RequirePermission resource={resource} action={action}>
+      <Component />
+    </RequirePermission>
   </AuthGuard>
 );
 
@@ -71,14 +80,20 @@ function AppRouter() {
 
           {/* Organization-scoped protected routes */}
           <Route path=":organizationId" element={<OrganizationScope />}>
-            <Route index element={withAuthOnly(HomePage)} />
-            <Route path="canvases/new" element={withAuthOnly(CreateCanvasPage)} />
+            <Route index element={withAuthAndPermission(HomePage, "canvases", "read")} />
+            <Route path="canvases/new" element={withAuthAndPermission(CreateCanvasPage, "canvases", "create")} />
             {isCustomComponentsEnabled() && (
-              <Route path="custom-components/:blueprintId" element={withAuthOnly(CustomComponent)} />
+              <Route
+                path="custom-components/:blueprintId"
+                element={withAuthAndPermission(CustomComponent, "blueprints", "read")}
+              />
             )}
-            <Route path="canvases/:canvasId" element={withAuthOnly(WorkflowPageV2)} />
-            <Route path="templates/:canvasId" element={withAuthOnly(WorkflowPageV2)} />
-            <Route path="canvases/:canvasId/nodes/:nodeId/:executionId" element={withAuthOnly(NodeRunPage)} />
+            <Route path="canvases/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
+            <Route path="templates/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
+            <Route
+              path="canvases/:canvasId/nodes/:nodeId/:executionId"
+              element={withAuthAndPermission(NodeRunPage, "canvases", "read")}
+            />
             <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
           </Route>
 

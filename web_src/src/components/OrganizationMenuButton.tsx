@@ -9,6 +9,7 @@ import {
   ChevronDown,
   CircleUser,
   Key,
+  Lock,
   LogOut,
   Settings,
   Shield,
@@ -16,6 +17,8 @@ import {
   Users,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { PermissionTooltip } from "@/components/PermissionGate";
+import { usePermissions } from "@/contexts/PermissionsContext";
 
 interface OrganizationMenuButtonProps {
   organizationId?: string;
@@ -26,6 +29,7 @@ interface OrganizationMenuButtonProps {
 export function OrganizationMenuButton({ organizationId, onLogoClick, className }: OrganizationMenuButtonProps) {
   const { account } = useAccount();
   const { data: organization } = useOrganization(organizationId || "");
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -86,21 +90,41 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
       label: "Settings",
       href: organizationId ? `/${organizationId}/settings/general` : "#",
       Icon: Settings,
+      permission: { resource: "org", action: "read" },
     },
-    { label: "Members", href: organizationId ? `/${organizationId}/settings/members` : "#", Icon: UserIcon },
-    { label: "Groups", href: organizationId ? `/${organizationId}/settings/groups` : "#", Icon: Users },
+    {
+      label: "Members",
+      href: organizationId ? `/${organizationId}/settings/members` : "#",
+      Icon: UserIcon,
+      permission: { resource: "members", action: "read" },
+    },
+    {
+      label: "Groups",
+      href: organizationId ? `/${organizationId}/settings/groups` : "#",
+      Icon: Users,
+      permission: { resource: "groups", action: "read" },
+    },
     ...(isRBACEnabled()
-      ? [{ label: "Roles", href: organizationId ? `/${organizationId}/settings/roles` : "#", Icon: Shield }]
+      ? [
+          {
+            label: "Roles",
+            href: organizationId ? `/${organizationId}/settings/roles` : "#",
+            Icon: Shield,
+            permission: { resource: "roles", action: "read" },
+          },
+        ]
       : []),
     {
       label: "Integrations",
       href: organizationId ? `/${organizationId}/settings/integrations` : "#",
       Icon: AppWindow,
+      permission: { resource: "integrations", action: "read" },
     },
     {
       label: "Secrets",
       href: organizationId ? `/${organizationId}/settings/secrets` : "#",
       Icon: Key,
+      permission: { resource: "secrets", action: "read" },
     },
     { label: "Change Organization", href: "/", Icon: ArrowRightLeft },
   ];
@@ -137,16 +161,44 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
             <div className="mt-2 flex flex-col">
               {sidebarOrganizationLinks.map((link) => {
                 const MenuIcon = link.Icon;
-                return (
-                  <a
+                const allowed =
+                  !link.permission || permissionsLoading || canAct(link.permission.resource, link.permission.action);
+                const linkButton = (
+                  <button
                     key={link.label}
-                    href={link.href}
-                    className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
-                    onClick={() => setIsMenuOpen(false)}
+                    type="button"
+                    onClick={() => {
+                      if (!allowed) return;
+                      setIsMenuOpen(false);
+                      if (link.href) {
+                        window.location.href = link.href;
+                      }
+                    }}
+                    className={cn(
+                      "group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800",
+                      !allowed && "opacity-60 cursor-not-allowed hover:bg-transparent hover:text-gray-500",
+                    )}
+                    disabled={!allowed}
                   >
                     <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
                     <span>{link.label}</span>
-                  </a>
+                    {!allowed && <Lock size={12} className="ml-auto text-gray-400" />}
+                  </button>
+                );
+
+                if (allowed) {
+                  return linkButton;
+                }
+
+                return (
+                  <PermissionTooltip
+                    key={link.label}
+                    allowed={false}
+                    message={`You don't have permission to view ${link.label.toLowerCase()}.`}
+                    className="w-full"
+                  >
+                    {linkButton}
+                  </PermissionTooltip>
                 );
               })}
             </div>
