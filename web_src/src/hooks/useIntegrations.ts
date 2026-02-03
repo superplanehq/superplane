@@ -8,6 +8,7 @@ import {
   organizationsUpdateIntegration,
   organizationsDeleteIntegration,
 } from "@/api-client/sdk.gen";
+import type { IntegrationsIntegrationDefinition } from "@/api-client/types.gen";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 
@@ -28,14 +29,14 @@ export const useAvailableIntegrations = () => {
     queryKey: integrationKeys.available(),
     queryFn: async () => {
       const response = await integrationsListIntegrations(withOrganizationHeader({}));
-      const list = response.data?.integrations || [];
-      return list.map((integration: Record<string, unknown>) => {
+      const list: IntegrationsIntegrationDefinition[] = response.data?.integrations || [];
+      return list.map((integration: IntegrationsIntegrationDefinition) => {
         // Support both camelCase and PascalCase (API may send either)
-        const rawLabel = (integration.label ?? integration.Label) as string | undefined;
-        const rawName = (integration.name ?? integration.Name) as string | undefined;
+        const rawLabel = integration.label;
+        const rawName = integration.name;
         const displayLabel =
           getIntegrationTypeDisplayName(rawLabel, rawName) || rawLabel || rawName || "";
-        return { ...integration, label: displayLabel };
+        return { ...integration, label: displayLabel } as IntegrationsIntegrationDefinition;
       });
     },
     staleTime: 5 * 60 * 1000, // 5 minutes

@@ -1,6 +1,6 @@
 import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { baseMapper } from "./base";
-import { buildActionStateRegistry } from "../github/utils";
+import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createDnsRecord: baseMapper,

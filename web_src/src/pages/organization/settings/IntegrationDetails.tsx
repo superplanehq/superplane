@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
+import type { ConfigurationField } from "@/api-client";
 import { showErrorToast } from "@/utils/toast";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
@@ -299,7 +300,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
 
               {integrationDef?.configuration && integrationDef.configuration.length > 0 ? (
                 <form onSubmit={handleConfigSubmit} className="space-y-4">
-                  {integrationDef.configuration.map((field) => (
+                  {integrationDef.configuration.map((field: ConfigurationField) => (
                     <ConfigurationFieldRenderer
                       key={field.name}
                       field={field}

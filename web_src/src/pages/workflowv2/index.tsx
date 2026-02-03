@@ -1352,7 +1352,7 @@ export function WorkflowPageV2() {
 
         // Check if this component is from an integration
         const componentIntegration = availableIntegrations.find((integration) =>
-          integration.components?.some((c) => c.name === node.component?.name),
+          integration.components?.some((c: ComponentsComponent) => c.name === node.component?.name),
         );
         if (componentIntegration) {
           integrationName = componentIntegration.name;
@@ -1365,7 +1365,7 @@ export function WorkflowPageV2() {
 
         // Check if this trigger is from an application
         const triggerIntegration = availableIntegrations.find((integration) =>
-          integration.triggers?.some((t) => t.name === node.trigger?.name),
+          integration.triggers?.some((t: TriggersTrigger) => t.name === node.trigger?.name),
         );
         if (triggerIntegration) {
           integrationName = triggerIntegration.name;
