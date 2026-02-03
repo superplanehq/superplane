@@ -39,27 +39,10 @@ type WorkflowRunMetadata struct {
 }
 
 type RunWorkflowSpec struct {
-	Repository      string   `json:"repository"`
-	WorkflowFile    string   `json:"workflowFile"`
-	Ref             string   `json:"ref"`
-	Inputs          []Input  `json:"inputs"`
-	// AllowedBranches specifies which branches can trigger workflows.
-	// If empty and EnforceBranchRestriction is not false, defaults are used.
-	AllowedBranches []string `json:"allowedBranches,omitempty"`
-	// EnforceBranchRestriction controls branch restriction behavior:
-	//   - nil (not set): Use secure defaults (main, master, release, production, staging)
-	//   - true: Enforce branch restrictions with AllowedBranches or defaults
-	//   - false: Disable branch restrictions (allow any branch) - USE WITH CAUTION
-	EnforceBranchRestriction *bool `json:"enforceBranchRestriction,omitempty"`
-}
-
-// Default allowed branches (protected branches)
-var defaultAllowedBranches = []string{
-	"main",
-	"master",
-	"release",
-	"production",
-	"staging",
+	Repository   string  `json:"repository"`
+	WorkflowFile string  `json:"workflowFile"`
+	Ref          string  `json:"ref"`
+	Inputs       []Input `json:"inputs"`
 }
 
 type Input struct {
@@ -193,31 +176,6 @@ func (r *RunWorkflow) Configuration() []configuration.Field {
 				},
 			},
 		},
-		// Security configuration for branch restrictions
-		{
-			Name:        "enforceBranchRestriction",
-			Label:       "Restrict allowed branches",
-			Type:        configuration.FieldTypeBool,
-			Description: "When enabled, only specified branches (or defaults: main, master, release, production, staging) can trigger this workflow. Blocks commit SHAs and PR references.",
-			Togglable:   true,
-		},
-		{
-			Name:        "allowedBranches",
-			Label:       "Allowed Branches",
-			Type:        configuration.FieldTypeList,
-			Description: "Branch names or patterns (e.g., main, release/*) allowed for workflow execution.",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "enforceBranchRestriction", Values: []string{"true"}},
-			},
-			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel: "Branch",
-					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeString,
-					},
-				},
-			},
-		},
 	}
 }
 
@@ -255,12 +213,6 @@ func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	// Validate branch restriction for security
-	if err := r.validateBranchRestriction(spec); err != nil {
-		ctx.Logger.Warnf("Branch restriction validation failed: %v", err)
-		return ctx.ExecutionState.Fail("branch_restricted", err.Error())
 	}
 
 	var appMetadata Metadata
@@ -648,66 +600,4 @@ func (r *RunWorkflow) buildInputs(ctx core.ExecutionContext, inputs []Input) map
 	result["superplane_execution_id"] = ctx.ID
 
 	return result
-}
-
-// validateBranchRestriction checks if the ref is an allowed branch.
-// This prevents triggering workflows on unreviewed branches/PRs which could contain malicious code.
-func (r *RunWorkflow) validateBranchRestriction(spec RunWorkflowSpec) error {
-	// Branch restriction is opt-in: only enforce if explicitly enabled
-	// This avoids breaking existing workflows while allowing security-conscious users to enable it
-	if spec.EnforceBranchRestriction == nil || !*spec.EnforceBranchRestriction {
-		return nil
-	}
-
-	// Determine allowed branches:
-	// 1. Use user-specified AllowedBranches if provided
-	// 2. Otherwise use secure defaults
-	allowedBranches := spec.AllowedBranches
-	if len(allowedBranches) == 0 {
-		allowedBranches = defaultAllowedBranches
-	}
-
-	ref := spec.Ref
-
-	// Check if ref is a commit SHA (40 hex characters)
-	// Commit SHAs are blocked as they could reference unreviewed code
-	if len(ref) == 40 && isHexString(ref) {
-		return fmt.Errorf("direct commit SHA references are not allowed for security reasons; use a branch name instead")
-	}
-
-	// Check if ref looks like a PR reference (e.g., refs/pull/123/head)
-	if strings.HasPrefix(ref, "refs/pull/") || strings.HasPrefix(ref, "pull/") {
-		return fmt.Errorf("pull request references are not allowed for security reasons; use a protected branch name instead")
-	}
-
-	// Check if ref is in the allowed branches list
-	for _, allowed := range allowedBranches {
-		// Exact match
-		if ref == allowed {
-			return nil
-		}
-		// Match with refs/heads/ prefix
-		if ref == "refs/heads/"+allowed {
-			return nil
-		}
-		// Wildcard matching for patterns like "release/*"
-		if strings.HasSuffix(allowed, "*") {
-			prefix := strings.TrimSuffix(allowed, "*")
-			if strings.HasPrefix(ref, prefix) || strings.HasPrefix(ref, "refs/heads/"+prefix) {
-				return nil
-			}
-		}
-	}
-
-	return fmt.Errorf("ref '%s' is not in the allowed branches list; allowed branches: %v", ref, allowedBranches)
-}
-
-// isHexString checks if a string contains only hexadecimal characters
-func isHexString(s string) bool {
-	for _, c := range s {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
-			return false
-		}
-	}
-	return true
 }
