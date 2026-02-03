@@ -27,18 +27,9 @@ func Test__FlyIO__Components(t *testing.T) {
 	f := &FlyIO{}
 	components := f.Components()
 
-	require.Len(t, components, 5)
-
-	names := make([]string, len(components))
-	for i, c := range components {
-		names[i] = c.Name()
-	}
-
-	assert.Contains(t, names, "flyio.startMachine")
-	assert.Contains(t, names, "flyio.stopMachine")
-	assert.Contains(t, names, "flyio.createMachine")
-	assert.Contains(t, names, "flyio.deleteMachine")
-	assert.Contains(t, names, "flyio.listMachines")
+	// Base integration returns empty components
+	// Component subtasks (startMachine, stopMachine, etc.) are separate tickets
+	assert.Empty(t, components)
 }
 
 func Test__FlyIO__Configuration(t *testing.T) {
