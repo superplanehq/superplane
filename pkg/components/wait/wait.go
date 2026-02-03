@@ -135,6 +135,7 @@ func (w *Wait) Configuration() []configuration.Field {
 			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "mode", Values: []string{ModeInterval}},
 			},
+			Default: "10",
 		},
 		{
 			Name:        "unit",
@@ -443,4 +444,8 @@ func (w *Wait) Cancel(ctx core.ExecutionContext) error {
 			),
 		},
 	)
+}
+
+func (w *Wait) Cleanup(ctx core.SetupContext) error {
+	return nil
 }

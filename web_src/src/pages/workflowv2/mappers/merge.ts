@@ -1,8 +1,8 @@
 import {
   ComponentsComponent,
   ComponentsNode,
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper, EventStateRegistry, StateFunction } from "./types";
 import {
@@ -61,7 +61,7 @@ interface MergeAdditionalData {
  * Determines which output channel has data, indicating the merge outcome.
  * Returns the channel name or null if no output found.
  */
-function getActiveChannel(execution: WorkflowsWorkflowNodeExecution): string | null {
+function getActiveChannel(execution: CanvasesCanvasNodeExecution): string | null {
   const outputs = execution.outputs as MergeOutputs | undefined;
   if (!outputs) return null;
 
@@ -110,7 +110,7 @@ export const MERGE_STATE_MAP: EventStateMap = {
 /**
  * Merge-specific state logic function
  */
-export const mergeStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
+export const mergeStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
   if (!execution) return "neutral";
 
   // Check for cancellation
@@ -159,8 +159,8 @@ export const mergeMapper: ComponentBaseMapper = {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
-    _nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
+    lastExecutions: CanvasesCanvasNodeExecution[],
+    _nodeQueueItems?: CanvasesCanvasNodeQueueItem[],
     additionalData?: unknown,
   ): ComponentBaseProps {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
@@ -177,12 +177,12 @@ export const mergeMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution, additionalData?: unknown): string {
+  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution, additionalData?: unknown): string {
     return getMergeSubtitle(execution, additionalData);
   },
 
   getExecutionDetails(
-    execution: WorkflowsWorkflowNodeExecution,
+    execution: CanvasesCanvasNodeExecution,
     _node: ComponentsNode,
     nodes?: ComponentsNode[],
   ): Record<string, any> {
@@ -208,7 +208,7 @@ export const mergeMapper: ComponentBaseMapper = {
 
 function getMergeEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
   additionalData?: unknown,
 ): EventSection[] {
   const sections: EventSection[] = [];
@@ -231,7 +231,7 @@ function getMergeEventSections(
   return sections;
 }
 
-function getMergeSubtitle(execution: WorkflowsWorkflowNodeExecution, additionalData?: unknown): string {
+function getMergeSubtitle(execution: CanvasesCanvasNodeExecution, additionalData?: unknown): string {
   const metadata = execution.metadata as MergeExecutionMetadata | undefined;
   const mergeData = additionalData as MergeAdditionalData | undefined;
 
@@ -279,7 +279,7 @@ interface MergeTimelineEntry {
  */
 function buildMergeTimeline(
   metadata: MergeExecutionMetadata,
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
   nodes?: ComponentsNode[],
 ): MergeTimelineEntry[] {
   const timeline: MergeTimelineEntry[] = [];

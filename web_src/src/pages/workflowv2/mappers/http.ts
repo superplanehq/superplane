@@ -1,8 +1,8 @@
 import {
   ComponentsComponent,
   ComponentsNode,
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper, EventStateRegistry } from "./types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventStateMap, EventState } from "@/ui/componentBase";
@@ -64,7 +64,7 @@ const HTTP_EVENT_STATE_MAP: EventStateMap = {
 };
 
 // Custom state function for HTTP component
-const httpStateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
+const httpStateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
   if (!execution) return "neutral";
 
   if (
@@ -117,15 +117,15 @@ export const httpMapper: ComponentBaseMapper = {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
-    _items?: WorkflowsWorkflowNodeQueueItem[],
+    lastExecutions: CanvasesCanvasNodeExecution[],
+    _items?: CanvasesCanvasNodeQueueItem[],
   ): ComponentBaseProps {
     return {
       iconSlug: componentDefinition.icon || "globe",
       iconColor: getColorClass("black"),
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-white",
-      title: node.name!,
+      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
       eventSections: lastExecutions[0] ? getHTTPEventSections(nodes, lastExecutions[0], httpStateFunction) : undefined,
       includeEmptyState: !lastExecutions[0],
       metadata: getHTTPMetadataList(node),
@@ -134,7 +134,7 @@ export const httpMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, string> {
+  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
     const details: Record<string, string> = {};
     const metadata = execution.metadata as Record<string, unknown> | undefined;
 
@@ -190,7 +190,7 @@ export const httpMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
     const state = httpStateFunction(execution);
 
     // For running state, show duration
@@ -436,8 +436,8 @@ function getHTTPSpecs(node: ComponentsNode): ComponentBaseSpec[] {
 
 function getHTTPEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution,
-  stateFunction: (execution: WorkflowsWorkflowNodeExecution) => EventState,
+  execution: CanvasesCanvasNodeExecution,
+  stateFunction: (execution: CanvasesCanvasNodeExecution) => EventState,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");

@@ -19,40 +19,44 @@ import (
 )
 
 type IntegrationContext struct {
-	tx              *gorm.DB
-	node            *models.WorkflowNode
-	appInstallation *models.AppInstallation
-	encryptor       crypto.Encryptor
-	registry        *registry.Registry
+	tx          *gorm.DB
+	node        *models.CanvasNode
+	integration *models.Integration
+	encryptor   crypto.Encryptor
+	registry    *registry.Registry
 }
 
-func NewIntegrationContext(tx *gorm.DB, node *models.WorkflowNode, installation *models.AppInstallation, encryptor crypto.Encryptor, registry *registry.Registry) *IntegrationContext {
+func NewIntegrationContext(tx *gorm.DB, node *models.CanvasNode, integration *models.Integration, encryptor crypto.Encryptor, registry *registry.Registry) *IntegrationContext {
 	return &IntegrationContext{
-		tx:              tx,
-		node:            node,
-		appInstallation: installation,
-		encryptor:       encryptor,
-		registry:        registry,
+		tx:          tx,
+		node:        node,
+		integration: integration,
+		encryptor:   encryptor,
+		registry:    registry,
 	}
 }
 
 func (c *IntegrationContext) ID() uuid.UUID {
-	return c.appInstallation.ID
+	return c.integration.ID
 }
 
 func (c *IntegrationContext) RequestWebhook(configuration any) error {
-	integration, err := c.registry.GetIntegration(c.appInstallation.AppName)
+	impl, err := c.registry.GetIntegration(c.integration.AppName)
 	if err != nil {
 		return err
 	}
 
-	webhooks, err := models.ListAppInstallationWebhooks(c.tx, c.appInstallation.ID)
+	if err := c.replaceMismatchedWebhook(configuration, impl); err != nil {
+		return err
+	}
+
+	webhooks, err := models.ListIntegrationWebhooks(c.tx, c.integration.ID)
 	if err != nil {
 		return fmt.Errorf("Failed to list webhooks: %v", err)
 	}
 
 	for _, hook := range webhooks {
-		ok, err := integration.CompareWebhookConfig(hook.Configuration.Data(), configuration)
+		ok, err := impl.CompareWebhookConfig(hook.Configuration.Data(), configuration)
 		if err != nil {
 			return err
 		}
@@ -64,6 +68,39 @@ func (c *IntegrationContext) RequestWebhook(configuration any) error {
 	}
 
 	return c.createWebhook(configuration)
+}
+
+func (c *IntegrationContext) replaceMismatchedWebhook(configuration any, impl core.Integration) error {
+	if c.node == nil || c.node.WebhookID == nil {
+		return nil
+	}
+
+	webhook, err := models.FindWebhookInTransaction(c.tx, *c.node.WebhookID)
+	if err != nil {
+		return err
+	}
+
+	matches, err := impl.CompareWebhookConfig(webhook.Configuration.Data(), configuration)
+	if err != nil {
+		return err
+	}
+
+	if matches {
+		return nil
+	}
+
+	c.node.WebhookID = nil
+
+	nodes, err := models.FindWebhookNodesInTransaction(c.tx, webhook.ID)
+	if err != nil {
+		return err
+	}
+
+	if len(nodes) > 1 {
+		return nil
+	}
+
+	return c.tx.Delete(webhook).Error
 }
 
 func (c *IntegrationContext) createWebhook(configuration any) error {
@@ -79,7 +116,7 @@ func (c *IntegrationContext) createWebhook(configuration any) error {
 		State:             models.WebhookStatePending,
 		Secret:            encryptedKey,
 		Configuration:     datatypes.NewJSONType(configuration),
-		AppInstallationID: &c.appInstallation.ID,
+		AppInstallationID: &c.integration.ID,
 		CreatedAt:         &now,
 	}
 
@@ -103,11 +140,20 @@ func (c *IntegrationContext) ScheduleResync(interval time.Duration) error {
 	}
 
 	runAt := time.Now().Add(interval)
-	return c.appInstallation.CreateSyncRequest(c.tx, &runAt)
+	return c.integration.CreateSyncRequest(c.tx, &runAt)
+}
+
+func (c *IntegrationContext) ScheduleActionCall(actionName string, parameters any, interval time.Duration) error {
+	if interval < time.Second {
+		return fmt.Errorf("interval must be bigger than 1s")
+	}
+
+	runAt := time.Now().Add(interval)
+	return c.integration.CreateActionRequest(c.tx, actionName, parameters, &runAt)
 }
 
 func (c *IntegrationContext) completeCurrentRequestForInstallation() error {
-	request, err := models.FindPendingRequestForAppInstallation(c.tx, c.appInstallation.ID)
+	request, err := models.FindPendingRequestForIntegration(c.tx, c.integration.ID)
 	if err == nil {
 		return request.Complete(c.tx)
 	}
@@ -120,18 +166,18 @@ func (c *IntegrationContext) completeCurrentRequestForInstallation() error {
 }
 
 func (c *IntegrationContext) GetConfig(name string) ([]byte, error) {
-	config := c.appInstallation.Configuration.Data()
+	config := c.integration.Configuration.Data()
 	v, ok := config[name]
 	if !ok {
 		return nil, fmt.Errorf("config %s not found", name)
 	}
 
-	integration, err := c.registry.GetIntegration(c.appInstallation.AppName)
+	impl, err := c.registry.GetIntegration(c.integration.AppName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get integration %s: %w", c.appInstallation.AppName, err)
+		return nil, fmt.Errorf("failed to get integration %s: %w", c.integration.AppName, err)
 	}
 
-	configDef, err := findConfigDef(integration.Configuration(), name)
+	configDef, err := findConfigDef(impl.Configuration(), name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find config %s: %w", name, err)
 	}
@@ -154,7 +200,7 @@ func (c *IntegrationContext) GetConfig(name string) ([]byte, error) {
 		return nil, err
 	}
 
-	return c.encryptor.Decrypt(context.Background(), []byte(decoded), []byte(c.appInstallation.ID.String()))
+	return c.encryptor.Decrypt(context.Background(), []byte(decoded), []byte(c.integration.ID.String()))
 }
 
 func findConfigDef(configs []configuration.Field, name string) (configuration.Field, error) {
@@ -168,7 +214,7 @@ func findConfigDef(configs []configuration.Field, name string) (configuration.Fi
 }
 
 func (c *IntegrationContext) GetMetadata() any {
-	return c.appInstallation.Metadata.Data()
+	return c.integration.Metadata.Data()
 }
 
 func (c *IntegrationContext) SetMetadata(value any) {
@@ -183,16 +229,21 @@ func (c *IntegrationContext) SetMetadata(value any) {
 		return
 	}
 
-	c.appInstallation.Metadata = datatypes.NewJSONType(v)
+	c.integration.Metadata = datatypes.NewJSONType(v)
 }
 
 func (c *IntegrationContext) GetState() string {
-	return c.appInstallation.State
+	return c.integration.State
 }
 
-func (c *IntegrationContext) SetState(state, stateDescription string) {
-	c.appInstallation.State = state
-	c.appInstallation.StateDescription = stateDescription
+func (c *IntegrationContext) Ready() {
+	c.integration.State = models.IntegrationStateReady
+	c.integration.StateDescription = ""
+}
+
+func (c *IntegrationContext) Error(message string) {
+	c.integration.State = models.IntegrationStateError
+	c.integration.StateDescription = message
 }
 
 func (c *IntegrationContext) SetSecret(name string, value []byte) error {
@@ -202,15 +253,15 @@ func (c *IntegrationContext) SetSecret(name string, value []byte) error {
 	encryptedValue, err := c.encryptor.Encrypt(
 		context.Background(),
 		value,
-		[]byte(c.appInstallation.ID.String()),
+		[]byte(c.integration.ID.String()),
 	)
 	if err != nil {
 		return err
 	}
 
-	var secret models.AppInstallationSecret
+	var secret models.IntegrationSecret
 	err = c.tx.
-		Where("installation_id = ?", c.appInstallation.ID).
+		Where("installation_id = ?", c.integration.ID).
 		Where("name = ?", name).
 		First(&secret).
 		Error
@@ -220,9 +271,9 @@ func (c *IntegrationContext) SetSecret(name string, value []byte) error {
 			return err
 		}
 
-		secret = models.AppInstallationSecret{
-			OrganizationID: c.appInstallation.OrganizationID,
-			InstallationID: c.appInstallation.ID,
+		secret = models.IntegrationSecret{
+			OrganizationID: c.integration.OrganizationID,
+			InstallationID: c.integration.ID,
 			Name:           name,
 			Value:          encryptedValue,
 			CreatedAt:      &now,
@@ -239,9 +290,9 @@ func (c *IntegrationContext) SetSecret(name string, value []byte) error {
 }
 
 func (c *IntegrationContext) GetSecrets() ([]core.IntegrationSecret, error) {
-	var fromDB []models.AppInstallationSecret
+	var fromDB []models.IntegrationSecret
 	err := c.tx.
-		Where("installation_id = ?", c.appInstallation.ID).
+		Where("installation_id = ?", c.integration.ID).
 		Find(&fromDB).
 		Error
 
@@ -254,7 +305,7 @@ func (c *IntegrationContext) GetSecrets() ([]core.IntegrationSecret, error) {
 		decryptedValue, err := c.encryptor.Decrypt(
 			context.Background(),
 			secret.Value,
-			[]byte(c.appInstallation.ID.String()),
+			[]byte(c.integration.ID.String()),
 		)
 
 		if err != nil {
@@ -278,15 +329,15 @@ func (c *IntegrationContext) NewBrowserAction(action core.BrowserAction) {
 		Description: action.Description,
 	})
 
-	c.appInstallation.BrowserAction = &d
+	c.integration.BrowserAction = &d
 }
 
 func (c *IntegrationContext) RemoveBrowserAction() {
-	c.appInstallation.BrowserAction = nil
+	c.integration.BrowserAction = nil
 }
 
 func (c *IntegrationContext) Subscribe(configuration any) (*uuid.UUID, error) {
-	subscription, err := models.CreateAppSubscriptionInTransaction(c.tx, c.node, c.appInstallation, configuration)
+	subscription, err := models.CreateIntegrationSubscriptionInTransaction(c.tx, c.node, c.integration, configuration)
 	if err != nil {
 		return nil, err
 	}
@@ -295,14 +346,14 @@ func (c *IntegrationContext) Subscribe(configuration any) (*uuid.UUID, error) {
 }
 
 func (c *IntegrationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
-	subscriptions, err := models.ListAppSubscriptions(c.tx, c.appInstallation.ID)
+	subscriptions, err := models.ListIntegrationSubscriptions(c.tx, c.integration.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	contexts := []core.IntegrationSubscriptionContext{}
 	for _, subscription := range subscriptions {
-		node, err := models.FindWorkflowNode(c.tx, subscription.WorkflowID, subscription.NodeID)
+		node, err := models.FindCanvasNode(c.tx, subscription.WorkflowID, subscription.NodeID)
 		if err != nil {
 			return nil, err
 		}
@@ -312,7 +363,7 @@ func (c *IntegrationContext) ListSubscriptions() ([]core.IntegrationSubscription
 			c.registry,
 			&subscription,
 			node,
-			c.appInstallation,
+			c.integration,
 			c,
 		))
 	}

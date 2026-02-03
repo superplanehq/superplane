@@ -5,7 +5,7 @@ import { ChainItem, type ChainItemData } from "../../chainItem";
 import { SidebarEvent } from "../types";
 import { formatTimeAgo } from "@/utils/date";
 import {
-  WorkflowsWorkflowNodeExecution,
+  CanvasesCanvasNodeExecution,
   ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
@@ -16,7 +16,7 @@ import { ChildExecution } from "@/ui/chainItem/ChainItem";
 import { getExecutionDetails } from "@/pages/workflowv2/mappers";
 
 function buildExecutionTabData(
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
   workflowNode: ComponentsNode,
   workflowNodes: ComponentsNode[],
 ): { current?: Record<string, any>; payload?: any } {
@@ -142,7 +142,7 @@ interface ExecutionChainPageProps {
   onToggleOpen: (itemId: string) => void;
   getExecutionState?: (
     nodeId: string,
-    execution: WorkflowsWorkflowNodeExecution,
+    execution: CanvasesCanvasNodeExecution,
   ) => { map: EventStateMap; state: EventState };
   getTabData?: (event: SidebarEvent) => any;
   onEventClick?: (event: SidebarEvent) => void;
@@ -326,7 +326,6 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
 
       setChainItems(transformedItems);
     } catch (err) {
-      console.error("Failed to load execution chain:", err);
       setError(err instanceof Error ? err.message : "Failed to load execution chain");
     } finally {
       setLoading(false);

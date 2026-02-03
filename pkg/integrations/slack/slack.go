@@ -95,6 +95,14 @@ func (s *Slack) Configuration() []configuration.Field {
 	}
 }
 
+func (s *Slack) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (s *Slack) HandleAction(ctx core.IntegrationActionContext) error {
+	return nil
+}
+
 func (s *Slack) Components() []core.Component {
 	return []core.Component{
 		&SendTextMessage{},
@@ -105,6 +113,10 @@ func (s *Slack) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnAppMention{},
 	}
+}
+
+func (s *Slack) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
 }
 
 func (s *Slack) Sync(ctx core.SyncContext) error {
@@ -149,7 +161,7 @@ func (s *Slack) Sync(ctx core.SyncContext) error {
 		})
 
 		ctx.Integration.RemoveBrowserAction()
-		ctx.Integration.SetState("ready", "")
+		ctx.Integration.Ready()
 		return nil
 	}
 

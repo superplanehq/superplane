@@ -1,8 +1,8 @@
 import {
   ComponentsComponent,
   ComponentsNode,
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper, EventStateRegistry, OutputPayload, StateFunction } from "../types";
 import {
@@ -61,7 +61,7 @@ export const RUN_WORKFLOW_STATE_MAP: EventStateMap = {
 /**
  * Semaphore-specific state logic function
  */
-export const runWorkflowStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
+export const runWorkflowStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
   if (!execution) return "neutral";
 
   if (
@@ -108,11 +108,11 @@ export const runWorkflowMapper: ComponentBaseMapper = {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
-    _nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
+    lastExecutions: CanvasesCanvasNodeExecution[],
+    _nodeQueueItems?: CanvasesCanvasNodeQueueItem[],
   ): ComponentBaseProps {
     return {
-      title: node.name!,
+      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
       iconSrc: SemaphoreLogo,
       iconSlug: componentDefinition.icon || "workflow",
       iconColor: getColorClass(componentDefinition?.color || "gray"),
@@ -125,11 +125,11 @@ export const runWorkflowMapper: ComponentBaseMapper = {
       eventStateMap: RUN_WORKFLOW_STATE_MAP,
     };
   },
-  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
     const timestamp = execution.updatedAt || execution.createdAt;
     return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
   },
-  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, any> {
+  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, any> {
     const details: Record<string, any> = {};
     const outputs = execution.outputs as
       | { passed?: OutputPayload[]; failed?: OutputPayload[]; default?: OutputPayload[] }
@@ -247,7 +247,7 @@ function runWorkflowSpecs(node: ComponentsNode): ComponentBaseSpec[] {
 
 function runWorkflowEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
 ): EventSection[] | undefined {
   if (!execution) {
     return undefined;

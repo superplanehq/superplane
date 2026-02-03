@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
@@ -92,7 +92,7 @@ export const EmitEventModal = ({ isOpen, onClose, nodeName, channels, onEmit, in
       showSuccessToast("Event emitted successfully");
       handleClose();
     } catch (error) {
-      console.error("Error emitting event:", error);
+      console.error("Failed to emit event", error);
       showErrorToast("Failed to emit event");
       setIsSubmitting(false);
     }
@@ -107,9 +107,9 @@ export const EmitEventModal = ({ isOpen, onClose, nodeName, channels, onEmit, in
             Emit Event
           </DialogTitle>
 
-          <div className="text-sm text-gray-500 dark:text-gray-400">
+          <DialogDescription className="text-sm text-gray-500 dark:text-gray-400">
             Manually emit an output event for node: <strong>{nodeName}</strong>
-          </div>
+          </DialogDescription>
 
           <div className="space-y-4">
             <div className="flex items-center gap-3">

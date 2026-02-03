@@ -10,9 +10,9 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/workflows"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/protobuf/encoding/protojson"
 	"gorm.io/datatypes"
@@ -73,23 +73,23 @@ func SeedTemplates(registry *registry.Registry) error {
 				return fmt.Errorf("parse template %s: %w", entry.Name(), err)
 			}
 
-			var workflow pb.Workflow
-			if err := protojson.Unmarshal(jsonData, &workflow); err != nil {
+			var canvas pb.Canvas
+			if err := protojson.Unmarshal(jsonData, &canvas); err != nil {
 				return fmt.Errorf("parse template %s: %w", entry.Name(), err)
 			}
 
-			if workflow.Metadata == nil {
+			if canvas.Metadata == nil {
 				return fmt.Errorf("template %s missing metadata", entry.Name())
 			}
 
-			if workflow.Metadata.Name == "" {
+			if canvas.Metadata.Name == "" {
 				return fmt.Errorf("template %s missing name", entry.Name())
 			}
 
-			workflow.Metadata.IsTemplate = true
+			canvas.Metadata.IsTemplate = true
 
-			if err := createTemplateWorkflow(tx, registry, &workflow); err != nil {
-				return fmt.Errorf("create template %s: %w", workflow.Metadata.Name, err)
+			if err := createTemplateCanvas(tx, registry, &canvas); err != nil {
+				return fmt.Errorf("create template %s: %w", canvas.Metadata.Name, err)
 			}
 		}
 
@@ -104,7 +104,7 @@ func deleteAllTemplateWorkflows(tx *gorm.DB) error {
 
 	err = tx.
 		Unscoped().
-		Model(&models.Workflow{}).
+		Model(&models.Canvas{}).
 		Where("organization_id = ?", models.TemplateOrganizationID).
 		Where("is_template = ?", true).
 		Pluck("id", &workflowIDs).Error
@@ -115,9 +115,9 @@ func deleteAllTemplateWorkflows(tx *gorm.DB) error {
 
 	err = tx.
 		Unscoped().
-		Model(&models.WorkflowNode{}).
+		Model(&models.CanvasNode{}).
 		Where("workflow_id IN (?)", workflowIDs).
-		Delete(&models.WorkflowNode{}).Error
+		Delete(&models.CanvasNode{}).Error
 
 	if err != nil {
 		return err
@@ -125,10 +125,10 @@ func deleteAllTemplateWorkflows(tx *gorm.DB) error {
 
 	err = tx.
 		Unscoped().
-		Model(&models.Workflow{}).
+		Model(&models.Canvas{}).
 		Where("organization_id = ?", models.TemplateOrganizationID).
 		Where("is_template = ?", true).
-		Delete(&models.Workflow{}).Error
+		Delete(&models.Canvas{}).Error
 
 	if err != nil {
 		return err
@@ -137,20 +137,20 @@ func deleteAllTemplateWorkflows(tx *gorm.DB) error {
 	return nil
 }
 
-func createTemplateWorkflow(tx *gorm.DB, registry *registry.Registry, template *pb.Workflow) error {
+func createTemplateCanvas(tx *gorm.DB, registry *registry.Registry, template *pb.Canvas) error {
 	organizationID := models.TemplateOrganizationID.String()
-	nodes, edges, err := workflows.ParseWorkflow(registry, organizationID, template)
+	nodes, edges, err := canvases.ParseCanvas(registry, organizationID, template)
 	if err != nil {
 		return err
 	}
 
-	expandedNodes, err := workflows.ExpandNodes(organizationID, nodes)
+	expandedNodes, err := canvases.ExpandNodes(organizationID, nodes)
 	if err != nil {
 		return err
 	}
 
 	now := time.Now()
-	workflow := models.Workflow{
+	canvas := models.Canvas{
 		ID:             uuid.New(),
 		OrganizationID: models.TemplateOrganizationID,
 		IsTemplate:     true,
@@ -162,7 +162,7 @@ func createTemplateWorkflow(tx *gorm.DB, registry *registry.Registry, template *
 		Nodes:          datatypes.NewJSONSlice(expandedNodes),
 	}
 
-	if err := tx.Create(&workflow).Error; err != nil {
+	if err := tx.Create(&canvas).Error; err != nil {
 		return err
 	}
 
@@ -173,12 +173,12 @@ func createTemplateWorkflow(tx *gorm.DB, registry *registry.Registry, template *
 			parentNodeID = &parent
 		}
 
-		workflowNode := models.WorkflowNode{
-			WorkflowID:    workflow.ID,
+		canvasNode := models.CanvasNode{
+			WorkflowID:    canvas.ID,
 			NodeID:        node.ID,
 			ParentNodeID:  parentNodeID,
 			Name:          node.Name,
-			State:         models.WorkflowNodeStateReady,
+			State:         models.CanvasNodeStateReady,
 			Type:          node.Type,
 			Ref:           datatypes.NewJSONType(node.Ref),
 			Configuration: datatypes.NewJSONType(node.Configuration),
@@ -187,7 +187,7 @@ func createTemplateWorkflow(tx *gorm.DB, registry *registry.Registry, template *
 			UpdatedAt:     &now,
 		}
 
-		if err := tx.Create(&workflowNode).Error; err != nil {
+		if err := tx.Create(&canvasNode).Error; err != nil {
 			return err
 		}
 	}

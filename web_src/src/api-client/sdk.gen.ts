@@ -17,6 +17,60 @@ import type {
   BlueprintsUpdateBlueprintData,
   BlueprintsUpdateBlueprintResponse2,
   BlueprintsUpdateBlueprintError,
+  CanvasesListCanvasesData,
+  CanvasesListCanvasesResponse2,
+  CanvasesListCanvasesError,
+  CanvasesCreateCanvasData,
+  CanvasesCreateCanvasResponse2,
+  CanvasesCreateCanvasError,
+  CanvasesListCanvasEventsData,
+  CanvasesListCanvasEventsResponse2,
+  CanvasesListCanvasEventsError,
+  CanvasesListEventExecutionsData,
+  CanvasesListEventExecutionsResponse2,
+  CanvasesListEventExecutionsError,
+  CanvasesResolveExecutionErrorsData,
+  CanvasesResolveExecutionErrorsResponse2,
+  CanvasesResolveExecutionErrorsError,
+  CanvasesInvokeNodeExecutionActionData,
+  CanvasesInvokeNodeExecutionActionResponse2,
+  CanvasesInvokeNodeExecutionActionError,
+  CanvasesCancelExecutionData,
+  CanvasesCancelExecutionResponse2,
+  CanvasesCancelExecutionError,
+  CanvasesListChildExecutionsData,
+  CanvasesListChildExecutionsResponse2,
+  CanvasesListChildExecutionsError,
+  CanvasesListNodeEventsData,
+  CanvasesListNodeEventsResponse2,
+  CanvasesListNodeEventsError,
+  CanvasesEmitNodeEventData,
+  CanvasesEmitNodeEventResponse2,
+  CanvasesEmitNodeEventError,
+  CanvasesListNodeExecutionsData,
+  CanvasesListNodeExecutionsResponse2,
+  CanvasesListNodeExecutionsError,
+  CanvasesUpdateNodePauseData,
+  CanvasesUpdateNodePauseResponse2,
+  CanvasesUpdateNodePauseError,
+  CanvasesListNodeQueueItemsData,
+  CanvasesListNodeQueueItemsResponse2,
+  CanvasesListNodeQueueItemsError,
+  CanvasesDeleteNodeQueueItemData,
+  CanvasesDeleteNodeQueueItemResponse2,
+  CanvasesDeleteNodeQueueItemError,
+  CanvasesInvokeNodeTriggerActionData,
+  CanvasesInvokeNodeTriggerActionResponse2,
+  CanvasesInvokeNodeTriggerActionError,
+  CanvasesDeleteCanvasData,
+  CanvasesDeleteCanvasResponse2,
+  CanvasesDeleteCanvasError,
+  CanvasesDescribeCanvasData,
+  CanvasesDescribeCanvasResponse2,
+  CanvasesDescribeCanvasError,
+  CanvasesUpdateCanvasData,
+  CanvasesUpdateCanvasResponse2,
+  CanvasesUpdateCanvasError,
   ComponentsListComponentsData,
   ComponentsListComponentsResponse2,
   ComponentsListComponentsError,
@@ -164,57 +218,6 @@ import type {
   WidgetsDescribeWidgetData,
   WidgetsDescribeWidgetResponse2,
   WidgetsDescribeWidgetError,
-  WorkflowsListWorkflowsData,
-  WorkflowsListWorkflowsResponse2,
-  WorkflowsListWorkflowsError,
-  WorkflowsCreateWorkflowData,
-  WorkflowsCreateWorkflowResponse2,
-  WorkflowsCreateWorkflowError,
-  WorkflowsDeleteWorkflowData,
-  WorkflowsDeleteWorkflowResponse2,
-  WorkflowsDeleteWorkflowError,
-  WorkflowsDescribeWorkflowData,
-  WorkflowsDescribeWorkflowResponse2,
-  WorkflowsDescribeWorkflowError,
-  WorkflowsUpdateWorkflowData,
-  WorkflowsUpdateWorkflowResponse2,
-  WorkflowsUpdateWorkflowError,
-  WorkflowsListWorkflowEventsData,
-  WorkflowsListWorkflowEventsResponse2,
-  WorkflowsListWorkflowEventsError,
-  WorkflowsListEventExecutionsData,
-  WorkflowsListEventExecutionsResponse2,
-  WorkflowsListEventExecutionsError,
-  WorkflowsResolveExecutionErrorsData,
-  WorkflowsResolveExecutionErrorsResponse2,
-  WorkflowsResolveExecutionErrorsError,
-  WorkflowsInvokeNodeExecutionActionData,
-  WorkflowsInvokeNodeExecutionActionResponse2,
-  WorkflowsInvokeNodeExecutionActionError,
-  WorkflowsCancelExecutionData,
-  WorkflowsCancelExecutionResponse2,
-  WorkflowsCancelExecutionError,
-  WorkflowsListChildExecutionsData,
-  WorkflowsListChildExecutionsResponse2,
-  WorkflowsListChildExecutionsError,
-  WorkflowsListNodeEventsData,
-  WorkflowsListNodeEventsResponse2,
-  WorkflowsListNodeEventsError,
-  WorkflowsEmitNodeEventData,
-  WorkflowsEmitNodeEventResponse2,
-  WorkflowsEmitNodeEventError,
-  WorkflowsListNodeExecutionsData,
-  WorkflowsListNodeExecutionsResponse2,
-  WorkflowsListNodeExecutionsError,
-  WorkflowsListNodeQueueItemsData,
-  WorkflowsListNodeQueueItemsResponse2,
-  WorkflowsListNodeQueueItemsError,
-  WorkflowsDeleteNodeQueueItemData,
-  WorkflowsDeleteNodeQueueItemResponse2,
-  WorkflowsDeleteNodeQueueItemError,
-  WorkflowsInvokeNodeTriggerActionData,
-  WorkflowsInvokeNodeTriggerActionResponse2,
-  WorkflowsInvokeNodeTriggerActionError,
 } from "./types.gen";
 import { client as _heyApiClient } from "./client.gen";
 
@@ -320,6 +323,340 @@ export const blueprintsUpdateBlueprint = <ThrowOnError extends boolean = true>(
     ThrowOnError
   >({
     url: "/api/v1/blueprints/{id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+  });
+};
+
+/**
+ * List canvases
+ * Returns a list of all canvases
+ */
+export const canvasesListCanvases = <ThrowOnError extends boolean = true>(
+  options?: Options<CanvasesListCanvasesData, ThrowOnError>,
+) => {
+  return (options?.client ?? _heyApiClient).get<CanvasesListCanvasesResponse2, CanvasesListCanvasesError, ThrowOnError>(
+    {
+      url: "/api/v1/canvases",
+      ...options,
+    },
+  );
+};
+
+/**
+ * Create canvas
+ * Creates a new canvas
+ */
+export const canvasesCreateCanvas = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesCreateCanvasData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).post<CanvasesCreateCanvasResponse2, CanvasesCreateCanvasError, ThrowOnError>(
+    {
+      url: "/api/v1/canvases",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    },
+  );
+};
+
+/**
+ * List canvas events
+ * Returns a list of root events that triggered executions in a canvas
+ */
+export const canvasesListCanvasEvents = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesListCanvasEventsData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).get<
+    CanvasesListCanvasEventsResponse2,
+    CanvasesListCanvasEventsError,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/events",
+    ...options,
+  });
+};
+
+/**
+ * List event executions
+ * Returns a list of all node executions triggered by a root event
+ */
+export const canvasesListEventExecutions = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesListEventExecutionsData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).get<
+    CanvasesListEventExecutionsResponse2,
+    CanvasesListEventExecutionsError,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/events/{eventId}/executions",
+    ...options,
+  });
+};
+
+/**
+ * Resolve execution errors
+ * Marks canvas node execution errors as resolved
+ */
+export const canvasesResolveExecutionErrors = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesResolveExecutionErrorsData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).patch<
+    CanvasesResolveExecutionErrorsResponse2,
+    CanvasesResolveExecutionErrorsError,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/executions/resolve",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+  });
+};
+
+/**
+ * Invoke execution action
+ * Invokes a custom action on a canvas node execution
+ */
+export const canvasesInvokeNodeExecutionAction = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesInvokeNodeExecutionActionData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).post<
+    CanvasesInvokeNodeExecutionActionResponse2,
+    CanvasesInvokeNodeExecutionActionError,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/executions/{executionId}/actions/{actionName}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+  });
+};
+
+/**
+ * Cancel execution
+ * Cancels a running canvas node execution
+ */
+export const canvasesCancelExecution = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesCancelExecutionData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).patch<
+    CanvasesCancelExecutionResponse2,
+    CanvasesCancelExecutionError,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/executions/{executionId}/cancel",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+  });
+};
+
+/**
+ * List child executions for an execution
+ * List child executions for an execution
+ */
+export const canvasesListChildExecutions = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesListChildExecutionsData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).post<
+    CanvasesListChildExecutionsResponse2,
+    CanvasesListChildExecutionsError,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/executions/{executionId}/children",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+  });
+};
+
+/**
+ * List node events
+ * Returns a list of events for a specific canvas node
+ */
+export const canvasesListNodeEvents = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesListNodeEventsData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).get<
+    CanvasesListNodeEventsResponse2,
+    CanvasesListNodeEventsError,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/events",
+    ...options,
+  });
+};
+
+/**
+ * Emit output event for canvas node
+ * Emit output event for canvas node
+ */
+export const canvasesEmitNodeEvent = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesEmitNodeEventData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).post<
+    CanvasesEmitNodeEventResponse2,
+    CanvasesEmitNodeEventError,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/events",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+  });
+};
+
+/**
+ * List node executions
+ * Returns a list of executions for a specific canvas node
+ */
+export const canvasesListNodeExecutions = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesListNodeExecutionsData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).get<
+    CanvasesListNodeExecutionsResponse2,
+    CanvasesListNodeExecutionsError,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/executions",
+    ...options,
+  });
+};
+
+/**
+ * Pause or resume node processing
+ * Pauses or resumes processing for a canvas node while continuing to queue incoming items
+ */
+export const canvasesUpdateNodePause = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesUpdateNodePauseData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).patch<
+    CanvasesUpdateNodePauseResponse2,
+    CanvasesUpdateNodePauseError,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/pause",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+  });
+};
+
+/**
+ * List items in a node's queue
+ * Returns a list of items in a node's queue
+ */
+export const canvasesListNodeQueueItems = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesListNodeQueueItemsData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).get<
+    CanvasesListNodeQueueItemsResponse2,
+    CanvasesListNodeQueueItemsError,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/queue",
+    ...options,
+  });
+};
+
+/**
+ * Delete item from a node's queue
+ * Deletes a specific item in a node's queue
+ */
+export const canvasesDeleteNodeQueueItem = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesDeleteNodeQueueItemData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).delete<
+    CanvasesDeleteNodeQueueItemResponse2,
+    CanvasesDeleteNodeQueueItemError,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/queue/{itemId}",
+    ...options,
+  });
+};
+
+/**
+ * Invoke trigger action
+ * Invokes a custom action on a canvas node trigger
+ */
+export const canvasesInvokeNodeTriggerAction = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesInvokeNodeTriggerActionData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).post<
+    CanvasesInvokeNodeTriggerActionResponse2,
+    CanvasesInvokeNodeTriggerActionError,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/triggers/{nodeId}/actions/{actionName}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+  });
+};
+
+/**
+ * Delete canvas
+ * Deletes an existing canvas
+ */
+export const canvasesDeleteCanvas = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesDeleteCanvasData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).delete<
+    CanvasesDeleteCanvasResponse2,
+    CanvasesDeleteCanvasError,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{id}",
+    ...options,
+  });
+};
+
+/**
+ * Describe canvas
+ * Returns a canvas by ID
+ */
+export const canvasesDescribeCanvas = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesDescribeCanvasData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).get<
+    CanvasesDescribeCanvasResponse2,
+    CanvasesDescribeCanvasError,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{id}",
+    ...options,
+  });
+};
+
+/**
+ * Update canvas
+ * Updates an existing canvas
+ */
+export const canvasesUpdateCanvas = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesUpdateCanvasData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).put<CanvasesUpdateCanvasResponse2, CanvasesUpdateCanvasError, ThrowOnError>({
+    url: "/api/v1/canvases/{id}",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1126,326 +1463,5 @@ export const widgetsDescribeWidget = <ThrowOnError extends boolean = true>(
   >({
     url: "/api/v1/widgets/{name}",
     ...options,
-  });
-};
-
-/**
- * List workflows
- * Returns a list of all workflows
- */
-export const workflowsListWorkflows = <ThrowOnError extends boolean = true>(
-  options?: Options<WorkflowsListWorkflowsData, ThrowOnError>,
-) => {
-  return (options?.client ?? _heyApiClient).get<
-    WorkflowsListWorkflowsResponse2,
-    WorkflowsListWorkflowsError,
-    ThrowOnError
-  >({
-    url: "/api/v1/workflows",
-    ...options,
-  });
-};
-
-/**
- * Create workflow
- * Creates a new workflow
- */
-export const workflowsCreateWorkflow = <ThrowOnError extends boolean = true>(
-  options: Options<WorkflowsCreateWorkflowData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).post<
-    WorkflowsCreateWorkflowResponse2,
-    WorkflowsCreateWorkflowError,
-    ThrowOnError
-  >({
-    url: "/api/v1/workflows",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
-};
-
-/**
- * Delete workflow
- * Deletes an existing workflow
- */
-export const workflowsDeleteWorkflow = <ThrowOnError extends boolean = true>(
-  options: Options<WorkflowsDeleteWorkflowData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).delete<
-    WorkflowsDeleteWorkflowResponse2,
-    WorkflowsDeleteWorkflowError,
-    ThrowOnError
-  >({
-    url: "/api/v1/workflows/{id}",
-    ...options,
-  });
-};
-
-/**
- * Describe workflow
- * Returns a workflow by ID
- */
-export const workflowsDescribeWorkflow = <ThrowOnError extends boolean = true>(
-  options: Options<WorkflowsDescribeWorkflowData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).get<
-    WorkflowsDescribeWorkflowResponse2,
-    WorkflowsDescribeWorkflowError,
-    ThrowOnError
-  >({
-    url: "/api/v1/workflows/{id}",
-    ...options,
-  });
-};
-
-/**
- * Update workflow
- * Updates an existing workflow
- */
-export const workflowsUpdateWorkflow = <ThrowOnError extends boolean = true>(
-  options: Options<WorkflowsUpdateWorkflowData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).put<
-    WorkflowsUpdateWorkflowResponse2,
-    WorkflowsUpdateWorkflowError,
-    ThrowOnError
-  >({
-    url: "/api/v1/workflows/{id}",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
-};
-
-/**
- * List workflow events
- * Returns a list of root events that triggered executions in a workflow
- */
-export const workflowsListWorkflowEvents = <ThrowOnError extends boolean = true>(
-  options: Options<WorkflowsListWorkflowEventsData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).get<
-    WorkflowsListWorkflowEventsResponse2,
-    WorkflowsListWorkflowEventsError,
-    ThrowOnError
-  >({
-    url: "/api/v1/workflows/{workflowId}/events",
-    ...options,
-  });
-};
-
-/**
- * List event executions
- * Returns a list of all node executions triggered by a root event
- */
-export const workflowsListEventExecutions = <ThrowOnError extends boolean = true>(
-  options: Options<WorkflowsListEventExecutionsData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).get<
-    WorkflowsListEventExecutionsResponse2,
-    WorkflowsListEventExecutionsError,
-    ThrowOnError
-  >({
-    url: "/api/v1/workflows/{workflowId}/events/{eventId}/executions",
-    ...options,
-  });
-};
-
-/**
- * Resolve execution errors
- * Marks workflow node execution errors as resolved
- */
-export const workflowsResolveExecutionErrors = <ThrowOnError extends boolean = true>(
-  options: Options<WorkflowsResolveExecutionErrorsData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).patch<
-    WorkflowsResolveExecutionErrorsResponse2,
-    WorkflowsResolveExecutionErrorsError,
-    ThrowOnError
-  >({
-    url: "/api/v1/workflows/{workflowId}/executions/resolve",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
-};
-
-/**
- * Invoke execution action
- * Invokes a custom action on a workflow node execution
- */
-export const workflowsInvokeNodeExecutionAction = <ThrowOnError extends boolean = true>(
-  options: Options<WorkflowsInvokeNodeExecutionActionData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).post<
-    WorkflowsInvokeNodeExecutionActionResponse2,
-    WorkflowsInvokeNodeExecutionActionError,
-    ThrowOnError
-  >({
-    url: "/api/v1/workflows/{workflowId}/executions/{executionId}/actions/{actionName}",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
-};
-
-/**
- * Cancel execution
- * Cancels a running workflow node execution
- */
-export const workflowsCancelExecution = <ThrowOnError extends boolean = true>(
-  options: Options<WorkflowsCancelExecutionData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).patch<
-    WorkflowsCancelExecutionResponse2,
-    WorkflowsCancelExecutionError,
-    ThrowOnError
-  >({
-    url: "/api/v1/workflows/{workflowId}/executions/{executionId}/cancel",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
-};
-
-/**
- * List child executions for an execution
- * List child executions for an execution
- */
-export const workflowsListChildExecutions = <ThrowOnError extends boolean = true>(
-  options: Options<WorkflowsListChildExecutionsData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).post<
-    WorkflowsListChildExecutionsResponse2,
-    WorkflowsListChildExecutionsError,
-    ThrowOnError
-  >({
-    url: "/api/v1/workflows/{workflowId}/executions/{executionId}/children",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
-};
-
-/**
- * List node events
- * Returns a list of events for a specific workflow node
- */
-export const workflowsListNodeEvents = <ThrowOnError extends boolean = true>(
-  options: Options<WorkflowsListNodeEventsData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).get<
-    WorkflowsListNodeEventsResponse2,
-    WorkflowsListNodeEventsError,
-    ThrowOnError
-  >({
-    url: "/api/v1/workflows/{workflowId}/nodes/{nodeId}/events",
-    ...options,
-  });
-};
-
-/**
- * Emit output event for workflow node
- * Emit output event for workflow node
- */
-export const workflowsEmitNodeEvent = <ThrowOnError extends boolean = true>(
-  options: Options<WorkflowsEmitNodeEventData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).post<
-    WorkflowsEmitNodeEventResponse2,
-    WorkflowsEmitNodeEventError,
-    ThrowOnError
-  >({
-    url: "/api/v1/workflows/{workflowId}/nodes/{nodeId}/events",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
-};
-
-/**
- * List node executions
- * Returns a list of executions for a specific workflow node
- */
-export const workflowsListNodeExecutions = <ThrowOnError extends boolean = true>(
-  options: Options<WorkflowsListNodeExecutionsData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).get<
-    WorkflowsListNodeExecutionsResponse2,
-    WorkflowsListNodeExecutionsError,
-    ThrowOnError
-  >({
-    url: "/api/v1/workflows/{workflowId}/nodes/{nodeId}/executions",
-    ...options,
-  });
-};
-
-/**
- * List items in a node's queue
- * Returns a list of items in a node's queue
- */
-export const workflowsListNodeQueueItems = <ThrowOnError extends boolean = true>(
-  options: Options<WorkflowsListNodeQueueItemsData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).get<
-    WorkflowsListNodeQueueItemsResponse2,
-    WorkflowsListNodeQueueItemsError,
-    ThrowOnError
-  >({
-    url: "/api/v1/workflows/{workflowId}/nodes/{nodeId}/queue",
-    ...options,
-  });
-};
-
-/**
- * Delete item from a node's queue
- * Deletes a specific item in a node's queue
- */
-export const workflowsDeleteNodeQueueItem = <ThrowOnError extends boolean = true>(
-  options: Options<WorkflowsDeleteNodeQueueItemData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).delete<
-    WorkflowsDeleteNodeQueueItemResponse2,
-    WorkflowsDeleteNodeQueueItemError,
-    ThrowOnError
-  >({
-    url: "/api/v1/workflows/{workflowId}/nodes/{nodeId}/queue/{itemId}",
-    ...options,
-  });
-};
-
-/**
- * Invoke trigger action
- * Invokes a custom action on a workflow node trigger
- */
-export const workflowsInvokeNodeTriggerAction = <ThrowOnError extends boolean = true>(
-  options: Options<WorkflowsInvokeNodeTriggerActionData, ThrowOnError>,
-) => {
-  return (options.client ?? _heyApiClient).post<
-    WorkflowsInvokeNodeTriggerActionResponse2,
-    WorkflowsInvokeNodeTriggerActionError,
-    ThrowOnError
-  >({
-    url: "/api/v1/workflows/{workflowId}/triggers/{nodeId}/actions/{actionName}",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
   });
 };

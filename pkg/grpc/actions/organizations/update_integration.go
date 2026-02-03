@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -30,61 +31,62 @@ func UpdateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 		return nil, status.Errorf(codes.InvalidArgument, "invalid integration ID: %v", err)
 	}
 
-	i, err := models.FindAppInstallation(org, ID)
+	instance, err := models.FindIntegration(org, ID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "integration not found: %v", err)
 	}
 
-	integration, err := registry.GetIntegration(i.AppName)
+	integration, err := registry.GetIntegration(instance.AppName)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "integration %s not found", i.AppName)
+		return nil, status.Errorf(codes.Internal, "integration %s not found", instance.AppName)
 	}
 
-	existingConfig := i.Configuration.Data()
-	configuration, err = encryptConfigurationIfNeeded(ctx, registry, integration, configuration, i.ID, existingConfig)
+	existingConfig := instance.Configuration.Data()
+	configuration, err = encryptConfigurationIfNeeded(ctx, registry, integration, configuration, instance.ID, existingConfig)
 	if err != nil {
-		log.Errorf("failed to encrypt sensitive configuration for integration %s: %v", i.ID, err)
+		log.Errorf("failed to encrypt sensitive configuration for integration %s: %v", instance.ID, err)
 		return nil, status.Error(codes.Internal, "failed to encrypt sensitive configuration")
 	}
 
 	maps.Copy(existingConfig, configuration)
-	i.Configuration = datatypes.NewJSONType(existingConfig)
+	instance.Configuration = datatypes.NewJSONType(existingConfig)
 
 	integrationCtx := contexts.NewIntegrationContext(
 		database.Conn(),
 		nil,
-		i,
+		instance,
 		registry.Encryptor,
 		registry,
 	)
 
 	syncErr := integration.Sync(core.SyncContext{
+		Logger:          logging.ForIntegration(*instance),
 		HTTP:            contexts.NewHTTPContext(registry.GetHTTPClient()),
-		Configuration:   i.Configuration.Data(),
+		Configuration:   instance.Configuration.Data(),
 		BaseURL:         baseURL,
 		WebhooksBaseURL: webhooksBaseURL,
 		OrganizationID:  orgID,
-		InstallationID:  i.ID.String(),
+		InstallationID:  instance.ID.String(),
 		Integration:     integrationCtx,
 		OIDC:            oidcProvider,
 	})
 
 	if syncErr != nil {
-		i.State = "error"
-		i.StateDescription = fmt.Sprintf("Sync failed: %v", syncErr)
+		instance.State = "error"
+		instance.StateDescription = fmt.Sprintf("Sync failed: %v", syncErr)
 	} else {
-		i.StateDescription = ""
+		instance.StateDescription = ""
 	}
 
-	err = database.Conn().Save(i).Error
+	err = database.Conn().Save(instance).Error
 	if err != nil {
-		log.Errorf("failed to save integration %s: %v", i.ID, err)
+		log.Errorf("failed to save integration %s: %v", instance.ID, err)
 		return nil, status.Error(codes.Internal, "failed to save integration")
 	}
 
-	proto, err := serializeIntegration(registry, i, []models.WorkflowNodeReference{})
+	proto, err := serializeIntegration(registry, instance, []models.WorkflowNodeReference{})
 	if err != nil {
-		log.Errorf("failed to serialize integration %s: %v", i.ID, err)
+		log.Errorf("failed to serialize integration %s: %v", instance.ID, err)
 		return nil, status.Error(codes.Internal, "failed to serialize integration")
 	}
 

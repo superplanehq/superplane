@@ -1,17 +1,17 @@
 import {
   ComponentsNode,
   ComponentsComponent,
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import { ComponentBaseMapper, OutputPayload } from "../types";
+import { ComponentBaseMapper } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
-import { BaseNodeMetadata, Incident } from "./types";
-import { getDetailsForIncident } from "./base";
+import { BaseNodeMetadata } from "./types";
+import { buildIncidentExecutionDetails } from "./base";
 import { formatTimeAgo } from "@/utils/date";
 
 export const createIncidentMapper: ComponentBaseMapper = {
@@ -19,17 +19,17 @@ export const createIncidentMapper: ComponentBaseMapper = {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
-    _?: WorkflowsWorkflowNodeQueueItem[],
+    lastExecutions: CanvasesCanvasNodeExecution[],
+    _?: CanvasesCanvasNodeQueueItem[],
   ): ComponentBaseProps {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition.name!;
+    const componentName = componentDefinition.name || node.component?.name || "unknown";
 
     return {
       iconSrc: pdIcon,
       collapsedBackground: getBackgroundColorClass(componentDefinition.color),
       collapsed: node.isCollapsed,
-      title: node.name!,
+      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
       eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
       metadata: metadataList(node),
       includeEmptyState: !lastExecution,
@@ -37,12 +37,10 @@ export const createIncidentMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _: ComponentsNode): Record<string, string> {
-    const outputs = execution.outputs as { default: OutputPayload[] };
-    const incident = outputs.default[0].data.incident as Incident;
-    return getDetailsForIncident(incident);
+  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _: ComponentsNode): Record<string, any> {
+    return buildIncidentExecutionDetails(execution);
   },
-  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
     if (!execution.createdAt) return "";
     return formatTimeAgo(new Date(execution.createdAt));
   },
@@ -66,7 +64,7 @@ function metadataList(node: ComponentsNode): MetadataItem[] {
 
 function baseEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
   componentName: string,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);

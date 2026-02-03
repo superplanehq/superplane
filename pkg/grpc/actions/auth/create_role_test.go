@@ -16,6 +16,7 @@ func Test_CreateRole(t *testing.T) {
 	r := support.Setup(t)
 	ctx := context.Background()
 	orgID := r.Organization.ID.String()
+	canvasPath := "canvases"
 
 	t.Run("successful custom role creation", func(t *testing.T) {
 		role := &pb.Role{
@@ -27,13 +28,13 @@ func Test_CreateRole(t *testing.T) {
 				Description: "Custom Role Description",
 				Permissions: []*pbAuth.Permission{
 					{
-						Resource:   "canvas",
+						Resource:   canvasPath,
 						Action:     "read",
 						DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 					},
 					{
-						Resource:   "canvas",
-						Action:     "write",
+						Resource:   canvasPath,
+						Action:     "update",
 						DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 					},
 				},
@@ -64,7 +65,7 @@ func Test_CreateRole(t *testing.T) {
 				Description: "Custom Role With Inheritance Description",
 				Permissions: []*pbAuth.Permission{
 					{
-						Resource:   "canvas",
+						Resource:   canvasPath,
 						Action:     "create",
 						DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 					},
@@ -102,7 +103,7 @@ func Test_CreateRole(t *testing.T) {
 				Description: "Custom Role Description",
 				Permissions: []*pbAuth.Permission{
 					{
-						Resource:   "canvas",
+						Resource:   canvasPath,
 						Action:     "read",
 						DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 					},
@@ -125,7 +126,7 @@ func Test_CreateRole(t *testing.T) {
 				Description: "Custom Role Description",
 				Permissions: []*pbAuth.Permission{
 					{
-						Resource:   "canvas",
+						Resource:   canvasPath,
 						Action:     "read",
 						DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 					},
@@ -148,7 +149,7 @@ func Test_CreateRole(t *testing.T) {
 				Description: "Custom Role Description",
 				Permissions: []*pbAuth.Permission{
 					{
-						Resource:   "canvas",
+						Resource:   canvasPath,
 						Action:     "read",
 						DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 					},

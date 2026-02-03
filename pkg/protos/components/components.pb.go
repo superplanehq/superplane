@@ -570,6 +570,7 @@ type Node struct {
 	Integration    *IntegrationRef        `protobuf:"bytes,12,opt,name=integration,proto3" json:"integration,omitempty"`
 	ErrorMessage   string                 `protobuf:"bytes,13,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
 	WarningMessage string                 `protobuf:"bytes,14,opt,name=warning_message,json=warningMessage,proto3" json:"warning_message,omitempty"`
+	Paused         bool                   `protobuf:"varint,15,opt,name=paused,proto3" json:"paused,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -700,6 +701,13 @@ func (x *Node) GetWarningMessage() string {
 		return x.WarningMessage
 	}
 	return ""
+}
+
+func (x *Node) GetPaused() bool {
+	if x != nil {
+		return x.Paused
+	}
+	return false
 }
 
 type Position struct {
@@ -1187,7 +1195,7 @@ const file_components_proto_rawDesc = "" +
 	"parameters\x18\x03 \x03(\v2\x1f.Superplane.Configuration.FieldR\n" +
 	"parameters\"`\n" +
 	"\x1cListComponentActionsResponse\x12@\n" +
-	"\aactions\x18\x01 \x03(\v2&.Superplane.Components.ComponentActionR\aactions\"\xb6\a\n" +
+	"\aactions\x18\x01 \x03(\v2&.Superplane.Components.ComponentActionR\aactions\"\xce\a\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x124\n" +
@@ -1203,7 +1211,8 @@ const file_components_proto_rawDesc = "" +
 	"\fis_collapsed\x18\v \x01(\bR\visCollapsed\x12G\n" +
 	"\vintegration\x18\f \x01(\v2%.Superplane.Components.IntegrationRefR\vintegration\x12#\n" +
 	"\rerror_message\x18\r \x01(\tR\ferrorMessage\x12'\n" +
-	"\x0fwarning_message\x18\x0e \x01(\tR\x0ewarningMessage\x1a\"\n" +
+	"\x0fwarning_message\x18\x0e \x01(\tR\x0ewarningMessage\x12\x16\n" +
+	"\x06paused\x18\x0f \x01(\bR\x06paused\x1a\"\n" +
 	"\fComponentRef\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x1a \n" +
 	"\n" +

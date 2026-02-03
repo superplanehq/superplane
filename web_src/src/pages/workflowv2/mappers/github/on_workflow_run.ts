@@ -1,4 +1,4 @@
-import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
+import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
@@ -53,7 +53,7 @@ interface OnWorkflowRunEventData {
  * Renderer for the "github.onWorkflowRun" trigger
  */
 export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
     const eventData = event.data?.data as OnWorkflowRunEventData;
     const workflowName =
       eventData?.workflow_run?.display_title ||
@@ -68,7 +68,7 @@ export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
+  getRootEventValues: (lastEvent: CanvasesCanvasEvent): Record<string, string> => {
     const eventData = lastEvent.data?.data as OnWorkflowRunEventData;
     const receivedAt = lastEvent.createdAt ? new Date(lastEvent.createdAt).toLocaleString() : "";
 
@@ -80,7 +80,7 @@ export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
+  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
     const metadata = node.metadata as unknown as BaseNodeMetadata;
     const configuration = node.configuration as unknown as OnWorkflowRunConfiguration;
     const metadataItems = [];
@@ -115,7 +115,7 @@ export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
         : undefined;
 
     const props: TriggerProps = {
-      title: node.name!,
+      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
       iconSrc: githubIcon,
       iconColor: getColorClass(trigger.color),
       collapsedBackground: getBackgroundColorClass(trigger.color),

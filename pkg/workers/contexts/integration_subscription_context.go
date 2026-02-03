@@ -13,8 +13,8 @@ import (
 type IntegrationSubscriptionContext struct {
 	tx             *gorm.DB
 	registry       *registry.Registry
-	node           *models.WorkflowNode
-	installation   *models.AppInstallation
+	node           *models.CanvasNode
+	integration    *models.Integration
 	subscription   *models.NodeSubscription
 	integrationCtx *IntegrationContext
 }
@@ -23,8 +23,8 @@ func NewIntegrationSubscriptionContext(
 	tx *gorm.DB,
 	registry *registry.Registry,
 	subscription *models.NodeSubscription,
-	node *models.WorkflowNode,
-	installation *models.AppInstallation,
+	node *models.CanvasNode,
+	integration *models.Integration,
 	integrationCtx *IntegrationContext,
 ) core.IntegrationSubscriptionContext {
 	return &IntegrationSubscriptionContext{
@@ -32,7 +32,7 @@ func NewIntegrationSubscriptionContext(
 		registry:       registry,
 		subscription:   subscription,
 		node:           node,
-		installation:   installation,
+		integration:    integration,
 		integrationCtx: integrationCtx,
 	}
 }
@@ -71,11 +71,13 @@ func (c *IntegrationSubscriptionContext) sendMessageToComponent(message any) err
 	}
 
 	return integrationComponent.OnIntegrationMessage(core.IntegrationMessageContext{
+		HTTP:          NewHTTPContext(c.registry.GetHTTPClient()),
 		Configuration: c.node.Configuration.Data(),
+		NodeMetadata:  NewNodeMetadataContext(c.tx, c.node),
 		Integration:   c.integrationCtx,
 		Events:        NewEventContext(c.tx, c.node),
 		Message:       message,
-		Logger:        logging.WithAppInstallation(logging.ForNode(*c.node), *c.installation),
+		Logger:        logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
 	})
 }
 
@@ -97,10 +99,12 @@ func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error
 	}
 
 	return integrationTrigger.OnIntegrationMessage(core.IntegrationMessageContext{
+		HTTP:          NewHTTPContext(c.registry.GetHTTPClient()),
 		Configuration: c.node.Configuration.Data(),
+		NodeMetadata:  NewNodeMetadataContext(c.tx, c.node),
 		Integration:   c.integrationCtx,
 		Message:       message,
 		Events:        NewEventContext(c.tx, c.node),
-		Logger:        logging.WithAppInstallation(logging.ForNode(*c.node), *c.installation),
+		Logger:        logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
 	})
 }

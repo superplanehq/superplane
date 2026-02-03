@@ -1,4 +1,4 @@
-import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
+import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
@@ -20,7 +20,7 @@ interface OnIssueEventData {
  * Renderer for the "github.onIssue" trigger
  */
 export const onIssueTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
     const eventData = event.data?.data as OnIssueEventData;
 
     return {
@@ -29,13 +29,13 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
+  getRootEventValues: (lastEvent: CanvasesCanvasEvent): Record<string, string> => {
     const eventData = lastEvent.data?.data as OnIssueEventData;
     const issue = eventData.issue as Issue;
     return getDetailsForIssue(issue);
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
+  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
     const metadata = node.metadata as unknown as BaseNodeMetadata;
     const configuration = node.configuration as unknown as OnIssueConfiguration;
     const metadataItems = [];
@@ -55,7 +55,7 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     }
 
     const props: TriggerProps = {
-      title: node.name!,
+      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
       iconSrc: githubIcon,
       iconColor: getColorClass(trigger.color),
       collapsedBackground: getBackgroundColorClass(trigger.color),

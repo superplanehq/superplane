@@ -1,18 +1,18 @@
 import { useCallback, useMemo } from "react";
-import { useInfiniteNodeQueueItems } from "./useWorkflowData";
-import { ComponentsNode, WorkflowsListNodeQueueItemsResponse } from "@/api-client";
+import { useInfiniteNodeQueueItems } from "./useCanvasData";
+import { ComponentsNode, CanvasesListNodeQueueItemsResponse } from "@/api-client";
 import { mapQueueItemsToSidebarEvents } from "@/pages/workflowv2/utils";
 import { SidebarEvent } from "@/ui/componentSidebar/types";
 
 interface UseQueueHistoryProps {
-  workflowId: string;
+  canvasId: string;
   nodeId: string;
   allNodes: ComponentsNode[];
   enabled: boolean;
 }
 
-export const useQueueHistory = ({ workflowId, nodeId, allNodes, enabled }: UseQueueHistoryProps) => {
-  const queueItemsQuery = useInfiniteNodeQueueItems(workflowId, nodeId, enabled);
+export const useQueueHistory = ({ canvasId, nodeId, allNodes, enabled }: UseQueueHistoryProps) => {
+  const queueItemsQuery = useInfiniteNodeQueueItems(canvasId, nodeId, enabled);
 
   const getAllHistoryEvents = useCallback((): SidebarEvent[] => {
     if (!enabled) return [];
@@ -21,7 +21,7 @@ export const useQueueHistory = ({ workflowId, nodeId, allNodes, enabled }: UseQu
     if (!node) return [];
 
     const allQueueItems =
-      queueItemsQuery.data?.pages.flatMap((page) => (page as WorkflowsListNodeQueueItemsResponse)?.items || []) || [];
+      queueItemsQuery.data?.pages.flatMap((page) => (page as CanvasesListNodeQueueItemsResponse)?.items || []) || [];
     return mapQueueItemsToSidebarEvents(allQueueItems, allNodes);
   }, [enabled, allNodes, nodeId, queueItemsQuery.data]);
 

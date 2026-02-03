@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import {
   ComponentsComponent,
   ComponentsNode,
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, StateFunction } from "../types";
 import {
@@ -61,7 +61,7 @@ export const RUN_WORKFLOW_STATE_MAP: EventStateMap = {
 /**
  * GitHub-specific state logic function
  */
-export const runWorkflowStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
+export const runWorkflowStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
   if (!execution) return "neutral";
 
   if (
@@ -109,11 +109,11 @@ export const runWorkflowMapper: ComponentBaseMapper = {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
-    _nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
+    lastExecutions: CanvasesCanvasNodeExecution[],
+    _nodeQueueItems?: CanvasesCanvasNodeQueueItem[],
   ): ComponentBaseProps {
     return {
-      title: node.name!,
+      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
       iconSrc: githubIcon,
       iconColor: getColorClass(componentDefinition?.color!),
       collapsed: node.isCollapsed,
@@ -125,11 +125,11 @@ export const runWorkflowMapper: ComponentBaseMapper = {
       eventStateMap: RUN_WORKFLOW_STATE_MAP,
     };
   },
-  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
     return buildGithubExecutionSubtitle(execution);
   },
 
-  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, string> {
+  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
     const metadata = execution.metadata as ExecutionMetadata;
     const details: Record<string, string> = {};
 
@@ -205,7 +205,7 @@ function runWorkflowSpecs(node: ComponentsNode): ComponentBaseSpec[] {
 
 function runWorkflowEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
 ): EventSection[] | undefined {
   if (!execution) {
     return undefined;
@@ -244,9 +244,7 @@ const CopyCodeButton: React.FC<{ code: string }> = ({ code }) => {
       await navigator.clipboard.writeText(code);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy text: ", err);
-    }
+    } catch (_err) {}
   };
 
   return (

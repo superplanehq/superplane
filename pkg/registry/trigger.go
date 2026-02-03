@@ -101,6 +101,20 @@ func (s *PanicableTrigger) HandleAction(ctx core.TriggerActionContext) (result m
 	return s.underlying.HandleAction(ctx)
 }
 
+func (s *PanicableTrigger) Cleanup(ctx core.TriggerContext) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if ctx.Logger != nil {
+				ctx.Logger.Errorf("Trigger %s panicked in Cleanup(): %v\nStack: %s",
+					s.underlying.Name(), r, debug.Stack())
+			}
+			err = fmt.Errorf("trigger %s panicked in Cleanup(): %v",
+				s.underlying.Name(), r)
+		}
+	}()
+	return s.underlying.Cleanup(ctx)
+}
+
 func (s *PanicableTrigger) OnIntegrationMessage(ctx core.IntegrationMessageContext) (err error) {
 	defer func() {
 		if r := recover(); r != nil {

@@ -59,7 +59,6 @@ export function CreateCustomComponentModal({
       setNameError("");
       onClose();
     } catch (error) {
-      console.error("Error creating Bundle:", error);
       const errorMessage =
         (error as Error)?.message || error?.toString() || "Something went wrong. We failed to create a Bundle";
 

@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { useDeleteRole, useOrganizationRoles } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { showErrorToast } from "@/utils/toast";
 
 interface RolesProps {
   organizationId: string;
@@ -42,8 +43,8 @@ export function Roles({ organizationId }: RolesProps) {
         domainType: "DOMAIN_TYPE_ORGANIZATION",
         domainId: organizationId,
       });
-    } catch (err) {
-      console.error("Error deleting role:", err);
+    } catch (_err) {
+      showErrorToast("Failed to delete role");
     }
   };
 

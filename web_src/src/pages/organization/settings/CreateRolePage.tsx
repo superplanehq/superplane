@@ -8,6 +8,7 @@ import { Text } from "../../../components/Text/text";
 import { useCreateRole, useRole, useUpdateRole } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/ui/checkbox";
+import { showErrorToast } from "@/utils/toast";
 
 interface Permission {
   id: string;
@@ -61,35 +62,43 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
     icon: "group",
     permissions: [
       {
-        id: "user.read",
+        id: "member.read",
         name: "View Members",
         description: "View organization members and their details",
         category: "People & Groups",
-        resource: "user",
+        resource: "members",
         action: "read",
       },
       {
-        id: "user.invite",
-        name: "Invite Members",
-        description: "Invite new members to the organization",
+        id: "member.create",
+        name: "Add Members",
+        description: "Invite or add members to the organization",
         category: "People & Groups",
-        resource: "user",
-        action: "invite",
+        resource: "members",
+        action: "create",
       },
       {
-        id: "user.remove",
+        id: "member.update",
+        name: "Manage Members",
+        description: "Update member roles and permissions",
+        category: "People & Groups",
+        resource: "members",
+        action: "update",
+      },
+      {
+        id: "member.delete",
         name: "Remove Members",
         description: "Remove members from the organization",
         category: "People & Groups",
-        resource: "user",
-        action: "remove",
+        resource: "members",
+        action: "delete",
       },
       {
         id: "group.read",
         name: "View Groups",
         description: "View organization groups and their members",
         category: "People & Groups",
-        resource: "group",
+        resource: "groups",
         action: "read",
       },
       {
@@ -97,7 +106,7 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
         name: "Create Groups",
         description: "Create new groups within the organization",
         category: "People & Groups",
-        resource: "group",
+        resource: "groups",
         action: "create",
       },
       {
@@ -105,8 +114,16 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
         name: "Manage Groups",
         description: "Update group settings and membership",
         category: "People & Groups",
-        resource: "group",
+        resource: "groups",
         action: "update",
+      },
+      {
+        id: "group.delete",
+        name: "Delete Groups",
+        description: "Delete groups from the organization",
+        category: "People & Groups",
+        resource: "groups",
+        action: "delete",
       },
     ],
   },
@@ -119,7 +136,7 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
         name: "View Roles",
         description: "View organization roles and their permissions",
         category: "Roles & Permissions",
-        resource: "role",
+        resource: "roles",
         action: "read",
       },
       {
@@ -127,7 +144,7 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
         name: "Create Roles",
         description: "Create new roles within the organization",
         category: "Roles & Permissions",
-        resource: "role",
+        resource: "roles",
         action: "create",
       },
       {
@@ -135,7 +152,7 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
         name: "Manage Roles",
         description: "Update role permissions and settings",
         category: "Roles & Permissions",
-        resource: "role",
+        resource: "roles",
         action: "update",
       },
       {
@@ -143,61 +160,159 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
         name: "Delete Roles",
         description: "Delete roles from the organization",
         category: "Roles & Permissions",
-        resource: "role",
+        resource: "roles",
         action: "delete",
-      },
-      {
-        id: "role.assign",
-        name: "Assign Roles",
-        description: "Assign roles to users and groups",
-        category: "Roles & Permissions",
-        resource: "role",
-        action: "assign",
-      },
-      {
-        id: "role.remove",
-        name: "Remove Roles",
-        description: "Remove roles from users and groups",
-        category: "Roles & Permissions",
-        resource: "role",
-        action: "remove",
       },
     ],
   },
   {
-    category: "Projects & Resources",
-    icon: "folder",
+    category: "Canvases",
+    icon: "dashboard",
     permissions: [
       {
         id: "canvas.read",
         name: "View Canvases",
         description: "View organization canvases",
-        category: "Projects & Resources",
-        resource: "canvas",
+        category: "Canvases",
+        resource: "canvases",
         action: "read",
       },
       {
         id: "canvas.create",
         name: "Create Canvases",
         description: "Create new canvases within the organization",
-        category: "Projects & Resources",
-        resource: "canvas",
+        category: "Canvases",
+        resource: "canvases",
         action: "create",
       },
       {
         id: "canvas.update",
         name: "Manage Canvases",
         description: "Update canvas settings and configuration",
-        category: "Projects & Resources",
-        resource: "canvas",
+        category: "Canvases",
+        resource: "canvases",
         action: "update",
       },
       {
         id: "canvas.delete",
         name: "Delete Canvases",
         description: "Delete canvases from the organization",
-        category: "Projects & Resources",
-        resource: "canvas",
+        category: "Canvases",
+        resource: "canvases",
+        action: "delete",
+      },
+    ],
+  },
+  {
+    category: "Blueprints",
+    icon: "view_module",
+    permissions: [
+      {
+        id: "blueprint.read",
+        name: "View Blueprints",
+        description: "View organization blueprints",
+        category: "Blueprints",
+        resource: "blueprints",
+        action: "read",
+      },
+      {
+        id: "blueprint.create",
+        name: "Create Blueprints",
+        description: "Create new blueprints",
+        category: "Blueprints",
+        resource: "blueprints",
+        action: "create",
+      },
+      {
+        id: "blueprint.update",
+        name: "Manage Blueprints",
+        description: "Update blueprint settings and configuration",
+        category: "Blueprints",
+        resource: "blueprints",
+        action: "update",
+      },
+      {
+        id: "blueprint.delete",
+        name: "Delete Blueprints",
+        description: "Delete blueprints from the organization",
+        category: "Blueprints",
+        resource: "blueprints",
+        action: "delete",
+      },
+    ],
+  },
+  {
+    category: "Integrations",
+    icon: "integration_instructions",
+    permissions: [
+      {
+        id: "integration.read",
+        name: "View Integrations",
+        description: "View organization integrations",
+        category: "Integrations",
+        resource: "integrations",
+        action: "read",
+      },
+      {
+        id: "integration.create",
+        name: "Create Integrations",
+        description: "Create new integrations",
+        category: "Integrations",
+        resource: "integrations",
+        action: "create",
+      },
+      {
+        id: "integration.update",
+        name: "Manage Integrations",
+        description: "Update integration settings and configuration",
+        category: "Integrations",
+        resource: "integrations",
+        action: "update",
+      },
+      {
+        id: "integration.delete",
+        name: "Delete Integrations",
+        description: "Delete integrations from the organization",
+        category: "Integrations",
+        resource: "integrations",
+        action: "delete",
+      },
+    ],
+  },
+  {
+    category: "Secrets",
+    icon: "lock",
+    permissions: [
+      {
+        id: "secret.read",
+        name: "View Secrets",
+        description: "View organization secrets",
+        category: "Secrets",
+        resource: "secrets",
+        action: "read",
+      },
+      {
+        id: "secret.create",
+        name: "Create Secrets",
+        description: "Create new secrets",
+        category: "Secrets",
+        resource: "secrets",
+        action: "create",
+      },
+      {
+        id: "secret.update",
+        name: "Manage Secrets",
+        description: "Update secrets",
+        category: "Secrets",
+        resource: "secrets",
+        action: "update",
+      },
+      {
+        id: "secret.delete",
+        name: "Delete Secrets",
+        description: "Delete secrets from the organization",
+        category: "Secrets",
+        resource: "secrets",
         action: "delete",
       },
     ],
@@ -311,7 +426,7 @@ export function CreateRolePage() {
 
       navigate(`/${orgId}/settings/roles`);
     } catch {
-      console.error("Failed to create role");
+      showErrorToast("Failed to create role");
     }
   };
 

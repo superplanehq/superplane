@@ -1,0 +1,14 @@
+{
+  "data": {
+    "registryId": "123456789012",
+    "repositoryName": "my-repo",
+    "imageDigest": "sha256:8f1d3e4f5a6b7c8d9e0f11121314151617181920212223242526272829303132",
+    "imageTags": ["latest", "v1.2.3"],
+    "imageSizeInBytes": 48273912,
+    "imagePushedAt": "2026-02-03T12:00:00Z",
+    "imageManifestMediaType": "application/vnd.docker.distribution.manifest.v2+json",
+    "artifactMediaType": "application/vnd.docker.container.image.v1+json"
+  },
+  "timestamp": "2026-02-03T12:00:00Z",
+  "type": "aws.ecr.image"
+}

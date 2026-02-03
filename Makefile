@@ -102,9 +102,7 @@ dev.start.fg:
 
 dev.start:
 	docker compose $(DOCKER_COMPOSE_OPTS) up -d
-	echo "Waiting for services to start..."
-	sleep 20 # usually takes some time for the DB and the app to be ready
-	echo "Dev environment started. Access the app at http://localhost:8000"
+	@bash ./scripts/wait-for-app
 
 dev.logs:
 	docker compose $(DOCKER_COMPOSE_OPTS) logs -f
@@ -126,6 +124,9 @@ dev.db:
 
 dev.db.console:
 	$(MAKE) db.console DB_NAME=superplane_dev
+
+dev.pr.clean.checkout:
+	bash ./scripts/clean-pr-checkout $(PR)
 
 check.db.structure:
 	bash ./scripts/verify_db_structure_clean.sh
@@ -163,12 +164,19 @@ db.migration.create:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app migrate create -ext sql -dir db/migrations $(NAME)
 	ls -lah db/migrations/*$(NAME)*
 
+db.data_migration.create:
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app mkdir -p db/data_migrations
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app migrate create -ext sql -dir db/data_migrations $(NAME)
+	ls -lah db/data_migrations/*$(NAME)*
+
 db.migrate:
 	rm -f db/structure.sql
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) app migrate -source file://db/migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable up
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) app migrate -source file://db/data_migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable\&x-migrations-table=data_migrations up
 	# echo dump schema to db/structure.sql
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --schema-only --no-privileges --restrict-key abcdef123 --no-owner -h db -p 5432 -U postgres -d $(DB_NAME)" > db/structure.sql
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table schema_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table data_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
 
 db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
@@ -209,8 +217,8 @@ gen.components.local.update: gen.components.docs
 	rm -rf ../docs/src/content/docs/components
 	cp -R docs/components ../docs/src/content/docs/components
 
-MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,workflows
-REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,workflows
+MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases
+REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases
 pb.gen:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)

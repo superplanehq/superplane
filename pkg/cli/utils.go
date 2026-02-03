@@ -41,19 +41,19 @@ func getDomainOrExit(client *openapi_client.APIClient, cmd *cobra.Command) (stri
 	return string(openapi_client.AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_ORGANIZATION), *response.OrganizationId
 }
 
-func findWorkflowIDByName(ctx context.Context, client *openapi_client.APIClient, name string) (string, error) {
-	response, _, err := client.WorkflowAPI.WorkflowsListWorkflows(ctx).Execute()
+func findCanvasIDByName(ctx context.Context, client *openapi_client.APIClient, name string) (string, error) {
+	response, _, err := client.CanvasAPI.CanvasesListCanvases(ctx).Execute()
 	if err != nil {
 		return "", err
 	}
 
-	var matches []openapi_client.WorkflowsWorkflow
-	for _, workflow := range response.GetWorkflows() {
-		if workflow.Metadata == nil || workflow.Metadata.Name == nil {
+	var matches []openapi_client.CanvasesCanvas
+	for _, canvas := range response.GetCanvases() {
+		if canvas.Metadata == nil || canvas.Metadata.Name == nil {
 			continue
 		}
-		if *workflow.Metadata.Name == name {
-			matches = append(matches, workflow)
+		if *canvas.Metadata.Name == name {
+			matches = append(matches, canvas)
 		}
 	}
 

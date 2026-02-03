@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
+	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -24,7 +25,6 @@ import (
 	triggerPb "github.com/superplanehq/superplane/pkg/protos/triggers"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	widgetPb "github.com/superplanehq/superplane/pkg/protos/widgets"
-	pbWorkflows "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -118,8 +118,8 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 	blueprintService := NewBlueprintService(registry)
 	pbBlueprints.RegisterBlueprintsServer(grpcServer, blueprintService)
 
-	workflowService := NewWorkflowService(authService, registry, encryptor, webhooksBaseURL+basePath)
-	pbWorkflows.RegisterWorkflowsServer(grpcServer, workflowService)
+	canvasService := NewCanvasService(authService, registry, encryptor, webhooksBaseURL+basePath)
+	pbCanvases.RegisterCanvasesServer(grpcServer, canvasService)
 
 	integrationService := NewIntegrationService(encryptor, registry)
 	integrationpb.RegisterIntegrationsServer(grpcServer, integrationService)

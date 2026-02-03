@@ -1,0 +1,14 @@
+{
+    "type": "datadog.event",
+    "data": {
+        "id": 1234567890,
+        "title": "Deployment completed",
+        "text": "Application v1.2.3 has been deployed successfully",
+        "date_happened": 1704067200,
+        "alert_type": "info",
+        "priority": "normal",
+        "tags": ["env:prod", "service:web"],
+        "url": "https://app.datadoghq.com/event/event?id=1234567890"
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}

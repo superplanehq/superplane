@@ -37,7 +37,7 @@ func (steps *TestHomePageSteps) VisitHomePage() {
 }
 
 func (steps *TestHomePageSteps) AssertCanvasSavedInDB(canvasName string) {
-	canvas, err := models.FindWorkflowByName(canvasName, steps.session.OrgID)
+	canvas, err := models.FindCanvasByName(canvasName, steps.session.OrgID)
 
 	assert.NoError(steps.t, err)
 	assert.Equal(steps.t, canvasName, canvas.Name)

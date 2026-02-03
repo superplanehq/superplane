@@ -1,0 +1,33 @@
+---
+description: When creating or editing general SuperPlane issue drafts in tmp/pm_logger, or when working in the issue-logger workflow.
+globs:
+  - "tmp/pm_logger/**"
+  - "**/pm_logger/**"
+alwaysApply: false
+---
+
+# SuperPlane Issue Logger Conventions
+
+Apply these conventions when creating or editing issue drafts in `tmp/pm_logger` for general SuperPlane issues (non-integration).
+
+## Issue types
+
+- **bug**: Something isn't working as expected (incorrect behavior, failure, regression).
+- **enhancement**: Small/medium improvement to an existing feature already in the app.
+- **feature**: Completely new feature or functionality.
+- **papercut**: Small issue, bug, or inconsistency; minor improvement that doesn't break flows.
+
+Bug vs papercut: breaks a flow or blocks usage → bug. Annoying but workable → papercut.
+
+## Title and body
+
+- **Title**: Short — **max 40 characters**. One or two concrete concepts; not a full list of details, not too vague. Stored in the file as `### Title` (or clear header) so the log-to-GitHub step can reuse it.
+- **Body**: Use the per-type template from the issue-logger skill (bug, papercut, enhancement, feature). Keep drafts short and efficient; no empty sections. **Do not put Priority in the body** — Priority is set only via the Board Project field when logging to GitHub.
+- **Priority**: Always suggested (P1–P4) and confirmed with the user before writing the draft and before logging to GitHub; store only in memory or Board, never in the draft body.
+
+## When creating issues on GitHub
+
+- **Never log the issue until the user has verified the draft** (title, body, type, priority) and explicitly approved (e.g. "looks good", "log it").
+- Create issues **sequentially** to avoid API rate limiting.
+- Use one type label per issue: `bug`, `enhancement`, `feature`, or `papercut` (match repo labels).
+- Add to SuperPlane Board (project 2) and set Priority via Board fields. Do not set Integration Status for general issues.

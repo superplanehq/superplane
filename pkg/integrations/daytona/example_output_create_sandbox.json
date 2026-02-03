@@ -1,0 +1,8 @@
+{
+    "type": "daytona.sandbox",
+    "data": {
+        "id": "sandbox-abc123def456",
+        "state": "started"
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}

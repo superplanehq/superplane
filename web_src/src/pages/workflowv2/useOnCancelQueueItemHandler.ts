@@ -1,22 +1,23 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
-import { workflowsDeleteNodeQueueItem, WorkflowsWorkflow } from "@/api-client";
-import { workflowKeys } from "@/hooks/useWorkflowData";
+import { canvasesDeleteNodeQueueItem, CanvasesCanvas } from "@/api-client";
+import { canvasKeys } from "@/hooks/useCanvasData";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { showErrorToast } from "@/utils/toast";
 
 type Params = {
-  workflowId: string;
+  canvasId: string;
   organizationId?: string;
-  workflow?: WorkflowsWorkflow | null;
+  canvas?: CanvasesCanvas | null;
   loadSidebarData: (nodeId: string) => void;
 };
 
 /**
  * Returns a handler that cancels a queued item for a node and refreshes related data.
  */
-export function useOnCancelQueueItemHandler({ workflowId, organizationId, workflow, loadSidebarData }: Params) {
+export function useOnCancelQueueItemHandler({ canvasId, organizationId, canvas, loadSidebarData }: Params) {
   const queryClient = useQueryClient();
   const refetchNodeDataMethod = useNodeExecutionStore((state) => state.refetchNodeData);
 
@@ -25,10 +26,10 @@ export function useOnCancelQueueItemHandler({ workflowId, organizationId, workfl
       if (!window.confirm("Cancel this queued event?")) return;
 
       try {
-        await workflowsDeleteNodeQueueItem(
+        await canvasesDeleteNodeQueueItem(
           withOrganizationHeader({
             path: {
-              workflowId,
+              canvasId,
               nodeId,
               itemId: queueItemId,
             },
@@ -36,18 +37,19 @@ export function useOnCancelQueueItemHandler({ workflowId, organizationId, workfl
         );
 
         // Refresh queue items and sidebar data for this node
-        await queryClient.invalidateQueries({ queryKey: workflowKeys.nodeQueueItem(workflowId, nodeId) });
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeQueueItem(canvasId, nodeId) });
 
-        const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
+        const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
         if (node) {
-          await refetchNodeDataMethod(workflowId, nodeId, node.type!, queryClient);
+          await refetchNodeDataMethod(canvasId, nodeId, node.type!, queryClient);
         } else {
           loadSidebarData(nodeId);
         }
       } catch (err) {
         console.error("Failed to cancel queue item", err);
+        showErrorToast("Failed to cancel queue item");
       }
     },
-    [workflowId, organizationId, queryClient, workflow, refetchNodeDataMethod, loadSidebarData],
+    [canvasId, organizationId, queryClient, canvas, refetchNodeDataMethod, loadSidebarData],
   );
 }

@@ -44,13 +44,13 @@ func FormatDomain(domainType, domainID string) string {
 }
 
 func PrefixUser(userID string) string {
-	return fmt.Sprintf("user:%s", userID)
+	return fmt.Sprintf("/users/%s", userID)
 }
 
 func PrefixGroup(groupName string) string {
-	return fmt.Sprintf("group:%s", groupName)
+	return fmt.Sprintf("/groups/%s", groupName)
 }
 
 func PrefixRole(role string) string {
-	return fmt.Sprintf("role:%s", role)
+	return fmt.Sprintf("/roles/%s", role)
 }

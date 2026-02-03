@@ -6,9 +6,9 @@ import {
   RolesRole,
   SuperplaneUsersUser,
   groupsListGroupUsers,
-  workflowsInvokeNodeExecutionAction,
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
+  canvasesInvokeNodeExecutionAction,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
 import { ComponentAdditionalDataBuilder, ComponentBaseMapper, EventStateRegistry, StateFunction } from "./types";
 import {
@@ -27,8 +27,9 @@ import { ApprovalItemProps } from "@/ui/approvalItem";
 import { QueryClient } from "@tanstack/react-query";
 import { organizationKeys } from "@/hooks/useOrganizationData";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
-import { workflowKeys } from "@/hooks/useWorkflowData";
+import { canvasKeys } from "@/hooks/useCanvasData";
 import { formatTimeAgo } from "@/utils/date";
+import { showErrorToast } from "@/utils/toast";
 
 type ApprovalItem = {
   type: string;
@@ -79,7 +80,7 @@ export const APPROVAL_STATE_MAP: EventStateMap = {
 /**
  * Approval-specific state logic function
  */
-export const approvalStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
+export const approvalStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
   if (
     execution.resultMessage &&
     (execution.resultReason === "RESULT_REASON_ERROR" ||
@@ -134,8 +135,8 @@ export const approvalMapper: ComponentBaseMapper = {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
-    _?: WorkflowsWorkflowNodeQueueItem[],
+    lastExecutions: CanvasesCanvasNodeExecution[],
+    _?: CanvasesCanvasNodeQueueItem[],
     additionalData?: unknown,
   ): ComponentBaseProps {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
@@ -157,7 +158,7 @@ export const approvalMapper: ComponentBaseMapper = {
   subtitle(node, execution, additionalData) {
     return getComponentSubtitle(node, execution, additionalData);
   },
-  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, any> {
+  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, any> {
     const details: Record<string, any> = {};
     const metadata = execution.metadata as Record<string, unknown> | undefined;
     const records = (metadata?.records as ApprovalRecord[] | undefined) || [];
@@ -179,7 +180,7 @@ export const approvalMapper: ComponentBaseMapper = {
 };
 
 function getApprovalCustomField(
-  lastExecution: WorkflowsWorkflowNodeExecution | null,
+  lastExecution: CanvasesCanvasNodeExecution | null,
   approvals: ApprovalItemProps[],
 ): React.ReactNode | undefined {
   const isAwaitingApproval = ["STATE_STARTED", "STATE_PENDING"].includes(lastExecution?.state || "");
@@ -237,7 +238,7 @@ function getApprovalSpecs(items: ApprovalItem[], additionalData?: unknown): Comp
 
 function getApprovalEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
   additionalData?: unknown,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
@@ -259,7 +260,7 @@ function getApprovalEventSections(
 
 function getComponentSubtitle(
   _node: ComponentsNode,
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
   additionalData?: unknown,
 ): string | React.ReactNode {
   // Show progress for in-progress approvals
@@ -402,7 +403,7 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
     _nodes: ComponentsNode[],
     node: ComponentsNode,
     _componentDefinition: ComponentsComponent,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
+    lastExecutions: CanvasesCanvasNodeExecution[],
     workflowId: string,
     queryClient: QueryClient,
     organizationId?: string,
@@ -564,10 +565,10 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
           if (!execution?.id) return;
 
           try {
-            await workflowsInvokeNodeExecutionAction(
+            await canvasesInvokeNodeExecutionAction(
               withOrganizationHeader({
                 path: {
-                  workflowId: workflowId,
+                  canvasId: workflowId,
                   executionId: execution.id,
                   actionName: "approve",
                 },
@@ -581,20 +582,20 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
             );
 
             queryClient.invalidateQueries({
-              queryKey: workflowKeys.nodeExecution(workflowId, node.id!),
+              queryKey: canvasKeys.nodeExecution(workflowId, node.id!),
             });
-          } catch (error) {
-            console.error("Failed to approve:", error);
+          } catch (_error) {
+            showErrorToast("Failed to approve");
           }
         },
         onReject: async (comment?: string) => {
           if (!execution?.id) return;
 
           try {
-            await workflowsInvokeNodeExecutionAction(
+            await canvasesInvokeNodeExecutionAction(
               withOrganizationHeader({
                 path: {
-                  workflowId: workflowId,
+                  canvasId: workflowId,
                   executionId: execution.id,
                   actionName: "reject",
                 },
@@ -608,10 +609,10 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
             );
 
             queryClient.invalidateQueries({
-              queryKey: workflowKeys.nodeExecution(workflowId, node.id!),
+              queryKey: canvasKeys.nodeExecution(workflowId, node.id!),
             });
-          } catch (error) {
-            console.error("Failed to reject:", error);
+          } catch (_error) {
+            showErrorToast("Failed to reject");
           }
         },
       };

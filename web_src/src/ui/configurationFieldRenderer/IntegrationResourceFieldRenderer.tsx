@@ -1,10 +1,13 @@
+import { createPortal } from "react-dom";
 import { AutoCompleteSelect, type AutoCompleteOption } from "@/components/AutoCompleteSelect";
+import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
 import { MultiCombobox, MultiComboboxLabel } from "@/components/MultiCombobox/multi-combobox";
 import { Select, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfigurationField } from "../../api-client";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { toTestId } from "@/utils/testID";
-import { useEffect, useMemo } from "react";
+import { type RefObject, useEffect, useMemo, useState } from "react";
 
 interface IntegrationResourceFieldRendererProps {
   field: ConfigurationField;
@@ -12,6 +15,10 @@ interface IntegrationResourceFieldRendererProps {
   onChange: (value: string | string[] | undefined) => void;
   organizationId?: string;
   integrationId?: string;
+  allowExpressions?: boolean;
+  autocompleteExampleObj?: Record<string, unknown> | null;
+  labelRightRef?: RefObject<HTMLDivElement | null>;
+  labelRightReady?: boolean;
 }
 
 type SelectOption = {
@@ -20,17 +27,39 @@ type SelectOption = {
   value: string;
 };
 
+/**
+ * Detect if value looks like a wrapped expression (e.g. {{ $["node-name"].value }}).
+ * Requires both {{ and }} so fixed IDs (e.g. channel IDs) are not misclassified.
+ * Aligns with AutoCompleteInput wrapped expression detection.
+ */
+function isExpressionValue(value: string | string[] | undefined): boolean {
+  if (value == null) return false;
+  const str = Array.isArray(value) ? value[0] : value;
+  if (typeof str !== "string") return false;
+  const trimmed = str.trim();
+  if (!trimmed.length) return false;
+  return /\{\{[\s\S]*?\}\}/.test(trimmed);
+}
+
 export const IntegrationResourceFieldRenderer = ({
   field,
   value,
   onChange,
   organizationId,
   integrationId,
+  allowExpressions = false,
+  autocompleteExampleObj = null,
+  labelRightRef,
+  labelRightReady = false,
 }: IntegrationResourceFieldRendererProps) => {
   const resourceType = field.typeOptions?.resource?.type;
   const useNameAsValue = field.typeOptions?.resource?.useNameAsValue ?? false;
   // Check for multi - be explicit about truthiness since it's a boolean field
   const isMulti = Boolean(field.typeOptions?.resource?.multi);
+
+  // Fixed vs Expression mode for single-select when expressions are allowed
+  const initialIsExpression = allowExpressions && !isMulti && isExpressionValue(value);
+  const [useExpressionMode, setUseExpressionMode] = useState(initialIsExpression);
 
   const {
     data: resources,
@@ -129,21 +158,72 @@ export const IntegrationResourceFieldRenderer = ({
 
     const selectedValue =
       useNameAsValue && typeof value === "string" && value
-        ? (resources.find((resource) => resource.id === value)?.name ?? value)
+        ? (resources.find((r) => r.id === value)?.name ?? value)
         : typeof value === "string"
           ? value
           : "";
 
-    return (
-      <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)}>
-        <AutoCompleteSelect
-          options={options}
-          value={selectedValue}
-          onChange={(val) => onChange(val || undefined)}
-          placeholder={`Select ${resourceType}`}
-        />
-      </div>
+    const expressionValue = typeof value === "string" ? value : "";
+
+    const picker = (
+      <AutoCompleteSelect
+        options={options}
+        value={selectedValue}
+        onChange={(val) => onChange(val || undefined)}
+        placeholder={field.placeholder ?? `Select ${resourceType}`}
+      />
     );
+
+    const expressionInput = (
+      <AutoCompleteInput
+        exampleObj={autocompleteExampleObj}
+        value={expressionValue}
+        onChange={(nextValue) => onChange(nextValue || undefined)}
+        placeholder={field.placeholder ?? `e.g. {{ $["node-name"].value }}`}
+        startWord="{{"
+        prefix="{{ "
+        suffix=" }}"
+        inputSize="md"
+        showValuePreview
+        quickTip="Tip: type {{ to start an expression."
+        className=""
+      />
+    );
+
+    if (allowExpressions) {
+      const tabsList = (
+        <TabsList className="h-7 rounded-md p-0.5">
+          <TabsTrigger value="fixed" className="text-xs px-2 py-1 data-[state=active]:shadow-sm">
+            Fixed
+          </TabsTrigger>
+          <TabsTrigger value="expression" className="text-xs px-2 py-1 data-[state=active]:shadow-sm">
+            Expression
+          </TabsTrigger>
+        </TabsList>
+      );
+      const tabsInLabelRow =
+        labelRightReady && labelRightRef?.current ? createPortal(tabsList, labelRightRef.current) : null;
+
+      const handleTabChange = (v: string) => {
+        const nextExpression = v === "expression";
+        if (nextExpression !== useExpressionMode) {
+          onChange(undefined);
+        }
+        setUseExpressionMode(nextExpression);
+      };
+
+      return (
+        <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)} className="space-y-2">
+          <Tabs value={useExpressionMode ? "expression" : "fixed"} onValueChange={handleTabChange}>
+            {tabsInLabelRow ?? <div className="flex justify-end">{tabsList}</div>}
+            <TabsContent value="fixed">{picker}</TabsContent>
+            <TabsContent value="expression">{expressionInput}</TabsContent>
+          </Tabs>
+        </div>
+      );
+    }
+
+    return <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)}>{picker}</div>;
   }
 
   // Multi-select mode

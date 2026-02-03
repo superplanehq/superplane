@@ -32,6 +32,7 @@ func (p *panickingTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int, e
 func (p *panickingTrigger) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
 	panic("handle action panic")
 }
+func (p *panickingTrigger) Cleanup(ctx core.TriggerContext) error { panic("cleanup panic") }
 
 func TestPanicableTrigger_Setup_CatchesPanic(t *testing.T) {
 	trig := &panickingTrigger{name: "panicking-trigger"}
@@ -73,4 +74,18 @@ func TestPanicableTrigger_HandleAction_CatchesPanic(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "panicking-trigger panicked in HandleAction(test-action)")
 	assert.Contains(t, err.Error(), "handle action panic")
+}
+
+func TestPanicableTrigger_Cleanup_CatchesPanic(t *testing.T) {
+	trig := &panickingTrigger{name: "panicking-trigger"}
+	panicable := NewPanicableTrigger(trig)
+	ctx := core.TriggerContext{
+		Logger: log.NewEntry(log.StandardLogger()),
+	}
+
+	err := panicable.Cleanup(ctx)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "panicking-trigger panicked in Cleanup()")
+	assert.Contains(t, err.Error(), "cleanup panic")
 }

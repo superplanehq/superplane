@@ -41,7 +41,6 @@ export function General({ organization }: GeneralProps) {
       setTimeout(() => setSaveMessage(null), 3000);
     } catch (err) {
       setSaveMessage("Failed to update organization");
-      console.error("Error updating organization:", err);
       setTimeout(() => setSaveMessage(null), 3000);
     }
   };
@@ -61,7 +60,6 @@ export function General({ organization }: GeneralProps) {
       await deleteOrganizationMutation.mutateAsync();
       window.location.href = "/";
     } catch (err) {
-      console.error("Failed to delete organization:", err);
       setDeleteError("Failed to delete organization. Please try again.");
     }
   };

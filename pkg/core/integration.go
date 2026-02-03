@@ -57,6 +57,22 @@ type Integration interface {
 	Sync(ctx SyncContext) error
 
 	/*
+	 * Called when the integration is deleted.
+	 */
+	Cleanup(ctx IntegrationCleanupContext) error
+
+	/*
+	 * The list of actions exposed by the integration.
+	 */
+	Actions() []Action
+
+	/*
+	 * Execute an action - defined in Actions() -
+	 * on the integration.
+	 */
+	HandleAction(ctx IntegrationActionContext) error
+
+	/*
 	 * List resources of a given type.
 	 */
 	ListResources(resourceType string, ctx ListResourcesContext) ([]IntegrationResource, error)
@@ -111,7 +127,9 @@ type IntegrationTrigger interface {
 type IntegrationMessageContext struct {
 	Message       any
 	Configuration any
+	NodeMetadata  MetadataContext
 	Logger        *logrus.Entry
+	HTTP          HTTPContext
 	Integration   IntegrationContext
 	Events        EventContext
 }
@@ -150,6 +168,7 @@ type WebhookOptions struct {
 }
 
 type SyncContext struct {
+	Logger          *logrus.Entry
 	Configuration   any
 	BaseURL         string
 	WebhooksBaseURL string
@@ -158,6 +177,27 @@ type SyncContext struct {
 	HTTP            HTTPContext
 	Integration     IntegrationContext
 	OIDC            oidc.Provider
+}
+
+type IntegrationCleanupContext struct {
+	Configuration  any
+	BaseURL        string
+	OrganizationID string
+	InstallationID string
+	Logger         *logrus.Entry
+	HTTP           HTTPContext
+	Integration    IntegrationContext
+}
+
+type IntegrationActionContext struct {
+	Name            string
+	Parameters      any
+	Configuration   any
+	WebhooksBaseURL string
+	Logger          *logrus.Entry
+	Requests        RequestContext
+	Integration     IntegrationContext
+	HTTP            HTTPContext
 }
 
 /*
@@ -176,8 +216,8 @@ type IntegrationContext interface {
 	//
 	// Control the state of the integration
 	//
-	GetState() string
-	SetState(state, stateDescription string)
+	Ready()
+	Error(message string)
 
 	//
 	// Control the browser action of the integration
@@ -203,9 +243,10 @@ type IntegrationContext interface {
 	Subscribe(any) (*uuid.UUID, error)
 
 	/*
-	 * Schedule a sync call for the integration.
+	 * Schedule actions for the integration.
 	 */
 	ScheduleResync(interval time.Duration) error
+	ScheduleActionCall(actionName string, parameters any, interval time.Duration) error
 
 	/*
 	 * List integration subscriptions from nodes.

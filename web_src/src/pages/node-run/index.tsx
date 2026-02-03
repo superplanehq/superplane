@@ -4,25 +4,25 @@ import { useParams } from "react-router-dom";
 import { BlueprintsBlueprint, ComponentsComponent, ComponentsEdge, ComponentsNode } from "@/api-client";
 import { useBlueprint, useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useChildExecutions, useWorkflow } from "@/hooks/useWorkflowData";
+import { useChildExecutions, useCanvas } from "@/hooks/useCanvasData";
 import { getTriggerRenderer } from "@/pages/workflowv2/mappers";
 import { CanvasEdge, CanvasNode, CanvasPage } from "@/ui/CanvasPage";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 
 export function NodeRunPage() {
-  const { organizationId, workflowId, nodeId, executionId } = useParams();
-  const { data: workflow } = useWorkflow(organizationId!, workflowId!);
+  const { organizationId, canvasId, nodeId, executionId } = useParams();
+  const { data: canvas } = useCanvas(organizationId!, canvasId!);
 
-  usePageTitle([workflow?.metadata?.name]);
+  usePageTitle([canvas?.metadata?.name]);
 
   // Node details within the workflow
-  const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
+  const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
 
   // If this is a blueprint node, load the blueprint definition
   const { data: blueprint } = useBlueprint(organizationId || "", node?.blueprint?.id || "");
 
   // Fetch child executions based on the executionId from the URL
-  const { data: childExecsResp } = useChildExecutions(workflowId || "", executionId || null);
+  const { data: childExecsResp } = useChildExecutions(canvasId || "", executionId || null);
   const childExecs = childExecsResp?.executions || [];
 
   // Components metadata for icon/color/channel information
@@ -64,12 +64,12 @@ export function NodeRunPage() {
 
   const isSidebarOpenRef = useRef<boolean | null>(false);
   const breadcrumbs = useBreadcrumbs();
-  const workflowName = workflow?.metadata?.name || "Workflow";
+  const canvasName = canvas?.metadata?.name || "Canvas";
 
   return (
     <div className="h-screen w-screen bg-slate-50">
       <CanvasPage
-        title={workflowName}
+        title={canvasName}
         breadcrumbs={breadcrumbs}
         organizationId={organizationId}
         nodes={nodes}
@@ -170,19 +170,19 @@ function friendlyChildLabel(ce: any, nodes: ComponentsNode[]) {
 }
 
 function useBreadcrumbs() {
-  const { organizationId, workflowId, nodeId, executionId } = useParams();
-  const { data: workflow } = useWorkflow(organizationId || "", workflowId || "");
-  const { data: childExecsResp } = useChildExecutions(workflowId || "", executionId || null);
+  const { organizationId, canvasId, nodeId, executionId } = useParams();
+  const { data: canvas } = useCanvas(organizationId || "", canvasId || "");
+  const { data: childExecsResp } = useChildExecutions(canvasId || "", executionId || null);
   const { data: blueprints = [] } = useBlueprints(organizationId || "");
   const { data: components = [] } = useComponents(organizationId || "");
 
-  const nodeName = workflow?.spec?.nodes?.find((n) => n.id === nodeId)?.name || "Component";
+  const nodeName = canvas?.spec?.nodes?.find((n) => n.id === nodeId)?.name || "Component";
   const selectedExecution = childExecsResp?.executions?.[0];
-  const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
+  const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
 
   const latestRunTitle = (() => {
     if (!selectedExecution) return undefined;
-    const rootNode = workflow?.spec?.nodes?.find((n) => n.id === selectedExecution.rootEvent?.nodeId);
+    const rootNode = canvas?.spec?.nodes?.find((n) => n.id === selectedExecution.rootEvent?.nodeId);
     const renderer = getTriggerRenderer(rootNode?.trigger?.name || "");
     if (selectedExecution.rootEvent) {
       return renderer.getTitleAndSubtitle(selectedExecution.rootEvent).title;
@@ -208,7 +208,7 @@ function useBreadcrumbs() {
 
   return [
     { label: "Canvases", href: `/${organizationId}` },
-    { label: workflow?.metadata?.name || "Workflow", href: `/${organizationId}/workflows/${workflowId}` },
+    { label: canvas?.metadata?.name || "Canvas", href: `/${organizationId}/canvases/${canvasId}` },
     {
       label: nodeName,
       iconSlug: iconSlug || "boxes",

@@ -35,16 +35,22 @@ services:
       START_CONSUMERS: "yes"
       PUBLIC_API_BASE_PATH: /api/v1
       START_WEB_SERVER: "yes"
+      PUBLIC_API_PORT: ${PUBLIC_API_PORT:-8000}
+      INTERNAL_API_PORT: ${INTERNAL_API_PORT:-50051}
+      GRPC_SERVER_ADDR: ${GRPC_SERVER_ADDR:-127.0.0.1:${INTERNAL_API_PORT:-50051}}
+      PORT: ${PORT:-${PUBLIC_API_PORT:-8000}}
+      API_PORT: ${API_PORT:-${PUBLIC_API_PORT:-8000}}
+      VITE_DEV_PORT: ${VITE_DEV_PORT:-5173}
       START_EVENT_DISTRIBUTER: "yes"
-      START_WORKFLOW_EVENT_ROUTER: "yes"
-      START_WORKFLOW_NODE_EXECUTOR: "yes"
-      START_WORKFLOW_NODE_QUEUE_WORKER: "yes"
+      START_EVENT_ROUTER: "yes"
+      START_NODE_EXECUTOR: "yes"
+      START_NODE_QUEUE_WORKER: "yes"
       START_NODE_REQUEST_WORKER: "yes"
-      START_APP_INSTALLATION_REQUEST_WORKER: "yes"
+      START_INTEGRATION_REQUEST_WORKER: "yes"
       START_WEBHOOK_PROVISIONER: "yes"
       START_WEBHOOK_CLEANUP_WORKER: "yes"
-      START_INSTALLATION_CLEANUP_WORKER: "yes"
-      START_WORKFLOW_CLEANUP_WORKER: "yes"
+      START_INTEGRATION_CLEANUP_WORKER: "yes"
+      START_CANVAS_CLEANUP_WORKER: "yes"
       WEB_BASE_PATH: ""
       SENTRY_DSN: ""
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
@@ -74,11 +80,11 @@ services:
       VITE_RBAC_ENABLED: "true"
 
     ports:
-      - 5173:5173
-      - 4173:4173
-      - 6006:6006
-      - 8000:8000
-      - 50051:50051
+      - ${VITE_DEV_PORT:-5173}:${VITE_DEV_PORT:-5173}
+      - ${VITE_PREVIEW_PORT:-4173}:${VITE_PREVIEW_PORT:-4173}
+      - ${STORYBOOK_PORT:-6006}:${STORYBOOK_PORT:-6006}
+      - ${PUBLIC_API_PORT:-8000}:${PUBLIC_API_PORT:-8000}
+      - ${INTERNAL_API_PORT:-50051}:${INTERNAL_API_PORT:-50051}
 
     links:
       - db:db
@@ -102,8 +108,8 @@ services:
     volumes:
       - ./otel-collector-config.dev.yaml:/etc/otel-collector-config.yaml:ro
     ports:
-      - 4317:4317
-      - 4318:4318
+      - ${OTEL_GRPC_PORT:-4317}:${OTEL_GRPC_PORT:-4317}
+      - ${OTEL_HTTP_PORT:-4318}:${OTEL_HTTP_PORT:-4318}
 
   db:
     image: postgres:17.5
@@ -123,7 +129,7 @@ services:
     environment:
       DATABASE_URL: "postgres://postgres:the-cake-is-a-lie@db:5432/superplane_dev?sslmode=disable"
     ports:
-      - 8081:8081
+      - ${PGWEB_PORT:-8081}:${PGWEB_PORT:-8081}
     links:
       - db:db
     depends_on:
@@ -133,8 +139,8 @@ services:
   rabbitmq:
     image: rabbitmq:3.8.17-management-alpine
     ports:
-      - 5672:5672
-      - 15672:15672
+      - ${RABBITMQ_PORT:-5672}:${RABBITMQ_PORT:-5672}
+      - ${RABBITMQ_MANAGEMENT_PORT:-15672}:${RABBITMQ_MANAGEMENT_PORT:-15672}
     restart: "on-failure"
     healthcheck:
       test: rabbitmq-diagnostics -q ping

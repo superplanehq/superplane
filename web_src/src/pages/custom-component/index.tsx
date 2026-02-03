@@ -418,7 +418,6 @@ export const CustomComponent = () => {
         // Clear the snapshot since changes are now saved
         setInitialBlueprintSnapshot(null);
       } catch (error: any) {
-        console.error("Error saving component:", error);
         const errorMessage = error?.response?.data?.message || error?.message || "Failed to save component";
         showErrorToast(errorMessage);
       }
@@ -800,7 +799,7 @@ export const CustomComponent = () => {
       try {
         await handleSaveBlueprint(updatedNodes, updatedEdges);
       } catch (error) {
-        console.error("Failed to auto-save after adding node:", error);
+        console.error("Failed to save component", error);
         showErrorToast("Failed to save component");
       }
 
@@ -1274,7 +1273,7 @@ export const CustomComponent = () => {
   const breadcrumbs: BreadcrumbItem[] =
     fromWorkflowId && workflowName
       ? [
-          { label: workflowName, href: `/${organizationId}/workflows/${fromWorkflowId}` },
+          { label: workflowName, href: `/${organizationId}/canvases/${fromWorkflowId}` },
           { label: blueprintName, iconSlug: BUNDLE_ICON_SLUG, iconColor: BUNDLE_ICON_COLOR_CLASS },
         ]
       : [

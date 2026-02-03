@@ -1,4 +1,4 @@
-import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
+import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
 import { formatTimeAgo } from "@/utils/date";
@@ -29,7 +29,7 @@ interface AppMentionEventData {
  * Renderer for the "slack.onAppMention" trigger
  */
 export const onAppMentionTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
     const eventData = event.data?.data as AppMentionEventData | undefined;
     const title = eventData?.text?.trim() ? eventData.text : "App mention";
     const subtitle = buildSubtitle(eventData?.user ? `Mention by ${eventData.user}` : "Mention", event.createdAt);
@@ -40,7 +40,7 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getRootEventValues: (event: WorkflowsWorkflowEvent): Record<string, string> => {
+  getRootEventValues: (event: CanvasesCanvasEvent): Record<string, string> => {
     const eventData = event.data?.data as AppMentionEventData | undefined;
     const mentionedAt = formatSlackTimestamp(eventData?.ts || eventData?.event_ts);
 
@@ -53,7 +53,7 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
+  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
     const metadata = node.metadata as OnAppMentionMetadata | undefined;
     const configuration = node.configuration as OnAppMentionConfiguration | undefined;
     const metadataItems = [];
@@ -67,7 +67,7 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
     }
 
     const props: TriggerProps = {
-      title: node.name!,
+      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
       iconSrc: slackIcon,
       iconSlug: "slack",
       iconColor: getColorClass(trigger.color),

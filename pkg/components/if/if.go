@@ -64,15 +64,15 @@ func (f *If) Documentation() string {
 ## Expression Environment
 
 The expression has access to:
-- **$**: The current event data
+- **$**: The run context data
 - **root()**: Access to the root event data
 - **previous()**: Access to previous node outputs (optionally with depth parameter)
 
 ## Examples
 
-- ` + "`$.status == \"approved\"`" + `: Route approved items to True channel
-- ` + "`$.amount > 1000`" + `: Route high-value items to True channel
-- ` + "`$.user.role == \"admin\"`" + `: Route admin actions to True channel`
+- ` + "`$[\"Node Name\"].status == \"approved\"`" + `: Route approved items to True channel
+- ` + "`$[\"Node Name\"].amount > 1000`" + `: Route high-value items to True channel
+- ` + "`$[\"Node Name\"].user.role == \"admin\"`" + `: Route admin actions to True channel`
 }
 
 func (f *If) Icon() string {
@@ -286,4 +286,8 @@ func (f *If) Cancel(ctx core.ExecutionContext) error {
 
 func (f *If) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
+}
+
+func (f *If) Cleanup(ctx core.SetupContext) error {
+	return nil
 }

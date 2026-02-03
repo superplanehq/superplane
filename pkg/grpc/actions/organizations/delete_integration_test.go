@@ -28,9 +28,11 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		// Register a test integration
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			ctx.Integration.SetState("ready", "")
-			return nil
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
 		})
 
 		name := support.RandomName("integration")
@@ -74,7 +76,7 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		// Verify integration is soft-deleted in the database
 		//
-		integration, err := models.FindMaybeDeletedInstallationInTransaction(database.Conn(), uuid.MustParse(integrationID))
+		integration, err := models.FindMaybeDeletedIntegrationInTransaction(database.Conn(), uuid.MustParse(integrationID))
 		require.NoError(t, err)
 		assert.True(t, integration.DeletedAt.Valid)
 	})
@@ -119,9 +121,11 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		// Register a test application
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			ctx.Integration.SetState("ready", "")
-			return nil
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
 		})
 
 		//
@@ -155,9 +159,11 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		// Register a test integration
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			ctx.Integration.SetState("ready", "")
-			return nil
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
 		})
 
 		name := support.RandomName("integration")
@@ -192,9 +198,11 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		// Register a test integration
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			ctx.Integration.SetState("ready", "")
-			return nil
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
 		})
 
 		name := support.RandomName("integration")
@@ -217,7 +225,7 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		// Verify the integration name has been modified
 		//
-		integration, err := models.FindMaybeDeletedInstallationInTransaction(database.Conn(), uuid.MustParse(integrationID))
+		integration, err := models.FindMaybeDeletedIntegrationInTransaction(database.Conn(), uuid.MustParse(integrationID))
 		require.NoError(t, err)
 		assert.True(t, integration.DeletedAt.Valid)
 		assert.NotEqual(t, name, integration.InstallationName)

@@ -1,0 +1,8 @@
+{
+    "type": "daytona.execute.response",
+    "data": {
+        "exitCode": 0,
+        "result": "Hello, World!\n"
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}

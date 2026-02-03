@@ -26,13 +26,13 @@ var listCanvasCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		client := DefaultClient()
 		ctx := context.Background()
-		response, _, err := client.WorkflowAPI.WorkflowsListWorkflows(ctx).Execute()
+		response, _, err := client.CanvasAPI.CanvasesListCanvases(ctx).Execute()
 		Check(err)
 
 		writer := tabwriter.NewWriter(os.Stdout, 0, 8, 2, ' ', 0)
 		fmt.Fprintln(writer, "ID\tNAME\tCREATED_AT")
-		for _, workflow := range response.Workflows {
-			metadata := workflow.GetMetadata()
+		for _, canvas := range response.GetCanvases() {
+			metadata := canvas.GetMetadata()
 			createdAt := ""
 			if metadata.HasCreatedAt() {
 				createdAt = metadata.GetCreatedAt().Format(time.RFC3339)

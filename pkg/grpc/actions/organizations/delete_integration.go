@@ -23,7 +23,7 @@ func DeleteIntegration(ctx context.Context, orgID string, ID string) (*pb.Delete
 		return nil, status.Errorf(codes.InvalidArgument, "invalid integration ID: %v", err)
 	}
 
-	integration, err := models.FindAppInstallation(org, integrationID)
+	integration, err := models.FindIntegration(org, integrationID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "integration not found: %v", err)
 	}
@@ -34,7 +34,7 @@ func DeleteIntegration(ctx context.Context, orgID string, ID string) (*pb.Delete
 	// and delete its webhooks before we delete the integration itself.
 	//
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		webhooks, err := models.ListAppInstallationWebhooks(tx, integration.ID)
+		webhooks, err := models.ListIntegrationWebhooks(tx, integration.ID)
 		if err != nil {
 			return status.Error(codes.Internal, "failed to list integration webhooks")
 		}

@@ -6,12 +6,12 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
+	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbOrganization "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecrets "github.com/superplanehq/superplane/pkg/protos/secrets"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
-	pbWorkflows "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -38,82 +38,79 @@ type AuthorizationInterceptor struct {
 func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterceptor {
 	rules := map[string]AuthorizationRule{
 		// Secrets rules
-		pbSecrets.Secrets_CreateSecret_FullMethodName:   {Resource: "secret", Action: "create", DomainType: models.DomainTypeOrganization},
-		pbSecrets.Secrets_UpdateSecret_FullMethodName:   {Resource: "secret", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbSecrets.Secrets_DescribeSecret_FullMethodName: {Resource: "secret", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbSecrets.Secrets_ListSecrets_FullMethodName:    {Resource: "secret", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbSecrets.Secrets_DeleteSecret_FullMethodName:   {Resource: "secret", Action: "delete", DomainType: models.DomainTypeOrganization},
+		pbSecrets.Secrets_CreateSecret_FullMethodName:   {Resource: "secrets", Action: "create", DomainType: models.DomainTypeOrganization},
+		pbSecrets.Secrets_UpdateSecret_FullMethodName:   {Resource: "secrets", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbSecrets.Secrets_DescribeSecret_FullMethodName: {Resource: "secrets", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbSecrets.Secrets_ListSecrets_FullMethodName:    {Resource: "secrets", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbSecrets.Secrets_DeleteSecret_FullMethodName:   {Resource: "secrets", Action: "delete", DomainType: models.DomainTypeOrganization},
 
 		// Groups rules
-		pbGroups.Groups_CreateGroup_FullMethodName:         {Resource: "group", Action: "create", DomainType: models.DomainTypeOrganization},
-		pbGroups.Groups_AddUserToGroup_FullMethodName:      {Resource: "group", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbGroups.Groups_RemoveUserFromGroup_FullMethodName: {Resource: "group", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbGroups.Groups_UpdateGroup_FullMethodName:         {Resource: "group", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbGroups.Groups_ListGroups_FullMethodName:          {Resource: "group", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbGroups.Groups_ListGroupUsers_FullMethodName:      {Resource: "group", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbGroups.Groups_DescribeGroup_FullMethodName:       {Resource: "group", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbGroups.Groups_DeleteGroup_FullMethodName:         {Resource: "group", Action: "delete", DomainType: models.DomainTypeOrganization},
+		pbGroups.Groups_CreateGroup_FullMethodName:         {Resource: "groups", Action: "create", DomainType: models.DomainTypeOrganization},
+		pbGroups.Groups_AddUserToGroup_FullMethodName:      {Resource: "groups", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbGroups.Groups_RemoveUserFromGroup_FullMethodName: {Resource: "groups", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbGroups.Groups_UpdateGroup_FullMethodName:         {Resource: "groups", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbGroups.Groups_ListGroups_FullMethodName:          {Resource: "groups", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbGroups.Groups_ListGroupUsers_FullMethodName:      {Resource: "groups", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbGroups.Groups_DescribeGroup_FullMethodName:       {Resource: "groups", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbGroups.Groups_DeleteGroup_FullMethodName:         {Resource: "groups", Action: "delete", DomainType: models.DomainTypeOrganization},
 
 		// Users rules
-		pbUsers.Users_ListUserPermissions_FullMethodName: {Resource: "member", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbUsers.Users_ListUserRoles_FullMethodName:       {Resource: "member", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbUsers.Users_ListUsers_FullMethodName:           {Resource: "member", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbUsers.Users_ListUserPermissions_FullMethodName: {Resource: "members", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbUsers.Users_ListUserRoles_FullMethodName:       {Resource: "members", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbUsers.Users_ListUsers_FullMethodName:           {Resource: "members", Action: "read", DomainType: models.DomainTypeOrganization},
 
 		// Roles rules
-		pbRoles.Roles_AssignRole_FullMethodName:   {Resource: "member", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbRoles.Roles_ListRoles_FullMethodName:    {Resource: "role", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbRoles.Roles_DescribeRole_FullMethodName: {Resource: "role", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbRoles.Roles_CreateRole_FullMethodName:   {Resource: "role", Action: "create", DomainType: models.DomainTypeOrganization},
-		pbRoles.Roles_UpdateRole_FullMethodName:   {Resource: "role", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbRoles.Roles_DeleteRole_FullMethodName:   {Resource: "role", Action: "delete", DomainType: models.DomainTypeOrganization},
+		pbRoles.Roles_AssignRole_FullMethodName:   {Resource: "members", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbRoles.Roles_ListRoles_FullMethodName:    {Resource: "roles", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbRoles.Roles_DescribeRole_FullMethodName: {Resource: "roles", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbRoles.Roles_CreateRole_FullMethodName:   {Resource: "roles", Action: "create", DomainType: models.DomainTypeOrganization},
+		pbRoles.Roles_UpdateRole_FullMethodName:   {Resource: "roles", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbRoles.Roles_DeleteRole_FullMethodName:   {Resource: "roles", Action: "delete", DomainType: models.DomainTypeOrganization},
 
 		// Organization Rules
-		pbOrganization.Organizations_DescribeOrganization_FullMethodName: {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_ListInvitations_FullMethodName:      {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_RemoveInvitation_FullMethodName:     {Resource: "member", Action: "delete", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_UpdateOrganization_FullMethodName:   {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_CreateInvitation_FullMethodName:     {Resource: "member", Action: "create", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_GetInviteLink_FullMethodName:        {Resource: "member", Action: "create", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_UpdateInviteLink_FullMethodName:     {Resource: "member", Action: "create", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_ResetInviteLink_FullMethodName:      {Resource: "member", Action: "create", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_RemoveUser_FullMethodName:           {Resource: "member", Action: "delete", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_DeleteOrganization_FullMethodName:   {Resource: "org", Action: "delete", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_CreateIntegration_FullMethodName:    {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_UpdateIntegration_FullMethodName:    {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_DeleteIntegration_FullMethodName:    {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_ListIntegrations_FullMethodName:     {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_DescribeIntegration_FullMethodName:  {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_ListIntegrationResources_FullMethodName: {
-			Resource:   "org",
-			Action:     "read",
-			DomainType: models.DomainTypeOrganization,
-		},
+		pbOrganization.Organizations_DescribeOrganization_FullMethodName:     {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_ListInvitations_FullMethodName:          {Resource: "members", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_RemoveInvitation_FullMethodName:         {Resource: "members", Action: "delete", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_UpdateOrganization_FullMethodName:       {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_CreateInvitation_FullMethodName:         {Resource: "members", Action: "create", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_GetInviteLink_FullMethodName:            {Resource: "members", Action: "create", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_UpdateInviteLink_FullMethodName:         {Resource: "members", Action: "create", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_ResetInviteLink_FullMethodName:          {Resource: "members", Action: "create", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_RemoveUser_FullMethodName:               {Resource: "members", Action: "delete", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_DeleteOrganization_FullMethodName:       {Resource: "org", Action: "delete", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_CreateIntegration_FullMethodName:        {Resource: "integrations", Action: "create", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_UpdateIntegration_FullMethodName:        {Resource: "integrations", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_DeleteIntegration_FullMethodName:        {Resource: "integrations", Action: "delete", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_ListIntegrations_FullMethodName:         {Resource: "integrations", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_DescribeIntegration_FullMethodName:      {Resource: "integrations", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_ListIntegrationResources_FullMethodName: {Resource: "integrations", Action: "read", DomainType: models.DomainTypeOrganization},
 
 		// Blueprints rules
-		pbBlueprints.Blueprints_ListBlueprints_FullMethodName:    {Resource: "blueprint", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbBlueprints.Blueprints_DescribeBlueprint_FullMethodName: {Resource: "blueprint", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbBlueprints.Blueprints_CreateBlueprint_FullMethodName:   {Resource: "blueprint", Action: "create", DomainType: models.DomainTypeOrganization},
-		pbBlueprints.Blueprints_UpdateBlueprint_FullMethodName:   {Resource: "blueprint", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbBlueprints.Blueprints_DeleteBlueprint_FullMethodName:   {Resource: "blueprint", Action: "delete", DomainType: models.DomainTypeOrganization},
+		pbBlueprints.Blueprints_ListBlueprints_FullMethodName:    {Resource: "blueprints", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbBlueprints.Blueprints_DescribeBlueprint_FullMethodName: {Resource: "blueprints", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbBlueprints.Blueprints_CreateBlueprint_FullMethodName:   {Resource: "blueprints", Action: "create", DomainType: models.DomainTypeOrganization},
+		pbBlueprints.Blueprints_UpdateBlueprint_FullMethodName:   {Resource: "blueprints", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbBlueprints.Blueprints_DeleteBlueprint_FullMethodName:   {Resource: "blueprints", Action: "delete", DomainType: models.DomainTypeOrganization},
 
-		// Workflows rules
-		pbWorkflows.Workflows_ListWorkflows_FullMethodName:             {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_DescribeWorkflow_FullMethodName:          {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_CreateWorkflow_FullMethodName:            {Resource: "workflow", Action: "create", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_UpdateWorkflow_FullMethodName:            {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_DeleteWorkflow_FullMethodName:            {Resource: "workflow", Action: "delete", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_ListNodeExecutions_FullMethodName:        {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_ListNodeQueueItems_FullMethodName:        {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_DeleteNodeQueueItem_FullMethodName:       {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_ListWorkflowEvents_FullMethodName:        {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_ListEventExecutions_FullMethodName:       {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_ListChildExecutions_FullMethodName:       {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_CancelExecution_FullMethodName:           {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_ResolveExecutionErrors_FullMethodName:    {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_InvokeNodeExecutionAction_FullMethodName: {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_InvokeNodeTriggerAction_FullMethodName:   {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_ListNodeEvents_FullMethodName:            {Resource: "workflow", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbWorkflows.Workflows_EmitNodeEvent_FullMethodName:             {Resource: "workflow", Action: "update", DomainType: models.DomainTypeOrganization},
+		// Canvases rules
+		pbCanvases.Canvases_ListCanvases_FullMethodName:              {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_DescribeCanvas_FullMethodName:            {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_CreateCanvas_FullMethodName:              {Resource: "canvases", Action: "create", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_UpdateCanvas_FullMethodName:              {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_DeleteCanvas_FullMethodName:              {Resource: "canvases", Action: "delete", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ListNodeExecutions_FullMethodName:        {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ListNodeQueueItems_FullMethodName:        {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_DeleteNodeQueueItem_FullMethodName:       {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_UpdateNodePause_FullMethodName:           {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ListCanvasEvents_FullMethodName:          {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ListEventExecutions_FullMethodName:       {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ListChildExecutions_FullMethodName:       {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_CancelExecution_FullMethodName:           {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ResolveExecutionErrors_FullMethodName:    {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_InvokeNodeExecutionAction_FullMethodName: {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_InvokeNodeTriggerAction_FullMethodName:   {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ListNodeEvents_FullMethodName:            {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_EmitNodeEvent_FullMethodName:             {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
 	}
 
 	return &AuthorizationInterceptor{

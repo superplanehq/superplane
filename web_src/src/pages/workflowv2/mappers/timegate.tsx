@@ -2,8 +2,8 @@ import React from "react";
 import {
   ComponentsComponent,
   ComponentsNode,
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper, EventStateRegistry, StateFunction } from "./types";
 import {
@@ -24,8 +24,8 @@ export const timeGateMapper: ComponentBaseMapper = {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
-    nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
+    lastExecutions: CanvasesCanvasNodeExecution[],
+    nodeQueueItems?: CanvasesCanvasNodeQueueItem[],
   ): ComponentBaseProps {
     const componentName = componentDefinition.name || "timegate";
 
@@ -34,7 +34,7 @@ export const timeGateMapper: ComponentBaseMapper = {
       iconColor: getColorClass("black"),
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-white",
-      title: node.name!,
+      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
       eventSections: lastExecutions[0]
         ? getTimeGateEventSections(nodes, lastExecutions[0], nodeQueueItems, componentName)
         : undefined,
@@ -43,11 +43,11 @@ export const timeGateMapper: ComponentBaseMapper = {
       eventStateMap: getStateMap(componentName),
     };
   },
-  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): React.ReactNode {
+  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): React.ReactNode {
     const subtitle = getTimeGateEventSubtitle(execution, "timegate");
     return subtitle || "";
   },
-  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, string> {
+  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
     const details: Record<string, string> = {};
     const metadata = execution.metadata as
       | { nextValidTime?: string; pushedThroughBy?: { name?: string; email?: string }; pushedThroughAt?: string }
@@ -100,7 +100,7 @@ export const TIME_GATE_STATE_MAP: EventStateMap = {
   },
 };
 
-export const timeGateStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
+export const timeGateStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
   if (!execution) return "neutral";
 
   if (
@@ -222,8 +222,8 @@ function getTimeGateSpecs(node: ComponentsNode): ComponentBaseSpec[] {
 
 function getTimeGateEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution,
-  _nodeQueueItems: WorkflowsWorkflowNodeQueueItem[] | undefined,
+  execution: CanvasesCanvasNodeExecution,
+  _nodeQueueItems: CanvasesCanvasNodeQueueItem[] | undefined,
   componentName: string,
 ): EventSection[] {
   const executionState = getState(componentName)(execution);
@@ -245,7 +245,7 @@ function getTimeGateEventSections(
 }
 
 function getTimeGateEventSubtitle(
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
   componentName: string,
 ): React.ReactNode | undefined {
   const executionState = getState(componentName)(execution);
@@ -296,7 +296,7 @@ const TimeGateCountdown: React.FC<{ nextValidTime: string; timeAgo?: string }> =
   );
 };
 
-function isTimeGatePushedThrough(execution: WorkflowsWorkflowNodeExecution): boolean {
+function isTimeGatePushedThrough(execution: CanvasesCanvasNodeExecution): boolean {
   if (!execution.updatedAt) {
     return false;
   }

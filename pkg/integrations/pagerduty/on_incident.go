@@ -277,3 +277,7 @@ func buildPayload(agent map[string]any, incident map[string]any) map[string]any 
 
 	return payload
 }
+
+func (t *OnIncident) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}

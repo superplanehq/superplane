@@ -1,24 +1,20 @@
 import { create } from "zustand";
 import { QueryClient } from "@tanstack/react-query";
 import {
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
-  WorkflowsWorkflowEvent,
-  WorkflowsWorkflow,
-  WorkflowsListNodeExecutionsResponse,
-  WorkflowsListNodeQueueItemsResponse,
-  WorkflowsListNodeEventsResponse,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
+  CanvasesCanvasEvent,
+  CanvasesCanvas,
+  CanvasesListNodeExecutionsResponse,
+  CanvasesListNodeQueueItemsResponse,
+  CanvasesListNodeEventsResponse,
 } from "@/api-client";
-import {
-  nodeExecutionsQueryOptions,
-  nodeQueueItemsQueryOptions,
-  nodeEventsQueryOptions,
-} from "@/hooks/useWorkflowData";
+import { nodeExecutionsQueryOptions, nodeQueueItemsQueryOptions, nodeEventsQueryOptions } from "@/hooks/useCanvasData";
 
 interface NodeExecutionData {
-  executions: WorkflowsWorkflowNodeExecution[];
-  queueItems: WorkflowsWorkflowNodeQueueItem[];
-  events: WorkflowsWorkflowEvent[];
+  executions: CanvasesCanvasNodeExecution[];
+  queueItems: CanvasesCanvasNodeQueueItem[];
+  events: CanvasesCanvasEvent[];
   isLoading: boolean;
   isLoaded: boolean;
   totalInHistoryCount: number;
@@ -31,13 +27,13 @@ interface NodeExecutionStore {
   version: number; // Version counter to track updates
 
   // Actions
-  initializeFromWorkflow: (workflow: WorkflowsWorkflow) => void;
+  initializeFromWorkflow: (workflow: CanvasesCanvas) => void;
   loadNodeData: (workflowId: string, nodeId: string, nodeType: string, queryClient: QueryClient) => Promise<void>;
   refetchNodeData: (workflowId: string, nodeId: string, nodeType: string, queryClient: QueryClient) => Promise<void>;
   getNodeData: (nodeId: string) => NodeExecutionData;
-  updateNodeExecution: (nodeId: string, execution: WorkflowsWorkflowNodeExecution) => void;
-  updateNodeEvent: (nodeId: string, event: WorkflowsWorkflowEvent) => void;
-  addNodeQueueItem: (nodeId: string, queueItem: WorkflowsWorkflowNodeQueueItem) => void;
+  updateNodeExecution: (nodeId: string, execution: CanvasesCanvasNodeExecution) => void;
+  updateNodeEvent: (nodeId: string, event: CanvasesCanvasEvent) => void;
+  addNodeQueueItem: (nodeId: string, queueItem: CanvasesCanvasNodeQueueItem) => void;
   removeNodeQueueItem: (nodeId: string, queueItemId: string) => void;
   clear: () => void;
 }
@@ -60,9 +56,9 @@ const emptyNodeData: NodeExecutionData = {
  * @returns
  */
 function updateChildExecution(
-  executions: WorkflowsWorkflowNodeExecution[],
-  childExecution: WorkflowsWorkflowNodeExecution,
-): WorkflowsWorkflowNodeExecution[] {
+  executions: CanvasesCanvasNodeExecution[],
+  childExecution: CanvasesCanvasNodeExecution,
+): CanvasesCanvasNodeExecution[] {
   const parentIndex = executions.findIndex((e) => e.id === childExecution.parentExecutionId);
 
   /*
@@ -100,9 +96,9 @@ function updateChildExecution(
  * @returns The updated array of parent executions.
  */
 function updateParentExecution(
-  executions: WorkflowsWorkflowNodeExecution[],
-  parentExecution: WorkflowsWorkflowNodeExecution,
-): WorkflowsWorkflowNodeExecution[] {
+  executions: CanvasesCanvasNodeExecution[],
+  parentExecution: CanvasesCanvasNodeExecution,
+): CanvasesCanvasNodeExecution[] {
   const existingIndex = executions.findIndex((e) => e.id === parentExecution.id);
 
   /*
@@ -162,9 +158,7 @@ async function fetchNodeData(
   nodeId: string,
   nodeType: string,
   queryClient: QueryClient,
-): Promise<
-  [WorkflowsListNodeExecutionsResponse, WorkflowsListNodeQueueItemsResponse, WorkflowsListNodeEventsResponse]
-> {
+): Promise<[CanvasesListNodeExecutionsResponse, CanvasesListNodeQueueItemsResponse, CanvasesListNodeEventsResponse]> {
   return await Promise.all([
     nodeType !== "TYPE_TRIGGER"
       ? queryClient.fetchQuery(nodeExecutionsQueryOptions(workflowId, nodeId))
@@ -258,9 +252,7 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
         });
         return { data: newData, version: state.version + 1 };
       });
-    } catch (error) {
-      console.error("Failed to load node data:", error);
-
+    } catch (_error) {
       // Mark as not loading on error
       set((state) => {
         const newData = new Map(state.data);
@@ -294,9 +286,9 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
 
       // Fetch fresh data in parallel
       const [executionsResult, queueItemsResult, eventsResult]: [
-        WorkflowsListNodeExecutionsResponse,
-        WorkflowsListNodeQueueItemsResponse,
-        WorkflowsListNodeEventsResponse,
+        CanvasesListNodeExecutionsResponse,
+        CanvasesListNodeQueueItemsResponse,
+        CanvasesListNodeEventsResponse,
       ] = await Promise.all([
         nodeType !== "TYPE_TRIGGER"
           ? queryClient.fetchQuery(nodeExecutionsQueryOptions(workflowId, nodeId))
@@ -324,9 +316,7 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
         });
         return { data: newData, version: state.version + 1 };
       });
-    } catch (error) {
-      console.error("Failed to refetch node data:", error);
-
+    } catch (_error) {
       // Mark as not loading on error
       set((state) => {
         const newData = new Map(state.data);

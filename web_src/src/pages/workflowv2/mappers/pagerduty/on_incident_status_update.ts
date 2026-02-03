@@ -1,4 +1,4 @@
-import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
+import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
 import { TriggerRenderer } from "../types";
@@ -38,7 +38,7 @@ interface OnIncidentStatusUpdateEventData {
  * Renderer for the "pagerduty.onIncidentStatusUpdate" trigger type
  */
 export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
     const eventData = event.data?.data as OnIncidentStatusUpdateEventData;
     const incident = eventData?.incident;
     const statusUpdate = eventData?.status_update;
@@ -50,7 +50,7 @@ export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
+  getRootEventValues: (lastEvent: CanvasesCanvasEvent): Record<string, string> => {
     const eventData = lastEvent.data?.data as OnIncidentStatusUpdateEventData;
     const incident = eventData?.incident;
     const statusUpdate = eventData?.status_update;
@@ -79,7 +79,7 @@ export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
     return values;
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
+  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
     const metadata = node.metadata as unknown as OnIncidentStatusUpdateMetadata;
     const metadataItems = [];
 
@@ -91,7 +91,7 @@ export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
     }
 
     const props: TriggerProps = {
-      title: node.name!,
+      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
       iconSrc: pdIcon,
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: metadataItems,

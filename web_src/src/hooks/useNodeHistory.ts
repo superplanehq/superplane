@@ -1,11 +1,11 @@
 import { useCallback, useMemo } from "react";
-import { useInfiniteNodeEvents, useInfiniteNodeExecutions } from "./useWorkflowData";
+import { useInfiniteNodeEvents, useInfiniteNodeExecutions } from "./useCanvasData";
 import { SidebarEvent } from "@/ui/componentSidebar/types";
 import {
   ComponentsComponent,
   ComponentsNode,
-  WorkflowsListNodeEventsResponse,
-  WorkflowsListNodeExecutionsResponse,
+  CanvasesListNodeEventsResponse,
+  CanvasesListNodeExecutionsResponse,
 } from "@/api-client";
 import { mapTriggerEventsToSidebarEvents, mapExecutionsToSidebarEvents } from "@/pages/workflowv2/utils";
 import { QueryClient } from "@tanstack/react-query";
@@ -14,7 +14,7 @@ import { useAccount } from "@/contexts/AccountContext";
 import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
 
 interface UseNodeHistoryProps {
-  workflowId: string;
+  canvasId: string;
   organizationId: string;
   components: ComponentsComponent[];
   nodeId: string;
@@ -25,7 +25,7 @@ interface UseNodeHistoryProps {
 }
 
 export const useNodeHistory = ({
-  workflowId,
+  canvasId,
   nodeId,
   nodeType,
   allNodes,
@@ -38,8 +38,8 @@ export const useNodeHistory = ({
   // For trigger nodes, use events; for other nodes, use executions
   const isTriggerNode = nodeType === "TYPE_TRIGGER";
 
-  const eventsQuery = useInfiniteNodeEvents(workflowId, nodeId, enabled && isTriggerNode);
-  const executionsQuery = useInfiniteNodeExecutions(workflowId, nodeId, enabled && !isTriggerNode);
+  const eventsQuery = useInfiniteNodeEvents(canvasId, nodeId, enabled && isTriggerNode);
+  const executionsQuery = useInfiniteNodeExecutions(canvasId, nodeId, enabled && !isTriggerNode);
 
   const node = useMemo(() => allNodes.find((n) => n.id === nodeId), [allNodes, nodeId]);
   const componentDef = useMemo(
@@ -49,7 +49,7 @@ export const useNodeHistory = ({
   const allExecutions = useMemo(() => {
     if (!enabled || isTriggerNode) return [];
     return (
-      executionsQuery.data?.pages.flatMap((page) => (page as WorkflowsListNodeExecutionsResponse)?.executions || []) ||
+      executionsQuery.data?.pages.flatMap((page) => (page as CanvasesListNodeExecutionsResponse)?.executions || []) ||
       []
     );
   }, [enabled, isTriggerNode, executionsQuery.data]);
@@ -85,7 +85,7 @@ export const useNodeHistory = ({
 
     if (isTriggerNode) {
       const allEvents =
-        eventsQuery.data?.pages.flatMap((page) => (page as WorkflowsListNodeEventsResponse)?.events || []) || [];
+        eventsQuery.data?.pages.flatMap((page) => (page as CanvasesListNodeEventsResponse)?.events || []) || [];
       return mapTriggerEventsToSidebarEvents(allEvents, node);
     } else {
       const additionalData = getComponentAdditionalDataBuilder(componentDef?.name || "")?.buildAdditionalData(
@@ -93,7 +93,7 @@ export const useNodeHistory = ({
         node,
         componentDef!,
         allExecutions,
-        workflowId || "",
+        canvasId || "",
         queryClient,
         organizationId || "",
         account ? { id: account.id, email: account.email } : undefined,
@@ -111,7 +111,7 @@ export const useNodeHistory = ({
     componentDef,
     organizationId,
     queryClient,
-    workflowId,
+    canvasId,
     account,
   ]);
 

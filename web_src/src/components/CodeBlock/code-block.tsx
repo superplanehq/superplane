@@ -14,9 +14,7 @@ export function CodeBlock({ children, className = "" }: CodeBlockProps) {
       await navigator.clipboard.writeText(children);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy text: ", err);
-    }
+    } catch (_err) {}
   };
 
   return (

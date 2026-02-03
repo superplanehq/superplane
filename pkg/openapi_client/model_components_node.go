@@ -34,6 +34,7 @@ type ComponentsNode struct {
 	Integration    *ComponentsIntegrationRef `json:"integration,omitempty"`
 	ErrorMessage   *string                   `json:"errorMessage,omitempty"`
 	WarningMessage *string                   `json:"warningMessage,omitempty"`
+	Paused         *bool                     `json:"paused,omitempty"`
 }
 
 // NewComponentsNode instantiates a new ComponentsNode object
@@ -505,6 +506,38 @@ func (o *ComponentsNode) SetWarningMessage(v string) {
 	o.WarningMessage = &v
 }
 
+// GetPaused returns the Paused field value if set, zero value otherwise.
+func (o *ComponentsNode) GetPaused() bool {
+	if o == nil || IsNil(o.Paused) {
+		var ret bool
+		return ret
+	}
+	return *o.Paused
+}
+
+// GetPausedOk returns a tuple with the Paused field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ComponentsNode) GetPausedOk() (*bool, bool) {
+	if o == nil || IsNil(o.Paused) {
+		return nil, false
+	}
+	return o.Paused, true
+}
+
+// HasPaused returns a boolean if a field has been set.
+func (o *ComponentsNode) HasPaused() bool {
+	if o != nil && !IsNil(o.Paused) {
+		return true
+	}
+
+	return false
+}
+
+// SetPaused gets a reference to the given bool and assigns it to the Paused field.
+func (o *ComponentsNode) SetPaused(v bool) {
+	o.Paused = &v
+}
+
 func (o ComponentsNode) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -556,6 +589,9 @@ func (o ComponentsNode) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.WarningMessage) {
 		toSerialize["warningMessage"] = o.WarningMessage
+	}
+	if !IsNil(o.Paused) {
+		toSerialize["paused"] = o.Paused
 	}
 	return toSerialize, nil
 }

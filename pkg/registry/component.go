@@ -137,6 +137,20 @@ func (s *PanicableComponent) Cancel(ctx core.ExecutionContext) (err error) {
 	return s.underlying.Cancel(ctx)
 }
 
+func (s *PanicableComponent) Cleanup(ctx core.SetupContext) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if ctx.Logger != nil {
+				ctx.Logger.Errorf("Component %s panicked in Cleanup(): %v\nStack: %s",
+					s.underlying.Name(), r, debug.Stack())
+			}
+			err = fmt.Errorf("component %s panicked in Cleanup(): %v",
+				s.underlying.Name(), r)
+		}
+	}()
+	return s.underlying.Cleanup(ctx)
+}
+
 func (s *PanicableComponent) OnIntegrationMessage(ctx core.IntegrationMessageContext) (err error) {
 	defer func() {
 		if r := recover(); r != nil {

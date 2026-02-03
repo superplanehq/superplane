@@ -51,6 +51,14 @@ type APIClient struct {
 
 	BlueprintAPI *BlueprintAPIService
 
+	CanvasAPI *CanvasAPIService
+
+	CanvasEventAPI *CanvasEventAPIService
+
+	CanvasNodeAPI *CanvasNodeAPIService
+
+	CanvasNodeExecutionAPI *CanvasNodeExecutionAPIService
+
 	ComponentAPI *ComponentAPIService
 
 	GroupsAPI *GroupsAPIService
@@ -70,14 +78,6 @@ type APIClient struct {
 	UsersAPI *UsersAPIService
 
 	WidgetAPI *WidgetAPIService
-
-	WorkflowAPI *WorkflowAPIService
-
-	WorkflowEventAPI *WorkflowEventAPIService
-
-	WorkflowNodeAPI *WorkflowNodeAPIService
-
-	WorkflowNodeExecutionAPI *WorkflowNodeExecutionAPIService
 }
 
 type service struct {
@@ -97,6 +97,10 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 
 	// API Services
 	c.BlueprintAPI = (*BlueprintAPIService)(&c.common)
+	c.CanvasAPI = (*CanvasAPIService)(&c.common)
+	c.CanvasEventAPI = (*CanvasEventAPIService)(&c.common)
+	c.CanvasNodeAPI = (*CanvasNodeAPIService)(&c.common)
+	c.CanvasNodeExecutionAPI = (*CanvasNodeExecutionAPIService)(&c.common)
 	c.ComponentAPI = (*ComponentAPIService)(&c.common)
 	c.GroupsAPI = (*GroupsAPIService)(&c.common)
 	c.IntegrationAPI = (*IntegrationAPIService)(&c.common)
@@ -107,10 +111,6 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	c.TriggerAPI = (*TriggerAPIService)(&c.common)
 	c.UsersAPI = (*UsersAPIService)(&c.common)
 	c.WidgetAPI = (*WidgetAPIService)(&c.common)
-	c.WorkflowAPI = (*WorkflowAPIService)(&c.common)
-	c.WorkflowEventAPI = (*WorkflowEventAPIService)(&c.common)
-	c.WorkflowNodeAPI = (*WorkflowNodeAPIService)(&c.common)
-	c.WorkflowNodeExecutionAPI = (*WorkflowNodeExecutionAPIService)(&c.common)
 
 	return c
 }

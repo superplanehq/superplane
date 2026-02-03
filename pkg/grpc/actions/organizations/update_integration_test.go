@@ -26,9 +26,11 @@ func Test__UpdateIntegration(t *testing.T) {
 		//
 		// Register a test integration that succeeds on Sync
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			ctx.Integration.SetState("ready", "")
-			return nil
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
 		})
 
 		integrationName := support.RandomName("integration")
@@ -54,9 +56,9 @@ func Test__UpdateIntegration(t *testing.T) {
 		//
 		// Verify integration was updated
 		//
-		integration, err := models.FindAppInstallationByName(r.Organization.ID, integrationName)
+		integration, err := models.FindIntegrationByName(r.Organization.ID, integrationName)
 		require.NoError(t, err)
-		assert.Equal(t, models.AppInstallationStateReady, integration.State)
+		assert.Equal(t, models.IntegrationStateReady, integration.State)
 		assert.Empty(t, integration.StateDescription)
 
 		//
@@ -69,7 +71,7 @@ func Test__UpdateIntegration(t *testing.T) {
 		//
 		// Verify the response reflects updated integration
 		//
-		assert.Equal(t, models.AppInstallationStateReady, updateResponse.Integration.Status.State)
+		assert.Equal(t, models.IntegrationStateReady, updateResponse.Integration.Status.State)
 		assert.Empty(t, updateResponse.Integration.Status.StateDescription)
 	})
 
@@ -78,13 +80,15 @@ func Test__UpdateIntegration(t *testing.T) {
 		// Register a test integration that succeeds initially but fails on update
 		//
 		syncCount := 0
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			syncCount++
-			if syncCount == 1 {
-				ctx.Integration.SetState("ready", "")
-				return nil
-			}
-			return errors.New("sync failed on update")
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				syncCount++
+				if syncCount == 1 {
+					ctx.Integration.Ready()
+					return nil
+				}
+				return errors.New("sync failed on update")
+			},
 		})
 
 		integrationName := support.RandomName("integration")
@@ -108,15 +112,15 @@ func Test__UpdateIntegration(t *testing.T) {
 		//
 		// Verify integration is in error state
 		//
-		integration, err := models.FindAppInstallationByName(r.Organization.ID, integrationName)
+		integration, err := models.FindIntegrationByName(r.Organization.ID, integrationName)
 		require.NoError(t, err)
-		assert.Equal(t, models.AppInstallationStateError, integration.State)
+		assert.Equal(t, models.IntegrationStateError, integration.State)
 		assert.Contains(t, integration.StateDescription, "sync failed on update")
 
 		//
 		// Verify the response reflects error state
 		//
-		assert.Equal(t, models.AppInstallationStateError, updateResponse.Integration.Status.State)
+		assert.Equal(t, models.IntegrationStateError, updateResponse.Integration.Status.State)
 		assert.Contains(t, updateResponse.Integration.Status.StateDescription, "sync failed on update")
 	})
 
@@ -148,9 +152,11 @@ func Test__UpdateIntegration(t *testing.T) {
 		//
 		// Register a test integration that succeeds on Sync
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			ctx.Integration.SetState("ready", "")
-			return nil
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
 		})
 
 		integrationName := support.RandomName("integration")
@@ -173,7 +179,7 @@ func Test__UpdateIntegration(t *testing.T) {
 		//
 		// Verify all keys are preserved, and only the updated key changed
 		//
-		integration, err := models.FindAppInstallationByName(r.Organization.ID, integrationName)
+		integration, err := models.FindIntegrationByName(r.Organization.ID, integrationName)
 		require.NoError(t, err)
 		config := integration.Configuration.Data()
 		assert.Equal(t, "value1", config["key1"], "key1 should be preserved")

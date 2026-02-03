@@ -1,19 +1,19 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
-import { workflowsInvokeNodeExecutionAction, WorkflowsWorkflow } from "@/api-client";
-import { workflowKeys } from "@/hooks/useWorkflowData";
+import { canvasesInvokeNodeExecutionAction, CanvasesCanvas } from "@/api-client";
+import { canvasKeys } from "@/hooks/useCanvasData";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 
 type Params = {
-  workflowId: string;
+  canvasId: string;
   organizationId?: string;
-  workflow?: WorkflowsWorkflow | null;
+  canvas?: CanvasesCanvas | null;
 };
 
-export function usePushThroughHandler({ workflowId, organizationId, workflow }: Params) {
+export function usePushThroughHandler({ canvasId, organizationId, canvas }: Params) {
   const queryClient = useQueryClient();
   const refetchNodeData = useNodeExecutionStore((state) => state.refetchNodeData);
   const getNodeData = useNodeExecutionStore((state) => state.getNodeData);
@@ -21,10 +21,10 @@ export function usePushThroughHandler({ workflowId, organizationId, workflow }: 
   const onPushThrough = useCallback(
     async (nodeId: string, executionId: string) => {
       try {
-        await workflowsInvokeNodeExecutionAction(
+        await canvasesInvokeNodeExecutionAction(
           withOrganizationHeader({
             path: {
-              workflowId,
+              canvasId,
               executionId,
               actionName: "pushThrough",
             },
@@ -32,29 +32,29 @@ export function usePushThroughHandler({ workflowId, organizationId, workflow }: 
           }),
         );
 
-        await queryClient.invalidateQueries({ queryKey: workflowKeys.nodeExecution(workflowId, nodeId) });
-        const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeExecution(canvasId, nodeId) });
+        const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
 
         if (node) {
-          await refetchNodeData(workflowId, nodeId, node.type!, queryClient);
+          await refetchNodeData(canvasId, nodeId, node.type!, queryClient);
         }
 
         showSuccessToast("Pushed through");
       } catch (error) {
-        console.error("Failed to push through:", error);
+        console.error("Failed to push through", error);
         showErrorToast("Failed to push through");
       }
     },
-    [workflowId, organizationId, queryClient, workflow?.spec?.nodes, refetchNodeData, getNodeData],
+    [canvasId, organizationId, queryClient, canvas?.spec?.nodes, refetchNodeData, getNodeData],
   );
 
   const supportsPushThrough = useCallback(
     (nodeId: string) => {
-      const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
+      const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
       const name = node?.component?.name;
       return name === "wait" || name === "timeGate";
     },
-    [workflow],
+    [canvas],
   );
 
   return { onPushThrough, supportsPushThrough } as const;

@@ -1,8 +1,8 @@
 import {
   ComponentsNode,
   ComponentsComponent,
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
 import {
   ComponentBaseProps,
@@ -37,7 +37,7 @@ type ListIssuesOutputs = {
  * Supports both the new channel-based outputs (clear/degraded/critical) and
  * the legacy default channel for backwards compatibility.
  */
-function getFirstPayload(execution: WorkflowsWorkflowNodeExecution): OutputPayload | null {
+function getFirstPayload(execution: CanvasesCanvasNodeExecution): OutputPayload | null {
   const outputs = execution.outputs as ListIssuesOutputs | undefined;
   if (!outputs) return null;
 
@@ -61,7 +61,7 @@ function getFirstPayload(execution: WorkflowsWorkflowNodeExecution): OutputPaylo
  * Determines which output channel has data, indicating the issue state.
  * Returns the channel name or null if no output found.
  */
-function getActiveChannel(execution: WorkflowsWorkflowNodeExecution): string | null {
+function getActiveChannel(execution: CanvasesCanvasNodeExecution): string | null {
   const outputs = execution.outputs as ListIssuesOutputs | undefined;
   if (!outputs) return null;
 
@@ -81,11 +81,11 @@ export const listIssuesMapper: ComponentBaseMapper = {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
-    _?: WorkflowsWorkflowNodeQueueItem[],
+    lastExecutions: CanvasesCanvasNodeExecution[],
+    _?: CanvasesCanvasNodeQueueItem[],
   ): ComponentBaseProps {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition.name!;
+    const componentName = componentDefinition.name || node.component?.name || "unknown";
 
     const configuration = node.configuration as unknown as ListIssuesConfiguration;
     const specs = getSpecs(configuration);
@@ -94,7 +94,7 @@ export const listIssuesMapper: ComponentBaseMapper = {
       iconSrc: dash0Icon,
       collapsedBackground: "bg-white",
       collapsed: node.isCollapsed,
-      title: node.name!,
+      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
       eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
       metadata: metadataList(node),
       specs,
@@ -103,7 +103,7 @@ export const listIssuesMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution, additionalData?: unknown): string {
+  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution, additionalData?: unknown): string {
     // Check if this is being called from ChainItem (which passes additionalData as undefined or a different structure)
     // For ChainItem, just return the time without counts
     const timeAgo = formatTimeAgo(new Date(execution.createdAt!));
@@ -133,7 +133,7 @@ export const listIssuesMapper: ComponentBaseMapper = {
     return `no issues · ${timeAgo}`;
   },
 
-  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _: ComponentsNode): Record<string, any> {
+  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _: ComponentsNode): Record<string, any> {
     const details: Record<string, any> = {};
 
     // Add "Checked at" timestamp
@@ -235,7 +235,7 @@ export const LIST_ISSUES_STATE_MAP: EventStateMap = {
   },
 };
 
-export const listIssuesStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
+export const listIssuesStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
   if (!execution) return "neutral";
 
   // Handle error states
@@ -335,7 +335,7 @@ export const LIST_ISSUES_STATE_REGISTRY: EventStateRegistry = {
   getState: listIssuesStateFunction,
 };
 
-function getIssueCounts(execution: WorkflowsWorkflowNodeExecution): { critical: number; degraded: number } {
+function getIssueCounts(execution: CanvasesCanvasNodeExecution): { critical: number; degraded: number } {
   const payload = getFirstPayload(execution);
   if (!payload || !payload.data) {
     return { critical: 0, degraded: 0 };
@@ -367,7 +367,7 @@ function getIssueCounts(execution: WorkflowsWorkflowNodeExecution): { critical: 
 
 function baseEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
   componentName: string,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);

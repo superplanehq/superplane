@@ -3,12 +3,15 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { resolveIcon } from "@/lib/utils";
 import { Check, Copy, X } from "lucide-react";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
+import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
+import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ChildEventsState } from "../composite";
 import { TabData } from "./SidebarEventItem/SidebarEventItem";
@@ -19,7 +22,7 @@ import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import {
   AuthorizationDomainType,
   ConfigurationField,
-  WorkflowsWorkflowNodeExecution,
+  CanvasesCanvasNodeExecution,
   ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
@@ -34,13 +37,16 @@ import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
 
 const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   dash0: dash0Icon,
+  daytona: daytonaIcon,
   github: githubIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
   pagerduty: pagerDutyIcon,
+  rootly: rootlyIcon,
   semaphore: SemaphoreLogo,
   slack: slackIcon,
   aws: {
+    ecr: awsEcrIcon,
     lambda: awsLambdaIcon,
   },
 };
@@ -110,7 +116,7 @@ interface ComponentSidebarProps {
   // State registry function for determining execution states
   getExecutionState?: (
     nodeId: string,
-    execution: WorkflowsWorkflowNodeExecution,
+    execution: CanvasesCanvasNodeExecution,
   ) => { map: EventStateMap; state: EventState };
 
   // Settings tab props

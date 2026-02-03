@@ -209,7 +209,7 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 		return nil, fmt.Errorf("error dequeuing item: %v", err)
 	}
 
-	if err := ctx.UpdateNodeState(models.WorkflowNodeStateReady); err != nil {
+	if err := ctx.UpdateNodeState(models.CanvasNodeStateReady); err != nil {
 		return nil, fmt.Errorf("error updating node state: %v", err)
 	}
 
@@ -537,4 +537,8 @@ func durationFrom(value int, unit string) time.Duration {
 	default:
 		return 0
 	}
+}
+
+func (m *Merge) Cleanup(ctx core.SetupContext) error {
+	return nil
 }

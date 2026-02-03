@@ -5,7 +5,7 @@ import {
   EventStateRegistry,
   CustomFieldRenderer,
 } from "./types";
-import { ComponentsNode, WorkflowsWorkflowNodeExecution } from "@/api-client";
+import { ComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
 import { defaultTriggerRenderer } from "./default";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
 import { webhookTriggerRenderer, webhookCustomFieldRenderer } from "./webhook";
@@ -34,6 +34,16 @@ import {
   eventStateRegistry as dash0EventStateRegistry,
 } from "./dash0/index";
 import {
+  componentMappers as daytonaComponentMappers,
+  triggerRenderers as daytonaTriggerRenderers,
+  eventStateRegistry as daytonaEventStateRegistry,
+} from "./daytona/index";
+import {
+  componentMappers as datadogComponentMappers,
+  triggerRenderers as datadogTriggerRenderers,
+  eventStateRegistry as datadogEventStateRegistry,
+} from "./datadog/index";
+import {
   componentMappers as slackComponentMappers,
   triggerRenderers as slackTriggerRenderers,
   eventStateRegistry as slackEventStateRegistry,
@@ -43,8 +53,22 @@ import {
   triggerRenderers as smtpTriggerRenderers,
   eventStateRegistry as smtpEventStateRegistry,
 } from "./smtp";
-import { componentMappers as awsComponentMappers, triggerRenderers as awsTriggerRenderers } from "./aws";
+import {
+  componentMappers as rootlyComponentMappers,
+  triggerRenderers as rootlyTriggerRenderers,
+  eventStateRegistry as rootlyEventStateRegistry,
+} from "./rootly/index";
+import {
+  componentMappers as awsComponentMappers,
+  triggerRenderers as awsTriggerRenderers,
+  eventStateRegistry as awsEventStateRegistry,
+} from "./aws";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
+import {
+  componentMappers as discordComponentMappers,
+  triggerRenderers as discordTriggerRenderers,
+  eventStateRegistry as discordEventStateRegistry,
+} from "./discord";
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
@@ -78,9 +102,13 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   github: githubComponentMappers,
   pagerduty: pagerdutyComponentMappers,
   dash0: dash0ComponentMappers,
+  daytona: daytonaComponentMappers,
+  datadog: datadogComponentMappers,
   slack: slackComponentMappers,
   smtp: smtpComponentMappers,
+  rootly: rootlyComponentMappers,
   aws: awsComponentMappers,
+  discord: discordComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -88,9 +116,13 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   github: githubTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
   dash0: dash0TriggerRenderers,
+  daytona: daytonaTriggerRenderers,
+  datadog: datadogTriggerRenderers,
   slack: slackTriggerRenderers,
   smtp: smtpTriggerRenderers,
+  rootly: rootlyTriggerRenderers,
   aws: awsTriggerRenderers,
+  discord: discordTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -98,8 +130,13 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   github: githubEventStateRegistry,
   pagerduty: pagerdutyEventStateRegistry,
   dash0: dash0EventStateRegistry,
+  daytona: daytonaEventStateRegistry,
+  datadog: datadogEventStateRegistry,
   slack: slackEventStateRegistry,
   smtp: smtpEventStateRegistry,
+  discord: discordEventStateRegistry,
+  rootly: rootlyEventStateRegistry,
+  aws: awsEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
@@ -236,7 +273,7 @@ export function getCustomFieldRenderer(componentName: string): CustomFieldRender
  */
 export function getExecutionDetails(
   componentName: string,
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
   node: ComponentsNode,
   nodes?: ComponentsNode[],
 ): Record<string, any> | undefined {

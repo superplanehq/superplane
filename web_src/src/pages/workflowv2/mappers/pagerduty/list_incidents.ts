@@ -1,8 +1,8 @@
 import {
   ComponentsNode,
   ComponentsComponent,
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
 import {
   ComponentBaseProps,
@@ -36,7 +36,7 @@ type ListIncidentsOutputs = {
 /**
  * Extracts the first payload from execution outputs, checking all possible channels.
  */
-function getFirstPayload(execution: WorkflowsWorkflowNodeExecution): OutputPayload | null {
+function getFirstPayload(execution: CanvasesCanvasNodeExecution): OutputPayload | null {
   const outputs = execution.outputs as ListIncidentsOutputs | undefined;
   if (!outputs) return null;
 
@@ -59,7 +59,7 @@ function getFirstPayload(execution: WorkflowsWorkflowNodeExecution): OutputPaylo
 /**
  * Determines which output channel has data, indicating the incident urgency state.
  */
-function getActiveChannel(execution: WorkflowsWorkflowNodeExecution): string | null {
+function getActiveChannel(execution: CanvasesCanvasNodeExecution): string | null {
   const outputs = execution.outputs as ListIncidentsOutputs | undefined;
   if (!outputs) return null;
 
@@ -74,7 +74,7 @@ function getActiveChannel(execution: WorkflowsWorkflowNodeExecution): string | n
 /**
  * Extracts incidents from the execution payload.
  */
-function getIncidents(execution: WorkflowsWorkflowNodeExecution): Incident[] {
+function getIncidents(execution: CanvasesCanvasNodeExecution): Incident[] {
   const payload = getFirstPayload(execution);
   if (!payload || !payload.data) return [];
 
@@ -89,11 +89,11 @@ export const listIncidentsMapper: ComponentBaseMapper = {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
-    _?: WorkflowsWorkflowNodeQueueItem[],
+    lastExecutions: CanvasesCanvasNodeExecution[],
+    _?: CanvasesCanvasNodeQueueItem[],
   ): ComponentBaseProps {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition.name!;
+    const componentName = componentDefinition.name || node.component?.name || "unknown";
 
     const configuration = node.configuration as unknown as ListIncidentsConfiguration;
     const specs = getSpecs(configuration);
@@ -102,7 +102,7 @@ export const listIncidentsMapper: ComponentBaseMapper = {
       iconSrc: pdIcon,
       collapsedBackground: getBackgroundColorClass(componentDefinition.color),
       collapsed: node.isCollapsed,
-      title: node.name!,
+      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
       eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
       metadata: metadataList(node),
       specs,
@@ -111,7 +111,7 @@ export const listIncidentsMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
     const timeAgo = formatTimeAgo(new Date(execution.createdAt!));
     const incidents = getIncidents(execution);
 
@@ -137,7 +137,7 @@ export const listIncidentsMapper: ComponentBaseMapper = {
     return `no incidents · ${timeAgo}`;
   },
 
-  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _: ComponentsNode): Record<string, any> {
+  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _: ComponentsNode): Record<string, any> {
     const details: Record<string, any> = {};
 
     // Add "Checked at" timestamp
@@ -226,7 +226,7 @@ export const LIST_INCIDENTS_STATE_MAP: EventStateMap = {
   },
 };
 
-export const listIncidentsStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
+export const listIncidentsStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
   if (!execution) return "neutral";
 
   // Handle error states
@@ -282,7 +282,7 @@ export const LIST_INCIDENTS_STATE_REGISTRY: EventStateRegistry = {
 
 function baseEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
   componentName: string,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);

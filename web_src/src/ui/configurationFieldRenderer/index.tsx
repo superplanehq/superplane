@@ -69,6 +69,11 @@ export const ConfigurationFieldRenderer = ({
 }: ConfigurationFieldRendererProps) => {
   const isTogglable = field.togglable === true;
   const isEnabled = isTogglable ? value !== null && value !== undefined : true;
+  const labelRightRef = React.useRef<HTMLDivElement | null>(null);
+  const [labelRightReady, setLabelRightReady] = React.useState(false);
+  React.useLayoutEffect(() => {
+    setLabelRightReady(true);
+  }, []);
 
   const parsedDefaultValue = React.useMemo(() => {
     if (!field.name) return undefined;
@@ -291,6 +296,10 @@ export const ConfigurationFieldRenderer = ({
             onChange={onChange}
             organizationId={organizationId}
             integrationId={integrationId}
+            allowExpressions={allowExpressions}
+            autocompleteExampleObj={autocompleteExampleObj}
+            labelRightRef={allowExpressions ? labelRightRef : undefined}
+            labelRightReady={allowExpressions ? labelRightReady : false}
           />
         );
 
@@ -414,7 +423,7 @@ export const ConfigurationFieldRenderer = ({
     <div className="space-y-2">
       <div className="flex items-center gap-3">
         {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
-        <Label className="block text-left">
+        <Label className="block text-left flex-1 min-w-0">
           {field.label || field.name}
           {isRequired && <span className="text-gray-800 ml-1">*</span>}
           {hasFieldError &&
@@ -426,6 +435,7 @@ export const ConfigurationFieldRenderer = ({
               <span className="text-red-500 text-xs ml-2 leading-0">Required</span>
             )}
         </Label>
+        <div ref={labelRightRef} className="ml-auto shrink-0" />
       </div>
       {isEnabled && (
         <div className="flex items-center gap-2">

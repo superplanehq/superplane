@@ -1,8 +1,8 @@
 import {
   ComponentsComponent,
   ComponentsNode,
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper, OutputPayload } from "./types";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
@@ -15,8 +15,8 @@ export const noopMapper: ComponentBaseMapper = {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent | undefined,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
-    _?: WorkflowsWorkflowNodeQueueItem[],
+    lastExecutions: CanvasesCanvasNodeExecution[],
+    _?: CanvasesCanvasNodeQueueItem[],
   ): ComponentBaseProps {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
     const componentName = componentDefinition?.name ?? "noop";
@@ -25,17 +25,17 @@ export const noopMapper: ComponentBaseMapper = {
       iconSlug: componentDefinition?.icon ?? "circle-off",
       collapsed: node.isCollapsed,
       collapsedBackground: "bg-white",
-      title: node.name!,
+      title: node.name || componentDefinition?.label || componentDefinition?.name || "Unnamed component",
       eventSections: lastExecution ? getNoopEventSections(nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
   },
-  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): string {
+  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
     const timestamp = execution.updatedAt || execution.createdAt;
     return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
   },
-  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, string> {
+  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
     const details: Record<string, string> = {};
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
     const payload = outputs?.default?.[0];
@@ -54,7 +54,7 @@ export const noopMapper: ComponentBaseMapper = {
 
 function getNoopEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
   _componentName: string,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
