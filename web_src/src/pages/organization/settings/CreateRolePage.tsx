@@ -319,13 +319,19 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
   },
 ];
 
+const DEFAULT_ROLE_NAMES = ["org_viewer", "org_admin", "org_owner"];
+
+const isDefaultRole = (roleName?: string | null) => {
+  if (!roleName) return false;
+  return DEFAULT_ROLE_NAMES.includes(roleName);
+};
+
 export function CreateRolePage() {
   const { roleName: roleNameParam } = useParams<{ roleName?: string }>();
   const navigate = useNavigate();
   const { organizationId } = useParams<{ organizationId: string }>();
   const orgId = organizationId;
   const isEditMode = !!roleNameParam;
-  usePageTitle([isEditMode ? "Edit Role" : "Create Role"]);
 
   const [roleName, setRoleName] = useState("");
   const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(new Set());
@@ -336,8 +342,12 @@ export function CreateRolePage() {
   const updateRoleMutation = useUpdateRole(orgId || "");
 
   const isSubmitting = createRoleMutation.isPending || updateRoleMutation.isPending;
+  const isReadOnly = isDefaultRole(roleNameParam);
+
+  usePageTitle([isReadOnly ? "View Role" : isEditMode ? "Edit Role" : "Create Role"]);
 
   const handleCategoryToggle = (permissions: Permission[]) => {
+    if (isReadOnly) return;
     const permissionIds = permissions.map((p) => p.id);
     const allSelected = permissionIds.every((id) => selectedPermissions.has(id));
 
@@ -380,6 +390,7 @@ export function CreateRolePage() {
   }, [isEditMode, existingRole]);
 
   const handleSubmitRole = async () => {
+    if (isReadOnly) return;
     if (!roleName.trim() || selectedPermissions.size === 0 || !orgId) return;
 
     try {
@@ -438,8 +449,13 @@ export function CreateRolePage() {
           <div className="flex items-center text-left">
             <div>
               <Heading level={2} className="text-2xl font-medium text-gray-800 dark:text-white mb-2">
-                {isEditMode ? "Edit Role" : "Create New Role"}
+                {isReadOnly ? "View Role" : isEditMode ? "Edit Role" : "Create New Role"}
               </Heading>
+              {isReadOnly && (
+                <Text className="text-sm text-gray-500 dark:text-gray-400">
+                  Default roles are read-only and cannot be edited.
+                </Text>
+              )}
             </div>
           </div>
         </div>
@@ -478,7 +494,7 @@ export function CreateRolePage() {
                     className="max-w-lg"
                     disabled={isEditMode}
                   />
-                  {isEditMode && (
+                  {isEditMode && !isReadOnly && (
                     <Text className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       Role name cannot be changed when editing
                     </Text>
@@ -493,6 +509,11 @@ export function CreateRolePage() {
                   <Text className="text-sm text-gray-500 dark:text-gray-400">
                     Select the permissions this role should have within the organization.
                   </Text>
+                  {isReadOnly && (
+                    <Text className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Permissions are read-only for default roles.
+                    </Text>
+                  )}
                 </div>
 
                 <div className="space-y-6">
@@ -500,13 +521,15 @@ export function CreateRolePage() {
                     <div key={category.category} className="space-y-4">
                       <div className="flex items-center mb-3">
                         <h3 className="text-md font-semibold text-gray-800 dark:text-white">{category.category}</h3>
-                        <button
-                          type="button"
-                          className="text-xs font-medium text-gray-500 ml-3 bg-transparent border-none cursor-pointer"
-                          onClick={() => handleCategoryToggle(category.permissions)}
-                        >
-                          {isCategorySelected(category.permissions) ? "Deselect all" : "Select all"}
-                        </button>
+                        {!isReadOnly && (
+                          <button
+                            type="button"
+                            className="text-xs font-medium text-gray-500 ml-3 bg-transparent border-none cursor-pointer"
+                            onClick={() => handleCategoryToggle(category.permissions)}
+                          >
+                            {isCategorySelected(category.permissions) ? "Deselect all" : "Select all"}
+                          </button>
+                        )}
                       </div>
                       <div className="space-y-3">
                         {category.permissions.map((permission) => {
@@ -516,7 +539,9 @@ export function CreateRolePage() {
                               <Checkbox
                                 id={checkboxId}
                                 checked={selectedPermissions.has(permission.id)}
+                                disabled={isReadOnly}
                                 onCheckedChange={(checked) => {
+                                  if (isReadOnly) return;
                                   setSelectedPermissions((prev) => {
                                     const newSet = new Set(prev);
                                     if (checked) {
@@ -529,7 +554,7 @@ export function CreateRolePage() {
                                 }}
                               />
                               <div className="space-y-1">
-                                <Label htmlFor={checkboxId} className="cursor-pointer">
+                                <Label htmlFor={checkboxId} className={isReadOnly ? "" : "cursor-pointer"}>
                                   {permission.name}
                                 </Label>
                                 <Description>{permission.description}</Description>
@@ -542,7 +567,7 @@ export function CreateRolePage() {
                   ))}
                 </div>
 
-                {selectedPermissions.size === 0 && (
+                {selectedPermissions.size === 0 && !isReadOnly && (
                   <Text className="text-sm text-red-600 dark:text-red-400 mt-2">
                     Please select at least one permission for this role
                   </Text>
@@ -553,14 +578,22 @@ export function CreateRolePage() {
 
           {/* Action Buttons */}
           <div className="flex justify-start gap-3">
-            <Button
-              onClick={handleSubmitRole}
-              disabled={!roleName.trim() || selectedPermissions.size === 0 || isSubmitting || isLoading}
-            >
-              {isSubmitting ? (isEditMode ? "Updating..." : "Creating...") : isEditMode ? "Update Role" : "Create Role"}
-            </Button>
+            {!isReadOnly && (
+              <Button
+                onClick={handleSubmitRole}
+                disabled={!roleName.trim() || selectedPermissions.size === 0 || isSubmitting || isLoading}
+              >
+                {isSubmitting
+                  ? isEditMode
+                    ? "Updating..."
+                    : "Creating..."
+                  : isEditMode
+                    ? "Update Role"
+                    : "Create Role"}
+              </Button>
+            )}
             <Link to={`/${orgId}/settings/roles`}>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="outline">{isReadOnly ? "Back to Roles" : "Cancel"}</Button>
             </Link>
           </div>
         </div>

@@ -28,6 +28,10 @@ export function Roles({ organizationId }: RolesProps) {
     navigate(`/${organizationId}/settings/create-role/${role.metadata?.name}`);
   };
 
+  const handleViewRole = (role: RolesRole) => {
+    navigate(`/${organizationId}/settings/create-role/${role.metadata?.name}`);
+  };
+
   const handleDeleteRole = async (role: RolesRole) => {
     if (!role.metadata?.name) return;
 
@@ -133,9 +137,26 @@ export function Roles({ organizationId }: RolesProps) {
                         <TableCell>
                           <div className="flex justify-end">
                             {isDefault ? (
-                              <span className="text-xs text-gray-700 dark:text-gray-400 px-2 py-1 bg-gray-200 dark:bg-gray-800 rounded">
-                                Default Role
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-700 dark:text-gray-400 px-2 py-1 bg-gray-200 dark:bg-gray-800 rounded">
+                                  Default Role
+                                </span>
+                                <TooltipProvider delayDuration={200}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleViewRole(role)}
+                                        className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors dark:text-gray-100 dark:hover:bg-gray-800"
+                                        aria-label="View role"
+                                      >
+                                        <Icon name="eye" size="sm" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">View Permissions</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
                             ) : (
                               <TooltipProvider delayDuration={200}>
                                 <div className="flex items-center gap-1">
