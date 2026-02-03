@@ -173,3 +173,7 @@ func (c *ReassignEscalationPolicy) HandleAction(ctx core.ActionContext) error {
 func (c *ReassignEscalationPolicy) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
+
+func (c *ReassignEscalationPolicy) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
