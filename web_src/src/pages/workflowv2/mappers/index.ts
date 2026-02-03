@@ -23,6 +23,7 @@ import {
   eventStateRegistry as githubEventStateRegistry,
   customFieldRenderers as githubCustomFieldRenderers,
 } from "./github/index";
+import { componentMappers as gitlabComponentMappers } from "./gitlab/index";
 import {
   componentMappers as pagerdutyComponentMappers,
   triggerRenderers as pagerdutyTriggerRenderers,
@@ -100,6 +101,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   semaphore: semaphoreComponentMappers,
   github: githubComponentMappers,
+  gitlab: gitlabComponentMappers,
   pagerduty: pagerdutyComponentMappers,
   dash0: dash0ComponentMappers,
   daytona: daytonaComponentMappers,
