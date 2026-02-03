@@ -1,0 +1,99 @@
+---
+title: "GitLab"
+sidebar:
+  order: 9
+---
+
+Manage and react to changes in your GitLab repositories
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Overview
+
+The GitLab integration allows you to connect SuperPlane with your GitLab repositories. It supports both GitLab.com and self-hosted GitLab instances using OAuth 2.0 authentication.
+
+## Setup
+
+### Option 1: App OAuth (Recommended)
+
+1. **Create Integration in SuperPlane**:
+   - Go to **Settings → Integrations → Add Integration → GitLab**.
+   - Select **Auth Type**: `App OAuth`.
+   - Leave **Client ID** and **Client Secret** empty for now.
+   - Click **Save**.
+
+2. **Configure GitLab Application**:
+   - SuperPlane will show you the **Callback URL** and a link to GitLab settings.
+   - Go to GitLab (**User Settings → Applications** for Cloud, or **Admin Area** for Self-hosted).
+   - Create a new application:
+     - **Name**: `SuperPlane Integration`
+     - **Redirect URI**: Paste the URL provided by SuperPlane.
+     - **Confidential**: Checked.
+     - **Scopes**: Select `api`, `read_user`, `read_api`, `read_repository`, `write_repository`.
+   - Save and copy the **Application ID** and **Secret**.
+
+3. **Complete Setup**:
+   - Back in SuperPlane, enter the **Client ID** and **Client Secret**.
+   - Click **Save**.
+   - Click the **Connect to GitLab** button that appears.
+   - Authorize the application when prompted.
+
+### Option 2: Personal Access Token
+
+1. **Generate Token in GitLab**:
+   - Go to **User Settings → Access Tokens**.
+   - Create a new token with the following scopes:
+     - `api`, `read_user`, `read_api`, `read_repository`, `write_repository`
+   - Copy the generated token.
+
+2. **Create Integration in SuperPlane**:
+   - Go to **Settings → Integrations → Add Integration → GitLab**.
+   - Select **Auth Type**: `Personal Access Token`.
+   - Paste your token into the **Personal Access Token** field.
+   - Enter the **Group ID** you wish to manage.
+   - Click **Save**.
+
+## Self-Hosted GitLab
+
+For self-hosted GitLab instances:
+
+1. Specify your GitLab URL in the configuration (e.g., `https://gitlab.mycompany.com`)
+2. Create the OAuth application on your GitLab instance
+3. Follow the same setup process
+
+## Authentication
+
+The GitLab integration supports two methods of authentication:
+
+### 1. OAuth 2.0 (Recommended)
+- **User Authorization**: Delegated access control
+- **Automatic Refresh**: Tokens stay valid automatically
+- **Revocable**: Can be revoked at any time
+
+### 2. Personal Access Token
+- **Simple Setup**: Just generate and paste a token
+- **Fine-grained control**: Use a dedicated token for the integration
+
+### Required Scopes
+
+| Scope | Description |
+|-------|-------------|
+| `api` | Full API access for managing resources |
+| `read_user` | Read authenticated user information |
+| `read_api` | Read API access |
+| `read_repository` | Read repository contents |
+| `write_repository` | Manage repository contents |
+
+## Triggers
+
+> **Coming Soon**: GitLab triggers are currently in development.
+
+## Actions
+
+> **Coming Soon**: GitLab actions are currently in development.
+
+## Troubleshooting
+
+### "Access token expired or invalid"
+
+If you see this error, the OAuth token may have expired or been revoked. Click **Connect to GitLab** to re-authorize the integration.
