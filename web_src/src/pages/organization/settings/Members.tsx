@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { useAccount } from "@/contexts/AccountContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { Avatar } from "../../../components/Avatar/avatar";
 import { Badge } from "../../../components/Badge/badge";

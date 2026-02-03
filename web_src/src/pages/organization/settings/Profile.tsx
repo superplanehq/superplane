@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { meMe, meRegenerateToken } from "../../../api-client/sdk.gen";
+import { meRegenerateToken } from "../../../api-client/sdk.gen";
 import type { SuperplaneMeUser } from "../../../api-client/types.gen";
 import { Avatar } from "../../../components/Avatar/avatar";
 import { Heading } from "../../../components/Heading/heading";
