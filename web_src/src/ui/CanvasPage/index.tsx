@@ -1923,9 +1923,7 @@ function CanvasContent({
         return;
       }
 
-      const filteredChanges = changes.filter(
-        (change) => change.type === "select" || change.type === "dimensions" || change.type === "reset",
-      );
+      const filteredChanges = changes.filter((change) => change.type === "select" || change.type === "dimensions");
       if (filteredChanges.length > 0) {
         state.onNodesChange(filteredChanges);
       }
@@ -1940,7 +1938,7 @@ function CanvasContent({
         return;
       }
 
-      const filteredChanges = changes.filter((change) => change.type === "select" || change.type === "reset");
+      const filteredChanges = changes.filter((change) => change.type === "select");
       if (filteredChanges.length > 0) {
         state.onEdgesChange(filteredChanges);
       }
