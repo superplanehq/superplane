@@ -101,11 +101,6 @@ func (t *OnImagePushed) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to parse metadata: %w", err)
 	}
 
-	// If metadata is already set, trigger is already setup
-	if metadata.Repository != "" {
-		return nil
-	}
-
 	config := OnImagePushedConfiguration{}
 	err = mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
@@ -114,6 +109,11 @@ func (t *OnImagePushed) Setup(ctx core.TriggerContext) error {
 
 	if config.Repository == "" {
 		return fmt.Errorf("repository is required")
+	}
+
+	// If metadata matches current config, trigger is already setup
+	if metadata.Repository == config.Repository {
+		return nil
 	}
 
 	// Store metadata
@@ -190,6 +190,12 @@ func matchesPattern(s, pattern string) bool {
 		return true
 	}
 
+	// Handle contains matching (e.g., "*beta*") - check this FIRST
+	if strings.HasPrefix(pattern, "*") && strings.HasSuffix(pattern, "*") && len(pattern) > 2 {
+		contains := pattern[1 : len(pattern)-1]
+		return strings.Contains(s, contains)
+	}
+
 	// Handle simple prefix matching (e.g., "v*")
 	if strings.HasSuffix(pattern, "*") {
 		prefix := strings.TrimSuffix(pattern, "*")
@@ -200,12 +206,6 @@ func matchesPattern(s, pattern string) bool {
 	if strings.HasPrefix(pattern, "*") {
 		suffix := strings.TrimPrefix(pattern, "*")
 		return strings.HasSuffix(s, suffix)
-	}
-
-	// Handle contains matching (e.g., "*beta*")
-	if strings.HasPrefix(pattern, "*") && strings.HasSuffix(pattern, "*") {
-		contains := strings.TrimPrefix(strings.TrimSuffix(pattern, "*"), "*")
-		return strings.Contains(s, contains)
 	}
 
 	// Exact match
