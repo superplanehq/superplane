@@ -2,6 +2,8 @@ package organizations
 
 import (
 	"context"
+	"net/url"
+	"strings"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -15,7 +17,14 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func ListIntegrationResources(ctx context.Context, registry *registry.Registry, orgID, integrationID, resourceType string) (*pb.ListIntegrationResourcesResponse, error) {
+func ListIntegrationResources(
+	ctx context.Context,
+	registry *registry.Registry,
+	orgID,
+	integrationID,
+	resourceType string,
+	parameters string,
+) (*pb.ListIntegrationResourcesResponse, error) {
 	org, err := uuid.Parse(orgID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
@@ -52,6 +61,7 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 		}),
 		HTTP:        contexts.NewHTTPContext(registry.GetHTTPClient()),
 		Integration: integrationCtx,
+		Parameters:  parseParameters(parameters),
 	}
 
 	resources, err := integration.ListResources(resourceType, listCtx)
@@ -63,6 +73,39 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 	return &pb.ListIntegrationResourcesResponse{
 		Resources: serializeIntegrationResources(resources),
 	}, nil
+}
+
+func parseParameters(parameters string) map[string]string {
+	if parameters == "" {
+		return nil
+	}
+
+	trimmed := strings.TrimPrefix(parameters, "?")
+	values, err := url.ParseQuery(trimmed)
+	if err != nil {
+		log.WithError(err).Warn("invalid integration resource parameters")
+		return nil
+	}
+
+	out := make(map[string]string, len(values))
+	for name, entries := range values {
+		if name == "" {
+			continue
+		}
+		if len(entries) == 0 {
+			continue
+		}
+		if len(entries) == 1 {
+			out[name] = entries[0]
+			continue
+		}
+		out[name] = strings.Join(entries, ",")
+	}
+
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func serializeIntegrationResources(resources []core.IntegrationResource) []*pb.IntegrationResourceRef {

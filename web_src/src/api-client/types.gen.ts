@@ -411,6 +411,16 @@ export type ConfigurationObjectTypeOptions = {
   schema?: Array<ConfigurationField>;
 };
 
+export type ConfigurationParameterRef = {
+  name?: string;
+  value?: string;
+  valueFrom?: ConfigurationParameterValueFrom;
+};
+
+export type ConfigurationParameterValueFrom = {
+  field?: string;
+};
+
 export type ConfigurationRequiredCondition = {
   field?: string;
   values?: Array<string>;
@@ -420,6 +430,7 @@ export type ConfigurationResourceTypeOptions = {
   type?: string;
   useNameAsValue?: boolean;
   multi?: boolean;
+  parameters?: Array<ConfigurationParameterRef>;
 };
 
 export type ConfigurationSelectOption = {
@@ -2362,6 +2373,7 @@ export type OrganizationsListIntegrationResourcesData = {
   };
   query?: {
     type?: string;
+    parameters?: string;
   };
   url: "/api/v1/organizations/{id}/integrations/{integrationId}/resources";
 };

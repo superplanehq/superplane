@@ -359,6 +359,7 @@ message ListIntegrationResourcesRequest {
   string id = 1;
   string integration_id = 2;
   string type = 3;
+  string parameters = 4;
 }
 
 message ListIntegrationResourcesResponse {

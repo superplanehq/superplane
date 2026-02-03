@@ -13,6 +13,7 @@ interface IntegrationResourceFieldRendererProps {
   field: ConfigurationField;
   value: string | string[] | undefined;
   onChange: (value: string | string[] | undefined) => void;
+  allValues?: Record<string, unknown>;
   organizationId?: string;
   integrationId?: string;
   allowExpressions?: boolean;
@@ -45,6 +46,7 @@ export const IntegrationResourceFieldRenderer = ({
   field,
   value,
   onChange,
+  allValues,
   organizationId,
   integrationId,
   allowExpressions = false,
@@ -56,16 +58,57 @@ export const IntegrationResourceFieldRenderer = ({
   const useNameAsValue = field.typeOptions?.resource?.useNameAsValue ?? false;
   // Check for multi - be explicit about truthiness since it's a boolean field
   const isMulti = Boolean(field.typeOptions?.resource?.multi);
+  const resourceParameters = field.typeOptions?.resource?.parameters ?? [];
 
   // Fixed vs Expression mode for single-select when expressions are allowed
   const initialIsExpression = allowExpressions && !isMulti && isExpressionValue(value);
   const [useExpressionMode, setUseExpressionMode] = useState(initialIsExpression);
 
+  const additionalQueryParameters = useMemo(() => {
+    if (!resourceParameters.length) return undefined;
+    const parameters: Record<string, string> = {};
+
+    for (const parameter of resourceParameters) {
+      const name = parameter.name?.trim();
+      if (!name) continue;
+
+      let rawValue: unknown;
+      if (parameter.value !== undefined && parameter.value !== "") {
+        rawValue = parameter.value;
+      } else if (parameter.valueFrom?.field) {
+        rawValue = allValues?.[parameter.valueFrom.field];
+      } else {
+        continue;
+      }
+
+      if (rawValue === undefined || rawValue === null) continue;
+
+      if (Array.isArray(rawValue)) {
+        const normalized = rawValue.map((entry) => String(entry)).filter((entry) => entry.length > 0);
+        if (normalized.length === 0) continue;
+        parameters[name] = normalized.join(",");
+        continue;
+      }
+
+      if (typeof rawValue === "string") {
+        if (!rawValue.length) continue;
+        parameters[name] = rawValue;
+        continue;
+      }
+
+      if (typeof rawValue === "number" || typeof rawValue === "boolean") {
+        parameters[name] = String(rawValue);
+      }
+    }
+
+    return Object.keys(parameters).length > 0 ? parameters : undefined;
+  }, [resourceParameters, allValues]);
+
   const {
     data: resources,
     isLoading: isLoadingResources,
     error: resourcesError,
-  } = useIntegrationResources(organizationId ?? "", integrationId ?? "", resourceType ?? "");
+  } = useIntegrationResources(organizationId ?? "", integrationId ?? "", resourceType ?? "", additionalQueryParameters);
 
   // All hooks must be called before any early returns
   // Multi-select options (always compute, even if not used)

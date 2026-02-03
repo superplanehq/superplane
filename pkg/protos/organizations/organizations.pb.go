@@ -1426,6 +1426,7 @@ type ListIntegrationResourcesRequest struct {
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	IntegrationId string                 `protobuf:"bytes,2,opt,name=integration_id,json=integrationId,proto3" json:"integration_id,omitempty"`
 	Type          string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
+	Parameters    string                 `protobuf:"bytes,4,opt,name=parameters,proto3" json:"parameters,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1477,6 +1478,13 @@ func (x *ListIntegrationResourcesRequest) GetIntegrationId() string {
 func (x *ListIntegrationResourcesRequest) GetType() string {
 	if x != nil {
 		return x.Type
+	}
+	return ""
+}
+
+func (x *ListIntegrationResourcesRequest) GetParameters() string {
+	if x != nil {
+		return x.Parameters
 	}
 	return ""
 }
@@ -2549,11 +2557,14 @@ const file_organizations_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12%\n" +
 	"\x0eintegration_id\x18\x02 \x01(\tR\rintegrationId\"f\n" +
 	"\x1bDescribeIntegrationResponse\x12G\n" +
-	"\vintegration\x18\x01 \x01(\v2%.Superplane.Organizations.IntegrationR\vintegration\"l\n" +
+	"\vintegration\x18\x01 \x01(\v2%.Superplane.Organizations.IntegrationR\vintegration\"\x8c\x01\n" +
 	"\x1fListIntegrationResourcesRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12%\n" +
 	"\x0eintegration_id\x18\x02 \x01(\tR\rintegrationId\x12\x12\n" +
-	"\x04type\x18\x03 \x01(\tR\x04type\"r\n" +
+	"\x04type\x18\x03 \x01(\tR\x04type\x12\x1e\n" +
+	"\n" +
+	"parameters\x18\x04 \x01(\tR\n" +
+	"parameters\"r\n" +
 	" ListIntegrationResourcesResponse\x12N\n" +
 	"\tresources\x18\x01 \x03(\v20.Superplane.Organizations.IntegrationResourceRefR\tresources\"P\n" +
 	"\x16IntegrationResourceRef\x12\x12\n" +
