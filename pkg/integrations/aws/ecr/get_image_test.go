@@ -138,7 +138,7 @@ func Test__GetImage__Execute(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, execState.Payloads, 1)
 		payload := execState.Payloads[0].(map[string]any)["data"]
-		imageDetail, ok := payload.(ImageDetail)
+		imageDetail, ok := payload.(*ImageDetail)
 		require.True(t, ok)
 		assert.Equal(t, "backend", imageDetail.RepositoryName)
 		assert.Equal(t, "sha256:abc", imageDetail.ImageDigest)
