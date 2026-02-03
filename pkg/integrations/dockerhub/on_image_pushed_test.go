@@ -69,6 +69,34 @@ func Test__OnImagePushed__Setup(t *testing.T) {
 		// No new webhook request should be made
 		assert.Len(t, integration.WebhookRequests, 0)
 	})
+
+	t.Run("repository config changed -> updates setup", func(t *testing.T) {
+		metadata := &contexts.MetadataContext{
+			Metadata: OnImagePushedMetadata{
+				Repository: "myorg/oldapp",
+			},
+		}
+		integration := &contexts.IntegrationContext{}
+
+		err := trigger.Setup(core.TriggerContext{
+			Configuration: map[string]any{
+				"repository": "myorg/newapp",
+			},
+			Metadata:    metadata,
+			Integration: integration,
+		})
+
+		require.NoError(t, err)
+
+		// Verify metadata was updated
+		m := metadata.Get().(OnImagePushedMetadata)
+		assert.Equal(t, "myorg/newapp", m.Repository)
+
+		// Verify webhook was requested for new repo
+		require.Len(t, integration.WebhookRequests, 1)
+		webhookConfig := integration.WebhookRequests[0].(WebhookConfiguration)
+		assert.Equal(t, "myorg/newapp", webhookConfig.Repository)
+	})
 }
 
 func Test__OnImagePushed__HandleWebhook(t *testing.T) {
@@ -214,6 +242,10 @@ func Test__matchesPattern(t *testing.T) {
 		{"suffix wildcard match", "feature-latest", "*-latest", true},
 		{"suffix wildcard mismatch", "feature-main", "*-latest", false},
 		{"single wildcard matches anything", "anything", "*", true},
+		{"contains wildcard match", "v1.2.3-beta-hotfix", "*beta*", true},
+		{"contains wildcard mismatch", "v1.2.3-release", "*beta*", false},
+		{"contains wildcard at start", "beta-release", "*beta*", true},
+		{"contains wildcard at end", "my-beta", "*beta*", true},
 	}
 
 	for _, tt := range tests {

@@ -1,9 +1,6 @@
 package dockerhub
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -230,21 +227,4 @@ type RepositoryInfo struct {
 	RepoURL         string `json:"repo_url"`
 	StarCount       int    `json:"star_count"`
 	Status          string `json:"status"`
-}
-
-// verifyWebhookSignature verifies the Docker Hub webhook signature
-func verifyWebhookSignature(secret []byte, body []byte, signature string) error {
-	if len(secret) == 0 {
-		return nil // No secret configured, skip verification
-	}
-
-	h := hmac.New(sha256.New, secret)
-	h.Write(body)
-	expectedSignature := hex.EncodeToString(h.Sum(nil))
-
-	if !hmac.Equal([]byte(signature), []byte(expectedSignature)) {
-		return fmt.Errorf("invalid signature")
-	}
-
-	return nil
 }
