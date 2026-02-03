@@ -244,3 +244,7 @@ func (c *ScanImage) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 func (c *ScanImage) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
+
+func (c *ScanImage) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
