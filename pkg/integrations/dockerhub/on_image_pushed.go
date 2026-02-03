@@ -116,17 +116,22 @@ func (t *OnImagePushed) Setup(ctx core.TriggerContext) error {
 		return nil
 	}
 
-	// Store metadata
+	// Request webhook setup first - only persist metadata after success
+	err = ctx.Integration.RequestWebhook(WebhookConfiguration{
+		Repository: config.Repository,
+	})
+	if err != nil {
+		return err
+	}
+
+	// Store metadata only after webhook request succeeds
 	metadata.Repository = config.Repository
 	err = ctx.Metadata.Set(metadata)
 	if err != nil {
 		return fmt.Errorf("failed to set metadata: %w", err)
 	}
 
-	// Request webhook setup
-	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		Repository: config.Repository,
-	})
+	return nil
 }
 
 func (t *OnImagePushed) Actions() []core.Action {
