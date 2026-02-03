@@ -49,3 +49,44 @@ export interface CodeArtifactPackageVersionEvent {
   "detail-type"?: string;
   detail?: CodeArtifactPackageVersionDetail;
 }
+
+export interface CodeArtifactPackageVersionConfiguration {
+  region?: string;
+  domain?: string;
+  repository?: string;
+  package?: string;
+  format?: string;
+  namespace?: string;
+  version?: string;
+}
+
+export interface CodeArtifactPackageLicense {
+  name?: string;
+  url?: string;
+}
+
+export interface CodeArtifactPackageVersionDomainEntryPoint {
+  externalConnectionName?: string;
+  repositoryName?: string;
+}
+
+export interface CodeArtifactPackageVersionOrigin {
+  domainEntryPoint?: CodeArtifactPackageVersionDomainEntryPoint;
+  originType?: string;
+}
+
+export interface CodeArtifactPackageVersionDescription {
+  displayName?: string;
+  format?: string;
+  homePage?: string;
+  licenses?: CodeArtifactPackageLicense[];
+  namespace?: string;
+  origin?: CodeArtifactPackageVersionOrigin;
+  packageName?: string;
+  publishedTime?: number;
+  revision?: string;
+  sourceCodeRepository?: string;
+  status?: string;
+  summary?: string;
+  version?: string;
+}

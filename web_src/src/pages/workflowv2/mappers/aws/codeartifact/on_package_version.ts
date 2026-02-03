@@ -2,7 +2,7 @@ import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-clie
 import { getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../../types";
 import { TriggerProps } from "@/ui/trigger";
-import awsIcon from "@/assets/icons/integrations/aws.svg";
+import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import {
   CodeArtifactPackageVersionDetail,
   CodeArtifactPackageVersionEvent,
@@ -64,7 +64,7 @@ export const onPackageVersionTriggerRenderer: TriggerRenderer = {
 
     const props: TriggerProps = {
       title: node.name!,
-      iconSrc: awsIcon,
+      iconSrc: awsCodeArtifactIcon,
       collapsedBackground: getBackgroundColorClass(trigger.color),
       metadata: metadataItems,
     };

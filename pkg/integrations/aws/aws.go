@@ -130,6 +130,7 @@ func (a *AWS) Configuration() []configuration.Field {
 
 func (a *AWS) Components() []core.Component {
 	return []core.Component{
+		&codeartifact.GetPackageVersion{},
 		&ecr.GetImage{},
 		&ecr.GetImageScanFindings{},
 		&ecr.ScanImage{},

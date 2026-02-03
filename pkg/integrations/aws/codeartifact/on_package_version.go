@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -21,22 +20,16 @@ const (
 type OnPackageVersion struct{}
 
 type OnPackageVersionConfiguration struct {
-	Region              string `json:"region" mapstructure:"region"`
-	DomainName          string `json:"domainName" mapstructure:"domainName"`
-	DomainOwner         string `json:"domainOwner" mapstructure:"domainOwner"`
-	RepositoryName      string `json:"repositoryName" mapstructure:"repositoryName"`
-	PackageFormat       string `json:"packageFormat" mapstructure:"packageFormat"`
-	PackageNamespace    string `json:"packageNamespace" mapstructure:"packageNamespace"`
-	PackageName         string `json:"packageName" mapstructure:"packageName"`
-	PackageVersion      string `json:"packageVersion" mapstructure:"packageVersion"`
-	PackageVersionState string `json:"packageVersionState" mapstructure:"packageVersionState"`
-	OperationType       string `json:"operationType" mapstructure:"operationType"`
+	Region     string                    `json:"region" mapstructure:"region"`
+	Repository string                    `json:"repository" mapstructure:"repository"`
+	Packages   []configuration.Predicate `json:"packages" mapstructure:"packages"`
+	Versions   []configuration.Predicate `json:"versions" mapstructure:"versions"`
 }
 
 type OnPackageVersionMetadata struct {
-	Region         string                        `json:"region" mapstructure:"region"`
-	SubscriptionID string                        `json:"subscriptionId" mapstructure:"subscriptionId"`
-	Filters        OnPackageVersionConfiguration `json:"filters" mapstructure:"filters"`
+	Region         string      `json:"region" mapstructure:"region"`
+	SubscriptionID string      `json:"subscriptionId" mapstructure:"subscriptionId"`
+	Repository     *Repository `json:"repository" mapstructure:"repository"`
 }
 
 func (p *OnPackageVersion) Name() string {
@@ -59,25 +52,6 @@ func (p *OnPackageVersion) Documentation() string {
 - **Release automation**: Trigger downstream workflows when a new package version is published
 - **Dependency monitoring**: Notify teams about changes to shared libraries
 - **Compliance checks**: Validate artifacts before promotion
-
-## Configuration
-
-- **Region**: AWS region where the CodeArtifact domain lives
-- **Domain Name**: Optional filter for the CodeArtifact domain
-- **Repository Name**: Optional filter for the CodeArtifact repository
-- **Package Format**: Optional filter for package format (e.g., ` + "`npm`" + `, ` + "`maven`" + `)
-- **Package Name**: Optional filter for a specific package
-- **Package Version State**: Optional filter for state (e.g., ` + "`Published`" + `)
-
-## Event Data
-
-Each event includes:
-- **detail.domainName**: CodeArtifact domain name
-- **detail.repositoryName**: Repository name
-- **detail.packageName**: Package name
-- **detail.packageVersion**: Package version
-- **detail.packageVersionState**: Version state (Published, Disposed, etc.)
-- **detail.operationType**: Operation (Created, Updated, Deleted)
 `
 }
 
@@ -99,67 +73,39 @@ func (p *OnPackageVersion) Configuration() []configuration.Field {
 			Default:  "us-east-1",
 		},
 		{
-			Name:        "domainName",
-			Label:       "Domain Name",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Filter by CodeArtifact domain",
+			Name:     "repository",
+			Label:    "Repository",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "codeartifact.repository",
+				},
+			},
 		},
 		{
-			Name:        "domainOwner",
-			Label:       "Domain Owner",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Filter by CodeArtifact domain owner (AWS account ID)",
+			Name:     "packages",
+			Label:    "Packages",
+			Type:     configuration.FieldTypeAnyPredicateList,
+			Required: false,
+			Default:  []any{},
+			TypeOptions: &configuration.TypeOptions{
+				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
+					Operators: configuration.AllPredicateOperators,
+				},
+			},
 		},
 		{
-			Name:        "repositoryName",
-			Label:       "Repository Name",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Filter by CodeArtifact repository",
-		},
-		{
-			Name:        "packageFormat",
-			Label:       "Package Format",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Filter by package format (e.g., npm, maven, pypi)",
-		},
-		{
-			Name:        "packageNamespace",
-			Label:       "Package Namespace",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Filter by package namespace (for example npm scope)",
-		},
-		{
-			Name:        "packageName",
-			Label:       "Package Name",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Filter by package name",
-		},
-		{
-			Name:        "packageVersion",
-			Label:       "Package Version",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Filter by package version",
-		},
-		{
-			Name:        "packageVersionState",
-			Label:       "Package Version State",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Filter by package version state (e.g., Published)",
-		},
-		{
-			Name:        "operationType",
-			Label:       "Operation Type",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Filter by operation type (Created, Updated, Deleted)",
+			Name:     "versions",
+			Label:    "Versions",
+			Type:     configuration.FieldTypeAnyPredicateList,
+			Required: false,
+			Default:  []any{},
+			TypeOptions: &configuration.TypeOptions{
+				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
+					Operators: configuration.AllPredicateOperators,
+				},
+			},
 		},
 	}
 }
@@ -175,12 +121,10 @@ func (p *OnPackageVersion) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	config = normalizeConfiguration(config)
-	if config.Region == "" {
-		return fmt.Errorf("region is required")
-	}
-
-	if metadata.SubscriptionID != "" && filtersEqual(metadata.Filters, config) {
+	//
+	// If already subscribed to the integration events, nothing to do.
+	//
+	if metadata.SubscriptionID != "" {
 		return nil
 	}
 
@@ -189,11 +133,16 @@ func (p *OnPackageVersion) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode integration metadata: %w", err)
 	}
 
+	repository, err := validateRepository(ctx.Integration, ctx.HTTP, config.Region, config.Repository)
+	if err != nil {
+		return fmt.Errorf("failed to validate repository: %w", err)
+	}
+
 	rule, ok := integrationMetadata.EventBridge.Rules[Source]
 	if !ok || !slices.Contains(rule.DetailTypes, DetailTypePackageVersionStateChange) {
 		err := ctx.Metadata.Set(OnPackageVersionMetadata{
-			Region:  config.Region,
-			Filters: config,
+			Region:     config.Region,
+			Repository: repository,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to set metadata: %w", err)
@@ -202,15 +151,15 @@ func (p *OnPackageVersion) Setup(ctx core.TriggerContext) error {
 		return p.provisionRule(ctx.Integration, ctx.Requests, config.Region)
 	}
 
-	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(config))
+	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(config.Region))
 	if err != nil {
 		return fmt.Errorf("failed to subscribe: %w", err)
 	}
 
 	return ctx.Metadata.Set(OnPackageVersionMetadata{
 		Region:         config.Region,
+		Repository:     repository,
 		SubscriptionID: subscriptionID.String(),
-		Filters:        config,
 	})
 }
 
@@ -235,41 +184,15 @@ func (p *OnPackageVersion) provisionRule(integration core.IntegrationContext, re
 	)
 }
 
-func (p *OnPackageVersion) subscriptionPattern(config OnPackageVersionConfiguration) *common.EventBridgeEvent {
-	detail := map[string]any{}
-	if config.DomainName != "" {
-		detail["domainName"] = config.DomainName
-	}
-	if config.DomainOwner != "" {
-		detail["domainOwner"] = config.DomainOwner
-	}
-	if config.RepositoryName != "" {
-		detail["repositoryName"] = config.RepositoryName
-	}
-	if config.PackageFormat != "" {
-		detail["packageFormat"] = config.PackageFormat
-	}
-	if config.PackageNamespace != "" {
-		detail["packageNamespace"] = config.PackageNamespace
-	}
-	if config.PackageName != "" {
-		detail["packageName"] = config.PackageName
-	}
-	if config.PackageVersion != "" {
-		detail["packageVersion"] = config.PackageVersion
-	}
-	if config.PackageVersionState != "" {
-		detail["packageVersionState"] = config.PackageVersionState
-	}
-	if config.OperationType != "" {
-		detail["operationType"] = config.OperationType
-	}
-
+func (p *OnPackageVersion) subscriptionPattern(region string) *common.EventBridgeEvent {
 	return &common.EventBridgeEvent{
-		Region:     config.Region,
+		Region:     region,
 		DetailType: DetailTypePackageVersionStateChange,
 		Source:     Source,
-		Detail:     detail,
+		// Detail: map[string]any{
+		// 	"operationType":       "CREATED",
+		// 	"packageVersionState": "Published",
+		// },
 	}
 }
 
@@ -322,7 +245,7 @@ func (p *OnPackageVersion) checkRuleAvailability(ctx core.TriggerActionContext) 
 		)
 	}
 
-	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(metadata.Filters))
+	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(metadata.Region))
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe: %w", err)
 	}
@@ -336,19 +259,29 @@ func (p *OnPackageVersion) OnIntegrationMessage(ctx core.IntegrationMessageConte
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	config = normalizeConfiguration(config)
 
 	event := common.EventBridgeEvent{}
 	if err := mapstructure.Decode(ctx.Message, &event); err != nil {
 		return fmt.Errorf("failed to decode message: %w", err)
 	}
 
-	if config.Region != "" && event.Region != "" && config.Region != event.Region {
-		ctx.Logger.Infof("Skipping event for region %s, expected %s", event.Region, config.Region)
+	packageName, ok := event.Detail["packageName"].(string)
+	if !ok || packageName == "" {
+		return fmt.Errorf("missing package name")
+	}
+
+	if len(config.Packages) > 0 && !configuration.MatchesAnyPredicate(config.Packages, packageName) {
+		ctx.Logger.Infof("Skipping event for package %s, does not match any packages", packageName)
 		return nil
 	}
 
-	if !matchesDetailFilters(event.Detail, config) {
+	version, ok := event.Detail["packageVersion"].(string)
+	if !ok || version == "" {
+		return fmt.Errorf("missing package version")
+	}
+
+	if len(config.Versions) > 0 && !configuration.MatchesAnyPredicate(config.Versions, version) {
+		ctx.Logger.Infof("Skipping event for version %s, does not match any versions", version)
 		return nil
 	}
 
@@ -361,85 +294,4 @@ func (p *OnPackageVersion) HandleWebhook(ctx core.WebhookRequestContext) (int, e
 
 func (p *OnPackageVersion) Cleanup(ctx core.TriggerContext) error {
 	return nil
-}
-
-func normalizeConfiguration(config OnPackageVersionConfiguration) OnPackageVersionConfiguration {
-	config.Region = strings.TrimSpace(config.Region)
-	config.DomainName = strings.TrimSpace(config.DomainName)
-	config.DomainOwner = strings.TrimSpace(config.DomainOwner)
-	config.RepositoryName = strings.TrimSpace(config.RepositoryName)
-	config.PackageFormat = strings.TrimSpace(config.PackageFormat)
-	config.PackageNamespace = strings.TrimSpace(config.PackageNamespace)
-	config.PackageName = strings.TrimSpace(config.PackageName)
-	config.PackageVersion = strings.TrimSpace(config.PackageVersion)
-	config.PackageVersionState = strings.TrimSpace(config.PackageVersionState)
-	config.OperationType = strings.TrimSpace(config.OperationType)
-	return config
-}
-
-func filtersEqual(a, b OnPackageVersionConfiguration) bool {
-	return a.Region == b.Region &&
-		a.DomainName == b.DomainName &&
-		a.DomainOwner == b.DomainOwner &&
-		a.RepositoryName == b.RepositoryName &&
-		a.PackageFormat == b.PackageFormat &&
-		a.PackageNamespace == b.PackageNamespace &&
-		a.PackageName == b.PackageName &&
-		a.PackageVersion == b.PackageVersion &&
-		a.PackageVersionState == b.PackageVersionState &&
-		a.OperationType == b.OperationType
-}
-
-func matchesDetailFilters(detail map[string]any, config OnPackageVersionConfiguration) bool {
-	if len(detail) == 0 {
-		return false
-	}
-
-	if !matchesDetailValue(detail, "domainName", config.DomainName) {
-		return false
-	}
-	if !matchesDetailValue(detail, "domainOwner", config.DomainOwner) {
-		return false
-	}
-	if !matchesDetailValue(detail, "repositoryName", config.RepositoryName) {
-		return false
-	}
-	if !matchesDetailValue(detail, "packageFormat", config.PackageFormat) {
-		return false
-	}
-	if !matchesDetailValue(detail, "packageNamespace", config.PackageNamespace) {
-		return false
-	}
-	if !matchesDetailValue(detail, "packageName", config.PackageName) {
-		return false
-	}
-	if !matchesDetailValue(detail, "packageVersion", config.PackageVersion) {
-		return false
-	}
-	if !matchesDetailValue(detail, "packageVersionState", config.PackageVersionState) {
-		return false
-	}
-	if !matchesDetailValue(detail, "operationType", config.OperationType) {
-		return false
-	}
-
-	return true
-}
-
-func matchesDetailValue(detail map[string]any, key string, expected string) bool {
-	if expected == "" {
-		return true
-	}
-
-	value, ok := detail[key]
-	if !ok || value == nil {
-		return false
-	}
-
-	stringValue, ok := value.(string)
-	if !ok {
-		return false
-	}
-
-	return stringValue == expected
 }

@@ -1,5 +1,10 @@
 import { MetadataItem } from "@/ui/metadataList";
-import { CodeArtifactPackageVersionDetail, CodeArtifactTriggerConfiguration, CodeArtifactTriggerMetadata } from "./types";
+import {
+  CodeArtifactPackageVersionConfiguration,
+  CodeArtifactPackageVersionDetail,
+  CodeArtifactTriggerConfiguration,
+  CodeArtifactTriggerMetadata,
+} from "./types";
 
 function resolveFilters(
   metadata?: CodeArtifactTriggerMetadata,
@@ -26,7 +31,10 @@ export function formatPackageLabel(
   detail?: CodeArtifactPackageVersionDetail,
 ): string | undefined {
   const filters = resolveFilters(metadata, configuration);
-  const packageName = formatPackageName(filters.packageNamespace ?? detail?.packageNamespace, filters.packageName ?? detail?.packageName);
+  const packageName = formatPackageName(
+    filters.packageNamespace ?? detail?.packageNamespace,
+    filters.packageName ?? detail?.packageName,
+  );
   if (!packageName) {
     return undefined;
   }
@@ -65,6 +73,37 @@ export function buildCodeArtifactMetadataItems(
     items.push({
       icon: "tag",
       label: packageLabel,
+    });
+  }
+
+  return items;
+}
+
+export function buildCodeArtifactPackageMetadataItems(
+  configuration?: CodeArtifactPackageVersionConfiguration,
+): MetadataItem[] {
+  const items: MetadataItem[] = [];
+
+  if (configuration?.domain) {
+    items.push({
+      icon: "database",
+      label: configuration.domain,
+    });
+  }
+
+  if (configuration?.repository) {
+    items.push({
+      icon: "package",
+      label: configuration.repository,
+    });
+  }
+
+  const packageName = formatPackageName(configuration?.namespace, configuration?.package);
+  if (packageName) {
+    const label = configuration?.version ? `${packageName}@${configuration.version}` : packageName;
+    items.push({
+      icon: "tag",
+      label,
     });
   }
 
