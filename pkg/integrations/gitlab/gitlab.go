@@ -221,7 +221,7 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 	callbackURL := fmt.Sprintf("%s/api/v1/integrations/%s/callback", ctx.BaseURL, ctx.Integration.ID())
 
 	// Case 1: No credentials yet - show setup instructions
-	if configuration.ClientID == "" {
+	if configuration.ClientID == "" || configuration.ClientSecret == "" {
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
 			Description: fmt.Sprintf(appSetupDescription, callbackURL, strings.Join(scopeList, ", ")),
 			URL:         fmt.Sprintf("%s/-/user_settings/applications", baseURL),
@@ -239,7 +239,13 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 		if err != nil {
 			return fmt.Errorf("failed to generate state: %v", err)
 		}
-		ctx.Integration.SetMetadata(Metadata{State: state})
+
+		metadata := Metadata{}
+		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+			ctx.Logger.Errorf("Failed to decode metadata while setting state: %v", err)
+		}
+		metadata.State = state
+		ctx.Integration.SetMetadata(metadata)
 
 		authURL := fmt.Sprintf(
 			"%s/oauth/authorize?client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s",

@@ -96,6 +96,26 @@ func Test__GitLab__Sync(t *testing.T) {
 		assert.Contains(t, ctx.BrowserAction.Description, "Step 1: Create a GitLab OAuth Application")
 	})
 
+	t.Run("oauth - missing client secret - setup instructions", func(t *testing.T) {
+		ctx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"authType": AuthTypeAppOAuth,
+				"groupId":  "123",
+				"clientId": "id",
+			},
+		}
+
+		err := g.Sync(core.SyncContext{
+			Configuration: ctx.Configuration,
+			Integration:   ctx,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "error", ctx.State)
+		assert.NotNil(t, ctx.BrowserAction)
+		assert.Contains(t, ctx.BrowserAction.Description, "Step 1: Create a GitLab OAuth Application")
+	})
+
 	t.Run("oauth - has client id, no tokens - connect button", func(t *testing.T) {
 		ctx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
@@ -103,6 +123,9 @@ func Test__GitLab__Sync(t *testing.T) {
 				"groupId":      "123",
 				"clientId":     "id",
 				"clientSecret": "secret",
+			},
+			Metadata: Metadata{
+				Owner: "existing-owner",
 			},
 		}
 
@@ -116,7 +139,15 @@ func Test__GitLab__Sync(t *testing.T) {
 		assert.NotNil(t, ctx.BrowserAction)
 		assert.Contains(t, ctx.BrowserAction.URL, "/oauth/authorize")
 		assert.Contains(t, ctx.BrowserAction.Description, "Connect to GitLab")
+
+		// Verify metadata preservation
+		metadata, ok := ctx.Metadata.(Metadata)
+		assert.True(t, ok)
+		assert.Equal(t, "existing-owner", metadata.Owner)
+		assert.NotEmpty(t, metadata.State)
 	})
+
+
 
 	t.Run("oauth - has tokens - success", func(t *testing.T) {
 		ctx := &contexts.IntegrationContext{
