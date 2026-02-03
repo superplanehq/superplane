@@ -62,7 +62,7 @@ func (c *CreateIssue) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:           "repository", // Using repository type to match fetched resource
-					UseNameAsValue: false, // We need ID for API calls
+					UseNameAsValue: false,        // We need ID for API calls
 				},
 			},
 		},

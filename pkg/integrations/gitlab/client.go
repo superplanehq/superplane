@@ -32,7 +32,7 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 	baseURL := normalizeBaseURL(string(baseURLBytes))
 
 	var token string
-	
+
 	groupIDBytes, err := ctx.GetConfig("groupId")
 	if err != nil || len(groupIDBytes) == 0 {
 		return nil, fmt.Errorf("groupId is required")
@@ -164,7 +164,7 @@ type User struct {
 
 func (c *Client) CreateIssue(ctx context.Context, projectID string, req *IssueRequest) (*Issue, error) {
 	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/issues", c.baseURL, apiVersion, url.PathEscape(projectID))
-	
+
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %v", err)

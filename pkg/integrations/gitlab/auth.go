@@ -114,7 +114,7 @@ func (a *Auth) HandleCallback(req *http.Request, config *Configuration, expected
 	}
 
 	baseURL := config.BaseURL
-	
+
 	return a.exchangeCode(baseURL, config.ClientID, config.ClientSecret, code, redirectURI)
 }
 

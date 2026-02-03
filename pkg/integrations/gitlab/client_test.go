@@ -105,14 +105,14 @@ func Test__Client__FetchIntegrationData(t *testing.T) {
 
 		user, projects, err := client.FetchIntegrationData()
 		require.NoError(t, err)
-		
+
 		require.Len(t, mockClient.Requests, 2)
 		assert.Equal(t, "https://gitlab.com/api/v4/user", mockClient.Requests[0].URL.String())
 		assert.Equal(t, "token", mockClient.Requests[0].Header.Get("PRIVATE-TOKEN"))
 
 		assert.Equal(t, "https://gitlab.com/api/v4/groups/123/projects?include_subgroups=true&per_page=100&page=1", mockClient.Requests[1].URL.String())
 		assert.Equal(t, "token", mockClient.Requests[1].Header.Get("PRIVATE-TOKEN"))
-		
+
 		require.NotNil(t, user)
 		assert.Equal(t, 1, user.ID)
 		assert.Equal(t, "user1", user.Username)
@@ -125,7 +125,7 @@ func Test__Client__FetchIntegrationData(t *testing.T) {
 	t.Run("pagination", func(t *testing.T) {
 		resp1 := GitlabMockResponse(http.StatusOK, `[{"id": 1}]`)
 		resp1.Header.Set("X-Next-Page", "2")
-		
+
 		resp2 := GitlabMockResponse(http.StatusOK, `[{"id": 2}]`)
 
 		mockClient := &contexts.HTTPContext{
@@ -146,12 +146,12 @@ func Test__Client__FetchIntegrationData(t *testing.T) {
 
 		_, projects, err := client.FetchIntegrationData()
 		require.NoError(t, err)
-		
+
 		require.Len(t, mockClient.Requests, 3)
 		assert.Equal(t, "https://gitlab.com/api/v4/user", mockClient.Requests[0].URL.String())
 		assert.Equal(t, "https://gitlab.com/api/v4/groups/123/projects?include_subgroups=true&per_page=100&page=1", mockClient.Requests[1].URL.String())
 		assert.Equal(t, "https://gitlab.com/api/v4/groups/123/projects?include_subgroups=true&per_page=100&page=2", mockClient.Requests[2].URL.String())
-		
+
 		require.Len(t, projects, 2)
 		assert.Equal(t, 1, projects[0].ID)
 		assert.Equal(t, 2, projects[1].ID)
@@ -196,7 +196,7 @@ func Test__Client__FetchIntegrationData(t *testing.T) {
 
 		_, _, err := client.FetchIntegrationData()
 		require.NoError(t, err)
-		
+
 		require.Len(t, mockClient.Requests, 2)
 		assert.Equal(t, "Bearer oauth-token", mockClient.Requests[0].Header.Get("Authorization"))
 	})

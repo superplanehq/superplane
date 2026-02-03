@@ -23,7 +23,6 @@ func GitlabMockResponse(status int, body string) *http.Response {
 	}
 }
 
-
 func Test__GitLab__Sync(t *testing.T) {
 	g := &GitLab{}
 
@@ -52,7 +51,7 @@ func Test__GitLab__Sync(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, "ready", ctx.State)
-		
+
 		require.Len(t, mockHTTP.Requests, 2)
 		assert.Equal(t, "https://gitlab.com/api/v4/user", mockHTTP.Requests[0].URL.String())
 		assert.Equal(t, "https://gitlab.com/api/v4/groups/123/projects?include_subgroups=true&per_page=100&page=1", mockHTTP.Requests[1].URL.String())
@@ -144,10 +143,10 @@ func Test__GitLab__Sync(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, "ready", ctx.State)
-		
+
 		require.Len(t, mockHTTP.Requests, 0)
 	})
-	
+
 	t.Run("error cases", func(t *testing.T) {
 		t.Run("missing authType", func(t *testing.T) {
 			ctx := &contexts.IntegrationContext{
@@ -184,10 +183,10 @@ func Test__GitLab__HandleRequest(t *testing.T) {
 		ctx := &contexts.IntegrationContext{
 			Metadata: Metadata{State: state},
 			Configuration: map[string]any{
-				"clientId": "id",
+				"clientId":     "id",
 				"clientSecret": "secret",
-				"baseUrl": "https://gitlab.com",
-				"authType": AuthTypeAppOAuth,
+				"baseUrl":      "https://gitlab.com",
+				"authType":     AuthTypeAppOAuth,
 			},
 			Secrets: make(map[string]core.IntegrationSecret),
 		}
@@ -207,7 +206,7 @@ func Test__GitLab__HandleRequest(t *testing.T) {
 				GitlabMockResponse(http.StatusOK, `[{"id": 1}]`),
 			},
 		}
-		
+
 		ctx.Configuration["groupId"] = "123"
 
 		g.HandleRequest(core.HTTPRequestContext{
@@ -217,15 +216,15 @@ func Test__GitLab__HandleRequest(t *testing.T) {
 			HTTP:        mockHTTP,
 			Logger:      logger,
 		})
-		
+
 		assert.Equal(t, http.StatusSeeOther, recorder.Code)
 		assert.Equal(t, "ready", ctx.State)
-		
+
 		require.Len(t, mockHTTP.Requests, 3)
 		assert.Equal(t, "https://gitlab.com/oauth/token", mockHTTP.Requests[0].URL.String())
 		assert.Equal(t, "https://gitlab.com/api/v4/user", mockHTTP.Requests[1].URL.String())
 		assert.Equal(t, "https://gitlab.com/api/v4/groups/123/projects?include_subgroups=true&per_page=100&page=1", mockHTTP.Requests[2].URL.String())
-		
+
 		assert.Equal(t, "1", ctx.Metadata.(Metadata).Owner)
 		assert.Len(t, ctx.Metadata.(Metadata).Repositories, 1)
 	})
@@ -235,14 +234,14 @@ func Test__GitLab__HandleRequest(t *testing.T) {
 			ctx := &contexts.IntegrationContext{}
 			recorder := httptest.NewRecorder()
 			req := httptest.NewRequest("GET", "/unknown", nil)
-			
+
 			g.HandleRequest(core.HTTPRequestContext{
 				Request:     req,
 				Response:    recorder,
 				Integration: ctx,
 				Logger:      logger,
 			})
-			
+
 			assert.Equal(t, http.StatusNotFound, recorder.Code)
 		})
 
@@ -250,32 +249,32 @@ func Test__GitLab__HandleRequest(t *testing.T) {
 			ctx := &contexts.IntegrationContext{
 				Metadata: Metadata{State: "valid-state"},
 				Configuration: map[string]any{
-					"clientId": "id",
+					"clientId":     "id",
 					"clientSecret": "secret",
-					"baseUrl": "https://gitlab.com",
+					"baseUrl":      "https://gitlab.com",
 				},
 				Secrets: make(map[string]core.IntegrationSecret),
 			}
-			
+
 			mockHTTP := &contexts.HTTPContext{
 				Responses: []*http.Response{
 					GitlabMockResponse(http.StatusBadRequest, "{}"),
 				},
 			}
-			
+
 			recorder := httptest.NewRecorder()
 			req := httptest.NewRequest("GET", "/callback?code=bad&state=valid-state", nil)
-			
+
 			g.HandleRequest(core.HTTPRequestContext{
 				Request:     req,
 				Response:    recorder,
-				Integration: ctx, 
+				Integration: ctx,
 				HTTP:        mockHTTP,
 				Logger:      logger,
 			})
-			
+
 			assert.Equal(t, http.StatusSeeOther, recorder.Code)
-			
+
 			assert.NotContains(t, ctx.State, "error")
 		})
 	})

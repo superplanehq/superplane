@@ -13,12 +13,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-
 const (
 	AuthTypePersonalAccessToken = "personalAccessToken"
-	AuthTypeAppOAuth           = "appOAuth"
-	OAuthAccessToken           = "accessToken"
-	OAuthRefreshToken          = "refreshToken"
+	AuthTypeAppOAuth            = "appOAuth"
+	OAuthAccessToken            = "accessToken"
+	OAuthRefreshToken           = "refreshToken"
 )
 
 var scopeList = []string{
@@ -77,8 +76,8 @@ type GitLab struct {
 }
 
 type Configuration struct {
-	AuthType            string  `mapstructure:"authType" json:"authType"`
-	BaseURL             string  `mapstructure:"baseUrl" json:"baseUrl"`
+	AuthType            string `mapstructure:"authType" json:"authType"`
+	BaseURL             string `mapstructure:"baseUrl" json:"baseUrl"`
 	ClientID            string `mapstructure:"clientId" json:"clientId"`
 	ClientSecret        string `mapstructure:"clientSecret" json:"clientSecret"`
 	GroupID             string `mapstructure:"groupId" json:"groupId"`
@@ -86,9 +85,9 @@ type Configuration struct {
 }
 
 type Metadata struct {
-	State        string        `mapstructure:"state" json:"state"`
-	Owner        string        `mapstructure:"owner" json:"owner"`
-	Repositories []Repository  `mapstructure:"repositories" json:"repositories"`
+	State        string       `mapstructure:"state" json:"state"`
+	Owner        string       `mapstructure:"owner" json:"owner"`
+	Repositories []Repository `mapstructure:"repositories" json:"repositories"`
 }
 
 type Repository struct {
@@ -171,11 +170,11 @@ func (g *GitLab) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "groupId",
-			Label:    "Group ID",
-			Type:     configuration.FieldTypeString,
+			Name:        "groupId",
+			Label:       "Group ID",
+			Type:        configuration.FieldTypeString,
 			Description: "Group ID",
-			Required: true,
+			Required:    true,
 		},
 	}
 }
@@ -275,7 +274,7 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 
 func (g *GitLab) personalAccessTokenSync(ctx core.SyncContext, configuration Configuration) error {
 	token := configuration.PersonalAccessToken
-	
+
 	if len(token) == 0 {
 		baseURL := configuration.BaseURL
 
@@ -395,7 +394,7 @@ func (g *GitLab) handleCallback(ctx core.HTTPRequestContext, config *Configurati
 			return
 		}
 	}
-	
+
 	if err := ctx.Integration.ScheduleResync(tokenResponse.GetExpiration()); err != nil {
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
@@ -409,10 +408,10 @@ func (g *GitLab) handleCallback(ctx core.HTTPRequestContext, config *Configurati
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	
+
 	ctx.Integration.RemoveBrowserAction()
 	ctx.Integration.SetState("ready", "")
-	
+
 	http.Redirect(ctx.Response, ctx.Request,
 		fmt.Sprintf("%s/%s/settings/integrations/%s", redirectBaseURL, ctx.OrganizationID, ctx.Integration.ID().String()),
 		http.StatusSeeOther)

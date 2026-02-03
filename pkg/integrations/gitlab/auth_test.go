@@ -26,17 +26,17 @@ func Test__Auth__exchangeCode(t *testing.T) {
 
 		service := NewAuth(mock)
 		resp, err := service.exchangeCode("https://gitlab.com", "id", "secret", "code-123", "redirect")
-		
+
 		require.NoError(t, err)
 		assert.Equal(t, "access-123", resp.AccessToken)
 		assert.Equal(t, "refresh-123", resp.RefreshToken)
 		assert.Equal(t, 7200, resp.ExpiresIn)
-		
+
 		require.Len(t, mock.Requests, 1)
 		req := mock.Requests[0]
 		assert.Equal(t, "POST", req.Method)
 		assert.Equal(t, "https://gitlab.com/oauth/token", req.URL.String())
-		
+
 		body, _ := io.ReadAll(req.Body)
 		values, _ := url.ParseQuery(string(body))
 		assert.Equal(t, "authorization_code", values.Get("grant_type"))
@@ -52,7 +52,7 @@ func Test__Auth__exchangeCode(t *testing.T) {
 
 		service := NewAuth(mock)
 		_, err := service.exchangeCode("https://gitlab.com", "id", "secret", "code", "redirect")
-		
+
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "status 400")
 	})
@@ -72,14 +72,14 @@ func Test__Auth__RefreshToken(t *testing.T) {
 
 		service := NewAuth(mock)
 		resp, err := service.RefreshToken("https://gitlab.com", "id", "secret", "refresh-old")
-		
+
 		require.NoError(t, err)
 		assert.Equal(t, "access-new", resp.AccessToken)
-		
+
 		require.Len(t, mock.Requests, 1)
 		req := mock.Requests[0]
 		assert.Equal(t, "POST", req.Method)
-		
+
 		body, _ := io.ReadAll(req.Body)
 		values, _ := url.ParseQuery(string(body))
 		assert.Equal(t, "refresh_token", values.Get("grant_type"))
@@ -102,11 +102,11 @@ func Test__Auth__HandleCallback(t *testing.T) {
 		id := "id"
 		secret := "secret"
 		config := &Configuration{
-			BaseURL: "https://gitlab.com",
-			ClientID: id,
+			BaseURL:      "https://gitlab.com",
+			ClientID:     id,
 			ClientSecret: secret,
 		}
-		
+
 		resp, err := service.HandleCallback(req, config, state, "uri")
 		require.NoError(t, err)
 		assert.Equal(t, "ok", resp.AccessToken)
@@ -115,7 +115,7 @@ func Test__Auth__HandleCallback(t *testing.T) {
 	t.Run("invalid state", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/?code=123&state=bad", nil)
 		config := &Configuration{}
-		
+
 		_, err := service.HandleCallback(req, config, "valid-state", "uri")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid state")
@@ -124,7 +124,7 @@ func Test__Auth__HandleCallback(t *testing.T) {
 	t.Run("error param", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/?error=access_denied&error_description=bad", nil)
 		config := &Configuration{}
-		
+
 		_, err := service.HandleCallback(req, config, "xyz", "uri")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "OAuth error")
