@@ -102,9 +102,7 @@ dev.start.fg:
 
 dev.start:
 	docker compose $(DOCKER_COMPOSE_OPTS) up -d
-	echo "Waiting for services to start..."
-	sleep 20 # usually takes some time for the DB and the app to be ready
-	echo "Dev environment started. Access the app at http://localhost:8000"
+	@bash ./scripts/wait-for-app
 
 dev.logs:
 	docker compose $(DOCKER_COMPOSE_OPTS) logs -f
