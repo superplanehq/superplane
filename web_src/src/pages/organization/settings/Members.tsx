@@ -18,7 +18,6 @@ import {
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { isRBACEnabled } from "@/lib/env";
 import { Switch } from "@/ui/switch";
 import { getApiErrorMessage } from "@/utils/errors";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
@@ -349,17 +348,15 @@ export function Members({ organizationId }: MembersProps) {
                       <Icon name={getSortIcon("email")} size="sm" className="text-gray-400" />
                     </div>
                   </TableHeader>
-                  {isRBACEnabled() && (
-                    <TableHeader
-                      className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                      onClick={() => handleSort("role")}
-                    >
-                      <div className="flex items-center gap-2">
-                        Role
-                        <Icon name={getSortIcon("role")} size="sm" className="text-gray-400" />
-                      </div>
-                    </TableHeader>
-                  )}
+                  <TableHeader
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    onClick={() => handleSort("role")}
+                  >
+                    <div className="flex items-center gap-2">
+                      Role
+                      <Icon name={getSortIcon("role")} size="sm" className="text-gray-400" />
+                    </div>
+                  </TableHeader>
                   <TableHeader
                     className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
                     onClick={() => handleSort("status")}
@@ -384,50 +381,48 @@ export function Members({ organizationId }: MembersProps) {
                       </div>
                     </TableCell>
                     <TableCell>{member.email}</TableCell>
-                    {isRBACEnabled() && (
-                      <TableCell>
-                        {(() => {
-                          const isSelf = account?.id === member.id;
-                          const roleChangeAllowed = canUpdateMembers && !isSelf;
-                          const tooltipAllowed = roleChangeAllowed || (permissionsLoading && !isSelf);
-                          const tooltipMessage = isSelf
-                            ? "You can't change your own role."
-                            : "You don't have permission to update member roles.";
+                    <TableCell>
+                      {(() => {
+                        const isSelf = account?.id === member.id;
+                        const roleChangeAllowed = canUpdateMembers && !isSelf;
+                        const tooltipAllowed = roleChangeAllowed || (permissionsLoading && !isSelf);
+                        const tooltipMessage = isSelf
+                          ? "You can't change your own role."
+                          : "You don't have permission to update member roles.";
 
-                          return (
-                            <PermissionTooltip allowed={tooltipAllowed} message={tooltipMessage}>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <button className="flex items-center gap-2 text-sm" disabled={!roleChangeAllowed}>
-                                    {member.role}
-                                    <Icon name="chevron-down" />
-                                  </button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                  {organizationRoles.map((role) => (
-                                    <DropdownMenuItem
-                                      key={role.metadata?.name}
-                                      onClick={() => handleRoleChange(member.id, role.metadata?.name || "")}
-                                      disabled={loadingRoles || !roleChangeAllowed}
-                                      className="flex flex-col items-start gap-1"
-                                    >
-                                      <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                                        {role.spec?.displayName || role.metadata?.name}
-                                      </span>
-                                    </DropdownMenuItem>
-                                  ))}
-                                  {loadingRoles && (
-                                    <DropdownMenuItem disabled>
-                                      <span className="text-sm text-gray-500 dark:text-gray-400">Loading roles...</span>
-                                    </DropdownMenuItem>
-                                  )}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </PermissionTooltip>
-                          );
-                        })()}
-                      </TableCell>
-                    )}
+                        return (
+                          <PermissionTooltip allowed={tooltipAllowed} message={tooltipMessage}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="flex items-center gap-2 text-sm" disabled={!roleChangeAllowed}>
+                                  {member.role}
+                                  <Icon name="chevron-down" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent>
+                                {organizationRoles.map((role) => (
+                                  <DropdownMenuItem
+                                    key={role.metadata?.name}
+                                    onClick={() => handleRoleChange(member.id, role.metadata?.name || "")}
+                                    disabled={loadingRoles || !roleChangeAllowed}
+                                    className="flex flex-col items-start gap-1"
+                                  >
+                                    <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                                      {role.spec?.displayName || role.metadata?.name}
+                                    </span>
+                                  </DropdownMenuItem>
+                                ))}
+                                {loadingRoles && (
+                                  <DropdownMenuItem disabled>
+                                    <span className="text-sm text-gray-500 dark:text-gray-400">Loading roles...</span>
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </PermissionTooltip>
+                        );
+                      })()}
+                    </TableCell>
                     <TableCell>
                       <Badge color="green">Active</Badge>
                     </TableCell>

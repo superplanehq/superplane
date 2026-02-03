@@ -14,7 +14,6 @@ import {
   useUpdateGroup,
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
-import { isRBACEnabled } from "@/lib/env";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { showErrorToast } from "@/utils/toast";
 
@@ -213,17 +212,15 @@ export function Groups({ organizationId }: GroupsProps) {
                       <Icon name={getSortIcon("members")} size="sm" className="text-gray-400" />
                     </div>
                   </TableHeader>
-                  {isRBACEnabled() && (
-                    <TableHeader
-                      className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                      onClick={() => handleSort("role")}
-                    >
-                      <div className="flex items-center gap-2">
-                        Role
-                        <Icon name={getSortIcon("role")} size="sm" className="text-gray-400" />
-                      </div>
-                    </TableHeader>
-                  )}
+                  <TableHeader
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    onClick={() => handleSort("role")}
+                  >
+                    <div className="flex items-center gap-2">
+                      Role
+                      <Icon name={getSortIcon("role")} size="sm" className="text-gray-400" />
+                    </div>
+                  </TableHeader>
                   <TableHeader></TableHeader>
                 </TableRow>
               </TableHead>
@@ -252,43 +249,41 @@ export function Groups({ organizationId }: GroupsProps) {
                         {group.status?.membersCount || 0} member{group.status?.membersCount === 1 ? "" : "s"}
                       </span>
                     </TableCell>
-                    {isRBACEnabled() && (
-                      <TableCell>
-                        <PermissionTooltip
-                          allowed={canUpdateGroups || permissionsLoading}
-                          message="You don't have permission to update groups."
-                        >
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button
-                                className="flex items-center gap-2 text-sm justify-between"
-                                disabled={updateGroupMutation.isPending || !canUpdateGroups}
+                    <TableCell>
+                      <PermissionTooltip
+                        allowed={canUpdateGroups || permissionsLoading}
+                        message="You don't have permission to update groups."
+                      >
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              className="flex items-center gap-2 text-sm justify-between"
+                              disabled={updateGroupMutation.isPending || !canUpdateGroups}
+                            >
+                              {updateGroupMutation.isPending
+                                ? "Updating..."
+                                : roles.find((r) => r?.metadata?.name === group.spec?.role)?.spec?.displayName ||
+                                  "Select Role"}
+                              <Icon name="chevron-down" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            {roles.map((role) => (
+                              <DropdownMenuItem
+                                key={role.metadata?.name}
+                                onClick={() => handleRoleUpdate(group.metadata!.name!, role.metadata!.name!)}
+                                className="flex flex-col items-start gap-1"
+                                disabled={!canUpdateGroups}
                               >
-                                {updateGroupMutation.isPending
-                                  ? "Updating..."
-                                  : roles.find((r) => r?.metadata?.name === group.spec?.role)?.spec?.displayName ||
-                                    "Select Role"}
-                                <Icon name="chevron-down" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              {roles.map((role) => (
-                                <DropdownMenuItem
-                                  key={role.metadata?.name}
-                                  onClick={() => handleRoleUpdate(group.metadata!.name!, role.metadata!.name!)}
-                                  className="flex flex-col items-start gap-1"
-                                  disabled={!canUpdateGroups}
-                                >
-                                  <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                                    {role.spec?.displayName || role.metadata!.name}
-                                  </span>
-                                </DropdownMenuItem>
-                              ))}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </PermissionTooltip>
-                      </TableCell>
-                    )}
+                                <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                                  {role.spec?.displayName || role.metadata!.name}
+                                </span>
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </PermissionTooltip>
+                    </TableCell>
                     <TableCell>
                       <div className="flex justify-end">
                         <PermissionTooltip

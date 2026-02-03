@@ -30,7 +30,6 @@ import {
   Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { isRBACEnabled } from "@/lib/env";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { PermissionTooltip, RequirePermission } from "@/components/PermissionGate";
 
@@ -133,17 +132,13 @@ export function OrganizationSettings() {
       Icon: Users,
       permission: { resource: "groups", action: "read" },
     },
-    ...(isRBACEnabled()
-      ? [
-          {
-            id: "roles",
-            label: "Roles",
-            href: `/${organizationId}/settings/roles`,
-            Icon: Shield,
-            permission: { resource: "roles", action: "read" },
-          },
-        ]
-      : []),
+    {
+      id: "roles",
+      label: "Roles",
+      href: `/${organizationId}/settings/roles`,
+      Icon: Shield,
+      permission: { resource: "roles", action: "read" },
+    },
     {
       id: "integrations",
       label: "Integrations",
