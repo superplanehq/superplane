@@ -16,8 +16,7 @@ func init() {
 type FlyIO struct{}
 
 type Configuration struct {
-	APIToken string `json:"apiToken" mapstructure:"apiToken"`
-	OrgSlug  string `json:"orgSlug" mapstructure:"orgSlug"`
+	OrgSlug string `json:"orgSlug" mapstructure:"orgSlug"`
 }
 
 type Metadata struct {
@@ -86,8 +85,7 @@ func (f *FlyIO) Configuration() []configuration.Field {
 }
 
 func (f *FlyIO) Components() []core.Component {
-	return []core.Component{
-	}
+	return []core.Component{}
 }
 
 func (f *FlyIO) Triggers() []core.Trigger {
