@@ -162,7 +162,7 @@ export function Members({ organizationId }: MembersProps) {
   };
 
   const handleRoleChange = async (memberId: string, newRoleName: string) => {
-    if (!canUpdateMembers) return;
+    if (!canUpdateMembers || account?.id === memberId) return;
     try {
       await assignRoleMutation.mutateAsync({
         userId: memberId,
@@ -386,38 +386,46 @@ export function Members({ organizationId }: MembersProps) {
                     <TableCell>{member.email}</TableCell>
                     {isRBACEnabled() && (
                       <TableCell>
-                        <PermissionTooltip
-                          allowed={canUpdateMembers || permissionsLoading}
-                          message="You don't have permission to update member roles."
-                        >
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className="flex items-center gap-2 text-sm" disabled={!canUpdateMembers}>
-                                {member.role}
-                                <Icon name="chevron-down" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              {organizationRoles.map((role) => (
-                                <DropdownMenuItem
-                                  key={role.metadata?.name}
-                                  onClick={() => handleRoleChange(member.id, role.metadata?.name || "")}
-                                  disabled={loadingRoles || !canUpdateMembers}
-                                  className="flex flex-col items-start gap-1"
-                                >
-                                  <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                                    {role.spec?.displayName || role.metadata?.name}
-                                  </span>
-                                </DropdownMenuItem>
-                              ))}
-                              {loadingRoles && (
-                                <DropdownMenuItem disabled>
-                                  <span className="text-sm text-gray-500 dark:text-gray-400">Loading roles...</span>
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </PermissionTooltip>
+                        {(() => {
+                          const isSelf = account?.id === member.id;
+                          const roleChangeAllowed = canUpdateMembers && !isSelf;
+                          const tooltipAllowed = roleChangeAllowed || (permissionsLoading && !isSelf);
+                          const tooltipMessage = isSelf
+                            ? "You can't change your own role."
+                            : "You don't have permission to update member roles.";
+
+                          return (
+                            <PermissionTooltip allowed={tooltipAllowed} message={tooltipMessage}>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button className="flex items-center gap-2 text-sm" disabled={!roleChangeAllowed}>
+                                    {member.role}
+                                    <Icon name="chevron-down" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                  {organizationRoles.map((role) => (
+                                    <DropdownMenuItem
+                                      key={role.metadata?.name}
+                                      onClick={() => handleRoleChange(member.id, role.metadata?.name || "")}
+                                      disabled={loadingRoles || !roleChangeAllowed}
+                                      className="flex flex-col items-start gap-1"
+                                    >
+                                      <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                                        {role.spec?.displayName || role.metadata?.name}
+                                      </span>
+                                    </DropdownMenuItem>
+                                  ))}
+                                  {loadingRoles && (
+                                    <DropdownMenuItem disabled>
+                                      <span className="text-sm text-gray-500 dark:text-gray-400">Loading roles...</span>
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </PermissionTooltip>
+                          );
+                        })()}
                       </TableCell>
                     )}
                     <TableCell>
