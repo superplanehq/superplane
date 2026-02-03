@@ -232,21 +232,3 @@ type Repository struct {
 	MediaTypes        []string `json:"media_types,omitempty"`
 	ContentTypes      []string `json:"content_types,omitempty"`
 }
-
-// GetRepository retrieves information about a repository
-func (c *Client) GetRepository(repository string) (*Repository, error) {
-	apiURL := fmt.Sprintf("%s/repositories/%s", dockerHubAPIURL, repository)
-
-	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var repo Repository
-	err = json.Unmarshal(responseBody, &repo)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	return &repo, nil
-}
