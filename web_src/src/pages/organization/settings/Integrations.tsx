@@ -20,6 +20,7 @@ import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import discordIcon from "@/assets/icons/integrations/discord.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
+import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
@@ -53,6 +54,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
     daytona: daytonaIcon,
     discord: discordIcon,
     github: githubIcon,
+    gitlab: gitlabIcon,
     openai: openAiIcon,
     "open-ai": openAiIcon,
     pagerduty: pagerDutyIcon,
