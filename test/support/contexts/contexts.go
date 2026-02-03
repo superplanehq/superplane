@@ -234,8 +234,10 @@ func (c *ExecutionStateContext) SetKV(key, value string) error {
 }
 
 type AuthContext struct {
-	User  *core.User
-	Users map[string]*core.User
+	User   *core.User
+	Users  map[string]*core.User
+	Roles  map[string]struct{}
+	Groups map[string]struct{}
 }
 
 func (c *AuthContext) AuthenticatedUser() *core.User {
@@ -253,11 +255,29 @@ func (c *AuthContext) GetUser(id uuid.UUID) (*core.User, error) {
 }
 
 func (c *AuthContext) HasRole(role string) (bool, error) {
-	return false, fmt.Errorf("not implemented")
+	if c.User == nil {
+		return false, fmt.Errorf("user not authenticated")
+	}
+
+	if c.Roles == nil {
+		return false, nil
+	}
+
+	_, ok := c.Roles[role]
+	return ok, nil
 }
 
 func (c *AuthContext) InGroup(group string) (bool, error) {
-	return false, fmt.Errorf("not implemented")
+	if c.User == nil {
+		return false, fmt.Errorf("user not authenticated")
+	}
+
+	if c.Groups == nil {
+		return false, nil
+	}
+
+	_, ok := c.Groups[group]
+	return ok, nil
 }
 
 type RequestContext struct {
