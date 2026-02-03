@@ -22,6 +22,9 @@ var exampleOutputPublishCommitStatusBytes []byte
 //go:embed example_output_create_release.json
 var exampleOutputCreateReleaseBytes []byte
 
+//go:embed example_output_get_release.json
+var exampleOutputGetReleaseBytes []byte
+
 //go:embed example_output_update_release.json
 var exampleOutputUpdateReleaseBytes []byte
 
@@ -72,6 +75,9 @@ var exampleOutputPublishCommitStatus map[string]any
 
 var exampleOutputCreateReleaseOnce sync.Once
 var exampleOutputCreateRelease map[string]any
+
+var exampleOutputGetReleaseOnce sync.Once
+var exampleOutputGetRelease map[string]any
 
 var exampleOutputUpdateReleaseOnce sync.Once
 var exampleOutputUpdateRelease map[string]any
@@ -131,6 +137,10 @@ func (c *PublishCommitStatus) ExampleOutput() map[string]any {
 
 func (c *CreateRelease) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateReleaseOnce, exampleOutputCreateReleaseBytes, &exampleOutputCreateRelease)
+}
+
+func (c *GetRelease) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetReleaseOnce, exampleOutputGetReleaseBytes, &exampleOutputGetRelease)
 }
 
 func (c *UpdateRelease) ExampleOutput() map[string]any {
