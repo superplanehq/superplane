@@ -1,7 +1,7 @@
 import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import "./App.css";
 
@@ -9,6 +9,7 @@ import "./App.css";
 import AuthGuard from "./components/AuthGuard";
 import { AccountProvider } from "./contexts/AccountContext";
 import { useAccount } from "./contexts/AccountContext";
+import { PermissionsProvider } from "./contexts/PermissionsContext";
 import { isCustomComponentsEnabled } from "./lib/env";
 import { Login } from "./pages/auth/Login";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
@@ -69,7 +70,7 @@ function AppRouter() {
           <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
 
           {/* Organization-scoped protected routes */}
-          <Route path=":organizationId">
+          <Route path=":organizationId" element={<OrganizationScope />}>
             <Route index element={withAuthOnly(HomePage)} />
             <Route path="canvases/new" element={withAuthOnly(CreateCanvasPage)} />
             {isCustomComponentsEnabled() && (
@@ -86,6 +87,14 @@ function AppRouter() {
         </Routes>
       </SetupGuard>
     </BrowserRouter>
+  );
+}
+
+function OrganizationScope() {
+  return (
+    <PermissionsProvider>
+      <Outlet />
+    </PermissionsProvider>
   );
 }
 
