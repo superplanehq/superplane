@@ -1,7 +1,6 @@
 import { ArrowLeft, ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useState, useEffect, useMemo } from "react";
-import ReactMarkdown from "react-markdown";
 import {
   useAvailableIntegrations,
   useDeleteIntegration,
@@ -11,9 +10,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
-import { Alert, AlertDescription } from "@/ui/alert";
 import { showErrorToast } from "@/utils/toast";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
+import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 
 interface IntegrationDetailsProps {
   organizationId: string;
@@ -284,26 +283,11 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
           <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
             <div className="p-6">
               {integration?.status?.browserAction && (
-                <Alert className="mb-6 bg-orange-100 dark:bg-yellow-900/20 border-orange-200 dark:border-yellow-800">
-                  <div className="flex items-start justify-between gap-4">
-                    <AlertDescription className="flex-1 text-yellow-800 dark:text-yellow-200 [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:space-y-1">
-                      {integration.status.browserAction.description && (
-                        <ReactMarkdown>{integration.status.browserAction.description}</ReactMarkdown>
-                      )}
-                    </AlertDescription>
-                    {integration.status.browserAction.url && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleBrowserAction}
-                        className="shrink-0 px-3 py-1.5"
-                      >
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        Continue
-                      </Button>
-                    )}
-                  </div>
-                </Alert>
+                <IntegrationInstructions
+                  description={integration.status.browserAction.description}
+                  onContinue={integration.status.browserAction.url ? handleBrowserAction : undefined}
+                  className="mb-6"
+                />
               )}
 
               {integrationDef?.configuration && integrationDef.configuration.length > 0 ? (

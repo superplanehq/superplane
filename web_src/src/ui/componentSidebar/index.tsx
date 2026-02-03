@@ -14,7 +14,6 @@ import { Label } from "@/components/ui/label";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { resolveIcon } from "@/lib/utils";
 import { Check, Copy, Loader2, X } from "lucide-react";
-import ReactMarkdown from "react-markdown";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getHeaderIconSrc, IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import {
@@ -26,6 +25,7 @@ import {
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { getApiErrorMessage } from "@/utils/errors";
 import { showErrorToast } from "@/utils/toast";
+import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { ChildEventsState } from "../composite";
 import { TabData } from "./SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "./types";
@@ -353,6 +353,31 @@ export const ComponentSidebar = ({
     updateIntegrationMutation,
     handleCloseConfigureIntegrationDialog,
   ]);
+
+  const handleConfigureBrowserAction = useCallback(() => {
+    const browserAction = configureIntegration?.status?.browserAction;
+    if (!browserAction) return;
+    const { url, method, formFields } = browserAction;
+    if (method?.toUpperCase() === "POST" && formFields) {
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = url || "";
+      form.target = "_blank";
+      form.style.display = "none";
+      Object.entries(formFields).forEach(([key, value]) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = key;
+        input.value = String(value);
+        form.appendChild(input);
+      });
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
+    } else if (url) {
+      window.open(url, "_blank");
+    }
+  }, [configureIntegration?.status?.browserAction]);
 
   useEffect(() => {
     if (configureIntegration?.spec?.configuration) {
@@ -911,19 +936,15 @@ export const ComponentSidebar = ({
                     className="h-6 w-6 text-gray-500 dark:text-gray-400"
                   />
                   <DialogTitle>
-                    Connect{" "}
                     {getIntegrationTypeDisplayName(
                       undefined,
                       selectedIntegrationForDialog.name,
-                    ) || selectedIntegrationForDialog.name}
+                    ) || selectedIntegrationForDialog.name}{" "}
+                    Integration
                   </DialogTitle>
                 </div>
                 {selectedInstructions && (
-                  <DialogDescription asChild>
-                    <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-100 [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:space-y-1 mt-2">
-                      <ReactMarkdown>{selectedInstructions}</ReactMarkdown>
-                    </div>
-                  </DialogDescription>
+                  <IntegrationInstructions description={selectedInstructions} className="mt-2" />
                 )}
               </DialogHeader>
               <div className="space-y-4">
@@ -1033,6 +1054,15 @@ export const ComponentSidebar = ({
                   </DialogTitle>
                 </div>
               </DialogHeader>
+              {configureIntegration?.status?.browserAction && (
+                <IntegrationInstructions
+                  description={configureIntegration.status.browserAction.description}
+                  onContinue={
+                    configureIntegration.status.browserAction.url ? handleConfigureBrowserAction : undefined
+                  }
+                  className="mb-6"
+                />
+              )}
               {configureIntegrationDefinition?.configuration &&
               configureIntegrationDefinition.configuration.length > 0 ? (
                 <form

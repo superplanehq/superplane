@@ -1,7 +1,6 @@
 import { AppWindow, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
 import {
   useAvailableIntegrations,
   useConnectedIntegrations,
@@ -16,6 +15,7 @@ import { getApiErrorMessage } from "@/utils/errors";
 import { Icon } from "@/components/Icon";
 import { showErrorToast } from "@/utils/toast";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
+import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 
 interface IntegrationsProps {
   organizationId: string;
@@ -246,9 +246,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
 
                   <div className="space-y-4">
                     {selectedInstructions && (
-                      <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-100 [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:space-y-1">
-                        <ReactMarkdown>{selectedInstructions}</ReactMarkdown>
-                      </div>
+                      <IntegrationInstructions description={selectedInstructions} />
                     )}
                     {/* Integration Name Field */}
                     <div>

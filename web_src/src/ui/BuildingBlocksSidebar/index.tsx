@@ -513,24 +513,26 @@ function CategorySection({
               </ItemMedia>
 
               <ItemContent>
-                <div className="flex items-center gap-2">
-                  <ItemTitle className="text-sm font-normal">{block.label || block.name}</ItemTitle>
+                <div className="flex items-center gap-2 w-full min-w-0">
+                  <ItemTitle className="text-sm font-normal min-w-0 flex-1 truncate">
+                    {block.label || block.name}
+                  </ItemTitle>
                   {(() => {
                     const subtype = block.componentSubtype || getComponentSubtype(block);
                     const badgeClass =
                       subtype === "trigger"
-                        ? "px-1.5 py-0.5 text-[11px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 rounded whitespace-nowrap"
+                        ? "w-14 inline-block text-center px-1.5 py-0.5 text-[11px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 rounded whitespace-nowrap flex-shrink-0"
                         : subtype === "flow"
-                          ? "px-1.5 py-0.5 text-[11px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 rounded whitespace-nowrap"
-                          : "px-1.5 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400 rounded whitespace-nowrap";
+                          ? "w-14 inline-block text-center px-1.5 py-0.5 text-[11px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 rounded whitespace-nowrap flex-shrink-0"
+                          : "w-14 inline-block text-center px-1.5 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400 rounded whitespace-nowrap flex-shrink-0";
                     return (
-                      <span className={badgeClass}>
+                      <span className={`${badgeClass} ml-auto`}>
                         {subtype === "trigger" ? "Trigger" : subtype === "flow" ? "Flow" : "Action"}
                       </span>
                     );
                   })()}
                   {block.deprecated && (
-                    <span className="px-1.5 py-0.5 text-[11px] font-medium bg-gray-950/5 text-gray-500 rounded whitespace-nowrap">
+                    <span className="px-1.5 py-0.5 text-[11px] font-medium bg-gray-950/5 text-gray-500 rounded whitespace-nowrap flex-shrink-0">
                       Deprecated
                     </span>
                   )}

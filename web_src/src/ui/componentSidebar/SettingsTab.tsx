@@ -269,7 +269,7 @@ export function SettingsTab({
           <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
             {integrationsOfType.length === 0 ? (
               /* No integration: Connect XYZ — always use helper so "github" shows as "GitHub" */
-              <div className="bg-orange-50 dark:bg-orange-950/30 border border-black/10 rounded-md p-3 flex items-center justify-between gap-4">
+              <div className="bg-orange-100 dark:bg-orange-950/30 border border-orange-950/15 rounded-md p-3 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 min-w-0">
                   <IntegrationIcon
                     integrationName={integrationName}
@@ -277,8 +277,7 @@ export function SettingsTab({
                     className="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400"
                   />
                   <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
-                    Connect{" "}
-                    {getIntegrationTypeDisplayName(undefined, integrationName) || integrationName}
+                    {getIntegrationTypeDisplayName(undefined, integrationName) || integrationName} Integration
                   </span>
                 </div>
                 <Button
@@ -431,13 +430,11 @@ export function SettingsTab({
         )}
       </div>
 
-      {isIntegrationReady && (
-        <div className="flex gap-2 justify-end mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-          <Button data-testid="save-node-button" variant="default" onClick={handleSave}>
-            Save
-          </Button>
-        </div>
-      )}
+      <div className="flex gap-2 justify-end mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+        <Button data-testid="save-node-button" variant="default" onClick={handleSave}>
+          Save
+        </Button>
+      </div>
     </div>
   );
 }
