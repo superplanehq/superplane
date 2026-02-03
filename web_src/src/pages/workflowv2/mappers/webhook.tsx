@@ -185,7 +185,7 @@ const ResetAuthButton: React.FC<{
   const [isResetting, setIsResetting] = useState(false);
   const [newSecret, setNewSecret] = useState<string | null>(null);
   const queryClient = useQueryClient();
-  const { organizationId, workflowId } = useParams<{ organizationId: string; workflowId: string }>();
+  const { organizationId, canvasId } = useParams<{ organizationId: string; canvasId: string }>();
 
   const getAuthLabels = () => {
     switch (authMethod) {
@@ -218,14 +218,14 @@ const ResetAuthButton: React.FC<{
   const labels = getAuthLabels();
 
   const handleResetAuth = async () => {
-    if (authMethod === "none" || !workflowId) return;
+    if (authMethod === "none" || !canvasId) return;
 
     setIsResetting(true);
     try {
       const response = await canvasesInvokeNodeTriggerAction(
         withOrganizationHeader({
           path: {
-            canvasId: workflowId,
+            canvasId: canvasId,
             nodeId: nodeId,
             actionName: "resetAuthentication",
           },
@@ -243,7 +243,7 @@ const ResetAuthButton: React.FC<{
         // Invalidate workflow queries to refresh the UI
         if (organizationId) {
           queryClient.invalidateQueries({
-            queryKey: canvasKeys.detail(organizationId, workflowId),
+            queryKey: canvasKeys.detail(organizationId, canvasId),
           });
         }
       }
@@ -319,13 +319,13 @@ export const webhookCustomFieldRenderer: CustomFieldRenderer = {
 export PAYLOAD='{"hello":"world"}'
 
 export SIGNATURE=$(echo -n "$PAYLOAD" \\
-  | openssl dgst -sha256 -hmac "$SIGNATURE_KEY" \\
-  | awk '{print $2}')
+  | openssl dgst -sha256 -hmac "$SIGNATURE_KEY" -binary \\
+  | xxd -p -c 256)
 
 curl -X POST \\
   -H "X-Signature-256: sha256=$SIGNATURE" \\
   -H "Content-Type: application/json" \\
-  --data "$PAYLOAD" \\
+  --data-binary "$PAYLOAD" \\
   ${webhookUrl}`;
           break;
 
