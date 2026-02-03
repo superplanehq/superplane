@@ -272,7 +272,7 @@ func (g *GitLab) personalAccessTokenSync(ctx core.SyncContext, configuration Con
 
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
 			Description: fmt.Sprintf(patSetupDescription, strings.Join(scopeList, ", ")),
-			URL:         baseURL,
+			URL:         fmt.Sprintf("%s/-/user_settings/personal_access_tokens", baseURL),
 			Method:      "GET",
 		})
 		ctx.Integration.SetState("pending", "Waiting for Personal Access Token")

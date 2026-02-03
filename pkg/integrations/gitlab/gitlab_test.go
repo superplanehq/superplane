@@ -75,7 +75,7 @@ func Test__GitLab__Sync(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "pending", ctx.State)
 		assert.NotNil(t, ctx.BrowserAction)
-		assert.Contains(t, ctx.BrowserAction.Description, "Personal Access Token Setup")
+		assert.Equal(t, "https://gitlab.com/-/user_settings/personal_access_tokens", ctx.BrowserAction.URL)
 	})
 
 	t.Run("oauth - missing client id - setup instructions", func(t *testing.T) {

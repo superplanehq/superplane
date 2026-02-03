@@ -51,15 +51,9 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 		}
 
 	case AuthTypeAppOAuth:
-		secrets, err := ctx.GetSecrets()
+		token, err = findSecret(ctx, OAuthAccessToken)
 		if err != nil {
 			return nil, err
-		}
-		for _, secret := range secrets {
-			if secret.Name == OAuthAccessToken {
-				token = string(secret.Value)
-				break
-			}
 		}
 		if token == "" {
 			return nil, fmt.Errorf("OAuth access token not found")
