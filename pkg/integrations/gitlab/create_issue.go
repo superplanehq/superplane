@@ -110,10 +110,23 @@ func (c *CreateIssue) Configuration() []configuration.Field {
 }
 
 func (c *CreateIssue) Setup(ctx core.SetupContext) error {
+	var config CreateIssueConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	if config.Project == "" {
+		return fmt.Errorf("project is required")
+	}
+
+	if config.Title == "" {
+		return fmt.Errorf("title is required")
+	}
+
 	return ensureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
-		ctx.Configuration,
+		config.Project,
 	)
 }
 

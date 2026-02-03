@@ -12,15 +12,14 @@ type NodeMetadata struct {
 	Repository *Repository `json:"repository"`
 }
 
-func ensureRepoInMetadata(ctx core.MetadataContext, app core.IntegrationContext, configuration any) error {
+func ensureRepoInMetadata(ctx core.MetadataContext, app core.IntegrationContext, projectID string) error {
 	var nodeMetadata NodeMetadata
 	err := mapstructure.Decode(ctx.Get(), &nodeMetadata)
 	if err != nil {
 		return fmt.Errorf("failed to decode node metadata: %w", err)
 	}
 
-	projectIDStr := getProjectFromConfiguration(configuration)
-	if projectIDStr == "" {
+	if projectID == "" {
 		return fmt.Errorf("project is required")
 	}
 
@@ -33,37 +32,18 @@ func ensureRepoInMetadata(ctx core.MetadataContext, app core.IntegrationContext,
 	}
 
 	repoIndex := slices.IndexFunc(appMetadata.Repositories, func(r Repository) bool {
-		return fmt.Sprintf("%d", r.ID) == projectIDStr
+		return fmt.Sprintf("%d", r.ID) == projectID
 	})
 
 	if repoIndex == -1 {
-		return fmt.Errorf("project %s is not accessible to integration", projectIDStr)
+		return fmt.Errorf("project %s is not accessible to integration", projectID)
 	}
 
-	if nodeMetadata.Repository != nil && fmt.Sprintf("%d", nodeMetadata.Repository.ID) == projectIDStr {
+	if nodeMetadata.Repository != nil && fmt.Sprintf("%d", nodeMetadata.Repository.ID) == projectID {
 		return nil
 	}
 
 	return ctx.Set(NodeMetadata{
 		Repository: &appMetadata.Repositories[repoIndex],
 	})
-}
-
-func getProjectFromConfiguration(c any) string {
-	configMap, ok := c.(map[string]any)
-	if !ok {
-		return ""
-	}
-
-	r, ok := configMap["project"]
-	if !ok {
-		return ""
-	}
-
-	project, ok := r.(string)
-	if !ok {
-		return ""
-	}
-
-	return project
 }

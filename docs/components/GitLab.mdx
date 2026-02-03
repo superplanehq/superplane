@@ -90,7 +90,18 @@ The GitLab integration supports two methods of authentication:
 
 ## Actions
 
-> **Coming Soon**: GitLab actions are currently in development.
+### Create Issue
+Creates a new issue in a GitLab project.
+
+**Inputs:**
+- **Project** (Required): The project where the issue will be created.
+- **Title** (Required): The title of the issue.
+- **Description** (Optional): The description of the issue.
+- **Assignee IDs** (Optional): A list of user IDs to assign the issue to.
+- **Labels** (Optional): A list of labels to apply to the issue.
+
+**Output:**
+- The created issue object.
 
 ## Troubleshooting
 
