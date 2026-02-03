@@ -8,6 +8,65 @@ import (
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
 )
 
+func Test__GetRelease__Execute__Validation(t *testing.T) {
+	component := GetRelease{}
+	helloRepo := Repository{ID: 123456, Name: "hello", URL: "https://github.com/testhq/hello"}
+
+	t.Run("returns error when releaseId is nil for byId strategy", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Metadata: Metadata{
+				InstallationID: "12345",
+				Owner:          "testhq",
+				Repositories:   []Repository{helloRepo},
+				GitHubApp:      GitHubAppMetadata{ID: 12345},
+			},
+			Configuration: map[string]any{
+				"privateKey": "test-key",
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Integration:    integrationCtx,
+			NodeMetadata:   &contexts.MetadataContext{Metadata: NodeMetadata{Repository: &helloRepo}},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Configuration: map[string]any{
+				"repository":      "hello",
+				"releaseStrategy": "byId",
+				"releaseId":       nil,
+			},
+		})
+
+		require.ErrorContains(t, err, "release ID is required when using byId strategy")
+	})
+
+	t.Run("returns error when tagName is empty for specific strategy", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Metadata: Metadata{
+				InstallationID: "12345",
+				Owner:          "testhq",
+				Repositories:   []Repository{helloRepo},
+				GitHubApp:      GitHubAppMetadata{ID: 12345},
+			},
+			Configuration: map[string]any{
+				"privateKey": "test-key",
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Integration:    integrationCtx,
+			NodeMetadata:   &contexts.MetadataContext{Metadata: NodeMetadata{Repository: &helloRepo}},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Configuration: map[string]any{
+				"repository":      "hello",
+				"releaseStrategy": "specific",
+				"tagName":         "",
+			},
+		})
+
+		require.ErrorContains(t, err, "tag name is required when using specific tag strategy")
+	})
+}
+
 func Test__GetRelease__Setup(t *testing.T) {
 	helloRepo := Repository{ID: 123456, Name: "hello", URL: "https://github.com/testhq/hello"}
 	component := GetRelease{}

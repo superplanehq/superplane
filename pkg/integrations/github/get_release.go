@@ -174,6 +174,14 @@ func (c *GetRelease) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	// Validate required fields based on strategy BEFORE creating client
+	if config.ReleaseStrategy == "byId" && config.ReleaseID == nil {
+		return fmt.Errorf("release ID is required when using byId strategy")
+	}
+	if config.ReleaseStrategy == "specific" && (config.TagName == nil || *config.TagName == "") {
+		return fmt.Errorf("tag name is required when using specific tag strategy")
+	}
+
 	var nodeMetadata NodeMetadata
 	if err := mapstructure.Decode(ctx.NodeMetadata.Get(), &nodeMetadata); err != nil {
 		return fmt.Errorf("failed to decode node metadata: %w", err)
@@ -195,9 +203,7 @@ func (c *GetRelease) Execute(ctx core.ExecutionContext) error {
 	var release any
 
 	if config.ReleaseStrategy == "byId" {
-		if config.ReleaseID == nil {
-			return fmt.Errorf("release ID is required when using byId strategy")
-		}
+		// Validation already done above
 		// Fetch by release ID
 		r, _, err := client.Repositories.GetRelease(
 			context.Background(),
@@ -210,10 +216,7 @@ func (c *GetRelease) Execute(ctx core.ExecutionContext) error {
 		}
 		release = r
 	} else if config.ReleaseStrategy == "specific" {
-		// Validate TagName is provided for specific strategy
-		if config.TagName == nil || *config.TagName == "" {
-			return fmt.Errorf("tag name is required when using specific tag strategy")
-		}
+		// Fetch by tag (validation done above)
 		r, err := fetchReleaseByStrategy(client, appMetadata.Owner, config.Repository, config.ReleaseStrategy, *config.TagName)
 		if err != nil {
 			return err
