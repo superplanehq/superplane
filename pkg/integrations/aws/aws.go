@@ -150,11 +150,7 @@ func (a *AWS) generateCredentials(ctx core.SyncContext, config Configuration) er
 		durationSeconds = defaultSessionDurationSecs
 	}
 
-	subject := fmt.Sprintf("app-installation:%s", ctx.InstallationID)
-	if strings.TrimSpace(ctx.InstallationID) == "" {
-		subject = fmt.Sprintf("app-installation:%s", ctx.Integration.ID())
-	}
-
+	subject := fmt.Sprintf("app-installation:%s", ctx.Integration.ID())
 	oidcToken, err := ctx.OIDC.Sign(subject, 5*time.Minute, ctx.Integration.ID().String(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to generate OIDC token: %w", err)

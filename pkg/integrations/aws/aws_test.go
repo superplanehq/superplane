@@ -68,11 +68,10 @@ func Test__AWS__Sync(t *testing.T) {
 		}
 
 		err := a.Sync(core.SyncContext{
-			Configuration:  integrationCtx.Configuration,
-			HTTP:           httpContext,
-			OIDC:           support.NewOIDCProvider(),
-			Integration:    integrationCtx,
-			InstallationID: "installation-123",
+			Configuration: integrationCtx.Configuration,
+			HTTP:          httpContext,
+			OIDC:          support.NewOIDCProvider(),
+			Integration:   integrationCtx,
 		})
 
 		require.NoError(t, err)

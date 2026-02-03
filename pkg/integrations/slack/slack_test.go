@@ -78,9 +78,8 @@ func Test__Slack__Sync(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
 
 		err := s.Sync(core.SyncContext{
-			Integration:    integrationCtx,
-			BaseURL:        "https://app.example.com",
-			InstallationID: "install-123",
+			Integration: integrationCtx,
+			BaseURL:     "https://app.example.com",
 		})
 
 		require.NoError(t, err)

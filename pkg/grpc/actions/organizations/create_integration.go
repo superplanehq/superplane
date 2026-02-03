@@ -67,7 +67,6 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 		BaseURL:         baseURL,
 		WebhooksBaseURL: webhooksBaseURL,
 		OrganizationID:  orgID,
-		InstallationID:  newIntegration.ID.String(),
 		OIDC:            oidcProvider,
 	})
 

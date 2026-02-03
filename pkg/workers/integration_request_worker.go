@@ -113,7 +113,6 @@ func (w *IntegrationRequestWorker) syncIntegration(tx *gorm.DB, request *models.
 		BaseURL:         w.baseURL,
 		WebhooksBaseURL: w.webhooksBaseURL,
 		OrganizationID:  instance.OrganizationID.String(),
-		InstallationID:  instance.ID.String(),
 		OIDC:            w.oidcProvider,
 	})
 
