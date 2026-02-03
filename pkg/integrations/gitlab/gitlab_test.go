@@ -72,7 +72,7 @@ func Test__GitLab__Sync(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "pending", ctx.State)
+		assert.Equal(t, "error", ctx.State)
 		assert.NotNil(t, ctx.BrowserAction)
 		assert.Equal(t, "https://gitlab.com/-/user_settings/personal_access_tokens", ctx.BrowserAction.URL)
 	})
@@ -91,7 +91,7 @@ func Test__GitLab__Sync(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "pending", ctx.State)
+		assert.Equal(t, "error", ctx.State)
 		assert.NotNil(t, ctx.BrowserAction)
 		assert.Contains(t, ctx.BrowserAction.Description, "Step 1: Create a GitLab OAuth Application")
 	})
@@ -112,7 +112,7 @@ func Test__GitLab__Sync(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "pending", ctx.State)
+		assert.Equal(t, "error", ctx.State)
 		assert.NotNil(t, ctx.BrowserAction)
 		assert.Contains(t, ctx.BrowserAction.URL, "/oauth/authorize")
 		assert.Contains(t, ctx.BrowserAction.Description, "Connect to GitLab")
@@ -132,7 +132,16 @@ func Test__GitLab__Sync(t *testing.T) {
 		}
 
 		mockHTTP := &contexts.HTTPContext{
-			Responses: []*http.Response{},
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{
+					"access_token": "new-access-token",
+					"refresh_token": "new-refresh-token",
+					"expires_in": 7200,
+					"token_type": "Bearer"
+				}`),
+				GitlabMockResponse(http.StatusOK, `{"id": 1}`),
+				GitlabMockResponse(http.StatusOK, `[{"id": 1, "path_with_namespace": "group/project1", "web_url": "https://gitlab.com/group/project1"}]`),
+			},
 		}
 
 		err := g.Sync(core.SyncContext{
@@ -144,7 +153,10 @@ func Test__GitLab__Sync(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "ready", ctx.State)
 
-		require.Len(t, mockHTTP.Requests, 0)
+		require.Len(t, mockHTTP.Requests, 3)
+		assert.Equal(t, "https://gitlab.com/oauth/token", mockHTTP.Requests[0].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/user", mockHTTP.Requests[1].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/groups/123/projects?include_subgroups=true&per_page=100&page=1", mockHTTP.Requests[2].URL.String())
 	})
 
 	t.Run("error cases", func(t *testing.T) {
