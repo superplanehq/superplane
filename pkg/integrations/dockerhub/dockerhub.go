@@ -1,11 +1,7 @@
 package dockerhub
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -126,33 +122,7 @@ func (d *DockerHub) Sync(ctx core.SyncContext) error {
 }
 
 func (d *DockerHub) HandleRequest(ctx core.HTTPRequestContext) {
-	if strings.HasSuffix(ctx.Request.URL.Path, "/webhook") {
-		d.handleWebhook(ctx)
-		return
-	}
-
-	ctx.Logger.Warnf("unknown path: %s", ctx.Request.URL.Path)
-	ctx.Response.WriteHeader(http.StatusNotFound)
-}
-
-func (d *DockerHub) handleWebhook(ctx core.HTTPRequestContext) {
-	body, err := io.ReadAll(ctx.Request.Body)
-	if err != nil {
-		ctx.Logger.Errorf("Error reading request body: %v", err)
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	var payload WebhookPayload
-	err = json.Unmarshal(body, &payload)
-	if err != nil {
-		ctx.Logger.Errorf("Error parsing webhook payload: %v", err)
-		ctx.Response.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	ctx.Logger.Infof("Received Docker Hub webhook for repository: %s", payload.Repository.RepoName)
-	ctx.Response.WriteHeader(http.StatusOK)
+	// no-op: webhooks are handled by individual triggers (OnImagePushed)
 }
 
 func (d *DockerHub) CleanupWebhook(ctx core.CleanupWebhookContext) error {
