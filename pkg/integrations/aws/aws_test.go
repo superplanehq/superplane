@@ -162,7 +162,7 @@ func Test__AWS__Sync(t *testing.T) {
 				EventBridge: &common.EventBridgeMetadata{
 					APIDestinations: map[string]common.APIDestinationMetadata{
 						"us-east-1": {
-							ApiDestinationArn: "arn:aws:events:us-east-1:123456789012:api-destination/superplane-test/def456",
+							APIDestinationArn: "arn:aws:events:us-east-1:123456789012:api-destination/superplane-test/def456",
 						},
 					},
 				},

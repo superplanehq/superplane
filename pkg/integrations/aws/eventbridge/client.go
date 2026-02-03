@@ -89,7 +89,7 @@ func (c *Client) DeleteConnection(name string) error {
 	return c.postJSON("DeleteConnection", payload, nil)
 }
 
-func (c *Client) CreateApiDestination(name, connectionArn, url string, tags []common.Tag) (string, error) {
+func (c *Client) CreateAPIDestination(name, connectionArn, url string, tags []common.Tag) (string, error) {
 	payload := map[string]any{
 		"Name":                         name,
 		"ConnectionArn":                connectionArn,
@@ -103,30 +103,30 @@ func (c *Client) CreateApiDestination(name, connectionArn, url string, tags []co
 	}
 
 	var response struct {
-		ApiDestinationArn string `json:"ApiDestinationArn"`
+		APIDestinationArn string `json:"ApiDestinationArn"`
 	}
 
 	if err := c.postJSON("CreateApiDestination", payload, &response); err != nil {
 		return "", err
 	}
 
-	return response.ApiDestinationArn, nil
+	return response.APIDestinationArn, nil
 }
 
-func (c *Client) DescribeApiDestination(name string) (string, error) {
+func (c *Client) DescribeAPIDestination(name string) (string, error) {
 	payload := map[string]any{"Name": name}
 	var response struct {
-		ApiDestinationArn string `json:"ApiDestinationArn"`
+		APIDestinationArn string `json:"ApiDestinationArn"`
 	}
 
 	if err := c.postJSON("DescribeApiDestination", payload, &response); err != nil {
 		return "", err
 	}
 
-	return response.ApiDestinationArn, nil
+	return response.APIDestinationArn, nil
 }
 
-func (c *Client) DeleteApiDestination(name string) error {
+func (c *Client) DeleteAPIDestination(name string) error {
 	payload := map[string]any{"Name": name}
 	return c.postJSON("DeleteApiDestination", payload, nil)
 }

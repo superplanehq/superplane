@@ -247,7 +247,7 @@ func (a *AWS) cleanupEventBridge(ctx core.IntegrationCleanupContext, metadata *c
 	for region, destination := range metadata.EventBridge.APIDestinations {
 		client := eventbridge.NewClient(ctx.HTTP, credentials, region)
 
-		err := client.DeleteApiDestination(destination.Name)
+		err := client.DeleteAPIDestination(destination.Name)
 		if err != nil && !common.IsNotFoundErr(err) {
 			err = errors.Join(err, fmt.Errorf("failed to delete API destination in region %s: %w", region, err))
 		}
@@ -388,7 +388,7 @@ func (a *AWS) configureEventBridge(ctx core.SyncContext, config Configuration, m
 		return fmt.Errorf("failed to create API destination: %w", err)
 	}
 
-	ctx.Logger.Infof("Created API destination %s for region %s", apiDestination.ApiDestinationArn, region)
+	ctx.Logger.Infof("Created API destination %s for region %s", apiDestination.APIDestinationArn, region)
 
 	metadata.EventBridge = &common.EventBridgeMetadata{
 		APIDestinations: map[string]common.APIDestinationMetadata{
@@ -502,32 +502,6 @@ func (a *AWS) ruleName(integration core.IntegrationContext, source string) (stri
 	return fmt.Sprintf("superplane-%s-%s", integration.ID().String(), service), nil
 }
 
-func roleNameFromArn(arn string) (string, bool) {
-	arn = strings.TrimSpace(arn)
-	if arn == "" {
-		return "", false
-	}
-
-	index := strings.LastIndex(arn, "role/")
-	if index == -1 {
-		return "", false
-	}
-
-	name := strings.TrimSpace(arn[index+len("role/"):])
-	if name == "" {
-		return "", false
-	}
-
-	if lastSlash := strings.LastIndex(name, "/"); lastSlash != -1 {
-		name = strings.TrimSpace(name[lastSlash+1:])
-		if name == "" {
-			return "", false
-		}
-	}
-
-	return name, true
-}
-
 func (a *AWS) createAPIDestination(
 	credentials *aws.Credentials,
 	integration core.IntegrationContext,
@@ -544,7 +518,7 @@ func (a *AWS) createAPIDestination(
 		return nil, fmt.Errorf("failed to create connection: %w", err)
 	}
 
-	apiDestinationArn, err := a.ensureApiDestination(
+	apiDestinationArn, err := a.ensureAPIDestination(
 		client,
 		fmt.Sprintf("superplane-%s", integration.ID().String()),
 		connectionArn,
@@ -560,7 +534,7 @@ func (a *AWS) createAPIDestination(
 		Name:              name,
 		Region:            region,
 		ConnectionArn:     connectionArn,
-		ApiDestinationArn: apiDestinationArn,
+		APIDestinationArn: apiDestinationArn,
 	}, nil
 }
 
@@ -582,8 +556,8 @@ func (a *AWS) ensureConnection(client *eventbridge.Client, name string, secret [
 	return connectionArn, nil
 }
 
-func (a *AWS) ensureApiDestination(client *eventbridge.Client, name, connectionArn, url string, tags []common.Tag) (string, error) {
-	apiDestinationArn, err := client.CreateApiDestination(name, connectionArn, url, tags)
+func (a *AWS) ensureAPIDestination(client *eventbridge.Client, name, connectionArn, url string, tags []common.Tag) (string, error) {
+	apiDestinationArn, err := client.CreateAPIDestination(name, connectionArn, url, tags)
 	if err == nil {
 		return apiDestinationArn, nil
 	}
@@ -592,7 +566,7 @@ func (a *AWS) ensureApiDestination(client *eventbridge.Client, name, connectionA
 		return "", err
 	}
 
-	apiDestinationArn, err = client.DescribeApiDestination(name)
+	apiDestinationArn, err = client.DescribeAPIDestination(name)
 	if err != nil {
 		return "", err
 	}
@@ -845,7 +819,7 @@ func (a *AWS) provisionDestination(credentials *aws.Credentials, logger *logrus.
 		return nil, fmt.Errorf("failed to create API destination: %w", err)
 	}
 
-	logger.Infof("Created API destination %s for region %s", newDestination.ApiDestinationArn, region)
+	logger.Infof("Created API destination %s for region %s", newDestination.APIDestinationArn, region)
 	metadata.EventBridge.APIDestinations[region] = *newDestination
 	return newDestination, nil
 }
@@ -935,7 +909,7 @@ func (a *AWS) createRule(
 	err = client.PutTargets(ruleName, []eventbridge.Target{
 		{
 			ID:      "api-destination",
-			Arn:     destination.ApiDestinationArn,
+			Arn:     destination.APIDestinationArn,
 			RoleArn: metadata.IAM.TargetDestinationRole.RoleArn,
 		},
 	})

@@ -74,7 +74,7 @@ type APIDestinationMetadata struct {
 	Name              string `json:"name" mapstructure:"name"`
 	Region            string `json:"region" mapstructure:"region"`
 	ConnectionArn     string `json:"connectionArn" mapstructure:"connectionArn"`
-	ApiDestinationArn string `json:"apiDestinationArn" mapstructure:"apiDestinationArn"`
+	APIDestinationArn string `json:"apiDestinationArn" mapstructure:"apiDestinationArn"`
 }
 
 type ProvisionRuleParameters struct {
