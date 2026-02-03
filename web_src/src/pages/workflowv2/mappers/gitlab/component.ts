@@ -11,7 +11,7 @@ import { formatTimeAgo } from "@/utils/date";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import { MetadataItem } from "@/ui/metadataList";
 import { OutputPayload, ComponentBaseMapper } from "../types";
-import { Issue } from "./types";
+import { Issue, GitLabNodeMetadata } from "./types";
 
 export const createIssueMapper: ComponentBaseMapper = {
   props(
@@ -26,8 +26,8 @@ export const createIssueMapper: ComponentBaseMapper = {
   subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
     if (outputs?.default?.[0]?.data) {
-        const issue = outputs.default[0].data as Issue;
-        return `#${issue.iid} ${issue.title}`;
+      const issue = outputs.default[0].data as Issue;
+      return `#${issue.iid} ${issue.title}`;
     }
     return "Issue Created";
   },
@@ -80,7 +80,7 @@ export function getDetailsForIssue(issue: Issue): Record<string, string> {
   details["State"] = issue?.state;
   details["URL"] = issue?.web_url;
   details["Title"] = issue?.title || "-";
-  
+
   if (issue.closed_by) {
     details["Closed By"] = issue?.closed_by.username;
     details["Closed At"] = issue?.closed_at ? new Date(issue.closed_at).toLocaleString() : "";
@@ -99,7 +99,7 @@ export function getDetailsForIssue(issue: Issue): Record<string, string> {
 
 function metadataList(node: ComponentsNode): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const nodeMetadata = node.metadata as any;
+  const nodeMetadata = node.metadata as unknown as GitLabNodeMetadata;
 
   if (nodeMetadata?.repository?.name) {
     metadata.push({ icon: "book", label: nodeMetadata.repository.name });

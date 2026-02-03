@@ -24,3 +24,11 @@ export interface User {
   avatar_url: string;
   web_url: string;
 }
+
+export interface GitLabNodeMetadata {
+  repository?: {
+    name?: string;
+    url?: string;
+    id?: number;
+  };
+}

@@ -23,9 +23,7 @@ import {
   eventStateRegistry as githubEventStateRegistry,
   customFieldRenderers as githubCustomFieldRenderers,
 } from "./github/index";
-import {
-  componentMappers as gitlabComponentMappers,
-} from "./gitlab/index";
+import { componentMappers as gitlabComponentMappers } from "./gitlab/index";
 import {
   componentMappers as pagerdutyComponentMappers,
   triggerRenderers as pagerdutyTriggerRenderers,
