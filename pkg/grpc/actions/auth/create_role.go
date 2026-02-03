@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"fmt"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
@@ -37,6 +38,12 @@ func CreateRole(ctx context.Context, domainType string, domainID string, role *p
 			Resource:   perm.Resource,
 			Action:     perm.Action,
 			DomainType: domainType,
+		}
+	}
+
+	for _, permission := range permissions {
+		if !authService.IsValidPermission(domainType, permission) {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid permission: %s %s", permission.Resource, permission.Action))
 		}
 	}
 
