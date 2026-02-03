@@ -147,8 +147,6 @@ func Test__GitLab__Sync(t *testing.T) {
 		assert.NotEmpty(t, metadata.State)
 	})
 
-
-
 	t.Run("oauth - has tokens - success", func(t *testing.T) {
 		ctx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
