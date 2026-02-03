@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
 import { showErrorToast } from "@/utils/toast";
+import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 
@@ -173,10 +174,16 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
           className="w-6 h-6"
         />
         <div className="flex-1">
-          <h4 className="text-2xl font-semibold">{integration.metadata?.name || integration.spec?.integrationName}</h4>
+          <h4 className="text-2xl font-semibold">
+            {integration.metadata?.name ||
+              getIntegrationTypeDisplayName(undefined, integration.spec?.integrationName) ||
+              integration.spec?.integrationName}
+          </h4>
           {integration.spec?.integrationName && integration.metadata?.name !== integration.spec?.integrationName && (
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Integration: {integration.spec.integrationName}
+              Integration:{" "}
+              {getIntegrationTypeDisplayName(undefined, integration.spec?.integrationName) ||
+                integration.spec?.integrationName}
             </p>
           )}
         </div>

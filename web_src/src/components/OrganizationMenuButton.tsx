@@ -4,11 +4,11 @@ import { useOrganization } from "@/hooks/useOrganizationData";
 import { isRBACEnabled } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import {
-  AppWindow,
   ArrowRightLeft,
   ChevronDown,
   CircleUser,
   LogOut,
+  Plug,
   Settings,
   Shield,
   User as UserIcon,
@@ -94,7 +94,7 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
     {
       label: "Integrations",
       href: organizationId ? `/${organizationId}/settings/integrations` : "#",
-      Icon: AppWindow,
+      Icon: Plug,
     },
     { label: "Change Organization", href: "/", Icon: ArrowRightLeft },
   ];

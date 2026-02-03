@@ -269,8 +269,8 @@ export function SettingsTab({
           <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
             {integrationsOfType.length === 0 ? (
               /* No integration: Connect XYZ — always use helper so "github" shows as "GitHub" */
-              <div className="bg-orange-100 dark:bg-orange-950/30 border border-orange-950/15 rounded-md p-3 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3 min-w-0">
+              <div className="bg-orange-100 dark:bg-orange-950/30 border border-orange-950/15 rounded-md bg-stripe-diagonal p-3 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2 min-w-0">
                   <IntegrationIcon
                     integrationName={integrationName}
                     iconSlug={integrationDefinition?.icon}
@@ -315,17 +315,33 @@ export function SettingsTab({
                       <SelectValue placeholder="Select an installation" />
                     </SelectTrigger>
                     <SelectContent>
-                      {integrationsOfType.map((integration) => (
-                        <SelectItem key={integration.metadata?.id} value={integration.metadata?.id || ""}>
-                          {integration.metadata?.name || "Unnamed integration"}
-                        </SelectItem>
-                      ))}
+                      {integrationsOfType.map((integration) => {
+                        const instanceName = integration.metadata?.name;
+                        const typeName = integration.spec?.integrationName;
+                        const displayName =
+                          instanceName?.toLowerCase() === typeName?.toLowerCase()
+                            ? getIntegrationTypeDisplayName(undefined, typeName) || instanceName
+                            : instanceName;
+                        return (
+                          <SelectItem key={integration.metadata?.id} value={integration.metadata?.id || ""}>
+                            {displayName || "Unnamed integration"}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
                 {selectedIntegrationFull && (
-                  <div className="mt-3 bg-white border border-gray-300 dark:border-gray-700 rounded-md p-3 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className={`mt-3 border border-gray-300 dark:border-gray-700 rounded-md bg-stripe-diagonal p-3 flex items-center justify-between gap-4 ${
+                      selectedIntegrationFull.status?.state === "ready"
+                        ? "bg-green-100 dark:bg-green-950/30"
+                        : selectedIntegrationFull.status?.state === "error"
+                          ? "bg-red-100 dark:bg-red-950/30"
+                          : "bg-orange-100 dark:bg-orange-950/30"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
                       <IntegrationIcon
                         integrationName={selectedIntegrationFull.spec?.integrationName}
                         iconSlug={integrationDefinition?.icon}

@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { ConfigurationFieldRenderer } from "../../../ui/configurationFieldRenderer";
 import type { IntegrationsIntegrationDefinition } from "../../../api-client/types.gen";
 import { getApiErrorMessage } from "@/utils/errors";
+import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { Icon } from "@/components/Icon";
 import { showErrorToast } from "@/utils/toast";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
@@ -96,7 +97,10 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                 const integrationDefinition = availableIntegrations.find(
                   (a) => a.name === integration.spec?.integrationName,
                 );
-                const integrationLabel = integrationDefinition?.label || integration.spec?.integrationName;
+                const integrationLabel =
+                  integrationDefinition?.label ||
+                  getIntegrationTypeDisplayName(undefined, integration.spec?.integrationName) ||
+                  integration.spec?.integrationName;
                 const integrationName = integrationDefinition?.name || integration.spec?.integrationName;
                 const statusLabel = integration.status?.state
                   ? integration.status.state.charAt(0).toUpperCase() + integration.status.state.slice(1)
@@ -117,7 +121,10 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                       </div>
                       <div>
                         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                          {integrationLabel || integration.metadata?.name || integration.spec?.integrationName}
+                          {integrationLabel ||
+                          integration.metadata?.name ||
+                          getIntegrationTypeDisplayName(undefined, integration.spec?.integrationName) ||
+                          integration.spec?.integrationName}
                         </h3>
                         {integrationDefinition?.description ? (
                           <p className="mt-1 text-sm text-gray-800 dark:text-gray-400">

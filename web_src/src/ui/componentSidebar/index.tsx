@@ -687,7 +687,15 @@ export const ComponentSidebar = ({
           } ${isDetailView ? "pointer-events-none" : "pointer-events-auto"}`}
         >
           {integrationName && integrationRef && resolvedIntegration && (
-            <div className="border-border border-b-1 px-4 py-3 flex-shrink-0">
+            <div
+              className={`border-border border-b-1 bg-stripe-diagonal px-4 py-3 flex-shrink-0 ${
+                resolvedIntegration.status?.state === "ready"
+                  ? "bg-green-100 dark:bg-green-950/30"
+                  : resolvedIntegration.status?.state === "error"
+                    ? "bg-red-100 dark:bg-red-950/30"
+                    : "bg-orange-100 dark:bg-orange-950/30"
+              }`}
+            >
               <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 min-w-0">
                     <IntegrationIcon
@@ -936,11 +944,11 @@ export const ComponentSidebar = ({
                     className="h-6 w-6 text-gray-500 dark:text-gray-400"
                   />
                   <DialogTitle>
+                    Configure{" "}
                     {getIntegrationTypeDisplayName(
                       undefined,
                       selectedIntegrationForDialog.name,
-                    ) || selectedIntegrationForDialog.name}{" "}
-                    Integration
+                    ) || selectedIntegrationForDialog.name}
                   </DialogTitle>
                 </div>
                 {selectedInstructions && (
@@ -1045,11 +1053,10 @@ export const ComponentSidebar = ({
                   />
                   <DialogTitle>
                     Configure{" "}
-                    {configureIntegration.metadata?.name ||
-                      getIntegrationTypeDisplayName(
-                        undefined,
-                        configureIntegration.spec?.integrationName,
-                      ) ||
+                    {getIntegrationTypeDisplayName(
+                      undefined,
+                      configureIntegration.spec?.integrationName,
+                    ) ||
                       configureIntegration.spec?.integrationName}
                   </DialogTitle>
                 </div>

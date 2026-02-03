@@ -16,11 +16,11 @@ import { IntegrationDetails } from "./IntegrationDetails";
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { cn } from "@/lib/utils";
 import {
-  AppWindow,
   ArrowRightLeft,
   CircleUser,
   Home,
   LogOut,
+  Plug,
   Settings,
   Shield,
   User as UserIcon,
@@ -105,7 +105,7 @@ export function OrganizationSettings() {
     ...(isRBACEnabled()
       ? [{ id: "roles", label: "Roles", href: `/${organizationId}/settings/roles`, Icon: Shield }]
       : []),
-    { id: "integrations", label: "Integrations", href: `/${organizationId}/settings/integrations`, Icon: AppWindow },
+    { id: "integrations", label: "Integrations", href: `/${organizationId}/settings/integrations`, Icon: Plug },
     { id: "change-org", label: "Change Organization", href: "/", Icon: ArrowRightLeft },
   ];
 
