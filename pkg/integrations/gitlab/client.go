@@ -96,39 +96,48 @@ func (c *Client) listProjects() ([]Project, error) {
 	page := 1
 
 	for {
-		apiURL := fmt.Sprintf("%s/api/%s/groups/%s/projects?include_subgroups=true&per_page=100&page=%d", c.baseURL, apiVersion, url.PathEscape(c.groupID), page)
-		req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+		projects, nextPage, err := c.fetchProjectsPage(page)
 		if err != nil {
 			return nil, err
-		}
-
-		resp, err := c.do(req)
-		if err != nil {
-			return nil, err
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			if resp.StatusCode == http.StatusNotFound {
-				return nil, fmt.Errorf("group not found (404). Please verify that the Group ID '%s' is correct and you have access to it", c.groupID)
-			}
-			return nil, fmt.Errorf("failed to list projects: status %d", resp.StatusCode)
-		}
-
-		var projects []Project
-		if err := json.NewDecoder(resp.Body).Decode(&projects); err != nil {
-			return nil, fmt.Errorf("failed to decode projects: %v", err)
 		}
 
 		allProjects = append(allProjects, projects...)
 
-		if resp.Header.Get("X-Next-Page") == "" {
+		if nextPage == "" {
 			break
 		}
 		page++
 	}
 
 	return allProjects, nil
+}
+
+func (c *Client) fetchProjectsPage(page int) ([]Project, string, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/groups/%s/projects?include_subgroups=true&per_page=100&page=%d", c.baseURL, apiVersion, url.PathEscape(c.groupID), page)
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, "", err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusNotFound {
+			return nil, "", fmt.Errorf("group not found (404). Please verify that the Group ID '%s' is correct and you have access to it", c.groupID)
+		}
+		return nil, "", fmt.Errorf("failed to list projects: status %d", resp.StatusCode)
+	}
+
+	var projects []Project
+	if err := json.NewDecoder(resp.Body).Decode(&projects); err != nil {
+		return nil, "", fmt.Errorf("failed to decode projects: %v", err)
+	}
+
+	return projects, resp.Header.Get("X-Next-Page"), nil
 }
 
 type IssueRequest struct {
