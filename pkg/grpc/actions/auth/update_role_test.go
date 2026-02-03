@@ -17,6 +17,8 @@ func Test_UpdateRole(t *testing.T) {
 	r := support.Setup(t)
 	ctx := context.Background()
 	orgID := r.Organization.ID.String()
+	canvasPath := "canvases"
+	secretPath := "secrets"
 
 	// Create a custom role first
 	customRoleDef := &authorization.RoleDefinition{
@@ -24,7 +26,7 @@ func Test_UpdateRole(t *testing.T) {
 		DomainType: models.DomainTypeOrganization,
 		Permissions: []*authorization.Permission{
 			{
-				Resource:   "canvas",
+				Resource:   canvasPath,
 				Action:     "read",
 				DomainType: models.DomainTypeOrganization,
 			},
@@ -37,17 +39,17 @@ func Test_UpdateRole(t *testing.T) {
 		req := &pb.Role_Spec{
 			Permissions: []*pbAuth.Permission{
 				{
-					Resource:   "canvas",
+					Resource:   canvasPath,
 					Action:     "read",
 					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
 				{
-					Resource:   "canvas",
-					Action:     "write",
+					Resource:   canvasPath,
+					Action:     "update",
 					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
 				{
-					Resource:   "secret",
+					Resource:   secretPath,
 					Action:     "read",
 					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
@@ -73,7 +75,7 @@ func Test_UpdateRole(t *testing.T) {
 			},
 			Permissions: []*pbAuth.Permission{
 				{
-					Resource:   "canvas",
+					Resource:   canvasPath,
 					Action:     "create",
 					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
@@ -96,7 +98,7 @@ func Test_UpdateRole(t *testing.T) {
 		req := &pb.Role_Spec{
 			Permissions: []*pbAuth.Permission{
 				{
-					Resource:   "canvas",
+					Resource:   canvasPath,
 					Action:     "read",
 					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
@@ -112,7 +114,7 @@ func Test_UpdateRole(t *testing.T) {
 		req := &pb.Role_Spec{
 			Permissions: []*pbAuth.Permission{
 				{
-					Resource:   "canvas",
+					Resource:   canvasPath,
 					Action:     "read",
 					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
@@ -128,7 +130,7 @@ func Test_UpdateRole(t *testing.T) {
 		req := &pb.Role_Spec{
 			Permissions: []*pbAuth.Permission{
 				{
-					Resource:   "canvas",
+					Resource:   canvasPath,
 					Action:     "read",
 					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
@@ -149,7 +151,7 @@ func Test_UpdateRole(t *testing.T) {
 			},
 			Permissions: []*pbAuth.Permission{
 				{
-					Resource:   "canvas",
+					Resource:   canvasPath,
 					Action:     "read",
 					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},

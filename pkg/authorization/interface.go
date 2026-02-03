@@ -4,6 +4,7 @@ import "gorm.io/gorm"
 
 type PermissionChecker interface {
 	CheckOrganizationPermission(userID, orgID, resource, action string) (bool, error)
+	IsValidPermission(domainType string, permission *Permission) bool
 }
 
 // Group management interface
