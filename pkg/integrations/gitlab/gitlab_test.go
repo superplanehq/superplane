@@ -39,7 +39,8 @@ func Test__GitLab__Sync(t *testing.T) {
 
 		mockHTTP := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				GitlabMockResponse(http.StatusOK, `{"id": 123}`),
+				GitlabMockResponse(http.StatusOK, `{"id": 1}`),
+				GitlabMockResponse(http.StatusOK, `[{"id": 1, "path_with_namespace": "group/project1", "web_url": "https://gitlab.com/group/project1"}]`),
 			},
 		}
 
@@ -52,11 +53,12 @@ func Test__GitLab__Sync(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "ready", ctx.State)
 		
-		require.Len(t, mockHTTP.Requests, 1)
-		assert.Equal(t, "https://gitlab.com/api/v4/groups/123", mockHTTP.Requests[0].URL.String())
+		require.Len(t, mockHTTP.Requests, 2)
+		assert.Equal(t, "https://gitlab.com/api/v4/user", mockHTTP.Requests[0].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/groups/123/projects?include_subgroups=true&per_page=100&page=1", mockHTTP.Requests[1].URL.String())
 	})
 
-	t.Run("personal access token - missing token - pending", func(t *testing.T) {
+	t.Run("personal access token - missing token - error state", func(t *testing.T) {
 		ctx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"authType":            AuthTypePersonalAccessToken,
@@ -117,7 +119,7 @@ func Test__GitLab__Sync(t *testing.T) {
 		assert.Contains(t, ctx.BrowserAction.Description, "Connect to GitLab")
 	})
 
-	t.Run("oauth - has tokens - refresh success", func(t *testing.T) {
+	t.Run("oauth - has tokens - success", func(t *testing.T) {
 		ctx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"authType":     AuthTypeAppOAuth,
@@ -131,14 +133,7 @@ func Test__GitLab__Sync(t *testing.T) {
 		}
 
 		mockHTTP := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				GitlabMockResponse(http.StatusOK, `{
-						"access_token": "new-access", 
-						"refresh_token": "new-refresh", 
-						"expires_in": 3600
-					}`),
-				GitlabMockResponse(http.StatusOK, `{"id": 123}`),
-			},
+			Responses: []*http.Response{},
 		}
 
 		err := g.Sync(core.SyncContext{
@@ -150,18 +145,7 @@ func Test__GitLab__Sync(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "ready", ctx.State)
 		
-		require.Len(t, mockHTTP.Requests, 2)
-		assert.Equal(t, "https://gitlab.com/oauth/token", mockHTTP.Requests[0].URL.String())
-		assert.Equal(t, "https://gitlab.com/api/v4/groups/123", mockHTTP.Requests[1].URL.String())
-
-		secrets, _ := ctx.GetSecrets()
-		var accessToken string
-		for _, s := range secrets {
-			if s.Name == OAuthAccessToken {
-				accessToken = string(s.Value)
-			}
-		}
-		assert.Equal(t, "new-access", accessToken)
+		require.Len(t, mockHTTP.Requests, 0)
 	})
 	
 	t.Run("error cases", func(t *testing.T) {
@@ -184,60 +168,7 @@ func Test__GitLab__Sync(t *testing.T) {
 		})
 
 
-		t.Run("oauth refresh failure", func(t *testing.T) {
-			ctx := &contexts.IntegrationContext{
-				Configuration: map[string]any{
-					"authType":     AuthTypeAppOAuth,
-					"groupId":      "123",
-					"clientId":     "id",
-					"clientSecret": "secret",
-				},
-				Secrets: map[string]core.IntegrationSecret{
-					OAuthRefreshToken: {Name: OAuthRefreshToken, Value: []byte("bad-token")},
-				},
-			}
-			mockHTTP := &contexts.HTTPContext{
-				Responses: []*http.Response{
-					GitlabMockResponse(http.StatusBadRequest, `{"error":"invalid_grant"}`),
-				},
-			}
-			err := g.Sync(core.SyncContext{
-				Configuration: ctx.Configuration,
-				Integration:   ctx,
-				HTTP:          mockHTTP,
-			})
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "token expired")
-		})
 
-		t.Run("oauth verify failure", func(t *testing.T) {
-			ctx := &contexts.IntegrationContext{
-				Configuration: map[string]any{
-					"authType":     AuthTypeAppOAuth,
-					"groupId":      "123",
-					"clientId":     "id",
-					"clientSecret": "secret",
-				},
-				Secrets: map[string]core.IntegrationSecret{
-					OAuthRefreshToken: {Name: OAuthRefreshToken, Value: []byte("token")},
-				},
-			}
-			
-			mockHTTP := &contexts.HTTPContext{
-				Responses: []*http.Response{
-					GitlabMockResponse(http.StatusOK, `{"access_token": "ok"}`),
-					GitlabMockResponse(http.StatusForbidden, "{}"),
-				},
-			}
-			
-			err := g.Sync(core.SyncContext{
-				Configuration: ctx.Configuration,
-				Integration:   ctx,
-				HTTP:          mockHTTP,
-			})
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "verify access token")
-		})
 	})
 }
 
@@ -261,7 +192,7 @@ func Test__GitLab__HandleRequest(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "/callback?code=code123&state="+url.QueryEscape(state), nil)
 
-		// Sequence: Exchange Code -> Verify
+		// Sequence: Exchange Code -> Verify (User) -> Verify (Projects)
 		mockHTTP := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				GitlabMockResponse(http.StatusOK, `{
@@ -269,7 +200,8 @@ func Test__GitLab__HandleRequest(t *testing.T) {
 						"refresh_token": "refresh",
 						"expires_in": 3600
 					}`),
-				GitlabMockResponse(http.StatusOK, `{"id": 123}`),
+				GitlabMockResponse(http.StatusOK, `{"id": 1}`),
+				GitlabMockResponse(http.StatusOK, `[{"id": 1}]`),
 			},
 		}
 		
@@ -286,9 +218,13 @@ func Test__GitLab__HandleRequest(t *testing.T) {
 		assert.Equal(t, http.StatusSeeOther, recorder.Code)
 		assert.Equal(t, "ready", ctx.State)
 		
-		require.Len(t, mockHTTP.Requests, 2)
+		require.Len(t, mockHTTP.Requests, 3)
 		assert.Equal(t, "https://gitlab.com/oauth/token", mockHTTP.Requests[0].URL.String())
-		assert.Equal(t, "https://gitlab.com/api/v4/groups/123", mockHTTP.Requests[1].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/user", mockHTTP.Requests[1].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/groups/123/projects?include_subgroups=true&per_page=100&page=1", mockHTTP.Requests[2].URL.String())
+		
+		assert.Equal(t, "1", ctx.Metadata.(Metadata).Owner)
+		assert.Len(t, ctx.Metadata.(Metadata).Repositories, 1)
 	})
 
 	t.Run("error cases", func(t *testing.T) {

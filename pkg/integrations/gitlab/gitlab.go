@@ -77,16 +77,24 @@ type GitLab struct {
 }
 
 type Configuration struct {
-	AuthType     string  `json:"authType"`
-	BaseURL      string  `json:"baseUrl"`
-	ClientID     *string `json:"clientId"`
-	ClientSecret *string `json:"clientSecret"`
-	GroupID             *string `json:"groupId"`
-	PersonalAccessToken *string `json:"personalAccessToken"`
+	AuthType            string  `mapstructure:"authType" json:"authType"`
+	BaseURL             string  `mapstructure:"baseUrl" json:"baseUrl"`
+	ClientID            string `mapstructure:"clientId" json:"clientId"`
+	ClientSecret        string `mapstructure:"clientSecret" json:"clientSecret"`
+	GroupID             string `mapstructure:"groupId" json:"groupId"`
+	PersonalAccessToken string `mapstructure:"personalAccessToken" json:"personalAccessToken"`
 }
 
 type Metadata struct {
-	State string `mapstructure:"state" json:"state"`
+	State        string        `mapstructure:"state" json:"state"`
+	Owner        string        `mapstructure:"owner" json:"owner"`
+	Repositories []Repository  `mapstructure:"repositories" json:"repositories"`
+}
+
+type Repository struct {
+	ID   int    `mapstructure:"id" json:"id"`
+	Name string `mapstructure:"name" json:"name"`
+	URL  string `mapstructure:"url" json:"url"`
 }
 
 func (g *GitLab) Name() string {
@@ -124,7 +132,6 @@ func (g *GitLab) Configuration() []configuration.Field {
 			Label:    "Auth Type",
 			Type:     configuration.FieldTypeSelect,
 			Required: true,
-			Default:  AuthTypeAppOAuth,
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
@@ -174,7 +181,9 @@ func (g *GitLab) Configuration() []configuration.Field {
 }
 
 func (g *GitLab) Components() []core.Component {
-	return []core.Component{}
+	return []core.Component{
+		&CreateIssue{},
+	}
 }
 
 func (g *GitLab) Triggers() []core.Trigger {
@@ -213,7 +222,7 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 	callbackURL := fmt.Sprintf("%s/api/v1/integrations/%s/callback", ctx.BaseURL, ctx.InstallationID)
 
 	// Case 1: No credentials yet - show setup instructions
-	if configuration.ClientID == nil || *configuration.ClientID == "" {
+	if configuration.ClientID == "" {
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
 			Description: fmt.Sprintf(appSetupDescription, callbackURL, strings.Join(scopeList, ", ")),
 			URL:         fmt.Sprintf("%s/-/user_settings/applications", baseURL),
@@ -223,11 +232,6 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 		return nil
 	}
 
-	clientSecret, err := ctx.Integration.GetConfig("clientSecret")
-	if err != nil {
-		return err
-	}
-	
 	// Case 2: Has credentials but no tokens - show auth button
 	refreshToken, _ := findSecret(ctx.Integration, OAuthRefreshToken)
 	if refreshToken == "" {
@@ -240,7 +244,7 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 		authURL := fmt.Sprintf(
 			"%s/oauth/authorize?client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s",
 			baseURL,
-			url.QueryEscape(*configuration.ClientID),
+			url.QueryEscape(configuration.ClientID),
 			url.QueryEscape(callbackURL),
 			url.QueryEscape(strings.Join(scopeList, " ")),
 			url.QueryEscape(state),
@@ -255,39 +259,13 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 		return nil
 	}
 
-	// STEP 3: Has tokens - refresh and set ready
-	authService := NewAuthService(ctx.HTTP)
-	tokenResp, err := authService.RefreshToken(baseURL, *configuration.ClientID, string(clientSecret), refreshToken)
-	if err != nil {
-		return fmt.Errorf("token expired, please re-authorize: %v", err)
-	}
-
-	if err := ctx.Integration.SetSecret(OAuthAccessToken, []byte(tokenResp.AccessToken)); err != nil {
-		return err
-	}
-
-	if err := ctx.Integration.SetSecret(OAuthRefreshToken, []byte(tokenResp.RefreshToken)); err != nil {
-			return err
-	}
-
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return err
-	}
-	if err := client.Verify(); err != nil {
-		return fmt.Errorf("failed to verify access token: %v", err)
-	}
-
-	ctx.Integration.RemoveBrowserAction()
+	// STEP 3: Has tokens - set ready
 	ctx.Integration.SetState("ready", "")
-	return ctx.Integration.ScheduleResync(tokenResp.GetExpiration())
+	return nil
 }
 
 func (g *GitLab) personalAccessTokenSync(ctx core.SyncContext, configuration Configuration) error {
-	token := ""
-	if configuration.PersonalAccessToken != nil {
-		token = *configuration.PersonalAccessToken
-	}
+	token := configuration.PersonalAccessToken
 	
 	if len(token) == 0 {
 		baseURL := configuration.BaseURL
@@ -301,17 +279,44 @@ func (g *GitLab) personalAccessTokenSync(ctx core.SyncContext, configuration Con
 		return nil
 	}
 
+	if err := g.updateMetadata(ctx); err != nil {
+		ctx.Integration.SetState("error", "")
+		return nil
+	}
+
+	ctx.Integration.RemoveBrowserAction()
+	ctx.Integration.SetState("ready", "")
+	return nil
+}
+
+func (g *GitLab) updateMetadata(ctx core.SyncContext) error {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}
 
-	if err := client.Verify(); err != nil {
-		return fmt.Errorf("invalid personal access token: %v", err)
+	user, projects, err := client.FetchIntegrationData()
+	if err != nil {
+		return err
 	}
 
-	ctx.Integration.RemoveBrowserAction()
-	ctx.Integration.SetState("ready", "")
+	repos := []Repository{}
+	for _, p := range projects {
+		repos = append(repos, Repository{
+			ID:   p.ID,
+			Name: p.PathWithNamespace,
+			URL:  p.WebURL,
+		})
+	}
+
+	metadata := Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err == nil {
+		metadata.Repositories = repos
+		if user != nil {
+			metadata.Owner = fmt.Sprintf("%d", user.ID)
+		}
+		ctx.Integration.SetMetadata(metadata)
+	}
 	return nil
 }
 
@@ -341,8 +346,8 @@ func (g *GitLab) HandleRequest(ctx core.HTTPRequestContext) {
 
 	config := &Configuration{
 		BaseURL:      strBaseURL,
-		ClientID:     &strClientID,
-		ClientSecret: &strClientSecret,
+		ClientID:     strClientID,
+		ClientSecret: strClientSecret,
 	}
 
 	g.handleCallback(ctx, config)
@@ -350,7 +355,6 @@ func (g *GitLab) HandleRequest(ctx core.HTTPRequestContext) {
 
 func (g *GitLab) handleCallback(ctx core.HTTPRequestContext, config *Configuration) {
 	redirectBaseURL := ctx.BaseURL
-
 	metadata := Metadata{}
 	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
@@ -359,8 +363,8 @@ func (g *GitLab) handleCallback(ctx core.HTTPRequestContext, config *Configurati
 
 	redirectURI := fmt.Sprintf("%s/api/v1/integrations/%s/callback", redirectBaseURL, ctx.Integration.ID().String())
 
-	authService := NewAuthService(ctx.HTTP)
-	tokenResponse, err := authService.HandleCallback(ctx.Request, config, metadata.State, redirectURI)
+	auth := NewAuth(ctx.HTTP)
+	tokenResponse, err := auth.HandleCallback(ctx.Request, config, metadata.State, redirectURI)
 
 	if err != nil {
 		http.Redirect(ctx.Response, ctx.Request,
@@ -382,30 +386,23 @@ func (g *GitLab) handleCallback(ctx core.HTTPRequestContext, config *Configurati
 			return
 		}
 	}
-
-	ctx.Integration.SetMetadata(Metadata{})
-
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	if err := client.Verify(); err != nil {
-		http.Redirect(ctx.Response, ctx.Request,
-			fmt.Sprintf("%s/%s/settings/integrations/%s", redirectBaseURL, ctx.OrganizationID, ctx.Integration.ID().String()),
-			http.StatusSeeOther)
-		return
-	}
-
+	
 	if err := ctx.Integration.ScheduleResync(tokenResponse.GetExpiration()); err != nil {
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	ctx.Integration.RemoveBrowserAction()
+	if err := g.updateMetadata(core.SyncContext{
+		HTTP:        ctx.HTTP,
+		Integration: ctx.Integration,
+	}); err != nil {
+		fmt.Printf("Callback error: failed to update metadata: %v\n", err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	
 	ctx.Integration.SetState("ready", "")
-
+	
 	http.Redirect(ctx.Response, ctx.Request,
 		fmt.Sprintf("%s/%s/settings/integrations/%s", redirectBaseURL, ctx.OrganizationID, ctx.Integration.ID().String()),
 		http.StatusSeeOther)
@@ -422,12 +419,6 @@ func findSecret(integration core.IntegrationContext, name string) (string, error
 		}
 	}
 	return "", nil
-}
-
-
-
-func (g *GitLab) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	return []core.IntegrationResource{}, nil
 }
 
 func (g *GitLab) CompareWebhookConfig(a, b any) (bool, error) {

@@ -12,15 +12,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-type AuthService struct {
+type Auth struct {
 	client core.HTTPContext
 }
 
-func NewAuthService(client core.HTTPContext) *AuthService {
-	return &AuthService{client: client}
+func NewAuth(client core.HTTPContext) *Auth {
+	return &Auth{client: client}
 }
 
-func (s *AuthService) RefreshToken(baseURL, clientID, clientSecret, refreshToken string) (*TokenResponse, error) {
+func (a *Auth) RefreshToken(baseURL, clientID, clientSecret, refreshToken string) (*TokenResponse, error) {
 	data := url.Values{}
 	data.Set("grant_type", "refresh_token")
 	data.Set("client_id", clientID)
@@ -33,7 +33,7 @@ func (s *AuthService) RefreshToken(baseURL, clientID, clientSecret, refreshToken
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := s.client.Do(req)
+	resp, err := a.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func (s *AuthService) RefreshToken(baseURL, clientID, clientSecret, refreshToken
 	return &tokenResp, nil
 }
 
-func (s *AuthService) ExchangeCode(baseURL, clientID, clientSecret, code, redirectURI string) (*TokenResponse, error) {
+func (a *Auth) exchangeCode(baseURL, clientID, clientSecret, code, redirectURI string) (*TokenResponse, error) {
 	data := url.Values{}
 	data.Set("grant_type", "authorization_code")
 	data.Set("client_id", clientID)
@@ -71,7 +71,7 @@ func (s *AuthService) ExchangeCode(baseURL, clientID, clientSecret, code, redire
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := s.client.Do(req)
+	resp, err := a.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (s *AuthService) ExchangeCode(baseURL, clientID, clientSecret, code, redire
 	return &tokenResp, nil
 }
 
-func (s *AuthService) HandleCallback(req *http.Request, config *Configuration, expectedState, redirectURI string) (*TokenResponse, error) {
+func (a *Auth) HandleCallback(req *http.Request, config *Configuration, expectedState, redirectURI string) (*TokenResponse, error) {
 	code := req.URL.Query().Get("code")
 	state := req.URL.Query().Get("state")
 	errorParam := req.URL.Query().Get("error")
@@ -115,7 +115,7 @@ func (s *AuthService) HandleCallback(req *http.Request, config *Configuration, e
 
 	baseURL := config.BaseURL
 	
-	return s.ExchangeCode(baseURL, *config.ClientID, *config.ClientSecret, code, redirectURI)
+	return a.exchangeCode(baseURL, config.ClientID, config.ClientSecret, code, redirectURI)
 }
 
 type TokenResponse struct {

@@ -12,7 +12,7 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__AuthService__ExchangeCode(t *testing.T) {
+func Test__Auth__exchangeCode(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mock := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -24,8 +24,8 @@ func Test__AuthService__ExchangeCode(t *testing.T) {
 			},
 		}
 
-		service := NewAuthService(mock)
-		resp, err := service.ExchangeCode("https://gitlab.com", "id", "secret", "code-123", "redirect")
+		service := NewAuth(mock)
+		resp, err := service.exchangeCode("https://gitlab.com", "id", "secret", "code-123", "redirect")
 		
 		require.NoError(t, err)
 		assert.Equal(t, "access-123", resp.AccessToken)
@@ -50,15 +50,15 @@ func Test__AuthService__ExchangeCode(t *testing.T) {
 			},
 		}
 
-		service := NewAuthService(mock)
-		_, err := service.ExchangeCode("https://gitlab.com", "id", "secret", "code", "redirect")
+		service := NewAuth(mock)
+		_, err := service.exchangeCode("https://gitlab.com", "id", "secret", "code", "redirect")
 		
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "status 400")
 	})
 }
 
-func Test__AuthService__RefreshToken(t *testing.T) {
+func Test__Auth__RefreshToken(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mock := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -70,7 +70,7 @@ func Test__AuthService__RefreshToken(t *testing.T) {
 			},
 		}
 
-		service := NewAuthService(mock)
+		service := NewAuth(mock)
 		resp, err := service.RefreshToken("https://gitlab.com", "id", "secret", "refresh-old")
 		
 		require.NoError(t, err)
@@ -87,14 +87,14 @@ func Test__AuthService__RefreshToken(t *testing.T) {
 	})
 }
 
-func Test__AuthService__HandleCallback(t *testing.T) {
+func Test__Auth__HandleCallback(t *testing.T) {
 
 	mock := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			GitlabMockResponse(http.StatusOK, `{"access_token": "ok"}`),
 		},
 	}
-	service := NewAuthService(mock)
+	service := NewAuth(mock)
 
 	t.Run("valid callback", func(t *testing.T) {
 		state := "xyz"
@@ -103,8 +103,8 @@ func Test__AuthService__HandleCallback(t *testing.T) {
 		secret := "secret"
 		config := &Configuration{
 			BaseURL: "https://gitlab.com",
-			ClientID: &id,
-			ClientSecret: &secret,
+			ClientID: id,
+			ClientSecret: secret,
 		}
 		
 		resp, err := service.HandleCallback(req, config, state, "uri")
