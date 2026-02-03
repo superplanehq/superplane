@@ -196,12 +196,18 @@ func (c *GetRepositoryIssues) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if config.Labels != nil && *config.Labels != "" {
-		// Parse comma-separated labels
-		labelList := strings.Split(*config.Labels, ",")
-		for i, label := range labelList {
-			labelList[i] = strings.TrimSpace(label)
+		// Parse comma-separated labels, filtering empty strings
+		rawLabels := strings.Split(*config.Labels, ",")
+		labelList := make([]string, 0, len(rawLabels))
+		for _, label := range rawLabels {
+			trimmed := strings.TrimSpace(label)
+			if trimmed != "" {
+				labelList = append(labelList, trimmed)
+			}
 		}
-		opts.Labels = labelList
+		if len(labelList) > 0 {
+			opts.Labels = labelList
+		}
 	}
 
 	if config.PerPage != nil && *config.PerPage > 0 {
@@ -229,10 +235,12 @@ func (c *GetRepositoryIssues) Execute(ctx core.ExecutionContext) error {
 		issueList[i] = buildIssueData(issue)
 	}
 
+	// Wrap issueList in []any so the entire list is emitted as ONE output item
+	// Emit() processes each element of payloads as a separate output
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"github.issues",
-		issueList,
+		[]any{issueList},
 	)
 }
 
