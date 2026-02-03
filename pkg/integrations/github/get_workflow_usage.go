@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/go-github/v74/github"
 	"github.com/google/uuid"
@@ -129,12 +130,15 @@ func (c *GetWorkflowUsage) Execute(ctx core.ExecutionContext) error {
 }
 
 func (c *GetWorkflowUsage) getWorkflowUsageByFile(ctx core.ExecutionContext, client *github.Client, owner, repo, workflowFile string) error {
+	// Normalize workflow file path - API expects just the filename, not full path
+	normalizedFile := strings.Replace(workflowFile, ".github/workflows/", "", 1)
+
 	// Get the workflow by filename
 	workflow, _, err := client.Actions.GetWorkflowByFileName(
 		context.Background(),
 		owner,
 		repo,
-		workflowFile,
+		normalizedFile,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to get workflow: %w", err)
@@ -161,20 +165,32 @@ func (c *GetWorkflowUsage) getWorkflowUsageByFile(ctx core.ExecutionContext, cli
 }
 
 func (c *GetWorkflowUsage) getAllWorkflowsUsage(ctx core.ExecutionContext, client *github.Client, owner, repo string) error {
-	// List all workflows
-	workflows, _, err := client.Actions.ListWorkflows(
-		context.Background(),
-		owner,
-		repo,
-		&github.ListOptions{PerPage: 100},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to list workflows: %w", err)
+	// List all workflows with pagination
+	var allWorkflows []*github.Workflow
+	opts := &github.ListOptions{PerPage: 100}
+
+	for {
+		workflows, resp, err := client.Actions.ListWorkflows(
+			context.Background(),
+			owner,
+			repo,
+			opts,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to list workflows: %w", err)
+		}
+
+		allWorkflows = append(allWorkflows, workflows.Workflows...)
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
 	}
 
-	usageList := make([]any, 0, len(workflows.Workflows))
+	usageList := make([]any, 0, len(allWorkflows))
 
-	for _, workflow := range workflows.Workflows {
+	for _, workflow := range allWorkflows {
 		usage, _, err := client.Actions.GetWorkflowUsageByID(
 			context.Background(),
 			owner,
