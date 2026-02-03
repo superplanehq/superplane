@@ -277,7 +277,7 @@ func buildIssueData(issue *github.Issue) map[string]any {
 		"body":           issue.GetBody(),
 		"state":          issue.GetState(),
 		"html_url":       issue.GetHTMLURL(),
-		"comments_count": issue.GetComments(),
+		"comments": issue.GetComments(),
 		"locked":         issue.GetLocked(),
 	}
 
