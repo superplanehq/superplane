@@ -242,7 +242,7 @@ export function Members({ organizationId }: MembersProps) {
                 </Text>
                 <Text className="text-sm text-gray-500 dark:text-gray-400">
                   {canManageInviteLink
-                    ? "Only people with owner and admin roles can see this."
+                    ? "Only people with required roles can see this."
                     : "You don't have permission to manage invite links."}
                   {inviteLinkEnabled && (
                     <>
