@@ -10,11 +10,11 @@ import (
 )
 
 const installationInstructions = `
-To configure DataDog to work with SuperPlane:
+To configure Datadog to work with SuperPlane:
 
-1. **Get API Keys**: In DataDog, go to Organization Settings > API Keys to get your API Key
+1. **Get API Keys**: In Datadog, go to Organization Settings > API Keys to get your API Key
 2. **Get Application Key**: Go to Organization Settings > Application Keys to create an Application Key
-3. **Select Site**: Choose the DataDog site that matches your account (US1, US3, US5, EU, or AP1)
+3. **Select Site**: Choose the Datadog site that matches your account (US1, US3, US5, EU, or AP1)
 4. **Enter Credentials**: Provide your API Key, Application Key, and Site in the integration configuration
 `
 
@@ -35,7 +35,7 @@ func (d *Datadog) Name() string {
 }
 
 func (d *Datadog) Label() string {
-	return "DataDog"
+	return "Datadog"
 }
 
 func (d *Datadog) Icon() string {
@@ -43,7 +43,7 @@ func (d *Datadog) Icon() string {
 }
 
 func (d *Datadog) Description() string {
-	return "Create events in DataDog"
+	return "Create events in Datadog"
 }
 
 func (d *Datadog) Instructions() string {
@@ -54,7 +54,7 @@ func (d *Datadog) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:     "site",
-			Label:    "DataDog Site",
+			Label:    "Datadog Site",
 			Type:     configuration.FieldTypeSelect,
 			Required: true,
 			Default:  "datadoghq.com",
@@ -76,7 +76,7 @@ func (d *Datadog) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Sensitive:   true,
-			Description: "DataDog API Key for authentication",
+			Description: "Datadog API Key for authentication",
 		},
 		{
 			Name:        "appKey",
@@ -84,7 +84,7 @@ func (d *Datadog) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Sensitive:   true,
-			Description: "DataDog Application Key for authentication",
+			Description: "Datadog Application Key for authentication",
 		},
 	}
 }

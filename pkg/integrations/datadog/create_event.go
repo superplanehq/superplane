@@ -31,7 +31,7 @@ func (c *CreateEvent) Label() string {
 }
 
 func (c *CreateEvent) Description() string {
-	return "Create a new event in DataDog"
+	return "Create a new event in Datadog"
 }
 
 func (c *CreateEvent) Icon() string {
@@ -43,7 +43,7 @@ func (c *CreateEvent) Color() string {
 }
 
 func (c *CreateEvent) Documentation() string {
-	return `The Create Event component creates a new event in DataDog.
+	return `The Create Event component creates a new event in Datadog.
 
 ## Use Cases
 
@@ -61,7 +61,7 @@ The component emits an event containing:
 - ` + "`alert_type`" + `: The severity level (info, warning, error, success)
 - ` + "`priority`" + `: Event priority (normal, low)
 - ` + "`tags`" + `: Array of tags attached to the event
-- ` + "`url`" + `: Link to view the event in DataDog
+- ` + "`url`" + `: Link to view the event in Datadog
 `
 }
 
