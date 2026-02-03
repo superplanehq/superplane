@@ -1,0 +1,8 @@
+{
+  "id": "record_abc123",
+  "type": "A",
+  "name": "api.example.com",
+  "content": "192.0.2.1",
+  "proxied": false,
+  "ttl": 1
+}

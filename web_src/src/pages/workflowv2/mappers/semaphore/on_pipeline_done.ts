@@ -1,4 +1,4 @@
-import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
+import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "../types";
 import { TriggerProps } from "@/ui/trigger";
@@ -36,7 +36,7 @@ interface OnPipelineDoneEventData {
  * Renderer for the "semaphore.onPipelineDone" trigger type
  */
 export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
     const eventData = event.data?.data as OnPipelineDoneEventData;
     const result = eventData?.pipeline?.result || "";
     const timeAgo = event.createdAt ? formatTimeAgo(new Date(event.createdAt)) : "";
@@ -48,7 +48,7 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
+  getRootEventValues: (lastEvent: CanvasesCanvasEvent): Record<string, string> => {
     const eventData = lastEvent.data?.data as OnPipelineDoneEventData;
     const doneAt = eventData?.pipeline?.done_at ? new Date(eventData.pipeline.done_at).toLocaleString() : "";
     const repositoryUrl = eventData?.repository?.url || "";
@@ -66,7 +66,7 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
+  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
     const metadata = node.metadata as unknown as OnPipelineDoneMetadata;
     const metadataItems = [];
 

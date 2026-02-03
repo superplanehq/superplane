@@ -737,7 +737,7 @@ func (a *Approval) notifyApprovers(ctx core.ExecutionContext, metadata *Metadata
 	url := ""
 	if ctx.BaseURL != "" && ctx.OrganizationID != "" && ctx.WorkflowID != "" && ctx.NodeID != "" {
 		url = fmt.Sprintf(
-			"%s/%s/workflows/%s?sidebar=1&node=%s",
+			"%s/%s/canvases/%s?sidebar=1&node=%s",
 			strings.TrimRight(ctx.BaseURL, "/"),
 			ctx.OrganizationID,
 			ctx.WorkflowID,
@@ -794,4 +794,8 @@ func mapKeys(input map[string]struct{}) []string {
 		result = append(result, key)
 	}
 	return result
+}
+
+func (a *Approval) Cleanup(ctx core.SetupContext) error {
+	return nil
 }

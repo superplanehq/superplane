@@ -199,3 +199,7 @@ func (e *ExecuteCode) HandleAction(ctx core.ActionContext) error {
 func (e *ExecuteCode) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
+
+func (e *ExecuteCode) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

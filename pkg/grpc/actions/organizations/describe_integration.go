@@ -22,17 +22,17 @@ func DescribeIntegration(ctx context.Context, registry *registry.Registry, orgID
 		return nil, status.Error(codes.InvalidArgument, "invalid integration ID")
 	}
 
-	appInstallation, err := models.FindAppInstallation(org, integration)
+	instance, err := models.FindIntegration(org, integration)
 	if err != nil {
 		return nil, err
 	}
 
-	nodeRefs, err := models.ListAppInstallationNodeReferences(appInstallation.ID)
+	nodeRefs, err := models.ListIntegrationNodeReferences(instance.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	proto, err := serializeIntegration(registry, appInstallation, nodeRefs)
+	proto, err := serializeIntegration(registry, instance, nodeRefs)
 	if err != nil {
 		return nil, err
 	}

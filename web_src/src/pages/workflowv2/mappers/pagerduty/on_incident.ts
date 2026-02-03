@@ -1,4 +1,4 @@
-import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
+import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
 import { TriggerRenderer } from "../types";
@@ -24,7 +24,7 @@ interface OnIncidentEventData {
  * Renderer for the "pagerduty.onIncident" trigger type
  */
 export const onIncidentTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
     const eventData = event.data?.data as OnIncidentEventData;
     const incident = eventData?.incident;
     const contentParts = [incident?.urgency, incident?.status].filter(Boolean).join(" · ");
@@ -36,12 +36,12 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
+  getRootEventValues: (lastEvent: CanvasesCanvasEvent): Record<string, string> => {
     const eventData = lastEvent.data?.data as OnIncidentEventData;
     return getDetailsForIncident(eventData?.incident!, eventData?.agent);
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
+  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
     const metadata = node.metadata as unknown as OnIncidentMetadata;
     const configuration = node.configuration as any;
     const metadataItems = [];

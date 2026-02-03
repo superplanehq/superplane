@@ -1,11 +1,11 @@
 import {
   ComponentsEdge,
   ComponentsNode,
-  WorkflowsWorkflow,
-  WorkflowsWorkflowEvent,
-  WorkflowsWorkflowEventWithExecutions,
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
+  CanvasesCanvas,
+  CanvasesCanvasEvent,
+  CanvasesCanvasEventWithExecutions,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
 import { flattenObject } from "@/lib/utils";
 import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
@@ -63,7 +63,7 @@ export function generateUniqueNodeName(componentName: string, existingNodeNames:
 }
 
 export function mapTriggerEventsToSidebarEvents(
-  events: WorkflowsWorkflowEvent[],
+  events: CanvasesCanvasEvent[],
   node: ComponentsNode,
   limit?: number,
 ): SidebarEvent[] {
@@ -71,7 +71,7 @@ export function mapTriggerEventsToSidebarEvents(
   return eventsToMap.map((event) => mapTriggerEventToSidebarEvent(event, node));
 }
 
-export function mapTriggerEventToSidebarEvent(event: WorkflowsWorkflowEvent, node: ComponentsNode): SidebarEvent {
+export function mapTriggerEventToSidebarEvent(event: CanvasesCanvasEvent, node: ComponentsNode): SidebarEvent {
   const triggerRenderer = getTriggerRenderer(node.trigger?.name || "");
   const { title, subtitle } = triggerRenderer.getTitleAndSubtitle(event);
   const values = triggerRenderer.getRootEventValues(event);
@@ -92,7 +92,7 @@ export function mapTriggerEventToSidebarEvent(event: WorkflowsWorkflowEvent, nod
 }
 
 export function mapExecutionsToSidebarEvents(
-  executions: WorkflowsWorkflowNodeExecution[],
+  executions: CanvasesCanvasNodeExecution[],
   nodes: ComponentsNode[],
   limit?: number,
   additionalData?: unknown,
@@ -141,7 +141,7 @@ export function mapExecutionsToSidebarEvents(
 }
 
 export function getNextInQueueInfo(
-  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]> | undefined,
+  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]> | undefined,
   nodeId: string,
   nodes: ComponentsNode[],
 ): { title: string; subtitle: string; receivedAt: Date } | undefined {
@@ -172,7 +172,7 @@ export function getNextInQueueInfo(
 }
 
 export function mapQueueItemsToSidebarEvents(
-  queueItems: WorkflowsWorkflowNodeQueueItem[],
+  queueItems: CanvasesCanvasNodeQueueItem[],
   nodes: ComponentsNode[],
   limit?: number,
 ): SidebarEvent[] {
@@ -205,7 +205,7 @@ export function mapQueueItemsToSidebarEvents(
 }
 
 export function mapExecutionStateToLogType(
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
   state?: string,
 ): "success" | "error" | "resolved-error" {
   if (execution.resultReason === "RESULT_REASON_ERROR_RESOLVED") {
@@ -215,7 +215,7 @@ export function mapExecutionStateToLogType(
 }
 
 export function buildRunItemFromExecution(options: {
-  execution: WorkflowsWorkflowNodeExecution;
+  execution: CanvasesCanvasNodeExecution;
   nodes: ComponentsNode[];
   onNodeSelect: (nodeId: string) => void;
   onExecutionSelect?: (options: {
@@ -224,7 +224,7 @@ export function buildRunItemFromExecution(options: {
     executionId: string;
     triggerEvent?: SidebarEvent;
   }) => void;
-  event?: WorkflowsWorkflowEvent;
+  event?: CanvasesCanvasEvent;
   timestampOverride?: string;
 }): LogRunItem {
   const { execution, nodes, onNodeSelect, timestampOverride } = options;
@@ -297,7 +297,7 @@ export function buildRunItemFromExecution(options: {
 }
 
 export function buildRunEntryFromEvent(options: {
-  event: WorkflowsWorkflowEvent;
+  event: CanvasesCanvasEvent;
   nodes: ComponentsNode[];
   runItems?: LogRunItem[];
 }): LogEntry {
@@ -321,7 +321,7 @@ export function buildRunEntryFromEvent(options: {
 }
 
 export function mapWorkflowEventsToRunLogEntries(options: {
-  events: WorkflowsWorkflowEventWithExecutions[];
+  events: CanvasesCanvasEventWithExecutions[];
   nodes: ComponentsNode[];
   onNodeSelect: (nodeId: string) => void;
   onExecutionSelect?: (options: {
@@ -336,17 +336,17 @@ export function mapWorkflowEventsToRunLogEntries(options: {
   return events.map((event) => {
     const runItems = (event.executions || []).map((execution) =>
       buildRunItemFromExecution({
-        execution: execution as WorkflowsWorkflowNodeExecution,
+        execution: execution as CanvasesCanvasNodeExecution,
         nodes,
         onNodeSelect,
         onExecutionSelect,
-        event: event as WorkflowsWorkflowEvent,
+        event: event as CanvasesCanvasEvent,
         timestampOverride: event.createdAt || "",
       }),
     );
 
     return buildRunEntryFromEvent({
-      event: event as WorkflowsWorkflowEvent,
+      event: event as CanvasesCanvasEvent,
       nodes,
       runItems,
     });
@@ -838,8 +838,8 @@ function formatSummaryConnectionEntry(
 }
 
 export function summarizeWorkflowChanges(options: {
-  before: WorkflowsWorkflow | null;
-  after: WorkflowsWorkflow | null;
+  before: CanvasesCanvas | null;
+  after: CanvasesCanvas | null;
   onNodeSelect: (nodeId: string) => void;
 }): { detail?: ReactNode; searchText?: string; changeCount?: number } {
   const { before, after, onNodeSelect } = options;
@@ -997,9 +997,9 @@ export function buildTabData(
   event: SidebarEvent,
   options: {
     workflowNodes: ComponentsNode[];
-    nodeEventsMap: Record<string, WorkflowsWorkflowEvent[]>;
-    nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>;
-    nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>;
+    nodeEventsMap: Record<string, CanvasesCanvasEvent[]>;
+    nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>;
+    nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>;
   },
 ): TabData | undefined {
   const { workflowNodes, nodeEventsMap, nodeExecutionsMap, nodeQueueItemsMap } = options;
@@ -1036,7 +1036,7 @@ export function buildTabData(
   if (event.kind === "queue") {
     // Handle queue items - get the queue item data
     const queueItems = nodeQueueItemsMap[nodeId] || [];
-    const queueItem = queueItems.find((item: WorkflowsWorkflowNodeQueueItem) => item.id === event.id);
+    const queueItem = queueItems.find((item: CanvasesCanvasNodeQueueItem) => item.id === event.id);
 
     if (!queueItem) return undefined;
 
@@ -1067,7 +1067,7 @@ export function buildTabData(
 
   // Handle other components (non-triggers) - get execution for this event
   const executions = nodeExecutionsMap[nodeId] || [];
-  const execution = executions.find((exec: WorkflowsWorkflowNodeExecution) => exec.id === event.id);
+  const execution = executions.find((exec: CanvasesCanvasNodeExecution) => exec.id === event.id);
 
   if (!execution) return undefined;
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { useCreateWorkflow, useUpdateWorkflow, useWorkflowTemplates } from "../../hooks/useWorkflowData";
+import { useCreateCanvas, useUpdateCanvas, useCanvasTemplates } from "../../hooks/useCanvasData";
 import type { ComponentsEdge, ComponentsNode } from "@/api-client";
 
 type ModalMode = "create" | "edit";
@@ -32,9 +32,9 @@ export function useCreateCanvasModalState() {
   const onOpenEdit = (workflow: WorkflowSummary) => setModalState({ mode: "edit", workflow });
   const onClose = () => setModalState(null);
 
-  const createMutation = useCreateWorkflow(organizationId || "");
-  const updateMutation = useUpdateWorkflow(organizationId || "", modalState?.workflow?.id || "");
-  const { data: workflowTemplates = [] } = useWorkflowTemplates(organizationId || "");
+  const createMutation = useCreateCanvas(organizationId || "");
+  const updateMutation = useUpdateCanvas(organizationId || "", modalState?.workflow?.id || "");
+  const { data: workflowTemplates = [] } = useCanvasTemplates(organizationId || "");
 
   const onSubmit = async (data: { name: string; description?: string; templateId?: string }) => {
     if (!organizationId) {
@@ -60,9 +60,9 @@ export function useCreateCanvasModalState() {
       edges: selectedTemplate?.spec?.edges,
     });
 
-    if (result?.data?.workflow?.metadata?.id) {
+    if (result?.data?.canvas?.metadata?.id) {
       onClose();
-      navigate(`/${organizationId}/workflows/${result.data.workflow.metadata.id}`);
+      navigate(`/${organizationId}/canvases/${result.data.canvas.metadata.id}`);
     }
   };
 

@@ -1,4 +1,4 @@
-import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
+import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "./types";
 import { TriggerProps } from "@/ui/trigger";
@@ -10,15 +10,15 @@ import { formatTimeAgo } from "@/utils/date";
  * Uses basic icon/color configuration from the trigger metadata.
  */
 export const defaultTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
     return { title: `Event received at ${new Date(event.createdAt!).toLocaleString()}`, subtitle: "" };
   },
 
-  getRootEventValues: (event: WorkflowsWorkflowEvent): Record<string, string> => {
+  getRootEventValues: (event: CanvasesCanvasEvent): Record<string, string> => {
     return flattenObject(event.data || {});
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
+  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
     const props: TriggerProps = {
       title: node.name || trigger.label || trigger.name || "Unnamed trigger",
       iconSlug: trigger.icon || "bolt",

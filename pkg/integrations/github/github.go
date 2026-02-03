@@ -118,6 +118,10 @@ func (g *GitHub) Triggers() []core.Trigger {
 	}
 }
 
+func (g *GitHub) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (g *GitHub) Sync(ctx core.SyncContext) error {
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
@@ -238,12 +242,12 @@ func (g *GitHub) handleInstallationEvent(ctx core.HTTPRequestContext, metadata M
 
 	case "suspend":
 		ctx.Logger.Infof("installation %s suspended", metadata.InstallationID)
-		ctx.Integration.SetState("error", "app installation was suspended")
+		ctx.Integration.Error("app installation was suspended")
 		return
 
 	case "unsuspend":
 		ctx.Logger.Infof("installation %s unsuspended", metadata.InstallationID)
-		ctx.Integration.SetState("ready", "")
+		ctx.Integration.Ready()
 		return
 
 	//
@@ -265,7 +269,7 @@ func (g *GitHub) handleInstallationEvent(ctx core.HTTPRequestContext, metadata M
 		metadata.State = state
 
 		ctx.Integration.SetMetadata(metadata)
-		ctx.Integration.SetState("error", "app was uninstalled")
+		ctx.Integration.Error("error")
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
 			Description: appInstallationDescription,
 			URL:         fmt.Sprintf("https://github.com/apps/%s/installations/new?state=%s", metadata.GitHubApp.Slug, state),
@@ -587,7 +591,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Meta
 
 	ctx.Integration.SetMetadata(metadata)
 	ctx.Integration.RemoveBrowserAction()
-	ctx.Integration.SetState("ready", "")
+	ctx.Integration.Ready()
 
 	ctx.Logger.Infof("Successfully installed GitHub App %s - installation=%s", metadata.GitHubApp.Slug, metadata.InstallationID)
 	ctx.Logger.Infof("Repositories: %v", metadata.Repositories)
@@ -623,10 +627,10 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 			"repository_hooks": "write",
 			"statuses":         "write",
 		},
-		"setup_url":    fmt.Sprintf(`%s/api/v1/integrations/%s/setup`, ctx.BaseURL, ctx.InstallationID),
-		"redirect_url": fmt.Sprintf(`%s/api/v1/integrations/%s/redirect`, ctx.BaseURL, ctx.InstallationID),
+		"setup_url":    fmt.Sprintf(`%s/api/v1/integrations/%s/setup`, ctx.BaseURL, ctx.Integration.ID().String()),
+		"redirect_url": fmt.Sprintf(`%s/api/v1/integrations/%s/redirect`, ctx.BaseURL, ctx.Integration.ID().String()),
 		"hook_attributes": map[string]any{
-			"url": fmt.Sprintf(`%s/api/v1/integrations/%s/webhook`, ctx.WebhooksBaseURL, ctx.InstallationID),
+			"url": fmt.Sprintf(`%s/api/v1/integrations/%s/webhook`, ctx.WebhooksBaseURL, ctx.Integration.ID().String()),
 		},
 	}
 
@@ -678,4 +682,12 @@ func (g *GitHub) createAppFromManifest(httpCtx core.HTTPContext, code string) (*
 	}
 
 	return &appData, nil
+}
+
+func (g *GitHub) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (g *GitHub) HandleAction(ctx core.IntegrationActionContext) error {
+	return nil
 }

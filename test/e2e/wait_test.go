@@ -97,7 +97,7 @@ func (s *WaitSteps) givenACanvasWithManualTriggerWaitAndOutput() {
 
 func (s *WaitSteps) runManualTrigger() {
 	s.canvas.RunManualTrigger("Start")
-	s.canvas.WaitForExecution("Wait", models.WorkflowNodeExecutionStateStarted, 10*time.Second)
+	s.canvas.WaitForExecution("Wait", models.CanvasNodeExecutionStatePending, 10*time.Second)
 }
 
 func (s *WaitSteps) openSidebarForNode(node string) {
@@ -111,7 +111,7 @@ func (s *WaitSteps) pushThroughFirstItemFromSidebar() {
 	s.session.Click(q.Locator(`[data-testid="sidebar-event-item"][data-event-state="running"] button[aria-label="Open actions"]`))
 	s.session.Sleep(300) // Wait for actions menu to open
 	s.session.Click(q.TestID("push-through-item"))
-	s.canvas.WaitForExecution("Output", models.WorkflowNodeExecutionStateFinished, 15*time.Second)
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 15*time.Second)
 }
 
 func (s *WaitSteps) assertWaitExecutionFinishedAndOutputNodeProcessed() {
@@ -121,6 +121,6 @@ func (s *WaitSteps) assertWaitExecutionFinishedAndOutputNodeProcessed() {
 	require.Len(s.t, waitExecs, 1, "expected one execution for wait node")
 	require.Len(s.t, outputExecs, 1, "expected one execution for output node")
 
-	require.Equal(s.t, models.WorkflowNodeExecutionStateFinished, waitExecs[0].State)
-	require.Equal(s.t, models.WorkflowNodeExecutionStateFinished, outputExecs[0].State)
+	require.Equal(s.t, models.CanvasNodeExecutionStateFinished, waitExecs[0].State)
+	require.Equal(s.t, models.CanvasNodeExecutionStateFinished, outputExecs[0].State)
 }

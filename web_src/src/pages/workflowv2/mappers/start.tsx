@@ -1,4 +1,4 @@
-import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
+import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer, CustomFieldRenderer } from "./types";
 import { TriggerProps } from "@/ui/trigger";
@@ -21,15 +21,15 @@ interface StartConfiguration {
  * Default renderer for the start trigger
  */
 export const startTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
     return { title: `Event received at ${new Date(event.createdAt!).toLocaleString()}`, subtitle: "" };
   },
 
-  getRootEventValues: (event: WorkflowsWorkflowEvent): Record<string, string> => {
+  getRootEventValues: (event: CanvasesCanvasEvent): Record<string, string> => {
     return flattenObject(event.data || {});
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
+  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
     const configuration = (node.configuration || {}) as Record<string, unknown>;
     const nodeId = node.id!;
 

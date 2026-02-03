@@ -274,15 +274,15 @@ The Filter component evaluates a boolean expression against incoming events and 
 ### Expression Environment
 
 The expression has access to:
-- **$**: The current event data
+- **$**: The run context data
 - **root()**: Access to the root event data
 - **previous()**: Access to previous node outputs (optionally with depth parameter)
 
 ### Examples
 
-- `$.status == "active"`: Only forward events where status is "active"
-- `$.amount > 1000`: Filter events with amount greater than 1000
-- `$.user.role == "admin" && $.action == "delete"`: Complex condition checking multiple fields
+- `$["Node Name"].status == "active"`: Only forward events where status is "active"
+- `$["Node Name"].amount > 1000`: Filter events with amount greater than 1000
+- `$["Node Name"].user.role == "admin" && $["Node Name"].action == "delete"`: Complex condition checking multiple fields
 
 ### Example Output
 
@@ -391,15 +391,15 @@ The If component evaluates a boolean expression and routes events to different o
 ### Expression Environment
 
 The expression has access to:
-- **$**: The current event data
+- **$**: The run context data
 - **root()**: Access to the root event data
 - **previous()**: Access to previous node outputs (optionally with depth parameter)
 
 ### Examples
 
-- `$.status == "approved"`: Route approved items to True channel
-- `$.amount > 1000`: Route high-value items to True channel
-- `$.user.role == "admin"`: Route admin actions to True channel
+- `$["Node Name"].status == "approved"`: Route approved items to True channel
+- `$["Node Name"].amount > 1000`: Route high-value items to True channel
+- `$["Node Name"].user.role == "admin"`: Route admin actions to True channel
 
 ### Example Output
 

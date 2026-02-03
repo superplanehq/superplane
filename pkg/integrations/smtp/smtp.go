@@ -113,6 +113,10 @@ func (s *SMTP) Instructions() string {
 	return ""
 }
 
+func (s *SMTP) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (s *SMTP) Sync(ctx core.SyncContext) error {
 	config := Configuration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
@@ -141,7 +145,7 @@ func (s *SMTP) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("SMTP connection test failed: %w", err)
 	}
 
-	ctx.Integration.SetState("ready", "")
+	ctx.Integration.Ready()
 	return nil
 }
 
@@ -163,5 +167,13 @@ func (s *SMTP) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 }
 
 func (s *SMTP) CleanupWebhook(ctx core.CleanupWebhookContext) error {
+	return nil
+}
+
+func (s *SMTP) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (s *SMTP) HandleAction(ctx core.IntegrationActionContext) error {
 	return nil
 }

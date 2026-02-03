@@ -159,7 +159,7 @@ func (s *ApprovalSteps) addApprovalWithAnyAndSpecificUser(nodeName string, pos m
 
 func (s *ApprovalSteps) runManualTrigger() {
 	s.canvas.RunManualTrigger("Start")
-	s.canvas.WaitForExecution("Approval", models.WorkflowNodeExecutionStateStarted, 5*time.Second)
+	s.canvas.WaitForExecution("Approval", models.CanvasNodeExecutionStatePending, 5*time.Second)
 }
 
 func (s *ApprovalSteps) approveFirstPendingRequirement() {
@@ -237,7 +237,7 @@ func (s *ApprovalSteps) assertNoApproveButtons() {
 }
 
 func (s *ApprovalSteps) assertApprovalExecutionFinishedAndOutputNodeProcessed() {
-	s.canvas.WaitForExecution("Output", models.WorkflowNodeExecutionStateFinished, 10*time.Second)
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 10*time.Second)
 
 	approvaExecs := s.canvas.GetExecutionsForNode("Approval")
 	outputExecs := s.canvas.GetExecutionsForNode("Output")

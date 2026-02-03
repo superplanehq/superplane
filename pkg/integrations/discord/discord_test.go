@@ -71,7 +71,6 @@ func Test__Discord__Sync(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, "ready", integrationCtx.State)
-		assert.Contains(t, integrationCtx.StateDescription, "TestBot")
 
 		metadata, ok := integrationCtx.Metadata.(Metadata)
 		require.True(t, ok)

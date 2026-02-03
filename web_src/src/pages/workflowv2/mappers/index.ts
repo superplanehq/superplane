@@ -5,7 +5,7 @@ import {
   EventStateRegistry,
   CustomFieldRenderer,
 } from "./types";
-import { ComponentsNode, WorkflowsWorkflowNodeExecution } from "@/api-client";
+import { ComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
 import { defaultTriggerRenderer } from "./default";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
 import { webhookTriggerRenderer, webhookCustomFieldRenderer } from "./webhook";
@@ -61,7 +61,11 @@ import {
   triggerRenderers as rootlyTriggerRenderers,
   eventStateRegistry as rootlyEventStateRegistry,
 } from "./rootly/index";
-import { componentMappers as awsComponentMappers, triggerRenderers as awsTriggerRenderers } from "./aws";
+import {
+  componentMappers as awsComponentMappers,
+  triggerRenderers as awsTriggerRenderers,
+  eventStateRegistry as awsEventStateRegistry,
+} from "./aws";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
 import {
   componentMappers as discordComponentMappers,
@@ -136,6 +140,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   smtp: smtpEventStateRegistry,
   discord: discordEventStateRegistry,
   rootly: rootlyEventStateRegistry,
+  aws: awsEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
@@ -272,7 +277,7 @@ export function getCustomFieldRenderer(componentName: string): CustomFieldRender
  */
 export function getExecutionDetails(
   componentName: string,
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
   node: ComponentsNode,
   nodes?: ComponentsNode[],
 ): Record<string, any> | undefined {

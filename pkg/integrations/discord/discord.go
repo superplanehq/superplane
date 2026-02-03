@@ -106,7 +106,7 @@ func (d *Discord) Sync(ctx core.SyncContext) error {
 		Username: botUser.Username,
 	})
 
-	ctx.Integration.SetState("ready", fmt.Sprintf("Connected as: %s", botUser.Username))
+	ctx.Integration.Ready()
 	return nil
 }
 
@@ -116,6 +116,10 @@ func (d *Discord) HandleRequest(ctx core.HTTPRequestContext) {
 
 func (d *Discord) CompareWebhookConfig(a, b any) (bool, error) {
 	return true, nil
+}
+
+func (d *Discord) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
 }
 
 func (d *Discord) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -182,5 +186,13 @@ func (d *Discord) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 }
 
 func (d *Discord) CleanupWebhook(ctx core.CleanupWebhookContext) error {
+	return nil
+}
+
+func (d *Discord) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (d *Discord) HandleAction(ctx core.IntegrationActionContext) error {
 	return nil
 }

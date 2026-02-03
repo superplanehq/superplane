@@ -34,6 +34,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
+	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -44,7 +45,6 @@ import (
 	pbTriggers "github.com/superplanehq/superplane/pkg/protos/triggers"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	pbWidgets "github.com/superplanehq/superplane/pkg/protos/widgets"
-	pbWorkflows "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"github.com/superplanehq/superplane/pkg/web"
@@ -226,7 +226,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
-	err = pbWorkflows.RegisterWorkflowsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbCanvases.RegisterCanvasesHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
 	}
@@ -482,20 +482,20 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	integrationInstance, err := models.FindUnscopedAppInstallation(integrationID)
+	integrationInstance, err := models.FindUnscopedIntegration(integrationID)
 	if err != nil {
-		http.Error(w, "installation not found", http.StatusNotFound)
+		http.Error(w, "integration not found", http.StatusNotFound)
 		return
 	}
 
 	integration, err := s.registry.GetIntegration(integrationInstance.AppName)
 	if err != nil {
-		http.Error(w, "app not found", http.StatusNotFound)
+		http.Error(w, "integration not found", http.StatusNotFound)
 		return
 	}
 
 	integration.HandleRequest(core.HTTPRequestContext{
-		Logger:          logging.ForAppInstallation(*integrationInstance),
+		Logger:          logging.ForIntegration(*integrationInstance),
 		Request:         r,
 		Response:        w,
 		BaseURL:         s.BaseURL,
@@ -664,7 +664,7 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 		orgIDs = append(orgIDs, organization.ID.String())
 	}
 
-	canvasCounts, err := models.CountWorkflowsByOrganizationIDs(orgIDs)
+	canvasCounts, err := models.CountCanvasesByOrganizationIDs(orgIDs)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -771,7 +771,7 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.WorkflowNode) (int, error) {
+func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode) (int, error) {
 	if node.Type == models.NodeTypeTrigger {
 		return s.executeTriggerNode(ctx, body, headers, node)
 	}
@@ -779,7 +779,7 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 	return s.executeComponentNode(ctx, body, headers, node)
 }
 
-func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.WorkflowNode) (int, error) {
+func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode) (int, error) {
 	ref := node.Ref.Data()
 	trigger, err := s.registry.GetTrigger(ref.Trigger.Name)
 	if err != nil {
@@ -798,7 +798,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 	})
 }
 
-func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers http.Header, node models.WorkflowNode) (int, error) {
+func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode) (int, error) {
 	ref := node.Ref.Data()
 	component, err := s.registry.GetComponent(ref.Component.Name)
 	if err != nil {
@@ -856,9 +856,9 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = models.FindWorkflow(user.OrganizationID, parsedWorkflowID)
+	_, err = models.FindCanvas(user.OrganizationID, parsedWorkflowID)
 	if err != nil {
-		http.Error(w, "workflow not found", http.StatusNotFound)
+		http.Error(w, "canvas not found", http.StatusNotFound)
 		return
 	}
 
@@ -878,7 +878,17 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 // setupDevProxy configures a simple reverse proxy to the Vite development server
 func (s *Server) setupDevProxy(webBasePath string) {
-	target, err := url.Parse("http://localhost:5173")
+	viteHost := os.Getenv("VITE_DEV_HOST")
+	if viteHost == "" {
+		viteHost = "localhost"
+	}
+
+	vitePort := os.Getenv("VITE_DEV_PORT")
+	if vitePort == "" {
+		vitePort = "5173"
+	}
+
+	target, err := url.Parse(fmt.Sprintf("http://%s:%s", viteHost, vitePort))
 	if err != nil {
 		log.Fatalf("Error parsing Vite dev server URL: %v", err)
 	}

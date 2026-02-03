@@ -95,7 +95,8 @@ CREATE TABLE public.app_installation_requests (
     type character varying(32) NOT NULL,
     run_at timestamp without time zone NOT NULL,
     created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    spec jsonb
 );
 
 
@@ -204,6 +205,16 @@ CREATE SEQUENCE public.casbin_rule_id_seq
 --
 
 ALTER SEQUENCE public.casbin_rule_id_seq OWNED BY public.casbin_rule.id;
+
+
+--
+-- Name: data_migrations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.data_migrations (
+    version bigint NOT NULL,
+    dirty boolean NOT NULL
+);
 
 
 --
@@ -635,6 +646,14 @@ ALTER TABLE ONLY public.blueprints
 
 ALTER TABLE ONLY public.casbin_rule
     ADD CONSTRAINT casbin_rule_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: data_migrations data_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.data_migrations
+    ADD CONSTRAINT data_migrations_pkey PRIMARY KEY (version);
 
 
 --
@@ -1496,7 +1515,43 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260121233727	f
+20260131134819	f
+\.
+
+
+--
+-- PostgreSQL database dump complete
+--
+
+\unrestrict abcdef123
+
+--
+-- PostgreSQL database dump
+--
+
+\restrict abcdef123
+
+-- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
+-- Dumped by pg_dump version 17.7 (Ubuntu 17.7-3.pgdg22.04+1)
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Data for Name: data_migrations; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.data_migrations (version, dirty) FROM stdin;
+20260202201226	f
 \.
 
 

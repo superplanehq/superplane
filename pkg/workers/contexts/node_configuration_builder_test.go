@@ -17,15 +17,15 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root(t *testing.T) {
 	defer r.Close()
 
 	//
-	// Create a simple workflow with a trigger and a component node
+	// Create a simple canvas with a trigger and a component node
 	//
 	triggerNode := "trigger-1"
 	componentNode := "component-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Name:   triggerNode,
@@ -53,12 +53,12 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root(t *testing.T) {
 		"success": true,
 		"count":   42,
 	}
-	rootEvent := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, triggerNode, "default", nil, rootEventData)
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, rootEventData)
 
 	//
 	// Use message chain access to get information from the root event
 	//
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithRootEvent(&rootEvent.ID).
 		WithInput(map[string]any{triggerNode: rootEventData})
 
@@ -83,11 +83,11 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_RootFunction(t *testing.T) 
 
 	triggerNode := "trigger-1"
 	componentNode := "component-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Name:   triggerNode,
@@ -112,9 +112,9 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_RootFunction(t *testing.T) 
 		"success": true,
 		"count":   42,
 	}
-	rootEvent := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, triggerNode, "default", nil, rootEventData)
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, rootEventData)
 
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithRootEvent(&rootEvent.ID).
 		WithInput(map[string]any{triggerNode: rootEventData})
 
@@ -140,11 +140,11 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root_ByName(t *testing.T) {
 	triggerNode := "trigger-1"
 	triggerName := "filter"
 	componentNode := "component-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Name:   triggerName,
@@ -169,9 +169,9 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root_ByName(t *testing.T) {
 		"success": true,
 		"count":   42,
 	}
-	rootEvent := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, triggerNode, "default", nil, rootEventData)
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, rootEventData)
 
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithRootEvent(&rootEvent.ID).
 		WithInput(map[string]any{triggerNode: rootEventData})
 
@@ -197,11 +197,11 @@ func Test_NodeConfigurationBuilder_NodeNameNotUnique_UsesClosestInChain(t *testi
 	// Create a workflow with two nodes having the same name "filter"
 	// node-1 (filter) -> node-2 (filter) -> node-3 (target)
 	// When node-3 references "filter", it should get node-2's data (the closest one)
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "filter",
@@ -228,18 +228,18 @@ func Test_NodeConfigurationBuilder_NodeNameNotUnique_UsesClosestInChain(t *testi
 	)
 
 	// Create executions for the chain
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 
-	execution1 := support.CreateWorkflowNodeExecution(t, workflow.ID, "node-1", rootEvent.ID, rootEvent.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID, nil)
 	node1Data := map[string]any{"result": "first-filter"}
-	event1 := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, "node-1", "default", &execution1.ID, node1Data)
+	event1 := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "node-1", "default", &execution1.ID, node1Data)
 
-	execution2 := support.CreateNextNodeExecution(t, workflow.ID, "node-2", rootEvent.ID, event1.ID, &execution1.ID)
+	execution2 := support.CreateNextNodeExecution(t, canvas.ID, "node-2", rootEvent.ID, event1.ID, &execution1.ID)
 	node2Data := map[string]any{"result": "second-filter"}
-	support.EmitWorkflowEventForNodeWithData(t, workflow.ID, "node-2", "default", &execution2.ID, node2Data)
+	support.EmitCanvasEventForNodeWithData(t, canvas.ID, "node-2", "default", &execution2.ID, node2Data)
 
 	// Build configuration from node-3's perspective - should get node-2's data (closest "filter")
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithPreviousExecution(&execution2.ID).
 		WithRootEvent(&rootEvent.ID).
 		WithInput(map[string]any{"node-2": node2Data})
@@ -258,11 +258,11 @@ func Test_NodeConfigurationBuilder_NodeNameNotUnique_NoneInChain(t *testing.T) {
 	defer r.Close()
 
 	// Create a workflow with two nodes having the same name but neither in the execution chain
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "filter",
@@ -279,7 +279,7 @@ func Test_NodeConfigurationBuilder_NodeNameNotUnique_NoneInChain(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithInput(map[string]any{})
 
 	configuration := map[string]any{
@@ -295,11 +295,11 @@ func Test_NodeConfigurationBuilder_NodeIDNotAllowed(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "filter",
@@ -310,7 +310,7 @@ func Test_NodeConfigurationBuilder_NodeIDNotAllowed(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithInput(map[string]any{"node-1": map[string]any{"data": "value"}})
 
 	configuration := map[string]any{
@@ -326,17 +326,17 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root_NoRootEvent(t *testing
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent},
 		},
 		[]models.Edge{},
 	)
 
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithInput(map[string]any{})
 
 	configuration := map[string]any{
@@ -357,11 +357,11 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain(t *testing.T) {
 	node1 := "node-1"
 	node2 := "node-2"
 	node3 := "node-3"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Name:   triggerNode,
@@ -396,14 +396,14 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain(t *testing.T) {
 	//
 	// Create root event
 	//
-	rootEvent := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, triggerNode, "default", nil, map[string]any{"root": "data"})
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, map[string]any{"root": "data"})
 
 	//
 	// Simulate execution for first node
 	//
-	execution1 := support.CreateWorkflowNodeExecution(
+	execution1 := support.CreateCanvasNodeExecution(
 		t,
-		workflow.ID,
+		canvas.ID,
 		node1,
 		rootEvent.ID,
 		rootEvent.ID,
@@ -413,14 +413,14 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain(t *testing.T) {
 		"step":   1,
 		"result": "first",
 	}
-	event1 := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, node1, "default", &execution1.ID, node1Data)
+	event1 := support.EmitCanvasEventForNodeWithData(t, canvas.ID, node1, "default", &execution1.ID, node1Data)
 
 	//
 	// Simulate execution for second node
 	//
 	execution2 := support.CreateNextNodeExecution(
 		t,
-		workflow.ID,
+		canvas.ID,
 		node2,
 		rootEvent.ID,
 		event1.ID,
@@ -431,12 +431,12 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain(t *testing.T) {
 		"step":   2,
 		"result": "second",
 	}
-	support.EmitWorkflowEventForNodeWithData(t, workflow.ID, node2, "default", &execution2.ID, node2Data)
+	support.EmitCanvasEventForNodeWithData(t, canvas.ID, node2, "default", &execution2.ID, node2Data)
 
 	//
 	// Now test message chain access from node3 perspective
 	//
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithPreviousExecution(&execution2.ID).
 		WithRootEvent(&rootEvent.ID).
 		WithInput(map[string]any{node2: node2Data})
@@ -462,11 +462,11 @@ func Test_NodeConfigurationBuilder_Chain_IncludesParallelUpstreamExecutions(t *t
 	action3Node := "action-3"
 	mergeNode := "merge"
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: startNode,
 				Name:   startNode,
@@ -508,21 +508,21 @@ func Test_NodeConfigurationBuilder_Chain_IncludesParallelUpstreamExecutions(t *t
 		},
 	)
 
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, startNode, "default", nil)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, startNode, "default", nil)
 
-	execution1 := support.CreateWorkflowNodeExecution(t, workflow.ID, action1Node, rootEvent.ID, rootEvent.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, action1Node, rootEvent.ID, rootEvent.ID, nil)
 	action1Data := map[string]any{"value": "from-action-1"}
-	support.EmitWorkflowEventForNodeWithData(t, workflow.ID, action1Node, "default", &execution1.ID, action1Data)
+	support.EmitCanvasEventForNodeWithData(t, canvas.ID, action1Node, "default", &execution1.ID, action1Data)
 
-	execution2 := support.CreateWorkflowNodeExecution(t, workflow.ID, action2Node, rootEvent.ID, rootEvent.ID, nil)
+	execution2 := support.CreateCanvasNodeExecution(t, canvas.ID, action2Node, rootEvent.ID, rootEvent.ID, nil)
 	action2Data := map[string]any{"value": "from-action-2"}
-	support.EmitWorkflowEventForNodeWithData(t, workflow.ID, action2Node, "default", &execution2.ID, action2Data)
+	support.EmitCanvasEventForNodeWithData(t, canvas.ID, action2Node, "default", &execution2.ID, action2Data)
 
-	execution3 := support.CreateWorkflowNodeExecution(t, workflow.ID, action3Node, rootEvent.ID, rootEvent.ID, nil)
+	execution3 := support.CreateCanvasNodeExecution(t, canvas.ID, action3Node, rootEvent.ID, rootEvent.ID, nil)
 	action3Data := map[string]any{"value": "from-action-3"}
-	support.EmitWorkflowEventForNodeWithData(t, workflow.ID, action3Node, "default", &execution3.ID, action3Data)
+	support.EmitCanvasEventForNodeWithData(t, canvas.ID, action3Node, "default", &execution3.ID, action3Data)
 
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithNodeID(mergeNode).
 		WithPreviousExecution(&execution1.ID).
 		WithRootEvent(&rootEvent.ID).
@@ -549,11 +549,11 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Previous(t *testing.T) {
 	node1 := "node-1"
 	node2 := "node-2"
 	node3 := "node-3"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Type:   models.NodeTypeTrigger,
@@ -581,11 +581,11 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Previous(t *testing.T) {
 		},
 	)
 
-	rootEvent := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, triggerNode, "default", nil, map[string]any{"root": "data"})
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, map[string]any{"root": "data"})
 
-	execution1 := support.CreateWorkflowNodeExecution(
+	execution1 := support.CreateCanvasNodeExecution(
 		t,
-		workflow.ID,
+		canvas.ID,
 		node1,
 		rootEvent.ID,
 		rootEvent.ID,
@@ -595,11 +595,11 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Previous(t *testing.T) {
 		"step":   1,
 		"result": "first",
 	}
-	event1 := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, node1, "default", &execution1.ID, node1Data)
+	event1 := support.EmitCanvasEventForNodeWithData(t, canvas.ID, node1, "default", &execution1.ID, node1Data)
 
 	execution2 := support.CreateNextNodeExecution(
 		t,
-		workflow.ID,
+		canvas.ID,
 		node2,
 		rootEvent.ID,
 		event1.ID,
@@ -609,9 +609,9 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Previous(t *testing.T) {
 		"step":   2,
 		"result": "second",
 	}
-	support.EmitWorkflowEventForNodeWithData(t, workflow.ID, node2, "default", &execution2.ID, node2Data)
+	support.EmitCanvasEventForNodeWithData(t, canvas.ID, node2, "default", &execution2.ID, node2Data)
 
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithPreviousExecution(&execution2.ID).
 		WithRootEvent(&rootEvent.ID).
 		WithInput(map[string]any{node2: node2Data})
@@ -633,18 +633,18 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Previous_MultipleInputs(t *
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{NodeID: "node-1", Type: models.NodeTypeComponent},
 			{NodeID: "node-2", Type: models.NodeTypeComponent},
 		},
 		[]models.Edge{},
 	)
 
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithInput(map[string]any{
 			"node-1": map[string]any{"value": "one"},
 			"node-2": map[string]any{"value": "two"},
@@ -659,17 +659,17 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_NoPreviousExecution(t
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent},
 		},
 		[]models.Edge{},
 	)
 
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithInput(map[string]any{})
 
 	configuration := map[string]any{
@@ -687,21 +687,21 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_NodeNotInChain(t *tes
 
 	node1 := "node-1"
 	node2 := "node-2"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{NodeID: node1, Name: node1, Type: models.NodeTypeComponent},
 			{NodeID: node2, Name: node2, Type: models.NodeTypeComponent},
 		},
 		[]models.Edge{},
 	)
 
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, node1, "default", nil)
-	execution1 := support.CreateWorkflowNodeExecution(t, workflow.ID, node1, rootEvent.ID, rootEvent.ID, nil)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, node1, "default", nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, node1, rootEvent.ID, rootEvent.ID, nil)
 
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithPreviousExecution(&execution1.ID).
 		WithInput(map[string]any{})
 
@@ -743,11 +743,11 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Root(t *testing.T) {
 	// Create a workflow with a trigger and a blueprint node
 	triggerNode := "trigger-1"
 	blueprintNode := "blueprint-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Name:   triggerNode,
@@ -772,12 +772,12 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Root(t *testing.T) {
 		"email":    "alice@example.com",
 		"age":      30,
 	}
-	rootEvent := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, triggerNode, "default", nil, rootEventData)
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, rootEventData)
 
 	// Create a blueprint execution
-	blueprintExecution := support.CreateWorkflowNodeExecution(
+	blueprintExecution := support.CreateCanvasNodeExecution(
 		t,
-		workflow.ID,
+		canvas.ID,
 		blueprintNode,
 		rootEvent.ID,
 		rootEvent.ID,
@@ -785,12 +785,12 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Root(t *testing.T) {
 	)
 
 	// Get the blueprint node for testing
-	blueprintWorkflowNode, err := models.FindWorkflowNode(database.Conn(), workflow.ID, blueprintNode)
+	blueprintCanvasNode, err := models.FindCanvasNode(database.Conn(), canvas.ID, blueprintNode)
 	require.NoError(t, err)
 
 	// Build configuration for a node inside the blueprint
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
-		ForBlueprintNode(blueprintWorkflowNode).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		ForBlueprintNode(blueprintCanvasNode).
 		WithRootEvent(&rootEvent.ID).
 		WithPreviousExecution(&blueprintExecution.ID).
 		WithInput(map[string]any{triggerNode: rootEventData})
@@ -845,11 +845,11 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Chain(t *testing.T) {
 	// Create a workflow with a trigger and a blueprint node
 	triggerNode := "trigger-1"
 	blueprintNode := "blueprint-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: triggerNode,
 				Name:   triggerNode,
@@ -868,14 +868,14 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Chain(t *testing.T) {
 		},
 	)
 
-	rootEvent := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, triggerNode, "default", nil, map[string]any{"root": "data"})
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, map[string]any{"root": "data"})
 
 	//
 	// Create parent blueprint execution
 	//
-	blueprintExecution := support.CreateWorkflowNodeExecution(
+	blueprintExecution := support.CreateCanvasNodeExecution(
 		t,
-		workflow.ID,
+		canvas.ID,
 		blueprintNode,
 		rootEvent.ID,
 		rootEvent.ID,
@@ -887,9 +887,9 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Chain(t *testing.T) {
 	//
 	bpNode1ID := blueprintNode + ":bp-node-1"
 	bpNode2ID := blueprintNode + ":bp-node-2"
-	bpNode1Execution := support.CreateWorkflowNodeExecution(
+	bpNode1Execution := support.CreateCanvasNodeExecution(
 		t,
-		workflow.ID,
+		canvas.ID,
 		bpNode1ID,
 		rootEvent.ID,
 		rootEvent.ID,
@@ -900,14 +900,14 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Chain(t *testing.T) {
 		"processed": true,
 		"value":     "from-first-node",
 	}
-	event1 := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, bpNode1ID, "default", &bpNode1Execution.ID, bpNode1Data)
+	event1 := support.EmitCanvasEventForNodeWithData(t, canvas.ID, bpNode1ID, "default", &bpNode1Execution.ID, bpNode1Data)
 
 	//
 	// Create second blueprint node child execution
 	//
-	bpNode2Execution := support.CreateWorkflowNodeExecution(
+	bpNode2Execution := support.CreateCanvasNodeExecution(
 		t,
-		workflow.ID,
+		canvas.ID,
 		bpNode2ID,
 		rootEvent.ID,
 		event1.ID,
@@ -919,11 +919,11 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Chain(t *testing.T) {
 	//
 	// Test message chain access from bp-node-2 perspective
 	//
-	blueprintWorkflowNode, err := models.FindWorkflowNode(database.Conn(), workflow.ID, blueprintNode)
+	blueprintCanvasNode, err := models.FindCanvasNode(database.Conn(), canvas.ID, blueprintNode)
 	require.NoError(t, err)
 
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
-		ForBlueprintNode(blueprintWorkflowNode).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		ForBlueprintNode(blueprintCanvasNode).
 		WithPreviousExecution(&bpNode2Execution.ID).
 		WithRootEvent(&rootEvent.ID).
 		WithInput(map[string]any{bpNode1ID: bpNode1Data})
@@ -965,13 +965,13 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Config(t *testing.T) {
 		},
 	)
 
-	// Create a workflow with a blueprint node that has configuration
+	// Create a canvas with a blueprint node that has configuration
 	blueprintNode := "blueprint-1"
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: blueprintNode,
 				Name:   blueprintNode,
@@ -991,15 +991,15 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Config(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, blueprintNode, "default", nil)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, blueprintNode, "default", nil)
 
 	// Get the blueprint node
-	blueprintWorkflowNode, err := models.FindWorkflowNode(database.Conn(), workflow.ID, blueprintNode)
+	blueprintCanvasNode, err := models.FindCanvasNode(database.Conn(), canvas.ID, blueprintNode)
 	require.NoError(t, err)
 
 	// Build configuration accessing parent blueprint node config
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
-		ForBlueprintNode(blueprintWorkflowNode).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		ForBlueprintNode(blueprintCanvasNode).
 		WithRootEvent(&rootEvent.ID).
 		WithInput(map[string]any{blueprintNode: map[string]any{"input": "data"}})
 
@@ -1026,11 +1026,11 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Config_NotAvailableForWork
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{
 				NodeID: "node-1",
 				Name:   "node-1",
@@ -1044,10 +1044,10 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Config_NotAvailableForWork
 	)
 
 	//
-	// Build without ForBlueprintNode - this is a workflow-level node
+	// Build without ForBlueprintNode - this is a canvas-level node
 	//
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithRootEvent(&rootEvent.ID).
 		WithInput(map[string]any{"node-1": rootEvent.Data.Data()})
 
@@ -1060,11 +1060,11 @@ func Test_NodeConfigurationBuilder_ComplexNesting(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent},
 		},
 		[]models.Edge{},
@@ -1078,9 +1078,9 @@ func Test_NodeConfigurationBuilder_ComplexNesting(t *testing.T) {
 		"items":  []any{"apple", "banana", "cherry"},
 		"prefix": "user",
 	}
-	rootEvent := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, "node-1", "default", nil, rootEventData)
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "node-1", "default", nil, rootEventData)
 
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithRootEvent(&rootEvent.ID).
 		WithInput(map[string]any{"node-1": rootEventData})
 
@@ -1118,11 +1118,11 @@ func Test_NodeConfigurationBuilder_InputVariable(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent},
 		},
 		[]models.Edge{},
@@ -1137,9 +1137,9 @@ func Test_NodeConfigurationBuilder_InputVariable(t *testing.T) {
 		},
 	}
 
-	rootEvent := support.EmitWorkflowEventForNodeWithData(t, workflow.ID, "node-1", "default", nil, inputData)
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "node-1", "default", nil, inputData)
 
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithRootEvent(&rootEvent.ID).
 		WithInput(map[string]any{"node-1": inputData})
 
@@ -1164,19 +1164,19 @@ func Test_NodeConfigurationBuilder_NoExpression(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent},
 		},
 		[]models.Edge{},
 	)
 
-	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithRootEvent(&rootEvent.ID).
 		WithInput(map[string]any{})
 
@@ -1199,17 +1199,17 @@ func Test_NodeConfigurationBuilder_DisallowExpression_ListItems(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	workflow, _ := support.CreateWorkflow(
+	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
-		[]models.WorkflowNode{
+		[]models.CanvasNode{
 			{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent},
 		},
 		[]models.Edge{},
 	)
 
-	builder := NewNodeConfigurationBuilder(database.Conn(), workflow.ID).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithInput(map[string]any{
 			"node-1": map[string]any{
 				"allowed":    "resolved",

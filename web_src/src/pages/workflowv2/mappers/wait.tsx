@@ -2,8 +2,8 @@ import React from "react";
 import {
   ComponentsComponent,
   ComponentsNode,
-  WorkflowsWorkflowNodeExecution,
-  WorkflowsWorkflowNodeQueueItem,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, OutputPayload, StateFunction } from "./types";
 import {
@@ -59,8 +59,8 @@ export const waitMapper: ComponentBaseMapper = {
     nodes: ComponentsNode[],
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
-    nodeQueueItems?: WorkflowsWorkflowNodeQueueItem[],
+    lastExecutions: CanvasesCanvasNodeExecution[],
+    nodeQueueItems?: CanvasesCanvasNodeQueueItem[],
   ): ComponentBaseProps {
     const componentName = componentDefinition.name || "wait";
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
@@ -80,11 +80,11 @@ export const waitMapper: ComponentBaseMapper = {
       eventStateMap: getStateMap(componentName),
     };
   },
-  subtitle(_node: ComponentsNode, execution: WorkflowsWorkflowNodeExecution): React.ReactNode {
+  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): React.ReactNode {
     const subtitle = getWaitEventSubtitle(execution, undefined, "wait");
     return subtitle || "";
   },
-  getExecutionDetails(execution: WorkflowsWorkflowNodeExecution, _node: ComponentsNode): Record<string, any> {
+  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, any> {
     const details: Record<string, any> = {};
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
     const payload = outputs?.default?.[0];
@@ -138,7 +138,7 @@ export const WAIT_STATE_MAP: EventStateMap = {
   },
 };
 
-export const waitStateFunction: StateFunction = (execution: WorkflowsWorkflowNodeExecution): EventState => {
+export const waitStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
   if (!execution) return "neutral";
 
   if (
@@ -249,8 +249,8 @@ function getWaitMetadataList(node: ComponentsNode): MetadataItem[] {
 
 function getWaitEventSections(
   nodes: ComponentsNode[],
-  execution: WorkflowsWorkflowNodeExecution,
-  _nodeQueueItems: WorkflowsWorkflowNodeQueueItem[] | undefined,
+  execution: CanvasesCanvasNodeExecution,
+  _nodeQueueItems: CanvasesCanvasNodeQueueItem[] | undefined,
   configuration: Record<string, unknown> | undefined,
   componentName: string,
 ): EventSection[] {
@@ -273,7 +273,7 @@ function getWaitEventSections(
 }
 
 function getWaitEventSubtitle(
-  execution: WorkflowsWorkflowNodeExecution,
+  execution: CanvasesCanvasNodeExecution,
   configuration: Record<string, unknown> | undefined,
   componentName: string,
 ): string | React.ReactNode | undefined {
@@ -373,36 +373,49 @@ export const waitCustomFieldRenderer: CustomFieldRenderer = {
   render: (_node: ComponentsNode, configuration: Record<string, unknown>) => {
     const mode = configuration?.mode as string;
 
-    let content: string;
+    let content: React.ReactNode;
     let title: string;
 
     if (mode === "interval") {
       title = "Fixed Time Interval";
-      content = `Component will wait for a fixed amount of time before emitting the event forward.
-
-Supports expressions and expects integer.
-
-Example expressions:
-{{ $.wait_time }}
-{{ $.wait_time + 5 }}
-{{ $.status == "urgent" ? 0 : 30 }}
-{{ int($.delay_seconds) }}
-
-Check Docs for more details on selecting data from payloads and expressions.`;
+      content = (
+        <div className="space-y-2">
+          <p>Component will wait for a fixed amount of time before emitting the event forward.</p>
+          <p>Supports expressions and expects integer.</p>
+          <ExpressionEnvironment />
+          <ExpressionExamples
+            examples={[
+              '{{ $["Node Name"].data.wait_seconds }}',
+              "{{ root().data.policy.delay_minutes }}",
+              "{{ previous().data.retry_after_seconds }}",
+              "{{ previous(2).data.backoff_seconds }}",
+              '{{ $["Node Name"].data.priority == "urgent" ? 0 : 30 }}',
+              '{{ int($["Node Name"].data.delay_seconds) }}',
+            ]}
+          />
+          <p>Check Docs for more details on selecting data from payloads and expressions.</p>
+        </div>
+      );
     } else if (mode === "countdown") {
       title = "Countdown to Date/Time";
-      content = `Component will countdown until the provided date/time before emitting an event forward.
-
-Supports expressions and expects date in ISO 8601 format.
-
-Example expressions:
-{{ $.run_time }}
-{{ date($.date_string) }}
-{{ date($.date).Add(duration("1h")).Format("2006-01-02T15:04:05Z") }}
-{{ now().Add(duration("24h")).Format("2006-01-02") }}
-{{ date("2023-08-14 00:00:00").In(timezone("Europe/Zurich")) }}
-
-Check Docs for more details on selecting data from payloads and expressions.`;
+      content = (
+        <div className="space-y-2">
+          <p>Component will countdown until the provided date/time before emitting an event forward.</p>
+          <p>Supports expressions and expects date in ISO 8601 format.</p>
+          <ExpressionEnvironment />
+          <ExpressionExamples
+            examples={[
+              '{{ $["Node Name"].data.run_at }}',
+              "{{ root().data.schedule.start_at }}",
+              '{{ previous().data["Scheduler"].data.next_run_at }}',
+              '{{ date($["Node Name"].data.start_at).Add(duration("2h")).Format("2006-01-02T15:04:05Z") }}',
+              '{{ now().Add(duration("24h")).Format("2006-01-02") }}',
+              '{{ date(previous(3).data["Creator"].data.created_at).In(timezone("America/Chicago")) }}',
+            ]}
+          />
+          <p>Check Docs for more details on selecting data from payloads and expressions.</p>
+        </div>
+      );
     } else {
       title = "Wait Component";
       content = "Configure the wait mode to see more details.";
@@ -413,7 +426,7 @@ Check Docs for more details on selecting data from payloads and expressions.`;
         <div className="space-y-3">
           <div>
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{title}:</span>
-            <div className="text-xs text-gray-800 dark:text-gray-100 mt-1 border-1 border-orange-950/20 px-2.5 py-2 bg-orange-50 dark:bg-amber-800 rounded-md font-mono whitespace-pre-line">
+            <div className="text-xs text-gray-800 dark:text-gray-100 mt-1 border-1 border-gray-200 dark:border-gray-700 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-md">
               {content}
             </div>
           </div>
@@ -422,3 +435,67 @@ Check Docs for more details on selecting data from payloads and expressions.`;
     );
   },
 };
+
+const EXPRESSION_TOKEN_PATTERN =
+  /({{|}}|\$|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\b\d+(?:\.\d+)?\b|\b(?:root|previous|date|duration|now|timezone|int)\b|\b(?:true|false|null)\b|==|!=|>=|<=|&&|\|\||[?:+\-*/%().,[\]]|[A-Za-z_][A-Za-z0-9_]*|\s+)/g;
+
+function tokenClass(token: string): string | undefined {
+  if (/^\s+$/.test(token)) return undefined;
+  if (token === "{{" || token === "}}") return "text-gray-500";
+  if (token === "$") return "text-emerald-700";
+  if (token.startsWith('"') || token.startsWith("'")) return "text-amber-700";
+  if (/^\b\d+(\.\d+)?\b$/.test(token)) return "text-blue-700";
+  if (/^\b(?:root|previous|date|duration|now|timezone|int)\b$/.test(token)) return "text-purple-700";
+  if (/^\b(?:true|false|null)\b$/.test(token)) return "text-emerald-700";
+  if (/^(==|!=|>=|<=|&&|\|\||[?:+\-*/%().,[\]])$/.test(token)) return "text-gray-600";
+  return "text-gray-800 dark:text-gray-100";
+}
+
+function renderHighlightedExpression(expression: string): React.ReactNode {
+  const tokens = expression.match(EXPRESSION_TOKEN_PATTERN) ?? [expression];
+  return tokens.map((token, index) => {
+    const className = tokenClass(token);
+    if (!className) {
+      return <React.Fragment key={`${token}-${index}`}>{token}</React.Fragment>;
+    }
+    return (
+      <span key={`${token}-${index}`} className={className}>
+        {token}
+      </span>
+    );
+  });
+}
+
+function ExpressionEnvironment() {
+  return (
+    <div className="space-y-1">
+      <div className="font-medium text-gray-700 dark:text-gray-300">Expression environment:</div>
+      <ul className="list-disc pl-4 text-gray-700 dark:text-gray-300">
+        <li>
+          <span className="font-mono">$</span>: run context data
+        </li>
+        <li>
+          <span className="font-mono">root()</span>: root event data
+        </li>
+        <li>
+          <span className="font-mono">previous()</span>: previous node outputs (optional depth)
+        </li>
+      </ul>
+    </div>
+  );
+}
+
+function ExpressionExamples({ examples }: { examples: string[] }) {
+  return (
+    <div className="space-y-1">
+      <div className="font-medium text-gray-700 dark:text-gray-300">Examples:</div>
+      <div className="space-y-1 font-mono text-xs">
+        {examples.map((example) => (
+          <div key={example} className="rounded bg-gray-50 dark:bg-gray-800 px-2 py-1">
+            {renderHighlightedExpression(example)}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

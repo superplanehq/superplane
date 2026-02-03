@@ -1,10 +1,5 @@
 import { useState } from "react";
-import {
-  ComponentsNode,
-  TriggersTrigger,
-  WorkflowsWorkflowEvent,
-  workflowsInvokeNodeTriggerAction,
-} from "@/api-client";
+import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent, canvasesInvokeNodeTriggerAction } from "@/api-client";
 import { getColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
 import { TriggerRenderer, CustomFieldRenderer } from "./types";
@@ -13,7 +8,7 @@ import { Icon } from "@/components/Icon";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
-import { workflowKeys } from "@/hooks/useWorkflowData";
+import { canvasKeys } from "@/hooks/useCanvasData";
 import { showErrorToast } from "@/utils/toast";
 
 interface WebhookConfiguration {
@@ -60,7 +55,7 @@ interface WebhookEventData {
   headers?: Record<string, string>;
 }
 
-function getWebhookEventTitle(event: WorkflowsWorkflowEvent): string {
+function getWebhookEventTitle(event: CanvasesCanvasEvent): string {
   // Check for run_name in the webhook request body
   const runName = (event.data?.data as { body?: { run_name?: string } })?.body?.run_name;
   if (runName) {
@@ -75,7 +70,7 @@ function getWebhookEventTitle(event: WorkflowsWorkflowEvent): string {
  * Renderer for the "webhook" trigger type
  */
 export const webhookTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
     const eventDate = new Date(event.createdAt!);
 
     return {
@@ -84,7 +79,7 @@ export const webhookTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getRootEventValues: (event: WorkflowsWorkflowEvent): Record<string, string> => {
+  getRootEventValues: (event: CanvasesCanvasEvent): Record<string, string> => {
     const webhookData = event.data?._webhook as WebhookEventData | undefined;
     const receivedOn = (event.data?.["timestamp"] as string) || event.createdAt;
     const values: Record<string, string> = {
@@ -115,7 +110,7 @@ export const webhookTriggerRenderer: TriggerRenderer = {
     return values;
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent?: WorkflowsWorkflowEvent) => {
+  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent?: CanvasesCanvasEvent) => {
     const metadata = node.metadata as WebhookMetadata | undefined;
     const configuration = node.configuration as WebhookConfiguration | undefined;
 
@@ -190,7 +185,7 @@ const ResetAuthButton: React.FC<{
   const [isResetting, setIsResetting] = useState(false);
   const [newSecret, setNewSecret] = useState<string | null>(null);
   const queryClient = useQueryClient();
-  const { organizationId, workflowId } = useParams<{ organizationId: string; workflowId: string }>();
+  const { organizationId, canvasId } = useParams<{ organizationId: string; canvasId: string }>();
 
   const getAuthLabels = () => {
     switch (authMethod) {
@@ -223,14 +218,14 @@ const ResetAuthButton: React.FC<{
   const labels = getAuthLabels();
 
   const handleResetAuth = async () => {
-    if (authMethod === "none" || !workflowId) return;
+    if (authMethod === "none" || !canvasId) return;
 
     setIsResetting(true);
     try {
-      const response = await workflowsInvokeNodeTriggerAction(
+      const response = await canvasesInvokeNodeTriggerAction(
         withOrganizationHeader({
           path: {
-            workflowId: workflowId,
+            canvasId: canvasId,
             nodeId: nodeId,
             actionName: "resetAuthentication",
           },
@@ -248,7 +243,7 @@ const ResetAuthButton: React.FC<{
         // Invalidate workflow queries to refresh the UI
         if (organizationId) {
           queryClient.invalidateQueries({
-            queryKey: workflowKeys.detail(organizationId, workflowId),
+            queryKey: canvasKeys.detail(organizationId, canvasId),
           });
         }
       }
@@ -324,13 +319,13 @@ export const webhookCustomFieldRenderer: CustomFieldRenderer = {
 export PAYLOAD='{"hello":"world"}'
 
 export SIGNATURE=$(echo -n "$PAYLOAD" \\
-  | openssl dgst -sha256 -hmac "$SIGNATURE_KEY" \\
-  | awk '{print $2}')
+  | openssl dgst -sha256 -hmac "$SIGNATURE_KEY" -binary \\
+  | xxd -p -c 256)
 
 curl -X POST \\
   -H "X-Signature-256: sha256=$SIGNATURE" \\
   -H "Content-Type: application/json" \\
-  --data "$PAYLOAD" \\
+  --data-binary "$PAYLOAD" \\
   ${webhookUrl}`;
           break;
 

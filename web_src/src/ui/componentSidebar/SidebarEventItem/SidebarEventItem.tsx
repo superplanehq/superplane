@@ -7,7 +7,7 @@ import { SidebarEventActionsMenu } from "./SidebarEventActionsMenu";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../SimpleTooltip";
 import { DEFAULT_EVENT_STATE_MAP, EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
-import { WorkflowsWorkflowNodeExecution } from "@/api-client";
+import { CanvasesCanvasNodeExecution } from "@/api-client";
 
 export interface ExecutionChainItem extends EventStateStyle {
   name: string;
@@ -48,7 +48,7 @@ interface SidebarEventItemProps {
   ) => Promise<any[]>;
   getExecutionState?: (
     nodeId: string,
-    execution: WorkflowsWorkflowNodeExecution,
+    execution: CanvasesCanvasNodeExecution,
   ) => { map: EventStateMap; state: EventState };
 }
 
@@ -100,7 +100,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
 
     const { map, state } = getExecutionState(
       event.nodeId || "",
-      event.originalExecution as WorkflowsWorkflowNodeExecution,
+      event.originalExecution as CanvasesCanvasNodeExecution,
     );
     return map[state];
   }, [event.nodeId, event.originalExecution, getExecutionState, event.kind, event.state]);
@@ -254,10 +254,10 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         const nodeId = execution.nodeId;
         const executionId = execution.executionId;
 
-        const link = `${window.location.origin}/${orgId}/workflows/${workflowId}/nodes/${nodeId}/${executionId}`;
+        const link = `${window.location.origin}/${orgId}/canvases/${workflowId}/nodes/${nodeId}/${executionId}`;
         copyToClipboard(link);
       } else {
-        const link = `${window.location.origin}/${orgId}/workflows/${workflowId}?sidebar=1&node=${execution.nodeId}`;
+        const link = `${window.location.origin}/${orgId}/canvases/${workflowId}?sidebar=1&node=${execution.nodeId}`;
         copyToClipboard(link);
       }
 
@@ -283,7 +283,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       const nodeId = execution.nodeId;
       const executionId = execution.executionId;
 
-      const path = `/${orgId}/workflows/${workflowId}/nodes/${nodeId}/${executionId}`;
+      const path = `/${orgId}/canvases/${workflowId}/nodes/${nodeId}/${executionId}`;
       navigate(path, { replace: false });
     },
     [navigate],

@@ -95,6 +95,14 @@ func (s *Slack) Configuration() []configuration.Field {
 	}
 }
 
+func (s *Slack) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (s *Slack) HandleAction(ctx core.IntegrationActionContext) error {
+	return nil
+}
+
 func (s *Slack) Components() []core.Component {
 	return []core.Component{
 		&SendTextMessage{},
@@ -105,6 +113,10 @@ func (s *Slack) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnAppMention{},
 	}
+}
+
+func (s *Slack) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
 }
 
 func (s *Slack) Sync(ctx core.SyncContext) error {
@@ -149,7 +161,7 @@ func (s *Slack) Sync(ctx core.SyncContext) error {
 		})
 
 		ctx.Integration.RemoveBrowserAction()
-		ctx.Integration.SetState("ready", "")
+		ctx.Integration.Ready()
 		return nil
 	}
 
@@ -233,7 +245,7 @@ func (s *Slack) appManifest(ctx core.SyncContext) ([]byte, error) {
 		},
 		"settings": map[string]any{
 			"event_subscriptions": map[string]any{
-				"request_url": fmt.Sprintf("%s/api/v1/integrations/%s/events", appURL, ctx.InstallationID),
+				"request_url": fmt.Sprintf("%s/api/v1/integrations/%s/events", appURL, ctx.Integration.ID().String()),
 				"bot_events": []string{
 					"app_mention",
 					"reaction_added",
@@ -246,7 +258,7 @@ func (s *Slack) appManifest(ctx core.SyncContext) ([]byte, error) {
 			},
 			"interactivity": map[string]any{
 				"is_enabled":  true,
-				"request_url": fmt.Sprintf("%s/api/v1/integrations/%s/interactions", appURL, ctx.InstallationID),
+				"request_url": fmt.Sprintf("%s/api/v1/integrations/%s/interactions", appURL, ctx.Integration.ID().String()),
 			},
 			"org_deploy_enabled":  false,
 			"socket_mode_enabled": false,

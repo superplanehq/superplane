@@ -11,6 +11,7 @@ import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
+import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ChildEventsState } from "../composite";
 import { TabData } from "./SidebarEventItem/SidebarEventItem";
@@ -21,7 +22,7 @@ import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import {
   AuthorizationDomainType,
   ConfigurationField,
-  WorkflowsWorkflowNodeExecution,
+  CanvasesCanvasNodeExecution,
   ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
@@ -45,6 +46,7 @@ const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   semaphore: SemaphoreLogo,
   slack: slackIcon,
   aws: {
+    ecr: awsEcrIcon,
     lambda: awsLambdaIcon,
   },
 };
@@ -114,7 +116,7 @@ interface ComponentSidebarProps {
   // State registry function for determining execution states
   getExecutionState?: (
     nodeId: string,
-    execution: WorkflowsWorkflowNodeExecution,
+    execution: CanvasesCanvasNodeExecution,
   ) => { map: EventStateMap; state: EventState };
 
   // Settings tab props

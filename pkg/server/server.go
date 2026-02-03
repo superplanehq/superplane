@@ -50,7 +50,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/widgets/annotation"
 )
 
-func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, authService authorization.Authorization) {
+func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, authService authorization.Authorization) {
 	log.Println("Starting Workers")
 
 	rabbitMQURL, err := config.RabbitMQURL()
@@ -62,17 +62,17 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		startEmailConsumers(rabbitMQURL, encryptor, baseURL, authService)
 	}
 
-	if os.Getenv("START_WORKFLOW_EVENT_ROUTER") == "yes" {
-		log.Println("Starting Execution Router")
+	if os.Getenv("START_WORKFLOW_EVENT_ROUTER") == "yes" || os.Getenv("START_EVENT_ROUTER") == "yes" {
+		log.Println("Starting Event Router")
 
-		w := workers.NewWorkflowEventRouter()
+		w := workers.NewEventRouter()
 		go w.Start(context.Background())
 	}
 
-	if os.Getenv("START_WORKFLOW_NODE_EXECUTOR") == "yes" {
-		log.Println("Starting Pending Node Execution Worker")
+	if os.Getenv("START_WORKFLOW_NODE_EXECUTOR") == "yes" || os.Getenv("START_NODE_EXECUTOR") == "yes" {
+		log.Println("Starting Node Executor")
 
-		w := workers.NewWorkflowNodeExecutor(encryptor, registry, baseURL)
+		w := workers.NewNodeExecutor(encryptor, registry, baseURL)
 		go w.Start(context.Background())
 	}
 
@@ -83,18 +83,18 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		go w.Start(context.Background())
 	}
 
-	if os.Getenv("START_APP_INSTALLATION_REQUEST_WORKER") == "yes" {
-		log.Println("Starting App Installation Request Worker")
+	if os.Getenv("START_APP_INSTALLATION_REQUEST_WORKER") == "yes" || os.Getenv("START_INTEGRATION_REQUEST_WORKER") == "yes" {
+		log.Println("Starting Integration Request Worker")
 
 		webhooksBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewAppInstallationRequestWorker(encryptor, registry, oidcProvider, baseURL, webhooksBaseURL)
+		w := workers.NewIntegrationRequestWorker(encryptor, registry, oidcProvider, baseURL, webhooksBaseURL)
 		go w.Start(context.Background())
 	}
 
-	if os.Getenv("START_WORKFLOW_NODE_QUEUE_WORKER") == "yes" {
-		log.Println("Starting Workflow Node Queue Worker")
+	if os.Getenv("START_WORKFLOW_NODE_QUEUE_WORKER") == "yes" || os.Getenv("START_NODE_QUEUE_WORKER") == "yes" {
+		log.Println("Starting Node Queue Worker")
 
-		w := workers.NewWorkflowNodeQueueWorker(registry)
+		w := workers.NewNodeQueueWorker(registry)
 		go w.Start(context.Background())
 	}
 
@@ -113,17 +113,17 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		go w.Start(context.Background())
 	}
 
-	if os.Getenv("START_INSTALLATION_CLEANUP_WORKER") == "yes" {
-		log.Println("Starting App Installation Cleanup Worker")
+	if os.Getenv("START_INSTALLATION_CLEANUP_WORKER") == "yes" || os.Getenv("START_INTEGRATION_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting Integration Cleanup Worker")
 
-		w := workers.NewInstallationCleanupWorker()
+		w := workers.NewIntegrationCleanupWorker(registry, encryptor, baseURL)
 		go w.Start(context.Background())
 	}
 
-	if os.Getenv("START_WORKFLOW_CLEANUP_WORKER") == "yes" {
-		log.Println("Starting Workflow Cleanup Worker")
+	if os.Getenv("START_WORKFLOW_CLEANUP_WORKER") == "yes" || os.Getenv("START_CANVAS_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting Canvas Cleanup Worker")
 
-		w := workers.NewWorkflowCleanupWorker()
+		w := workers.NewCanvasCleanupWorker()
 		go w.Start(context.Background())
 	}
 }
@@ -319,12 +319,6 @@ func Start() {
 		panic("PUBLIC_API_BASE_PATH must be set")
 	}
 
-	// Sync missing default roles on startup
-	log.Info("Syncing default permissions for all organizations and canvases...")
-	if err := authService.CheckAndSyncMissingPermissions(); err != nil {
-		log.Warnf("Failed to sync missing permissions on startup: %v", err)
-	}
-
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		panic("JWT_SECRET must be set")
@@ -354,7 +348,7 @@ func Start() {
 		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, authService, registry, oidcProvider)
 	}
 
-	startWorkers(jwtSigner, encryptorInstance, registry, oidcProvider, baseURL, authService)
+	startWorkers(encryptorInstance, registry, oidcProvider, baseURL, authService)
 
 	log.Println("SuperPlane is UP.")
 

@@ -49,23 +49,23 @@ spec:
           env:
             - name: START_CONSUMERS
               value: "yes"
-            - name: START_WORKFLOW_EVENT_ROUTER
+            - name: START_EVENT_ROUTER
               value: "yes"
-            - name: START_WORKFLOW_NODE_EXECUTOR
+            - name: START_NODE_EXECUTOR
               value: "yes"
-            - name: START_WORKFLOW_NODE_QUEUE_WORKER
+            - name: START_NODE_QUEUE_WORKER
               value: "yes"
             - name: START_NODE_REQUEST_WORKER
               value: "yes"
-            - name: START_APP_INSTALLATION_REQUEST_WORKER
+            - name: START_INTEGRATION_REQUEST_WORKER
               value: "yes"
             - name: START_WEBHOOK_PROVISIONER
               value: "yes"
             - name: START_WEBHOOK_CLEANUP_WORKER
               value: "yes"
-            - name: START_INSTALLATION_CLEANUP_WORKER
+            - name: START_INTEGRATION_CLEANUP_WORKER
               value: "yes"
-            - name: START_WORKFLOW_CLEANUP_WORKER
+            - name: START_CANVAS_CLEANUP_WORKER
               value: "yes"
             - name: RBAC_MODEL_PATH
               value: /app/rbac/rbac_model.conf

@@ -10,7 +10,7 @@ import (
 )
 
 func ListIntegrations(ctx context.Context, registry *registry.Registry, orgID string) (*pb.ListIntegrationsResponse, error) {
-	integrations, err := models.ListAppInstallations(uuid.MustParse(orgID))
+	integrations, err := models.ListIntegrations(uuid.MustParse(orgID))
 	if err != nil {
 		return nil, err
 	}

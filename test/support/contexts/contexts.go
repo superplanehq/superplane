@@ -67,6 +67,7 @@ func (m *MetadataContext) Set(metadata any) error {
 }
 
 type IntegrationContext struct {
+	IntegrationID    string
 	Configuration    map[string]any
 	Metadata         any
 	State            string
@@ -75,7 +76,14 @@ type IntegrationContext struct {
 	Secrets          map[string]core.IntegrationSecret
 	WebhookRequests  []any
 	ResyncRequests   []time.Duration
+	ActionRequests   []ActionRequest
 	Subscriptions    []Subscription
+}
+
+type ActionRequest struct {
+	ActionName string
+	Parameters any
+	Interval   time.Duration
 }
 
 type Subscription struct {
@@ -84,6 +92,10 @@ type Subscription struct {
 }
 
 func (c *IntegrationContext) ID() uuid.UUID {
+	if c.IntegrationID != "" {
+		return uuid.MustParse(c.IntegrationID)
+	}
+
 	return uuid.New()
 }
 
@@ -117,9 +129,14 @@ func (c *IntegrationContext) GetState() string {
 	return ""
 }
 
-func (c *IntegrationContext) SetState(state, stateDescription string) {
-	c.State = state
-	c.StateDescription = stateDescription
+func (c *IntegrationContext) Ready() {
+	c.State = "ready"
+	c.StateDescription = ""
+}
+
+func (c *IntegrationContext) Error(message string) {
+	c.State = "error"
+	c.StateDescription = message
 }
 
 func (c *IntegrationContext) NewBrowserAction(action core.BrowserAction) {
@@ -150,6 +167,11 @@ func (c *IntegrationContext) RequestWebhook(configuration any) error {
 
 func (c *IntegrationContext) ScheduleResync(interval time.Duration) error {
 	c.ResyncRequests = append(c.ResyncRequests, interval)
+	return nil
+}
+
+func (c *IntegrationContext) ScheduleActionCall(actionName string, parameters any, interval time.Duration) error {
+	c.ActionRequests = append(c.ActionRequests, ActionRequest{ActionName: actionName, Parameters: parameters, Interval: interval})
 	return nil
 }
 

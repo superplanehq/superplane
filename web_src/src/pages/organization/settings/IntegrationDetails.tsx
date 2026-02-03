@@ -270,7 +270,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
                     {workflowGroups.map((group) => (
                       <button
                         key={group.workflowId}
-                        onClick={() => window.open(`/${organizationId}/workflows/${group.workflowId}`, "_blank")}
+                        onClick={() => window.open(`/${organizationId}/canvases/${group.workflowId}`, "_blank")}
                         className="w-full flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
                       >
                         <div className="flex-1">

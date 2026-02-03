@@ -170,6 +170,10 @@ func (p *PagerDuty) Triggers() []core.Trigger {
 	}
 }
 
+func (p *PagerDuty) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
 func (p *PagerDuty) Sync(ctx core.SyncContext) error {
 	configuration := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &configuration)
@@ -221,7 +225,7 @@ func (p *PagerDuty) apiTokenSync(ctx core.SyncContext) error {
 	}
 
 	ctx.Integration.SetMetadata(Metadata{Services: services})
-	ctx.Integration.SetState("ready", "")
+	ctx.Integration.Ready()
 	return nil
 }
 
@@ -305,7 +309,7 @@ func (p *PagerDuty) appOAuthSync(ctx core.SyncContext, configuration Configurati
 	}
 
 	ctx.Integration.SetMetadata(Metadata{Services: services})
-	ctx.Integration.SetState("ready", "")
+	ctx.Integration.Ready()
 
 	//
 	// Schedule a new sync to refresh the access token before it expires
@@ -446,5 +450,13 @@ func (p *PagerDuty) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 		return fmt.Errorf("error deleting webhook subscription: %v", err)
 	}
 
+	return nil
+}
+
+func (p *PagerDuty) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (p *PagerDuty) HandleAction(ctx core.IntegrationActionContext) error {
 	return nil
 }

@@ -25,9 +25,11 @@ func Test__DescribeIntegration(t *testing.T) {
 		//
 		// Register a test integration
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			ctx.Integration.SetState("ready", "")
-			return nil
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
 		})
 
 		name := support.RandomName("integration")
@@ -55,7 +57,7 @@ func Test__DescribeIntegration(t *testing.T) {
 		assert.Equal(t, integrationID, describeResponse.Integration.Metadata.Id)
 		assert.Equal(t, name, describeResponse.Integration.Metadata.Name)
 		assert.Equal(t, "dummy", describeResponse.Integration.Spec.IntegrationName)
-		assert.Equal(t, models.AppInstallationStateReady, describeResponse.Integration.Status.State)
+		assert.Equal(t, models.IntegrationStateReady, describeResponse.Integration.Status.State)
 	})
 
 	t.Run("invalid organization ID -> error", func(t *testing.T) {
@@ -95,9 +97,11 @@ func Test__DescribeIntegration(t *testing.T) {
 		//
 		// Register a test integration
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			ctx.Integration.SetState("ready", "")
-			return nil
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
 		})
 
 		//
@@ -128,9 +132,11 @@ func Test__DescribeIntegration(t *testing.T) {
 		//
 		// Register a test application
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(func(ctx core.SyncContext) error {
-			ctx.Integration.SetState("ready", "")
-			return nil
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
 		})
 
 		name := support.RandomName("integration")

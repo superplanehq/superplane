@@ -177,3 +177,7 @@ func (e *ExecuteCommand) HandleAction(ctx core.ActionContext) error {
 func (e *ExecuteCommand) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
+
+func (e *ExecuteCommand) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
