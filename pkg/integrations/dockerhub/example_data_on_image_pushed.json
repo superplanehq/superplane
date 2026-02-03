@@ -1,0 +1,31 @@
+{
+  "data": {
+    "callback_url": "https://registry.hub.docker.com/u/myorg/myapp/hook/...",
+    "push_data": {
+      "images": [
+        "sha256:abc123def456789..."
+      ],
+      "pushed_at": 1706803200,
+      "pusher": "johndoe",
+      "tag": "v1.2.3"
+    },
+    "repository": {
+      "comment_count": 0,
+      "date_created": 1640995200,
+      "description": "My application container image",
+      "dockerfile": "",
+      "full_description": "# My Application\n\nThis is my application container image.",
+      "is_official": false,
+      "is_private": false,
+      "is_trusted": true,
+      "name": "myapp",
+      "namespace": "myorg",
+      "owner": "myorg",
+      "repo_name": "myorg/myapp",
+      "repo_url": "https://hub.docker.com/r/myorg/myapp",
+      "star_count": 42,
+      "status": "Active"
+    }
+  },
+  "timestamp": "2026-02-01T12:00:00Z"
+}
