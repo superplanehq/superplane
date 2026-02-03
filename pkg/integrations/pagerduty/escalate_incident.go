@@ -202,3 +202,7 @@ func (c *EscalateIncident) HandleAction(ctx core.ActionContext) error {
 func (c *EscalateIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
+
+func (c *EscalateIncident) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
