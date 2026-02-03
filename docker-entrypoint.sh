@@ -18,6 +18,7 @@ PGPASSWORD=${DB_PASSWORD} createdb -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USERNAME}
 echo "Migrating DB..."
 DB_URL="postgres://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${PGSSLMODE}"
 migrate -source file:///app/db/migrations -database ${DB_URL} up
+migrate -source file:///app/db/data_migrations -database ${DB_URL}\&x-migrations-table=data_migrations up
 
 echo "Starting server..."
 /app/build/superplane
