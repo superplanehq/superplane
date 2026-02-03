@@ -7,6 +7,8 @@ import {
   useReactFlow,
   type Edge as ReactFlowEdge,
   type Node as ReactFlowNode,
+  type NodeChange,
+  type EdgeChange,
 } from "@xyflow/react";
 
 import { CircleX, Loader2, ScanLine, ScanText, ScrollText, TriangleAlert } from "lucide-react";
@@ -126,8 +128,13 @@ export interface CanvasPageProps {
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
+  saveDisabled?: boolean;
+  saveDisabledTooltip?: string;
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
+  autoSaveDisabled?: boolean;
+  autoSaveDisabledTooltip?: string;
+  readOnly?: boolean;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
   // Undo functionality
@@ -312,6 +319,7 @@ function CanvasPage(props: CanvasPageProps) {
   const cancelQueueItemRef = useRef<CanvasPageProps["onCancelQueueItem"]>(props.onCancelQueueItem);
   cancelQueueItemRef.current = props.onCancelQueueItem;
   const state = useCanvasState(props);
+  const readOnly = props.readOnly ?? false;
   const [currentTab, setCurrentTab] = useState<"latest" | "settings">("latest");
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
@@ -454,6 +462,7 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleConnectionDropInEmptySpace = useCallback(
     async (position: { x: number; y: number }, sourceConnection: { nodeId: string; handleId: string | null }) => {
+      if (readOnly) return;
       if (!sourceConnection || !props.onPlaceholderAdd) return;
 
       // Save placeholder immediately to backend
@@ -468,11 +477,12 @@ function CanvasPage(props: CanvasPageProps) {
       setIsBuildingBlocksSidebarOpen(true);
       state.componentSidebar.close();
     },
-    [props, state, setTemplateNodeId, setIsBuildingBlocksSidebarOpen],
+    [props, state, setTemplateNodeId, setIsBuildingBlocksSidebarOpen, readOnly],
   );
 
   const handlePendingConnectionNodeClick = useCallback(
     (nodeId: string) => {
+      if (readOnly) return;
       // For both placeholders and legacy pending connections:
       // Set this node as the active template so we can configure it when a building block is selected
       setTemplateNodeId(nodeId);
@@ -483,11 +493,12 @@ function CanvasPage(props: CanvasPageProps) {
       // Close ComponentSidebar since we're selecting a building block first
       state.componentSidebar.close();
     },
-    [setTemplateNodeId, setIsBuildingBlocksSidebarOpen, state.componentSidebar],
+    [setTemplateNodeId, setIsBuildingBlocksSidebarOpen, state.componentSidebar, readOnly],
   );
 
   const handleBuildingBlockClick = useCallback(
     async (block: BuildingBlock) => {
+      if (readOnly) return;
       if (!templateNodeId) {
         return;
       }
@@ -556,10 +567,11 @@ function CanvasPage(props: CanvasPageProps) {
         }
       }
     },
-    [templateNodeId, state, props, setCurrentTab, setIsBuildingBlocksSidebarOpen],
+    [templateNodeId, state, props, setCurrentTab, setIsBuildingBlocksSidebarOpen, readOnly],
   );
 
   const handleAddNote = useCallback(async () => {
+    if (readOnly) return;
     if (!props.onNodeAdd) return;
 
     const viewport = props.viewportRef?.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM };
@@ -653,10 +665,11 @@ function CanvasPage(props: CanvasPageProps) {
       configuration: {},
       position,
     });
-  }, [props, state.nodes, props.viewportRef]);
+  }, [props, state.nodes, props.viewportRef, readOnly]);
 
   const handleBuildingBlockDrop = useCallback(
     async (block: BuildingBlock, position?: { x: number; y: number }) => {
+      if (readOnly) return;
       const defaultConfiguration = (() => {
         const defaults = parseDefaultValues(block.configuration || []);
         const filtered = { ...defaults };
@@ -686,7 +699,7 @@ function CanvasPage(props: CanvasPageProps) {
         setCurrentTab("settings");
       }
     },
-    [state, props, setCurrentTab, setIsBuildingBlocksSidebarOpen],
+    [state, props, setCurrentTab, setIsBuildingBlocksSidebarOpen, readOnly],
   );
 
   const handleSidebarToggle = useCallback(
@@ -781,8 +794,12 @@ function CanvasPage(props: CanvasPageProps) {
           unsavedMessage={props.unsavedMessage}
           saveIsPrimary={props.saveIsPrimary}
           saveButtonHidden={props.saveButtonHidden}
+          saveDisabled={props.saveDisabled}
+          saveDisabledTooltip={props.saveDisabledTooltip}
           isAutoSaveEnabled={props.isAutoSaveEnabled}
           onToggleAutoSave={props.onToggleAutoSave}
+          autoSaveDisabled={props.autoSaveDisabled}
+          autoSaveDisabledTooltip={props.autoSaveDisabledTooltip}
           onExportYamlCopy={props.onExportYamlCopy}
           onExportYamlDownload={props.onExportYamlDownload}
         />
@@ -796,7 +813,8 @@ function CanvasPage(props: CanvasPageProps) {
           onToggle={handleSidebarToggle}
           blocks={props.buildingBlocks || []}
           canvasZoom={canvasZoom}
-          disabled={false}
+          disabled={readOnly}
+          disabledMessage="You don't have permission to edit this canvas."
           onBlockClick={handleBuildingBlockClick}
           onAddNote={handleAddNote}
         />
@@ -837,8 +855,13 @@ function CanvasPage(props: CanvasPageProps) {
               unsavedMessage={props.unsavedMessage}
               saveIsPrimary={props.saveIsPrimary}
               saveButtonHidden={props.saveButtonHidden}
+              saveDisabled={props.saveDisabled}
+              saveDisabledTooltip={props.saveDisabledTooltip}
               isAutoSaveEnabled={props.isAutoSaveEnabled}
               onToggleAutoSave={props.onToggleAutoSave}
+              autoSaveDisabled={props.autoSaveDisabled}
+              autoSaveDisabledTooltip={props.autoSaveDisabledTooltip}
+              readOnly={props.readOnly}
               logEntries={props.logEntries}
               focusRequest={props.focusRequest}
               onExecutionChainHandled={props.onExecutionChainHandled}
@@ -1180,8 +1203,12 @@ function CanvasContentHeader({
   unsavedMessage,
   saveIsPrimary,
   saveButtonHidden,
+  saveDisabled,
+  saveDisabledTooltip,
   isAutoSaveEnabled,
   onToggleAutoSave,
+  autoSaveDisabled,
+  autoSaveDisabledTooltip,
   onExportYamlCopy,
   onExportYamlDownload,
 }: {
@@ -1193,8 +1220,12 @@ function CanvasContentHeader({
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
+  saveDisabled?: boolean;
+  saveDisabledTooltip?: string;
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
+  autoSaveDisabled?: boolean;
+  autoSaveDisabledTooltip?: string;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
 }) {
@@ -1236,8 +1267,12 @@ function CanvasContentHeader({
       unsavedMessage={unsavedMessage}
       saveIsPrimary={saveIsPrimary}
       saveButtonHidden={saveButtonHidden}
+      saveDisabled={saveDisabled}
+      saveDisabledTooltip={saveDisabledTooltip}
       isAutoSaveEnabled={isAutoSaveEnabled}
       onToggleAutoSave={onToggleAutoSave}
+      autoSaveDisabled={autoSaveDisabled}
+      autoSaveDisabledTooltip={autoSaveDisabledTooltip}
       onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
       onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
     />
@@ -1280,8 +1315,13 @@ function CanvasContent({
   unsavedMessage,
   saveIsPrimary,
   saveButtonHidden,
+  saveDisabled,
+  saveDisabledTooltip,
   isAutoSaveEnabled,
   onToggleAutoSave,
+  autoSaveDisabled,
+  autoSaveDisabledTooltip,
+  readOnly,
   logEntries = [],
   focusRequest,
   initialFocusNodeId,
@@ -1330,8 +1370,13 @@ function CanvasContent({
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
+  saveDisabled?: boolean;
+  saveDisabledTooltip?: string;
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
+  autoSaveDisabled?: boolean;
+  autoSaveDisabledTooltip?: string;
+  readOnly?: boolean;
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
   onExecutionChainHandled?: () => void;
@@ -1340,6 +1385,7 @@ function CanvasContent({
   title?: string;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
+  const isReadOnly = readOnly ?? false;
 
   // Determine selection key code to support both Control (Windows/Linux) and Meta (Mac)
   // Similar to existing keyboard shortcuts that check (e.ctrlKey || e.metaKey)
@@ -1513,21 +1559,27 @@ function CanvasContent({
 
   const handleConnect = useCallback(
     (connection: any) => {
+      if (isReadOnly) return;
       connectionCompletedRef.current = true;
       if (onEdgeCreate && connection.source && connection.target) {
         onEdgeCreate(connection.source, connection.target, connection.sourceHandle);
       }
     },
-    [onEdgeCreate],
+    [onEdgeCreate, isReadOnly],
   );
 
-  const handleDragOver = useCallback((event: React.DragEvent) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-  }, []);
+  const handleDragOver = useCallback(
+    (event: React.DragEvent) => {
+      if (isReadOnly) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+    },
+    [isReadOnly],
+  );
 
   const handleDrop = useCallback(
     (event: React.DragEvent) => {
+      if (isReadOnly) return;
       event.preventDefault();
 
       const blockData = event.dataTransfer.getData("application/reactflow");
@@ -1558,7 +1610,7 @@ function CanvasContent({
         console.error("Failed to parse building block data:", error);
       }
     },
-    [onBuildingBlockDrop, screenToFlowPosition],
+    [onBuildingBlockDrop, screenToFlowPosition, isReadOnly],
   );
 
   const handleMove = useCallback(
@@ -1783,17 +1835,19 @@ function CanvasContent({
       _event: any,
       params: { nodeId: string | null; handleId: string | null; handleType: "source" | "target" | null },
     ) => {
+      if (isReadOnly) return;
       if (params.nodeId) {
         const connectionInfo = { nodeId: params.nodeId, handleId: params.handleId, handleType: params.handleType };
         setConnectingFrom(connectionInfo);
         connectingFromRef.current = connectionInfo;
       }
     },
-    [],
+    [isReadOnly],
   );
 
   const handleConnectEnd = useCallback(
     (event: MouseEvent | TouchEvent) => {
+      if (isReadOnly) return;
       const currentConnectingFrom = connectingFromRef.current;
 
       if (currentConnectingFrom && !connectionCompletedRef.current) {
@@ -1816,7 +1870,7 @@ function CanvasContent({
       connectingFromRef.current = null;
       connectionCompletedRef.current = false;
     },
-    [screenToFlowPosition, onConnectionDropInEmptySpace],
+    [screenToFlowPosition, onConnectionDropInEmptySpace, isReadOnly],
   );
 
   // Find the hovered edge to get its source and target
@@ -1855,11 +1909,41 @@ function CanvasContent({
         data: {
           ...e.data,
           isHovered: e.id === hoveredEdgeId,
-          onDelete: (edgeId: string) => state.onEdgesChange([{ id: edgeId, type: "remove" }]),
+          onDelete: isReadOnly ? undefined : (edgeId: string) => state.onEdgesChange([{ id: edgeId, type: "remove" }]),
         },
         zIndex: e.id === hoveredEdgeId ? 1000 : 0,
       })),
-    [state.edges, hoveredEdgeId, state.onEdgesChange],
+    [state.edges, hoveredEdgeId, state.onEdgesChange, isReadOnly],
+  );
+
+  const handleNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      if (!isReadOnly) {
+        state.onNodesChange(changes);
+        return;
+      }
+
+      const filteredChanges = changes.filter((change) => change.type === "select" || change.type === "dimensions");
+      if (filteredChanges.length > 0) {
+        state.onNodesChange(filteredChanges);
+      }
+    },
+    [isReadOnly, state],
+  );
+
+  const handleEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      if (!isReadOnly) {
+        state.onEdgesChange(changes);
+        return;
+      }
+
+      const filteredChanges = changes.filter((change) => change.type === "select");
+      if (filteredChanges.length > 0) {
+        state.onEdgesChange(filteredChanges);
+      }
+    },
+    [isReadOnly, state],
   );
 
   const logCounts = useMemo(() => {
@@ -1963,8 +2047,12 @@ function CanvasContent({
           unsavedMessage={unsavedMessage}
           saveIsPrimary={saveIsPrimary}
           saveButtonHidden={saveButtonHidden}
+          saveDisabled={saveDisabled}
+          saveDisabledTooltip={saveDisabledTooltip}
           isAutoSaveEnabled={isAutoSaveEnabled}
           onToggleAutoSave={onToggleAutoSave}
+          autoSaveDisabled={autoSaveDisabled}
+          autoSaveDisabledTooltip={autoSaveDisabledTooltip}
         />
       )}
 
@@ -1990,16 +2078,16 @@ function CanvasContent({
                   multiSelectionKeyCode: selectionKey,
                 })}
             panOnScrollSpeed={0.8}
-            nodesDraggable={true}
-            nodesConnectable={!!onEdgeCreate}
+            nodesDraggable={!isReadOnly}
+            nodesConnectable={!isReadOnly && !!onEdgeCreate}
             elementsSelectable={true}
-            onNodesChange={state.onNodesChange}
-            onEdgesChange={state.onEdgesChange}
-            onConnect={handleConnect}
-            onConnectStart={handleConnectStart}
-            onConnectEnd={handleConnectEnd}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
+            onNodesChange={handleNodesChange}
+            onEdgesChange={handleEdgesChange}
+            onConnect={isReadOnly ? undefined : handleConnect}
+            onConnectStart={isReadOnly ? undefined : handleConnectStart}
+            onConnectEnd={isReadOnly ? undefined : handleConnectEnd}
+            onDragOver={isReadOnly ? undefined : handleDragOver}
+            onDrop={isReadOnly ? undefined : handleDrop}
             onMove={handleMove}
             onInit={handleInit}
             deleteKeyCode={null}

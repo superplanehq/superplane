@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -15,8 +16,16 @@ import (
 
 func Test_AssignRole(t *testing.T) {
 	r := support.Setup(t)
-	ctx := context.Background()
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	orgID := r.Organization.ID.String()
+
+	t.Run("user not authenticated -> error", func(t *testing.T) {
+		_, err := AssignRole(context.Background(), orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, r.User.String(), "", r.AuthService)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.Unauthenticated, s.Code())
+		assert.Equal(t, "user not authenticated", s.Message())
+	})
 
 	t.Run("user is not part of organization -> error", func(t *testing.T) {
 		_, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, uuid.NewString(), "", r.AuthService)
@@ -38,6 +47,14 @@ func Test_AssignRole(t *testing.T) {
 		resp, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", newUser.Email, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
+	})
+
+	t.Run("user cannot change own role", func(t *testing.T) {
+		_, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, r.User.String(), "", r.AuthService)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.PermissionDenied, s.Code())
+		assert.Equal(t, "cannot change your own role", s.Message())
 	})
 
 	t.Run("invalid request - missing role", func(t *testing.T) {
