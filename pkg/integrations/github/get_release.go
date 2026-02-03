@@ -209,13 +209,19 @@ func (c *GetRelease) Execute(ctx core.ExecutionContext) error {
 			return fmt.Errorf("failed to get release with ID %d: %w", *config.ReleaseID, err)
 		}
 		release = r
-	} else {
-		// Use the common helper for tag-based strategies
-		tagName := ""
-		if config.TagName != nil {
-			tagName = *config.TagName
+	} else if config.ReleaseStrategy == "specific" {
+		// Validate TagName is provided for specific strategy
+		if config.TagName == nil || *config.TagName == "" {
+			return fmt.Errorf("tag name is required when using specific tag strategy")
 		}
-		r, err := fetchReleaseByStrategy(client, appMetadata.Owner, config.Repository, config.ReleaseStrategy, tagName)
+		r, err := fetchReleaseByStrategy(client, appMetadata.Owner, config.Repository, config.ReleaseStrategy, *config.TagName)
+		if err != nil {
+			return err
+		}
+		release = r
+	} else {
+		// Use the common helper for other strategies (latest, latestDraft, latestPrerelease)
+		r, err := fetchReleaseByStrategy(client, appMetadata.Owner, config.Repository, config.ReleaseStrategy, "")
 		if err != nil {
 			return err
 		}
