@@ -22,6 +22,7 @@ import { Switch } from "@/ui/switch";
 import { getApiErrorMessage } from "@/utils/errors";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { useMe } from "@/hooks/useMe";
 
 interface Member {
   id: string;
@@ -40,7 +41,7 @@ interface MembersProps {
 }
 
 export function Members({ organizationId }: MembersProps) {
-  const { account } = useAccount();
+  const { data: me } = useMe();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Member | null;
@@ -161,7 +162,7 @@ export function Members({ organizationId }: MembersProps) {
   };
 
   const handleRoleChange = async (memberId: string, newRoleName: string) => {
-    if (!canUpdateMembers || account?.id === memberId) return;
+    if (!canUpdateMembers || me?.id === memberId) return;
     try {
       await assignRoleMutation.mutateAsync({
         userId: memberId,
@@ -383,7 +384,7 @@ export function Members({ organizationId }: MembersProps) {
                     <TableCell>{member.email}</TableCell>
                     <TableCell>
                       {(() => {
-                        const isSelf = account?.id === member.id;
+                        const isSelf = me?.id === member.id;
                         const roleChangeAllowed = canUpdateMembers && !isSelf;
                         const tooltipAllowed = roleChangeAllowed || (permissionsLoading && !isSelf);
                         const tooltipMessage = isSelf
