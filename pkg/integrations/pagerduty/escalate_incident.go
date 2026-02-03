@@ -29,7 +29,7 @@ func (c *EscalateIncident) Label() string {
 }
 
 func (c *EscalateIncident) Description() string {
-	return "Escalate an incident to a specific level in PagerDuty (high-urgency incidents only)"
+	return "Escalate an incident to a specific level (high-urgency only)"
 }
 
 func (c *EscalateIncident) Documentation() string {

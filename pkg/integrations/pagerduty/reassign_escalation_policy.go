@@ -28,7 +28,7 @@ func (c *ReassignEscalationPolicy) Label() string {
 }
 
 func (c *ReassignEscalationPolicy) Description() string {
-	return "Reassign an incident to a different escalation policy in PagerDuty"
+	return "Reassign an incident to a different escalation policy"
 }
 
 func (c *ReassignEscalationPolicy) Documentation() string {
@@ -136,12 +136,12 @@ func (c *ReassignEscalationPolicy) Execute(ctx core.ExecutionContext) error {
 	incident, err := client.UpdateIncident(
 		spec.IncidentID,
 		spec.FromEmail,
-		"",                   // status - not changing
-		"",                   // priority - not changing
-		"",                   // title - not changing
-		"",                   // description - not changing
+		"",                    // status - not changing
+		"",                    // priority - not changing
+		"",                    // title - not changing
+		"",                    // description - not changing
 		spec.EscalationPolicy, // escalation policy - changing this
-		nil,                  // assignees - not changing
+		nil,                   // assignees - not changing
 	)
 	if err != nil {
 		return fmt.Errorf("failed to reassign escalation policy: %v", err)
