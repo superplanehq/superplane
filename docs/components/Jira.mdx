@@ -1,0 +1,32 @@
+---
+title: "Jira"
+sidebar:
+  order: 9
+---
+
+Manage and react to issues in Jira
+
+## Setup
+
+To connect Jira to SuperPlane, you need:
+
+1. **Base URL**: Your Jira Cloud instance URL (e.g., `https://your-domain.atlassian.net`)
+2. **Email**: The email address associated with your Atlassian account
+3. **API Token**: A Jira API token for authentication
+
+### Getting an API Token
+
+1. Go to [Atlassian API Tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
+2. Click **Create API token**
+3. Give it a descriptive label
+4. Copy the generated token
+
+### Configuration
+
+| Field | Description |
+|-------|-------------|
+| Base URL | Your Jira Cloud instance URL |
+| Email | Email for API authentication |
+| API Token | Jira API token (sensitive) |
+
+Once configured, SuperPlane will verify your credentials and fetch available projects.
