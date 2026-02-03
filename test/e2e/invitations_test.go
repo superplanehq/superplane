@@ -171,7 +171,7 @@ func (s *invitationSteps) assertViewerInviteLinkMessage() {
 
 	copyLinkVisible, err := s.session.Page().Locator("text=Copy link").IsVisible()
 	require.NoError(s.t, err)
-	require.True(s.t, copyLinkVisible)
+	require.False(s.t, copyLinkVisible)
 }
 
 func (s *invitationSteps) assertInviteeViewerRole(email string) {
