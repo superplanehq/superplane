@@ -30,7 +30,7 @@ func (p *OnImageScan) Name() string {
 }
 
 func (p *OnImageScan) Label() string {
-	return "ECR - On Image Scan"
+	return "ECR • On Image Scan"
 }
 
 func (p *OnImageScan) Description() string {

@@ -1,6 +1,6 @@
 import { ComponentBaseMapper, TriggerRenderer, EventStateRegistry } from "../types";
 import { baseMapper } from "./base";
-import { buildActionStateRegistry } from "../github/utils";
+import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createSandbox: baseMapper,

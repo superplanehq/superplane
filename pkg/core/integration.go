@@ -129,6 +129,7 @@ type IntegrationMessageContext struct {
 	Configuration any
 	NodeMetadata  MetadataContext
 	Logger        *logrus.Entry
+	HTTP          HTTPContext
 	Integration   IntegrationContext
 	Events        EventContext
 }

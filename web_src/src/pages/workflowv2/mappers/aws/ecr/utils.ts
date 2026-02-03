@@ -1,9 +1,9 @@
 import { MetadataItem } from "@/ui/metadataList";
-import { EcrTriggerConfiguration, EcrTriggerMetadata } from "./types";
+import { EcrRepositoryConfiguration, EcrRepositoryMetadata } from "./types";
 
 export function getRepositoryLabel(
-  metadata?: EcrTriggerMetadata,
-  configuration?: EcrTriggerConfiguration,
+  metadata?: EcrRepositoryMetadata,
+  configuration?: EcrRepositoryConfiguration,
   fallback?: string,
 ): string | undefined {
   const repositoryRef =
@@ -54,8 +54,8 @@ export function formatTagLabel(tags?: string[]): string | undefined {
 }
 
 export function buildRepositoryMetadataItems(
-  metadata?: EcrTriggerMetadata,
-  configuration?: EcrTriggerConfiguration,
+  metadata?: EcrRepositoryMetadata,
+  configuration?: EcrRepositoryConfiguration,
 ): MetadataItem[] {
   const repositoryLabel = getRepositoryLabel(metadata, configuration);
 
@@ -69,20 +69,4 @@ export function buildRepositoryMetadataItems(
       label: repositoryLabel,
     },
   ];
-}
-
-export function numberOrZero(value?: number): number {
-  if (value === undefined || value === null) {
-    return 0;
-  }
-
-  return value;
-}
-
-export function stringOrDash(value?: unknown): string {
-  if (value === undefined || value === null || value === "") {
-    return "-";
-  }
-
-  return String(value);
 }

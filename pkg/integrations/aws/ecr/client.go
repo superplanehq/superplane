@@ -6,9 +6,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -86,6 +88,111 @@ func (c *Client) ListRepositories() ([]Repository, error) {
 	return repositories, nil
 }
 
+type DescribeImageResponse struct {
+	ImageDetails []ImageDetail `json:"imageDetails"`
+}
+
+type ImageDetail struct {
+	RegistryID             string   `json:"registryId"`
+	RepositoryName         string   `json:"repositoryName"`
+	ImageDigest            string   `json:"imageDigest"`
+	ImageTags              []string `json:"imageTags"`
+	ImageSizeInBytes       int64    `json:"imageSizeInBytes"`
+	ImageManifestMediaType string   `json:"imageManifestMediaType"`
+	ArtifactMediaType      string   `json:"artifactMediaType"`
+}
+
+func (c *Client) DescribeImage(repositoryName string, imageDigest string, imageTag string) (*ImageDetail, error) {
+	imageID := map[string]any{}
+	if strings.TrimSpace(imageDigest) != "" {
+		imageID["imageDigest"] = strings.TrimSpace(imageDigest)
+	}
+	if strings.TrimSpace(imageTag) != "" {
+		imageID["imageTag"] = strings.TrimSpace(imageTag)
+	}
+	if len(imageID) == 0 {
+		return nil, errors.New("image digest or image tag is required")
+	}
+
+	payload := map[string]any{
+		"repositoryName": repositoryName,
+		"imageIds":       []map[string]any{imageID},
+	}
+
+	response := DescribeImageResponse{}
+	if err := c.postJSON("DescribeImages", payload, &response); err != nil {
+		return nil, err
+	}
+
+	if len(response.ImageDetails) == 0 {
+		return nil, errors.New("image not found")
+	}
+
+	if len(response.ImageDetails) > 1 {
+		return nil, errors.New("multiple images found")
+	}
+
+	return &response.ImageDetails[0], nil
+}
+
+type DescribeImageScanFindingsResponse struct {
+	ImageScanFindings ImageScanFindings `json:"imageScanFindings"`
+	RegistryID        string            `json:"registryId"`
+	RepositoryName    string            `json:"repositoryName"`
+	ImageID           map[string]string `json:"imageId"`
+	ImageScanStatus   ImageScanStatus   `json:"imageScanStatus"`
+}
+
+type ImageScanStatus struct {
+	Status      string `json:"status"`
+	Description string `json:"description"`
+}
+
+type ImageScanFindings struct {
+	Findings                     []ImageScanFinding `json:"findings"`
+	ImageScanCompletedAt         time.Time          `json:"imageScanCompletedAt"`
+	VulnerabilitySourceUpdatedAt time.Time          `json:"vulnerabilitySourceUpdatedAt"`
+	FindingSeverityCounts        map[string]int     `json:"findingSeverityCounts"`
+}
+
+type ImageScanFinding struct {
+	Name        string                      `json:"name"`
+	Description string                      `json:"description"`
+	URI         string                      `json:"uri"`
+	Severity    string                      `json:"severity"`
+	Attributes  []ImageScanFindingAttribute `json:"attributes"`
+}
+
+type ImageScanFindingAttribute struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+func (c *Client) DescribeImageScanFindings(repositoryName string, imageDigest string, imageTag string) (*DescribeImageScanFindingsResponse, error) {
+	imageID := map[string]any{}
+	if strings.TrimSpace(imageDigest) != "" {
+		imageID["imageDigest"] = strings.TrimSpace(imageDigest)
+	}
+	if strings.TrimSpace(imageTag) != "" {
+		imageID["imageTag"] = strings.TrimSpace(imageTag)
+	}
+	if len(imageID) == 0 {
+		return nil, errors.New("image digest or image tag is required")
+	}
+
+	payload := map[string]any{
+		"repositoryName": repositoryName,
+		"imageId":        imageID,
+	}
+
+	response := DescribeImageScanFindingsResponse{}
+	if err := c.postJSON("DescribeImageScanFindings", payload, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
 func (c *Client) postJSON(action string, payload any, out any) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -127,6 +234,7 @@ func (c *Client) postJSON(action string, payload any, out any) error {
 		return nil
 	}
 
+	fmt.Println(string(responseBody))
 	if err := json.Unmarshal(responseBody, out); err != nil {
 		return fmt.Errorf("failed to decode response: %w", err)
 	}

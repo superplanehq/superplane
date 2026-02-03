@@ -9,11 +9,10 @@ import {
   formatTagLabel,
   formatTags,
   getRepositoryLabel,
-  numberOrZero,
-  stringOrDash,
 } from "./utils";
 import { formatTimeAgo } from "@/utils/date";
 import { EcrImageScanDetail } from "./types";
+import { numberOrZero, stringOrDash } from "../../utils";
 
 /**
  * Renderer for the "aws.ecr.onImageScan" trigger

@@ -21,36 +21,7 @@ type Repository struct {
 }
 
 func validateRepository(ctx core.TriggerContext, region string, repositoryRef string, existing *Repository) (*Repository, error) {
-	repositoryRef = strings.TrimSpace(repositoryRef)
-	if repositoryRef == "" {
-		return nil, fmt.Errorf("repository is required")
-	}
-
-	if existing != nil && repositoryMatchesRef(existing, repositoryRef) {
-		return existing, nil
-	}
-
-	credentials, err := common.CredentialsFromInstallation(ctx.Integration)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get AWS credentials: %w", err)
-	}
-
-	client := NewClient(ctx.HTTP, credentials, region)
-	repositoryName, err := repositoryNameFromRef(repositoryRef)
-	if err != nil {
-		return nil, err
-	}
-
-	repository, err := client.DescribeRepository(repositoryName)
-	if err != nil {
-		var awsErr *common.Error
-		if errors.As(err, &awsErr) && awsErr.Code == "RepositoryNotFoundException" {
-			return nil, fmt.Errorf("repository not found: %s", repositoryName)
-		}
-		return nil, err
-	}
-
-	return repository, nil
+	return validateRepositoryWithIntegration(ctx.HTTP, ctx.Integration, region, repositoryRef, existing)
 }
 
 func repositoryMatchesRef(repository *Repository, repositoryRef string) bool {
@@ -68,4 +39,37 @@ func repositoryNameFromRef(repositoryRef string) (string, error) {
 	}
 
 	return parts[1], nil
+}
+
+func validateRepositoryWithIntegration(httpCtx core.HTTPContext, integration core.IntegrationContext, region string, repositoryRef string, existing *Repository) (*Repository, error) {
+	repositoryRef = strings.TrimSpace(repositoryRef)
+	if repositoryRef == "" {
+		return nil, fmt.Errorf("repository is required")
+	}
+
+	if existing != nil && repositoryMatchesRef(existing, repositoryRef) {
+		return existing, nil
+	}
+
+	credentials, err := common.CredentialsFromInstallation(integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get AWS credentials: %w", err)
+	}
+
+	client := NewClient(httpCtx, credentials, region)
+	repositoryName, err := repositoryNameFromRef(repositoryRef)
+	if err != nil {
+		return nil, err
+	}
+
+	repository, err := client.DescribeRepository(repositoryName)
+	if err != nil {
+		var awsErr *common.Error
+		if errors.As(err, &awsErr) && awsErr.Code == "RepositoryNotFoundException" {
+			return nil, fmt.Errorf("repository not found: %s", repositoryName)
+		}
+		return nil, err
+	}
+
+	return repository, nil
 }

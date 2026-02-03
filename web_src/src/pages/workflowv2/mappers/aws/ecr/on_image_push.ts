@@ -4,8 +4,9 @@ import { TriggerRenderer } from "../../types";
 import { TriggerProps } from "@/ui/trigger";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import { EcrImagePushEvent, EcrTriggerConfiguration, EcrTriggerMetadata } from "./types";
-import { buildRepositoryMetadataItems, getRepositoryLabel, stringOrDash } from "./utils";
+import { buildRepositoryMetadataItems, getRepositoryLabel } from "./utils";
 import { formatTimeAgo } from "@/utils/date";
+import { stringOrDash } from "../../utils";
 
 /**
  * Renderer for the "aws.ecr.onImagePush" trigger

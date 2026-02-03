@@ -30,7 +30,7 @@ func (c *RunFunction) Name() string {
 }
 
 func (c *RunFunction) Label() string {
-	return "Lambda - Run Function"
+	return "Lambda • Run Function"
 }
 
 func (c *RunFunction) Description() string {

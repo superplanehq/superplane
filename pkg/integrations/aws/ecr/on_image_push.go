@@ -30,7 +30,7 @@ func (p *OnImagePush) Name() string {
 }
 
 func (p *OnImagePush) Label() string {
-	return "ECR - On Image Push"
+	return "ECR • On Image Push"
 }
 
 func (p *OnImagePush) Description() string {

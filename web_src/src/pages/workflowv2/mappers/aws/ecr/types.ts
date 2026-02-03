@@ -3,12 +3,62 @@ export interface EcrRepository {
   repositoryArn?: string;
 }
 
-export interface EcrTriggerMetadata {
+export interface EcrRepositoryMetadata {
   repository?: EcrRepository;
+  region?: string;
 }
 
-export interface EcrTriggerConfiguration {
+export interface EcrRepositoryConfiguration {
   repository?: string;
+  region?: string;
+  imageDigest?: string;
+  imageTag?: string;
+}
+
+export type EcrTriggerMetadata = EcrRepositoryMetadata;
+export type EcrTriggerConfiguration = EcrRepositoryConfiguration;
+
+export interface EcrImageDetail {
+  registryId?: string;
+  repositoryName?: string;
+  imageDigest?: string;
+  imageTags?: string[];
+  imageSizeInBytes?: number;
+  imageManifestMediaType?: string;
+  artifactMediaType?: string;
+}
+
+export interface EcrImageScanStatus {
+  status?: string;
+  description?: string;
+}
+
+export interface EcrImageScanFindingAttribute {
+  key?: string;
+  value?: string;
+}
+
+export interface EcrImageScanFinding {
+  name?: string;
+  description?: string;
+  uri?: string;
+  severity?: string;
+  attributes?: EcrImageScanFindingAttribute[];
+}
+
+export interface EcrImageScanFindings {
+  findings?: EcrImageScanFinding[];
+  imageScanCompletedAt?: string;
+  vulnerabilitySourceUpdatedAt?: string;
+  findingSeverityCounts?: Record<string, number>;
+}
+
+export interface EcrImageScanFindingsResponse {
+  imageScanFindings?: EcrImageScanFindings;
+  registryId?: string;
+  repositoryName?: string;
+  imageId?: Record<string, string>;
+  imageScanStatus?: EcrImageScanStatus;
 }
 
 export interface EcrImageScanDetail {

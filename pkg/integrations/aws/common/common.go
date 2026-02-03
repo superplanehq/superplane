@@ -36,7 +36,12 @@ type IAMMetadata struct {
 	/*
 	 * The role ARN of the role that will be used to invoke the EventBridge API destinations.
 	 */
-	TargetDestinationRoleArn string `json:"targetDestinationRoleArn" mapstructure:"targetDestinationRoleArn"`
+	TargetDestinationRole *IAMRoleMetadata `json:"targetDestinationRole" mapstructure:"targetDestinationRole"`
+}
+
+type IAMRoleMetadata struct {
+	RoleArn  string `json:"roleArn" mapstructure:"roleArn"`
+	RoleName string `json:"roleName" mapstructure:"roleName"`
 }
 
 /*
@@ -58,16 +63,18 @@ type EventBridgeMetadata struct {
 }
 
 type EventBridgeRuleMetadata struct {
-	Source      string   `json:"source"`
-	Region      string   `json:"region"`
+	Source      string   `json:"source" mapstructure:"source"`
+	Region      string   `json:"region" mapstructure:"region"`
+	Name        string   `json:"name" mapstructure:"name"`
 	RuleArn     string   `json:"ruleArn" mapstructure:"ruleArn"`
 	DetailTypes []string `json:"detailTypes" mapstructure:"detailTypes"`
 }
 
 type APIDestinationMetadata struct {
-	Region            string `json:"region"`
-	ConnectionArn     string `json:"connectionArn"`
-	ApiDestinationArn string `json:"apiDestinationArn"`
+	Name              string `json:"name" mapstructure:"name"`
+	Region            string `json:"region" mapstructure:"region"`
+	ConnectionArn     string `json:"connectionArn" mapstructure:"connectionArn"`
+	ApiDestinationArn string `json:"apiDestinationArn" mapstructure:"apiDestinationArn"`
 }
 
 type ProvisionRuleParameters struct {

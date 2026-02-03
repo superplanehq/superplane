@@ -129,6 +129,8 @@ func (a *AWS) Configuration() []configuration.Field {
 
 func (a *AWS) Components() []core.Component {
 	return []core.Component{
+		&ecr.GetImage{},
+		&ecr.GetImageScanFindings{},
 		&lambda.RunFunction{},
 	}
 }
@@ -189,54 +191,92 @@ func (a *AWS) Cleanup(ctx core.IntegrationCleanupContext) error {
 		return fmt.Errorf("failed to decode metadata: %v", err)
 	}
 
-	if metadata.EventBridge == nil && metadata.IAM == nil {
+	//
+	// If we don't have session metadata, we don't need to cleanup anything.
+	//
+	if metadata.Session == nil {
 		return nil
 	}
 
-	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	credentials, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to get AWS credentials: %w", err)
 	}
 
-	var cleanupErr error
-	destinationName := fmt.Sprintf("superplane-%s", ctx.Integration.ID().String())
-
+	var errs error
 	if metadata.EventBridge != nil {
-		for region := range metadata.EventBridge.APIDestinations {
-			client := eventbridge.NewClient(ctx.HTTP, creds, region)
-
-			err := client.DeleteApiDestination(destinationName)
-			if err != nil && !common.IsNotFoundErr(err) {
-				cleanupErr = errors.Join(cleanupErr, fmt.Errorf("failed to delete API destination in region %s: %w", region, err))
-			}
-
-			err = client.DeleteConnection(destinationName)
-			if err != nil && !common.IsNotFoundErr(err) {
-				cleanupErr = errors.Join(cleanupErr, fmt.Errorf("failed to delete connection in region %s: %w", region, err))
-			}
+		err := a.cleanupEventBridge(ctx, &metadata, credentials)
+		if err != nil {
+			errs = errors.Join(errs, fmt.Errorf("failed to cleanup event bridge: %w", err))
 		}
 	}
 
 	if metadata.IAM != nil {
-		client := iam.NewClient(ctx.HTTP, creds)
-		roleName := a.roleName(ctx.Integration)
-
-		if parsedRoleName, ok := roleNameFromArn(metadata.IAM.TargetDestinationRoleArn); ok {
-			roleName = parsedRoleName
-		}
-
-		err := client.DeleteRolePolicy(roleName, "invoke-api-destination")
-		if err != nil && !iam.IsNoSuchEntityErr(err) {
-			cleanupErr = errors.Join(cleanupErr, fmt.Errorf("failed to delete IAM role policy for %s: %w", roleName, err))
-		}
-
-		err = client.DeleteRole(roleName)
-		if err != nil && !iam.IsNoSuchEntityErr(err) {
-			cleanupErr = errors.Join(cleanupErr, fmt.Errorf("failed to delete IAM role %s: %w", roleName, err))
+		err := a.cleanupIAM(ctx, &metadata, credentials)
+		if err != nil {
+			errs = errors.Join(errs, fmt.Errorf("failed to cleanup IAM: %w", err))
 		}
 	}
 
-	return cleanupErr
+	return errs
+}
+
+func (a *AWS) cleanupEventBridge(ctx core.IntegrationCleanupContext, metadata *common.IntegrationMetadata, credentials *aws.Credentials) error {
+	var err error
+
+	//
+	// Remove the EventBridge rules and targets.
+	//
+	for _, rule := range metadata.EventBridge.Rules {
+		client := eventbridge.NewClient(ctx.HTTP, credentials, rule.Region)
+		err := client.RemoveTargets(rule.Name, []string{"api-destination"})
+		if err != nil && !common.IsNotFoundErr(err) {
+			err = errors.Join(err, fmt.Errorf("failed to remove targets for rule %s in region %s: %w", rule.Name, rule.Region, err))
+		}
+
+		err = client.DeleteRule(rule.Name)
+		if err != nil && !common.IsNotFoundErr(err) {
+			err = errors.Join(err, fmt.Errorf("failed to delete rule %s in region %s: %w", rule.Name, rule.Region, err))
+		}
+	}
+
+	//
+	// Remove the EventBridge API destinations and connections.
+	//
+	for region, destination := range metadata.EventBridge.APIDestinations {
+		client := eventbridge.NewClient(ctx.HTTP, credentials, region)
+
+		err := client.DeleteApiDestination(destination.Name)
+		if err != nil && !common.IsNotFoundErr(err) {
+			err = errors.Join(err, fmt.Errorf("failed to delete API destination in region %s: %w", region, err))
+		}
+
+		err = client.DeleteConnection(destination.Name)
+		if err != nil && !common.IsNotFoundErr(err) {
+			err = errors.Join(err, fmt.Errorf("failed to delete connection in region %s: %w", region, err))
+		}
+	}
+
+	return err
+}
+
+func (a *AWS) cleanupIAM(ctx core.IntegrationCleanupContext, metadata *common.IntegrationMetadata, credentials *aws.Credentials) error {
+	client := iam.NewClient(ctx.HTTP, credentials)
+
+	var err error
+	if metadata.IAM.TargetDestinationRole != nil {
+		err := client.DeleteRolePolicy(metadata.IAM.TargetDestinationRole.RoleName, "invoke-api-destination")
+		if err != nil && !iam.IsNoSuchEntityErr(err) {
+			err = errors.Join(err, fmt.Errorf("failed to delete IAM role policy for %s: %w", metadata.IAM.TargetDestinationRole.RoleName, err))
+		}
+
+		err = client.DeleteRole(metadata.IAM.TargetDestinationRole.RoleName)
+		if err != nil && !iam.IsNoSuchEntityErr(err) {
+			err = errors.Join(err, fmt.Errorf("failed to delete IAM role %s: %w", metadata.IAM.TargetDestinationRole.RoleName, err))
+		}
+	}
+
+	return err
 }
 
 func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
@@ -433,7 +473,10 @@ func (a *AWS) configureRole(ctx core.SyncContext, metadata *common.IntegrationMe
 	ctx.Logger.Infof("Created IAM role %s", roleArn)
 
 	metadata.IAM = &common.IAMMetadata{
-		TargetDestinationRoleArn: roleArn,
+		TargetDestinationRole: &common.IAMRoleMetadata{
+			RoleArn:  roleArn,
+			RoleName: roleName,
+		},
 	}
 
 	return nil
@@ -446,6 +489,16 @@ func (a *AWS) configureRole(ctx core.SyncContext, metadata *common.IntegrationMe
 func (a *AWS) roleName(integration core.IntegrationContext) string {
 	idParts := strings.Split(integration.ID().String(), "-")
 	return fmt.Sprintf("superplane-destination-invoker-%s", idParts[len(idParts)-1])
+}
+
+func (a *AWS) ruleName(integration core.IntegrationContext, source string) (string, error) {
+	sourceParts := strings.Split(source, ".")
+	if len(sourceParts) != 2 {
+		return "", fmt.Errorf("invalid source: %s", source)
+	}
+
+	service := sourceParts[1]
+	return fmt.Sprintf("superplane-%s-%s", integration.ID().String(), service), nil
 }
 
 func roleNameFromArn(arn string) (string, bool) {
@@ -503,6 +556,7 @@ func (a *AWS) createAPIDestination(
 	}
 
 	return &common.APIDestinationMetadata{
+		Name:              name,
 		Region:            region,
 		ConnectionArn:     connectionArn,
 		ApiDestinationArn: apiDestinationArn,
@@ -680,20 +734,6 @@ func (a *AWS) CompareWebhookConfig(aConfig, bConfig any) (bool, error) {
 	return false, nil
 }
 
-func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	switch resourceType {
-	case "lambda.function":
-		return lambda.ListFunctions(ctx, resourceType)
-
-	case "ecr.repository":
-		ctx.Logger.Infof("listing ECR repositories")
-		return ecr.ListRepositories(ctx, resourceType)
-
-	default:
-		return []core.IntegrationResource{}, nil
-	}
-}
-
 func (a *AWS) Actions() []core.Action {
 	return []core.Action{
 		{
@@ -843,13 +883,13 @@ func (a *AWS) updateRule(credentials *aws.Credentials, logger *logrus.Entry, int
 		return fmt.Errorf("failed to marshal event pattern: %w", err)
 	}
 
-	ruleName := fmt.Sprintf("superplane-%s-%s", integration.ID().String(), rule.Source)
-	_, err = client.PutRule(ruleName, string(pattern), metadata.Tags)
+	_, err = client.PutRule(rule.Name, string(pattern), metadata.Tags)
 	if err != nil {
 		return fmt.Errorf("error updating EventBridge rule %s: %v", rule.RuleArn, err)
 	}
 
 	metadata.EventBridge.Rules[rule.Source] = common.EventBridgeRuleMetadata{
+		Name:        rule.Name,
 		Source:      rule.Source,
 		Region:      rule.Region,
 		RuleArn:     rule.RuleArn,
@@ -881,7 +921,11 @@ func (a *AWS) createRule(
 		return fmt.Errorf("failed to marshal event pattern: %w", err)
 	}
 
-	ruleName := fmt.Sprintf("superplane-%s-%s", integration.ID().String(), source)
+	ruleName, err := a.ruleName(integration, source)
+	if err != nil {
+		return fmt.Errorf("failed to get rule name: %w", err)
+	}
+
 	ruleArn, err := client.PutRule(ruleName, string(pattern), metadata.Tags)
 	if err != nil {
 		return fmt.Errorf("error creating EventBridge rule for %s: %v", source, err)
@@ -891,7 +935,7 @@ func (a *AWS) createRule(
 		{
 			ID:      "api-destination",
 			Arn:     destination.ApiDestinationArn,
-			RoleArn: metadata.IAM.TargetDestinationRoleArn,
+			RoleArn: metadata.IAM.TargetDestinationRole.RoleArn,
 		},
 	})
 
@@ -904,6 +948,7 @@ func (a *AWS) createRule(
 	}
 
 	metadata.EventBridge.Rules[source] = common.EventBridgeRuleMetadata{
+		Name:        ruleName,
 		Source:      source,
 		Region:      destination.Region,
 		RuleArn:     ruleArn,

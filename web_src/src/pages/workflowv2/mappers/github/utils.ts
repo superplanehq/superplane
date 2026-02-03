@@ -62,16 +62,3 @@ export function buildGithubExecutionSubtitle(execution: CanvasesCanvasNodeExecut
   const timestamp = execution.updatedAt || execution.createdAt;
   return buildGithubSubtitle(content || "", timestamp);
 }
-
-export function buildActionStateRegistry(successState: string): EventStateRegistry {
-  return {
-    stateMap: {
-      ...DEFAULT_EVENT_STATE_MAP,
-      [successState]: DEFAULT_EVENT_STATE_MAP.success,
-    },
-    getState: (execution) => {
-      const state = defaultStateFunction(execution);
-      return state === "success" ? successState : state;
-    },
-  };
-}

@@ -71,6 +71,7 @@ func (c *IntegrationSubscriptionContext) sendMessageToComponent(message any) err
 	}
 
 	return integrationComponent.OnIntegrationMessage(core.IntegrationMessageContext{
+		HTTP:          NewHTTPContext(c.registry.GetHTTPClient()),
 		Configuration: c.node.Configuration.Data(),
 		NodeMetadata:  NewNodeMetadataContext(c.tx, c.node),
 		Integration:   c.integrationCtx,
@@ -98,6 +99,7 @@ func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error
 	}
 
 	return integrationTrigger.OnIntegrationMessage(core.IntegrationMessageContext{
+		HTTP:          NewHTTPContext(c.registry.GetHTTPClient()),
 		Configuration: c.node.Configuration.Data(),
 		NodeMetadata:  NewNodeMetadataContext(c.tx, c.node),
 		Integration:   c.integrationCtx,
