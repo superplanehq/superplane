@@ -22,6 +22,7 @@ import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import smtpIcon from "@/assets/icons/integrations/smtp.svg";
 import awsIcon from "@/assets/icons/integrations/aws.svg";
+import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
@@ -46,6 +47,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
     aws: awsIcon,
     dash0: dash0Icon,
     github: githubIcon,
+    jira: jiraIcon,
     openai: openAiIcon,
     daytona: daytonaIcon,
     "open-ai": openAiIcon,

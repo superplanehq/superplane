@@ -5,6 +5,7 @@ import { Check, Copy, X } from "lucide-react";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
+import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
@@ -38,6 +39,7 @@ const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   dash0: dash0Icon,
   daytona: daytonaIcon,
   github: githubIcon,
+  jira: jiraIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
   pagerduty: pagerDutyIcon,
