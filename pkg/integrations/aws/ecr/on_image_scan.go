@@ -298,3 +298,7 @@ func (p *OnImageScan) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	// and routed to OnIntegrationMessage()
 	return http.StatusOK, nil
 }
+
+func (p *OnImageScan) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}
