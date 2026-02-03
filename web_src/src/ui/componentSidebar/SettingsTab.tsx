@@ -235,8 +235,7 @@ export function SettingsTab({
   }, [integrationsOfType, selectedIntegration]);
 
   const isIntegrationReady = !integrationName || selectedIntegrationFull?.status?.state === "ready";
-  const shouldShowConfiguration =
-    (!integrationName || !!selectedIntegration?.id) && isIntegrationReady;
+  const shouldShowConfiguration = (!integrationName || !!selectedIntegration?.id) && isIntegrationReady;
 
   const handleSave = () => {
     validateNow();
@@ -280,12 +279,7 @@ export function SettingsTab({
                     {getIntegrationTypeDisplayName(undefined, integrationName) || integrationName} Integration
                   </span>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onOpenCreateIntegrationDialog}
-                  className="flex-shrink-0"
-                >
+                <Button variant="outline" size="sm" onClick={onOpenCreateIntegrationDialog} className="flex-shrink-0">
                   Connect
                 </Button>
               </div>
@@ -349,10 +343,8 @@ export function SettingsTab({
                       />
                       <div className="min-w-0">
                         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
-                          {getIntegrationTypeDisplayName(
-                            undefined,
-                            selectedIntegrationFull.spec?.integrationName,
-                          ) || "Integration"}
+                          {getIntegrationTypeDisplayName(undefined, selectedIntegrationFull.spec?.integrationName) ||
+                            "Integration"}
                         </h3>
                       </div>
                     </div>

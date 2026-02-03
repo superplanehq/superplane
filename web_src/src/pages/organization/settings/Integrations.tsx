@@ -122,9 +122,9 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                       <div>
                         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
                           {integrationLabel ||
-                          integration.metadata?.name ||
-                          getIntegrationTypeDisplayName(undefined, integration.spec?.integrationName) ||
-                          integration.spec?.integrationName}
+                            integration.metadata?.name ||
+                            getIntegrationTypeDisplayName(undefined, integration.spec?.integrationName) ||
+                            integration.spec?.integrationName}
                         </h3>
                         {integrationDefinition?.description ? (
                           <p className="mt-1 text-sm text-gray-800 dark:text-gray-400">
@@ -252,9 +252,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                   </div>
 
                   <div className="space-y-4">
-                    {selectedInstructions && (
-                      <IntegrationInstructions description={selectedInstructions} />
-                    )}
+                    {selectedInstructions && <IntegrationInstructions description={selectedInstructions} />}
                     {/* Integration Name Field */}
                     <div>
                       <Label className="text-gray-800 dark:text-gray-100 mb-2">

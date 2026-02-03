@@ -23,10 +23,7 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
  * Always uses the known-names map when the (lowercase) name matches, so we never show "github" etc.
  * Otherwise uses the API label if it looks properly capitalized, or capitalizes the first letter.
  */
-export function getIntegrationTypeDisplayName(
-  label: string | undefined,
-  name: string | undefined,
-): string {
+export function getIntegrationTypeDisplayName(label: string | undefined, name: string | undefined): string {
   // Use name for lookup; fall back to label so we still normalize when name is missing
   const key = (name ?? label)?.trim().toLowerCase();
   if (!key) return label?.trim() ?? "";

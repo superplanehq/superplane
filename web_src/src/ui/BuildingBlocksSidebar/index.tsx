@@ -283,9 +283,7 @@ export function BuildingBlocksSidebar({
         {hoveredBlock && (
           <ComponentBase
             title={hoveredBlock.label || hoveredBlock.name || "New Component"}
-            iconSlug={
-              hoveredBlock.name?.split(".")[0] === "smtp" ? "mail" : (hoveredBlock.icon ?? "zap")
-            }
+            iconSlug={hoveredBlock.name?.split(".")[0] === "smtp" ? "mail" : (hoveredBlock.icon ?? "zap")}
             iconColor="text-gray-800"
             collapsedBackground={getBackgroundColorClass("white")}
             includeEmptyState={true}
@@ -368,8 +366,7 @@ function CategorySection({
   const firstBlock = allBlocks[0];
   const integrationName = firstBlock?.integrationName || category.name.toLowerCase();
   const appLogo = appLogoMap[integrationName];
-  const categoryIconSrc =
-    typeof appLogo === "string" ? appLogo : integrationName === "aws" ? awsIcon : undefined;
+  const categoryIconSrc = typeof appLogo === "string" ? appLogo : integrationName === "aws" ? awsIcon : undefined;
 
   // Determine icon for special categories (Core, Bundles, SMTP use Lucide SVG; others use img when categoryIconSrc)
   let CategoryIcon: React.ComponentType<{ size?: number; className?: string }> | null = null;
@@ -410,11 +407,7 @@ function CategorySection({
         {allBlocks.map((block) => {
           const nameParts = block.name?.split(".") ?? [];
           const iconSlug =
-            block.type === "blueprint"
-              ? "component"
-              : nameParts[0] === "smtp"
-                ? "mail"
-                : block.icon || "zap";
+            block.type === "blueprint" ? "component" : nameParts[0] === "smtp" ? "mail" : block.icon || "zap";
 
           // Use SVG icons for application components/triggers (SMTP uses resolveIcon("mail"), same as core)
           const appLogoMap: Record<string, string | Record<string, string>> = {
@@ -510,16 +503,14 @@ function CategorySection({
               }}
               aria-disabled={!isLive}
               title={isLive ? undefined : "Coming soon"}
-              className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing ${
-                (() => {
-                  const subtype = block.componentSubtype || getComponentSubtype(block);
-                  return subtype === "trigger"
-                    ? "hover:bg-sky-100 dark:hover:bg-sky-900/20"
-                    : subtype === "flow"
-                      ? "hover:bg-purple-100 dark:hover:bg-purple-900/20"
-                      : "hover:bg-green-100 dark:hover:bg-green-900/20";
-                })()
-              }`}
+              className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing ${(() => {
+                const subtype = block.componentSubtype || getComponentSubtype(block);
+                return subtype === "trigger"
+                  ? "hover:bg-sky-100 dark:hover:bg-sky-900/20"
+                  : subtype === "flow"
+                    ? "hover:bg-purple-100 dark:hover:bg-purple-900/20"
+                    : "hover:bg-green-100 dark:hover:bg-green-900/20";
+              })()}`}
               size="sm"
             >
               <ItemMedia>

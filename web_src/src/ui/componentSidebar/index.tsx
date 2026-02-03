@@ -1,13 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
@@ -261,16 +255,11 @@ export const ComponentSidebar = ({
     domainId ?? "",
     configureIntegrationId ?? "",
   );
-  const updateIntegrationMutation = useUpdateIntegration(
-    domainId ?? "",
-    configureIntegrationId ?? "",
-  );
+  const updateIntegrationMutation = useUpdateIntegration(domainId ?? "", configureIntegrationId ?? "");
   const configureIntegrationDefinition = useMemo(
     () =>
       configureIntegration?.spec?.integrationName
-        ? availableIntegrationDefinitions.find(
-            (d) => d.name === configureIntegration.spec?.integrationName,
-          )
+        ? availableIntegrationDefinitions.find((d) => d.name === configureIntegration.spec?.integrationName)
         : undefined,
     [availableIntegrationDefinitions, configureIntegration?.spec?.integrationName],
   );
@@ -696,48 +685,45 @@ export const ComponentSidebar = ({
               }`}
             >
               <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <IntegrationIcon
-                      integrationName={resolvedIntegration.spec?.integrationName}
-                      iconSlug={createIntegrationDefinition?.icon}
-                      className="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400"
-                    />
-                    <span className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
-                      {resolvedIntegration.metadata?.name ||
-                        getIntegrationTypeDisplayName(
-                          undefined,
-                          resolvedIntegration.spec?.integrationName,
-                        ) ||
-                        "Integration"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        resolvedIntegration.status?.state === "ready"
-                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                          : resolvedIntegration.status?.state === "error"
-                            ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                            : "bg-orange-100 text-yellow-800 dark:text-yellow-900/30 dark:text-yellow-400"
-                      }`}
-                    >
-                      {resolvedIntegration.status?.state
-                        ? resolvedIntegration.status.state.charAt(0).toUpperCase() +
-                          resolvedIntegration.status.state.slice(1)
-                        : "Unknown"}
-                    </span>
-                    {domainId && resolvedIntegration.metadata?.id && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-sm py-1.5"
-                          onClick={() => handleOpenConfigureIntegrationDialog(resolvedIntegration.metadata!.id!)}
-                        >
-                          Configure...
-                        </Button>
-                    )}
-                  </div>
+                <div className="flex items-center gap-2 min-w-0">
+                  <IntegrationIcon
+                    integrationName={resolvedIntegration.spec?.integrationName}
+                    iconSlug={createIntegrationDefinition?.icon}
+                    className="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400"
+                  />
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
+                    {resolvedIntegration.metadata?.name ||
+                      getIntegrationTypeDisplayName(undefined, resolvedIntegration.spec?.integrationName) ||
+                      "Integration"}
+                  </span>
                 </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                      resolvedIntegration.status?.state === "ready"
+                        ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                        : resolvedIntegration.status?.state === "error"
+                          ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                          : "bg-orange-100 text-yellow-800 dark:text-yellow-900/30 dark:text-yellow-400"
+                    }`}
+                  >
+                    {resolvedIntegration.status?.state
+                      ? resolvedIntegration.status.state.charAt(0).toUpperCase() +
+                        resolvedIntegration.status.state.slice(1)
+                      : "Unknown"}
+                  </span>
+                  {domainId && resolvedIntegration.metadata?.id && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-sm py-1.5"
+                      onClick={() => handleOpenConfigureIntegrationDialog(resolvedIntegration.metadata!.id!)}
+                    >
+                      Configure...
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
           <Tabs
@@ -928,7 +914,10 @@ export const ComponentSidebar = ({
         </div>
       </div>
 
-      <Dialog open={isCreateIntegrationDialogOpen} onOpenChange={(open) => !open && handleCloseCreateIntegrationDialog()}>
+      <Dialog
+        open={isCreateIntegrationDialogOpen}
+        onOpenChange={(open) => !open && handleCloseCreateIntegrationDialog()}
+      >
         <DialogContent
           className="sm:max-w-2xl max-h-[80vh] overflow-y-auto"
           showCloseButton={!createIntegrationMutation.isPending}
@@ -944,10 +933,8 @@ export const ComponentSidebar = ({
                   />
                   <DialogTitle>
                     Configure{" "}
-                    {getIntegrationTypeDisplayName(
-                      undefined,
-                      selectedIntegrationForDialog.name,
-                    ) || selectedIntegrationForDialog.name}
+                    {getIntegrationTypeDisplayName(undefined, selectedIntegrationForDialog.name) ||
+                      selectedIntegrationForDialog.name}
                   </DialogTitle>
                 </div>
                 {selectedInstructions && (
@@ -960,9 +947,7 @@ export const ComponentSidebar = ({
                     Integration Name
                     <span className="text-gray-800 ml-1">*</span>
                   </Label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                    A unique name for this integration
-                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">A unique name for this integration</p>
                   <Input
                     type="text"
                     value={createIntegrationName}
@@ -1029,10 +1014,7 @@ export const ComponentSidebar = ({
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={!!configureIntegrationId}
-        onOpenChange={(open) => !open && handleCloseConfigureIntegrationDialog()}
-      >
+      <Dialog open={!!configureIntegrationId} onOpenChange={(open) => !open && handleCloseConfigureIntegrationDialog()}>
         <DialogContent
           className="sm:max-w-2xl max-h-[80vh] overflow-y-auto"
           showCloseButton={!updateIntegrationMutation.isPending}
@@ -1052,10 +1034,7 @@ export const ComponentSidebar = ({
                   />
                   <DialogTitle>
                     Configure{" "}
-                    {getIntegrationTypeDisplayName(
-                      undefined,
-                      configureIntegration.spec?.integrationName,
-                    ) ||
+                    {getIntegrationTypeDisplayName(undefined, configureIntegration.spec?.integrationName) ||
                       configureIntegration.spec?.integrationName}
                   </DialogTitle>
                 </div>
@@ -1063,9 +1042,7 @@ export const ComponentSidebar = ({
               {configureIntegration?.status?.browserAction && (
                 <IntegrationInstructions
                   description={configureIntegration.status.browserAction.description}
-                  onContinue={
-                    configureIntegration.status.browserAction.url ? handleConfigureBrowserAction : undefined
-                  }
+                  onContinue={configureIntegration.status.browserAction.url ? handleConfigureBrowserAction : undefined}
                   className="mb-6"
                 />
               )}

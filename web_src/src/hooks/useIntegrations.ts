@@ -34,8 +34,7 @@ export const useAvailableIntegrations = () => {
         // Support both camelCase and PascalCase (API may send either)
         const rawLabel = integration.label;
         const rawName = integration.name;
-        const displayLabel =
-          getIntegrationTypeDisplayName(rawLabel, rawName) || rawLabel || rawName || "";
+        const displayLabel = getIntegrationTypeDisplayName(rawLabel, rawName) || rawLabel || rawName || "";
         return { ...integration, label: displayLabel } as IntegrationsIntegrationDefinition;
       });
     },

@@ -19,11 +19,7 @@ export interface IntegrationInstructionsProps {
  * Same styling everywhere: bg-blue-50, border-blue-200, text-gray-800.
  * Used in sidebar (Create/Configure integration dialogs) and org/integrations.
  */
-export function IntegrationInstructions({
-  description,
-  onContinue,
-  className = "",
-}: IntegrationInstructionsProps) {
+export function IntegrationInstructions({ description, onContinue, className = "" }: IntegrationInstructionsProps) {
   if (!description?.trim()) return null;
 
   return (
