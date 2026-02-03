@@ -190,13 +190,6 @@ func (g *GitLab) Triggers() []core.Trigger {
 }
 
 func (g *GitLab) Sync(ctx core.SyncContext) error {
-	//
-	// App is already connected - do not do anything.
-	//
-	metadata := Metadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err == nil && metadata.Owner != "" {
-		return nil
-	}
 
 	configuration := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &configuration)
@@ -224,9 +217,8 @@ func (g *GitLab) Sync(ctx core.SyncContext) error {
 
 func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) error {
 	baseURL := configuration.BaseURL
-	baseURL = strings.TrimSuffix(baseURL, "/")
 
-	callbackURL := fmt.Sprintf("%s/api/v1/integrations/%s/callback", ctx.BaseURL, ctx.InstallationID)
+	callbackURL := fmt.Sprintf("%s/api/v1/integrations/%s/callback", ctx.BaseURL, ctx.Integration.ID())
 
 	// Case 1: No credentials yet - show setup instructions
 	if configuration.ClientID == "" {
@@ -235,7 +227,8 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 			URL:         fmt.Sprintf("%s/-/user_settings/applications", baseURL),
 			Method:      "GET",
 		})
-		ctx.Integration.SetState("pending", "Enter Client ID and Secret")
+
+		ctx.Integration.Error("Enter Client ID and Secret")
 		return nil
 	}
 
@@ -262,13 +255,46 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 			URL:         authURL,
 			Method:      "GET",
 		})
-		ctx.Integration.SetState("pending", "Click Connect to GitLab to authorize")
+
+		ctx.Integration.Error("Click Connect to GitLab to authorize")
 		return nil
 	}
 
-	// STEP 3: Has tokens - set ready
+	// STEP 3: Has tokens - refresh them and set ready
+	auth := NewAuth(ctx.HTTP)
+	tokenResponse, err := auth.RefreshToken(baseURL, configuration.ClientID, configuration.ClientSecret, refreshToken)
+
+	if err != nil {
+		ctx.Integration.Error(fmt.Sprintf("Failed to refresh token: %v", err))
+		return nil
+	}
+
+	if tokenResponse.AccessToken != "" {
+		if err := ctx.Integration.SetSecret(OAuthAccessToken, []byte(tokenResponse.AccessToken)); err != nil {
+			ctx.Integration.Error("Failed to save access token")
+			return nil
+		}
+	}
+
+	if tokenResponse.RefreshToken != "" {
+		if err := ctx.Integration.SetSecret(OAuthRefreshToken, []byte(tokenResponse.RefreshToken)); err != nil {
+			ctx.Integration.Error("Failed to save refresh token")
+			return nil
+		}
+	}
+
+	if err := ctx.Integration.ScheduleResync(tokenResponse.GetExpiration()); err != nil {
+		ctx.Integration.Error("Failed to schedule resync")
+		return nil
+	}
+
+	if err := g.updateMetadata(ctx); err != nil {
+		ctx.Integration.Error(err.Error())
+		return nil
+	}
+
 	ctx.Integration.RemoveBrowserAction()
-	ctx.Integration.SetState("ready", "")
+	ctx.Integration.Ready()
 	return nil
 }
 
@@ -283,17 +309,18 @@ func (g *GitLab) personalAccessTokenSync(ctx core.SyncContext, configuration Con
 			URL:         fmt.Sprintf("%s/-/user_settings/personal_access_tokens", baseURL),
 			Method:      "GET",
 		})
-		ctx.Integration.SetState("pending", "Waiting for Personal Access Token")
+
+		ctx.Integration.Error("Waiting for Personal Access Token")
 		return nil
 	}
 
 	if err := g.updateMetadata(ctx); err != nil {
-		ctx.Integration.SetState("error", "")
+		ctx.Integration.Error(err.Error())
 		return nil
 	}
 
 	ctx.Integration.RemoveBrowserAction()
-	ctx.Integration.SetState("ready", "")
+	ctx.Integration.Ready()
 	return nil
 }
 
@@ -318,13 +345,16 @@ func (g *GitLab) updateMetadata(ctx core.SyncContext) error {
 	}
 
 	metadata := Metadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err == nil {
-		metadata.Repositories = repos
-		if user != nil {
-			metadata.Owner = fmt.Sprintf("%d", user.ID)
-		}
-		ctx.Integration.SetMetadata(metadata)
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
+
+	metadata.Repositories = repos
+	if user != nil {
+		metadata.Owner = fmt.Sprintf("%d", user.ID)
+	}
+	ctx.Integration.SetMetadata(metadata)
+
 	return nil
 }
 
@@ -404,13 +434,13 @@ func (g *GitLab) handleCallback(ctx core.HTTPRequestContext, config *Configurati
 		HTTP:        ctx.HTTP,
 		Integration: ctx.Integration,
 	}); err != nil {
-		fmt.Printf("Callback error: failed to update metadata: %v\n", err)
+		ctx.Logger.Errorf("Callback error: failed to update metadata: %v", err)
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	ctx.Integration.RemoveBrowserAction()
-	ctx.Integration.SetState("ready", "")
+	ctx.Integration.Ready()
 
 	http.Redirect(ctx.Response, ctx.Request,
 		fmt.Sprintf("%s/%s/settings/integrations/%s", redirectBaseURL, ctx.OrganizationID, ctx.Integration.ID().String()),
@@ -450,4 +480,16 @@ func normalizeBaseURL(url string) string {
 		return "https://" + url
 	}
 	return url
+}
+
+func (g *GitLab) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (g *GitLab) HandleAction(ctx core.IntegrationActionContext) error {
+	return nil
+}
+
+func (g *GitLab) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
 }

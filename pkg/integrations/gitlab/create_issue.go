@@ -110,18 +110,17 @@ func (c *CreateIssue) Configuration() []configuration.Field {
 }
 
 func (c *CreateIssue) Setup(ctx core.SetupContext) error {
-	return nil
+	return ensureRepoInMetadata(
+		ctx.Metadata,
+		ctx.Integration,
+		ctx.Configuration,
+	)
 }
 
 func (c *CreateIssue) Execute(ctx core.ExecutionContext) error {
 	var config CreateIssueConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	appMetadata := Metadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode application metadata: %w", err)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -165,5 +164,9 @@ func (c *CreateIssue) HandleAction(ctx core.ActionContext) error {
 }
 
 func (c *CreateIssue) Cancel(ctx core.ExecutionContext) error {
+	return nil
+}
+
+func (c *CreateIssue) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
