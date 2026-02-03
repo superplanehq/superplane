@@ -22,7 +22,6 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
-import smtpIcon from "@/assets/icons/integrations/smtp.svg";
 import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
@@ -283,7 +282,9 @@ export function BuildingBlocksSidebar({
         {hoveredBlock && (
           <ComponentBase
             title={hoveredBlock.label || hoveredBlock.name || "New Component"}
-            iconSlug={hoveredBlock.icon}
+            iconSlug={
+              hoveredBlock.name?.split(".")[0] === "smtp" ? "mail" : (hoveredBlock.icon ?? "zap")
+            }
             iconColor="text-gray-800"
             collapsedBackground={getBackgroundColorClass("white")}
             includeEmptyState={true}
@@ -356,7 +357,6 @@ function CategorySection({
     rootly: rootlyIcon,
     semaphore: SemaphoreLogo,
     slack: slackIcon,
-    smtp: smtpIcon,
     aws: {
       lambda: awsLambdaIcon,
     },
@@ -369,12 +369,14 @@ function CategorySection({
   const categoryIconSrc =
     typeof appLogo === "string" ? appLogo : integrationName === "aws" ? awsIcon : undefined;
 
-  // Determine icon for special categories
+  // Determine icon for special categories (Core, Bundles, SMTP use Lucide SVG; others use img when categoryIconSrc)
   let CategoryIcon: React.ComponentType<{ size?: number; className?: string }> | null = null;
   if (category.name === "Core") {
     CategoryIcon = resolveIcon("zap");
   } else if (category.name === "Bundles") {
     CategoryIcon = resolveIcon("package");
+  } else if (integrationName === "smtp") {
+    CategoryIcon = resolveIcon("mail");
   } else if (categoryIconSrc) {
     // Integration category - will use img tag
   } else {
@@ -404,9 +406,15 @@ function CategorySection({
 
       <ItemGroup>
         {allBlocks.map((block) => {
-          const iconSlug = block.type === "blueprint" ? "component" : block.icon || "zap";
+          const nameParts = block.name?.split(".") ?? [];
+          const iconSlug =
+            block.type === "blueprint"
+              ? "component"
+              : nameParts[0] === "smtp"
+                ? "mail"
+                : block.icon || "zap";
 
-          // Use SVG icons for application components/triggers
+          // Use SVG icons for application components/triggers (SMTP uses resolveIcon("mail"), same as core)
           const appLogoMap: Record<string, string | Record<string, string>> = {
             cloudflare: cloudflareIcon,
             dash0: dash0Icon,
@@ -420,12 +428,10 @@ function CategorySection({
             rootly: rootlyIcon,
             semaphore: SemaphoreLogo,
             slack: slackIcon,
-            smtp: smtpIcon,
             aws: {
               lambda: awsLambdaIcon,
             },
           };
-          const nameParts = block.name?.split(".") ?? [];
           const appLogo = nameParts[0] ? appLogoMap[nameParts[0]] : undefined;
           const appIconSrc = typeof appLogo === "string" ? appLogo : nameParts[1] ? appLogo?.[nameParts[1]] : undefined;
           const IconComponent = resolveIcon(iconSlug);
@@ -501,7 +507,16 @@ function CategorySection({
               }}
               aria-disabled={!isLive}
               title={isLive ? undefined : "Coming soon"}
-              className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing hover:bg-sky-100`}
+              className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing ${
+                (() => {
+                  const subtype = block.componentSubtype || getComponentSubtype(block);
+                  return subtype === "trigger"
+                    ? "hover:bg-sky-100 dark:hover:bg-sky-900/20"
+                    : subtype === "flow"
+                      ? "hover:bg-purple-100 dark:hover:bg-purple-900/20"
+                      : "hover:bg-green-100 dark:hover:bg-green-900/20";
+                })()
+              }`}
               size="sm"
             >
               <ItemMedia>
@@ -521,10 +536,10 @@ function CategorySection({
                     const subtype = block.componentSubtype || getComponentSubtype(block);
                     const badgeClass =
                       subtype === "trigger"
-                        ? "w-14 inline-block text-center px-1.5 py-0.5 text-[11px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 rounded whitespace-nowrap flex-shrink-0"
+                        ? "inline-block text-left px-1.5 py-0.5 text-[11px] font-medium text-sky-600 dark:text-sky-400 rounded whitespace-nowrap flex-shrink-0"
                         : subtype === "flow"
-                          ? "w-14 inline-block text-center px-1.5 py-0.5 text-[11px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 rounded whitespace-nowrap flex-shrink-0"
-                          : "w-14 inline-block text-center px-1.5 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400 rounded whitespace-nowrap flex-shrink-0";
+                          ? "inline-block text-left px-1.5 py-0.5 text-[11px] font-medium text-purple-600 dark:text-purple-400 rounded whitespace-nowrap flex-shrink-0"
+                          : "inline-block text-left px-1.5 py-0.5 text-[11px] font-medium text-green-600 dark:text-green-400 rounded whitespace-nowrap flex-shrink-0";
                     return (
                       <span className={`${badgeClass} ml-auto`}>
                         {subtype === "trigger" ? "Trigger" : subtype === "flow" ? "Flow" : "Action"}
