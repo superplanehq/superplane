@@ -172,3 +172,51 @@ func fetchReleaseByStrategy(client *github.Client, owner, repo, strategy, tagNam
 		return nil, fmt.Errorf("invalid release strategy: %s", strategy)
 	}
 }
+
+// buildReleaseData converts a GitHub release to a map for output emission
+func buildReleaseData(release *github.RepositoryRelease) map[string]any {
+	data := map[string]any{
+		"id":         release.GetID(),
+		"tag_name":   release.GetTagName(),
+		"name":       release.GetName(),
+		"body":       release.GetBody(),
+		"html_url":   release.GetHTMLURL(),
+		"draft":      release.GetDraft(),
+		"prerelease": release.GetPrerelease(),
+	}
+
+	if release.CreatedAt != nil {
+		data["created_at"] = release.CreatedAt.Format("2006-01-02T15:04:05Z")
+	}
+
+	if release.PublishedAt != nil {
+		data["published_at"] = release.PublishedAt.Format("2006-01-02T15:04:05Z")
+	}
+
+	if release.Author != nil {
+		data["author"] = map[string]any{
+			"login":      release.Author.GetLogin(),
+			"id":         release.Author.GetID(),
+			"avatar_url": release.Author.GetAvatarURL(),
+			"html_url":   release.Author.GetHTMLURL(),
+		}
+	}
+
+	if len(release.Assets) > 0 {
+		assets := make([]map[string]any, len(release.Assets))
+		for i, asset := range release.Assets {
+			assets[i] = map[string]any{
+				"id":                 asset.GetID(),
+				"name":               asset.GetName(),
+				"label":              asset.GetLabel(),
+				"content_type":       asset.GetContentType(),
+				"size":               asset.GetSize(),
+				"download_count":     asset.GetDownloadCount(),
+				"browser_download_url": asset.GetBrowserDownloadURL(),
+			}
+		}
+		data["assets"] = assets
+	}
+
+	return data
+}
