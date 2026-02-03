@@ -1,0 +1,24 @@
+{
+  "data": {
+    "version": "0",
+    "id": "c1b45a2c-9c3f-4c52-bc98-5ea31ce17692",
+    "detail-type": "ECR Image Action",
+    "source": "aws.ecr",
+    "account": "123456789012",
+    "time": "2024-01-01T12:00:00Z",
+    "region": "us-east-1",
+    "resources": [
+      "arn:aws:ecr:us-east-1:123456789012:repository/my-repo"
+    ],
+    "detail": {
+      "repository-name": "my-repo",
+      "image-tag": "latest",
+      "image-digest": "sha256:2c26b46b68ffc68ff99b453c1d30413413422f1642f0e2b8c7b8a0b8a96a909e",
+      "action-type": "PUSH",
+      "result": "SUCCESS",
+      "repository-arn": "arn:aws:ecr:us-east-1:123456789012:repository/my-repo"
+    }
+  },
+  "timestamp": "2026-02-03T12:00:00Z",
+  "type": "aws.ecr.image.push"
+}
