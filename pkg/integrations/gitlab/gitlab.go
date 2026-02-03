@@ -191,6 +191,14 @@ func (g *GitLab) Triggers() []core.Trigger {
 }
 
 func (g *GitLab) Sync(ctx core.SyncContext) error {
+	//
+	// App is already connected - do not do anything.
+	//
+	metadata := Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err == nil && metadata.Owner != "" {
+		return nil
+	}
+
 	configuration := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &configuration)
 	if err != nil {
@@ -260,6 +268,7 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 	}
 
 	// STEP 3: Has tokens - set ready
+	ctx.Integration.RemoveBrowserAction()
 	ctx.Integration.SetState("ready", "")
 	return nil
 }
@@ -401,6 +410,7 @@ func (g *GitLab) handleCallback(ctx core.HTTPRequestContext, config *Configurati
 		return
 	}
 	
+	ctx.Integration.RemoveBrowserAction()
 	ctx.Integration.SetState("ready", "")
 	
 	http.Redirect(ctx.Response, ctx.Request,

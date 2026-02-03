@@ -153,7 +153,10 @@ func Test__GitLab__Sync(t *testing.T) {
 			ctx := &contexts.IntegrationContext{
 				Configuration: map[string]any{},
 			}
-			err := g.Sync(core.SyncContext{Configuration: ctx.Configuration})
+			err := g.Sync(core.SyncContext{
+				Configuration: ctx.Configuration,
+				Integration:   ctx,
+			})
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "authType is required")
 		})
@@ -162,13 +165,13 @@ func Test__GitLab__Sync(t *testing.T) {
 			ctx := &contexts.IntegrationContext{
 				Configuration: map[string]any{"authType": "unknown"},
 			}
-			err := g.Sync(core.SyncContext{Configuration: ctx.Configuration})
+			err := g.Sync(core.SyncContext{
+				Configuration: ctx.Configuration,
+				Integration:   ctx,
+			})
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "unknown authType")
 		})
-
-
-
 	})
 }
 
