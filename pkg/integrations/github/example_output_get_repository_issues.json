@@ -1,0 +1,64 @@
+{
+  "data": [
+    {
+      "id": 1001,
+      "number": 42,
+      "title": "Bug: Login button not working",
+      "body": "The login button doesn't respond when clicked on mobile devices.",
+      "state": "open",
+      "html_url": "https://github.com/acme/widgets/issues/42",
+      "comments_count": 3,
+      "locked": false,
+      "created_at": "2026-01-10T10:00:00Z",
+      "updated_at": "2026-01-15T14:30:00Z",
+      "user": {
+        "login": "johndoe",
+        "id": 12345,
+        "avatar_url": "https://github.com/images/error/octocat_happy.gif",
+        "html_url": "https://github.com/johndoe"
+      },
+      "labels": [
+        {
+          "id": 1,
+          "name": "bug",
+          "color": "d73a4a"
+        }
+      ],
+      "assignees": [
+        {
+          "login": "janedoe",
+          "id": 67890,
+          "avatar_url": "https://github.com/images/error/octocat_happy.gif",
+          "html_url": "https://github.com/janedoe"
+        }
+      ]
+    },
+    {
+      "id": 1002,
+      "number": 43,
+      "title": "Feature: Add dark mode support",
+      "body": "Would be great to have a dark mode option in the settings.",
+      "state": "open",
+      "html_url": "https://github.com/acme/widgets/issues/43",
+      "comments_count": 7,
+      "locked": false,
+      "created_at": "2026-01-12T09:00:00Z",
+      "updated_at": "2026-01-16T11:00:00Z",
+      "user": {
+        "login": "contributor",
+        "id": 11111,
+        "avatar_url": "https://github.com/images/error/octocat_happy.gif",
+        "html_url": "https://github.com/contributor"
+      },
+      "labels": [
+        {
+          "id": 2,
+          "name": "enhancement",
+          "color": "a2eeef"
+        }
+      ]
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.issues"
+}
