@@ -131,6 +131,7 @@ func (a *AWS) Components() []core.Component {
 	return []core.Component{
 		&ecr.GetImage{},
 		&ecr.GetImageScanFindings{},
+		&ecr.ScanImage{},
 		&lambda.RunFunction{},
 	}
 }

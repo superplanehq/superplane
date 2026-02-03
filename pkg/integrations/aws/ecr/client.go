@@ -139,8 +139,13 @@ type DescribeImageScanFindingsResponse struct {
 	ImageScanFindings ImageScanFindings `json:"imageScanFindings"`
 	RegistryID        string            `json:"registryId"`
 	RepositoryName    string            `json:"repositoryName"`
-	ImageID           map[string]string `json:"imageId"`
+	ImageID           ImageIdentifier   `json:"imageId"`
 	ImageScanStatus   ImageScanStatus   `json:"imageScanStatus"`
+}
+
+type ImageIdentifier struct {
+	ImageDigest string `json:"imageDigest"`
+	ImageTag    string `json:"imageTag"`
 }
 
 type ImageScanStatus struct {
@@ -149,10 +154,8 @@ type ImageScanStatus struct {
 }
 
 type ImageScanFindings struct {
-	Findings                     []ImageScanFinding `json:"findings"`
-	ImageScanCompletedAt         time.Time          `json:"imageScanCompletedAt"`
-	VulnerabilitySourceUpdatedAt time.Time          `json:"vulnerabilitySourceUpdatedAt"`
-	FindingSeverityCounts        map[string]int     `json:"findingSeverityCounts"`
+	Findings              []ImageScanFinding `json:"findings"`
+	FindingSeverityCounts map[string]int     `json:"findingSeverityCounts"`
 }
 
 type ImageScanFinding struct {
@@ -187,6 +190,35 @@ func (c *Client) DescribeImageScanFindings(repositoryName string, imageDigest st
 
 	response := DescribeImageScanFindingsResponse{}
 	if err := c.postJSON("DescribeImageScanFindings", payload, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
+type ScanImageResponse struct {
+	ImageIdentifier ImageIdentifier `json:"imageId"`
+	ScanStatus      ImageScanStatus `json:"scanStatus"`
+	RepositoryName  string          `json:"repositoryName"`
+	RegistryID      string          `json:"registryId"`
+}
+
+func (c *Client) ScanImage(repositoryName string, imageDigest string, imageTag string) (*ScanImageResponse, error) {
+	imageID := map[string]any{}
+	if strings.TrimSpace(imageDigest) != "" {
+		imageID["imageDigest"] = strings.TrimSpace(imageDigest)
+	}
+	if strings.TrimSpace(imageTag) != "" {
+		imageID["imageTag"] = strings.TrimSpace(imageTag)
+	}
+
+	payload := map[string]any{
+		"repositoryName": repositoryName,
+		"imageId":        imageID,
+	}
+
+	response := ScanImageResponse{}
+	if err := c.postJSON("StartImageScan", payload, &response); err != nil {
 		return nil, err
 	}
 
@@ -234,7 +266,6 @@ func (c *Client) postJSON(action string, payload any, out any) error {
 		return nil
 	}
 
-	fmt.Println(string(responseBody))
 	if err := json.Unmarshal(responseBody, out); err != nil {
 		return fmt.Errorf("failed to decode response: %w", err)
 	}

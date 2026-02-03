@@ -263,7 +263,34 @@ func (p *OnImageScan) checkRuleAvailability(ctx core.TriggerActionContext) (map[
 }
 
 func (p *OnImageScan) OnIntegrationMessage(ctx core.IntegrationMessageContext) error {
-	return ctx.Events.Emit("aws.ecr.image", ctx.Message)
+	metadata := OnImageScanMetadata{}
+	err := mapstructure.Decode(ctx.NodeMetadata.Get(), &metadata)
+	if err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	event := common.EventBridgeEvent{}
+	err = mapstructure.Decode(ctx.Message, &event)
+	if err != nil {
+		return fmt.Errorf("failed to decode message: %w", err)
+	}
+
+	repositoryName, ok := event.Detail["repository-name"]
+	if !ok {
+		return fmt.Errorf("missing repository-name in event")
+	}
+
+	r, ok := repositoryName.(string)
+	if !ok {
+		return fmt.Errorf("invalid repository-name in event")
+	}
+
+	if r != metadata.Repository.RepositoryName {
+		ctx.Logger.Infof("Skipping event for repository %s, expected %s", r, metadata.Repository.RepositoryName)
+		return nil
+	}
+
+	return ctx.Events.Emit("aws.ecr.image.scan", ctx.Message)
 }
 
 func (p *OnImageScan) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {

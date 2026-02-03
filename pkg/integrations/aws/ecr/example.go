@@ -19,6 +19,9 @@ var exampleOutputGetImageBytes []byte
 //go:embed example_output_get_image_scan_findings.json
 var exampleOutputGetImageScanFindingsBytes []byte
 
+//go:embed example_output_scan_image.json
+var exampleOutputScanImageBytes []byte
+
 var exampleDataOnImagePushOnce sync.Once
 var exampleDataOnImagePush map[string]any
 
@@ -30,6 +33,9 @@ var exampleOutputGetImage map[string]any
 
 var exampleOutputGetImageScanFindingsOnce sync.Once
 var exampleOutputGetImageScanFindings map[string]any
+
+var exampleOutputScanImageOnce sync.Once
+var exampleOutputScanImage map[string]any
 
 func (t *OnImagePush) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnImagePushOnce, exampleDataOnImagePushBytes, &exampleDataOnImagePush)
@@ -45,4 +51,8 @@ func (c *GetImage) ExampleOutput() map[string]any {
 
 func (c *GetImageScanFindings) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetImageScanFindingsOnce, exampleOutputGetImageScanFindingsBytes, &exampleOutputGetImageScanFindings)
+}
+
+func (c *ScanImage) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputScanImageOnce, exampleOutputScanImageBytes, &exampleOutputScanImage)
 }

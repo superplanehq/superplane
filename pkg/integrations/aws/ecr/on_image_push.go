@@ -289,7 +289,7 @@ func (p *OnImagePush) OnIntegrationMessage(ctx core.IntegrationMessageContext) e
 		return nil
 	}
 
-	return ctx.Events.Emit("aws.ecr.image", ctx.Message)
+	return ctx.Events.Emit("aws.ecr.image.push", ctx.Message)
 }
 
 func (p *OnImagePush) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {

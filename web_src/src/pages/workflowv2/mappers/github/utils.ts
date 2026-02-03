@@ -1,9 +1,6 @@
 import { MetadataItem } from "@/ui/metadataList";
 import { formatTimeAgo } from "@/utils/date";
 import { CanvasesCanvasNodeExecution } from "@/api-client";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { EventStateRegistry } from "../types";
-import { defaultStateFunction } from "../stateRegistry";
 
 export type PredicateType = "equals" | "notEquals" | "matches";
 
