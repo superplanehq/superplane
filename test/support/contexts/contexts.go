@@ -67,6 +67,7 @@ func (m *MetadataContext) Set(metadata any) error {
 }
 
 type IntegrationContext struct {
+	IntegrationID    string
 	Configuration    map[string]any
 	Metadata         any
 	State            string
@@ -91,6 +92,10 @@ type Subscription struct {
 }
 
 func (c *IntegrationContext) ID() uuid.UUID {
+	if c.IntegrationID != "" {
+		return uuid.MustParse(c.IntegrationID)
+	}
+
 	return uuid.New()
 }
 
