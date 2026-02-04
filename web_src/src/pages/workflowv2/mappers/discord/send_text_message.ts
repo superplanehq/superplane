@@ -10,6 +10,7 @@ import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import { formatTimeAgo } from "@/utils/date";
 import { MetadataItem } from "@/ui/metadataList";
+import discordIcon from "@/assets/icons/integrations/discord.svg";
 
 interface SendTextMessageConfiguration {
   channel?: string;
@@ -43,6 +44,7 @@ export const sendTextMessageMapper: ComponentBaseMapper = {
 
     return {
       title: node.name!,
+      iconSrc: discordIcon,
       iconSlug: "discord",
       iconColor: getColorClass(componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(componentDefinition.color),
