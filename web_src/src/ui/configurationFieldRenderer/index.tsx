@@ -24,6 +24,8 @@ import { RoleFieldRenderer } from "./RoleFieldRenderer";
 import { GroupFieldRenderer } from "./GroupFieldRenderer";
 import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
 import { SecretFieldRenderer } from "./SecretFieldRenderer";
+import { SecretKeyFieldRenderer } from "./SecretKeyFieldRenderer";
+import { SecretAndKeyFieldRenderer } from "./SecretAndKeyFieldRenderer";
 import { TimezoneFieldRenderer } from "./TimezoneFieldRenderer";
 import { AnyPredicateListFieldRenderer } from "./AnyPredicateListFieldRenderer";
 import { DaysOfWeekFieldRenderer } from "./DaysOfWeekFieldRenderer";
@@ -111,7 +113,7 @@ export const ConfigurationFieldRenderer = ({
           );
         } else if (field.type === "number") {
           onChange(typeof parsedDefaultValue === "number" ? parsedDefaultValue : 0);
-        } else if (field.type === "secret") {
+        } else if (field.type === "secret" || field.type === "secret-key" || field.type === "secret-and-key") {
           onChange(parsedDefaultValue ?? "");
         } else if (field.type === "boolean") {
           onChange(typeof parsedDefaultValue === "boolean" ? parsedDefaultValue : false);
@@ -325,6 +327,43 @@ export const ConfigurationFieldRenderer = ({
             domainId={domainId}
             domainType={domainType}
             allValues={allValues}
+          />
+        );
+
+      case "secret-key":
+        if (!domainId || !domainType) {
+          return (
+            <div className="text-sm text-red-500 dark:text-red-400">
+              Secret key field requires domainId and domainType props
+            </div>
+          );
+        }
+        return (
+          <SecretKeyFieldRenderer
+            field={field}
+            value={value as string}
+            onChange={onChange}
+            allValues={allValues}
+            domainId={domainId}
+            domainType={domainType}
+          />
+        );
+
+      case "secret-and-key":
+        if (!domainId || !domainType) {
+          return (
+            <div className="text-sm text-red-500 dark:text-red-400">
+              Secret & key field requires domainId and domainType props
+            </div>
+          );
+        }
+        return (
+          <SecretAndKeyFieldRenderer
+            field={field}
+            value={value as string}
+            onChange={onChange}
+            domainId={domainId}
+            domainType={domainType}
           />
         );
 

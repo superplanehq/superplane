@@ -226,6 +226,7 @@ export function ConfigurationFieldModal({ isOpen, onClose, field, onSave }: Conf
                   <SelectItem value="date">Date</SelectItem>
                   <SelectItem value="url">URL</SelectItem>
                   <SelectItem value="secret">Secret</SelectItem>
+                  <SelectItem value="secret-and-key">Secret and key</SelectItem>
                 </SelectContent>
               </Select>
             </div>

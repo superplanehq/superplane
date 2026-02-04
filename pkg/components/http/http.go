@@ -3,6 +3,7 @@ package http
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -35,20 +36,30 @@ type KeyValue struct {
 	Value string `json:"value"`
 }
 
+// AuthConfig is the resolved authentication config (nested under "authentication" in the component config).
+type AuthConfig struct {
+	Type        *string `json:"authenticationType,omitempty" mapstructure:"authenticationType"`
+	Credentials *string `json:"authenticationCredentials,omitempty" mapstructure:"authenticationCredentials"`
+	Username    *string `json:"authenticationUsername,omitempty" mapstructure:"authenticationUsername"`
+	Password    *string `json:"authenticationPassword,omitempty" mapstructure:"authenticationPassword"`
+	HeaderName  *string `json:"authenticationHeaderName,omitempty" mapstructure:"authenticationHeaderName"`
+}
+
 type Spec struct {
-	Method          string      `json:"method"`
-	URL             string      `json:"url"`
-	QueryParams     *[]KeyValue `json:"queryParams,omitempty"`
-	Headers         *[]Header   `json:"headers,omitempty"`
-	ContentType     *string     `json:"contentType,omitempty"`
-	JSON            *any        `json:"json,omitempty"`
-	XML             *string     `json:"xml,omitempty"`
-	Text            *string     `json:"text,omitempty"`
-	FormData        *[]KeyValue `json:"formData,omitempty"`
-	SuccessCodes    *string     `json:"successCodes,omitempty"`
-	TimeoutStrategy *string     `json:"timeoutStrategy,omitempty"`
-	TimeoutSeconds  *int        `json:"timeoutSeconds,omitempty"`
-	Retries         *int        `json:"retries,omitempty"`
+	Method          string            `json:"method"`
+	URL             string            `json:"url"`
+	QueryParams     *[]KeyValue       `json:"queryParams,omitempty"`
+	Headers         *[]Header         `json:"headers,omitempty"`
+	Authentication  *AuthConfig       `json:"authentication,omitempty" mapstructure:"authentication"`
+	ContentType     *string            `json:"contentType,omitempty"`
+	JSON                      *any              `json:"json,omitempty"`
+	XML                       *string           `json:"xml,omitempty"`
+	Text                      *string           `json:"text,omitempty"`
+	FormData                  *[]KeyValue       `json:"formData,omitempty"`
+	SuccessCodes              *string           `json:"successCodes,omitempty"`
+	TimeoutStrategy           *string           `json:"timeoutStrategy,omitempty"`
+	TimeoutSeconds            *int              `json:"timeoutSeconds,omitempty"`
+	Retries                   *int              `json:"retries,omitempty"`
 }
 
 type RetryMetadata struct {
@@ -205,6 +216,86 @@ func (e *HTTP) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Placeholder: "https://api.example.com/endpoint",
+		},
+		{
+			Name:        "authentication",
+			Label:       "Authentication",
+			Type:        configuration.FieldTypeObject,
+			Required:    false,
+			Togglable:   true,
+			Description: "Authenticate the request using a secret (Bearer token, Basic auth, or API key).",
+			TypeOptions: &configuration.TypeOptions{
+				Object: &configuration.ObjectTypeOptions{
+					Schema: []configuration.Field{
+						{
+							Name:        "authenticationType",
+							Label:       "Type",
+							Type:        configuration.FieldTypeSelect,
+							Required:    false,
+							TypeOptions: &configuration.TypeOptions{
+								Select: &configuration.SelectTypeOptions{
+									Options: []configuration.FieldOption{
+										{Label: "Bearer Token", Value: "bearer"},
+										{Label: "Basic Auth", Value: "basic"},
+										{Label: "API Key", Value: "api_key"},
+									},
+								},
+							},
+						},
+						{
+							Name:        "authenticationCredentials",
+							Label:       "Token",
+							Type:        configuration.FieldTypeSecretAndKey,
+							Required:    false,
+							VisibilityConditions: []configuration.VisibilityCondition{
+								{Field: "authenticationType", Values: []string{"bearer", "api_key"}},
+							},
+							RequiredConditions: []configuration.RequiredCondition{
+								{Field: "authenticationType", Values: []string{"bearer", "api_key"}},
+							},
+						},
+						{
+							Name:        "authenticationUsername",
+							Label:       "Username",
+							Type:        configuration.FieldTypeString,
+							Required:    false,
+							Placeholder: "username",
+							VisibilityConditions: []configuration.VisibilityCondition{
+								{Field: "authenticationType", Values: []string{"basic"}},
+							},
+							RequiredConditions: []configuration.RequiredCondition{
+								{Field: "authenticationType", Values: []string{"basic"}},
+							},
+						},
+						{
+							Name:        "authenticationPassword",
+							Label:       "Password",
+							Type:        configuration.FieldTypeSecretAndKey,
+							Required:    false,
+							VisibilityConditions: []configuration.VisibilityCondition{
+								{Field: "authenticationType", Values: []string{"basic"}},
+							},
+							RequiredConditions: []configuration.RequiredCondition{
+								{Field: "authenticationType", Values: []string{"basic"}},
+							},
+						},
+						{
+							Name:        "authenticationHeaderName",
+							Label:       "Header Name",
+							Type:        configuration.FieldTypeString,
+							Required:    false,
+							Placeholder:  "X-API-Key",
+							Description: "Header name for the API key (e.g. X-API-Key, Authorization).",
+							VisibilityConditions: []configuration.VisibilityCondition{
+								{Field: "authenticationType", Values: []string{"api_key"}},
+							},
+							RequiredConditions: []configuration.RequiredCondition{
+								{Field: "authenticationType", Values: []string{"api_key"}},
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "queryParams",
@@ -577,6 +668,36 @@ func (e *HTTP) calculateTimeoutForAttempt(strategy string, timeoutSeconds int, a
 	return baseTimeout
 }
 
+func (e *HTTP) setAuthentication(req *http.Request, spec Spec) error {
+	auth := spec.Authentication
+	if auth == nil || auth.Type == nil || *auth.Type == "" {
+		return nil
+	}
+	switch *auth.Type {
+	case "bearer":
+		if auth.Credentials == nil || *auth.Credentials == "" {
+			return nil
+		}
+		req.Header.Set("Authorization", "Bearer "+*auth.Credentials)
+	case "basic":
+		if auth.Username == nil || auth.Password == nil ||
+			*auth.Username == "" || *auth.Password == "" {
+			return fmt.Errorf("authentication: username and password (secret & key) required for Basic auth")
+		}
+		req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(*auth.Username+":"+*auth.Password)))
+	case "api_key":
+		if auth.Credentials == nil || *auth.Credentials == "" {
+			return nil
+		}
+		headerName := "X-API-Key"
+		if auth.HeaderName != nil && *auth.HeaderName != "" {
+			headerName = *auth.HeaderName
+		}
+		req.Header.Set(headerName, *auth.Credentials)
+	}
+	return nil
+}
+
 func (e *HTTP) executeRequest(spec Spec, timeout time.Duration) (*http.Response, error) {
 	var body io.Reader
 	var contentType string
@@ -620,6 +741,10 @@ func (e *HTTP) executeRequest(spec Spec, timeout time.Duration) (*http.Response,
 		for _, header := range *spec.Headers {
 			req.Header.Set(header.Name, header.Value)
 		}
+	}
+
+	if err := e.setAuthentication(req, spec); err != nil {
+		return nil, err
 	}
 
 	resp, err := http.DefaultClient.Do(req)

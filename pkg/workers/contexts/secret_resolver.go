@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -11,6 +12,30 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
+
+// splitSecretAndKey splits "secretId:keyName" on the first colon. Key names may contain colons.
+func splitSecretAndKey(ref string) (secretID, keyName string) {
+	i := strings.Index(ref, ":")
+	if i < 0 {
+		return ref, ""
+	}
+	return ref[:i], ref[i+1:]
+}
+
+func secretValueByKey(data any, key string) string {
+	m, ok := data.(map[string]any)
+	if !ok || key == "" {
+		return ""
+	}
+	v, ok := m[key]
+	if !ok {
+		return ""
+	}
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return ""
+}
 
 // NewSecretResolver returns a SecretResolver that looks up secrets by reference in the given
 // transaction and domain, decrypts the secret data, and returns it as a map.
@@ -76,6 +101,20 @@ func resolveSecretReferenceValue(value any, field configuration.Field, fieldsByN
 	if field.Type == configuration.FieldTypeSecret {
 		if ref, ok := value.(string); ok && ref != "" {
 			return resolver(ref)
+		}
+		return value, nil
+	}
+	if field.Type == configuration.FieldTypeSecretAndKey {
+		if ref, ok := value.(string); ok && ref != "" {
+			secretID, keyName := splitSecretAndKey(ref)
+			if secretID == "" || keyName == "" {
+				return value, nil
+			}
+			data, err := resolver(secretID)
+			if err != nil {
+				return nil, err
+			}
+			return secretValueByKey(data, keyName), nil
 		}
 		return value, nil
 	}

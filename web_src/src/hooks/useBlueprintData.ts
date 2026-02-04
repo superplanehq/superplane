@@ -156,6 +156,7 @@ export const useComponents = (organizationId: string) => {
       return response.data?.components || [];
     },
     enabled: !!organizationId,
+    staleTime: 0, // Refetch so new component config fields (e.g. Authorization) appear after backend deploy
   });
 };
 

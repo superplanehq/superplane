@@ -33,6 +33,8 @@ const (
 	FieldTypeAnyPredicateList    = "any-predicate-list"
 	FieldTypeGitRef              = "git-ref"
 	FieldTypeSecret              = "secret"
+	FieldTypeSecretKey           = "secret-key" // key name within a secret; secret ref comes from another field (convention: XSecretKey -> XSecret)
+	FieldTypeSecretAndKey        = "secret-and-key" // value format "secretId:keyName"; resolved to the key's string value
 )
 
 type Field struct {
