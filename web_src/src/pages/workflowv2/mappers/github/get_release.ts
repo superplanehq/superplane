@@ -8,6 +8,7 @@ import { ComponentBaseProps } from "@/ui/componentBase";
 import { ComponentBaseMapper, OutputPayload } from "../types";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
+import { MetadataItem } from "@/ui/metadataList";
 
 interface ReleaseOutput {
   id?: number;
@@ -29,6 +30,51 @@ interface ReleaseOutput {
   }>;
 }
 
+interface GetReleaseConfiguration {
+  repository?: string;
+  releaseStrategy?: string;
+  tagName?: string;
+  releaseId?: string;
+}
+
+function getReleaseMetadataList(node: ComponentsNode): MetadataItem[] {
+  const metadata: MetadataItem[] = [];
+  const configuration = node.configuration as GetReleaseConfiguration | undefined;
+  const nodeMetadata = node.metadata as { repository?: { name?: string } } | undefined;
+
+  // Show repository name
+  if (nodeMetadata?.repository?.name) {
+    metadata.push({ icon: "book", label: nodeMetadata.repository.name });
+  }
+
+  // Show release strategy info
+  if (configuration?.releaseStrategy) {
+    switch (configuration.releaseStrategy) {
+      case "latest":
+        metadata.push({ icon: "tag", label: "Latest release" });
+        break;
+      case "latestDraft":
+        metadata.push({ icon: "tag", label: "Latest draft" });
+        break;
+      case "latestPrerelease":
+        metadata.push({ icon: "tag", label: "Latest prerelease" });
+        break;
+      case "specific":
+        if (configuration.tagName) {
+          metadata.push({ icon: "tag", label: `Tag: ${configuration.tagName}` });
+        }
+        break;
+      case "byId":
+        if (configuration.releaseId) {
+          metadata.push({ icon: "hash", label: `ID: ${configuration.releaseId}` });
+        }
+        break;
+    }
+  }
+
+  return metadata;
+}
+
 export const getReleaseMapper: ComponentBaseMapper = {
   props(
     nodes: ComponentsNode[],
@@ -37,7 +83,14 @@ export const getReleaseMapper: ComponentBaseMapper = {
     lastExecutions: CanvasesCanvasNodeExecution[],
     queueItems: CanvasesCanvasNodeQueueItem[],
   ): ComponentBaseProps {
-    return baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
+    // Get base props (includes proper event title inheritance from root event)
+    const base = baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
+
+    // Override metadata to include release configuration display
+    return {
+      ...base,
+      metadata: getReleaseMetadataList(node),
+    };
   },
   subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
     return buildGithubExecutionSubtitle(execution);
