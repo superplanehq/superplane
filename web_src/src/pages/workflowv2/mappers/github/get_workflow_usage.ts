@@ -1,11 +1,12 @@
-import {
-  ComponentsNode,
-  ComponentsComponent,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
 import { ComponentBaseProps } from "@/ui/componentBase";
-import { ComponentBaseMapper, OutputPayload } from "../types";
+import {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  NodeInfo,
+  OutputPayload,
+  SubtitleContext,
+} from "../types";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
 import { MetadataItem } from "@/ui/metadataList";
@@ -32,11 +33,6 @@ interface WorkflowUsageOutput {
   };
 }
 
-interface GetWorkflowUsageConfiguration {
-  repository?: string;
-  workflowFile?: string;
-}
-
 function formatMs(ms: number): string {
   const hours = Math.floor(ms / 3600000);
   const minutes = Math.floor((ms % 3600000) / 60000);
@@ -46,9 +42,9 @@ function formatMs(ms: number): string {
   return `${minutes}m`;
 }
 
-function getWorkflowUsageMetadataList(node: ComponentsNode): MetadataItem[] {
+function getWorkflowUsageMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as GetWorkflowUsageConfiguration | undefined;
+  const configuration = node.configuration as { repository?: string; workflowFile?: string } | undefined;
   const nodeMetadata = node.metadata as { repository?: { name?: string } } | undefined;
 
   if (nodeMetadata?.repository?.name) {
@@ -65,36 +61,30 @@ function getWorkflowUsageMetadataList(node: ComponentsNode): MetadataItem[] {
 }
 
 export const getWorkflowUsageMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    queueItems: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
-    const base = baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const base = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
 
     return {
       ...base,
-      metadata: getWorkflowUsageMetadataList(node),
+      metadata: getWorkflowUsageMetadataList(context.node),
     };
   },
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  subtitle(context: SubtitleContext): string {
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     if (outputs?.default && Array.isArray(outputs.default[0]?.data)) {
       const workflows = outputs.default[0].data as WorkflowUsageOutput[];
       const count = workflows.length;
-      return buildGithubExecutionSubtitle(execution, `${count} workflow${count !== 1 ? "s" : ""}`);
+      return buildGithubExecutionSubtitle(context.execution, `${count} workflow${count !== 1 ? "s" : ""}`);
     }
-    return buildGithubExecutionSubtitle(execution);
+    return buildGithubExecutionSubtitle(context.execution);
   },
 
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const details: Record<string, string> = {};
 
     Object.assign(details, {
-      "Retrieved At": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : "-",
+      "Retrieved At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",
     });
 
     if (outputs?.default && Array.isArray(outputs.default[0]?.data)) {
