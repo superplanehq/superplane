@@ -1,0 +1,40 @@
+{
+    "type": "rootly.onEvent",
+    "data": {
+        "id": "evt-timeline-123",
+        "event": "incident_event.created",
+        "event_id": "evt-123456",
+        "issued_at": "2026-01-19T12:00:00Z",
+        "kind": "note",
+        "occurred_at": "2026-01-19T11:58:00Z",
+        "created_at": "2026-01-19T12:00:00Z",
+        "user_display_name": "John Doe",
+        "body": "Initial investigation shows the issue is related to a recent deployment. Rolling back to previous version.",
+        "source": "web",
+        "visibility": "internal",
+        "incident": {
+            "id": "inc-abc123",
+            "title": "API latency spike detected",
+            "summary": "The API response times have increased significantly across all endpoints.",
+            "status": "started",
+            "severity": "sev2",
+            "started_at": "2026-01-19T11:45:00Z",
+            "mitigated_at": null,
+            "resolved_at": null,
+            "url": "https://app.rootly.com/incidents/inc-abc123",
+            "services": [
+                {
+                    "id": "svc-001",
+                    "name": "api-gateway"
+                }
+            ],
+            "teams": [
+                {
+                    "id": "team-001",
+                    "name": "platform"
+                }
+            ]
+        }
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}
