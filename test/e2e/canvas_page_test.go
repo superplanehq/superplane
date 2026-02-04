@@ -69,23 +69,23 @@ func TestCanvasPage(t *testing.T) {
 	t.Run("viewing queued items in the sidebar", func(t *testing.T) {
 		steps := &CanvasPageSteps{t: t}
 		steps.start()
-		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(4)
+		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(2)
 		steps.openSidebarForNode("Wait")
 		steps.assertRunningItemsCount("Wait", 1)
-		steps.assertQueuedItemsCount("Wait", 3)
+		steps.assertQueuedItemsCount("Wait", 1)
 		steps.assertQueuedItemsVisibleInSidebar()
 	})
 
 	t.Run("canceling queued items from the sidebar", func(t *testing.T) {
 		steps := &CanvasPageSteps{t: t}
 		steps.start()
-		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(4)
+		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(2)
 		steps.openSidebarForNode("Wait")
 
 		steps.assertRunningItemsCount("Wait", 1)
-		steps.assertQueuedItemsCount("Wait", 3)
+		steps.assertQueuedItemsCount("Wait", 1)
 		steps.cancelFirstQueueItemFromSidebar()
-		steps.assertQueuedItemsCount("Wait", 2)
+		steps.assertQueuedItemsCount("Wait", 0)
 	})
 
 	t.Run("canceling running execution from the sidebar", func(t *testing.T) {

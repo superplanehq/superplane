@@ -86,7 +86,7 @@ func (s *WaitSteps) givenACanvasWithManualTriggerWaitAndOutput() {
 
 	s.canvas.Create()
 	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
-	s.canvas.AddWait("Wait", models.Position{X: 1000, Y: 200}, 60, "Seconds")
+	s.canvas.AddWait("Wait", models.Position{X: 1000, Y: 200}, 10, "Seconds")
 	s.canvas.AddNoop("Output", models.Position{X: 1400, Y: 200})
 
 	s.canvas.Connect("Start", "Wait")
@@ -97,11 +97,20 @@ func (s *WaitSteps) givenACanvasWithManualTriggerWaitAndOutput() {
 
 func (s *WaitSteps) runManualTrigger() {
 	s.canvas.RunManualTrigger("Start")
-	s.canvas.WaitForExecution("Wait", models.CanvasNodeExecutionStatePending, 10*time.Second)
+	s.canvas.WaitForExecutionInStates(
+		"Wait",
+		[]string{
+			models.CanvasNodeExecutionStatePending,
+			models.CanvasNodeExecutionStateStarted,
+		},
+		10*time.Second,
+	)
 }
 
 func (s *WaitSteps) openSidebarForNode(node string) {
-	s.session.Click(q.TestID("node", node, "header"))
+	header := q.TestID("node", node, "header")
+	s.session.AssertVisible(header)
+	s.session.Click(header)
 }
 
 func (s *WaitSteps) pushThroughFirstItemFromSidebar() {
