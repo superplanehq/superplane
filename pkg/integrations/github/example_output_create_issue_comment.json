@@ -1,0 +1,21 @@
+{
+  "data": [
+    {
+      "id": 1234567890,
+      "node_id": "IC_kwDOExample123",
+      "body": "Deployment completed successfully! All checks passed.",
+      "html_url": "https://github.com/acme/widgets/issues/42#issuecomment-1234567890",
+      "issue_url": "https://api.github.com/repos/acme/widgets/issues/42",
+      "created_at": "2026-01-16T18:30:00Z",
+      "updated_at": "2026-01-16T18:30:00Z",
+      "user": {
+        "login": "superplane-bot",
+        "id": 12345678,
+        "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+        "html_url": "https://github.com/superplane-bot"
+      }
+    }
+  ],
+  "timestamp": "2026-01-16T18:30:00.123456789Z",
+  "type": "github.issueComment"
+}
