@@ -13,10 +13,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
+	workerscontexts "github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-// Helper function to create execution context for tests
+// testHTTPContext creates an HTTP context without SSRF protection for tests that use localhost.
+func testHTTPContext() core.HTTPContext {
+	return workerscontexts.NewHTTPContextWithoutSSRFProtection(&http.Client{Timeout: 30 * time.Second})
+}
+
+// Helper function to create execution context for tests.
+// Uses HTTPContext without SSRF protection since tests use httptest.Server (localhost).
 func createExecutionContext(config map[string]any) (core.ExecutionContext, *contexts.ExecutionStateContext, *contexts.MetadataContext) {
 	stateCtx := &contexts.ExecutionStateContext{}
 	metadataCtx := &contexts.MetadataContext{}
@@ -24,6 +31,7 @@ func createExecutionContext(config map[string]any) (core.ExecutionContext, *cont
 		Configuration:  config,
 		ExecutionState: stateCtx,
 		Metadata:       metadataCtx,
+		HTTP:           testHTTPContext(),
 	}, stateCtx, metadataCtx
 }
 
@@ -664,6 +672,7 @@ func TestHTTP__Execute__WithoutRetryStrategy(t *testing.T) {
 		},
 		ExecutionState: stateCtx,
 		Metadata:       metadataCtx,
+		HTTP:           testHTTPContext(),
 	}
 
 	err := h.Execute(ctx)
@@ -711,6 +720,7 @@ func TestHTTP__Execute__FixedTimeoutStrategy_Success(t *testing.T) {
 		},
 		ExecutionState: stateCtx,
 		Metadata:       metadataCtx,
+		HTTP:           testHTTPContext(),
 	}
 
 	err := h.Execute(ctx)
@@ -756,6 +766,7 @@ func TestHTTP__Execute__ExponentialTimeoutStrategy_Success(t *testing.T) {
 		},
 		ExecutionState: stateCtx,
 		Metadata:       metadataCtx,
+		HTTP:           testHTTPContext(),
 	}
 
 	err := h.Execute(ctx)
@@ -793,6 +804,7 @@ func TestHTTP__HandleAction__RetryRequest_SuccessOnRetry(t *testing.T) {
 	metadataCtx := &contexts.MetadataContext{}
 	requestCtx := &contexts.RequestContext{}
 
+	httpCtx := testHTTPContext()
 	ctx := core.ExecutionContext{
 		Configuration: map[string]any{
 			"method":          "GET",
@@ -804,6 +816,7 @@ func TestHTTP__HandleAction__RetryRequest_SuccessOnRetry(t *testing.T) {
 		ExecutionState: stateCtx,
 		Metadata:       metadataCtx,
 		Requests:       requestCtx,
+		HTTP:           httpCtx,
 	}
 
 	err := h.Execute(ctx)
@@ -819,6 +832,7 @@ func TestHTTP__HandleAction__RetryRequest_SuccessOnRetry(t *testing.T) {
 		ExecutionState: stateCtx,
 		Metadata:       metadataCtx,
 		Requests:       requestCtx,
+		HTTP:           httpCtx,
 	}
 
 	err = h.HandleAction(actionCtx)
@@ -855,6 +869,7 @@ func TestHTTP__HandleAction__RetryRequest_ExhaustedRetries(t *testing.T) {
 	stateCtx := &contexts.ExecutionStateContext{}
 	metadataCtx := &contexts.MetadataContext{}
 	requestCtx := &contexts.RequestContext{}
+	httpCtx := testHTTPContext()
 
 	ctx := core.ExecutionContext{
 		Configuration: map[string]any{
@@ -867,6 +882,7 @@ func TestHTTP__HandleAction__RetryRequest_ExhaustedRetries(t *testing.T) {
 		ExecutionState: stateCtx,
 		Metadata:       metadataCtx,
 		Requests:       requestCtx,
+		HTTP:           httpCtx,
 	}
 
 	err := h.Execute(ctx)
@@ -878,6 +894,7 @@ func TestHTTP__HandleAction__RetryRequest_ExhaustedRetries(t *testing.T) {
 		ExecutionState: stateCtx,
 		Metadata:       metadataCtx,
 		Requests:       &contexts.RequestContext{},
+		HTTP:           httpCtx,
 	}
 
 	err = h.HandleAction(actionCtx)
@@ -980,6 +997,7 @@ func TestHTTP__RetryProgression_ExponentialStrategy(t *testing.T) {
 	stateCtx := &contexts.ExecutionStateContext{}
 	metadataCtx := &contexts.MetadataContext{}
 	requestCtx := &contexts.RequestContext{}
+	httpCtx := testHTTPContext()
 
 	ctx := core.ExecutionContext{
 		Configuration: map[string]any{
@@ -992,6 +1010,7 @@ func TestHTTP__RetryProgression_ExponentialStrategy(t *testing.T) {
 		ExecutionState: stateCtx,
 		Metadata:       metadataCtx,
 		Requests:       requestCtx,
+		HTTP:           httpCtx,
 	}
 
 	// Execute initial request (should fail and schedule retry)
@@ -1007,6 +1026,7 @@ func TestHTTP__RetryProgression_ExponentialStrategy(t *testing.T) {
 		ExecutionState: stateCtx,
 		Metadata:       metadataCtx,
 		Requests:       requestCtx1,
+		HTTP:           httpCtx,
 	}
 
 	err = h.HandleAction(actionCtx)
@@ -1054,6 +1074,7 @@ func TestHTTP__RetryProgression_NetworkError(t *testing.T) {
 	stateCtx := &contexts.ExecutionStateContext{}
 	metadataCtx := &contexts.MetadataContext{}
 	requestCtx := &contexts.RequestContext{}
+	httpCtx := testHTTPContext()
 
 	ctx := core.ExecutionContext{
 		Configuration: map[string]any{
@@ -1066,6 +1087,7 @@ func TestHTTP__RetryProgression_NetworkError(t *testing.T) {
 		ExecutionState: stateCtx,
 		Metadata:       metadataCtx,
 		Requests:       requestCtx,
+		HTTP:           httpCtx,
 	}
 
 	// Execute initial request (should fail with network error and schedule retry)
@@ -1084,6 +1106,7 @@ func TestHTTP__RetryProgression_NetworkError(t *testing.T) {
 			ExecutionState: stateCtx,
 			Metadata:       metadataCtx,
 			Requests:       &contexts.RequestContext{},
+			HTTP:           httpCtx,
 		}
 
 		if i == 1 {
@@ -1114,6 +1137,7 @@ func TestHTTP__RetryMetadata_Progression(t *testing.T) {
 
 	stateCtx := &contexts.ExecutionStateContext{}
 	metadataCtx := &contexts.MetadataContext{}
+	httpCtx := testHTTPContext()
 
 	ctx := core.ExecutionContext{
 		Configuration: map[string]any{
@@ -1126,6 +1150,7 @@ func TestHTTP__RetryMetadata_Progression(t *testing.T) {
 		ExecutionState: stateCtx,
 		Metadata:       metadataCtx,
 		Requests:       &contexts.RequestContext{},
+		HTTP:           httpCtx,
 	}
 
 	// Execute initial request (attempt 0)
@@ -1150,6 +1175,7 @@ func TestHTTP__RetryMetadata_Progression(t *testing.T) {
 		ExecutionState: stateCtx,
 		Metadata:       metadataCtx,
 		Requests:       &contexts.RequestContext{},
+		HTTP:           httpCtx,
 	}
 
 	err = h.HandleAction(actionCtx)
