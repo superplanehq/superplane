@@ -17,8 +17,8 @@ export function SpecsTooltip({ children, specTitle, specValues, tooltipTitle, hi
       render={(attrs) => (
         <div
           {...attrs}
-          className="bg-white outline-1 outline-slate-300 shadow-md rounded-md max-w-[800px]"
-          style={{ zIndex: 10000 }}
+          className="bg-white outline-1 outline-slate-300 shadow-md rounded-md max-w-[800px] overflow-auto"
+          style={{ zIndex: 10000, maxHeight: "400px" }}
         >
           <div className="flex items-center border-b border-slate-300">
             <span className="font-medium text-gray-500 text-[13px] px-3 py-1.5">
@@ -28,7 +28,7 @@ export function SpecsTooltip({ children, specTitle, specValues, tooltipTitle, hi
           {specValues.map((value, index) => (
             <div
               key={index}
-              className={`flex flex-wrap max-w-[800px] items-center gap-2 p-2 ${index === specValues.length - 1 ? "border-b-0" : "border-b"}`}
+              className={`flex flex-wrap max-w-[800px] items-start gap-2 p-2 ${index === specValues.length - 1 ? "border-b-0" : "border-b"}`}
             >
               {value.badges.flatMap((badge, badgeIndex) => {
                 const maxChunkLength = 120;
@@ -36,7 +36,8 @@ export function SpecsTooltip({ children, specTitle, specValues, tooltipTitle, hi
                   return (
                     <span
                       key={`${badgeIndex}-0`}
-                      className={`px-2 py-1 rounded text-xs font-mono whitespace-nowrap ${badge.bgColor} ${badge.textColor}`}
+                      className={`px-2 py-1 rounded text-xs font-mono break-words ${badge.bgColor} ${badge.textColor}`}
+                      style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
                     >
                       {badge.label}
                     </span>
@@ -75,7 +76,8 @@ export function SpecsTooltip({ children, specTitle, specValues, tooltipTitle, hi
                 return chunks.map((chunk, chunkIndex) => (
                   <span
                     key={`${badgeIndex}-${chunkIndex}`}
-                    className={`px-2 py-1 rounded text-xs font-mono whitespace-nowrap ${chunkIndex === 0 ? "basis-full" : ""} ${badge.bgColor} ${badge.textColor}`}
+                    className={`px-2 py-1 rounded text-xs font-mono break-words ${chunkIndex === 0 ? "basis-full" : ""} ${badge.bgColor} ${badge.textColor}`}
+                    style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
                   >
                     {chunk}
                   </span>
