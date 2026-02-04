@@ -28,8 +28,19 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
         ...DEFAULT_EVENT_STATE_MAP.neutral,
         label: "TIMEOUT",
       },
+      waiting: {
+        icon: "clock",
+        textColor: "text-gray-800",
+        backgroundColor: "bg-orange-100",
+        badgeColor: "bg-yellow-600",
+        label: "WAITING",
+      },
     },
     getState: (execution) => {
+      if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
+        return "waiting";
+      }
+
       const state = defaultStateFunction(execution);
       if (state !== "success") return state;
 
