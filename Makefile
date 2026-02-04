@@ -23,7 +23,7 @@ GOTESTSUM=docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_t
 #
 
 lint:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app revive -formatter friendly -config lint.toml ./...
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app revive -formatter friendly -config lint.toml -exclude ./tmp/... ./...
 
 tidy:
 	docker compose $(DOCKER_COMPOSE_OPTS) exec app go mod tidy
@@ -70,17 +70,17 @@ test.shell:
 
 setup.playwright:
 	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "bash scripts/docker/retry.sh 6 2s go install github.com/playwright-community/playwright-go/cmd/playwright@v0.5200.1"
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "bash scripts/docker/retry.sh 6 2s playwright install chromium-headless-shell --with-deps"
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "if [ -d /app/tmp/ms-playwright ] && [ \"$(ls -A /app/tmp/ms-playwright 2>/dev/null)\" ]; then echo \"Playwright browsers cache present, skipping install\"; else bash scripts/docker/retry.sh 6 2s playwright install chromium-headless-shell --with-deps; fi"
 
 #
 # Code formatting
 #
 
 format.go:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app gofmt -s -w .
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "find . -name '*.go' -not -path './tmp/*' -print0 | xargs -0 gofmt -s -w"
 
 format.go.check:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app gofmt -s -l . | tee /dev/stderr | if read; then exit 1; else exit 0; fi
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "find . -name '*.go' -not -path './tmp/*' -print0 | xargs -0 gofmt -s -l | tee /dev/stderr | if read; then exit 1; else exit 0; fi"
 
 format.js:
 	cd web_src && npm run format

@@ -22,6 +22,8 @@ import slackIcon from "@/assets/icons/integrations/slack.svg";
 import smtpIcon from "@/assets/icons/integrations/smtp.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
+import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
+import awsIcon from "@/assets/icons/integrations/aws.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
@@ -52,6 +54,7 @@ export interface BuildingBlocksSidebarProps {
   blocks: BuildingBlockCategory[];
   canvasZoom?: number;
   disabled?: boolean;
+  disabledMessage?: string;
   onBlockClick?: (block: BuildingBlock) => void;
   onAddNote?: () => void;
 }
@@ -62,25 +65,66 @@ export function BuildingBlocksSidebar({
   blocks,
   canvasZoom = 1,
   disabled = false,
+  disabledMessage,
   onBlockClick,
   onAddNote,
 }: BuildingBlocksSidebarProps) {
+  const disabledTooltip = disabledMessage || "Finish configuring the selected component first";
+
   if (!isOpen) {
+    const addNoteButton = (
+      <Button
+        variant="outline"
+        onClick={() => {
+          if (disabled) return;
+          onAddNote?.();
+        }}
+        aria-label="Add Note"
+        data-testid="add-note-button"
+        disabled={disabled}
+      >
+        <StickyNote size={16} className="animate-pulse" />
+        Add Note
+      </Button>
+    );
+    const openSidebarButton = (
+      <Button
+        variant="outline"
+        onClick={() => {
+          if (disabled) return;
+          onToggle(true);
+        }}
+        aria-label="Open sidebar"
+        data-testid="open-sidebar-button"
+        disabled={disabled}
+      >
+        <Plus size={16} />
+        Components
+      </Button>
+    );
+
     return (
       <div className="absolute top-4 right-4 z-10 flex gap-3">
-        <Button variant="outline" onClick={onAddNote} aria-label="Add Note" data-testid="add-note-button">
-          <StickyNote size={16} className="animate-pulse" />
-          Add Note
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => onToggle(true)}
-          aria-label="Open sidebar"
-          data-testid="open-sidebar-button"
-        >
-          <Plus size={16} />
-          Components
-        </Button>
+        {disabled ? (
+          <Tooltip>
+            <TooltipTrigger asChild>{addNoteButton}</TooltipTrigger>
+            <TooltipContent side="left" sideOffset={10}>
+              <p>{disabledTooltip}</p>
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          addNoteButton
+        )}
+        {disabled ? (
+          <Tooltip>
+            <TooltipTrigger asChild>{openSidebarButton}</TooltipTrigger>
+            <TooltipContent side="left" sideOffset={10}>
+              <p>{disabledTooltip}</p>
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          openSidebarButton
+        )}
       </div>
     );
   }
@@ -261,7 +305,7 @@ export function BuildingBlocksSidebar({
               <div className="absolute inset-0 bg-white/60 dark:bg-gray-900/60 z-30 cursor-not-allowed" />
             </TooltipTrigger>
             <TooltipContent side="left" sideOffset={10}>
-              <p>Finish configuring the selected component first</p>
+              <p>{disabledTooltip}</p>
             </TooltipContent>
           </Tooltip>
         )}
@@ -353,6 +397,7 @@ function CategorySection({
     slack: slackIcon,
     smtp: smtpIcon,
     aws: {
+      codeArtifact: awsIcon,
       lambda: awsLambdaIcon,
       ecr: awsEcrIcon,
     },
@@ -415,6 +460,7 @@ function CategorySection({
             slack: slackIcon,
             smtp: smtpIcon,
             aws: {
+              codeArtifact: awsCodeArtifactIcon,
               ecr: awsEcrIcon,
               lambda: awsLambdaIcon,
             },

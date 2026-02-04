@@ -14,6 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
 import { Alert, AlertDescription } from "@/ui/alert";
 import { resolveIcon } from "@/lib/utils";
 import { showErrorToast } from "@/utils/toast";
+import { PermissionTooltip } from "@/components/PermissionGate";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
@@ -34,8 +36,11 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
   const navigate = useNavigate();
   const location = useLocation();
   const { integrationId } = useParams<{ integrationId: string }>();
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [configValues, setConfigValues] = useState<Record<string, unknown>>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const canUpdateIntegrations = canAct("integrations", "update");
+  const canDeleteIntegrations = canAct("integrations", "delete");
 
   const { data: integration, isLoading, error } = useIntegration(organizationId, integrationId || "");
 
@@ -107,6 +112,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
 
   const handleConfigSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canUpdateIntegrations) return;
     try {
       await updateMutation.mutateAsync(configValues);
       navigate(`/${organizationId}/settings/integrations`);
@@ -149,6 +155,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
   };
 
   const handleDelete = async () => {
+    if (!canDeleteIntegrations) return;
     try {
       await deleteMutation.mutateAsync();
       navigate(`/${organizationId}/settings/integrations`);
@@ -303,14 +310,23 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
                 Once you delete this integration, all its data will be permanently deleted. This action cannot be
                 undone.
               </p>
-              <Button
-                variant="outline"
-                onClick={() => setShowDeleteConfirm(true)}
-                className="border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 gap-1"
+              <PermissionTooltip
+                allowed={canDeleteIntegrations || permissionsLoading}
+                message="You don't have permission to delete integrations."
               >
-                <Trash2 className="w-4 h-4" />
-                Delete Integration
-              </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (!canDeleteIntegrations) return;
+                    setShowDeleteConfirm(true);
+                  }}
+                  className="border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 gap-1"
+                  disabled={!canDeleteIntegrations}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete Integration
+                </Button>
+              </PermissionTooltip>
             </div>
           </div>
         </TabsContent>
@@ -327,57 +343,69 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
                       )}
                     </AlertDescription>
                     {integration.status.browserAction.url && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleBrowserAction}
-                        className="shrink-0 px-3 py-1.5"
+                      <PermissionTooltip
+                        allowed={canUpdateIntegrations || permissionsLoading}
+                        message="You don't have permission to update integrations."
                       >
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        Continue
-                      </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleBrowserAction}
+                          className="shrink-0 px-3 py-1.5"
+                          disabled={!canUpdateIntegrations}
+                        >
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Continue
+                        </Button>
+                      </PermissionTooltip>
                     )}
                   </div>
                 </Alert>
               )}
 
               {integrationDef?.configuration && integrationDef.configuration.length > 0 ? (
-                <form onSubmit={handleConfigSubmit} className="space-y-4">
-                  {integrationDef.configuration.map((field) => (
-                    <ConfigurationFieldRenderer
-                      key={field.name}
-                      field={field}
-                      value={configValues[field.name!]}
-                      onChange={(value) => setConfigValues({ ...configValues, [field.name!]: value })}
-                      allValues={configValues}
-                      domainId={organizationId}
-                      domainType="DOMAIN_TYPE_ORGANIZATION"
-                      organizationId={organizationId}
-                      appInstallationId={integration?.metadata?.id}
-                    />
-                  ))}
+                <PermissionTooltip
+                  allowed={canUpdateIntegrations || permissionsLoading}
+                  message="You don't have permission to update integrations."
+                  className="w-full"
+                >
+                  <form onSubmit={handleConfigSubmit} className="space-y-4">
+                    {integrationDef.configuration.map((field) => (
+                      <ConfigurationFieldRenderer
+                        key={field.name}
+                        field={field}
+                        value={configValues[field.name!]}
+                        onChange={(value) => setConfigValues({ ...configValues, [field.name!]: value })}
+                        allValues={configValues}
+                        domainId={organizationId}
+                        domainType="DOMAIN_TYPE_ORGANIZATION"
+                        organizationId={organizationId}
+                        appInstallationId={integration?.metadata?.id}
+                      />
+                    ))}
 
-                  <div className="flex items-center gap-3 pt-4">
-                    <Button type="submit" color="blue" disabled={updateMutation.isPending}>
-                      {updateMutation.isPending ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        "Save Configuration"
+                    <div className="flex items-center gap-3 pt-4">
+                      <Button type="submit" color="blue" disabled={updateMutation.isPending || !canUpdateIntegrations}>
+                        {updateMutation.isPending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          "Save Configuration"
+                        )}
+                      </Button>
+                      {updateMutation.isSuccess && (
+                        <span className="text-sm text-green-600 dark:text-green-400">
+                          Configuration updated successfully!
+                        </span>
                       )}
-                    </Button>
-                    {updateMutation.isSuccess && (
-                      <span className="text-sm text-green-600 dark:text-green-400">
-                        Configuration updated successfully!
-                      </span>
-                    )}
-                    {updateMutation.isError && (
-                      <span className="text-sm text-red-600 dark:text-red-400">Failed to update configuration</span>
-                    )}
-                  </div>
-                </form>
+                      {updateMutation.isError && (
+                        <span className="text-sm text-red-600 dark:text-red-400">Failed to update configuration</span>
+                      )}
+                    </div>
+                  </form>
+                </PermissionTooltip>
               ) : (
                 <p className="text-sm text-gray-500 dark:text-gray-400">No configuration fields available.</p>
               )}
@@ -401,7 +429,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
                 <Button
                   color="blue"
                   onClick={handleDelete}
-                  disabled={deleteMutation.isPending}
+                  disabled={deleteMutation.isPending || !canDeleteIntegrations}
                   className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
                 >
                   {deleteMutation.isPending ? (

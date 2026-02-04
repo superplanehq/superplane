@@ -10,6 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PermissionTooltip } from "@/components/PermissionGate";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { ConfigurationFieldRenderer } from "../../../ui/configurationFieldRenderer";
 import type { IntegrationsIntegrationDefinition } from "../../../api-client/types.gen";
 import { resolveIcon } from "@/lib/utils";
@@ -35,10 +37,13 @@ interface IntegrationsProps {
 
 export function Integrations({ organizationId }: IntegrationsProps) {
   const navigate = useNavigate();
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationsIntegrationDefinition | null>(null);
   const [integrationName, setIntegrationName] = useState("");
   const [configuration, setConfiguration] = useState<Record<string, unknown>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const canCreateIntegrations = canAct("integrations", "create");
+  const canUpdateIntegrations = canAct("integrations", "update");
 
   const { data: availableIntegrations = [], isLoading: loadingAvailable } = useAvailableIntegrations();
   const { data: organizationIntegrations = [], isLoading: loadingInstalled } = useConnectedIntegrations(organizationId);
@@ -78,12 +83,14 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   };
 
   const handleConnectClick = (integration: IntegrationsIntegrationDefinition) => {
+    if (!canCreateIntegrations) return;
     setSelectedIntegration(integration);
     setIntegrationName(integration.name || "");
     setConfiguration({});
     setIsModalOpen(true);
   };
   const handleConnect = async () => {
+    if (!canCreateIntegrations) return;
     if (!selectedIntegration?.name) return;
 
     try {
@@ -179,17 +186,24 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                       >
                         {statusLabel}
                       </span>
-                      <Button
-                        variant="outline"
-                        onClick={() =>
-                          navigate(`/${organizationId}/settings/integrations/${integration.metadata?.id}`, {
-                            state: { tab: "configuration" },
-                          })
-                        }
-                        className="text-sm py-1.5 self-start"
+                      <PermissionTooltip
+                        allowed={canUpdateIntegrations || permissionsLoading}
+                        message="You don't have permission to update integrations."
                       >
-                        Configure...
-                      </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            if (!canUpdateIntegrations) return;
+                            navigate(`/${organizationId}/settings/integrations/${integration.metadata?.id}`, {
+                              state: { tab: "configuration" },
+                            });
+                          }}
+                          className="text-sm py-1.5 self-start"
+                          disabled={!canUpdateIntegrations}
+                        >
+                          Configure...
+                        </Button>
+                      </PermissionTooltip>
                     </div>
                   </div>
                 );
@@ -237,13 +251,19 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                         </div>
                       </div>
 
-                      <Button
-                        color="blue"
-                        onClick={() => handleConnectClick(app)}
-                        className="text-sm py-1.5 self-start"
+                      <PermissionTooltip
+                        allowed={canCreateIntegrations || permissionsLoading}
+                        message="You don't have permission to connect integrations."
                       >
-                        Connect
-                      </Button>
+                        <Button
+                          color="blue"
+                          onClick={() => handleConnectClick(app)}
+                          className="text-sm py-1.5 self-start"
+                          disabled={!canCreateIntegrations}
+                        >
+                          Connect
+                        </Button>
+                      </PermissionTooltip>
                     </div>
                   );
                 })}
@@ -302,6 +322,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                         onChange={(e) => setIntegrationName(e.target.value)}
                         placeholder="e.g., my-app-integration"
                         required
+                        disabled={!canCreateIntegrations}
                       />
                     </div>
 
@@ -331,7 +352,9 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                     <Button
                       color="blue"
                       onClick={handleConnect}
-                      disabled={createIntegrationMutation.isPending || !integrationName?.trim()}
+                      disabled={
+                        createIntegrationMutation.isPending || !integrationName?.trim() || !canCreateIntegrations
+                      }
                       className="flex items-center gap-2"
                     >
                       {createIntegrationMutation.isPending ? (
