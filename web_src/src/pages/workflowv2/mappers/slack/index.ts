@@ -15,5 +15,27 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   sendTextMessage: buildActionStateRegistry("sent"),
-  sendAndWaitMessage: buildActionStateRegistry("received"),
+  sendAndWaitMessage: {
+    stateMap: {
+      ...DEFAULT_EVENT_STATE_MAP,
+      received: {
+        ...DEFAULT_EVENT_STATE_MAP.success,
+        label: "RECEIVED",
+      },
+      timeout: {
+        ...DEFAULT_EVENT_STATE_MAP.neutral,
+        label: "TIMEOUT",
+      },
+    },
+    getState: (execution) => {
+      const state = defaultStateFunction(execution);
+      if (state !== "success") return state;
+
+      const outputs = execution.outputs as { received?: unknown[]; timeout?: unknown[] } | undefined;
+      if (outputs?.timeout && outputs.timeout.length > 0) {
+        return "timeout";
+      }
+      return "received";
+    },
+  },
 };
