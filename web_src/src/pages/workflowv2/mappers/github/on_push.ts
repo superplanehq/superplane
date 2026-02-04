@@ -48,7 +48,7 @@ export const onPushTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as Push;
+      const eventData = lastEvent.data as Push;
       const shortSha = eventData?.head_commit?.id?.slice(0, 7) || "";
       props.lastEventData = {
         title: eventData?.head_commit?.message || "",

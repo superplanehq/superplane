@@ -98,7 +98,7 @@ export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as OnIncidentStatusUpdateEventData;
+      const eventData = lastEvent.data as OnIncidentStatusUpdateEventData;
       const incident = eventData?.incident;
       const statusUpdate = eventData?.status_update;
       const subtitle = buildSubtitle(statusUpdate?.message?.substring(0, 50) || "", lastEvent.createdAt);

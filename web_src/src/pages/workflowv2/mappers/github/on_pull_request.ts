@@ -68,7 +68,7 @@ export const onPullRequestTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as OnPullRequestEventData;
+      const eventData = lastEvent.data as OnPullRequestEventData;
 
       props.lastEventData = {
         title: `#${eventData?.number} - ${eventData?.pull_request?.title}`,

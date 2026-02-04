@@ -79,7 +79,7 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as AppMentionEventData | undefined;
+      const eventData = lastEvent.data as AppMentionEventData | undefined;
       const title = eventData?.text?.trim() ? eventData.text : "App mention";
       const subtitle = buildSubtitle(eventData?.user ? `Mention by ${eventData.user}` : "Mention", lastEvent.createdAt);
 

@@ -87,7 +87,7 @@ export const onIncidentAnnotatedTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent?.data?.data as OnIncidentAnnotatedEventData;
+      const eventData = lastEvent?.data as OnIncidentAnnotatedEventData;
       const incident = eventData?.incident;
       const agent = eventData?.agent;
       const contentParts = [agent?.summary, "added note"].filter(Boolean).join(" ");

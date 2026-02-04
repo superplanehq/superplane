@@ -75,7 +75,7 @@ export const onReleaseTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as OnReleaseEventData;
+      const eventData = lastEvent.data as OnReleaseEventData;
       const assetCount = eventData?.release?.assets?.length || 0;
       const releaseName = eventData?.release?.name || eventData?.release?.tag_name || "Release";
 

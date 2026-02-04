@@ -52,14 +52,7 @@ export const onImagePushTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onImagePushTriggerRenderer.getTitleAndSubtitle({
-        event: {
-          nodeId: node.id!,
-          id: lastEvent.id!,
-          createdAt: lastEvent.createdAt!,
-          data: lastEvent.data || {},
-        },
-      });
+      const { title, subtitle } = onImagePushTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
       props.lastEventData = {
         title,
         subtitle,

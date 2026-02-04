@@ -69,7 +69,7 @@ export const onIssueCommentTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as OnIssueCommentEventData;
+      const eventData = lastEvent.data as OnIssueCommentEventData;
 
       props.lastEventData = {
         title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,

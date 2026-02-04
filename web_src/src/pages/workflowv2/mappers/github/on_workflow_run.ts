@@ -124,7 +124,7 @@ export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as OnWorkflowRunEventData;
+      const eventData = lastEvent.data as OnWorkflowRunEventData;
       const workflowName =
         eventData?.workflow_run?.display_title ||
         eventData?.workflow_run?.name ||

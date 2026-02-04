@@ -48,7 +48,7 @@ export const onBranchCreatedTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as GitRef;
+      const eventData = lastEvent.data as GitRef;
       props.lastEventData = {
         title: eventData?.ref ? `Branch: ${eventData.ref}` : "Branch Created",
         subtitle: buildGithubSubtitle(eventData?.ref || "", lastEvent.createdAt),

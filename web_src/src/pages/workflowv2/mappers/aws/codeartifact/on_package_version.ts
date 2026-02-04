@@ -69,14 +69,7 @@ export const onPackageVersionTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onPackageVersionTriggerRenderer.getTitleAndSubtitle({
-        event: {
-          nodeId: node.id!,
-          id: lastEvent.id!,
-          createdAt: lastEvent.createdAt!,
-          data: lastEvent.data || {},
-        },
-      });
+      const { title, subtitle } = onPackageVersionTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
       props.lastEventData = {
         title,
         subtitle,

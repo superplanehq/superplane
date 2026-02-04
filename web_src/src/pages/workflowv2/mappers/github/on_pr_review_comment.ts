@@ -83,7 +83,7 @@ export const onPullRequestReviewCommentTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as OnPullRequestReviewCommentEventData;
+      const eventData = lastEvent.data as OnPullRequestReviewCommentEventData;
       const prNumber = eventData?.issue?.number || "";
       const fileName = eventData?.comment?.path || "";
       const title = fileName ? `#${prNumber} - Comment on ${fileName}` : `#${prNumber} - Review Comment`;

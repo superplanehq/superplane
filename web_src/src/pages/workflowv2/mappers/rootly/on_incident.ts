@@ -70,7 +70,7 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as OnIncidentEventData;
+      const eventData = lastEvent.data as OnIncidentEventData;
       const incident = eventData?.incident;
       const contentParts = [incident?.severity?.name, incident?.status].filter(Boolean).join(" · ");
       const subtitle = buildSubtitle(contentParts, lastEvent.createdAt);

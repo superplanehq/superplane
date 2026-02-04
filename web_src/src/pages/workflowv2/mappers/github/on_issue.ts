@@ -63,7 +63,7 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as OnIssueEventData;
+      const eventData = lastEvent.data as OnIssueEventData;
 
       props.lastEventData = {
         title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,

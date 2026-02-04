@@ -48,7 +48,7 @@ export const onTagCreatedTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as GitRef;
+      const eventData = lastEvent.data as GitRef;
       props.lastEventData = {
         title: eventData?.ref ? `Tag: ${eventData.ref}` : "Tag Created",
         subtitle: buildGithubSubtitle(eventData?.ref || "", lastEvent.createdAt),
