@@ -1,7 +1,6 @@
-import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
-import { TriggerRenderer } from "../types";
+import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import { Incident } from "./types";
@@ -33,11 +32,11 @@ interface OnIncidentEventData {
  * Renderer for the "rootly.onIncident" trigger type
  */
 export const onIncidentTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as OnIncidentEventData;
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+    const eventData = context.event.data as OnIncidentEventData;
     const incident = eventData?.incident;
     const contentParts = [incident?.severity?.name, incident?.status].filter(Boolean).join(" · ");
-    const subtitle = buildSubtitle(contentParts, event.createdAt);
+    const subtitle = buildSubtitle(contentParts, context.event.createdAt!);
 
     return {
       title: incident?.title || "Incident",
@@ -45,12 +44,13 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getRootEventValues: (lastEvent: CanvasesCanvasEvent): Record<string, string> => {
-    const eventData = lastEvent.data?.data as OnIncidentEventData;
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
+    const eventData = context.event.data as OnIncidentEventData;
     return getDetailsForIncident(eventData?.incident!);
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
+  getTriggerProps: (context: TriggerRendererContext) => {
+    const { node, definition, lastEvent } = context;
     const configuration = node.configuration as { events?: string[] };
     const metadataItems = [];
 
@@ -65,7 +65,7 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
     const props: TriggerProps = {
       title: node.name!,
       iconSrc: rootlyIcon,
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: metadataItems,
     };
 
@@ -78,9 +78,9 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
       props.lastEventData = {
         title: incident?.title || "Incident",
         subtitle,
-        receivedAt: new Date(lastEvent.createdAt!),
+        receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
-        eventId: lastEvent.id!,
+        eventId: lastEvent.id,
       };
     }
 

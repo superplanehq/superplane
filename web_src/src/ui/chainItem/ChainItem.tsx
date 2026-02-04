@@ -161,8 +161,37 @@ export const ChainItem: React.FC<ChainItemProps> = ({
     }
 
     const mapper = getComponentBaseMapper(item.workflowNode.component.name);
+
     // Pass a marker to indicate this is from ChainItem, so subtitle can skip issue counts
-    const subtitle = mapper.subtitle?.(item.workflowNode, item.originalExecution, { skipIssueCounts: true });
+    const subtitle = mapper.subtitle?.({
+      node: {
+        id: item.nodeId,
+        name: item.nodeName || item.componentName,
+        componentName: item.componentName,
+        isCollapsed: item.workflowNode.isCollapsed || false,
+        configuration: item.workflowNode.configuration,
+        metadata: item.workflowNode.metadata,
+      },
+      execution: {
+        id: item.originalExecution?.id || "",
+        createdAt: item.originalExecution?.createdAt || "",
+        updatedAt: item.originalExecution?.updatedAt || "",
+        state: item.originalExecution?.state || "STATE_PENDING",
+        result: item.originalExecution?.result || "RESULT_PASSED",
+        resultReason: item.originalExecution?.resultReason || "RESULT_REASON_OK",
+        resultMessage: item.originalExecution?.resultMessage || "",
+        metadata: item.originalExecution?.metadata || {},
+        configuration: item.originalExecution?.configuration || {},
+        rootEvent: {
+          id: item.originalExecution?.rootEvent?.id || "",
+          createdAt: item.originalExecution?.rootEvent?.createdAt || "",
+          data: item.originalExecution?.rootEvent?.data || {},
+          nodeId: item.originalExecution?.rootEvent?.nodeId || "",
+        },
+      },
+      additionalData: { skipIssueCounts: true },
+    });
+
     const parts = subtitle ? subtitle.toString().split(" · ") : [];
     if (parts.length > 1) {
       return parts[0];

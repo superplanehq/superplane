@@ -1,10 +1,4 @@
-import {
-  ComponentsComponent,
-  ComponentsNode,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
-import { ComponentBaseMapper, EventStateRegistry, OutputPayload, StateFunction } from "./types";
+import { ComponentBaseContext, ComponentBaseMapper, EventStateRegistry, ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload, StateFunction, SubtitleContext } from "./types";
 import {
   ComponentBaseProps,
   EventSection,
@@ -34,7 +28,7 @@ export const IF_STATE_MAP: EventStateMap = {
   },
 };
 
-export const ifStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
+export const ifStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
   if (
@@ -74,20 +68,20 @@ export const IF_STATE_REGISTRY: EventStateRegistry = {
   getState: ifStateFunction,
 };
 
+type IfConfiguration = {
+  expression: string;
+};
+
 export const ifMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    _nodeQueueItems: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
-    const componentName = componentDefinition.name || "if";
+  props(context: ComponentBaseContext): ComponentBaseProps {  
+    const componentName = context.componentDefinition.name || "if";
+    const configuration = context.node.configuration as IfConfiguration;
+
     // Prefer expression from execution metadata (stored at execution time)
     // Fall back to node configuration if metadata is not available
-    const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
+    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const metadata = lastExecution?.metadata as Record<string, any> | undefined;
-    const expression = (metadata?.expression as string) || (node.configuration?.expression as string) || undefined;
+    const expression = (metadata?.expression as string) || (configuration.expression as string) || undefined;
     const conditions = expression ? parseExpression(expression) : [];
     const specs = expression
       ? [
@@ -101,10 +95,10 @@ export const ifMapper: ComponentBaseMapper = {
 
     return {
       iconSlug: "split",
-      collapsed: node.isCollapsed,
+      collapsed: context.node.isCollapsed,
       collapsedBackground: "bg-white",
-      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
-      eventSections: lastExecution ? getEventSections(nodes, lastExecution, componentName) : undefined,
+      title: context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Unnamed component",
+      eventSections: lastExecution ? getEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       specs: specs,
       runDisabled: false,
@@ -112,16 +106,19 @@ export const ifMapper: ComponentBaseMapper = {
       eventStateMap: getStateMap(componentName),
     };
   },
-  subtitle(_node, execution) {
-    if (!execution?.createdAt) return "";
-    return formatTimeAgo(new Date(execution.createdAt));
+
+  subtitle(context: SubtitleContext): string {
+    if (!context.execution.createdAt) return "";
+    return formatTimeAgo(new Date(context.execution.createdAt));
   },
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, node: ComponentsNode): Record<string, any> {
+
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
     const details: Record<string, any> = {};
+    const configuration = context.node.configuration as IfConfiguration;
 
     // Evaluated at
-    if (execution.createdAt) {
-      const evaluatedAt = new Date(execution.createdAt);
+    if (context.execution.createdAt) {
+      const evaluatedAt = new Date(context.execution.createdAt);
       details["Evaluated at"] = evaluatedAt.toLocaleString("en-US", {
         year: "numeric",
         month: "2-digit",
@@ -137,11 +134,11 @@ export const ifMapper: ComponentBaseMapper = {
 
     // Get the expression from execution metadata (stored at execution time)
     // Fall back to node configuration or execution configuration if metadata is not available
-    const metadata = execution.metadata as Record<string, any> | undefined;
+    const metadata = context.execution.metadata as Record<string, any> | undefined;
     const expression =
       (metadata?.expression as string) ||
-      (node.configuration?.expression as string) ||
-      (execution.configuration?.expression as string) ||
+      (configuration.expression as string) ||
+      (context.execution.configuration?.expression as string) ||
       "";
 
     // Evaluation (with values replaced) - formatted with badges and color-coded
@@ -150,23 +147,23 @@ export const ifMapper: ComponentBaseMapper = {
       // Try execution.input first, then fall back to rootEvent.data
       let inputData: any = null;
 
-      if (execution.input) {
+      if (context.execution.input) {
         // Input might be an object directly or nested
-        inputData = execution.input;
-      } else if (execution.rootEvent?.data) {
-        inputData = execution.rootEvent.data;
+        inputData = context.execution.input;
+      } else if (context.execution.rootEvent?.data) {
+        inputData = context.execution.rootEvent.data;
       }
 
       // Substitute values in the expression
       if (inputData) {
         const substitutedExpression = substituteExpressionValues(expression, inputData, {
-          root: execution.rootEvent?.data,
+          root: context.execution.rootEvent?.data,
           previousByDepth: { "1": inputData },
         });
         const parsedEvaluation = parseExpression(substitutedExpression);
 
         // Determine if the if condition evaluated to true (has outputs on "true" channel)
-        const outputs = execution.outputs as IfOutputs | undefined;
+        const outputs = context.execution.outputs as IfOutputs | undefined;
         const trueOutputs = outputs?.true;
         const hasTrueOutputs = Array.isArray(trueOutputs) && trueOutputs.length > 0;
         const passed = hasTrueOutputs;
@@ -183,7 +180,7 @@ export const ifMapper: ComponentBaseMapper = {
       } else {
         // If no input data available, show the expression as-is with badges
         const parsedExpression = parseExpression(expression);
-        const outputs = execution.outputs as IfOutputs | undefined;
+        const outputs = context.execution.outputs as IfOutputs | undefined;
         const trueOutputs = outputs?.true;
         const hasTrueOutputs = Array.isArray(trueOutputs) && trueOutputs.length > 0;
         const passed = hasTrueOutputs;
@@ -200,13 +197,13 @@ export const ifMapper: ComponentBaseMapper = {
 
     // Error (if present) - placed at the end, after Evaluation
     if (
-      execution.resultMessage &&
-      (execution.resultReason === "RESULT_REASON_ERROR" ||
-        (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
+      context.execution.resultMessage &&
+      (context.execution.resultReason === "RESULT_REASON_ERROR" ||
+        (context.execution.result === "RESULT_FAILED" && context.execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
     ) {
       details["Error"] = {
         __type: "error",
-        message: execution.resultMessage,
+        message: context.execution.resultMessage,
       };
     }
 
@@ -215,14 +212,13 @@ export const ifMapper: ComponentBaseMapper = {
 };
 
 function getEventSections(
-  nodes: ComponentsNode[],
-  execution: CanvasesCanvasNodeExecution,
+  nodes: NodeInfo[],
+  execution: ExecutionInfo,
   componentName: string,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   const eventSection: EventSection = {
     receivedAt: new Date(execution.createdAt!),

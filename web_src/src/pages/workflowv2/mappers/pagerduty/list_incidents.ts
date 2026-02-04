@@ -1,10 +1,4 @@
 import {
-  ComponentsNode,
-  ComponentsComponent,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
-import {
   ComponentBaseProps,
   EventSection,
   ComponentBaseSpec,
@@ -14,7 +8,7 @@ import {
 } from "@/ui/componentBase";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import { ComponentBaseMapper, OutputPayload, EventStateRegistry, StateFunction } from "../types";
+import { ComponentBaseMapper, OutputPayload, EventStateRegistry, StateFunction, ComponentBaseContext, SubtitleContext, ExecutionDetailsContext, NodeInfo, ExecutionInfo } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
 import { Incident, ListIncidentsConfiguration, ListIncidentsResponse } from "./types";
@@ -36,8 +30,8 @@ type ListIncidentsOutputs = {
 /**
  * Extracts the first payload from execution outputs, checking all possible channels.
  */
-function getFirstPayload(execution: CanvasesCanvasNodeExecution): OutputPayload | null {
-  const outputs = execution.outputs as ListIncidentsOutputs | undefined;
+function getFirstPayload(execution: ExecutionInfo): OutputPayload | null {
+  const outputs = execution.outputs as unknown as ListIncidentsOutputs | undefined;
   if (!outputs) return null;
 
   // Check channel-based outputs first (in severity order)
@@ -59,8 +53,8 @@ function getFirstPayload(execution: CanvasesCanvasNodeExecution): OutputPayload 
 /**
  * Determines which output channel has data, indicating the incident urgency state.
  */
-function getActiveChannel(execution: CanvasesCanvasNodeExecution): string | null {
-  const outputs = execution.outputs as ListIncidentsOutputs | undefined;
+function getActiveChannel(execution: ExecutionInfo): string | null {
+  const outputs = execution.outputs as unknown as ListIncidentsOutputs | undefined;
   if (!outputs) return null;
 
   if (outputs.high && outputs.high.length > 0) return CHANNEL_HIGH;
@@ -74,7 +68,7 @@ function getActiveChannel(execution: CanvasesCanvasNodeExecution): string | null
 /**
  * Extracts incidents from the execution payload.
  */
-function getIncidents(execution: CanvasesCanvasNodeExecution): Incident[] {
+function getIncidents(execution: ExecutionInfo): Incident[] {
   const payload = getFirstPayload(execution);
   if (!payload || !payload.data) return [];
 
@@ -85,35 +79,29 @@ function getIncidents(execution: CanvasesCanvasNodeExecution): Incident[] {
 }
 
 export const listIncidentsMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    _?: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
-    const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition.name || node.component?.name || "unknown";
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+    const componentName = context.componentDefinition.name ?? "pagerduty";
 
-    const configuration = node.configuration as unknown as ListIncidentsConfiguration;
+    const configuration = context.node.configuration as unknown as ListIncidentsConfiguration;
     const specs = getSpecs(configuration);
 
     return {
       iconSrc: pdIcon,
-      collapsedBackground: getBackgroundColorClass(componentDefinition.color),
-      collapsed: node.isCollapsed,
-      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
-      eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
-      metadata: metadataList(node),
+      collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
+      collapsed: context.node.isCollapsed,
+      title: context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Unnamed component",
+      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
+      metadata: metadataList(context.node),
       specs,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
   },
 
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    const timeAgo = formatTimeAgo(new Date(execution.createdAt!));
-    const incidents = getIncidents(execution);
+  subtitle(context: SubtitleContext): string {
+    const timeAgo = formatTimeAgo(new Date(context.execution.createdAt!));
+    const incidents = getIncidents(context.execution);
 
     if (incidents.length > 0) {
       const highCount = incidents.filter((i) => i.urgency === "high").length;
@@ -137,15 +125,15 @@ export const listIncidentsMapper: ComponentBaseMapper = {
     return `no incidents · ${timeAgo}`;
   },
 
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _: ComponentsNode): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
     const details: Record<string, any> = {};
 
     // Add "Checked at" timestamp
-    if (execution.createdAt) {
-      details["Checked at"] = new Date(execution.createdAt).toLocaleString();
+    if (context.execution.createdAt) {
+      details["Checked at"] = new Date(context.execution.createdAt).toLocaleString();
     }
 
-    const incidents = getIncidents(execution);
+    const incidents = getIncidents(context.execution);
 
     if (incidents.length === 0) {
       details["Incidents"] = [];
@@ -170,7 +158,7 @@ export const listIncidentsMapper: ComponentBaseMapper = {
   },
 };
 
-function metadataList(node: ComponentsNode): MetadataItem[] {
+function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as { services?: { id: string; name: string }[] } | undefined;
 
@@ -226,7 +214,7 @@ export const LIST_INCIDENTS_STATE_MAP: EventStateMap = {
   },
 };
 
-export const listIncidentsStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
+export const listIncidentsStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
   // Handle error states
@@ -281,13 +269,13 @@ export const LIST_INCIDENTS_STATE_REGISTRY: EventStateRegistry = {
 };
 
 function baseEventSections(
-  nodes: ComponentsNode[],
-  execution: CanvasesCanvasNodeExecution,
+  nodes: NodeInfo[],
+  execution: ExecutionInfo,
   componentName: string,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   const incidents = getIncidents(execution);
   const timeAgo = formatTimeAgo(new Date(execution.createdAt!));

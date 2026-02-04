@@ -1,6 +1,5 @@
-import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerRenderer } from "../types";
+import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { formatTimeAgo } from "@/utils/date";
@@ -36,10 +35,10 @@ interface OnPipelineDoneEventData {
  * Renderer for the "semaphore.onPipelineDone" trigger type
  */
 export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as OnPipelineDoneEventData;
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+    const eventData = context.event.data as OnPipelineDoneEventData;
     const result = eventData?.pipeline?.result || "";
-    const timeAgo = event.createdAt ? formatTimeAgo(new Date(event.createdAt)) : "";
+    const timeAgo = context.event.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
     const subtitle = result && timeAgo ? `${result} · ${timeAgo}` : result || timeAgo;
 
     return {
@@ -48,8 +47,8 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getRootEventValues: (lastEvent: CanvasesCanvasEvent): Record<string, string> => {
-    const eventData = lastEvent.data?.data as OnPipelineDoneEventData;
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
+    const eventData = context.event.data as OnPipelineDoneEventData;
     const doneAt = eventData?.pipeline?.done_at ? new Date(eventData.pipeline.done_at).toLocaleString() : "";
     const repositoryUrl = eventData?.repository?.url || "";
     const commitSha = eventData?.revision?.commit_sha || "";
@@ -66,7 +65,8 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
+  getTriggerProps: (context: TriggerRendererContext) => {
+    const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as OnPipelineDoneMetadata;
     const metadataItems = [];
 
@@ -78,10 +78,10 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
     }
 
     const props: TriggerProps = {
-      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
+      title: node.name || definition.label || "Unnamed trigger",
       iconSrc: SemaphoreLogo,
-      iconColor: getColorClass(trigger.color),
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      iconColor: getColorClass(definition.color),
+      collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: metadataItems,
     };
 
@@ -94,9 +94,9 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
       props.lastEventData = {
         title: eventData?.pipeline?.name || "",
         subtitle,
-        receivedAt: new Date(lastEvent.createdAt!),
+        receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
-        eventId: lastEvent.id!,
+        eventId: lastEvent.id,
       };
     }
 

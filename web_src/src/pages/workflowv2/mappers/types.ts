@@ -1,10 +1,4 @@
-import {
-  ComponentsComponent,
-  ComponentsNode,
-  CanvasesCanvasEvent,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
+import { CanvasNodeExecutionResult, CanvasNodeExecutionResultReason, CanvasNodeExecutionState } from "@/api-client";
 import { ComponentBaseProps, EventState, EventStateMap } from "@/ui/componentBase";
 import { TriggerProps } from "@/ui/trigger";
 import { QueryClient } from "@tanstack/react-query";
@@ -23,40 +17,80 @@ export interface TriggerRenderer {
   /**
    * Converts node and trigger metadata from the backend into props for the Trigger UI component.
    *
-   * @param node The node information
-   * @param definition The component definition
+   * @param context The context for the trigger renderer
    * @returns the props needed to render the Trigger UI component
    */
-  getTriggerProps: (node: NodeInfo, definition: ComponentDefinition, lastEvent: any) => TriggerProps;
+  getTriggerProps: (context: TriggerRendererContext) => TriggerProps;
 
   /**
    * Display values for the root event.
-   * @param event The root event from the backend
-   * @returns The values to display (can include timeline arrays for special rendering)
+   * @param context The context for the trigger event
+   * @returns The values to display
    */
-  getRootEventValues: (event: CanvasesCanvasEvent) => Record<string, any>;
+  getRootEventValues: (context: TriggerEventContext) => Record<string, any>;
 
   /**
    * Get the title and subtitle for the trigger.
-   * @param node The node from the backend
-   * @param trigger The trigger metadata from the backend
+   * @param context The context for the trigger event
    * @returns The title and subtitle to display
    */
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent) => { title: string; subtitle: string };
+  getTitleAndSubtitle: (context: TriggerEventContext) => { title: string; subtitle: string };
+}
+
+export type TriggerEventContext = {
+  event: EventInfo;
+}
+
+export type TriggerRendererContext = {
+  node: NodeInfo;
+  definition: ComponentDefinition;
+  lastEvent: EventInfo;
+}
+
+export type EventInfo = {
+  id: string;
+  createdAt: string;
+  customName?: string;
+  data: any;
+  nodeId: string;
+}
+
+export type ExecutionInfo = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  state: CanvasNodeExecutionState;
+  result: CanvasNodeExecutionResult;
+  resultReason: CanvasNodeExecutionResultReason;
+  resultMessage: string;
+  metadata: any;
+  configuration: any;
+  rootEvent: EventInfo;
+  input?: {
+    [key: string]: unknown;
+  };
+  outputs?: {
+    [key: string]: unknown;
+  };
+}
+
+export type QueueItemInfo = {
+  id: string;
+  createdAt: string;
+  rootEvent: EventInfo;
 }
 
 export interface NodeInfo {
   id: string;
   name: string;
-  configuration?: {
-    [key: string]: unknown;
-  };
-  metadata?: {
-    [key: string]: unknown;
-  };
+  componentName: string;
+  isCollapsed: boolean;
+  configuration?: unknown;
+  metadata?: unknown;
 }
 
 export interface ComponentDefinition {
+  name: string;
   label: string;
   description: string;
   icon: string;
@@ -64,26 +98,30 @@ export interface ComponentDefinition {
 }
 
 export interface ComponentBaseMapper {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    nodeQueueItems?: CanvasesCanvasNodeQueueItem[],
-    additionalData?: unknown,
-  ): ComponentBaseProps;
+  props(context: ComponentBaseContext): ComponentBaseProps;
+  subtitle(context: SubtitleContext): string | React.ReactNode;
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any>;
+}
 
-  subtitle(
-    node: ComponentsNode,
-    execution: CanvasesCanvasNodeExecution,
-    additionalData?: unknown,
-  ): string | React.ReactNode;
+export type ComponentBaseContext = {
+  nodes: NodeInfo[],
+  node: NodeInfo,
+  componentDefinition: ComponentDefinition,
+  lastExecutions: ExecutionInfo[],
+  nodeQueueItems?: QueueItemInfo[],
+  additionalData?: unknown,
+}
 
-  getExecutionDetails(
-    execution: CanvasesCanvasNodeExecution,
-    node: ComponentsNode,
-    nodes?: ComponentsNode[],
-  ): Record<string, any>;
+export type SubtitleContext = {
+  node: NodeInfo,
+  execution: ExecutionInfo,
+  additionalData?: unknown,
+}
+
+export type ExecutionDetailsContext = {
+  nodes: NodeInfo[]
+  node: NodeInfo,
+  execution: ExecutionInfo,
 }
 
 /**
@@ -91,22 +129,29 @@ export interface ComponentBaseMapper {
  * that cannot be derived from the standard parameters alone.
  */
 export interface ComponentAdditionalDataBuilder {
-  buildAdditionalData(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    workflowId: string,
-    queryClient: QueryClient,
-    organizationId?: string,
-    currentUser?: { id?: string; email?: string },
-  ): unknown;
+  buildAdditionalData(context: AdditionalDataBuilderContext): unknown;
+}
+
+export type AdditionalDataBuilderContext = {
+  nodes: NodeInfo[];
+  node: NodeInfo;
+  componentDefinition: ComponentDefinition;
+  lastExecutions: ExecutionInfo[];
+  canvasId: string;
+  queryClient: QueryClient;
+  organizationId?: string;
+  currentUser?: User;
+}
+
+export type User = {
+  id?: string;
+  email?: string;
 }
 
 /**
  * A state function that determines the current state based on execution data
  */
-export type StateFunction = (execution: CanvasesCanvasNodeExecution) => EventState;
+export type StateFunction = (execution: ExecutionInfo) => EventState;
 
 /**
  * Event state registry for components with custom state logic and styling

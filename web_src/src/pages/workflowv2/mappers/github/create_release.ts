@@ -1,11 +1,5 @@
-import {
-  ComponentsNode,
-  ComponentsComponent,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
 import { ComponentBaseProps } from "@/ui/componentBase";
-import { ComponentBaseMapper, OutputPayload } from "../types";
+import { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, OutputPayload, SubtitleContext } from "../types";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
 
@@ -24,21 +18,16 @@ interface ReleaseOutput {
 }
 
 export const createReleaseMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    queueItems: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
-    return baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
-  },
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    return buildGithubExecutionSubtitle(execution);
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
   },
 
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  subtitle(context: SubtitleContext): string {
+    return buildGithubExecutionSubtitle(context.execution);
+  },
+
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const details: Record<string, string> = {};
 
     if (outputs && outputs.default && outputs.default.length > 0) {

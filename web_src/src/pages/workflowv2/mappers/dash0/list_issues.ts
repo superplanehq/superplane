@@ -1,10 +1,4 @@
 import {
-  ComponentsNode,
-  ComponentsComponent,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
-import {
   ComponentBaseProps,
   EventSection,
   ComponentBaseSpec,
@@ -13,8 +7,7 @@ import {
   DEFAULT_EVENT_STATE_MAP,
 } from "@/ui/componentBase";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import { ComponentBaseMapper, OutputPayload, EventStateRegistry, StateFunction } from "../types";
-import { MetadataItem } from "@/ui/metadataList";
+import { ComponentBaseMapper, OutputPayload, EventStateRegistry, StateFunction, ComponentBaseContext, SubtitleContext, ExecutionDetailsContext, NodeInfo, ExecutionInfo } from "../types";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import { ListIssuesConfiguration, PrometheusResponse } from "./types";
 import { formatTimeAgo } from "@/utils/date";
@@ -37,7 +30,7 @@ type ListIssuesOutputs = {
  * Supports both the new channel-based outputs (clear/degraded/critical) and
  * the legacy default channel for backwards compatibility.
  */
-function getFirstPayload(execution: CanvasesCanvasNodeExecution): OutputPayload | null {
+function getFirstPayload(execution: ExecutionInfo): OutputPayload | null {
   const outputs = execution.outputs as ListIssuesOutputs | undefined;
   if (!outputs) return null;
 
@@ -61,7 +54,7 @@ function getFirstPayload(execution: CanvasesCanvasNodeExecution): OutputPayload 
  * Determines which output channel has data, indicating the issue state.
  * Returns the channel name or null if no output found.
  */
-function getActiveChannel(execution: CanvasesCanvasNodeExecution): string | null {
+function getActiveChannel(execution: ExecutionInfo): string | null {
   const outputs = execution.outputs as ListIssuesOutputs | undefined;
   if (!outputs) return null;
 
@@ -77,44 +70,38 @@ function getActiveChannel(execution: CanvasesCanvasNodeExecution): string | null
 }
 
 export const listIssuesMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    _?: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
-    const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition.name || node.component?.name || "unknown";
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+    const componentName = context.componentDefinition.name || "unknown";
 
-    const configuration = node.configuration as unknown as ListIssuesConfiguration;
+    const configuration = context.node.configuration as ListIssuesConfiguration;
     const specs = getSpecs(configuration);
 
     return {
       iconSrc: dash0Icon,
       collapsedBackground: "bg-white",
-      collapsed: node.isCollapsed,
-      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
-      eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
-      metadata: metadataList(node),
+      collapsed: context.node.isCollapsed,
+      title: context.node.name || context.componentDefinition.label || "Unnamed component",
+      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
+      metadata: [],
       specs,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
   },
 
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution, additionalData?: unknown): string {
+  subtitle(context: SubtitleContext): string {
     // Check if this is being called from ChainItem (which passes additionalData as undefined or a different structure)
     // For ChainItem, just return the time without counts
-    const timeAgo = formatTimeAgo(new Date(execution.createdAt!));
+    const timeAgo = formatTimeAgo(new Date(context.execution.createdAt!));
 
     // If additionalData is explicitly a marker object indicating ChainItem context, skip counts
     // Otherwise, include counts for SidebarEventItem
-    if (additionalData && typeof additionalData === "object" && "skipIssueCounts" in additionalData) {
+    if (context.additionalData && typeof context.additionalData === "object" && "skipIssueCounts" in context.additionalData) {
       return timeAgo;
     }
 
-    const { critical, degraded } = getIssueCounts(execution);
+    const { critical, degraded } = getIssueCounts(context.execution);
 
     // Build subtitle with counts and time
     const countParts: string[] = [];
@@ -133,15 +120,15 @@ export const listIssuesMapper: ComponentBaseMapper = {
     return `no issues · ${timeAgo}`;
   },
 
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _: ComponentsNode): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
     const details: Record<string, any> = {};
 
     // Add "Checked at" timestamp
-    if (execution.createdAt) {
-      details["Checked at"] = new Date(execution.createdAt).toLocaleString();
+    if (context.execution.createdAt) {
+      details["Checked at"] = new Date(context.execution.createdAt).toLocaleString();
     }
 
-    const payload = getFirstPayload(execution);
+    const payload = getFirstPayload(context.execution);
     if (!payload || !payload.data) {
       details["Issues"] = [];
       return details;
@@ -187,10 +174,6 @@ export const listIssuesMapper: ComponentBaseMapper = {
   },
 };
 
-function metadataList(_node: ComponentsNode): MetadataItem[] {
-  return [];
-}
-
 function getSpecs(configuration: ListIssuesConfiguration): ComponentBaseSpec[] | undefined {
   if (!configuration?.checkRules || configuration.checkRules.length === 0) {
     return undefined;
@@ -235,7 +218,7 @@ export const LIST_ISSUES_STATE_MAP: EventStateMap = {
   },
 };
 
-export const listIssuesStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
+export const listIssuesStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
   // Handle error states
@@ -335,7 +318,7 @@ export const LIST_ISSUES_STATE_REGISTRY: EventStateRegistry = {
   getState: listIssuesStateFunction,
 };
 
-function getIssueCounts(execution: CanvasesCanvasNodeExecution): { critical: number; degraded: number } {
+function getIssueCounts(execution: ExecutionInfo): { critical: number; degraded: number } {
   const payload = getFirstPayload(execution);
   if (!payload || !payload.data) {
     return { critical: 0, degraded: 0 };
@@ -366,13 +349,13 @@ function getIssueCounts(execution: CanvasesCanvasNodeExecution): { critical: num
 }
 
 function baseEventSections(
-  nodes: ComponentsNode[],
-  execution: CanvasesCanvasNodeExecution,
+  nodes: NodeInfo[],
+  execution: ExecutionInfo,
   componentName: string,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   const { critical, degraded } = getIssueCounts(execution);
   const timeAgo = formatTimeAgo(new Date(execution.createdAt!));

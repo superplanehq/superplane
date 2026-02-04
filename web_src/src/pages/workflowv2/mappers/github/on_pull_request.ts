@@ -1,6 +1,5 @@
-import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerRenderer } from "../types";
+import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
 import { BaseNodeMetadata, PullRequest } from "./types";
@@ -20,17 +19,17 @@ interface OnPullRequestEventData {
  * Renderer for the "github.onPullRequest" trigger
  */
 export const onPullRequestTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as OnPullRequestEventData;
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+    const eventData = context.event.data as OnPullRequestEventData;
 
     return {
       title: `#${eventData?.number} - ${eventData?.pull_request?.title}`,
-      subtitle: buildGithubSubtitle(eventData?.action || "", event.createdAt),
+      subtitle: buildGithubSubtitle(eventData?.action || "", context.event.createdAt),
     };
   },
 
-  getRootEventValues: (lastEvent: CanvasesCanvasEvent): Record<string, string> => {
-    const eventData = lastEvent.data?.data as OnPullRequestEventData;
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
+    const eventData = context.event.data as OnPullRequestEventData;
 
     return {
       URL: eventData?.pull_request?._links?.html?.href || "",
@@ -40,7 +39,8 @@ export const onPullRequestTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
+  getTriggerProps: (context: TriggerRendererContext) => {
+    const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as BaseNodeMetadata;
     const configuration = node.configuration as unknown as OnPullRequestConfiguration;
     const metadataItems = [];
@@ -60,10 +60,10 @@ export const onPullRequestTriggerRenderer: TriggerRenderer = {
     }
 
     const props: TriggerProps = {
-      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
+      title: node.name || definition.label || "Unnamed trigger",
       iconSrc: githubIcon,
-      iconColor: getColorClass(trigger.color),
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      iconColor: getColorClass(definition.color),
+      collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: metadataItems,
     };
 
@@ -73,9 +73,9 @@ export const onPullRequestTriggerRenderer: TriggerRenderer = {
       props.lastEventData = {
         title: `#${eventData?.number} - ${eventData?.pull_request?.title}`,
         subtitle: buildGithubSubtitle(eventData?.action || "", lastEvent.createdAt),
-        receivedAt: new Date(lastEvent.createdAt!),
+        receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
-        eventId: lastEvent.id!,
+        eventId: lastEvent.id,
       };
     }
 

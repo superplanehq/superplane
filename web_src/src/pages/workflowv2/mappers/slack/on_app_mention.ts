@@ -1,6 +1,5 @@
-import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { TriggerRenderer } from "../types";
+import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { formatTimeAgo } from "@/utils/date";
 import { TriggerProps } from "@/ui/trigger";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
@@ -29,10 +28,10 @@ interface AppMentionEventData {
  * Renderer for the "slack.onAppMention" trigger
  */
 export const onAppMentionTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as AppMentionEventData | undefined;
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+    const eventData = context.event.data as AppMentionEventData | undefined;
     const title = eventData?.text?.trim() ? eventData.text : "App mention";
-    const subtitle = buildSubtitle(eventData?.user ? `Mention by ${eventData.user}` : "Mention", event.createdAt);
+    const subtitle = buildSubtitle(eventData?.user ? `Mention by ${eventData.user}` : "Mention", context.event.createdAt!);
 
     return {
       title,
@@ -40,8 +39,8 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getRootEventValues: (event: CanvasesCanvasEvent): Record<string, string> => {
-    const eventData = event.data?.data as AppMentionEventData | undefined;
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
+    const eventData = context.event.data as AppMentionEventData | undefined;
     const mentionedAt = formatSlackTimestamp(eventData?.ts || eventData?.event_ts);
 
     return {
@@ -53,7 +52,8 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
+  getTriggerProps: (context: TriggerRendererContext) => {
+    const { node, definition, lastEvent } = context;
     const metadata = node.metadata as OnAppMentionMetadata | undefined;
     const configuration = node.configuration as OnAppMentionConfiguration | undefined;
     const metadataItems = [];
@@ -67,11 +67,11 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
     }
 
     const props: TriggerProps = {
-      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
+      title: node.name || definition.label || "Unnamed trigger",
       iconSrc: slackIcon,
       iconSlug: "slack",
-      iconColor: getColorClass(trigger.color),
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      iconColor: getColorClass(definition.color),
+      collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: metadataItems,
     };
 
@@ -83,9 +83,9 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
       props.lastEventData = {
         title,
         subtitle,
-        receivedAt: new Date(lastEvent.createdAt!),
+        receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
-        eventId: lastEvent.id!,
+        eventId: lastEvent.id,
       };
     }
 

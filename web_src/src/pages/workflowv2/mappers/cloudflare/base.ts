@@ -1,41 +1,29 @@
-import {
-  ComponentsNode,
-  ComponentsComponent,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import { ComponentBaseMapper, OutputPayload } from "../types";
+import { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload, SubtitleContext } from "../types";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import { formatTimeAgo } from "@/utils/date";
 
 export const baseMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    _?: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
-    const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition.name ?? "cloudflare";
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+    const componentName = context.componentDefinition.name ?? "cloudflare";
 
     return {
       iconSrc: cloudflareIcon,
-      iconSlug: componentDefinition?.icon ?? "cloud",
+      iconSlug: context.componentDefinition?.icon ?? "cloud",
       collapsedBackground: "bg-white",
-      collapsed: node.isCollapsed,
-      title: node.name || componentDefinition?.label || componentDefinition?.name || "Cloudflare",
-      eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
+      collapsed: context.node.isCollapsed,
+      title: context.node.name || context.componentDefinition?.label || "Cloudflare",
+      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
   },
 
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const payload = outputs?.default?.[0];
 
     if (payload?.type) {
@@ -49,20 +37,20 @@ export const baseMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    const timestamp = execution.updatedAt || execution.createdAt;
+  subtitle(context: SubtitleContext): string {
+    const timestamp = context.execution.updatedAt || context.execution.createdAt;
     return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
   },
 };
 
 function baseEventSections(
-  nodes: ComponentsNode[],
-  execution: CanvasesCanvasNodeExecution,
+  nodes: NodeInfo[],
+  execution: ExecutionInfo,
   componentName: string,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : "";
 

@@ -4,6 +4,8 @@ import {
   ComponentAdditionalDataBuilder,
   EventStateRegistry,
   CustomFieldRenderer,
+  TriggerRendererContext,
+  TriggerEventContext,
 } from "./types";
 import { ComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
 import { defaultTriggerRenderer } from "./default";
@@ -85,6 +87,7 @@ import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./
 import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 import { startTriggerRenderer } from "./start";
+import { buildExecutionInfo, buildNodeInfo } from "../utils";
 
 /**
  * Registry mapping trigger names to their renderers.
@@ -307,15 +310,19 @@ export function getExecutionDetails(
     }
   }
 
-  return mapper?.getExecutionDetails?.(execution, node, nodes);
+  return mapper?.getExecutionDetails?.({
+    execution: buildExecutionInfo(execution),
+    node: buildNodeInfo(node),
+    nodes: nodes?.map((n) => buildNodeInfo(n)) || [],
+  });
 }
 
 function withCustomName(renderer: TriggerRenderer): TriggerRenderer {
   return {
     ...renderer,
-    getTriggerProps: (node, trigger, lastEvent) => {
-      const props = renderer.getTriggerProps(node, trigger, lastEvent);
-      const customName = lastEvent?.customName?.trim();
+    getTriggerProps: (context: TriggerRendererContext) => {
+      const props = renderer.getTriggerProps(context);
+      const customName = context.lastEvent?.customName?.trim();
       if (customName && props.lastEventData) {
         return {
           ...props,
@@ -328,9 +335,9 @@ function withCustomName(renderer: TriggerRenderer): TriggerRenderer {
 
       return props;
     },
-    getTitleAndSubtitle: (event) => {
-      const { title, subtitle } = renderer.getTitleAndSubtitle(event);
-      const customName = event.customName?.trim();
+    getTitleAndSubtitle: (context: TriggerEventContext) => {
+      const { title, subtitle } = renderer.getTitleAndSubtitle(context);
+      const customName = context.event.customName?.trim();
       if (customName) {
         return { title: customName, subtitle };
       }

@@ -1,16 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
-  ComponentsComponent,
-  ComponentsNode,
   GroupsGroup,
   RolesRole,
   SuperplaneUsersUser,
   groupsListGroupUsers,
   canvasesInvokeNodeExecutionAction,
   CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
-import { ComponentAdditionalDataBuilder, ComponentBaseMapper, EventStateRegistry, StateFunction } from "./types";
+import { AdditionalDataBuilderContext, ComponentAdditionalDataBuilder, ComponentBaseContext, ComponentBaseMapper, EventStateRegistry, ExecutionDetailsContext, ExecutionInfo, NodeInfo, StateFunction, SubtitleContext } from "./types";
 import {
   ComponentBaseProps,
   ComponentBaseSpec,
@@ -30,6 +27,10 @@ import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { formatTimeAgo } from "@/utils/date";
 import { showErrorToast } from "@/utils/toast";
+
+type ApprovalConfiguration = {
+  items: ApprovalItem[];
+};
 
 type ApprovalItem = {
   type: string;
@@ -131,47 +132,44 @@ export const APPROVAL_STATE_REGISTRY: EventStateRegistry = {
 };
 
 export const approvalMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    _?: CanvasesCanvasNodeQueueItem[],
-    additionalData?: unknown,
-  ): ComponentBaseProps {
-    const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const items = (node.configuration?.items || []) as ApprovalItem[];
-    const approvals = (additionalData as { approvals?: ApprovalItemProps[] })?.approvals || [];
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+    const configuration = context.node.configuration as ApprovalConfiguration;
+    const items = (configuration.items || []) as ApprovalItem[];
+    const approvals = (context.additionalData as { approvals?: ApprovalItemProps[] })?.approvals || [];
+
     return {
-      iconSlug: componentDefinition.icon || "hand",
+      iconSlug: context.componentDefinition.icon || "hand",
       iconColor: getColorClass("black"),
       collapsedBackground: getBackgroundColorClass("orange"),
-      collapsed: node.isCollapsed,
-      title: node.name || componentDefinition?.label || "Approval",
-      eventSections: lastExecution ? getApprovalEventSections(nodes, lastExecution, additionalData) : undefined,
+      collapsed: context.node.isCollapsed,
+      title: context.node.name || context.componentDefinition?.label || "Approval",
+      eventSections: lastExecution ? getApprovalEventSections(context.nodes, lastExecution, context.additionalData) : undefined,
       includeEmptyState: !lastExecution,
-      specs: getApprovalSpecs(items, additionalData),
+      specs: getApprovalSpecs(items, context.additionalData),
       customField: getApprovalCustomField(lastExecution, approvals),
       eventStateMap: APPROVAL_STATE_MAP,
     };
   },
-  subtitle(node, execution, additionalData) {
-    return getComponentSubtitle(node, execution, additionalData);
+
+  subtitle(context: SubtitleContext): string | React.ReactNode {
+    return getComponentSubtitle(context.execution, context.additionalData);
   },
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, any> {
+
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
     const details: Record<string, any> = {};
-    const metadata = execution.metadata as Record<string, unknown> | undefined;
+    const metadata = context.execution.metadata as Record<string, unknown> | undefined;
     const records = (metadata?.records as ApprovalRecord[] | undefined) || [];
 
-    if (execution.createdAt) {
-      details["Started at"] = new Date(execution.createdAt).toLocaleString();
+    if (context.execution.createdAt) {
+      details["Started at"] = new Date(context.execution.createdAt).toLocaleString();
     }
 
-    if (execution.state === "STATE_FINISHED" && execution.updatedAt) {
-      details["Finished at"] = new Date(execution.updatedAt).toLocaleString();
+    if (context.execution.state === "STATE_FINISHED" && context.execution.updatedAt) {
+      details["Finished at"] = new Date(context.execution.updatedAt).toLocaleString();
     }
 
-    if (execution.result !== "RESULT_CANCELLED") {
+    if (context.execution.result !== "RESULT_CANCELLED") {
       details["Approvals"] = buildApprovalTimeline(records);
     }
 
@@ -180,10 +178,11 @@ export const approvalMapper: ComponentBaseMapper = {
 };
 
 function getApprovalCustomField(
-  lastExecution: CanvasesCanvasNodeExecution | null,
+  lastExecution: ExecutionInfo | null,
   approvals: ApprovalItemProps[],
 ): React.ReactNode | undefined {
   const isAwaitingApproval = ["STATE_STARTED", "STATE_PENDING"].includes(lastExecution?.state || "");
+  if (!lastExecution) return;
   if (!isAwaitingApproval || approvals.length == 0) return;
   return React.createElement(ApprovalGroup, { approvals, awaitingApproval: isAwaitingApproval });
 }
@@ -237,15 +236,15 @@ function getApprovalSpecs(items: ApprovalItem[], additionalData?: unknown): Comp
 }
 
 function getApprovalEventSections(
-  nodes: ComponentsNode[],
-  execution: CanvasesCanvasNodeExecution,
+  nodes: NodeInfo[],
+  execution: ExecutionInfo,
   additionalData?: unknown,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  const { title: eventTitle } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title: eventTitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
-  const eventSubtitle = getComponentSubtitle({} as ComponentsNode, execution, additionalData);
+  const eventSubtitle = getComponentSubtitle(execution, additionalData);
 
   const eventSection: EventSection = {
     receivedAt: new Date(execution.createdAt!),
@@ -259,8 +258,7 @@ function getApprovalEventSections(
 }
 
 function getComponentSubtitle(
-  _node: ComponentsNode,
-  execution: CanvasesCanvasNodeExecution,
+  execution: ExecutionInfo,
   additionalData?: unknown,
 ): string | React.ReactNode {
   // Show progress for in-progress approvals
@@ -399,16 +397,8 @@ type ApprovalRecord = {
 };
 
 export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
-  buildAdditionalData(
-    _nodes: ComponentsNode[],
-    node: ComponentsNode,
-    _componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    workflowId: string,
-    queryClient: QueryClient,
-    organizationId?: string,
-    currentUser?: { id?: string; email?: string },
-  ) {
+  buildAdditionalData(context: AdditionalDataBuilderContext) {
+    const { node, lastExecutions, canvasId, queryClient, organizationId, currentUser } = context;
     const execution = lastExecutions.length > 0 ? lastExecutions[0] : null;
     const executionMetadata = execution?.metadata as Record<string, unknown> | undefined;
     const usersById: Record<string, { email?: string; name?: string }> = {};
@@ -568,7 +558,7 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
             await canvasesInvokeNodeExecutionAction(
               withOrganizationHeader({
                 path: {
-                  canvasId: workflowId,
+                  canvasId: canvasId,
                   executionId: execution.id,
                   actionName: "approve",
                 },
@@ -582,7 +572,7 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
             );
 
             queryClient.invalidateQueries({
-              queryKey: canvasKeys.nodeExecution(workflowId, node.id!),
+              queryKey: canvasKeys.nodeExecution(canvasId, node.id!),
             });
           } catch (_error) {
             showErrorToast("Failed to approve");
@@ -595,7 +585,7 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
             await canvasesInvokeNodeExecutionAction(
               withOrganizationHeader({
                 path: {
-                  canvasId: workflowId,
+                  canvasId: canvasId,
                   executionId: execution.id,
                   actionName: "reject",
                 },
@@ -609,7 +599,7 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
             );
 
             queryClient.invalidateQueries({
-              queryKey: canvasKeys.nodeExecution(workflowId, node.id!),
+              queryKey: canvasKeys.nodeExecution(canvasId, node.id!),
             });
           } catch (_error) {
             showErrorToast("Failed to reject");

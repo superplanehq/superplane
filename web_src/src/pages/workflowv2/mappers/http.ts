@@ -1,10 +1,4 @@
-import {
-  ComponentsComponent,
-  ComponentsNode,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
-import { ComponentBaseMapper, EventStateRegistry } from "./types";
+import { ComponentBaseContext, ComponentBaseMapper, EventStateRegistry, ExecutionDetailsContext, ExecutionInfo, NodeInfo, SubtitleContext } from "./types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventStateMap, EventState } from "@/ui/componentBase";
 import { getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
@@ -64,7 +58,7 @@ const HTTP_EVENT_STATE_MAP: EventStateMap = {
 };
 
 // Custom state function for HTTP component
-const httpStateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
+const httpStateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
   if (
@@ -113,35 +107,29 @@ export const HTTP_STATE_REGISTRY: EventStateRegistry = {
 };
 
 export const httpMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    _items?: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
+  props(context: ComponentBaseContext): ComponentBaseProps {
     return {
-      iconSlug: componentDefinition.icon || "globe",
+      iconSlug: context.componentDefinition.icon || "globe",
       iconColor: getColorClass("black"),
-      collapsed: node.isCollapsed,
+      collapsed: context.node.isCollapsed,
       collapsedBackground: "bg-white",
-      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
-      eventSections: lastExecutions[0] ? getHTTPEventSections(nodes, lastExecutions[0], httpStateFunction) : undefined,
-      includeEmptyState: !lastExecutions[0],
-      metadata: getHTTPMetadataList(node),
-      specs: getHTTPSpecs(node),
+      title: context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Unnamed component",
+      eventSections: context.lastExecutions[0] ? getHTTPEventSections(context.nodes, context.lastExecutions[0], httpStateFunction) : undefined,
+      includeEmptyState: !context.lastExecutions[0],
+      metadata: getHTTPMetadataList(context.node),
+      specs: getHTTPSpecs(context.node),
       eventStateMap: HTTP_EVENT_STATE_MAP,
     };
   },
 
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
-    const metadata = execution.metadata as Record<string, unknown> | undefined;
+    const metadata = context.execution.metadata as Record<string, unknown> | undefined;
 
     if (metadata?.finalStatus !== undefined && metadata.finalStatus !== null) {
       details["Response"] = metadata.finalStatus.toString();
     } else {
-      const outputs = execution.outputs as Record<string, unknown>;
+      const outputs = context.execution.outputs as Record<string, unknown>;
       const defaultArray = outputs?.default as unknown[];
       const response = defaultArray?.[0] as {
         data?: {
@@ -157,9 +145,9 @@ export const httpMapper: ComponentBaseMapper = {
       details["Retries"] = metadata.totalRetries.toString();
     }
 
-    if (execution.createdAt && execution.updatedAt) {
-      const startTime = new Date(execution.createdAt);
-      const endTime = new Date(execution.updatedAt);
+    if (context.execution.createdAt && context.execution.updatedAt) {
+      const startTime = new Date(context.execution.createdAt);
+      const endTime = new Date(context.execution.updatedAt);
       const durationMs = endTime.getTime() - startTime.getTime();
 
       if (durationMs < 1000) {
@@ -174,8 +162,8 @@ export const httpMapper: ComponentBaseMapper = {
     }
 
     // Time finished
-    if (execution.updatedAt) {
-      const finishedTime = new Date(execution.updatedAt);
+    if (context.execution.updatedAt) {
+      const finishedTime = new Date(context.execution.updatedAt);
       details["Time Finished"] = finishedTime.toLocaleDateString("en-US", {
         year: "numeric",
         month: "long",
@@ -190,13 +178,13 @@ export const httpMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    const state = httpStateFunction(execution);
+  subtitle(context: SubtitleContext): string {
+    const state = httpStateFunction(context.execution);
 
     // For running state, show duration
     if (state === "running") {
-      if (execution.createdAt) {
-        const startTime = new Date(execution.createdAt);
+      if (context.execution.createdAt) {
+        const startTime = new Date(context.execution.createdAt);
         const now = new Date();
         const durationMs = now.getTime() - startTime.getTime();
 
@@ -212,7 +200,7 @@ export const httpMapper: ComponentBaseMapper = {
 
     // For success/failed states, show response code and time
     if (state === "success" || state === "failed") {
-      const metadata = execution.metadata as Record<string, unknown> | undefined;
+      const metadata = context.execution.metadata as Record<string, unknown> | undefined;
       let responseCode: string | null = null;
 
       // Try to get response code from metadata first
@@ -220,7 +208,7 @@ export const httpMapper: ComponentBaseMapper = {
         responseCode = metadata.finalStatus.toString();
       } else {
         // Fallback to outputs
-        const outputs = execution.outputs as Record<string, unknown>;
+        const outputs = context.execution.outputs as Record<string, unknown>;
         const defaultArray = outputs?.default as unknown[];
         const response = defaultArray?.[0] as {
           data?: { status?: number };
@@ -230,7 +218,7 @@ export const httpMapper: ComponentBaseMapper = {
         }
       }
 
-      const timeAgo = execution.updatedAt ? formatTimeAgo(new Date(execution.updatedAt)) : "";
+      const timeAgo = context.execution.updatedAt ? formatTimeAgo(new Date(context.execution.updatedAt)) : "";
 
       if (responseCode && timeAgo) {
         return `Response: ${responseCode} · ${timeAgo}`;
@@ -242,33 +230,34 @@ export const httpMapper: ComponentBaseMapper = {
     }
 
     // Fallback: just show time ago
-    if (execution.updatedAt) {
-      return formatTimeAgo(new Date(execution.updatedAt));
+    if (context.execution.updatedAt) {
+      return formatTimeAgo(new Date(context.execution.updatedAt));
     }
 
     return "";
   },
 };
 
-function getHTTPMetadataList(node: ComponentsNode): MetadataItem[] {
+function getHTTPMetadataList(node: NodeInfo): MetadataItem[] {
+  const configuration = node.configuration as HTTPConfiguration;
   const metadata: Array<{ icon: string; label: string }> = [];
 
   // Method and URL
-  if (node.configuration?.url && node.configuration.method) {
+  if (configuration.url && configuration.method) {
     metadata.push({
       icon: "link",
-      label: `${node.configuration.method} ${node.configuration.url}`,
+      label: `${configuration.method} ${configuration.url}`,
     });
   }
 
   // Request body information
-  const contentType = node.configuration?.contentType;
+  const contentType = configuration.contentType;
   if (
     contentType &&
     node.configuration &&
-    (node.configuration.method === "POST" ||
-      node.configuration.method === "PUT" ||
-      node.configuration.method === "PATCH")
+    (configuration.method === "POST" ||
+      configuration.method === "PUT" ||
+      configuration.method === "PATCH")
   ) {
     let bodyLabel = "";
 
@@ -296,7 +285,7 @@ function getHTTPMetadataList(node: ComponentsNode): MetadataItem[] {
   }
 
   // Headers count
-  const headers = node.configuration?.headers as Array<{ name: string; value: string }> | undefined;
+  const headers = configuration.headers as Array<{ name: string; value: string }> | undefined;
   if (headers && headers.length > 0) {
     metadata.push({
       icon: "code",
@@ -305,9 +294,9 @@ function getHTTPMetadataList(node: ComponentsNode): MetadataItem[] {
   }
 
   // Retry configuration
-  const timeoutStrategy = node.configuration?.timeoutStrategy;
-  const retries = node.configuration?.retries as number | undefined;
-  const timeoutSeconds = node.configuration?.timeoutSeconds as number | undefined;
+  const timeoutStrategy = configuration.timeoutStrategy;
+  const retries = configuration.retries as number | undefined;
+  const timeoutSeconds = configuration.timeoutSeconds as number | undefined;
 
   if (timeoutStrategy && retries !== undefined && timeoutSeconds !== undefined) {
     const retriesText = retries === 0 ? "No retries" : `${retries} ${retries === 1 ? "retry" : "retries"}`;
@@ -325,91 +314,102 @@ function getHTTPMetadataList(node: ComponentsNode): MetadataItem[] {
   return metadata;
 }
 
-function getHTTPSpecs(node: ComponentsNode): ComponentBaseSpec[] {
-  const specs: ComponentBaseSpec[] = [];
+type HTTPConfiguration = {
+  url: string;
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  contentType: "application/json" | "application/xml" | "text/plain" | "application/x-www-form-urlencoded";
+  headers: Array<{ name: string; value: string }>;
+  json?: any;
+  formData?: Array<{ key: string; value: string }>;
+  text?: string;
+  xml?: string;
+  timeoutStrategy: "fixed" | "exponential";
+  timeoutSeconds: number;
+  retries: number;
+};
 
-  const sendBody = node.configuration?.sendBody;
-  const contentType = node.configuration?.contentType || "application/json";
+function getHTTPSpecs(node: NodeInfo): ComponentBaseSpec[] {
+  const specs: ComponentBaseSpec[] = [];
+  const configuration = node.configuration as HTTPConfiguration;
+
+  const contentType = configuration.contentType || "application/json";
 
   // Show payload based on content type if sendBody is enabled
-  if (sendBody) {
-    let payload: unknown = null;
-    let payloadIcon = "file-json";
-    let payloadTitle = "payload";
-    let tooltipContentType: "json" | "xml" | "text" = "json";
+  let payload: unknown = null;
+  let payloadIcon = "file-json";
+  let payloadTitle = "payload";
+  let tooltipContentType: "json" | "xml" | "text" = "json";
 
-    switch (contentType) {
-      case "application/json":
-        payload = node.configuration?.json;
-        payloadIcon = "file-json";
-        payloadTitle = "json payload";
-        tooltipContentType = "json";
-        break;
-      case "application/x-www-form-urlencoded":
-        payload = node.configuration?.formData;
-        payloadIcon = "list";
-        payloadTitle = "form data";
-        tooltipContentType = "json"; // Form data is shown as badges, not tooltip
-        break;
-      case "text/plain":
-        payload = node.configuration?.text;
-        payloadIcon = "file-text";
-        payloadTitle = "text payload";
-        tooltipContentType = "text";
-        break;
-      case "application/xml":
-        payload = node.configuration?.xml;
-        payloadIcon = "file-code";
-        payloadTitle = "xml payload";
-        tooltipContentType = "xml";
-        break;
-    }
+  switch (contentType) {
+    case "application/json":
+      payload = configuration.json;
+      payloadIcon = "file-json";
+      payloadTitle = "json payload";
+      tooltipContentType = "json";
+      break;
+    case "application/x-www-form-urlencoded":
+      payload = configuration.formData;
+      payloadIcon = "list";
+      payloadTitle = "form data";
+      tooltipContentType = "json"; // Form data is shown as badges, not tooltip
+      break;
+    case "text/plain":
+      payload = configuration.text;
+      payloadIcon = "file-text";
+      payloadTitle = "text payload";
+      tooltipContentType = "text";
+      break;
+    case "application/xml":
+      payload = configuration.xml;
+      payloadIcon = "file-code";
+      payloadTitle = "xml payload";
+      tooltipContentType = "xml";
+      break;
+  }
 
-    // Only show payload spec if there's actual content
-    if (payload) {
-      const hasContent =
-        (typeof payload === "object" && !Array.isArray(payload) && Object.keys(payload).length > 0) ||
-        (typeof payload === "string" && payload.length > 0) ||
-        (Array.isArray(payload) && payload.length > 0);
+  // Only show payload spec if there's actual content
+  if (payload) {
+    const hasContent =
+      (typeof payload === "object" && !Array.isArray(payload) && Object.keys(payload).length > 0) ||
+      (typeof payload === "string" && payload.length > 0) ||
+      (Array.isArray(payload) && payload.length > 0);
 
-      if (hasContent) {
-        // For form data, show as badges like headers
-        if (contentType === "application/x-www-form-urlencoded" && Array.isArray(payload)) {
-          specs.push({
-            title: payloadTitle,
-            tooltipTitle: "form data parameters",
-            iconSlug: payloadIcon,
-            values: payload.map((param: { key: string; value: string }) => ({
-              badges: [
-                {
-                  label: param.key,
-                  bgColor: "bg-green-100",
-                  textColor: "text-green-800",
-                },
-                {
-                  label: param.value,
-                  bgColor: "bg-gray-100",
-                  textColor: "text-gray-800",
-                },
-              ],
-            })),
-          });
-        } else {
-          specs.push({
-            title: payloadTitle,
-            tooltipTitle: `request ${payloadTitle}`,
-            iconSlug: payloadIcon,
-            value: payload,
-            contentType: tooltipContentType,
-          });
-        }
+    if (hasContent) {
+      // For form data, show as badges like headers
+      if (contentType === "application/x-www-form-urlencoded" && Array.isArray(payload)) {
+        specs.push({
+          title: payloadTitle,
+          tooltipTitle: "form data parameters",
+          iconSlug: payloadIcon,
+          values: payload.map((param: { key: string; value: string }) => ({
+            badges: [
+              {
+                label: param.key,
+                bgColor: "bg-green-100",
+                textColor: "text-green-800",
+              },
+              {
+                label: param.value,
+                bgColor: "bg-gray-100",
+                textColor: "text-gray-800",
+              },
+            ],
+          })),
+        });
+      } else {
+        specs.push({
+          title: payloadTitle,
+          tooltipTitle: `request ${payloadTitle}`,
+          iconSlug: payloadIcon,
+          value: payload,
+          contentType: tooltipContentType,
+        });
       }
     }
   }
 
-  const sendHeaders = node.configuration?.sendHeaders;
-  const headers = node.configuration?.headers as Array<{ name: string; value: string }> | undefined;
-  if (sendHeaders && headers && headers.length > 0) {
+  const headers = configuration.headers as Array<{ name: string; value: string }> | undefined;
+  if (headers && headers.length > 0) {
     specs.push({
       title: "header",
       tooltipTitle: "request headers",
@@ -435,13 +435,13 @@ function getHTTPSpecs(node: ComponentsNode): ComponentBaseSpec[] {
 }
 
 function getHTTPEventSections(
-  nodes: ComponentsNode[],
-  execution: CanvasesCanvasNodeExecution,
-  stateFunction: (execution: CanvasesCanvasNodeExecution) => EventState,
+  nodes: NodeInfo[],
+  execution: ExecutionInfo,
+  stateFunction: (execution: ExecutionInfo) => EventState,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   const generateEventSubtitle = (): string => {
     const state = stateFunction(execution);

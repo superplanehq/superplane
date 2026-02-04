@@ -1,39 +1,27 @@
-import {
-  ComponentsNode,
-  ComponentsComponent,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import { ComponentBaseMapper, OutputPayload } from "../types";
+import { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload, SubtitleContext } from "../types";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import { formatTimeAgo } from "@/utils/date";
 
 export const baseMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    _?: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
-    const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition.name!;
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+    const componentName = context.componentDefinition.name || "unknown";
 
     return {
       iconSrc: daytonaIcon,
       collapsedBackground: "bg-white",
-      collapsed: node.isCollapsed,
-      title: node.name!,
-      eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
+      collapsed: context.node.isCollapsed,
+      title: context.node.name || context.componentDefinition.label || "Unnamed component",
+      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
   },
 
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _: ComponentsNode): Record<string, string> {
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
 
     if (!outputs || !outputs.default || outputs.default.length === 0) {
       return { Response: "No data returned" };
@@ -60,20 +48,20 @@ export const baseMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    if (!execution.createdAt) return "";
-    return formatTimeAgo(new Date(execution.createdAt));
+  subtitle(context: SubtitleContext): string {
+    if (!context.execution.createdAt) return "";
+    return formatTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
 function baseEventSections(
-  nodes: ComponentsNode[],
-  execution: CanvasesCanvasNodeExecution,
+  nodes: NodeInfo[],
+  execution: ExecutionInfo,
   componentName: string,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [
     {

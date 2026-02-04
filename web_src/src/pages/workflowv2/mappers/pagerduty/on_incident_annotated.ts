@@ -1,7 +1,6 @@
-import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
-import { TriggerRenderer } from "../types";
+import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
 import { Agent, ResourceRef } from "./types";
@@ -42,12 +41,12 @@ interface OnIncidentAnnotatedEventData {
  * Renderer for the "pagerduty.onIncidentAnnotated" trigger type
  */
 export const onIncidentAnnotatedTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as OnIncidentAnnotatedEventData;
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+    const eventData = context.event.data?.data as OnIncidentAnnotatedEventData;
     const incident = eventData?.incident;
     const agent = eventData?.agent;
     const contentParts = [agent?.summary, "added note"].filter(Boolean).join(" ");
-    const subtitle = buildSubtitle(contentParts, event.createdAt);
+    const subtitle = buildSubtitle(contentParts, context.event.createdAt!);
 
     return {
       title: `${incident?.id || ""} - ${incident?.title || ""}`,
@@ -55,12 +54,13 @@ export const onIncidentAnnotatedTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getRootEventValues: (lastEvent: CanvasesCanvasEvent): Record<string, string> => {
-    const eventData = lastEvent.data?.data as OnIncidentAnnotatedEventData;
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
+    const eventData = context.event.data?.data as OnIncidentAnnotatedEventData;
     return getDetailsForAnnotatedIncident(eventData?.incident, eventData?.agent, eventData?.annotation);
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
+  getTriggerProps: (context: TriggerRendererContext) => {
+    const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as OnIncidentAnnotatedMetadata;
     const configuration = node.configuration as any;
     const metadataItems = [];
@@ -82,7 +82,7 @@ export const onIncidentAnnotatedTriggerRenderer: TriggerRenderer = {
     const props: TriggerProps = {
       title: node.name!,
       iconSrc: pdIcon,
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: metadataItems,
     };
 
@@ -96,9 +96,9 @@ export const onIncidentAnnotatedTriggerRenderer: TriggerRenderer = {
       props.lastEventData = {
         title: `${incident?.id || ""} - ${incident?.title || ""}`,
         subtitle,
-        receivedAt: new Date(lastEvent.createdAt!),
+        receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
-        eventId: lastEvent.id!,
+        eventId: lastEvent.id,
       };
     }
 

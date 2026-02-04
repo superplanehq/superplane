@@ -1,8 +1,7 @@
-import { CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass } from "@/utils/colors";
 import { formatTimestampInUserTimezone } from "@/utils/timezone";
 import { getNextCronExecution } from "@/utils/cron";
-import { TriggerRenderer, CustomFieldRenderer, NodeInfo, ComponentDefinition } from "./types";
+import { TriggerRenderer, CustomFieldRenderer, NodeInfo, TriggerRendererContext, TriggerEventContext } from "./types";
 import { TriggerProps } from "@/ui/trigger";
 import React from "react";
 import { formatTimeAgo } from "@/utils/date";
@@ -22,6 +21,10 @@ interface ScheduleConfiguration {
   dayOfMonth?: number;
   cronExpression?: string;
   timezone?: string;
+}
+
+interface ScheduleMetadata {
+  nextTrigger?: string;
 }
 
 function formatScheduleDescription(configuration: ScheduleConfiguration): string {
@@ -309,8 +312,8 @@ function formatNextTrigger(configuration: ScheduleConfiguration, metadata?: { ne
  * Renderer for the "schedule" trigger type
  */
 export const scheduleTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    const eventDate = new Date(event.createdAt!);
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+    const eventDate = new Date(context.event.createdAt);
     const formattedDate = eventDate.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
@@ -327,13 +330,14 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getRootEventValues: (event: CanvasesCanvasEvent): Record<string, string> => {
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     return {
-      Timestamp: (event.data?.["timestamp"] as string) || "n/a",
+      Timestamp: (context.event.data?.["timestamp"] as string) || "n/a",
     };
   },
 
-  getTriggerProps: (node: NodeInfo, definition: ComponentDefinition, lastEvent?: CanvasesCanvasEvent) => {
+  getTriggerProps: (context: TriggerRendererContext) => {
+    const { node, definition, lastEvent } = context;
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSlug: definition.icon,
@@ -342,17 +346,17 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
       metadata: [
         {
           icon: "calendar-cog",
-          label: formatScheduleDescription(node.configuration as unknown as ScheduleConfiguration),
+          label: formatScheduleDescription(node.configuration as ScheduleConfiguration),
         },
         {
           icon: "arrow-big-right",
-          label: formatNextTrigger(node.configuration as unknown as ScheduleConfiguration, node.metadata),
+          label: formatNextTrigger(node.configuration as ScheduleConfiguration, node.metadata as ScheduleMetadata),
         },
       ],
     };
 
     if (lastEvent) {
-      const eventDate = new Date(lastEvent.createdAt!);
+      const eventDate = new Date(lastEvent.createdAt);
       const formattedDate = eventDate.toLocaleDateString("en-US", {
         year: "numeric",
         month: "short",
@@ -365,10 +369,10 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
 
       props.lastEventData = {
         title: `Schedule: ${formattedDate}`,
-        subtitle: formatTimeAgo(new Date(lastEvent.createdAt!)),
-        receivedAt: new Date(lastEvent.createdAt!),
+        subtitle: formatTimeAgo(new Date(lastEvent.createdAt)),
+        receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
-        eventId: lastEvent.id!,
+        eventId: lastEvent.id,
       };
     }
 
