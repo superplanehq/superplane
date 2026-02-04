@@ -39,7 +39,7 @@ export const listReleasesMapper: ComponentBaseMapper = {
     const outputs = execution.outputs as { releases?: OutputPayload[] } | undefined;
     const details: Record<string, string> = {};
 
-    if (outputs && outputs.releases) {
+    if (outputs && outputs.releases && outputs.releases.length > 0) {
       const releases = outputs.releases[0].data as ReleaseOutput[];
       details["Total Releases"] = releases.length.toString();
 

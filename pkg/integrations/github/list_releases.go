@@ -159,10 +159,11 @@ func (c *ListReleases) Execute(ctx core.ExecutionContext) error {
 		output[i] = r
 	}
 
+	// Emit as a single payload containing the slice
 	return ctx.ExecutionState.Emit(
 		"releases",
 		"github.release",
-		output,
+		[]any{output},
 	)
 }
 
