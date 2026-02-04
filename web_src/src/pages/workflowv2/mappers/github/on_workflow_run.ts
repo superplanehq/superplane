@@ -53,7 +53,7 @@ interface OnWorkflowRunEventData {
  */
 export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event.data as OnWorkflowRunEventData;
+    const eventData = context.event?.data as OnWorkflowRunEventData;
     const workflowName =
       eventData?.workflow_run?.display_title ||
       eventData?.workflow_run?.name ||
@@ -63,13 +63,13 @@ export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
 
     return {
       title: workflowName,
-      subtitle: buildGithubSubtitle(conclusion, context.event.createdAt),
+      subtitle: buildGithubSubtitle(conclusion, context.event?.createdAt),
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event.data as OnWorkflowRunEventData;
-    const receivedAt = context.event.createdAt ? new Date(context.event.createdAt).toLocaleString() : "";
+    const eventData = context.event?.data as OnWorkflowRunEventData;
+    const receivedAt = context.event?.createdAt ? new Date(context.event?.createdAt || "").toLocaleString() : "";
 
     return {
       "Received at": receivedAt,

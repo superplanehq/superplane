@@ -16,16 +16,16 @@ interface GithubConfiguration {
  */
 export const onTagCreatedTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event.data as GitRef;
+    const eventData = context.event?.data as GitRef;
 
     return {
       title: eventData?.ref ? `Tag: ${eventData.ref}` : "Tag Created",
-      subtitle: buildGithubSubtitle(eventData?.ref || "", context.event.createdAt),
+      subtitle: buildGithubSubtitle(eventData?.ref || "", context.event?.createdAt),
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event.data as GitRef;
+    const eventData = context.event?.data as GitRef;
 
     return {
       Tag: eventData?.ref || "",

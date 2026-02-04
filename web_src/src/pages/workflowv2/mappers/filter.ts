@@ -1,4 +1,14 @@
-import { ComponentBaseContext, ComponentBaseMapper, EventStateRegistry, ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload, StateFunction, SubtitleContext } from "./types";
+import {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  EventStateRegistry,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  OutputPayload,
+  StateFunction,
+  SubtitleContext,
+} from "./types";
 import {
   ComponentBaseProps,
   EventSection,
@@ -93,7 +103,11 @@ export const filterMapper: ComponentBaseMapper = {
       iconSlug: "filter",
       collapsed: context.node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
-      title: context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Unnamed component",
+      title:
+        context.node.name ||
+        context.componentDefinition.label ||
+        context.componentDefinition.name ||
+        "Unnamed component",
       eventSections: lastExecution ? getfilterEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       specs,
@@ -191,7 +205,8 @@ export const filterMapper: ComponentBaseMapper = {
     if (
       context.execution.resultMessage &&
       (context.execution.resultReason === "RESULT_REASON_ERROR" ||
-        (context.execution.result === "RESULT_FAILED" && context.execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
+        (context.execution.result === "RESULT_FAILED" &&
+          context.execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
     ) {
       details["Error"] = {
         __type: "error",
@@ -203,11 +218,7 @@ export const filterMapper: ComponentBaseMapper = {
   },
 };
 
-function getfilterEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function getfilterEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });

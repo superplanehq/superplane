@@ -29,9 +29,12 @@ interface AppMentionEventData {
  */
 export const onAppMentionTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event.data as AppMentionEventData | undefined;
+    const eventData = context.event?.data as AppMentionEventData | undefined;
     const title = eventData?.text?.trim() ? eventData.text : "App mention";
-    const subtitle = buildSubtitle(eventData?.user ? `Mention by ${eventData.user}` : "Mention", context.event.createdAt!);
+    const subtitle = buildSubtitle(
+      eventData?.user ? `Mention by ${eventData.user}` : "Mention",
+      context.event?.createdAt,
+    );
 
     return {
       title,
@@ -40,7 +43,7 @@ export const onAppMentionTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event.data as AppMentionEventData | undefined;
+    const eventData = context.event?.data as AppMentionEventData | undefined;
     const mentionedAt = formatSlackTimestamp(eventData?.ts || eventData?.event_ts);
 
     return {

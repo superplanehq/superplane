@@ -19,18 +19,18 @@ interface OnReleaseEventData {
  */
 export const onReleaseTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event.data as OnReleaseEventData;
+    const eventData = context.event?.data as OnReleaseEventData;
     const assetCount = eventData?.release?.assets?.length || 0;
     const releaseName = eventData?.release?.name || eventData?.release?.tag_name || "Release";
 
     return {
       title: `${releaseName} (${assetCount} asset${assetCount !== 1 ? "s" : ""})`,
-      subtitle: buildGithubSubtitle(eventData?.action || "", context.event.createdAt),
+      subtitle: buildGithubSubtitle(eventData?.action || "", context.event?.createdAt),
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event.data as OnReleaseEventData;
+    const eventData = context.event?.data as OnReleaseEventData;
     const values: Record<string, string> = {
       Name: eventData?.release?.name || "",
       Tag: eventData?.release?.tag_name || "",

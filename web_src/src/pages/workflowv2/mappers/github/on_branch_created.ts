@@ -16,16 +16,16 @@ interface GithubConfiguration {
  */
 export const onBranchCreatedTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event.data as GitRef;
+    const eventData = context.event?.data as GitRef;
 
     return {
       title: eventData?.ref ? `Branch: ${eventData.ref}` : "Branch Created",
-      subtitle: buildGithubSubtitle(eventData?.ref || "", context.event.createdAt),
+      subtitle: buildGithubSubtitle(eventData?.ref || "", context.event?.createdAt),
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event.data as GitRef;
+    const eventData = context.event?.data as GitRef;
 
     return {
       Branch: eventData?.ref || "",

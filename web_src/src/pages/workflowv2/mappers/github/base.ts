@@ -3,18 +3,22 @@ import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { MetadataItem } from "@/ui/metadataList";
-import { OutputPayload, ComponentBaseMapper, ComponentBaseContext, SubtitleContext, ExecutionDetailsContext, NodeInfo, ComponentDefinition, ExecutionInfo } from "../types";
+import {
+  OutputPayload,
+  ComponentBaseMapper,
+  ComponentBaseContext,
+  SubtitleContext,
+  ExecutionDetailsContext,
+  NodeInfo,
+  ComponentDefinition,
+  ExecutionInfo,
+} from "../types";
 import { Issue } from "./types";
 import { buildGithubExecutionSubtitle } from "./utils";
 
 export const baseIssueMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    return baseProps(
-      context.nodes,
-      context.node,
-      context.componentDefinition,
-      context.lastExecutions,
-    );
+    return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
   },
 
   subtitle(context: SubtitleContext): string {
@@ -97,11 +101,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function baseEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });

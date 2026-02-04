@@ -3073,13 +3073,11 @@ function prepareTriggerNode(
   const triggerMetadata = triggers.find((t) => t.name === node.trigger?.name);
   const renderer = getTriggerRenderer(node.trigger?.name || "");
   const lastEvent = nodeEventsMap[node.id!]?.[0];
-  const triggerProps = renderer.getTriggerProps(
-    {
-      node: buildNodeInfo(node),
-      definition: buildComponentDefinition(triggerMetadata!),
-      lastEvent: buildEventInfo(lastEvent!),
-    },
-  );
+  const triggerProps = renderer.getTriggerProps({
+    node: buildNodeInfo(node),
+    definition: buildComponentDefinition(triggerMetadata!),
+    lastEvent: buildEventInfo(lastEvent),
+  });
 
   // Use node name if available, otherwise fall back to trigger label (from metadata)
   const displayLabel = node.name || triggerMetadata?.label || node.trigger?.name || "Trigger";
@@ -3368,30 +3366,26 @@ function prepareComponentBaseNode(
   const nodeQueueItems = nodeQueueItemsMap?.[node.id!];
 
   const additionalData = componentDef
-    ? getComponentAdditionalDataBuilder(node.component?.name || "")?.buildAdditionalData(
-        {
-          nodes: nodes.map((n) => buildNodeInfo(n)),
-          node: buildNodeInfo(node),
-          componentDefinition: buildComponentDefinition(componentDef!),
-          lastExecutions: executions.map((e) => buildExecutionInfo(e)),
-          canvasId: workflowId,
-          queryClient: queryClient,
-          organizationId: organizationId,
-          currentUser: currentUser,
-        },
-      )
+    ? getComponentAdditionalDataBuilder(node.component?.name || "")?.buildAdditionalData({
+        nodes: nodes.map((n) => buildNodeInfo(n)),
+        node: buildNodeInfo(node),
+        componentDefinition: buildComponentDefinition(componentDef!),
+        lastExecutions: executions.map((e) => buildExecutionInfo(e)),
+        canvasId: workflowId,
+        queryClient: queryClient,
+        organizationId: organizationId,
+        currentUser: currentUser,
+      })
     : undefined;
 
-  const componentBaseProps = getComponentBaseMapper(node.component?.name || "").props(
-    {
-      nodes: nodes.map((n) => buildNodeInfo(n)),
-      node: buildNodeInfo(node),
-      componentDefinition: buildComponentDefinition(fallbackComponentDef),
-      lastExecutions: executions.map((e) => buildExecutionInfo(e)),
-      nodeQueueItems: nodeQueueItems?.map((q) => buildQueueItemInfo(q)),
-      additionalData: additionalData,
-    }
-  );
+  const componentBaseProps = getComponentBaseMapper(node.component?.name || "").props({
+    nodes: nodes.map((n) => buildNodeInfo(n)),
+    node: buildNodeInfo(node),
+    componentDefinition: buildComponentDefinition(fallbackComponentDef),
+    lastExecutions: executions.map((e) => buildExecutionInfo(e)),
+    nodeQueueItems: nodeQueueItems?.map((q) => buildQueueItemInfo(q)),
+    additionalData: additionalData,
+  });
 
   // If there's an error and empty state is shown, customize the message
   const hasError = !!node.errorMessage;
@@ -3450,7 +3444,7 @@ function prepareMergeNode(
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
     const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
 
-    const executionInfo = buildExecutionInfo(execution)
+    const executionInfo = buildExecutionInfo(execution);
     const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: buildEventInfo(execution.rootEvent!) });
 
     // Get subtitle from the merge mapper with incoming sources count
@@ -3545,18 +3539,16 @@ function prepareSidebarData(
     color = triggerMetadata.color || color;
   }
 
-  const additionalData = getComponentAdditionalDataBuilder(node.component?.name || "")?.buildAdditionalData(
-    {
-      nodes: nodes.map((n) => buildNodeInfo(n)),
-      node: buildNodeInfo(node),
-      componentDefinition: buildComponentDefinition(componentMetadata!),
-      lastExecutions: executions.map((e) => buildExecutionInfo(e)),
-      canvasId: workflowId || "",
-      queryClient: queryClient as QueryClient,
-      organizationId: organizationId || "",
-      currentUser: currentUser,
-    }
-  );
+  const additionalData = getComponentAdditionalDataBuilder(node.component?.name || "")?.buildAdditionalData({
+    nodes: nodes.map((n) => buildNodeInfo(n)),
+    node: buildNodeInfo(node),
+    componentDefinition: buildComponentDefinition(componentMetadata!),
+    lastExecutions: executions.map((e) => buildExecutionInfo(e)),
+    canvasId: workflowId || "",
+    queryClient: queryClient as QueryClient,
+    organizationId: organizationId || "",
+    currentUser: currentUser,
+  });
 
   const latestEvents =
     node.type === "TYPE_TRIGGER"

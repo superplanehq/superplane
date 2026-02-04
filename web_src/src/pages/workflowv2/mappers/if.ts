@@ -1,4 +1,14 @@
-import { ComponentBaseContext, ComponentBaseMapper, EventStateRegistry, ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload, StateFunction, SubtitleContext } from "./types";
+import {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  EventStateRegistry,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  OutputPayload,
+  StateFunction,
+  SubtitleContext,
+} from "./types";
 import {
   ComponentBaseProps,
   EventSection,
@@ -73,7 +83,7 @@ type IfConfiguration = {
 };
 
 export const ifMapper: ComponentBaseMapper = {
-  props(context: ComponentBaseContext): ComponentBaseProps {  
+  props(context: ComponentBaseContext): ComponentBaseProps {
     const componentName = context.componentDefinition.name || "if";
     const configuration = context.node.configuration as IfConfiguration;
 
@@ -97,7 +107,11 @@ export const ifMapper: ComponentBaseMapper = {
       iconSlug: "split",
       collapsed: context.node.isCollapsed,
       collapsedBackground: "bg-white",
-      title: context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Unnamed component",
+      title:
+        context.node.name ||
+        context.componentDefinition.label ||
+        context.componentDefinition.name ||
+        "Unnamed component",
       eventSections: lastExecution ? getEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       specs: specs,
@@ -199,7 +213,8 @@ export const ifMapper: ComponentBaseMapper = {
     if (
       context.execution.resultMessage &&
       (context.execution.resultReason === "RESULT_REASON_ERROR" ||
-        (context.execution.result === "RESULT_FAILED" && context.execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
+        (context.execution.result === "RESULT_FAILED" &&
+          context.execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
     ) {
       details["Error"] = {
         __type: "error",
@@ -211,11 +226,7 @@ export const ifMapper: ComponentBaseMapper = {
   },
 };
 
-function getEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });

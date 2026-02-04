@@ -1,4 +1,12 @@
-import { ComponentBaseContext, ComponentBaseMapper, EventStateRegistry, ExecutionDetailsContext, ExecutionInfo, NodeInfo, SubtitleContext } from "./types";
+import {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  EventStateRegistry,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  SubtitleContext,
+} from "./types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventStateMap, EventState } from "@/ui/componentBase";
 import { getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
@@ -113,8 +121,14 @@ export const httpMapper: ComponentBaseMapper = {
       iconColor: getColorClass("black"),
       collapsed: context.node.isCollapsed,
       collapsedBackground: "bg-white",
-      title: context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Unnamed component",
-      eventSections: context.lastExecutions[0] ? getHTTPEventSections(context.nodes, context.lastExecutions[0], httpStateFunction) : undefined,
+      title:
+        context.node.name ||
+        context.componentDefinition.label ||
+        context.componentDefinition.name ||
+        "Unnamed component",
+      eventSections: context.lastExecutions[0]
+        ? getHTTPEventSections(context.nodes, context.lastExecutions[0], httpStateFunction)
+        : undefined,
       includeEmptyState: !context.lastExecutions[0],
       metadata: getHTTPMetadataList(context.node),
       specs: getHTTPSpecs(context.node),
@@ -255,9 +269,7 @@ function getHTTPMetadataList(node: NodeInfo): MetadataItem[] {
   if (
     contentType &&
     node.configuration &&
-    (configuration.method === "POST" ||
-      configuration.method === "PUT" ||
-      configuration.method === "PATCH")
+    (configuration.method === "POST" || configuration.method === "PUT" || configuration.method === "PATCH")
   ) {
     let bodyLabel = "";
 

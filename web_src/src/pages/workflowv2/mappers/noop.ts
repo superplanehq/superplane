@@ -1,4 +1,12 @@
-import { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload, SubtitleContext } from "./types";
+import {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  OutputPayload,
+  SubtitleContext,
+} from "./types";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getTriggerRenderer, getStateMap } from ".";
 import { formatTimeAgo } from "@/utils/date";
@@ -13,7 +21,11 @@ export const noopMapper: ComponentBaseMapper = {
       iconSlug: context.componentDefinition.icon ?? "circle-off",
       collapsed: context.node.isCollapsed,
       collapsedBackground: "bg-white",
-      title: context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Unnamed component",
+      title:
+        context.node.name ||
+        context.componentDefinition.label ||
+        context.componentDefinition.name ||
+        "Unnamed component",
       eventSections: lastExecution ? getNoopEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
@@ -40,11 +52,7 @@ export const noopMapper: ComponentBaseMapper = {
   },
 };
 
-function getNoopEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  _componentName: string,
-): EventSection[] {
+function getNoopEventSections(nodes: NodeInfo[], execution: ExecutionInfo, _componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });

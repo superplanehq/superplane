@@ -20,16 +20,16 @@ interface OnIssueCommentEventData {
  */
 export const onIssueCommentTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event.data as OnIssueCommentEventData;
+    const eventData = context.event?.data as OnIssueCommentEventData;
 
     return {
       title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
-      subtitle: buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, context.event.createdAt),
+      subtitle: buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, context.event?.createdAt),
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event.data as OnIssueCommentEventData;
+    const eventData = context.event?.data as OnIssueCommentEventData;
 
     return {
       Issue: `#${eventData?.issue?.number}`,

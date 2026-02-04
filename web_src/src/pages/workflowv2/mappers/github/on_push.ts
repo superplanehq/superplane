@@ -15,17 +15,17 @@ interface GithubConfiguration {
  */
 export const onPushTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event.data as Push;
+    const eventData = context.event?.data as Push;
     const shortSha = eventData?.head_commit?.id?.slice(0, 7) || "";
 
     return {
       title: eventData?.head_commit?.message || "",
-      subtitle: buildGithubSubtitle(shortSha, context.event.createdAt),
+      subtitle: buildGithubSubtitle(shortSha, context.event?.createdAt),
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event.data as Push;
+    const eventData = context.event?.data as Push;
 
     return {
       Commit: eventData?.head_commit?.message || "",

@@ -13,19 +13,19 @@ import { numberOrZero, stringOrDash } from "../../utils";
  */
 export const onImageScanTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event.data as EcrImageScanEvent;
+    const eventData = context.event?.data as EcrImageScanEvent;
     const detail = eventData?.detail;
     const repository = getRepositoryLabel(undefined, undefined, detail?.["repository-name"]);
     const tagLabel = formatTagLabel(detail?.["image-tags"]);
 
     const title = repository ? `${repository}${tagLabel ? `:${tagLabel}` : ""}` : "ECR image scan";
-    const subtitle = context.event.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
+    const subtitle = context.event?.createdAt ? formatTimeAgo(new Date(context.event?.createdAt || "")) : "";
 
     return { title, subtitle };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event.data as EcrImageScanEvent;
+    const eventData = context.event?.data as EcrImageScanEvent;
     const detail = eventData?.detail as EcrImageScanDetail;
 
     let values: Record<string, string> = {

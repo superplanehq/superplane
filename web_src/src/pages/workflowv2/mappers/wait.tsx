@@ -70,9 +70,18 @@ export const waitMapper: ComponentBaseMapper = {
       metadata: getWaitMetadataList(context.node),
       collapsed: context.node.isCollapsed,
       collapsedBackground: "bg-white",
-      title: context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Unnamed component",
+      title:
+        context.node.name ||
+        context.componentDefinition.label ||
+        context.componentDefinition.name ||
+        "Unnamed component",
       eventSections: lastExecution
-        ? getWaitEventSections(context.nodes, lastExecution, context.node.configuration as WaitConfiguration, componentName)
+        ? getWaitEventSections(
+            context.nodes,
+            lastExecution,
+            context.node.configuration as WaitConfiguration,
+            componentName,
+          )
         : undefined,
       includeEmptyState: !lastExecution,
       hideMetadataList: false,
@@ -278,7 +287,7 @@ type WaitConfiguration = {
   waitFor?: string;
   waitUntil?: string;
   duration?: { value: number; unit: "seconds" | "minutes" | "hours" };
-}
+};
 
 function getWaitEventSubtitle(
   execution: ExecutionInfo,

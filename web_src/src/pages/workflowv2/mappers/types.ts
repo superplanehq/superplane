@@ -39,21 +39,23 @@ export interface TriggerRenderer {
 
 export type TriggerEventContext = {
   event: EventInfo;
-}
+};
 
 export type TriggerRendererContext = {
   node: NodeInfo;
   definition: ComponentDefinition;
   lastEvent: EventInfo;
-}
+};
 
-export type EventInfo = {
-  id: string;
-  createdAt: string;
-  customName?: string;
-  data: any;
-  nodeId: string;
-}
+export type EventInfo =
+  | {
+      id: string;
+      createdAt: string;
+      customName?: string;
+      data: any;
+      nodeId: string;
+    }
+  | undefined;
 
 export type ExecutionInfo = {
   id: string;
@@ -72,13 +74,13 @@ export type ExecutionInfo = {
   outputs?: {
     [key: string]: unknown;
   };
-}
+};
 
 export type QueueItemInfo = {
   id: string;
   createdAt: string;
   rootEvent: EventInfo;
-}
+};
 
 export interface NodeInfo {
   id: string;
@@ -104,25 +106,25 @@ export interface ComponentBaseMapper {
 }
 
 export type ComponentBaseContext = {
-  nodes: NodeInfo[],
-  node: NodeInfo,
-  componentDefinition: ComponentDefinition,
-  lastExecutions: ExecutionInfo[],
-  nodeQueueItems?: QueueItemInfo[],
-  additionalData?: unknown,
-}
+  nodes: NodeInfo[];
+  node: NodeInfo;
+  componentDefinition: ComponentDefinition;
+  lastExecutions: ExecutionInfo[];
+  nodeQueueItems?: QueueItemInfo[];
+  additionalData?: unknown;
+};
 
 export type SubtitleContext = {
-  node: NodeInfo,
-  execution: ExecutionInfo,
-  additionalData?: unknown,
-}
+  node: NodeInfo;
+  execution: ExecutionInfo;
+  additionalData?: unknown;
+};
 
 export type ExecutionDetailsContext = {
-  nodes: NodeInfo[]
-  node: NodeInfo,
-  execution: ExecutionInfo,
-}
+  nodes: NodeInfo[];
+  node: NodeInfo;
+  execution: ExecutionInfo;
+};
 
 /**
  * A component additional data builder creates component-specific data
@@ -141,12 +143,12 @@ export type AdditionalDataBuilderContext = {
   queryClient: QueryClient;
   organizationId?: string;
   currentUser?: User;
-}
+};
 
 export type User = {
   id?: string;
   email?: string;
-}
+};
 
 /**
  * A state function that determines the current state based on execution data

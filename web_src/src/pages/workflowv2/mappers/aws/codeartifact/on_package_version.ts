@@ -17,17 +17,17 @@ import { numberOrZero, stringOrDash } from "../../utils";
  */
 export const onPackageVersionTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event.data?.data as CodeArtifactPackageVersionEvent;
+    const eventData = context.event?.data?.data as CodeArtifactPackageVersionEvent;
     const detail = eventData?.detail;
     const packageLabel = formatPackageLabel(detail);
     const title = packageLabel || "CodeArtifact package version";
-    const subtitle = formatTimeAgo(new Date(context.event.createdAt));
+    const subtitle = formatTimeAgo(new Date(context.event?.createdAt || ""));
 
     return { title, subtitle };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event.data?.data as CodeArtifactPackageVersionEvent;
+    const eventData = context.event?.data?.data as CodeArtifactPackageVersionEvent;
     const detail = eventData?.detail as CodeArtifactPackageVersionDetail;
 
     const values: Record<string, string> = {

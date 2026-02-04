@@ -14,6 +14,7 @@ import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { formatTimeAgo } from "@/utils/date";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { getComponentBaseMapper } from "@/pages/workflowv2/mappers";
+import { buildExecutionInfo, buildNodeInfo } from "@/pages/workflowv2/utils";
 
 export interface ChildExecution {
   name: string;
@@ -164,31 +165,8 @@ export const ChainItem: React.FC<ChainItemProps> = ({
 
     // Pass a marker to indicate this is from ChainItem, so subtitle can skip issue counts
     const subtitle = mapper.subtitle?.({
-      node: {
-        id: item.nodeId,
-        name: item.nodeName || item.componentName,
-        componentName: item.componentName,
-        isCollapsed: item.workflowNode.isCollapsed || false,
-        configuration: item.workflowNode.configuration,
-        metadata: item.workflowNode.metadata,
-      },
-      execution: {
-        id: item.originalExecution?.id || "",
-        createdAt: item.originalExecution?.createdAt || "",
-        updatedAt: item.originalExecution?.updatedAt || "",
-        state: item.originalExecution?.state || "STATE_PENDING",
-        result: item.originalExecution?.result || "RESULT_PASSED",
-        resultReason: item.originalExecution?.resultReason || "RESULT_REASON_OK",
-        resultMessage: item.originalExecution?.resultMessage || "",
-        metadata: item.originalExecution?.metadata || {},
-        configuration: item.originalExecution?.configuration || {},
-        rootEvent: {
-          id: item.originalExecution?.rootEvent?.id || "",
-          createdAt: item.originalExecution?.rootEvent?.createdAt || "",
-          data: item.originalExecution?.rootEvent?.data || {},
-          nodeId: item.originalExecution?.rootEvent?.nodeId || "",
-        },
-      },
+      node: buildNodeInfo(item.workflowNode),
+      execution: buildExecutionInfo(item.originalExecution),
       additionalData: { skipIssueCounts: true },
     });
 

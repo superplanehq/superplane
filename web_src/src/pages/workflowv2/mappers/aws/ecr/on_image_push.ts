@@ -12,19 +12,19 @@ import { stringOrDash } from "../../utils";
  */
 export const onImagePushTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event.data as EcrImagePushEvent;
+    const eventData = context.event?.data as EcrImagePushEvent;
     const detail = eventData?.detail;
     const repository = getRepositoryLabel(undefined, undefined, detail?.["repository-name"]);
     const tag = detail?.["image-tag"];
 
     const title = repository ? `${repository}${tag ? `:${tag}` : ""}` : "ECR image push";
-    const subtitle = context.event.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
+    const subtitle = context.event?.createdAt ? formatTimeAgo(new Date(context.event?.createdAt || "")) : "";
 
     return { title, subtitle };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event.data as EcrImagePushEvent;
+    const eventData = context.event?.data as EcrImagePushEvent;
     const detail = eventData?.detail;
 
     return {

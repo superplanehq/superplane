@@ -21,11 +21,11 @@ interface StartConfiguration {
  */
 export const startTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    return { title: `Event received at ${new Date(context.event.createdAt!).toLocaleString()}`, subtitle: "" };
+    return { title: `Event received at ${new Date(context.event?.createdAt || "").toLocaleString()}`, subtitle: "" };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    return flattenObject(context.event.data || {});
+    return flattenObject(context.event?.data || {});
   },
 
   getTriggerProps: (context: TriggerRendererContext) => {

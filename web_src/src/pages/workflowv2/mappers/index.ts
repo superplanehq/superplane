@@ -337,7 +337,7 @@ function withCustomName(renderer: TriggerRenderer): TriggerRenderer {
     },
     getTitleAndSubtitle: (context: TriggerEventContext) => {
       const { title, subtitle } = renderer.getTitleAndSubtitle(context);
-      const customName = context.event.customName?.trim();
+      const customName = context.event?.customName?.trim();
       if (customName) {
         return { title: customName, subtitle };
       }

@@ -20,19 +20,19 @@ interface OnPullRequestReviewCommentEventData {
  */
 export const onPullRequestReviewCommentTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event.data as OnPullRequestReviewCommentEventData;
+    const eventData = context.event?.data as OnPullRequestReviewCommentEventData;
     const prNumber = eventData?.issue?.number || "";
     const fileName = eventData?.comment?.path || "";
     const title = fileName ? `#${prNumber} - Comment on ${fileName}` : `#${prNumber} - Review Comment`;
 
     return {
       title: title,
-      subtitle: buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, context.event.createdAt),
+      subtitle: buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, context.event?.createdAt),
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event.data as OnPullRequestReviewCommentEventData;
+    const eventData = context.event?.data as OnPullRequestReviewCommentEventData;
 
     const rootValues: Record<string, string> = {
       Author: eventData?.comment?.user?.login || "",

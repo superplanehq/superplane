@@ -24,10 +24,10 @@ interface OnIncidentEventData {
  */
 export const onIncidentTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event.data?.data as OnIncidentEventData;
+    const eventData = context.event?.data?.data as OnIncidentEventData;
     const incident = eventData?.incident;
     const contentParts = [incident?.urgency, incident?.status].filter(Boolean).join(" · ");
-    const subtitle = buildSubtitle(contentParts, context.event.createdAt);
+    const subtitle = buildSubtitle(contentParts, context.event?.createdAt);
 
     return {
       title: `${incident?.id || ""} - ${incident?.title || ""}`,
@@ -36,7 +36,7 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event.data?.data as OnIncidentEventData;
+    const eventData = context.event?.data?.data as OnIncidentEventData;
     return getDetailsForIncident(eventData?.incident!, eventData?.agent);
   },
 

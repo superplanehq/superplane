@@ -7,7 +7,17 @@ import {
   DEFAULT_EVENT_STATE_MAP,
 } from "@/ui/componentBase";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import { ComponentBaseMapper, OutputPayload, EventStateRegistry, StateFunction, ComponentBaseContext, SubtitleContext, ExecutionDetailsContext, NodeInfo, ExecutionInfo } from "../types";
+import {
+  ComponentBaseMapper,
+  OutputPayload,
+  EventStateRegistry,
+  StateFunction,
+  ComponentBaseContext,
+  SubtitleContext,
+  ExecutionDetailsContext,
+  NodeInfo,
+  ExecutionInfo,
+} from "../types";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import { ListIssuesConfiguration, PrometheusResponse } from "./types";
 import { formatTimeAgo } from "@/utils/date";
@@ -97,7 +107,11 @@ export const listIssuesMapper: ComponentBaseMapper = {
 
     // If additionalData is explicitly a marker object indicating ChainItem context, skip counts
     // Otherwise, include counts for SidebarEventItem
-    if (context.additionalData && typeof context.additionalData === "object" && "skipIssueCounts" in context.additionalData) {
+    if (
+      context.additionalData &&
+      typeof context.additionalData === "object" &&
+      "skipIssueCounts" in context.additionalData
+    ) {
       return timeAgo;
     }
 
@@ -348,11 +362,7 @@ function getIssueCounts(execution: ExecutionInfo): { critical: number; degraded:
   return { critical, degraded };
 }
 
-function baseEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });

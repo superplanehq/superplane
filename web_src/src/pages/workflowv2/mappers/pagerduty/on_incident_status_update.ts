@@ -38,10 +38,10 @@ interface OnIncidentStatusUpdateEventData {
  */
 export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event.data?.data as OnIncidentStatusUpdateEventData;
+    const eventData = context.event?.data?.data as OnIncidentStatusUpdateEventData;
     const incident = eventData?.incident;
     const statusUpdate = eventData?.status_update;
-    const subtitle = buildSubtitle(statusUpdate?.message?.substring(0, 50) || "", context.event.createdAt);
+    const subtitle = buildSubtitle(statusUpdate?.message?.substring(0, 50) || "", context.event?.createdAt);
 
     return {
       title: incident?.summary || incident?.id || "Status Update",
@@ -50,7 +50,7 @@ export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event.data?.data as OnIncidentStatusUpdateEventData;
+    const eventData = context.event?.data?.data as OnIncidentStatusUpdateEventData;
     const incident = eventData?.incident;
     const statusUpdate = eventData?.status_update;
 
@@ -68,8 +68,8 @@ export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
     if (statusUpdate?.message) {
       values["Status Update Message"] = statusUpdate.message;
     }
-    if (context.event.createdAt) {
-      values["Updated At"] = new Date(context.event.createdAt).toLocaleString();
+    if (context.event?.createdAt) {
+      values["Updated At"] = new Date(context.event?.createdAt || "").toLocaleString();
     }
     if (eventData?.agent?.summary) {
       values["Agent"] = eventData.agent.summary;

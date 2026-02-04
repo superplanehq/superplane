@@ -20,16 +20,16 @@ interface OnPullRequestEventData {
  */
 export const onPullRequestTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event.data as OnPullRequestEventData;
+    const eventData = context.event?.data as OnPullRequestEventData;
 
     return {
       title: `#${eventData?.number} - ${eventData?.pull_request?.title}`,
-      subtitle: buildGithubSubtitle(eventData?.action || "", context.event.createdAt),
+      subtitle: buildGithubSubtitle(eventData?.action || "", context.event?.createdAt),
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event.data as OnPullRequestEventData;
+    const eventData = context.event?.data as OnPullRequestEventData;
 
     return {
       URL: eventData?.pull_request?._links?.html?.href || "",

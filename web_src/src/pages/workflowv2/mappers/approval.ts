@@ -7,7 +7,18 @@ import {
   canvasesInvokeNodeExecutionAction,
   CanvasesCanvasNodeExecution,
 } from "@/api-client";
-import { AdditionalDataBuilderContext, ComponentAdditionalDataBuilder, ComponentBaseContext, ComponentBaseMapper, EventStateRegistry, ExecutionDetailsContext, ExecutionInfo, NodeInfo, StateFunction, SubtitleContext } from "./types";
+import {
+  AdditionalDataBuilderContext,
+  ComponentAdditionalDataBuilder,
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  EventStateRegistry,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  StateFunction,
+  SubtitleContext,
+} from "./types";
 import {
   ComponentBaseProps,
   ComponentBaseSpec,
@@ -144,7 +155,9 @@ export const approvalMapper: ComponentBaseMapper = {
       collapsedBackground: getBackgroundColorClass("orange"),
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition?.label || "Approval",
-      eventSections: lastExecution ? getApprovalEventSections(context.nodes, lastExecution, context.additionalData) : undefined,
+      eventSections: lastExecution
+        ? getApprovalEventSections(context.nodes, lastExecution, context.additionalData)
+        : undefined,
       includeEmptyState: !lastExecution,
       specs: getApprovalSpecs(items, context.additionalData),
       customField: getApprovalCustomField(lastExecution, approvals),
@@ -257,10 +270,7 @@ function getApprovalEventSections(
   return [eventSection];
 }
 
-function getComponentSubtitle(
-  execution: ExecutionInfo,
-  additionalData?: unknown,
-): string | React.ReactNode {
+function getComponentSubtitle(execution: ExecutionInfo, additionalData?: unknown): string | React.ReactNode {
   // Show progress for in-progress approvals
   if (execution.state === "STATE_STARTED") {
     const approvals = (additionalData as { approvals?: ApprovalItemProps[] })?.approvals;

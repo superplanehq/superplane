@@ -1,5 +1,15 @@
 import React, { useState } from "react";
-import { ComponentBaseContext, ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, ExecutionDetailsContext, ExecutionInfo, NodeInfo, StateFunction, SubtitleContext } from "../types";
+import {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  CustomFieldRenderer,
+  EventStateRegistry,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  StateFunction,
+  SubtitleContext,
+} from "../types";
 import {
   ComponentBaseProps,
   ComponentBaseSpec,
@@ -101,7 +111,11 @@ export const RUN_WORKFLOW_STATE_REGISTRY: EventStateRegistry = {
 export const runWorkflowMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return {
-      title: context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Unnamed component",
+      title:
+        context.node.name ||
+        context.componentDefinition.label ||
+        context.componentDefinition.name ||
+        "Unnamed component",
       iconSrc: githubIcon,
       iconColor: getColorClass(context.componentDefinition?.color!),
       collapsed: context.node.isCollapsed,
@@ -191,10 +205,7 @@ function runWorkflowSpecs(node: NodeInfo): ComponentBaseSpec[] {
   return specs;
 }
 
-function runWorkflowEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-): EventSection[] | undefined {
+function runWorkflowEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] | undefined {
   if (!execution) {
     return undefined;
   }

@@ -7,7 +7,13 @@ import {
   CanvasesListNodeEventsResponse,
   CanvasesListNodeExecutionsResponse,
 } from "@/api-client";
-import { mapTriggerEventsToSidebarEvents, mapExecutionsToSidebarEvents, buildComponentDefinition, buildExecutionInfo, buildNodeInfo } from "@/pages/workflowv2/utils";
+import {
+  mapTriggerEventsToSidebarEvents,
+  mapExecutionsToSidebarEvents,
+  buildComponentDefinition,
+  buildExecutionInfo,
+  buildNodeInfo,
+} from "@/pages/workflowv2/utils";
 import { QueryClient } from "@tanstack/react-query";
 import { getComponentAdditionalDataBuilder } from "@/pages/workflowv2/mappers";
 import { useAccount } from "@/contexts/AccountContext";
@@ -88,18 +94,16 @@ export const useNodeHistory = ({
         eventsQuery.data?.pages.flatMap((page) => (page as CanvasesListNodeEventsResponse)?.events || []) || [];
       return mapTriggerEventsToSidebarEvents(allEvents, node);
     } else {
-      const additionalData = getComponentAdditionalDataBuilder(componentDef?.name || "")?.buildAdditionalData(
-        {
-          nodes: allNodes.map((n) => buildNodeInfo(n)),
-          node: buildNodeInfo(node),
-          componentDefinition: buildComponentDefinition(componentDef!),
-          lastExecutions: allExecutions.map((e) => buildExecutionInfo(e)),
-          canvasId: canvasId || "",
-          queryClient,
-          organizationId: organizationId || "",
-          currentUser: account ? { id: account.id, email: account.email } : undefined,
-        },
-      );
+      const additionalData = getComponentAdditionalDataBuilder(componentDef?.name || "")?.buildAdditionalData({
+        nodes: allNodes.map((n) => buildNodeInfo(n)),
+        node: buildNodeInfo(node),
+        componentDefinition: buildComponentDefinition(componentDef!),
+        lastExecutions: allExecutions.map((e) => buildExecutionInfo(e)),
+        canvasId: canvasId || "",
+        queryClient,
+        organizationId: organizationId || "",
+        currentUser: account ? { id: account.id, email: account.email } : undefined,
+      });
 
       return mapExecutionsToSidebarEvents(allExecutions, allNodes, undefined, additionalData);
     }

@@ -20,17 +20,17 @@ interface OnIssueEventData {
  */
 export const onIssueTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event.data as OnIssueEventData;
+    const eventData = context.event?.data as OnIssueEventData;
 
     return {
       title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
-      subtitle: buildGithubSubtitle(eventData?.action || "", context.event.createdAt),
+      subtitle: buildGithubSubtitle(eventData?.action || "", context.event?.createdAt),
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event.data as OnIssueEventData;
-    const issue = eventData.issue as Issue;
+    const eventData = context.event?.data as OnIssueEventData;
+    const issue = eventData?.issue as Issue;
     return getDetailsForIssue(issue);
   },
 

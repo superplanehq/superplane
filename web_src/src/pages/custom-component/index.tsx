@@ -684,16 +684,14 @@ export const CustomComponent = () => {
               name: component.name,
             },
           };
-          updatedData.component = getComponentBaseMapper(component.name!).props(
-            {
-              nodes: [],
-              node: buildNodeInfo(updatedNode),
-              componentDefinition: buildComponentDefinition(component!),
-              lastExecutions: [],
-              nodeQueueItems: [],
-              additionalData: undefined,
-            },
-          );
+          updatedData.component = getComponentBaseMapper(component.name!).props({
+            nodes: [],
+            node: buildNodeInfo(updatedNode),
+            componentDefinition: buildComponentDefinition(component!),
+            lastExecutions: [],
+            nodeQueueItems: [],
+            additionalData: undefined,
+          });
         }
 
         return {

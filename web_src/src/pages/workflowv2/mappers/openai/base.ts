@@ -1,6 +1,14 @@
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload, SubtitleContext } from "../types";
+import {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  OutputPayload,
+  SubtitleContext,
+} from "../types";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import { formatTimeAgo } from "@/utils/date";
 
@@ -43,11 +51,7 @@ export const baseMapper: ComponentBaseMapper = {
   },
 };
 
-function baseEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });

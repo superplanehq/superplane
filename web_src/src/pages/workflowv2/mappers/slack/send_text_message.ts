@@ -1,4 +1,12 @@
-import { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload, SubtitleContext } from "../types";
+import {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  OutputPayload,
+  SubtitleContext,
+} from "../types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
@@ -24,13 +32,19 @@ export const sendTextMessageMapper: ComponentBaseMapper = {
     const componentName = context.componentDefinition.name || "unknown";
 
     return {
-      title: context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Unnamed component",
+      title:
+        context.node.name ||
+        context.componentDefinition.label ||
+        context.componentDefinition.name ||
+        "Unnamed component",
       iconSrc: slackIcon,
       iconSlug: "slack",
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? sendTextMessageEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution
+        ? sendTextMessageEventSections(context.nodes, lastExecution, componentName)
+        : undefined,
       includeEmptyState: !lastExecution,
       metadata: sendTextMessageMetadataList(context.node),
       specs: sendTextMessageSpecs(context.node),

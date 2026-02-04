@@ -1,5 +1,11 @@
 import { ComponentBaseProps } from "@/ui/componentBase";
-import { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, OutputPayload, SubtitleContext } from "../types";
+import {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  OutputPayload,
+  SubtitleContext,
+} from "../types";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
 

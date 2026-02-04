@@ -57,13 +57,13 @@ interface WebhookEventData {
 
 function getWebhookEventTitle(context: TriggerEventContext): string {
   // Check for run_name in the webhook request body
-  const runName = (context.event.data?.data as { body?: { run_name?: string } })?.body?.run_name;
+  const runName = (context.event?.data?.data as { body?: { run_name?: string } })?.body?.run_name;
   if (runName) {
     return `${runName}`;
   }
 
   // Fallback to method and date
-  return `Webhook ${context.event.id} at ${new Date(context.event.createdAt).toLocaleString()}`;
+  return `Webhook ${context.event?.id} at ${new Date(context.event?.createdAt || "").toLocaleString()}`;
 }
 
 /**
@@ -73,13 +73,13 @@ export const webhookTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
     return {
       title: getWebhookEventTitle(context),
-      subtitle: formatTimeAgo(new Date(context.event.createdAt)),
+      subtitle: formatTimeAgo(new Date(context.event?.createdAt || "")),
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const webhookData = context.event.data?._webhook as WebhookEventData | undefined;
-    const receivedOn = (context.event.data?.["timestamp"] as string) || context.event.createdAt;
+    const webhookData = context.event?.data?._webhook as WebhookEventData | undefined;
+    const receivedOn = (context.event?.data?.["timestamp"] as string) || context.event?.createdAt;
     const values: Record<string, string> = {
       "Received on": receivedOn ? new Date(receivedOn).toLocaleString() : "n/a",
       Response: "200",

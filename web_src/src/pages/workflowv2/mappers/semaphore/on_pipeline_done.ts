@@ -36,9 +36,9 @@ interface OnPipelineDoneEventData {
  */
 export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event.data as OnPipelineDoneEventData;
+    const eventData = context.event?.data as OnPipelineDoneEventData;
     const result = eventData?.pipeline?.result || "";
-    const timeAgo = context.event.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
+    const timeAgo = context.event?.createdAt ? formatTimeAgo(new Date(context.event?.createdAt)) : "";
     const subtitle = result && timeAgo ? `${result} · ${timeAgo}` : result || timeAgo;
 
     return {
@@ -48,7 +48,7 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event.data as OnPipelineDoneEventData;
+    const eventData = context.event?.data as OnPipelineDoneEventData;
     const doneAt = eventData?.pipeline?.done_at ? new Date(eventData.pipeline.done_at).toLocaleString() : "";
     const repositoryUrl = eventData?.repository?.url || "";
     const commitSha = eventData?.revision?.commit_sha || "";

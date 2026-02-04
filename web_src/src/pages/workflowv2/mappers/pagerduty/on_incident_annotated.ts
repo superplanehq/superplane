@@ -42,11 +42,11 @@ interface OnIncidentAnnotatedEventData {
  */
 export const onIncidentAnnotatedTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event.data?.data as OnIncidentAnnotatedEventData;
+    const eventData = context.event?.data?.data as OnIncidentAnnotatedEventData;
     const incident = eventData?.incident;
     const agent = eventData?.agent;
     const contentParts = [agent?.summary, "added note"].filter(Boolean).join(" ");
-    const subtitle = buildSubtitle(contentParts, context.event.createdAt!);
+    const subtitle = buildSubtitle(contentParts, context.event?.createdAt);
 
     return {
       title: `${incident?.id || ""} - ${incident?.title || ""}`,
@@ -55,7 +55,7 @@ export const onIncidentAnnotatedTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event.data?.data as OnIncidentAnnotatedEventData;
+    const eventData = context.event?.data?.data as OnIncidentAnnotatedEventData;
     return getDetailsForAnnotatedIncident(eventData?.incident, eventData?.agent, eventData?.annotation);
   },
 
@@ -87,18 +87,18 @@ export const onIncidentAnnotatedTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as OnIncidentAnnotatedEventData;
+      const eventData = lastEvent?.data?.data as OnIncidentAnnotatedEventData;
       const incident = eventData?.incident;
       const agent = eventData?.agent;
       const contentParts = [agent?.summary, "added note"].filter(Boolean).join(" ");
-      const subtitle = buildSubtitle(contentParts, lastEvent.createdAt);
+      const subtitle = buildSubtitle(contentParts, lastEvent?.createdAt);
 
       props.lastEventData = {
         title: `${incident?.id || ""} - ${incident?.title || ""}`,
         subtitle,
-        receivedAt: new Date(lastEvent.createdAt),
+        receivedAt: new Date(lastEvent?.createdAt || ""),
         state: "triggered",
-        eventId: lastEvent.id,
+        eventId: lastEvent?.id,
       };
     }
 

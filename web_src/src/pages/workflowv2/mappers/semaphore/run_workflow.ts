@@ -1,4 +1,14 @@
-import { ComponentBaseContext, ComponentBaseMapper, EventStateRegistry, ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload, StateFunction, SubtitleContext } from "../types";
+import {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  EventStateRegistry,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  OutputPayload,
+  StateFunction,
+  SubtitleContext,
+} from "../types";
 import {
   ComponentBaseProps,
   ComponentBaseSpec,
@@ -103,7 +113,11 @@ export const runWorkflowMapper: ComponentBaseMapper = {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
 
     return {
-      title: context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Unnamed component",
+      title:
+        context.node.name ||
+        context.componentDefinition.label ||
+        context.componentDefinition.name ||
+        "Unnamed component",
       iconSrc: SemaphoreLogo,
       iconSlug: context.componentDefinition.icon || "workflow",
       iconColor: getColorClass(context.componentDefinition?.color || "gray"),
@@ -164,7 +178,10 @@ export const runWorkflowMapper: ComponentBaseMapper = {
     };
 
     addDetail("Done At", formatDate(pipeline?.done_at));
-    addDetail("Workflow URL", (context.execution.metadata as ExecutionMetadata | undefined)?.workflow?.url || workflow?.url);
+    addDetail(
+      "Workflow URL",
+      (context.execution.metadata as ExecutionMetadata | undefined)?.workflow?.url || workflow?.url,
+    );
     addDetail("Repository URL", repository?.url);
     addDetail("Project", project?.name);
     addDetail("Organization", organization?.name);
@@ -236,10 +253,7 @@ function runWorkflowSpecs(node: NodeInfo): ComponentBaseSpec[] {
   return specs;
 }
 
-function runWorkflowEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-): EventSection[] | undefined {
+function runWorkflowEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] | undefined {
   if (!execution) {
     return undefined;
   }

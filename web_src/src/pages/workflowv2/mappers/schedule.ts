@@ -313,7 +313,7 @@ function formatNextTrigger(configuration: ScheduleConfiguration, metadata?: { ne
  */
 export const scheduleTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventDate = new Date(context.event.createdAt);
+    const eventDate = new Date(context.event?.createdAt || "");
     const formattedDate = eventDate.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
@@ -332,7 +332,7 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     return {
-      Timestamp: (context.event.data?.["timestamp"] as string) || "n/a",
+      Timestamp: (context.event?.data?.["timestamp"] as string) || "n/a",
     };
   },
 
@@ -356,7 +356,7 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventDate = new Date(lastEvent.createdAt);
+      const eventDate = new Date(lastEvent.createdAt || "");
       const formattedDate = eventDate.toLocaleDateString("en-US", {
         year: "numeric",
         month: "short",

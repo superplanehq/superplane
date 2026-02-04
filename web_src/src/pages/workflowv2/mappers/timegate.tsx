@@ -1,8 +1,15 @@
 import React from "react";
+import { CanvasesCanvasNodeExecution } from "@/api-client";
 import {
-  CanvasesCanvasNodeExecution,
-} from "@/api-client";
-import { ComponentBaseContext, ComponentBaseMapper, EventStateRegistry, ExecutionDetailsContext, ExecutionInfo, NodeInfo, StateFunction, SubtitleContext } from "./types";
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  EventStateRegistry,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  StateFunction,
+  SubtitleContext,
+} from "./types";
 import {
   ComponentBaseProps,
   ComponentBaseSpec,
@@ -25,7 +32,11 @@ export const timeGateMapper: ComponentBaseMapper = {
       iconColor: getColorClass("black"),
       collapsed: context.node.isCollapsed,
       collapsedBackground: "bg-white",
-      title: context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Unnamed component",
+      title:
+        context.node.name ||
+        context.componentDefinition.label ||
+        context.componentDefinition.name ||
+        "Unnamed component",
       eventSections: context.lastExecutions[0]
         ? getTimeGateEventSections(context.nodes, context.lastExecutions[0], componentName)
         : undefined,
@@ -211,11 +222,7 @@ function getTimeGateSpecs(node: NodeInfo): ComponentBaseSpec[] {
   ];
 }
 
-function getTimeGateEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function getTimeGateEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const executionState = getState(componentName)(execution);
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
@@ -234,10 +241,7 @@ function getTimeGateEventSections(
   return [eventSection];
 }
 
-function getTimeGateEventSubtitle(
-  execution: ExecutionInfo,
-  componentName: string,
-): React.ReactNode | undefined {
+function getTimeGateEventSubtitle(execution: ExecutionInfo, componentName: string): React.ReactNode | undefined {
   const executionState = getState(componentName)(execution);
   const timeAgo = execution.updatedAt
     ? formatTimeAgo(new Date(execution.updatedAt))

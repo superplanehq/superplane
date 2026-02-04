@@ -1,4 +1,12 @@
-import { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload, SubtitleContext } from "../../types";
+import {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  OutputPayload,
+  SubtitleContext,
+} from "../../types";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
@@ -20,12 +28,18 @@ export const getPackageVersionMapper: ComponentBaseMapper = {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
 
     return {
-      title: context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Unnamed component",
+      title:
+        context.node.name ||
+        context.componentDefinition.label ||
+        context.componentDefinition.name ||
+        "Unnamed component",
       iconSrc: awsCodeArtifactIcon,
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? getPackageVersionEventSections(context.nodes, lastExecution, context.componentDefinition.name) : undefined,
+      eventSections: lastExecution
+        ? getPackageVersionEventSections(context.nodes, lastExecution, context.componentDefinition.name)
+        : undefined,
       includeEmptyState: !lastExecution,
       metadata: getPackageVersionMetadataList(context.node),
       eventStateMap: getStateMap(context.componentDefinition.name),

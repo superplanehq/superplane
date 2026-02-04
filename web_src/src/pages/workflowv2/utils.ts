@@ -110,13 +110,11 @@ export function mapExecutionsToSidebarEvents(
 
     const componentName = currentComponentNode?.component?.name || "";
     const componentMapper = getComponentBaseMapper(componentName);
-    const componentSubtitle = componentMapper.subtitle?.(
-      {
-        node: buildNodeInfo(currentComponentNode as ComponentsNode),
-        execution: buildExecutionInfo(execution),
-        additionalData,
-      }
-    );
+    const componentSubtitle = componentMapper.subtitle?.({
+      node: buildNodeInfo(currentComponentNode as ComponentsNode),
+      execution: buildExecutionInfo(execution),
+      additionalData,
+    });
 
     const { title, subtitle } = execution.rootEvent
       ? rootTriggerRenderer.getTitleAndSubtitle({ event: buildEventInfo(execution.rootEvent!) })
@@ -125,7 +123,9 @@ export function mapExecutionsToSidebarEvents(
           subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
         };
 
-    const values = execution.rootEvent ? rootTriggerRenderer.getRootEventValues({ event: buildEventInfo(execution.rootEvent!) }) : {};
+    const values = execution.rootEvent
+      ? rootTriggerRenderer.getRootEventValues({ event: buildEventInfo(execution.rootEvent!) })
+      : {};
 
     return {
       id: execution.id!,
@@ -196,7 +196,9 @@ export function mapQueueItemsToSidebarEvents(
           subtitle: item.createdAt ? formatTimeAgo(new Date(item.createdAt)).replace(" ago", "") : "",
         };
 
-    const values = item.rootEvent ? rootTriggerRenderer.getRootEventValues({ event: buildEventInfo(item.rootEvent!) }) : {};
+    const values = item.rootEvent
+      ? rootTriggerRenderer.getRootEventValues({ event: buildEventInfo(item.rootEvent!) })
+      : {};
 
     return {
       id: item.id!,
@@ -1022,15 +1024,7 @@ export function buildTabData(
 
     const tabData: TabData = {};
     const triggerRenderer = getTriggerRenderer(node.trigger?.name || "");
-
-    const eventValues = triggerRenderer.getRootEventValues({
-      event: {
-        id: triggerEvent.id!,
-        createdAt: triggerEvent.createdAt!,
-        nodeId: triggerEvent.nodeId!,
-        data: triggerEvent.data || {},
-      },
-    });
+    const eventValues = triggerRenderer.getRootEventValues({ event: buildEventInfo(triggerEvent) });
 
     tabData.current = {
       ...eventValues,
@@ -1060,14 +1054,7 @@ export function buildTabData(
     if (queueItem.rootEvent) {
       const rootTriggerNode = workflowNodes.find((n) => n.id === queueItem.rootEvent?.nodeId);
       const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-      const rootEventValues = rootTriggerRenderer.getRootEventValues({
-        event: {
-          id: queueItem.rootEvent?.id!,
-          nodeId: queueItem.rootEvent?.nodeId!,
-          createdAt: queueItem.rootEvent?.createdAt!,
-          data: queueItem.rootEvent?.data || {},
-        },
-      });
+      const rootEventValues = rootTriggerRenderer.getRootEventValues({ event: buildEventInfo(queueItem.rootEvent!) });
 
       tabData.root = Object.assign({}, rootEventValues, {
         "Created At": queueItem.rootEvent.createdAt
@@ -1114,14 +1101,7 @@ export function buildTabData(
   if (execution.rootEvent) {
     const rootTriggerNode = workflowNodes.find((n) => n.id === execution.rootEvent?.nodeId);
     const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-    const rootEventValues = rootTriggerRenderer.getRootEventValues({
-      event: {
-        id: execution.rootEvent?.id!,
-        nodeId: execution.rootEvent?.nodeId!,
-        createdAt: execution.rootEvent?.createdAt!,
-        data: execution.rootEvent?.data || {},
-      },
-    });
+    const rootEventValues = rootTriggerRenderer.getRootEventValues({ event: buildEventInfo(execution.rootEvent!) });
 
     tabData.root = {
       ...rootEventValues,
@@ -1164,12 +1144,7 @@ export function buildExecutionInfo(execution: CanvasesCanvasNodeExecution): Exec
     configuration: execution.configuration!,
     input: execution.input!,
     outputs: execution.outputs!,
-    rootEvent: {
-      id: execution.rootEvent?.id!,
-      createdAt: execution.rootEvent?.createdAt!,
-      data: execution.rootEvent?.data || {},
-      nodeId: execution.rootEvent?.nodeId!,
-    },
+    rootEvent: buildEventInfo(execution.rootEvent!),
   };
 }
 
@@ -1183,7 +1158,9 @@ export function buildComponentDefinition(component: ComponentsComponent): Compon
   };
 }
 
-export function buildEventInfo(event: CanvasesCanvasEvent): EventInfo {
+export function buildEventInfo(event: CanvasesCanvasEvent): EventInfo | undefined {
+  if (!event) return undefined;
+
   return {
     id: event.id!,
     createdAt: event.createdAt!,
@@ -1204,7 +1181,7 @@ export function buildNodeInfo(node: ComponentsNode): NodeInfo {
   return {
     id: node.id!,
     name: node.name || "",
-    componentName: node.component?.name || "",
+    componentName: node.type === "TYPE_TRIGGER" ? node.trigger?.name || "" : node.component?.name || "",
     isCollapsed: node.isCollapsed || false,
     configuration: node.configuration,
     metadata: node.metadata,
