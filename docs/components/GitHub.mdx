@@ -27,6 +27,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitHub repository" />
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitHub repository" />
+  <LinkCard title="Create Review" href="#create-review" description="Submit a pull request review on GitHub" />
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
@@ -1026,6 +1027,68 @@ Returns the created release object with all release information including tag, a
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.release"
+}
+```
+
+<a id="create-review"></a>
+
+## Create Review
+
+The Create Review component submits a pull request review (approve, request changes, or comment) on a GitHub PR.
+
+### Use Cases
+
+- **Automated approvals**: Submit automated approval when CI passes from SuperPlane
+- **Request changes**: Automatically request changes when code quality checks fail
+- **Post review comments**: Add review comments (inline or general) from automation or bots
+- **Sync review state**: Sync review state with external systems (Jira, Slack)
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the PR
+- **Pull Number**: The PR number to review (supports expressions)
+- **Event**: Review action - APPROVE, REQUEST_CHANGES, or COMMENT
+- **Body**: Review body text (optional; required for REQUEST_CHANGES with feedback)
+- **Commit ID**: Specific commit SHA to review (optional)
+- **Comments**: Inline review comments with path, line, and body (optional)
+
+### Output
+
+Returns the created review object with details including:
+- Review ID
+- State (APPROVED, CHANGES_REQUESTED, COMMENTED)
+- Submitted timestamp
+- HTML URL to the review
+
+### Notes
+
+- APPROVE and REQUEST_CHANGES events require appropriate permissions
+- Inline comments require the file path and line number
+- Use expressions to dynamically set the PR number from upstream data
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "body": "LGTM! All tests pass and code follows our style guidelines.",
+      "html_url": "https://github.com/acme/widgets/pull/42#pullrequestreview-987654321",
+      "id": 987654321,
+      "node_id": "PRR_kwDOExample123",
+      "pull_request": "https://api.github.com/repos/acme/widgets/pulls/42",
+      "state": "APPROVED",
+      "submitted_at": "2026-01-16T19:00:00Z",
+      "user": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+        "html_url": "https://github.com/superplane-bot",
+        "id": 12345678,
+        "login": "superplane-bot"
+      }
+    }
+  ],
+  "timestamp": "2026-01-16T19:00:00.123456789Z",
+  "type": "github.pullRequestReview"
 }
 ```
 
