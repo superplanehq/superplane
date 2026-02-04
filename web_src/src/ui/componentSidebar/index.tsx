@@ -270,9 +270,6 @@ export const ComponentSidebar = ({
   );
   const selectedIntegrationForDialog = isCreateIntegrationDialogOpen ? createIntegrationDefinition : undefined;
   const selectedInstructions = selectedIntegrationForDialog?.instructions?.trim();
-  const resolvedIntegration = integrationRef
-    ? (integrations ?? []).find((i) => i.metadata?.id === integrationRef.id)
-    : undefined;
 
   const handleCopyNodeId = useCallback(async () => {
     if (nodeId) {
@@ -674,58 +671,6 @@ export const ComponentSidebar = ({
             isDetailView ? "-translate-x-full" : "translate-x-0"
           } ${isDetailView ? "pointer-events-none" : "pointer-events-auto"}`}
         >
-          {integrationName && integrationRef && resolvedIntegration && (
-            <div
-              className={`border-border border-b-1 bg-stripe-diagonal px-4 py-3 flex-shrink-0 ${
-                resolvedIntegration.status?.state === "ready"
-                  ? "bg-green-100 dark:bg-green-950/30"
-                  : resolvedIntegration.status?.state === "error"
-                    ? "bg-red-100 dark:bg-red-950/30"
-                    : "bg-orange-100 dark:bg-orange-950/30"
-              }`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <IntegrationIcon
-                    integrationName={resolvedIntegration.spec?.integrationName}
-                    iconSlug={createIntegrationDefinition?.icon}
-                    className="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400"
-                  />
-                  <span className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
-                    {resolvedIntegration.metadata?.name ||
-                      getIntegrationTypeDisplayName(undefined, resolvedIntegration.spec?.integrationName) ||
-                      "Integration"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                      resolvedIntegration.status?.state === "ready"
-                        ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                        : resolvedIntegration.status?.state === "error"
-                          ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                          : "bg-orange-100 text-yellow-800 dark:text-yellow-900/30 dark:text-yellow-400"
-                    }`}
-                  >
-                    {resolvedIntegration.status?.state
-                      ? resolvedIntegration.status.state.charAt(0).toUpperCase() +
-                        resolvedIntegration.status.state.slice(1)
-                      : "Unknown"}
-                  </span>
-                  {domainId && resolvedIntegration.metadata?.id && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-sm py-1.5"
-                      onClick={() => handleOpenConfigureIntegrationDialog(resolvedIntegration.metadata!.id!)}
-                    >
-                      Configure...
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
           <Tabs
             value={activeTab}
             onValueChange={(value) => onTabChange?.(value as "latest" | "settings")}
