@@ -68,3 +68,30 @@ export function buildActionStateRegistry(successState: string): EventStateRegist
     },
   };
 }
+
+/*
+ * Predicate type and format function.
+ * See: AnyPredicateListFieldRenderer.
+ *
+ * @param predicate - The predicate to format.
+ * @returns The formatted predicate.
+ */
+export type PredicateType = "equals" | "notEquals" | "matches";
+
+export interface Predicate {
+  type: PredicateType;
+  value: string;
+}
+
+export function formatPredicate(predicate: Predicate): string {
+  switch (predicate.type) {
+    case "equals":
+      return `=${predicate.value}`;
+    case "notEquals":
+      return `!=${predicate.value}`;
+    case "matches":
+      return `~${predicate.value}`;
+    default:
+      return predicate.value;
+  }
+}

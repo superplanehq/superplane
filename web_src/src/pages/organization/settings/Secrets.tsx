@@ -1,8 +1,10 @@
 import { Icon } from "@/components/Icon";
+import { PermissionTooltip } from "@/components/PermissionGate";
 import { Textarea } from "@/components/Textarea/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { getApiErrorMessage } from "@/utils/errors";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { Edit2, Eye, EyeOff, Key, Loader2, Plus, Trash2 } from "lucide-react";
@@ -27,11 +29,15 @@ interface KeyValuePair {
 }
 
 export function Secrets({ organizationId }: SecretsProps) {
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingSecret, setEditingSecret] = useState<SecretsSecret | null>(null);
   const [secretName, setSecretName] = useState("");
   const [keyValuePairs, setKeyValuePairs] = useState<KeyValuePair[]>([{ name: "", value: "" }]);
   const [visibleValues, setVisibleValues] = useState<Set<string>>(new Set());
+  const canCreateSecrets = canAct("secrets", "create");
+  const canUpdateSecrets = canAct("secrets", "update");
+  const canDeleteSecrets = canAct("secrets", "delete");
 
   const { data: secrets = [], isLoading } = useSecrets(organizationId, "DOMAIN_TYPE_ORGANIZATION");
   const createSecretMutation = useCreateSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION");
@@ -41,14 +47,17 @@ export function Secrets({ organizationId }: SecretsProps) {
     "DOMAIN_TYPE_ORGANIZATION",
     editingSecret?.metadata?.id || "",
   );
+  const canWriteSecrets = editingSecret ? canUpdateSecrets : canCreateSecrets;
 
   const handleCreateClick = () => {
+    if (!canCreateSecrets) return;
     setSecretName("");
     setKeyValuePairs([{ name: "", value: "" }]);
     setIsCreateModalOpen(true);
   };
 
   const handleEditClick = (secret: SecretsSecret) => {
+    if (!canUpdateSecrets) return;
     const secretData = secret.spec?.local?.data || {};
     const pairs = Object.entries(secretData).map(([name, value]) => ({ name, value }));
     setSecretName(secret.metadata?.name || "");
@@ -65,6 +74,7 @@ export function Secrets({ organizationId }: SecretsProps) {
   };
 
   const handleCreate = async () => {
+    if (!canCreateSecrets) return;
     if (!secretName?.trim()) {
       showErrorToast("Secret name is required");
       return;
@@ -100,6 +110,7 @@ export function Secrets({ organizationId }: SecretsProps) {
   };
 
   const handleUpdate = async () => {
+    if (!canUpdateSecrets) return;
     if (!editingSecret || !secretName?.trim()) {
       showErrorToast("Secret name is required");
       return;
@@ -135,6 +146,7 @@ export function Secrets({ organizationId }: SecretsProps) {
   };
 
   const handleDelete = async (secret: SecretsSecret) => {
+    if (!canDeleteSecrets) return;
     if (!secret.metadata?.id) return;
 
     if (
@@ -195,10 +207,20 @@ export function Secrets({ organizationId }: SecretsProps) {
           </p>
         </div>
         {secrets.length > 0 && (
-          <Button color="blue" onClick={handleCreateClick} className="flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            Create Secret
-          </Button>
+          <PermissionTooltip
+            allowed={canCreateSecrets || permissionsLoading}
+            message="You don't have permission to create secrets."
+          >
+            <Button
+              color="blue"
+              onClick={handleCreateClick}
+              className="flex items-center gap-2"
+              disabled={!canCreateSecrets}
+            >
+              <Plus className="w-4 h-4" />
+              Create Secret
+            </Button>
+          </PermissionTooltip>
         )}
       </div>
 
@@ -206,10 +228,20 @@ export function Secrets({ organizationId }: SecretsProps) {
         <div className="text-center py-12 bg-white border border-gray-300 dark:border-gray-700 rounded-md">
           <Key className="w-8 h-8 text-gray-400 mx-auto mb-2" />
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">No secrets found</p>
-          <Button color="blue" onClick={handleCreateClick} className="flex items-center gap-2 mx-auto">
-            <Plus className="w-4 h-4" />
-            Create your first secret
-          </Button>
+          <PermissionTooltip
+            allowed={canCreateSecrets || permissionsLoading}
+            message="You don't have permission to create secrets."
+          >
+            <Button
+              color="blue"
+              onClick={handleCreateClick}
+              className="flex items-center gap-2 mx-auto"
+              disabled={!canCreateSecrets}
+            >
+              <Plus className="w-4 h-4" />
+              Create your first secret
+            </Button>
+          </PermissionTooltip>
         </div>
       ) : (
         <div className="space-y-4">
@@ -255,29 +287,40 @@ export function Secrets({ organizationId }: SecretsProps) {
                       >
                         {isVisible ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditClick(secret)}
-                        className="text-xs"
-                        title="Edit secret"
+                      <PermissionTooltip
+                        allowed={canUpdateSecrets || permissionsLoading}
+                        message="You don't have permission to update secrets."
                       >
-                        <Edit2 className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(secret)}
-                        className="text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                        title="Delete secret"
-                        disabled={deleteSecretMutation.isPending}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditClick(secret)}
+                          className="text-xs"
+                          title="Edit secret"
+                          disabled={!canUpdateSecrets}
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </Button>
+                      </PermissionTooltip>
+                      <PermissionTooltip
+                        allowed={canDeleteSecrets || permissionsLoading}
+                        message="You don't have permission to delete secrets."
                       >
-                        {deleteSecretMutation.isPending ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-3 h-3" />
-                        )}
-                      </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(secret)}
+                          className="text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                          title="Delete secret"
+                          disabled={deleteSecretMutation.isPending || !canDeleteSecrets}
+                        >
+                          {deleteSecretMutation.isPending ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3 h-3" />
+                          )}
+                        </Button>
+                      </PermissionTooltip>
                     </div>
                   </div>
                 </div>
@@ -321,6 +364,7 @@ export function Secrets({ organizationId }: SecretsProps) {
                     onChange={(e) => setSecretName(e.target.value)}
                     placeholder="e.g., production-api-keys"
                     required
+                    disabled={!canWriteSecrets}
                   />
                 </div>
 
@@ -343,6 +387,7 @@ export function Secrets({ organizationId }: SecretsProps) {
                               onChange={(e) => updateKeyValuePair(index, "name", e.target.value)}
                               placeholder="Key"
                               className="mb-2"
+                              disabled={!canWriteSecrets}
                             />
                             <Textarea
                               value={pair.value}
@@ -350,6 +395,7 @@ export function Secrets({ organizationId }: SecretsProps) {
                               placeholder="Value"
                               rows={4}
                               className="font-mono text-sm"
+                              disabled={!canWriteSecrets}
                             />
                           </div>
                           {keyValuePairs.length > 1 && (
@@ -359,6 +405,7 @@ export function Secrets({ organizationId }: SecretsProps) {
                               onClick={() => removeKeyValuePair(index)}
                               className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 mt-0"
                               title="Remove pair"
+                              disabled={!canWriteSecrets}
                             >
                               <Trash2 className="w-3 h-3" />
                             </Button>
@@ -368,7 +415,13 @@ export function Secrets({ organizationId }: SecretsProps) {
                     })}
                   </div>
                   <div className="mt-3">
-                    <Button variant="outline" size="sm" onClick={addKeyValuePair} className="text-xs">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={addKeyValuePair}
+                      className="text-xs"
+                      disabled={!canWriteSecrets}
+                    >
                       <Plus className="w-3 h-3 mr-1" />
                       Add Pair
                     </Button>
@@ -383,7 +436,12 @@ export function Secrets({ organizationId }: SecretsProps) {
                 <Button
                   color="blue"
                   onClick={editingSecret ? handleUpdate : handleCreate}
-                  disabled={createSecretMutation.isPending || updateSecretMutation.isPending || !secretName?.trim()}
+                  disabled={
+                    createSecretMutation.isPending ||
+                    updateSecretMutation.isPending ||
+                    !secretName?.trim() ||
+                    !canWriteSecrets
+                  }
                   className="flex items-center gap-2"
                 >
                   {createSecretMutation.isPending || updateSecretMutation.isPending ? (

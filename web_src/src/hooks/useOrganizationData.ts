@@ -219,8 +219,13 @@ export const useAssignRole = (organizationId: string) => {
         }),
       );
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) });
+      if (variables.userId) {
+        queryClient.invalidateQueries({ queryKey: ["permissions", organizationId, variables.userId] });
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: ["permissions", organizationId] });
     },
   });
 };

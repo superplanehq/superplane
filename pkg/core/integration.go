@@ -173,7 +173,6 @@ type SyncContext struct {
 	BaseURL         string
 	WebhooksBaseURL string
 	OrganizationID  string
-	InstallationID  string
 	HTTP            HTTPContext
 	Integration     IntegrationContext
 	OIDC            oidc.Provider
@@ -183,7 +182,6 @@ type IntegrationCleanupContext struct {
 	Configuration  any
 	BaseURL        string
 	OrganizationID string
-	InstallationID string
 	Logger         *logrus.Entry
 	HTTP           HTTPContext
 	Integration    IntegrationContext
