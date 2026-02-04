@@ -20,9 +20,9 @@ var _ MappedNullable = &SecretsCreateSecretRequest{}
 
 // SecretsCreateSecretRequest struct for SecretsCreateSecretRequest
 type SecretsCreateSecretRequest struct {
-	Secret *SecretsSecret `json:"secret,omitempty"`
+	Secret     *SecretsSecret           `json:"secret,omitempty"`
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
-	DomainId *string `json:"domainId,omitempty"`
+	DomainId   *string                  `json:"domainId,omitempty"`
 }
 
 // NewSecretsCreateSecretRequest instantiates a new SecretsCreateSecretRequest object
@@ -143,7 +143,7 @@ func (o *SecretsCreateSecretRequest) SetDomainId(v string) {
 }
 
 func (o SecretsCreateSecretRequest) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -199,5 +199,3 @@ func (v *NullableSecretsCreateSecretRequest) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

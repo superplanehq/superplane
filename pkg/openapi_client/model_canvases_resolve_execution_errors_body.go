@@ -73,7 +73,7 @@ func (o *CanvasesResolveExecutionErrorsBody) SetExecutionIds(v []string) {
 }
 
 func (o CanvasesResolveExecutionErrorsBody) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -123,5 +123,3 @@ func (v *NullableCanvasesResolveExecutionErrorsBody) UnmarshalJSON(src []byte) e
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

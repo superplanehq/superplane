@@ -20,7 +20,7 @@ var _ MappedNullable = &ConfigurationRequiredCondition{}
 
 // ConfigurationRequiredCondition struct for ConfigurationRequiredCondition
 type ConfigurationRequiredCondition struct {
-	Field *string `json:"field,omitempty"`
+	Field  *string  `json:"field,omitempty"`
 	Values []string `json:"values,omitempty"`
 }
 
@@ -106,7 +106,7 @@ func (o *ConfigurationRequiredCondition) SetValues(v []string) {
 }
 
 func (o ConfigurationRequiredCondition) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -159,5 +159,3 @@ func (v *NullableConfigurationRequiredCondition) UnmarshalJSON(src []byte) error
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

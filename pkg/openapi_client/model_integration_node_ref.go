@@ -20,10 +20,10 @@ var _ MappedNullable = &IntegrationNodeRef{}
 
 // IntegrationNodeRef struct for IntegrationNodeRef
 type IntegrationNodeRef struct {
-	WorkflowId *string `json:"workflowId,omitempty"`
+	WorkflowId   *string `json:"workflowId,omitempty"`
 	WorkflowName *string `json:"workflowName,omitempty"`
-	NodeId *string `json:"nodeId,omitempty"`
-	NodeName *string `json:"nodeName,omitempty"`
+	NodeId       *string `json:"nodeId,omitempty"`
+	NodeName     *string `json:"nodeName,omitempty"`
 }
 
 // NewIntegrationNodeRef instantiates a new IntegrationNodeRef object
@@ -172,7 +172,7 @@ func (o *IntegrationNodeRef) SetNodeName(v string) {
 }
 
 func (o IntegrationNodeRef) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -231,5 +231,3 @@ func (v *NullableIntegrationNodeRef) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

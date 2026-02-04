@@ -171,9 +171,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
   };
 
   const isUpdating =
-    setSecretKeyMutation.isPending ||
-    deleteSecretKeyMutation.isPending ||
-    updateSecretNameMutation.isPending;
+    setSecretKeyMutation.isPending || deleteSecretKeyMutation.isPending || updateSecretNameMutation.isPending;
   const handleBackToSecrets = () => navigate(`/${organizationId}/settings/secrets`);
 
   if (isLoading || !secretId) {

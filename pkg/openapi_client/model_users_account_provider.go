@@ -21,13 +21,13 @@ var _ MappedNullable = &UsersAccountProvider{}
 
 // UsersAccountProvider struct for UsersAccountProvider
 type UsersAccountProvider struct {
-	ProviderType *string `json:"providerType,omitempty"`
-	ProviderId *string `json:"providerId,omitempty"`
-	Email *string `json:"email,omitempty"`
-	DisplayName *string `json:"displayName,omitempty"`
-	AvatarUrl *string `json:"avatarUrl,omitempty"`
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
-	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+	ProviderType *string    `json:"providerType,omitempty"`
+	ProviderId   *string    `json:"providerId,omitempty"`
+	Email        *string    `json:"email,omitempty"`
+	DisplayName  *string    `json:"displayName,omitempty"`
+	AvatarUrl    *string    `json:"avatarUrl,omitempty"`
+	CreatedAt    *time.Time `json:"createdAt,omitempty"`
+	UpdatedAt    *time.Time `json:"updatedAt,omitempty"`
 }
 
 // NewUsersAccountProvider instantiates a new UsersAccountProvider object
@@ -272,7 +272,7 @@ func (o *UsersAccountProvider) SetUpdatedAt(v time.Time) {
 }
 
 func (o UsersAccountProvider) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -340,5 +340,3 @@ func (v *NullableUsersAccountProvider) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

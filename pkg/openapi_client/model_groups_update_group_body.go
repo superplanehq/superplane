@@ -21,8 +21,8 @@ var _ MappedNullable = &GroupsUpdateGroupBody{}
 // GroupsUpdateGroupBody struct for GroupsUpdateGroupBody
 type GroupsUpdateGroupBody struct {
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
-	DomainId *string `json:"domainId,omitempty"`
-	Group *GroupsGroup `json:"group,omitempty"`
+	DomainId   *string                  `json:"domainId,omitempty"`
+	Group      *GroupsGroup             `json:"group,omitempty"`
 }
 
 // NewGroupsUpdateGroupBody instantiates a new GroupsUpdateGroupBody object
@@ -143,7 +143,7 @@ func (o *GroupsUpdateGroupBody) SetGroup(v GroupsGroup) {
 }
 
 func (o GroupsUpdateGroupBody) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -199,5 +199,3 @@ func (v *NullableGroupsUpdateGroupBody) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

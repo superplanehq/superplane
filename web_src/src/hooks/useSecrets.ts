@@ -196,11 +196,7 @@ export interface SetSecretKeyParams {
   value: string;
 }
 
-export const useSetSecretKey = (
-  domainId: string,
-  domainType: AuthorizationDomainType,
-  secretId: string,
-) => {
+export const useSetSecretKey = (domainId: string, domainType: AuthorizationDomainType, secretId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -227,11 +223,7 @@ export const useSetSecretKey = (
   });
 };
 
-export const useDeleteSecretKey = (
-  domainId: string,
-  domainType: AuthorizationDomainType,
-  secretId: string,
-) => {
+export const useDeleteSecretKey = (domainId: string, domainType: AuthorizationDomainType, secretId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -254,11 +246,7 @@ export const useDeleteSecretKey = (
   });
 };
 
-export const useUpdateSecretName = (
-  domainId: string,
-  domainType: AuthorizationDomainType,
-  secretId: string,
-) => {
+export const useUpdateSecretName = (domainId: string, domainType: AuthorizationDomainType, secretId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({

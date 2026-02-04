@@ -21,8 +21,8 @@ type CanvasNodeExecutionResultReason string
 
 // List of CanvasNodeExecutionResultReason
 const (
-	CANVASNODEEXECUTIONRESULTREASON_RESULT_REASON_OK CanvasNodeExecutionResultReason = "RESULT_REASON_OK"
-	CANVASNODEEXECUTIONRESULTREASON_RESULT_REASON_ERROR CanvasNodeExecutionResultReason = "RESULT_REASON_ERROR"
+	CANVASNODEEXECUTIONRESULTREASON_RESULT_REASON_OK             CanvasNodeExecutionResultReason = "RESULT_REASON_OK"
+	CANVASNODEEXECUTIONRESULTREASON_RESULT_REASON_ERROR          CanvasNodeExecutionResultReason = "RESULT_REASON_ERROR"
 	CANVASNODEEXECUTIONRESULTREASON_RESULT_REASON_ERROR_RESOLVED CanvasNodeExecutionResultReason = "RESULT_REASON_ERROR_RESOLVED"
 )
 
@@ -111,4 +111,3 @@ func (v *NullableCanvasNodeExecutionResultReason) UnmarshalJSON(src []byte) erro
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-

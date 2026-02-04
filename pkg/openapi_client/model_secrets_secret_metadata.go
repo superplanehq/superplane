@@ -21,11 +21,11 @@ var _ MappedNullable = &SecretsSecretMetadata{}
 
 // SecretsSecretMetadata struct for SecretsSecretMetadata
 type SecretsSecretMetadata struct {
-	Id *string `json:"id,omitempty"`
-	Name *string `json:"name,omitempty"`
+	Id         *string                  `json:"id,omitempty"`
+	Name       *string                  `json:"name,omitempty"`
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
-	DomainId *string `json:"domainId,omitempty"`
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	DomainId   *string                  `json:"domainId,omitempty"`
+	CreatedAt  *time.Time               `json:"createdAt,omitempty"`
 }
 
 // NewSecretsSecretMetadata instantiates a new SecretsSecretMetadata object
@@ -210,7 +210,7 @@ func (o *SecretsSecretMetadata) SetCreatedAt(v time.Time) {
 }
 
 func (o SecretsSecretMetadata) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -272,5 +272,3 @@ func (v *NullableSecretsSecretMetadata) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

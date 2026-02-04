@@ -20,8 +20,8 @@ var _ MappedNullable = &SuperplaneComponentsOutputChannel{}
 
 // SuperplaneComponentsOutputChannel struct for SuperplaneComponentsOutputChannel
 type SuperplaneComponentsOutputChannel struct {
-	Name *string `json:"name,omitempty"`
-	Label *string `json:"label,omitempty"`
+	Name        *string `json:"name,omitempty"`
+	Label       *string `json:"label,omitempty"`
 	Description *string `json:"description,omitempty"`
 }
 
@@ -139,7 +139,7 @@ func (o *SuperplaneComponentsOutputChannel) SetDescription(v string) {
 }
 
 func (o SuperplaneComponentsOutputChannel) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -195,5 +195,3 @@ func (v *NullableSuperplaneComponentsOutputChannel) UnmarshalJSON(src []byte) er
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

@@ -21,12 +21,12 @@ var _ MappedNullable = &UsersUserRoleAssignment{}
 
 // UsersUserRoleAssignment struct for UsersUserRoleAssignment
 type UsersUserRoleAssignment struct {
-	RoleName *string `json:"roleName,omitempty"`
-	RoleDisplayName *string `json:"roleDisplayName,omitempty"`
-	RoleDescription *string `json:"roleDescription,omitempty"`
-	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
-	DomainId *string `json:"domainId,omitempty"`
-	AssignedAt *time.Time `json:"assignedAt,omitempty"`
+	RoleName        *string                  `json:"roleName,omitempty"`
+	RoleDisplayName *string                  `json:"roleDisplayName,omitempty"`
+	RoleDescription *string                  `json:"roleDescription,omitempty"`
+	DomainType      *AuthorizationDomainType `json:"domainType,omitempty"`
+	DomainId        *string                  `json:"domainId,omitempty"`
+	AssignedAt      *time.Time               `json:"assignedAt,omitempty"`
 }
 
 // NewUsersUserRoleAssignment instantiates a new UsersUserRoleAssignment object
@@ -243,7 +243,7 @@ func (o *UsersUserRoleAssignment) SetAssignedAt(v time.Time) {
 }
 
 func (o UsersUserRoleAssignment) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -308,5 +308,3 @@ func (v *NullableUsersUserRoleAssignment) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

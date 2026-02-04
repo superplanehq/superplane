@@ -20,8 +20,8 @@ var _ MappedNullable = &CanvasesEmitNodeEventBody{}
 
 // CanvasesEmitNodeEventBody struct for CanvasesEmitNodeEventBody
 type CanvasesEmitNodeEventBody struct {
-	Channel *string `json:"channel,omitempty"`
-	Data map[string]interface{} `json:"data,omitempty"`
+	Channel *string                `json:"channel,omitempty"`
+	Data    map[string]interface{} `json:"data,omitempty"`
 }
 
 // NewCanvasesEmitNodeEventBody instantiates a new CanvasesEmitNodeEventBody object
@@ -106,7 +106,7 @@ func (o *CanvasesEmitNodeEventBody) SetData(v map[string]interface{}) {
 }
 
 func (o CanvasesEmitNodeEventBody) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -159,5 +159,3 @@ func (v *NullableCanvasesEmitNodeEventBody) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-

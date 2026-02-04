@@ -73,7 +73,7 @@ func (o *OrganizationsListIntegrationResourcesResponse) SetResources(v []Organiz
 }
 
 func (o OrganizationsListIntegrationResourcesResponse) MarshalJSON() ([]byte, error) {
-	toSerialize,err := o.ToMap()
+	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -123,5 +123,3 @@ func (v *NullableOrganizationsListIntegrationResourcesResponse) UnmarshalJSON(sr
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
-
-
