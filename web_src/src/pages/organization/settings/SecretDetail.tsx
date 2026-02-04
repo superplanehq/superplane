@@ -8,12 +8,7 @@ import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { Edit2, Key, Loader2, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  useDeleteSecret,
-  useSecret,
-  useUpdateSecret,
-  type UpdateSecretParams,
-} from "@/hooks/useSecrets";
+import { useDeleteSecret, useSecret, useUpdateSecret, type UpdateSecretParams } from "@/hooks/useSecrets";
 
 const MASKED_VALUE_PLACEHOLDER = "***";
 
@@ -31,16 +26,8 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
   const [newKey, setNewKey] = useState("");
   const [newValue, setNewValue] = useState("");
 
-  const { data: secret, isLoading, error } = useSecret(
-    organizationId,
-    "DOMAIN_TYPE_ORGANIZATION",
-    secretId || "",
-  );
-  const updateSecretMutation = useUpdateSecret(
-    organizationId,
-    "DOMAIN_TYPE_ORGANIZATION",
-    secretId || "",
-  );
+  const { data: secret, isLoading, error } = useSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
+  const updateSecretMutation = useUpdateSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
   const deleteSecretMutation = useDeleteSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION");
 
   const handleSaveEdit = async () => {
@@ -151,9 +138,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
   const handleDelete = async () => {
     if (!secret) return;
     if (
-      !confirm(
-        `Are you sure you want to delete the secret "${secret.metadata?.name}"? This action cannot be undone.`,
-      )
+      !confirm(`Are you sure you want to delete the secret "${secret.metadata?.name}"? This action cannot be undone.`)
     ) {
       return;
     }
@@ -174,14 +159,15 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
       <div className="space-y-6 pt-6">
         <div className="mb-4">
           <Breadcrumbs
-            items={[{ label: "Secrets", onClick: handleBackToSecrets }, { label: "Secret", current: true }]}
+            items={[
+              { label: "Secrets", onClick: handleBackToSecrets },
+              { label: "Secret", current: true },
+            ]}
             showDivider={false}
           />
         </div>
         <div className="flex justify-center items-center h-32">
-          <p className="text-gray-500 dark:text-gray-400">
-            {!secretId ? "Secret not found" : "Loading..."}
-          </p>
+          <p className="text-gray-500 dark:text-gray-400">{!secretId ? "Secret not found" : "Loading..."}</p>
         </div>
       </div>
     );
@@ -247,156 +233,154 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
           </Button>
         </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
-        <div className="p-6">
-        <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100 mb-3">Key-value pairs</h3>
-        <div className="space-y-2">
-          {keys.map((keyName) => {
-            const isEditing = editingKey === keyName;
-            return (
-              <div
-                key={keyName}
-                className={
-                  isEditing
-                    ? "flex gap-2 items-start rounded-md border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-800/50 space-y-2"
-                    : "flex items-center gap-2 text-sm font-mono bg-gray-50 dark:bg-gray-800 rounded px-3 py-2"
-                }
-              >
-                {isEditing ? (
-                  <>
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <Label className="text-xs text-gray-500 dark:text-gray-400 font-normal">Key</Label>
-                      <Input
-                        type="text"
-                        value={editingKeyName}
-                        onChange={(e) => setEditingKeyName(e.target.value)}
-                        placeholder="Key name"
-                        className="font-mono text-sm"
-                        data-testid="secret-detail-edit-key-name"
-                      />
-                      <Label className="text-xs text-gray-500 dark:text-gray-400 font-normal block mt-2">
-                        Value
-                      </Label>
-                      <Textarea
-                        value={editingValue}
-                        onChange={(e) => setEditingValue(e.target.value)}
-                        placeholder="Value"
-                        rows={8}
-                        className="font-mono text-sm resize-y bg-white dark:bg-gray-900"
-                        autoFocus
-                        data-testid="secret-detail-edit-value"
-                      />
-                      <div className="flex gap-2 mt-2">
-                        <Button
-                          size="sm"
-                          onClick={handleSaveEdit}
-                          disabled={!editingKeyName.trim() || !editingValue.trim() || isUpdating}
-                          data-testid="secret-detail-edit-save"
-                        >
-                          {isUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-gray-700 dark:text-gray-200 shrink-0 w-32 truncate" title={keyName}>
-                      {keyName}
-                    </span>
-                    <span className="text-gray-500 dark:text-gray-400">•••</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                        onClick={() => {
-                          setEditingKey(keyName);
-                          setEditingKeyName(keyName);
-                          setEditingValue("");
-                        }}
-                      className="shrink-0 text-gray-600 dark:text-gray-300"
-                      title="Edit value"
-                      data-testid="secret-detail-edit-key"
-                    >
-                      <Edit2 className="w-3 h-3" />
-                    </Button>
-                    {keys.length > 1 && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
+          <div className="p-6">
+            <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100 mb-3">Key-value pairs</h3>
+            <div className="space-y-2">
+              {keys.map((keyName) => {
+                const isEditing = editingKey === keyName;
+                return (
+                  <div
+                    key={keyName}
+                    className={
+                      isEditing
+                        ? "flex gap-2 items-start rounded-md border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-800/50 space-y-2"
+                        : "flex items-center gap-2 text-sm font-mono bg-gray-50 dark:bg-gray-800 rounded px-3 py-2"
+                    }
+                  >
+                    {isEditing ? (
+                      <>
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <Label className="text-xs text-gray-500 dark:text-gray-400 font-normal">Key</Label>
+                          <Input
+                            type="text"
+                            value={editingKeyName}
+                            onChange={(e) => setEditingKeyName(e.target.value)}
+                            placeholder="Key name"
+                            className="font-mono text-sm"
+                            data-testid="secret-detail-edit-key-name"
+                          />
+                          <Label className="text-xs text-gray-500 dark:text-gray-400 font-normal block mt-2">
+                            Value
+                          </Label>
+                          <Textarea
+                            value={editingValue}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            placeholder="Value"
+                            rows={8}
+                            className="font-mono text-sm resize-y bg-white dark:bg-gray-900"
+                            autoFocus
+                            data-testid="secret-detail-edit-value"
+                          />
+                          <div className="flex gap-2 mt-2">
+                            <Button
+                              size="sm"
+                              onClick={handleSaveEdit}
+                              disabled={!editingKeyName.trim() || !editingValue.trim() || isUpdating}
+                              data-testid="secret-detail-edit-save"
+                            >
+                              {isUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-gray-700 dark:text-gray-200 shrink-0 w-32 truncate" title={keyName}>
+                          {keyName}
+                        </span>
+                        <span className="text-gray-500 dark:text-gray-400">•••</span>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleRemoveKey(keyName)}
-                          disabled={isUpdating}
-                          className="shrink-0 text-red-600 hover:text-red-700 dark:text-red-400"
-                          title="Remove key"
-                          data-testid="secret-detail-remove-key"
+                          onClick={() => {
+                            setEditingKey(keyName);
+                            setEditingKeyName(keyName);
+                            setEditingValue("");
+                          }}
+                          className="shrink-0 text-gray-600 dark:text-gray-300"
+                          title="Edit value"
+                          data-testid="secret-detail-edit-key"
                         >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
+                          <Edit2 className="w-3 h-3" />
+                        </Button>
+                        {keys.length > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveKey(keyName)}
+                            disabled={isUpdating}
+                            className="shrink-0 text-red-600 hover:text-red-700 dark:text-red-400"
+                            title="Remove key"
+                            data-testid="secret-detail-remove-key"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </>
                     )}
-                  </>
-                )}
-              </div>
-            );
-          })}
-          {isAddingKey && (
-            <div className="flex gap-2 items-start rounded-md border border-gray-200 dark:border-gray-700 border-dashed p-4 bg-gray-50/50 dark:bg-gray-800/50">
-              <div className="flex-1 min-w-0 space-y-2">
-                <Label className="text-xs text-gray-500 dark:text-gray-400 font-normal">Key</Label>
-                <Input
-                  type="text"
-                  value={newKey}
-                  onChange={(e) => setNewKey(e.target.value)}
-                  placeholder="Key name"
-                  className="font-mono text-sm"
-                  data-testid="secret-detail-add-key-name"
-                />
-                <Label className="text-xs text-gray-500 dark:text-gray-400 font-normal block mt-2">
-                  Value
-                </Label>
-                <Textarea
-                  value={newValue}
-                  onChange={(e) => setNewValue(e.target.value)}
-                  placeholder="Value"
-                  rows={8}
-                  className="font-mono text-sm resize-y bg-white dark:bg-gray-900"
-                  data-testid="secret-detail-add-value"
-                />
-                <div className="flex gap-2 mt-2">
-                  <Button
-                    size="sm"
-                    onClick={handleAddKey}
-                    disabled={!newKey.trim() || !newValue.trim() || isUpdating}
-                    data-testid="secret-detail-add-save"
-                  >
-                    {isUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={handleCancelAdd}>
-                    Cancel
-                  </Button>
+                  </div>
+                );
+              })}
+              {isAddingKey && (
+                <div className="flex gap-2 items-start rounded-md border border-gray-200 dark:border-gray-700 border-dashed p-4 bg-gray-50/50 dark:bg-gray-800/50">
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <Label className="text-xs text-gray-500 dark:text-gray-400 font-normal">Key</Label>
+                    <Input
+                      type="text"
+                      value={newKey}
+                      onChange={(e) => setNewKey(e.target.value)}
+                      placeholder="Key name"
+                      className="font-mono text-sm"
+                      data-testid="secret-detail-add-key-name"
+                    />
+                    <Label className="text-xs text-gray-500 dark:text-gray-400 font-normal block mt-2">Value</Label>
+                    <Textarea
+                      value={newValue}
+                      onChange={(e) => setNewValue(e.target.value)}
+                      placeholder="Value"
+                      rows={8}
+                      className="font-mono text-sm resize-y bg-white dark:bg-gray-900"
+                      data-testid="secret-detail-add-value"
+                    />
+                    <div className="flex gap-2 mt-2">
+                      <Button
+                        size="sm"
+                        onClick={handleAddKey}
+                        disabled={!newKey.trim() || !newValue.trim() || isUpdating}
+                        data-testid="secret-detail-add-save"
+                      >
+                        {isUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={handleCancelAdd}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
-          )}
+            {!isAddingKey && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsAddingKey(true);
+                  setNewKey("");
+                  setNewValue("");
+                }}
+                className="mt-3 text-xs"
+                data-testid="secret-detail-add-key"
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                Add key
+              </Button>
+            )}
+          </div>
         </div>
-        {!isAddingKey && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setIsAddingKey(true);
-              setNewKey("");
-              setNewValue("");
-            }}
-            className="mt-3 text-xs"
-            data-testid="secret-detail-add-key"
-          >
-            <Plus className="w-3 h-3 mr-1" />
-            Add key
-          </Button>
-        )}
-        </div>
-      </div>
       </div>
     </div>
   );

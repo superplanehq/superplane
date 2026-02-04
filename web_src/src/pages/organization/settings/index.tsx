@@ -438,10 +438,7 @@ export function OrganizationSettings() {
               }
             />
             <Route path="secrets" element={<Secrets organizationId={organizationId || ""} />} />
-            <Route
-              path="secrets/:secretId"
-              element={<SecretDetail organizationId={organizationId || ""} />}
-            />
+            <Route path="secrets/:secretId" element={<SecretDetail organizationId={organizationId || ""} />} />
             <Route path="create-role" element={<CreateRolePage />} />
             <Route path="create-role/:roleName" element={<CreateRolePage />} />
             <Route path="profile" element={<Profile />} />

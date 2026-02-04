@@ -12,11 +12,7 @@ import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { Key, Loader2, Plus, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  useCreateSecret,
-  useSecrets,
-  type CreateSecretParams,
-} from "@/hooks/useSecrets";
+import { useCreateSecret, useSecrets, type CreateSecretParams } from "@/hooks/useSecrets";
 
 interface SecretsProps {
   organizationId: string;
@@ -122,9 +118,7 @@ export function Secrets({ organizationId }: SecretsProps) {
     );
   }
 
-  const sortedSecrets = [...secrets].sort((a, b) =>
-    (a.metadata?.name || "").localeCompare(b.metadata?.name || ""),
-  );
+  const sortedSecrets = [...secrets].sort((a, b) => (a.metadata?.name || "").localeCompare(b.metadata?.name || ""));
 
   return (
     <div className="space-y-6 pt-6">
@@ -226,9 +220,7 @@ export function Secrets({ organizationId }: SecretsProps) {
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                   <Key className="w-6 h-6 text-gray-500 dark:text-gray-400" />
-                  <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">
-                    Create Secret
-                  </h3>
+                  <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">Create Secret</h3>
                 </div>
                 <button
                   type="button"
@@ -296,7 +288,15 @@ export function Secrets({ organizationId }: SecretsProps) {
                       </div>
                     ))}
                   </div>
-                  <Button type="button" variant="outline" size="sm" onClick={addKeyValuePair} className="mt-3 text-xs" disabled={!canCreateSecrets} data-testid="secrets-create-add-pair">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addKeyValuePair}
+                    className="mt-3 text-xs"
+                    disabled={!canCreateSecrets}
+                    data-testid="secrets-create-add-pair"
+                  >
                     <Plus className="w-3 h-3 mr-1" />
                     Add Pair
                   </Button>
@@ -320,7 +320,12 @@ export function Secrets({ organizationId }: SecretsProps) {
                     "Create Secret"
                   )}
                 </Button>
-                <Button type="button" variant="outline" onClick={handleCloseCreateModal} disabled={createSecretMutation.isPending}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCloseCreateModal}
+                  disabled={createSecretMutation.isPending}
+                >
                   Cancel
                 </Button>
               </div>

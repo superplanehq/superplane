@@ -116,7 +116,6 @@ func (s *SecretsSteps) fillKeyValuePair(index int, key, value string) {
 	s.session.Sleep(200)
 }
 
-
 func (s *SecretsSteps) clickAddPair() {
 	page := s.session.Page()
 	if err := page.GetByTestId("secrets-create-add-pair").Click(); err != nil {

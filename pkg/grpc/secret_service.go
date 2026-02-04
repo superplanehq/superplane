@@ -50,3 +50,15 @@ func (s *SecretService) DeleteSecret(ctx context.Context, req *pb.DeleteSecretRe
 	domainId := ctx.Value(authorization.DomainIdContextKey).(string)
 	return secrets.DeleteSecret(ctx, domainType, domainId, req.IdOrName)
 }
+
+func (s *SecretService) SetSecretKey(ctx context.Context, req *pb.SetSecretKeyRequest) (*pb.SetSecretKeyResponse, error) {
+	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
+	domainId := ctx.Value(authorization.DomainIdContextKey).(string)
+	return secrets.SetSecretKey(ctx, s.encryptor, domainType, domainId, req.IdOrName, req.KeyName, req.Value)
+}
+
+func (s *SecretService) DeleteSecretKey(ctx context.Context, req *pb.DeleteSecretKeyRequest) (*pb.DeleteSecretKeyResponse, error) {
+	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
+	domainId := ctx.Value(authorization.DomainIdContextKey).(string)
+	return secrets.DeleteSecretKey(ctx, s.encryptor, domainType, domainId, req.IdOrName, req.KeyName)
+}
