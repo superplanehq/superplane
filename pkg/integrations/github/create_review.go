@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/google/go-github/v74/github"
 	"github.com/google/uuid"
@@ -15,7 +16,7 @@ type CreateReview struct{}
 
 type CreateReviewConfiguration struct {
 	Repository string                `mapstructure:"repository"`
-	PullNumber int                   `mapstructure:"pullNumber"`
+	PullNumber string                `mapstructure:"pullNumber"`
 	Event      string                `mapstructure:"event"`
 	Body       *string               `mapstructure:"body,omitempty"`
 	CommitID   *string               `mapstructure:"commitId,omitempty"`
@@ -103,9 +104,9 @@ func (c *CreateReview) Configuration() []configuration.Field {
 		{
 			Name:        "pullNumber",
 			Label:       "Pull Request Number",
-			Type:        configuration.FieldTypeNumber,
+			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Placeholder: "e.g., 42",
+			Placeholder: "e.g., 42 or {{$.data.number}}",
 			Description: "The pull request number to review",
 		},
 		{
@@ -208,6 +209,11 @@ func (c *CreateReview) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
+	pullNumber, err := strconv.Atoi(config.PullNumber)
+	if err != nil {
+		return fmt.Errorf("invalid pull request number %q: %w", config.PullNumber, err)
+	}
+
 	// Build the review request
 	reviewRequest := &github.PullRequestReviewRequest{
 		Event: &config.Event,
@@ -240,7 +246,7 @@ func (c *CreateReview) Execute(ctx core.ExecutionContext) error {
 		context.Background(),
 		appMetadata.Owner,
 		config.Repository,
-		config.PullNumber,
+		pullNumber,
 		reviewRequest,
 	)
 	if err != nil {

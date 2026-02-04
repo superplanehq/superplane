@@ -8,6 +8,7 @@ import { ComponentBaseProps } from "@/ui/componentBase";
 import { ComponentBaseMapper, OutputPayload } from "../types";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
+import { MetadataItem } from "@/ui/metadataList";
 
 interface ReviewOutput {
   id?: number;
@@ -23,6 +24,38 @@ interface ReviewOutput {
   };
 }
 
+interface CreateReviewConfiguration {
+  repository?: string;
+  pullNumber?: string;
+  event?: string;
+  body?: string;
+}
+
+function getCreateReviewMetadataList(node: ComponentsNode): MetadataItem[] {
+  const metadata: MetadataItem[] = [];
+  const configuration = node.configuration as CreateReviewConfiguration | undefined;
+  const nodeMetadata = node.metadata as { repository?: { name?: string } } | undefined;
+
+  if (nodeMetadata?.repository?.name) {
+    metadata.push({ icon: "book", label: nodeMetadata.repository.name });
+  }
+
+  if (configuration?.pullNumber) {
+    metadata.push({ icon: "hash", label: `PR #${configuration.pullNumber}` });
+  }
+
+  if (configuration?.event) {
+    const eventLabels: Record<string, string> = {
+      APPROVE: "Approve",
+      REQUEST_CHANGES: "Request Changes",
+      COMMENT: "Comment",
+    };
+    metadata.push({ icon: "tag", label: eventLabels[configuration.event] || configuration.event });
+  }
+
+  return metadata;
+}
+
 export const createReviewMapper: ComponentBaseMapper = {
   props(
     nodes: ComponentsNode[],
@@ -31,7 +64,12 @@ export const createReviewMapper: ComponentBaseMapper = {
     lastExecutions: CanvasesCanvasNodeExecution[],
     queueItems: CanvasesCanvasNodeQueueItem[],
   ): ComponentBaseProps {
-    return baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
+    const base = baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
+
+    return {
+      ...base,
+      metadata: getCreateReviewMetadataList(node),
+    };
   },
   subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
