@@ -125,9 +125,7 @@ func Test__ListNotes__Execute(t *testing.T) {
 
 		// Verify response contains expected data
 		require.Len(t, execCtx.Payloads, 1)
-		wrappedPayload, ok := execCtx.Payloads[0].(map[string]any)
-		require.True(t, ok)
-		responseData, ok := wrappedPayload["data"].(map[string]any)
+		responseData, ok := execCtx.Payloads[0].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, 2, responseData["total"])
 	})
@@ -169,9 +167,7 @@ func Test__ListNotes__Execute(t *testing.T) {
 
 		// Verify response contains expected data
 		require.Len(t, execCtx.Payloads, 1)
-		wrappedPayload, ok := execCtx.Payloads[0].(map[string]any)
-		require.True(t, ok)
-		responseData, ok := wrappedPayload["data"].(map[string]any)
+		responseData, ok := execCtx.Payloads[0].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, 0, responseData["total"])
 	})
