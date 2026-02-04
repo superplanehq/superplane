@@ -13,7 +13,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -25,15 +24,13 @@ import (
 
 type NodeQueueWorker struct {
 	registry  *registry.Registry
-	encryptor crypto.Encryptor
 	semaphore *semaphore.Weighted
 	logger    *log.Entry
 }
 
-func NewNodeQueueWorker(registry *registry.Registry, encryptor crypto.Encryptor) *NodeQueueWorker {
+func NewNodeQueueWorker(registry *registry.Registry) *NodeQueueWorker {
 	return &NodeQueueWorker{
 		registry:  registry,
-		encryptor: encryptor,
 		semaphore: semaphore.NewWeighted(25),
 		logger:    log.WithFields(log.Fields{"worker": "NodeQueueWorker"}),
 	}
@@ -136,7 +133,7 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 		return nil, nil, err
 	}
 
-	ctx, err := contexts.BuildProcessQueueContext(w.registry.GetHTTPClient(), tx, node, queueItem, configFields, w.encryptor)
+	ctx, err := contexts.BuildProcessQueueContext(w.registry.GetHTTPClient(), tx, node, queueItem, configFields)
 	if err != nil {
 
 		//

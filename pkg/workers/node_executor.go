@@ -192,13 +192,7 @@ func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.Canva
 		configBuilder = configBuilder.WithConfigurationFields(configFields)
 	}
 
-	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID)
-	if err == nil {
-		configBuilder = configBuilder.WithSecretResolver(
-			contexts.NewSecretResolver(tx, models.DomainTypeOrganization, workflow.OrganizationID, w.encryptor),
-		)
-	}
-
+	// Do not resolve secrets here: persisted config must store only secret IDs (references).
 	config, err := configBuilder.Build(firstNode.Configuration)
 
 	if err != nil {
@@ -280,6 +274,22 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		return fmt.Errorf("failed to find workflow: %v", err)
 	}
 
+	// Resolve secret references in memory only; persisted config stores only secret IDs.
+	config := execution.Configuration.Data()
+	configFields := component.Configuration()
+	if len(configFields) > 0 {
+		resolved, err := contexts.ResolveSecretReferencesInConfig(
+			config,
+			configFields,
+			contexts.NewSecretResolver(tx, models.DomainTypeOrganization, workflow.OrganizationID, w.encryptor),
+		)
+		if err != nil {
+			logger.Errorf("failed to resolve secret references: %v", err)
+			return execution.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, fmt.Sprintf("failed to resolve secret references: %v", err))
+		}
+		config = resolved
+	}
+
 	ctx := core.ExecutionContext{
 		ID:             execution.ID,
 		WorkflowID:     execution.WorkflowID.String(),
@@ -287,7 +297,7 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		NodeID:         execution.NodeID,
 		SourceNodeID:   inputEvent.NodeID,
 		BaseURL:        w.baseURL,
-		Configuration:  execution.Configuration.Data(),
+		Configuration:  config,
 		Data:           input,
 		HTTP:           contexts.NewHTTPContext(w.registry.GetHTTPClient()),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
