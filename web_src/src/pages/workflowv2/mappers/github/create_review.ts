@@ -1,12 +1,11 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
 import {
-  ComponentBaseContext,
-  ComponentBaseMapper,
-  ExecutionDetailsContext,
-  NodeInfo,
-  OutputPayload,
-  SubtitleContext,
-} from "../types";
+  ComponentsNode,
+  ComponentsComponent,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
+} from "@/api-client";
+import { ComponentBaseProps } from "@/ui/componentBase";
+import { ComponentBaseMapper, OutputPayload } from "../types";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
 import { MetadataItem } from "@/ui/metadataList";
@@ -25,9 +24,16 @@ interface ReviewOutput {
   };
 }
 
-function getCreateReviewMetadataList(node: NodeInfo): MetadataItem[] {
+interface CreateReviewConfiguration {
+  repository?: string;
+  pullNumber?: string;
+  event?: string;
+  body?: string;
+}
+
+function getCreateReviewMetadataList(node: ComponentsNode): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as { repository?: string; pullNumber?: string; event?: string } | undefined;
+  const configuration = node.configuration as CreateReviewConfiguration | undefined;
   const nodeMetadata = node.metadata as { repository?: { name?: string } } | undefined;
 
   if (nodeMetadata?.repository?.name) {
@@ -51,32 +57,38 @@ function getCreateReviewMetadataList(node: NodeInfo): MetadataItem[] {
 }
 
 export const createReviewMapper: ComponentBaseMapper = {
-  props(context: ComponentBaseContext): ComponentBaseProps {
-    const base = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+  props(
+    nodes: ComponentsNode[],
+    node: ComponentsNode,
+    componentDefinition: ComponentsComponent,
+    lastExecutions: CanvasesCanvasNodeExecution[],
+    queueItems: CanvasesCanvasNodeQueueItem[],
+  ): ComponentBaseProps {
+    const base = baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
 
     return {
       ...base,
-      metadata: getCreateReviewMetadataList(context.node),
+      metadata: getCreateReviewMetadataList(node),
     };
   },
-  subtitle(context: SubtitleContext): string {
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
+    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
     if (outputs?.default && outputs.default.length > 0) {
       const reviews = outputs.default[0].data as ReviewOutput | ReviewOutput[];
       const review = Array.isArray(reviews) ? reviews[0] : reviews;
       if (review?.state) {
-        return buildGithubExecutionSubtitle(context.execution, review.state);
+        return buildGithubExecutionSubtitle(execution, review.state);
       }
     }
-    return buildGithubExecutionSubtitle(context.execution);
+    return buildGithubExecutionSubtitle(execution);
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
+    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
     const details: Record<string, string> = {};
 
     Object.assign(details, {
-      "Submitted At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",
+      "Submitted At": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : "-",
     });
 
     if (outputs?.default && outputs.default.length > 0) {
@@ -97,6 +109,7 @@ export const createReviewMapper: ComponentBaseMapper = {
         }
 
         if (review.body) {
+          // Truncate body for display
           const truncated = review.body.length > 100 ? review.body.substring(0, 100) + "..." : review.body;
           details["Body"] = truncated;
         }
