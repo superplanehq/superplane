@@ -101,6 +101,7 @@ func (g *GitHub) Components() []core.Component {
 		&CreateRelease{},
 		&UpdateRelease{},
 		&DeleteRelease{},
+		&ListReleases{},
 	}
 }
 
