@@ -113,8 +113,7 @@ func (g *GitLab) Description() string {
 }
 
 func (g *GitLab) Instructions() string {
-	scopes := strings.Join(scopeList, ", ")
-	return fmt.Sprintf("For **App OAuth**, you can leave the **Client ID** and **Secret** fields empty initially. You will be guided through the OAuth application setup process with the required callback URL.\n\nFor **Personal Access Token**, generate a token in your GitLab User Settings > Access Tokens with the following scopes: %s", scopes)
+	return fmt.Sprintf("For **App OAuth**, leave **Client ID** and **Secret** empty to start the setup wizard.\n\nFor **Personal Access Token**, use scopes: %s.", strings.Join(scopeList, ", "))
 }
 
 func (g *GitLab) Configuration() []configuration.Field {
@@ -235,17 +234,24 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 	// Case 2: Has credentials but no tokens - show auth button
 	refreshToken, _ := findSecret(ctx.Integration, OAuthRefreshToken)
 	if refreshToken == "" {
-		state, err := crypto.Base64String(32)
-		if err != nil {
-			return fmt.Errorf("failed to generate state: %v", err)
-		}
-
 		metadata := Metadata{}
 		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
 			ctx.Logger.Errorf("Failed to decode metadata while setting state: %v", err)
 		}
-		metadata.State = state
-		ctx.Integration.SetMetadata(metadata)
+
+		//
+		// If state is already set, reuse it to avoid race conditions.
+		//
+		state := metadata.State
+		if state == "" {
+			var err error
+			state, err = crypto.Base64String(32)
+			if err != nil {
+				return fmt.Errorf("failed to generate state: %v", err)
+			}
+			metadata.State = state
+			ctx.Integration.SetMetadata(metadata)
+		}
 
 		authURL := fmt.Sprintf(
 			"%s/oauth/authorize?client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s",
@@ -363,6 +369,12 @@ func (g *GitLab) updateMetadata(ctx core.SyncContext) error {
 	if user != nil {
 		metadata.Owner = fmt.Sprintf("%d", user.ID)
 	}
+
+	//
+	// Clear state after successful connection
+	//
+	metadata.State = ""
+
 	ctx.Integration.SetMetadata(metadata)
 
 	return nil
