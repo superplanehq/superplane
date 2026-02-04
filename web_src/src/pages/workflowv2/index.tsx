@@ -115,7 +115,10 @@ export function WorkflowPageV2() {
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
   const { data: widgets = [], isLoading: widgetsLoading } = useWidgets();
   const { data: availableIntegrations = [], isLoading: integrationsLoading } = useAvailableIntegrations();
-  const { data: integrations = [] } = useConnectedIntegrations(organizationId!);
+  const canReadIntegrations = canAct("integrations", "read");
+  const canCreateIntegrations = canAct("integrations", "create");
+  const canUpdateIntegrations = canAct("integrations", "update");
+  const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
   const { data: canvas, isLoading: canvasLoading, error: canvasError } = useCanvas(organizationId!, canvasId!);
   const { data: canvasEventsResponse } = useCanvasEvents(canvasId!);
   const canUpdateCanvas = canAct("canvases", "update");
@@ -2770,6 +2773,14 @@ export function WorkflowPageV2() {
   const saveButtonHidden = isTemplate || !canUpdateCanvas || !hasUnsavedChanges;
   const saveIsPrimary = hasUnsavedChanges && !isTemplate && canUpdateCanvas;
   const canUndo = !isTemplate && canUpdateCanvas && !isAutoSaveEnabled && initialWorkflowSnapshot !== null;
+  const runDisabled = hasRunBlockingChanges || isTemplate || !canUpdateCanvas;
+  const runDisabledTooltip = !canUpdateCanvas
+    ? "You don't have permission to emit events on this canvas."
+    : isTemplate
+      ? "Templates are read-only"
+      : hasRunBlockingChanges
+        ? "Save canvas changes before running"
+        : undefined;
 
   return (
     <>
@@ -2818,7 +2829,10 @@ export function WorkflowPageV2() {
         onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
         onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}
         onPlaceholderConfigure={!isReadOnly ? handlePlaceholderConfigure : undefined}
-        integrations={integrations}
+        integrations={canReadIntegrations ? integrations : []}
+        canReadIntegrations={canReadIntegrations}
+        canCreateIntegrations={canCreateIntegrations}
+        canUpdateIntegrations={canUpdateIntegrations}
         readOnly={isReadOnly}
         hasFitToViewRef={hasFitToViewRef}
         hasUserToggledSidebarRef={hasUserToggledSidebarRef}
@@ -2838,14 +2852,8 @@ export function WorkflowPageV2() {
         autoSaveDisabledTooltip={autoSaveDisabledTooltip}
         onExportYamlCopy={isDev ? handleExportYamlCopy : undefined}
         onExportYamlDownload={isDev ? handleExportYamlDownload : undefined}
-        runDisabled={hasRunBlockingChanges || isTemplate}
-        runDisabledTooltip={
-          isTemplate
-            ? "Templates are read-only"
-            : hasRunBlockingChanges
-              ? "Save canvas changes before running"
-              : undefined
-        }
+        runDisabled={runDisabled}
+        runDisabledTooltip={runDisabledTooltip}
         onCancelQueueItem={onCancelQueueItem}
         onPushThrough={onPushThrough}
         supportsPushThrough={supportsPushThrough}
@@ -2858,7 +2866,7 @@ export function WorkflowPageV2() {
         getAllQueueEvents={getAllQueueEvents}
         getHasMoreQueue={getHasMoreQueue}
         getLoadingMoreQueue={getLoadingMoreQueue}
-        onReEmit={handleReEmit}
+        onReEmit={canUpdateCanvas ? handleReEmit : undefined}
         loadExecutionChain={loadExecutionChain}
         getExecutionState={getExecutionState}
         workflowNodes={canvas?.spec?.nodes}
@@ -2866,7 +2874,7 @@ export function WorkflowPageV2() {
         triggers={triggers}
         blueprints={blueprints}
         logEntries={logEntries}
-        onResolveExecutionErrors={handleResolveExecutionErrors}
+        onResolveExecutionErrors={canUpdateCanvas ? handleResolveExecutionErrors : undefined}
         focusRequest={focusRequest}
         onExecutionChainHandled={handleExecutionChainHandled}
         breadcrumbs={[

@@ -135,6 +135,9 @@ export interface CanvasPageProps {
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
   readOnly?: boolean;
+  canReadIntegrations?: boolean;
+  canCreateIntegrations?: boolean;
+  canUpdateIntegrations?: boolean;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
   // Undo functionality
@@ -283,6 +286,7 @@ const nodeTypes = {
         selected={nodeProps.selected}
         runDisabled={callbacks?.runDisabled}
         runDisabledTooltip={callbacks?.runDisabledTooltip}
+        showHeader={callbacks?.showHeader}
         onExpand={callbacks.handleNodeExpand}
         onClick={() => callbacks.handleNodeClick(nodeProps.id)}
         onEdit={() => callbacks.onNodeEdit.current?.(nodeProps.id)}
@@ -925,6 +929,10 @@ function CanvasPage(props: CanvasPageProps) {
             onHighlightedNodesChange={setHighlightedNodeIds}
             focusRequest={props.focusRequest}
             onExecutionChainHandled={props.onExecutionChainHandled}
+            readOnly={readOnly}
+            canReadIntegrations={props.canReadIntegrations}
+            canCreateIntegrations={props.canCreateIntegrations}
+            canUpdateIntegrations={props.canUpdateIntegrations}
           />
         </div>
       </div>
@@ -995,6 +1003,10 @@ function Sidebar({
   onHighlightedNodesChange,
   focusRequest,
   onExecutionChainHandled,
+  readOnly,
+  canReadIntegrations,
+  canCreateIntegrations,
+  canUpdateIntegrations,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -1044,6 +1056,10 @@ function Sidebar({
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
   focusRequest?: FocusRequest | null;
   onExecutionChainHandled?: () => void;
+  readOnly?: boolean;
+  canReadIntegrations?: boolean;
+  canCreateIntegrations?: boolean;
+  canUpdateIntegrations?: boolean;
 }) {
   const sidebarData = useMemo(() => {
     if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
@@ -1175,6 +1191,9 @@ function Sidebar({
       integrationName={editingNodeData?.integrationName}
       integrationRef={editingNodeData?.integrationRef}
       integrations={integrations}
+      canReadIntegrations={canReadIntegrations}
+      canCreateIntegrations={canCreateIntegrations}
+      canUpdateIntegrations={canUpdateIntegrations}
       autocompleteExampleObj={autocompleteExampleObj}
       currentTab={isAnnotationNode ? "settings" : currentTab}
       onTabChange={onTabChange}
@@ -1190,6 +1209,7 @@ function Sidebar({
       onExecutionChainHandled={onExecutionChainHandled}
       hideRunsTab={isAnnotationNode}
       hideNodeId={isAnnotationNode}
+      readOnly={readOnly}
     />
   );
 }
@@ -1770,6 +1790,8 @@ function CanvasContent({
     [fitView, getViewport, onZoomChange, hasFitToViewRef, viewportRef, initialFocusNodeId],
   );
 
+  const showHeader = !isReadOnly;
+
   // Store callback handlers in a ref so they can be accessed without being in node data
   const callbacksRef = useRef({
     handleNodeExpand,
@@ -1787,6 +1809,7 @@ function CanvasContent({
     aiState: state.ai,
     runDisabled,
     runDisabledTooltip,
+    showHeader,
   });
   callbacksRef.current = {
     handleNodeExpand,
@@ -1804,6 +1827,7 @@ function CanvasContent({
     aiState: state.ai,
     runDisabled,
     runDisabledTooltip,
+    showHeader,
   };
 
   // Just pass the state nodes directly - callbacks will be added in nodeTypes
