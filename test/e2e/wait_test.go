@@ -97,7 +97,14 @@ func (s *WaitSteps) givenACanvasWithManualTriggerWaitAndOutput() {
 
 func (s *WaitSteps) runManualTrigger() {
 	s.canvas.RunManualTrigger("Start")
-	s.canvas.WaitForExecution("Wait", models.CanvasNodeExecutionStatePending, 10*time.Second)
+	s.canvas.WaitForExecutionInStates(
+		"Wait",
+		[]string{
+			models.CanvasNodeExecutionStatePending,
+			models.CanvasNodeExecutionStateStarted,
+		},
+		10*time.Second,
+	)
 }
 
 func (s *WaitSteps) openSidebarForNode(node string) {
