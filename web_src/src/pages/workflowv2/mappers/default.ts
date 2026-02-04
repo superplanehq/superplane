@@ -1,6 +1,6 @@
-import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
+import { CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerRenderer } from "./types";
+import { NodeInfo, ComponentDefinition, TriggerRenderer } from "./types";
 import { TriggerProps } from "@/ui/trigger";
 import { flattenObject } from "@/lib/utils";
 import { formatTimeAgo } from "@/utils/date";
@@ -18,12 +18,12 @@ export const defaultTriggerRenderer: TriggerRenderer = {
     return flattenObject(event.data || {});
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
+  getTriggerProps: (node: NodeInfo, definition: ComponentDefinition, lastEvent: CanvasesCanvasEvent) => {
     const props: TriggerProps = {
-      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
-      iconSlug: trigger.icon || "bolt",
+      title: node.name || definition.label || "Unnamed trigger",
+      iconSlug: definition.icon || "bolt",
       iconColor: getColorClass("black"),
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: [],
     };
 
