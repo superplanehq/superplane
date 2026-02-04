@@ -18,7 +18,6 @@
       "originType": "EXTERNAL"
     },
     "packageName": "@scope/example-package",
-    "publishedTime": 1760000000.0,
     "revision": "E30D52B451F42F41",
     "sourceCodeRepository": "https://github.com/example/example-package",
     "status": "Published",
