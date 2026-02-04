@@ -271,14 +271,14 @@ func (c *GetRepositoryIssues) Cleanup(ctx core.SetupContext) error {
 // buildIssueData converts a GitHub issue to a map for output emission
 func buildIssueData(issue *github.Issue) map[string]any {
 	data := map[string]any{
-		"id":             issue.GetID(),
-		"number":         issue.GetNumber(),
-		"title":          issue.GetTitle(),
-		"body":           issue.GetBody(),
-		"state":          issue.GetState(),
-		"html_url":       issue.GetHTMLURL(),
+		"id":       issue.GetID(),
+		"number":   issue.GetNumber(),
+		"title":    issue.GetTitle(),
+		"body":     issue.GetBody(),
+		"state":    issue.GetState(),
+		"html_url": issue.GetHTMLURL(),
 		"comments": issue.GetComments(),
-		"locked":         issue.GetLocked(),
+		"locked":   issue.GetLocked(),
 	}
 
 	if issue.CreatedAt != nil {
