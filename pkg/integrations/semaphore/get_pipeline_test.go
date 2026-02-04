@@ -4,52 +4,62 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/superplanehq/superplane/pkg/contexts"
+	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
 )
 
-func TestGetPipeline_Setup_RequiresPipelineID(t *testing.T) {
+func Test__GetPipeline__Setup(t *testing.T) {
 	component := &GetPipeline{}
 
-	ctx := contexts.SetupContext{
-		Configuration: map[string]any{},
-	}
+	t.Run("missing pipeline ID -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{},
+		})
 
-	err := component.Setup(ctx)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "pipeline ID is required")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "pipeline ID is required")
+	})
+
+	t.Run("empty pipeline ID -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"pipelineId": "",
+			},
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "pipeline ID is required")
+	})
+
+	t.Run("valid configuration -> success", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"pipelineId": "00000000-0000-0000-0000-000000000000",
+			},
+		})
+
+		require.NoError(t, err)
+	})
 }
 
-func TestGetPipeline_Setup_ValidConfiguration(t *testing.T) {
-	component := &GetPipeline{}
-
-	ctx := contexts.SetupContext{
-		Configuration: map[string]any{
-			"pipelineId": "00000000-0000-0000-0000-000000000000",
-		},
-	}
-
-	err := component.Setup(ctx)
-	assert.NoError(t, err)
-}
-
-func TestGetPipeline_Configuration(t *testing.T) {
+func Test__GetPipeline__Configuration(t *testing.T) {
 	component := &GetPipeline{}
 
 	fields := component.Configuration()
-	assert.Len(t, fields, 1)
+	require.Len(t, fields, 1)
 	assert.Equal(t, "pipelineId", fields[0].Name)
 	assert.True(t, fields[0].Required)
 }
 
-func TestGetPipeline_OutputChannels(t *testing.T) {
+func Test__GetPipeline__OutputChannels(t *testing.T) {
 	component := &GetPipeline{}
 
 	channels := component.OutputChannels(nil)
-	assert.Len(t, channels, 1)
+	require.Len(t, channels, 1)
 	assert.Equal(t, "default", channels[0].Name)
 }
 
-func TestGetPipeline_Metadata(t *testing.T) {
+func Test__GetPipeline__Metadata(t *testing.T) {
 	component := &GetPipeline{}
 
 	assert.Equal(t, "semaphore.getPipeline", component.Name())
