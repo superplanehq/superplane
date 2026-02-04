@@ -8,6 +8,7 @@ import { ComponentBaseProps } from "@/ui/componentBase";
 import { ComponentBaseMapper, OutputPayload } from "../types";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
+import { MetadataItem } from "@/ui/metadataList";
 
 interface IssueOutput {
   id?: number;
@@ -31,6 +32,35 @@ interface IssueOutput {
   }>;
 }
 
+interface GetRepositoryIssuesConfiguration {
+  repository?: string;
+  state?: string;
+  labels?: string;
+  sort?: string;
+  direction?: string;
+  perPage?: number;
+}
+
+function getRepositoryIssuesMetadataList(node: ComponentsNode): MetadataItem[] {
+  const metadata: MetadataItem[] = [];
+  const configuration = node.configuration as GetRepositoryIssuesConfiguration | undefined;
+  const nodeMetadata = node.metadata as { repository?: { name?: string } } | undefined;
+
+  if (nodeMetadata?.repository?.name) {
+    metadata.push({ icon: "book", label: nodeMetadata.repository.name });
+  }
+
+  if (configuration?.state) {
+    metadata.push({ icon: "filter", label: `State: ${configuration.state}` });
+  }
+
+  if (configuration?.labels) {
+    metadata.push({ icon: "tag", label: `Labels: ${configuration.labels}` });
+  }
+
+  return metadata;
+}
+
 export const getRepositoryIssuesMapper: ComponentBaseMapper = {
   props(
     nodes: ComponentsNode[],
@@ -39,7 +69,12 @@ export const getRepositoryIssuesMapper: ComponentBaseMapper = {
     lastExecutions: CanvasesCanvasNodeExecution[],
     queueItems: CanvasesCanvasNodeQueueItem[],
   ): ComponentBaseProps {
-    return baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
+    const base = baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
+
+    return {
+      ...base,
+      metadata: getRepositoryIssuesMetadataList(node),
+    };
   },
   subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
