@@ -114,4 +114,3 @@ func Test__GetRelease__Setup(t *testing.T) {
 		require.Equal(t, nodeMetadataCtx.Get(), NodeMetadata{Repository: &helloRepo})
 	})
 }
-
