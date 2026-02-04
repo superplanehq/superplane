@@ -131,7 +131,7 @@ func (c *GetWorkflowUsage) Execute(ctx core.ExecutionContext) error {
 
 func (c *GetWorkflowUsage) getWorkflowUsageByFile(ctx core.ExecutionContext, client *github.Client, owner, repo, workflowFile string) error {
 	// Normalize workflow file path - API expects just the filename, not full path
-	normalizedFile := strings.Replace(workflowFile, ".github/workflows/", "", 1)
+	normalizedFile := normalizeWorkflowPath(workflowFile)
 
 	// Get the workflow by filename
 	workflow, _, err := client.Actions.GetWorkflowByFileName(
