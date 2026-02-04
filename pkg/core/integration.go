@@ -127,7 +127,9 @@ type IntegrationTrigger interface {
 type IntegrationMessageContext struct {
 	Message       any
 	Configuration any
+	NodeMetadata  MetadataContext
 	Logger        *logrus.Entry
+	HTTP          HTTPContext
 	Integration   IntegrationContext
 	Events        EventContext
 }
@@ -166,11 +168,11 @@ type WebhookOptions struct {
 }
 
 type SyncContext struct {
+	Logger          *logrus.Entry
 	Configuration   any
 	BaseURL         string
 	WebhooksBaseURL string
 	OrganizationID  string
-	InstallationID  string
 	HTTP            HTTPContext
 	Integration     IntegrationContext
 	OIDC            oidc.Provider
@@ -180,19 +182,20 @@ type IntegrationCleanupContext struct {
 	Configuration  any
 	BaseURL        string
 	OrganizationID string
-	InstallationID string
 	Logger         *logrus.Entry
 	HTTP           HTTPContext
 	Integration    IntegrationContext
 }
 
 type IntegrationActionContext struct {
-	Name          string
-	Parameters    any
-	Configuration any
-	Logger        *logrus.Entry
-	Requests      RequestContext
-	Integration   IntegrationContext
+	Name            string
+	Parameters      any
+	Configuration   any
+	WebhooksBaseURL string
+	Logger          *logrus.Entry
+	Requests        RequestContext
+	Integration     IntegrationContext
+	HTTP            HTTPContext
 }
 
 /*

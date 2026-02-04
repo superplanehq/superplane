@@ -1,0 +1,41 @@
+{
+  "data": {
+    "imageScanFindings": {
+      "findings": [
+        {
+          "name": "CVE-2024-12345",
+          "description": "Example vulnerability in a package.",
+          "uri": "https://example.com/cve-2024-12345",
+          "severity": "HIGH",
+          "attributes": [
+            {
+              "key": "package_name",
+              "value": "openssl"
+            },
+            {
+              "key": "package_version",
+              "value": "1.1.1k"
+            }
+          ]
+        }
+      ],
+      "imageScanCompletedAt": "2026-02-03T12:05:00Z",
+      "vulnerabilitySourceUpdatedAt": "2026-02-03T00:00:00Z",
+      "findingSeverityCounts": {
+        "HIGH": 1
+      }
+    },
+    "registryId": "123456789012",
+    "repositoryName": "my-repo",
+    "imageId": {
+      "imageDigest": "sha256:8f1d3e4f5a6b7c8d9e0f11121314151617181920212223242526272829303132",
+      "imageTag": "latest"
+    },
+    "imageScanStatus": {
+      "status": "COMPLETE",
+      "description": "Scan completed"
+    }
+  },
+  "timestamp": "2026-02-03T12:05:00Z",
+  "type": "aws.ecr.image.scanFindings"
+}

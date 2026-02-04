@@ -1,4 +1,6 @@
 import { Heading } from "@/components/Heading/heading";
+import { NotFoundPage } from "@/components/NotFoundPage";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -9,6 +11,7 @@ import { useCreateRole, useRole, useUpdateRole } from "../../../hooks/useOrganiz
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/ui/checkbox";
 import { showErrorToast } from "@/utils/toast";
+import { isCustomComponentsEnabled } from "@/lib/env";
 
 interface Permission {
   id: string;
@@ -62,35 +65,43 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
     icon: "group",
     permissions: [
       {
-        id: "user.read",
+        id: "member.read",
         name: "View Members",
         description: "View organization members and their details",
         category: "People & Groups",
-        resource: "user",
+        resource: "members",
         action: "read",
       },
       {
-        id: "user.invite",
-        name: "Invite Members",
-        description: "Invite new members to the organization",
+        id: "member.create",
+        name: "Add Members",
+        description: "Invite or add members to the organization",
         category: "People & Groups",
-        resource: "user",
-        action: "invite",
+        resource: "members",
+        action: "create",
       },
       {
-        id: "user.remove",
+        id: "member.update",
+        name: "Manage Members",
+        description: "Update member roles and permissions",
+        category: "People & Groups",
+        resource: "members",
+        action: "update",
+      },
+      {
+        id: "member.delete",
         name: "Remove Members",
         description: "Remove members from the organization",
         category: "People & Groups",
-        resource: "user",
-        action: "remove",
+        resource: "members",
+        action: "delete",
       },
       {
         id: "group.read",
         name: "View Groups",
         description: "View organization groups and their members",
         category: "People & Groups",
-        resource: "group",
+        resource: "groups",
         action: "read",
       },
       {
@@ -98,7 +109,7 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
         name: "Create Groups",
         description: "Create new groups within the organization",
         category: "People & Groups",
-        resource: "group",
+        resource: "groups",
         action: "create",
       },
       {
@@ -106,8 +117,16 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
         name: "Manage Groups",
         description: "Update group settings and membership",
         category: "People & Groups",
-        resource: "group",
+        resource: "groups",
         action: "update",
+      },
+      {
+        id: "group.delete",
+        name: "Delete Groups",
+        description: "Delete groups from the organization",
+        category: "People & Groups",
+        resource: "groups",
+        action: "delete",
       },
     ],
   },
@@ -120,7 +139,7 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
         name: "View Roles",
         description: "View organization roles and their permissions",
         category: "Roles & Permissions",
-        resource: "role",
+        resource: "roles",
         action: "read",
       },
       {
@@ -128,7 +147,7 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
         name: "Create Roles",
         description: "Create new roles within the organization",
         category: "Roles & Permissions",
-        resource: "role",
+        resource: "roles",
         action: "create",
       },
       {
@@ -136,7 +155,7 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
         name: "Manage Roles",
         description: "Update role permissions and settings",
         category: "Roles & Permissions",
-        resource: "role",
+        resource: "roles",
         action: "update",
       },
       {
@@ -144,66 +163,175 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
         name: "Delete Roles",
         description: "Delete roles from the organization",
         category: "Roles & Permissions",
-        resource: "role",
+        resource: "roles",
         action: "delete",
-      },
-      {
-        id: "role.assign",
-        name: "Assign Roles",
-        description: "Assign roles to users and groups",
-        category: "Roles & Permissions",
-        resource: "role",
-        action: "assign",
-      },
-      {
-        id: "role.remove",
-        name: "Remove Roles",
-        description: "Remove roles from users and groups",
-        category: "Roles & Permissions",
-        resource: "role",
-        action: "remove",
       },
     ],
   },
   {
-    category: "Projects & Resources",
-    icon: "folder",
+    category: "Canvases",
+    icon: "dashboard",
     permissions: [
       {
         id: "canvas.read",
         name: "View Canvases",
         description: "View organization canvases",
-        category: "Projects & Resources",
-        resource: "canvas",
+        category: "Canvases",
+        resource: "canvases",
         action: "read",
       },
       {
         id: "canvas.create",
         name: "Create Canvases",
         description: "Create new canvases within the organization",
-        category: "Projects & Resources",
-        resource: "canvas",
+        category: "Canvases",
+        resource: "canvases",
         action: "create",
       },
       {
         id: "canvas.update",
         name: "Manage Canvases",
         description: "Update canvas settings and configuration",
-        category: "Projects & Resources",
-        resource: "canvas",
+        category: "Canvases",
+        resource: "canvases",
         action: "update",
       },
       {
         id: "canvas.delete",
         name: "Delete Canvases",
         description: "Delete canvases from the organization",
-        category: "Projects & Resources",
-        resource: "canvas",
+        category: "Canvases",
+        resource: "canvases",
+        action: "delete",
+      },
+    ],
+  },
+  ...(isCustomComponentsEnabled()
+    ? [
+        {
+          category: "Custom Components",
+          icon: "view_module",
+          permissions: [
+            {
+              id: "blueprint.read",
+              name: "View Custom Components",
+              description: "View organization custom components",
+              category: "Custom Components",
+              resource: "blueprints",
+              action: "read",
+            },
+            {
+              id: "blueprint.create",
+              name: "Create Custom Components",
+              description: "Create new custom components",
+              category: "Custom Components",
+              resource: "blueprints",
+              action: "create",
+            },
+            {
+              id: "blueprint.update",
+              name: "Manage Custom Components",
+              description: "Update custom components settings and configuration",
+              category: "Custom Components",
+              resource: "blueprints",
+              action: "update",
+            },
+            {
+              id: "blueprint.delete",
+              name: "Delete Custom Components",
+              description: "Delete custom components from the organization",
+              category: "Custom Components",
+              resource: "blueprints",
+              action: "delete",
+            },
+          ],
+        },
+      ]
+    : []),
+  {
+    category: "Integrations",
+    icon: "integration_instructions",
+    permissions: [
+      {
+        id: "integration.read",
+        name: "View Integrations",
+        description: "View organization integrations",
+        category: "Integrations",
+        resource: "integrations",
+        action: "read",
+      },
+      {
+        id: "integration.create",
+        name: "Create Integrations",
+        description: "Create new integrations",
+        category: "Integrations",
+        resource: "integrations",
+        action: "create",
+      },
+      {
+        id: "integration.update",
+        name: "Manage Integrations",
+        description: "Update integration settings and configuration",
+        category: "Integrations",
+        resource: "integrations",
+        action: "update",
+      },
+      {
+        id: "integration.delete",
+        name: "Delete Integrations",
+        description: "Delete integrations from the organization",
+        category: "Integrations",
+        resource: "integrations",
+        action: "delete",
+      },
+    ],
+  },
+  {
+    category: "Secrets",
+    icon: "lock",
+    permissions: [
+      {
+        id: "secret.read",
+        name: "View Secrets",
+        description: "View organization secrets",
+        category: "Secrets",
+        resource: "secrets",
+        action: "read",
+      },
+      {
+        id: "secret.create",
+        name: "Create Secrets",
+        description: "Create new secrets",
+        category: "Secrets",
+        resource: "secrets",
+        action: "create",
+      },
+      {
+        id: "secret.update",
+        name: "Manage Secrets",
+        description: "Update secrets",
+        category: "Secrets",
+        resource: "secrets",
+        action: "update",
+      },
+      {
+        id: "secret.delete",
+        name: "Delete Secrets",
+        description: "Delete secrets from the organization",
+        category: "Secrets",
+        resource: "secrets",
         action: "delete",
       },
     ],
   },
 ];
+
+const DEFAULT_ROLE_NAMES = ["org_viewer", "org_admin", "org_owner"];
+
+const isDefaultRole = (roleName?: string | null) => {
+  if (!roleName) return false;
+  return DEFAULT_ROLE_NAMES.includes(roleName);
+};
 
 export function CreateRolePage() {
   const { roleName: roleNameParam } = useParams<{ roleName?: string }>();
@@ -211,7 +339,7 @@ export function CreateRolePage() {
   const { organizationId } = useParams<{ organizationId: string }>();
   const orgId = organizationId;
   const isEditMode = !!roleNameParam;
-  usePageTitle([isEditMode ? "Edit Role" : "Create Role"]);
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
 
   const [roleName, setRoleName] = useState("");
   const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(new Set());
@@ -222,8 +350,15 @@ export function CreateRolePage() {
   const updateRoleMutation = useUpdateRole(orgId || "");
 
   const isSubmitting = createRoleMutation.isPending || updateRoleMutation.isPending;
+  const isReadOnly = isDefaultRole(roleNameParam);
+  const canReadRoles = canAct("roles", "read");
+  const canCreateRoles = canAct("roles", "create");
+  const canUpdateRoles = canAct("roles", "update");
+
+  usePageTitle([isReadOnly ? "View Role" : isEditMode ? "Edit Role" : "Create Role"]);
 
   const handleCategoryToggle = (permissions: Permission[]) => {
+    if (isReadOnly) return;
     const permissionIds = permissions.map((p) => p.id);
     const allSelected = permissionIds.every((id) => selectedPermissions.has(id));
 
@@ -266,7 +401,10 @@ export function CreateRolePage() {
   }, [isEditMode, existingRole]);
 
   const handleSubmitRole = async () => {
+    if (isReadOnly) return;
     if (!roleName.trim() || selectedPermissions.size === 0 || !orgId) return;
+    if (isEditMode && !canUpdateRoles) return;
+    if (!isEditMode && !canCreateRoles) return;
 
     try {
       // Convert selected permissions to the protobuf format
@@ -298,7 +436,7 @@ export function CreateRolePage() {
         await createRoleMutation.mutateAsync({
           role: {
             metadata: {
-              name: roleName,
+              name: roleName.toLowerCase().replace(/\s+/g, "_"),
             },
             spec: {
               permissions: permissions,
@@ -316,6 +454,26 @@ export function CreateRolePage() {
     }
   };
 
+  if (!canReadRoles) {
+    return <NotFoundPage />;
+  }
+
+  if (isEditMode && !isReadOnly && !canUpdateRoles) {
+    return <NotFoundPage />;
+  }
+
+  if (!isEditMode && !canCreateRoles) {
+    return <NotFoundPage />;
+  }
+
+  if (permissionsLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[40vh]">
+        <p className="text-gray-500">Checking permissions...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen text-left">
       <div className="max-w-8xl mx-auto py-8">
@@ -324,8 +482,13 @@ export function CreateRolePage() {
           <div className="flex items-center text-left">
             <div>
               <Heading level={2} className="text-2xl font-medium text-gray-800 dark:text-white mb-2">
-                {isEditMode ? "Edit Role" : "Create New Role"}
+                {isReadOnly ? "View Role" : isEditMode ? "Edit Role" : "Create New Role"}
               </Heading>
+              {isReadOnly && (
+                <Text className="text-sm text-gray-500 dark:text-gray-400">
+                  Default roles are read-only and cannot be edited.
+                </Text>
+              )}
             </div>
           </div>
         </div>
@@ -346,13 +509,13 @@ export function CreateRolePage() {
                 </div>
               )}
 
-              <div className="space-y-6">
+              <div className="space-y-1">
                 {/* Role Name */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Role Name *</label>
                   <Input
                     type="text"
-                    placeholder="Enter role name"
+                    placeholder={isEditMode ? "Enter role display name" : "Enter role name"}
                     value={roleName}
                     onChange={(e) => setRoleName(e.target.value)}
                     onKeyDown={(e) => {
@@ -362,13 +525,8 @@ export function CreateRolePage() {
                       }
                     }}
                     className="max-w-lg"
-                    disabled={isEditMode}
+                    disabled={isReadOnly}
                   />
-                  {isEditMode && (
-                    <Text className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Role name cannot be changed when editing
-                    </Text>
-                  )}
                 </div>
 
                 {/* Permissions */}
@@ -379,6 +537,11 @@ export function CreateRolePage() {
                   <Text className="text-sm text-gray-500 dark:text-gray-400">
                     Select the permissions this role should have within the organization.
                   </Text>
+                  {isReadOnly && (
+                    <Text className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Permissions are read-only for default roles.
+                    </Text>
+                  )}
                 </div>
 
                 <div className="space-y-6">
@@ -386,13 +549,15 @@ export function CreateRolePage() {
                     <div key={category.category} className="space-y-4">
                       <div className="flex items-center mb-3">
                         <h3 className="text-md font-semibold text-gray-800 dark:text-white">{category.category}</h3>
-                        <button
-                          type="button"
-                          className="text-xs font-medium text-gray-500 ml-3 bg-transparent border-none cursor-pointer"
-                          onClick={() => handleCategoryToggle(category.permissions)}
-                        >
-                          {isCategorySelected(category.permissions) ? "Deselect all" : "Select all"}
-                        </button>
+                        {!isReadOnly && (
+                          <button
+                            type="button"
+                            className="text-xs font-medium text-gray-500 ml-3 bg-transparent border-none cursor-pointer"
+                            onClick={() => handleCategoryToggle(category.permissions)}
+                          >
+                            {isCategorySelected(category.permissions) ? "Deselect all" : "Select all"}
+                          </button>
+                        )}
                       </div>
                       <div className="space-y-3">
                         {category.permissions.map((permission) => {
@@ -402,7 +567,9 @@ export function CreateRolePage() {
                               <Checkbox
                                 id={checkboxId}
                                 checked={selectedPermissions.has(permission.id)}
+                                disabled={isReadOnly}
                                 onCheckedChange={(checked) => {
+                                  if (isReadOnly) return;
                                   setSelectedPermissions((prev) => {
                                     const newSet = new Set(prev);
                                     if (checked) {
@@ -415,7 +582,7 @@ export function CreateRolePage() {
                                 }}
                               />
                               <div className="space-y-1">
-                                <Label htmlFor={checkboxId} className="cursor-pointer">
+                                <Label htmlFor={checkboxId} className={isReadOnly ? "" : "cursor-pointer"}>
                                   {permission.name}
                                 </Label>
                                 <Description>{permission.description}</Description>
@@ -428,7 +595,7 @@ export function CreateRolePage() {
                   ))}
                 </div>
 
-                {selectedPermissions.size === 0 && (
+                {selectedPermissions.size === 0 && !isReadOnly && (
                   <Text className="text-sm text-red-600 dark:text-red-400 mt-2">
                     Please select at least one permission for this role
                   </Text>
@@ -439,14 +606,22 @@ export function CreateRolePage() {
 
           {/* Action Buttons */}
           <div className="flex justify-start gap-3">
-            <Button
-              onClick={handleSubmitRole}
-              disabled={!roleName.trim() || selectedPermissions.size === 0 || isSubmitting || isLoading}
-            >
-              {isSubmitting ? (isEditMode ? "Updating..." : "Creating...") : isEditMode ? "Update Role" : "Create Role"}
-            </Button>
+            {!isReadOnly && (
+              <Button
+                onClick={handleSubmitRole}
+                disabled={!roleName.trim() || selectedPermissions.size === 0 || isSubmitting || isLoading}
+              >
+                {isSubmitting
+                  ? isEditMode
+                    ? "Updating..."
+                    : "Creating..."
+                  : isEditMode
+                    ? "Update Role"
+                    : "Create Role"}
+              </Button>
+            )}
             <Link to={`/${orgId}/settings/roles`}>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="outline">{isReadOnly ? "Back to Roles" : "Cancel"}</Button>
             </Link>
           </div>
         </div>

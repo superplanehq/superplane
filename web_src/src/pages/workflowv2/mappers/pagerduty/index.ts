@@ -7,7 +7,7 @@ import { updateIncidentMapper } from "./update_incident";
 import { annotateIncidentMapper } from "./annotate_incident";
 import { listIncidentsMapper, LIST_INCIDENTS_STATE_REGISTRY } from "./list_incidents";
 import { snoozeIncidentMapper } from "./snooze_incident";
-import { buildActionStateRegistry } from "../github/utils";
+import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createIncident: createIncidentMapper,

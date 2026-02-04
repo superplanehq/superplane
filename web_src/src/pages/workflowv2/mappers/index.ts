@@ -39,6 +39,11 @@ import {
   eventStateRegistry as daytonaEventStateRegistry,
 } from "./daytona/index";
 import {
+  componentMappers as cloudflareComponentMappers,
+  triggerRenderers as cloudflareTriggerRenderers,
+  eventStateRegistry as cloudflareEventStateRegistry,
+} from "./cloudflare/index";
+import {
   componentMappers as datadogComponentMappers,
   triggerRenderers as datadogTriggerRenderers,
   eventStateRegistry as datadogEventStateRegistry,
@@ -58,13 +63,22 @@ import {
   triggerRenderers as rootlyTriggerRenderers,
   eventStateRegistry as rootlyEventStateRegistry,
 } from "./rootly/index";
-import { componentMappers as awsComponentMappers, triggerRenderers as awsTriggerRenderers } from "./aws";
+import {
+  componentMappers as awsComponentMappers,
+  triggerRenderers as awsTriggerRenderers,
+  eventStateRegistry as awsEventStateRegistry,
+} from "./aws";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
 import {
   componentMappers as discordComponentMappers,
   triggerRenderers as discordTriggerRenderers,
   eventStateRegistry as discordEventStateRegistry,
 } from "./discord";
+import {
+  componentMappers as openaiComponentMappers,
+  triggerRenderers as openaiTriggerRenderers,
+  eventStateRegistry as openaiEventStateRegistry,
+} from "./openai/index";
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
@@ -94,6 +108,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
 };
 
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
+  cloudflare: cloudflareComponentMappers,
   semaphore: semaphoreComponentMappers,
   github: githubComponentMappers,
   pagerduty: pagerdutyComponentMappers,
@@ -105,9 +120,11 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   rootly: rootlyComponentMappers,
   aws: awsComponentMappers,
   discord: discordComponentMappers,
+  openai: openaiComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
+  cloudflare: cloudflareTriggerRenderers,
   semaphore: semaphoreTriggerRenderers,
   github: githubTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
@@ -119,9 +136,11 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   rootly: rootlyTriggerRenderers,
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
+  openai: openaiTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
+  cloudflare: cloudflareEventStateRegistry,
   semaphore: semaphoreEventStateRegistry,
   github: githubEventStateRegistry,
   pagerduty: pagerdutyEventStateRegistry,
@@ -132,6 +151,8 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   smtp: smtpEventStateRegistry,
   discord: discordEventStateRegistry,
   rootly: rootlyEventStateRegistry,
+  openai: openaiEventStateRegistry,
+  aws: awsEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {

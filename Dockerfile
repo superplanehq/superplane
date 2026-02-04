@@ -34,6 +34,7 @@ COPY cmd cmd
 COPY go.mod go.mod
 COPY go.sum go.sum
 COPY db/migrations /app/db/migrations
+COPY db/data_migrations /app/db/data_migrations
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 COPY web_src web_src
 COPY protos protos
@@ -77,7 +78,6 @@ FROM base AS builder
 
 ARG BASE_URL=https://app.superplane.com
 ARG VITE_ENABLE_CUSTOM_COMPONENTS=false
-ARG VITE_RBAC_ENABLED=false
 
 
 WORKDIR /app
@@ -85,7 +85,7 @@ RUN rm -rf build && go build -o build/superplane cmd/server/main.go
 
 WORKDIR /app/web_src
 RUN npm install
-RUN VITE_BASE_URL=$BASE_URL VITE_ENABLE_CUSTOM_COMPONENTS=$VITE_ENABLE_CUSTOM_COMPONENTS VITE_RBAC_ENABLED=$VITE_RBAC_ENABLED npm run build
+RUN VITE_BASE_URL=$BASE_URL VITE_ENABLE_CUSTOM_COMPONENTS=$VITE_ENABLE_CUSTOM_COMPONENTS npm run build
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Runner stage to run the application.
@@ -120,6 +120,7 @@ COPY --from=builder --chown=nobody:root /usr/bin/migrate /usr/bin/migrate
 COPY --from=builder --chown=nobody:root /app/build/superplane /app/build/superplane
 COPY --from=builder --chown=nobody:root /app/docker-entrypoint.sh /app/docker-entrypoint.sh
 COPY --from=builder --chown=nobody:root /app/db/migrations /app/db/migrations
+COPY --from=builder --chown=nobody:root /app/db/data_migrations /app/db/data_migrations
 COPY --from=builder --chown=nobody:root /app/pkg/web/assets/dist /app/pkg/web/assets/dist
 COPY --from=builder --chown=nobody:root /app/api/swagger /app/api/swagger
 COPY --from=builder --chown=nobody:root /app/rbac /app/rbac

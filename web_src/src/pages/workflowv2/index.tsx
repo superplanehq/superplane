@@ -72,6 +72,7 @@ import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { useAccount } from "@/contexts/AccountContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
 import {
   buildRunEntryFromEvent,
@@ -107,6 +108,7 @@ export function WorkflowPageV2() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { account } = useAccount();
+  const { canAct } = usePermissions();
   const updateWorkflowMutation = useUpdateCanvas(organizationId!, canvasId!);
   const { data: triggers = [], isLoading: triggersLoading } = useTriggers();
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
@@ -116,10 +118,12 @@ export function WorkflowPageV2() {
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!);
   const { data: canvas, isLoading: canvasLoading, error: canvasError } = useCanvas(organizationId!, canvasId!);
   const { data: canvasEventsResponse } = useCanvasEvents(canvasId!);
+  const canUpdateCanvas = canAct("canvases", "update");
 
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
 
   const isTemplate = canvas?.metadata?.isTemplate ?? false;
+  const isReadOnly = isTemplate || !canUpdateCanvas;
   const isDev = import.meta.env.DEV;
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const createWorkflowMutation = useCreateCanvas(organizationId!);
@@ -1260,6 +1264,12 @@ export function WorkflowPageV2() {
     async (workflowToSave?: CanvasesCanvas, options?: { showToast?: boolean }) => {
       const targetWorkflow = workflowToSave || canvasRef.current;
       if (!targetWorkflow || !organizationId || !canvasId) return;
+      if (!canUpdateCanvas) {
+        if (options?.showToast !== false) {
+          showErrorToast("You don't have permission to update this canvas");
+        }
+        return;
+      }
       if (isTemplate) {
         if (options?.showToast !== false) {
           showErrorToast("Template canvases are read-only");
@@ -1326,7 +1336,7 @@ export function WorkflowPageV2() {
         }
       }
     },
-    [organizationId, canvasId, updateWorkflowMutation, isTemplate],
+    [organizationId, canvasId, updateWorkflowMutation, isTemplate, canUpdateCanvas],
   );
 
   const getNodeEditData = useCallback(
@@ -1352,7 +1362,7 @@ export function WorkflowPageV2() {
 
         // Check if this component is from an integration
         const componentIntegration = availableIntegrations.find((integration) =>
-          integration.components?.some((c) => c.name === node.component?.name),
+          integration.components?.some((c: ComponentsComponent) => c.name === node.component?.name),
         );
         if (componentIntegration) {
           integrationName = componentIntegration.name;
@@ -1365,7 +1375,7 @@ export function WorkflowPageV2() {
 
         // Check if this trigger is from an application
         const triggerIntegration = availableIntegrations.find((integration) =>
-          integration.triggers?.some((t) => t.name === node.trigger?.name),
+          integration.triggers?.some((t: TriggersTrigger) => t.name === node.trigger?.name),
         );
         if (triggerIntegration) {
           integrationName = triggerIntegration.name;
@@ -2753,6 +2763,13 @@ export function WorkflowPageV2() {
       </Button>
     </div>
   ) : null;
+  const saveDisabled = !canUpdateCanvas;
+  const saveDisabledTooltip = saveDisabled ? "You don't have permission to edit this canvas." : undefined;
+  const autoSaveDisabled = !canUpdateCanvas;
+  const autoSaveDisabledTooltip = autoSaveDisabled ? "You don't have permission to edit this canvas." : undefined;
+  const saveButtonHidden = isTemplate || !canUpdateCanvas || !hasUnsavedChanges;
+  const saveIsPrimary = hasUnsavedChanges && !isTemplate && canUpdateCanvas;
+  const canUndo = !isTemplate && canUpdateCanvas && !isAutoSaveEnabled && initialWorkflowSnapshot !== null;
 
   return (
     <>
@@ -2775,45 +2792,50 @@ export function WorkflowPageV2() {
         nodes={nodes}
         edges={edges}
         organizationId={organizationId}
-        onDirty={() => markUnsavedChange("structural")}
+        onDirty={!isReadOnly ? () => markUnsavedChange("structural") : undefined}
         getSidebarData={getSidebarData}
         loadSidebarData={loadSidebarData}
         getTabData={getTabData}
         getNodeEditData={getNodeEditData}
         getAutocompleteExampleObj={getAutocompleteExampleObj}
         getCustomField={getCustomField}
-        onNodeConfigurationSave={handleNodeConfigurationSave}
-        onAnnotationUpdate={handleAnnotationUpdate}
-        onAnnotationBlur={handleAnnotationBlur}
+        onNodeConfigurationSave={!isReadOnly ? handleNodeConfigurationSave : undefined}
+        onAnnotationUpdate={!isReadOnly ? handleAnnotationUpdate : undefined}
+        onAnnotationBlur={!isReadOnly ? handleAnnotationBlur : undefined}
         onSave={isTemplate ? undefined : handleSave}
-        onEdgeCreate={handleEdgeCreate}
-        onNodeDelete={handleNodeDelete}
-        onEdgeDelete={handleEdgeDelete}
-        onNodePositionChange={handleNodePositionChange}
-        onNodesPositionChange={handleNodesPositionChange}
-        onToggleView={handleNodeCollapseChange}
-        onToggleCollapse={() => markUnsavedChange("structural")}
+        onEdgeCreate={!isReadOnly ? handleEdgeCreate : undefined}
+        onNodeDelete={!isReadOnly ? handleNodeDelete : undefined}
+        onEdgeDelete={!isReadOnly ? handleEdgeDelete : undefined}
+        onNodePositionChange={!isReadOnly ? handleNodePositionChange : undefined}
+        onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
+        onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}
+        onToggleCollapse={!isReadOnly ? () => markUnsavedChange("structural") : undefined}
         onRun={handleRun}
-        onTogglePause={handleTogglePause}
-        onDuplicate={handleNodeDuplicate}
-        onConfigure={handleConfigure}
+        onTogglePause={!isReadOnly ? handleTogglePause : undefined}
+        onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
+        onConfigure={!isReadOnly ? handleConfigure : undefined}
         buildingBlocks={buildingBlocks}
-        onNodeAdd={handleNodeAdd}
-        onPlaceholderAdd={handlePlaceholderAdd}
-        onPlaceholderConfigure={handlePlaceholderConfigure}
+        onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
+        onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}
+        onPlaceholderConfigure={!isReadOnly ? handlePlaceholderConfigure : undefined}
         integrations={integrations}
+        readOnly={isReadOnly}
         hasFitToViewRef={hasFitToViewRef}
         hasUserToggledSidebarRef={hasUserToggledSidebarRef}
         isSidebarOpenRef={isSidebarOpenRef}
         viewportRef={viewportRef}
         initialFocusNodeId={initialFocusNodeIdRef.current}
         unsavedMessage={hasUnsavedChanges ? "You have unsaved changes" : undefined}
-        saveIsPrimary={hasUnsavedChanges && !isTemplate}
-        saveButtonHidden={isTemplate || !hasUnsavedChanges}
-        onUndo={isTemplate ? undefined : handleRevert}
-        canUndo={!isTemplate && !isAutoSaveEnabled && initialWorkflowSnapshot !== null}
+        saveIsPrimary={saveIsPrimary}
+        saveButtonHidden={saveButtonHidden}
+        saveDisabled={saveDisabled}
+        saveDisabledTooltip={saveDisabledTooltip}
+        onUndo={!isReadOnly ? handleRevert : undefined}
+        canUndo={canUndo}
         isAutoSaveEnabled={isAutoSaveEnabled && !isTemplate}
         onToggleAutoSave={isTemplate ? undefined : handleToggleAutoSave}
+        autoSaveDisabled={autoSaveDisabled}
+        autoSaveDisabledTooltip={autoSaveDisabledTooltip}
         onExportYamlCopy={isDev ? handleExportYamlCopy : undefined}
         onExportYamlDownload={isDev ? handleExportYamlDownload : undefined}
         runDisabled={hasRunBlockingChanges || isTemplate}

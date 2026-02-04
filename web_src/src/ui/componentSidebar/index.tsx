@@ -1,17 +1,24 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { resolveIcon } from "@/lib/utils";
-import { Check, Copy, X } from "lucide-react";
-import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
-import githubIcon from "@/assets/icons/integrations/github.svg";
-import openAiIcon from "@/assets/icons/integrations/openai.svg";
-import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
-import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
-import slackIcon from "@/assets/icons/integrations/slack.svg";
-import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
-import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Check, Copy, Loader2, X } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getHeaderIconSrc, IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
+import {
+  useAvailableIntegrations,
+  useCreateIntegration,
+  useIntegration,
+  useUpdateIntegration,
+} from "@/hooks/useIntegrations";
+import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
+import { getApiErrorMessage } from "@/utils/errors";
+import { showErrorToast } from "@/utils/toast";
+import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { ChildEventsState } from "../composite";
 import { TabData } from "./SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "./types";
@@ -33,21 +40,6 @@ import { EventState, EventStateMap } from "../componentBase";
 import { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
-
-const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
-  dash0: dash0Icon,
-  daytona: daytonaIcon,
-  github: githubIcon,
-  openai: openAiIcon,
-  "open-ai": openAiIcon,
-  pagerduty: pagerDutyIcon,
-  rootly: rootlyIcon,
-  semaphore: SemaphoreLogo,
-  slack: slackIcon,
-  aws: {
-    lambda: awsLambdaIcon,
-  },
-};
 
 interface ComponentSidebarProps {
   isOpen?: boolean;
@@ -250,8 +242,34 @@ export const ComponentSidebar = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ChildEventsState | "all">("all");
   const [justCopied, setJustCopied] = useState(false);
+  const [isCreateIntegrationDialogOpen, setIsCreateIntegrationDialogOpen] = useState(false);
+  const [createIntegrationName, setCreateIntegrationName] = useState("");
+  const [createIntegrationConfig, setCreateIntegrationConfig] = useState<Record<string, unknown>>({});
+  const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
   // Use autocompleteExampleObj directly - current node is already filtered out upstream
   const resolvedAutocompleteExampleObj = autocompleteExampleObj ?? null;
+
+  const { data: availableIntegrationDefinitions = [] } = useAvailableIntegrations();
+  const createIntegrationMutation = useCreateIntegration(domainId ?? "");
+  const { data: configureIntegration, isLoading: configureIntegrationLoading } = useIntegration(
+    domainId ?? "",
+    configureIntegrationId ?? "",
+  );
+  const updateIntegrationMutation = useUpdateIntegration(domainId ?? "", configureIntegrationId ?? "");
+  const configureIntegrationDefinition = useMemo(
+    () =>
+      configureIntegration?.spec?.integrationName
+        ? availableIntegrationDefinitions.find((d) => d.name === configureIntegration.spec?.integrationName)
+        : undefined,
+    [availableIntegrationDefinitions, configureIntegration?.spec?.integrationName],
+  );
+  const [configureIntegrationConfig, setConfigureIntegrationConfig] = useState<Record<string, unknown>>({});
+  const createIntegrationDefinition = useMemo(
+    () => (integrationName ? availableIntegrationDefinitions.find((d) => d.name === integrationName) : undefined),
+    [availableIntegrationDefinitions, integrationName],
+  );
+  const selectedIntegrationForDialog = isCreateIntegrationDialogOpen ? createIntegrationDefinition : undefined;
+  const selectedInstructions = selectedIntegrationForDialog?.instructions?.trim();
 
   const handleCopyNodeId = useCallback(async () => {
     if (nodeId) {
@@ -260,6 +278,97 @@ export const ComponentSidebar = ({
       setTimeout(() => setJustCopied(false), 1000);
     }
   }, [nodeId]);
+
+  const handleOpenCreateIntegrationDialog = useCallback(() => {
+    setCreateIntegrationName(createIntegrationDefinition?.name ?? "");
+    setCreateIntegrationConfig({});
+    setIsCreateIntegrationDialogOpen(true);
+  }, [createIntegrationDefinition?.name]);
+
+  const handleCloseCreateIntegrationDialog = useCallback(() => {
+    setIsCreateIntegrationDialogOpen(false);
+    setCreateIntegrationName("");
+    setCreateIntegrationConfig({});
+    createIntegrationMutation.reset();
+  }, [createIntegrationMutation]);
+
+  const handleCreateIntegrationSubmit = useCallback(async () => {
+    if (!selectedIntegrationForDialog?.name || !domainId) return;
+    try {
+      await createIntegrationMutation.mutateAsync({
+        integrationName: selectedIntegrationForDialog.name,
+        name: createIntegrationName.trim(),
+        configuration: createIntegrationConfig,
+      });
+      handleCloseCreateIntegrationDialog();
+    } catch (_error) {
+      showErrorToast("Failed to create integration");
+    }
+  }, [
+    selectedIntegrationForDialog?.name,
+    domainId,
+    createIntegrationName,
+    createIntegrationConfig,
+    createIntegrationMutation,
+    handleCloseCreateIntegrationDialog,
+  ]);
+
+  const handleOpenConfigureIntegrationDialog = useCallback((integrationId: string) => {
+    setConfigureIntegrationId(integrationId);
+  }, []);
+
+  const handleCloseConfigureIntegrationDialog = useCallback(() => {
+    setConfigureIntegrationId(null);
+    setConfigureIntegrationConfig({});
+    updateIntegrationMutation.reset();
+  }, [updateIntegrationMutation]);
+
+  const handleConfigureIntegrationSubmit = useCallback(async () => {
+    if (!configureIntegrationId || !domainId) return;
+    try {
+      await updateIntegrationMutation.mutateAsync(configureIntegrationConfig);
+      handleCloseConfigureIntegrationDialog();
+    } catch (_error) {
+      showErrorToast("Failed to update configuration");
+    }
+  }, [
+    configureIntegrationId,
+    domainId,
+    configureIntegrationConfig,
+    updateIntegrationMutation,
+    handleCloseConfigureIntegrationDialog,
+  ]);
+
+  const handleConfigureBrowserAction = useCallback(() => {
+    const browserAction = configureIntegration?.status?.browserAction;
+    if (!browserAction) return;
+    const { url, method, formFields } = browserAction;
+    if (method?.toUpperCase() === "POST" && formFields) {
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = url || "";
+      form.target = "_blank";
+      form.style.display = "none";
+      Object.entries(formFields).forEach(([key, value]) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = key;
+        input.value = String(value);
+        form.appendChild(input);
+      });
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
+    } else if (url) {
+      window.open(url, "_blank");
+    }
+  }, [configureIntegration?.status?.browserAction]);
+
+  useEffect(() => {
+    if (configureIntegration?.spec?.configuration) {
+      setConfigureIntegrationConfig(configureIntegration.spec.configuration);
+    }
+  }, [configureIntegration?.spec?.configuration]);
 
   // Seed open ids from incoming props (without closing already open ones)
   useEffect(() => {
@@ -494,9 +603,7 @@ export const ComponentSidebar = ({
   }, [onHighlightedNodesChange]);
 
   const isDetailView = page !== "overview";
-  const nameParts = blockName?.split(".") ?? [];
-  const appLogo = nameParts[0] ? APP_LOGO_MAP[nameParts[0]] : undefined;
-  const appIconSrc = typeof appLogo === "string" ? appLogo : nameParts[1] ? appLogo?.[nameParts[1]] : undefined;
+  const appIconSrc = getHeaderIconSrc(blockName);
   const headerIconSrc = iconSrc ?? appIconSrc;
 
   if (!isOpen) return null;
@@ -647,7 +754,10 @@ export const ComponentSidebar = ({
                   integrationName={integrationName}
                   integrationRef={integrationRef}
                   integrations={integrations}
+                  integrationDefinition={createIntegrationDefinition}
                   autocompleteExampleObj={resolvedAutocompleteExampleObj}
+                  onOpenCreateIntegrationDialog={handleOpenCreateIntegrationDialog}
+                  onOpenConfigureIntegrationDialog={handleOpenConfigureIntegrationDialog}
                 />
               </TabsContent>
             )}
@@ -748,6 +858,206 @@ export const ComponentSidebar = ({
           )}
         </div>
       </div>
+
+      <Dialog
+        open={isCreateIntegrationDialogOpen}
+        onOpenChange={(open) => !open && handleCloseCreateIntegrationDialog()}
+      >
+        <DialogContent
+          className="sm:max-w-2xl max-h-[80vh] overflow-y-auto"
+          showCloseButton={!createIntegrationMutation.isPending}
+        >
+          {selectedIntegrationForDialog && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-3">
+                  <IntegrationIcon
+                    integrationName={selectedIntegrationForDialog.name}
+                    iconSlug={selectedIntegrationForDialog.icon}
+                    className="h-6 w-6 text-gray-500 dark:text-gray-400"
+                  />
+                  <DialogTitle>
+                    Configure{" "}
+                    {getIntegrationTypeDisplayName(undefined, selectedIntegrationForDialog.name) ||
+                      selectedIntegrationForDialog.name}
+                  </DialogTitle>
+                </div>
+                {selectedInstructions && (
+                  <IntegrationInstructions description={selectedInstructions} className="mt-2" />
+                )}
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-gray-800 dark:text-gray-100 mb-2">
+                    Integration Name
+                    <span className="text-gray-800 ml-1">*</span>
+                  </Label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">A unique name for this integration</p>
+                  <Input
+                    type="text"
+                    value={createIntegrationName}
+                    onChange={(e) => setCreateIntegrationName(e.target.value)}
+                    placeholder="e.g., my-app-integration"
+                  />
+                </div>
+                {selectedIntegrationForDialog.configuration &&
+                  selectedIntegrationForDialog.configuration.length > 0 && (
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
+                      {selectedIntegrationForDialog.configuration.map((field: ConfigurationField) => {
+                        if (!field.name) return null;
+                        return (
+                          <ConfigurationFieldRenderer
+                            key={field.name}
+                            field={field}
+                            value={createIntegrationConfig[field.name]}
+                            onChange={(value) =>
+                              setCreateIntegrationConfig((prev) => ({ ...prev, [field.name || ""]: value }))
+                            }
+                            allValues={createIntegrationConfig}
+                            domainId={domainId ?? ""}
+                            domainType="DOMAIN_TYPE_ORGANIZATION"
+                            organizationId={domainId ?? ""}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+              </div>
+              <DialogFooter className="gap-2 sm:justify-start mt-6">
+                <Button
+                  color="blue"
+                  onClick={() => void handleCreateIntegrationSubmit()}
+                  disabled={createIntegrationMutation.isPending || !createIntegrationName?.trim()}
+                  className="flex items-center gap-2"
+                >
+                  {createIntegrationMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Connecting...
+                    </>
+                  ) : (
+                    "Connect"
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleCloseCreateIntegrationDialog}
+                  disabled={createIntegrationMutation.isPending}
+                >
+                  Cancel
+                </Button>
+              </DialogFooter>
+              {createIntegrationMutation.isError && (
+                <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                  <p className="text-sm text-red-800 dark:text-red-200">
+                    Failed to create integration: {getApiErrorMessage(createIntegrationMutation.error)}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!configureIntegrationId} onOpenChange={(open) => !open && handleCloseConfigureIntegrationDialog()}>
+        <DialogContent
+          className="sm:max-w-2xl max-h-[80vh] overflow-y-auto"
+          showCloseButton={!updateIntegrationMutation.isPending}
+        >
+          {configureIntegrationLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-gray-500 dark:text-gray-400" />
+            </div>
+          ) : configureIntegrationId && configureIntegration ? (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-3">
+                  <IntegrationIcon
+                    integrationName={configureIntegration.spec?.integrationName}
+                    iconSlug={configureIntegrationDefinition?.icon}
+                    className="h-6 w-6 text-gray-500 dark:text-gray-400"
+                  />
+                  <DialogTitle>
+                    Configure{" "}
+                    {getIntegrationTypeDisplayName(undefined, configureIntegration.spec?.integrationName) ||
+                      configureIntegration.spec?.integrationName}
+                  </DialogTitle>
+                </div>
+              </DialogHeader>
+              {configureIntegration?.status?.browserAction && (
+                <IntegrationInstructions
+                  description={configureIntegration.status.browserAction.description}
+                  onContinue={configureIntegration.status.browserAction.url ? handleConfigureBrowserAction : undefined}
+                  className="mb-6"
+                />
+              )}
+              {configureIntegrationDefinition?.configuration &&
+              configureIntegrationDefinition.configuration.length > 0 ? (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void handleConfigureIntegrationSubmit();
+                  }}
+                  className="space-y-4"
+                >
+                  {configureIntegrationDefinition.configuration.map((field: ConfigurationField) => {
+                    if (!field.name) return null;
+                    return (
+                      <ConfigurationFieldRenderer
+                        key={field.name}
+                        field={field}
+                        value={configureIntegrationConfig[field.name]}
+                        onChange={(value) =>
+                          setConfigureIntegrationConfig((prev) => ({ ...prev, [field.name || ""]: value }))
+                        }
+                        allValues={configureIntegrationConfig}
+                        domainId={domainId ?? ""}
+                        domainType="DOMAIN_TYPE_ORGANIZATION"
+                        organizationId={domainId ?? ""}
+                        appInstallationId={configureIntegration.metadata?.id}
+                      />
+                    );
+                  })}
+                  <DialogFooter className="gap-2 sm:justify-start pt-4">
+                    <Button
+                      type="submit"
+                      color="blue"
+                      disabled={updateIntegrationMutation.isPending}
+                      className="flex items-center gap-2"
+                    >
+                      {updateIntegrationMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save Configuration"
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleCloseConfigureIntegrationDialog}
+                      disabled={updateIntegrationMutation.isPending}
+                    >
+                      Cancel
+                    </Button>
+                  </DialogFooter>
+                  {updateIntegrationMutation.isError && (
+                    <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                      <p className="text-sm text-red-800 dark:text-red-200">
+                        Failed to update configuration: {getApiErrorMessage(updateIntegrationMutation.error)}
+                      </p>
+                    </div>
+                  )}
+                </form>
+              ) : (
+                <p className="text-sm text-gray-500 dark:text-gray-400">No configuration fields available.</p>
+              )}
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
