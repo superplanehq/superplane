@@ -120,8 +120,9 @@ func (c *ListReleases) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode integration metadata: %w", err)
 	}
 
-	client, err := NewClient(
+	client, err := NewClientWithTransport(
 		ctx.Integration,
+		ctx.HTTP,
 		appMetadata.GitHubApp.ID,
 		appMetadata.InstallationID,
 	)
@@ -162,11 +163,7 @@ func (c *ListReleases) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(
 		"releases",
 		"github.release",
-		[]any{
-			map[string]any{
-				"releases": output,
-			},
-		},
+		[]any{output},
 	)
 }
 
