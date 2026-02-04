@@ -17,8 +17,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
-  <LinkCard title="Send Text Message" href="#send-text-message" description="Send a text message to a Slack channel" />
   <LinkCard title="Send Message and Wait" href="#send-message-and-wait" description="Send a message with buttons and wait for a response" />
+  <LinkCard title="Send Text Message" href="#send-text-message" description="Send a text message to a Slack channel" />
 </CardGrid>
 
 ## Instructions
@@ -84,6 +84,38 @@ This trigger automatically sets up a Slack event subscription when configured. T
 }
 ```
 
+<a id="send-message-and-wait"></a>
+
+## Send Message and Wait
+
+Send a message to a Slack channel or DM and wait for the user to click one of the configured buttons.
+
+### Use Cases
+
+- **Request approval**: Request approval or input from a user in Slack before applying or deploying.
+- **Pause workflow**: Pause a workflow until a human selects an option.
+- **Structured reply**: Implement flows that need a structured reply via buttons.
+
+### Configuration
+
+- **Channel**: Slack channel or DM channel name to post to.
+- **Message**: Message text (supports Slack formatting).
+- **Timeout**: Maximum time to wait in seconds (optional).
+- **Buttons**: Set of 1–4 items, each with name (label) and value.
+
+### Outputs
+
+- **Received**: Emits when the user clicks a button; payload includes the selected button's value.
+- **Timeout**: Emits when no button click is received within the configured timeout.
+
+### Example Output
+
+```json
+{
+  "value": "approved"
+}
+```
+
 <a id="send-text-message"></a>
 
 ## Send Text Message
@@ -127,44 +159,3 @@ Returns metadata about the sent message including channel information.
 }
 ```
 
-<a id="send-message-and-wait"></a>
-
-## Send Message and Wait
-
-Send a message to a Slack channel or DM and wait for the user to click one of the configured buttons.
-
-### Use Cases
-
-- **Request approval**: Request approval or input from a user in Slack before applying or deploying.
-- **Pause workflow**: Pause a workflow until a human selects an option.
-- **Structured reply**: Implement flows that need a structured reply via buttons.
-
-### Configuration
-
-- **Channel**: Slack channel or DM channel name to post to.
-- **Message**: Message text (supports Slack formatting).
-- **Timeout**: Maximum time to wait in seconds (optional).
-- **Buttons**: Set of 1–4 items, each with name (label) and value.
-
-### Output Channels
-
-- **Received**: Emitted when the user clicks a button; payload includes the selected button's value.
-- **Timeout**: Emitted when no button click is received within the configured timeout.
-
-### Notes
-
-- The component automatically sets up Slack interactivity handling.
-- Buttons are displayed as a Block Kit actions block.
-- Each button click is unique to the workflow execution.
-
-### Example Output (Received)
-
-```json
-{
-  "data": {
-    "value": "approved"
-  },
-  "timestamp": "2026-02-04T12:00:00Z",
-  "type": "slack.button.clicked"
-}
-```
