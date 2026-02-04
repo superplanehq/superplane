@@ -8,6 +8,7 @@ import { ComponentBaseProps } from "@/ui/componentBase";
 import { ComponentBaseMapper, OutputPayload } from "../types";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
+import { MetadataItem } from "@/ui/metadataList";
 
 interface CommentOutput {
   id?: number;
@@ -23,6 +24,28 @@ interface CommentOutput {
   };
 }
 
+interface CreateIssueCommentConfiguration {
+  repository?: string;
+  issueNumber?: string;
+  body?: string;
+}
+
+function getCreateIssueCommentMetadataList(node: ComponentsNode): MetadataItem[] {
+  const metadata: MetadataItem[] = [];
+  const configuration = node.configuration as CreateIssueCommentConfiguration | undefined;
+  const nodeMetadata = node.metadata as { repository?: { name?: string } } | undefined;
+
+  if (nodeMetadata?.repository?.name) {
+    metadata.push({ icon: "book", label: nodeMetadata.repository.name });
+  }
+
+  if (configuration?.issueNumber) {
+    metadata.push({ icon: "hash", label: `Issue #${configuration.issueNumber}` });
+  }
+
+  return metadata;
+}
+
 export const createIssueCommentMapper: ComponentBaseMapper = {
   props(
     nodes: ComponentsNode[],
@@ -31,7 +54,12 @@ export const createIssueCommentMapper: ComponentBaseMapper = {
     lastExecutions: CanvasesCanvasNodeExecution[],
     queueItems: CanvasesCanvasNodeQueueItem[],
   ): ComponentBaseProps {
-    return baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
+    const base = baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
+
+    return {
+      ...base,
+      metadata: getCreateIssueCommentMetadataList(node),
+    };
   },
   subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
     return buildGithubExecutionSubtitle(execution);
