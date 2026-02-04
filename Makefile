@@ -5,6 +5,8 @@ DB_PASSWORD=the-cake-is-a-lie
 DOCKER_COMPOSE_OPTS=-f docker-compose.dev.yml
 BASE_URL?=https://app.superplane.com
 
+export BUILDKIT_PROGRESS ?= plain
+
 PKG_TEST_PACKAGES := ./pkg/...
 E2E_TEST_PACKAGES := ./test/e2e/...
 
