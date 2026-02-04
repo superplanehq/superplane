@@ -16,7 +16,6 @@ var blockedHosts = []string{
 	"metadata.azure.com",
 	"169.254.169.254",
 	"fd00:ec2::254",
-	"[fd00:ec2::254]",
 	// Kubernetes API
 	"kubernetes.default",
 	"kubernetes.default.svc",
@@ -24,7 +23,7 @@ var blockedHosts = []string{
 	// Localhost variations
 	"localhost",
 	"127.0.0.1",
-	"[::1]",
+	"::1",
 	"0.0.0.0",
 }
 
