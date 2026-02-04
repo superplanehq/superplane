@@ -1,7 +1,6 @@
 import {
   ComponentsComponent,
   ComponentsNode,
-  TriggersTrigger,
   CanvasesCanvasEvent,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
@@ -16,7 +15,7 @@ import { ReactNode } from "react";
  * Each trigger type can register its own renderer with custom logic.
  *
  * To add a new trigger type:
- * 1. Create a new file in this renderers folder (e.g., 'mytrigger.ts')
+ * 1. Create a new file in this mappers folder (e.g., 'mytrigger.ts')
  * 2. Implement the TriggerRenderer interface
  * 3. Export it from index.ts and add it to the registry
  */
@@ -24,11 +23,11 @@ export interface TriggerRenderer {
   /**
    * Converts node and trigger metadata from the backend into props for the Trigger UI component.
    *
-   * @param node The node from the backend
-   * @param trigger The trigger metadata from the backend
+   * @param node The node information
+   * @param definition The component definition
    * @returns the props needed to render the Trigger UI component
    */
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: any) => TriggerProps;
+  getTriggerProps: (node: NodeInfo, definition: ComponentDefinition, lastEvent: any) => TriggerProps;
 
   /**
    * Display values for the root event.
@@ -44,6 +43,24 @@ export interface TriggerRenderer {
    * @returns The title and subtitle to display
    */
   getTitleAndSubtitle: (event: CanvasesCanvasEvent) => { title: string; subtitle: string };
+}
+
+export interface NodeInfo {
+  id: string;
+  name: string;
+  configuration?: {
+    [key: string]: unknown;
+  };
+  metadata?: {
+    [key: string]: unknown;
+  };
+}
+
+export interface ComponentDefinition {
+  label: string;
+  description: string;
+  icon: string;
+  color: string;
 }
 
 export interface ComponentBaseMapper {
@@ -112,11 +129,7 @@ export interface CustomFieldRenderer {
    * @param context Optional context with additional handlers (e.g., onRun for triggering the emit modal with initial data)
    * @returns React node to render
    */
-  render(
-    node: ComponentsNode,
-    configuration: Record<string, unknown>,
-    context?: { onRun?: (initialData?: string) => void },
-  ): ReactNode;
+  render(node: NodeInfo, context?: { onRun?: (initialData?: string) => void }): ReactNode;
 }
 
 export interface OutputPayload {
