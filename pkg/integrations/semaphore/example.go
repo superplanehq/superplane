@@ -23,7 +23,7 @@ var exampleDataOnce sync.Once
 var exampleData map[string]any
 
 var exampleOutputListPipelinesOnce sync.Once
-var exampleOutputListPipelines []map[string]any
+var exampleOutputListPipelines map[string]any
 
 func (c *RunWorkflow) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputOnce, exampleOutputRunWorkflowBytes, &exampleOutput)
@@ -33,7 +33,6 @@ func (t *OnPipelineDone) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnce, exampleDataOnPipelineDoneBytes, &exampleData)
 }
 
-func (c *ListPipelines) ExampleOutput() any {
-	utils.UnmarshalEmbeddedJSONSlice(&exampleOutputListPipelinesOnce, exampleOutputListPipelinesBytes, &exampleOutputListPipelines)
-	return exampleOutputListPipelines
+func (c *ListPipelines) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputListPipelinesOnce, exampleOutputListPipelinesBytes, &exampleOutputListPipelines)
 }
