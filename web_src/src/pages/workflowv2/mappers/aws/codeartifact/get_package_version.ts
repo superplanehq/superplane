@@ -16,6 +16,7 @@ import {
   CodeArtifactPackageVersionConfiguration,
   CodeArtifactPackageVersionDescription,
   CodeArtifactPackageLicense,
+  CodeArtifactPackageVersionPayload,
 } from "./types";
 import { buildCodeArtifactPackageMetadataItems, formatPackageName } from "./utils";
 import { stringOrDash } from "../../utils";
@@ -46,7 +47,8 @@ export const getPackageVersionMapper: ComponentBaseMapper = {
 
   getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as CodeArtifactPackageVersionDescription | undefined;
+    const payload = outputs?.default?.[0]?.data as CodeArtifactPackageVersionPayload | undefined;
+    const result = payload?.package as CodeArtifactPackageVersionDescription | undefined;
 
     if (!result) {
       return {};
