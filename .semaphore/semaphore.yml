@@ -44,6 +44,8 @@ blocks:
         - name: E2E Tests
           parallelism: 10
           commands:
+            - mkdir -p tmp/ms-playwright
+            - 'cache restore pw-browsers-$SEMAPHORE_GIT_BRANCH-$(checksum Makefile),pw-browsers-$SEMAPHORE_GIT_BRANCH,pw-browsers'
             - make setup.playwright
             - make test.e2e.autoparallel INDEX=$SEMAPHORE_JOB_INDEX TOTAL=$SEMAPHORE_JOB_COUNT
         - name: 'Check: DB structure'
@@ -64,6 +66,7 @@ blocks:
             - 'if [ -d tmp/screenshots ] && ls tmp/screenshots/*.png >/dev/null 2>&1; then artifact push job tmp/screenshots; fi'
             - 'cache store go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go'
             - 'cache store go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go-build'
+            - 'cache store pw-browsers-$SEMAPHORE_GIT_BRANCH-$(checksum Makefile) tmp/ms-playwright'
   - name: "\U0001F528 Frontend Build"
     dependencies: []
     task:
