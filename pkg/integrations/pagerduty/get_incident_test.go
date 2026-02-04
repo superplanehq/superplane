@@ -112,7 +112,7 @@ func Test__GetIncident__Execute(t *testing.T) {
 			},
 		}
 
-		executionState := &contexts.ExecutionState{}
+		executionState := &contexts.ExecutionStateContext{}
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -125,13 +125,13 @@ func Test__GetIncident__Execute(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, httpContext.Requests, 4)
-		require.Len(t, executionState.Emitted, 1)
+		require.Len(t, executionState.Payloads, 1)
 
-		emitted := executionState.Emitted[0]
-		assert.Equal(t, "default", emitted.OutputChannel)
-		assert.Equal(t, "pagerduty.incident", emitted.Type)
+		assert.Equal(t, "default", executionState.Channel)
+		assert.Equal(t, "pagerduty.incident", executionState.Type)
 
-		data := emitted.Data[0].(map[string]any)
+		payload := executionState.Payloads[0].(map[string]any)
+		data := payload["data"].(map[string]any)
 		assert.NotNil(t, data["incident"])
 		assert.NotNil(t, data["alerts"])
 		assert.NotNil(t, data["notes"])
@@ -179,7 +179,7 @@ func Test__GetIncident__Execute(t *testing.T) {
 			},
 		}
 
-		executionState := &contexts.ExecutionState{}
+		executionState := &contexts.ExecutionStateContext{}
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -191,10 +191,10 @@ func Test__GetIncident__Execute(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		require.Len(t, executionState.Emitted, 1)
+		require.Len(t, executionState.Payloads, 1)
 
-		emitted := executionState.Emitted[0]
-		data := emitted.Data[0].(map[string]any)
+		payload := executionState.Payloads[0].(map[string]any)
+		data := payload["data"].(map[string]any)
 		assert.NotNil(t, data["incident"])
 		// Optional data should be nil when API calls fail
 		assert.Nil(t, data["alerts"])
@@ -235,7 +235,7 @@ func Test__GetIncident__Execute(t *testing.T) {
 			},
 		}
 
-		executionState := &contexts.ExecutionState{}
+		executionState := &contexts.ExecutionStateContext{}
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
