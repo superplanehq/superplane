@@ -24,7 +24,7 @@ export const integrationKeys = {
 
 // Hook to fetch available integrations (catalog).
 // Normalizes each integration's label (e.g. "github" -> "GitHub") so consumers get correct display names.
-export const useAvailableIntegrations = () => {
+export const useAvailableIntegrations = (options?: { enabled?: boolean }) => {
   return useQuery({
     queryKey: integrationKeys.available(),
     queryFn: async () => {
@@ -40,11 +40,12 @@ export const useAvailableIntegrations = () => {
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
+    enabled: options?.enabled ?? true,
   });
 };
 
 // Hook to fetch connected integrations for an organization
-export const useConnectedIntegrations = (organizationId: string) => {
+export const useConnectedIntegrations = (organizationId: string, options?: { enabled?: boolean }) => {
   return useQuery({
     queryKey: integrationKeys.connected(organizationId),
     queryFn: async () => {
@@ -57,7 +58,7 @@ export const useConnectedIntegrations = (organizationId: string) => {
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
-    enabled: !!organizationId,
+    enabled: !!organizationId && (options?.enabled ?? true),
   });
 };
 

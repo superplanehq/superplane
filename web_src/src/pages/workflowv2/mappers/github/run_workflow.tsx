@@ -1,11 +1,15 @@
 import React, { useState } from "react";
 import {
-  ComponentsComponent,
-  ComponentsNode,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
-import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, StateFunction } from "../types";
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  CustomFieldRenderer,
+  EventStateRegistry,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  StateFunction,
+  SubtitleContext,
+} from "../types";
 import {
   ComponentBaseProps,
   ComponentBaseSpec,
@@ -61,7 +65,7 @@ export const RUN_WORKFLOW_STATE_MAP: EventStateMap = {
 /**
  * GitHub-specific state logic function
  */
-export const runWorkflowStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
+export const runWorkflowStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
   if (
@@ -105,32 +109,30 @@ export const RUN_WORKFLOW_STATE_REGISTRY: EventStateRegistry = {
 };
 
 export const runWorkflowMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    _nodeQueueItems?: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
+  props(context: ComponentBaseContext): ComponentBaseProps {
     return {
-      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
+      title:
+        context.node.name ||
+        context.componentDefinition.label ||
+        context.componentDefinition.name ||
+        "Unnamed component",
       iconSrc: githubIcon,
-      iconColor: getColorClass(componentDefinition?.color!),
-      collapsed: node.isCollapsed,
+      iconColor: getColorClass(context.componentDefinition?.color!),
+      collapsed: context.node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
-      eventSections: runWorkflowEventSections(nodes, lastExecutions[0]),
-      includeEmptyState: !lastExecutions[0],
-      metadata: runWorkflowMetadataList(node),
-      specs: runWorkflowSpecs(node),
+      eventSections: runWorkflowEventSections(context.nodes, context.lastExecutions[0]),
+      includeEmptyState: !context.lastExecutions[0],
+      metadata: runWorkflowMetadataList(context.node),
+      specs: runWorkflowSpecs(context.node),
       eventStateMap: RUN_WORKFLOW_STATE_MAP,
     };
   },
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    return buildGithubExecutionSubtitle(execution);
+  subtitle(context: SubtitleContext): string {
+    return buildGithubExecutionSubtitle(context.execution);
   },
 
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
-    const metadata = execution.metadata as ExecutionMetadata;
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const metadata = context.execution.metadata as ExecutionMetadata;
     const details: Record<string, string> = {};
 
     if (metadata.workflowRun?.url) {
@@ -153,7 +155,7 @@ export const runWorkflowMapper: ComponentBaseMapper = {
   },
 };
 
-function runWorkflowMetadataList(node: ComponentsNode): MetadataItem[] {
+function runWorkflowMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as any;
   const nodeMetadata = node.metadata as any;
@@ -173,7 +175,7 @@ function runWorkflowMetadataList(node: ComponentsNode): MetadataItem[] {
   return metadata;
 }
 
-function runWorkflowSpecs(node: ComponentsNode): ComponentBaseSpec[] {
+function runWorkflowSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
   const configuration = node.configuration as any;
 
@@ -203,10 +205,7 @@ function runWorkflowSpecs(node: ComponentsNode): ComponentBaseSpec[] {
   return specs;
 }
 
-function runWorkflowEventSections(
-  nodes: ComponentsNode[],
-  execution: CanvasesCanvasNodeExecution,
-): EventSection[] | undefined {
+function runWorkflowEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] | undefined {
   if (!execution) {
     return undefined;
   }
@@ -218,8 +217,8 @@ function runWorkflowEventSections(
   //
   if (execution) {
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+    const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
     sections.push({
       showAutomaticTime: true,
       receivedAt: new Date(execution.createdAt!),
@@ -290,13 +289,17 @@ ${inputsSection}
 run-name: "My workflow - \${{ inputs.superplane_execution_id }}"`;
 }
 
+type RunWorkflowConfiguration = {
+  inputs: Array<{ name: string; value: string }>;
+};
+
 /**
  * Custom field renderer for GitHub Run Workflow component configuration
  */
 export const runWorkflowCustomFieldRenderer: CustomFieldRenderer = {
-  render: (_node: ComponentsNode, configuration: Record<string, unknown>) => {
-    const inputs = configuration?.inputs as Array<{ name: string; value: string }> | undefined;
-    const yamlSnippet = generateWorkflowYamlSnippet(inputs);
+  render: (node: NodeInfo) => {
+    const configuration = node.configuration as RunWorkflowConfiguration;
+    const yamlSnippet = generateWorkflowYamlSnippet(configuration.inputs);
 
     return (
       <div className="border-t-1 border-gray-200 pt-4">

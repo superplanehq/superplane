@@ -38,6 +38,10 @@ interface SettingsTabProps {
   autocompleteExampleObj?: Record<string, unknown> | null;
   onOpenCreateIntegrationDialog?: () => void;
   onOpenConfigureIntegrationDialog?: (integrationId: string) => void;
+  readOnly?: boolean;
+  canReadIntegrations?: boolean;
+  canCreateIntegrations?: boolean;
+  canUpdateIntegrations?: boolean;
 }
 
 export function SettingsTab({
@@ -58,7 +62,15 @@ export function SettingsTab({
   autocompleteExampleObj,
   onOpenCreateIntegrationDialog,
   onOpenConfigureIntegrationDialog,
+  readOnly = false,
+  canReadIntegrations,
+  canCreateIntegrations,
+  canUpdateIntegrations,
 }: SettingsTabProps) {
+  const isReadOnly = readOnly ?? false;
+  const allowIntegrations = canReadIntegrations ?? true;
+  const allowCreateIntegrations = canCreateIntegrations ?? true;
+  const allowUpdateIntegrations = canUpdateIntegrations ?? true;
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(configuration || {});
   const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
@@ -234,17 +246,21 @@ export function SettingsTab({
     });
   }, [integrationsOfType, selectedIntegration]);
 
-  const isIntegrationReady = !integrationName || selectedIntegrationFull?.status?.state === "ready";
+  const isIntegrationReady =
+    !integrationName || !allowIntegrations || selectedIntegrationFull?.status?.state === "ready";
   const shouldShowConfiguration = (!integrationName || !!selectedIntegration?.id) && isIntegrationReady;
 
   const handleSave = () => {
+    if (isReadOnly) {
+      return;
+    }
     validateNow();
     onSave(nodeConfiguration, currentNodeName, selectedIntegration);
   };
 
   return (
     <div className="p-4 overflow-y-auto pb-20" style={{ maxHeight: "80vh" }}>
-      <div className="space-y-6">
+      <div className={`space-y-6 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`} aria-disabled={isReadOnly}>
         {/* Node identification section — always visible */}
         <div className="flex flex-col gap-2">
           <Label className="min-w-[100px] text-left">
@@ -260,13 +276,18 @@ export function SettingsTab({
             placeholder="Enter a name for this node"
             autoFocus
             className="shadow-none"
+            disabled={isReadOnly}
           />
         </div>
 
         {/* Integration section — one container, three states: Connect / error or incomplete / ready */}
         {integrationName && (
           <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-            {integrationsOfType.length === 0 ? (
+            {!allowIntegrations ? (
+              <div className="bg-gray-50 dark:bg-gray-900/30 border border-gray-200 dark:border-gray-700 rounded-md p-3 text-sm text-gray-600 dark:text-gray-300">
+                You don't have permission to view integrations.
+              </div>
+            ) : integrationsOfType.length === 0 ? (
               /* No integration: Connect XYZ — always use helper so "github" shows as "GitHub" */
               <div className="bg-orange-100 dark:bg-orange-950/30 border border-orange-950/15 rounded-md bg-stripe-diagonal p-3 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2 min-w-0">
@@ -279,7 +300,13 @@ export function SettingsTab({
                     {getIntegrationTypeDisplayName(undefined, integrationName) || integrationName} Integration
                   </span>
                 </div>
-                <Button variant="outline" size="sm" onClick={onOpenCreateIntegrationDialog} className="flex-shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onOpenCreateIntegrationDialog}
+                  className="flex-shrink-0"
+                  disabled={isReadOnly || !allowCreateIntegrations}
+                >
                   Connect
                 </Button>
               </div>
@@ -304,6 +331,7 @@ export function SettingsTab({
                         });
                       }
                     }}
+                    disabled={isReadOnly}
                   >
                     <SelectTrigger className="w-full shadow-none">
                       <SelectValue placeholder="Select an installation" />
@@ -369,6 +397,7 @@ export function SettingsTab({
                           size="sm"
                           className="text-sm py-1.5"
                           onClick={() => onOpenConfigureIntegrationDialog(selectedIntegrationFull.metadata!.id!)}
+                          disabled={isReadOnly || !allowUpdateIntegrations}
                         >
                           Configure...
                         </Button>
@@ -439,7 +468,7 @@ export function SettingsTab({
       </div>
 
       <div className="flex gap-2 justify-end mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-        <Button data-testid="save-node-button" variant="default" onClick={handleSave}>
+        <Button data-testid="save-node-button" variant="default" onClick={handleSave} disabled={isReadOnly}>
           Save
         </Button>
       </div>
