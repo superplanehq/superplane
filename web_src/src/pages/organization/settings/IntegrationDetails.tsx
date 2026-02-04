@@ -1,7 +1,6 @@
 import { ArrowLeft, ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useState, useEffect, useMemo } from "react";
-import ReactMarkdown from "react-markdown";
 import {
   useAvailableIntegrations,
   useDeleteIntegration,
@@ -11,22 +10,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
-import { Alert, AlertDescription } from "@/ui/alert";
-import { resolveIcon } from "@/lib/utils";
+import type { ConfigurationField } from "@/api-client";
 import { showErrorToast } from "@/utils/toast";
+import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
+import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
+import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
-import githubIcon from "@/assets/icons/integrations/github.svg";
-import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
-import openAiIcon from "@/assets/icons/integrations/openai.svg";
-import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
-import slackIcon from "@/assets/icons/integrations/slack.svg";
-import smtpIcon from "@/assets/icons/integrations/smtp.svg";
-import awsIcon from "@/assets/icons/integrations/aws.svg";
-import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
-import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 interface IntegrationDetailsProps {
   organizationId: string;
@@ -48,33 +38,6 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
   const integrationDef = integration
     ? availableIntegrations.find((i) => i.name === integration.spec?.integrationName)
     : undefined;
-  const appLogoMap: Record<string, string> = {
-    aws: awsIcon,
-    dash0: dash0Icon,
-    github: githubIcon,
-    gitlab: gitlabIcon,
-    openai: openAiIcon,
-    daytona: daytonaIcon,
-    "open-ai": openAiIcon,
-    pagerduty: pagerDutyIcon,
-    rootly: rootlyIcon,
-    semaphore: SemaphoreLogo,
-    slack: slackIcon,
-    smtp: smtpIcon,
-  };
-
-  const renderAppIcon = (slug: string | undefined, appName: string | undefined, className: string) => {
-    const logo = appName ? appLogoMap[appName] : undefined;
-    if (logo) {
-      return (
-        <span className={className}>
-          <img src={logo} alt="" className="h-full w-full object-contain" />
-        </span>
-      );
-    }
-    const IconComponent = resolveIcon(slug);
-    return <IconComponent className={className} />;
-  };
 
   const updateMutation = useUpdateIntegration(organizationId, integrationId || "");
   const deleteMutation = useDeleteIntegration(organizationId, integrationId || "");
@@ -213,13 +176,22 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        {integrationDef?.icon &&
-          renderAppIcon(integrationDef.icon, integrationDef.name || integration?.spec?.integrationName, "w-6 h-6")}
+        <IntegrationIcon
+          integrationName={integration?.spec?.integrationName}
+          iconSlug={integrationDef?.icon}
+          className="w-6 h-6"
+        />
         <div className="flex-1">
-          <h4 className="text-2xl font-semibold">{integration.metadata?.name || integration.spec?.integrationName}</h4>
+          <h4 className="text-2xl font-semibold">
+            {integration.metadata?.name ||
+              getIntegrationTypeDisplayName(undefined, integration.spec?.integrationName) ||
+              integration.spec?.integrationName}
+          </h4>
           {integration.spec?.integrationName && integration.metadata?.name !== integration.spec?.integrationName && (
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Integration: {integration.spec.integrationName}
+              Integration:{" "}
+              {getIntegrationTypeDisplayName(undefined, integration.spec?.integrationName) ||
+                integration.spec?.integrationName}
             </p>
           )}
         </div>
@@ -335,32 +307,11 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
           <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
             <div className="p-6">
               {integration?.status?.browserAction && (
-                <Alert className="mb-6 bg-orange-100 dark:bg-yellow-900/20 border-orange-200 dark:border-yellow-800">
-                  <div className="flex items-start justify-between gap-4">
-                    <AlertDescription className="flex-1 text-yellow-800 dark:text-yellow-200 [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:space-y-1">
-                      {integration.status.browserAction.description && (
-                        <ReactMarkdown>{integration.status.browserAction.description}</ReactMarkdown>
-                      )}
-                    </AlertDescription>
-                    {integration.status.browserAction.url && (
-                      <PermissionTooltip
-                        allowed={canUpdateIntegrations || permissionsLoading}
-                        message="You don't have permission to update integrations."
-                      >
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleBrowserAction}
-                          className="shrink-0 px-3 py-1.5"
-                          disabled={!canUpdateIntegrations}
-                        >
-                          <ExternalLink className="w-4 h-4 mr-2" />
-                          Continue
-                        </Button>
-                      </PermissionTooltip>
-                    )}
-                  </div>
-                </Alert>
+                <IntegrationInstructions
+                  description={integration.status.browserAction.description}
+                  onContinue={integration.status.browserAction.url ? handleBrowserAction : undefined}
+                  className="mb-6"
+                />
               )}
 
               {integrationDef?.configuration && integrationDef.configuration.length > 0 ? (
@@ -370,7 +321,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
                   className="w-full"
                 >
                   <form onSubmit={handleConfigSubmit} className="space-y-4">
-                    {integrationDef.configuration.map((field) => (
+                    {integrationDef.configuration.map((field: ConfigurationField) => (
                       <ConfigurationFieldRenderer
                         key={field.name}
                         field={field}
