@@ -1613,7 +1613,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
     ],
   },
   {
-    name: "Datadog",
+    name: "DataDog",
     blocks: [
       {
         name: "datadog-metric-query",
@@ -1687,7 +1687,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
       {
         name: "datadog-event-create",
         label: "Create Event",
-        description: "Create a Datadog event",
+        description: "Create a DataDog event",
         type: "component",
         outputChannels: [{ id: "created", label: "Created" } as any],
         configuration: [
@@ -1756,7 +1756,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
       {
         name: "datadog-event-stream-trigger",
         label: "Event Stream Trigger",
-        description: "Trigger on Datadog events matching filters",
+        description: "Trigger on DataDog events matching filters",
         type: "trigger",
         outputChannels: [{ id: "event", label: "Event" } as any],
         configuration: [
