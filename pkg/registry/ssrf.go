@@ -1,11 +1,13 @@
 package registry
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -16,7 +18,6 @@ var blockedHosts = []string{
 	"metadata.azure.com",
 	"169.254.169.254",
 	"fd00:ec2::254",
-	"[fd00:ec2::254]",
 	// Kubernetes API
 	"kubernetes.default",
 	"kubernetes.default.svc",
@@ -24,7 +25,7 @@ var blockedHosts = []string{
 	// Localhost variations
 	"localhost",
 	"127.0.0.1",
-	"[::1]",
+	"::1",
 	"0.0.0.0",
 }
 
@@ -50,6 +51,9 @@ func init() {
 	}
 }
 
+// ValidateURLForSSRF performs URL-level SSRF checks (scheme, blocked hostnames).
+// IP-level checks are performed at connection time by the dialer's Control function
+// to prevent DNS rebinding attacks.
 func ValidateURLForSSRF(targetURL string) error {
 	parsedURL, err := url.Parse(targetURL)
 	if err != nil {
@@ -66,6 +70,7 @@ func ValidateURLForSSRF(targetURL string) error {
 		return fmt.Errorf("URL must have a host")
 	}
 
+	// Check blocked hostnames
 	hostLower := strings.ToLower(host)
 	for _, blocked := range blockedHosts {
 		if hostLower == blocked || strings.HasSuffix(hostLower, "."+blocked) {
@@ -73,23 +78,13 @@ func ValidateURLForSSRF(targetURL string) error {
 		}
 	}
 
-	ip := net.ParseIP(host)
-	if ip != nil {
+	// If host is an IP address, validate it immediately
+	if ip := net.ParseIP(host); ip != nil {
 		if err := validateIP(ip); err != nil {
 			return err
 		}
-	} else {
-		ips, err := net.LookupIP(host)
-		if err != nil {
-			return fmt.Errorf("DNS lookup failed for %s: %w", host, err)
-		}
-
-		for _, resolvedIP := range ips {
-			if err := validateIP(resolvedIP); err != nil {
-				return fmt.Errorf("access to %s is not allowed: %w", host, err)
-			}
-		}
 	}
+	// For hostnames, IP validation happens at connection time via the dialer
 
 	return nil
 }
@@ -108,14 +103,55 @@ func validateIP(ip net.IP) error {
 	return nil
 }
 
+// ssrfSafeDialer creates a dialer that validates IP addresses at connection time.
+// This prevents DNS rebinding attacks by checking the resolved IP just before connecting.
+func ssrfSafeDialer() *net.Dialer {
+	return &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+		Control: func(network, address string, c syscall.RawConn) error {
+			host, _, err := net.SplitHostPort(address)
+			if err != nil {
+				return fmt.Errorf("invalid address: %w", err)
+			}
+
+			ip := net.ParseIP(host)
+			if ip == nil {
+				return fmt.Errorf("invalid IP address: %s", host)
+			}
+
+			if err := validateIP(ip); err != nil {
+				return fmt.Errorf("connection blocked: %w", err)
+			}
+
+			return nil
+		},
+	}
+}
+
 func NewSSRFSafeHTTPClient(timeout time.Duration) *http.Client {
+	dialer := ssrfSafeDialer()
+
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return dialer.DialContext(ctx, network, addr)
+		},
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
 	return &http.Client{
-		Timeout: timeout,
+		Timeout:   timeout,
+		Transport: transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
 				return fmt.Errorf("stopped after 10 redirects")
 			}
 
+			// Validate URL-level checks (scheme, blocked hostnames)
 			if err := ValidateURLForSSRF(req.URL.String()); err != nil {
 				return fmt.Errorf("redirect blocked: %w", err)
 			}
