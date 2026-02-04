@@ -11,6 +11,7 @@ import { useCreateRole, useRole, useUpdateRole } from "../../../hooks/useOrganiz
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/ui/checkbox";
 import { showErrorToast } from "@/utils/toast";
+import { isCustomComponentsEnabled } from "@/lib/env";
 
 interface Permission {
   id: string;
@@ -205,44 +206,48 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
       },
     ],
   },
-  // {
-  //   category: "Blueprints",
-  //   icon: "view_module",
-  //   permissions: [
-  //     {
-  //       id: "blueprint.read",
-  //       name: "View Blueprints",
-  //       description: "View organization blueprints",
-  //       category: "Blueprints",
-  //       resource: "blueprints",
-  //       action: "read",
-  //     },
-  //     {
-  //       id: "blueprint.create",
-  //       name: "Create Blueprints",
-  //       description: "Create new blueprints",
-  //       category: "Blueprints",
-  //       resource: "blueprints",
-  //       action: "create",
-  //     },
-  //     {
-  //       id: "blueprint.update",
-  //       name: "Manage Blueprints",
-  //       description: "Update blueprint settings and configuration",
-  //       category: "Blueprints",
-  //       resource: "blueprints",
-  //       action: "update",
-  //     },
-  //     {
-  //       id: "blueprint.delete",
-  //       name: "Delete Blueprints",
-  //       description: "Delete blueprints from the organization",
-  //       category: "Blueprints",
-  //       resource: "blueprints",
-  //       action: "delete",
-  //     },
-  //   ],
-  // },
+  ...(isCustomComponentsEnabled()
+    ? [
+        {
+          category: "Custom Components",
+          icon: "view_module",
+          permissions: [
+            {
+              id: "blueprint.read",
+              name: "View Custom Components",
+              description: "View organization custom components",
+              category: "Custom Components",
+              resource: "blueprints",
+              action: "read",
+            },
+            {
+              id: "blueprint.create",
+              name: "Create Custom Components",
+              description: "Create new custom components",
+              category: "Custom Components",
+              resource: "blueprints",
+              action: "create",
+            },
+            {
+              id: "blueprint.update",
+              name: "Manage Custom Components",
+              description: "Update custom components settings and configuration",
+              category: "Custom Components",
+              resource: "blueprints",
+              action: "update",
+            },
+            {
+              id: "blueprint.delete",
+              name: "Delete Custom Components",
+              description: "Delete custom components from the organization",
+              category: "Custom Components",
+              resource: "blueprints",
+              action: "delete",
+            },
+          ],
+        },
+      ]
+    : []),
   {
     category: "Integrations",
     icon: "integration_instructions",
@@ -352,26 +357,6 @@ export function CreateRolePage() {
 
   usePageTitle([isReadOnly ? "View Role" : isEditMode ? "Edit Role" : "Create Role"]);
 
-  if (permissionsLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-[40vh]">
-        <p className="text-gray-500">Checking permissions...</p>
-      </div>
-    );
-  }
-
-  if (!canReadRoles) {
-    return <NotFoundPage />;
-  }
-
-  if (isEditMode && !isReadOnly && !canUpdateRoles) {
-    return <NotFoundPage />;
-  }
-
-  if (!isEditMode && !canCreateRoles) {
-    return <NotFoundPage />;
-  }
-
   const handleCategoryToggle = (permissions: Permission[]) => {
     if (isReadOnly) return;
     const permissionIds = permissions.map((p) => p.id);
@@ -468,6 +453,26 @@ export function CreateRolePage() {
       showErrorToast("Failed to create role");
     }
   };
+
+  if (!canReadRoles) {
+    return <NotFoundPage />;
+  }
+
+  if (isEditMode && !isReadOnly && !canUpdateRoles) {
+    return <NotFoundPage />;
+  }
+
+  if (!isEditMode && !canCreateRoles) {
+    return <NotFoundPage />;
+  }
+
+  if (permissionsLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[40vh]">
+        <p className="text-gray-500">Checking permissions...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen text-left">
