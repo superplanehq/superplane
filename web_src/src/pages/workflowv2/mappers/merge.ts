@@ -176,7 +176,7 @@ export const mergeMapper: ComponentBaseMapper = {
   },
 
   subtitle(context: SubtitleContext): string {
-    return getMergeSubtitle(context.execution);
+    return getMergeSubtitle(context.execution, context.additionalData);
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
