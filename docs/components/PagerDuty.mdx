@@ -21,6 +21,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Annotate Incident" href="#annotate-incident" description="Add a note to an existing incident in PagerDuty" />
   <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in PagerDuty" />
+  <LinkCard title="Get Incident" href="#get-incident" description="Get a PagerDuty incident by ID" />
   <LinkCard title="List Incidents" href="#list-incidents" description="Query PagerDuty to get a list of all open incidents (triggered and acknowledged)" />
   <LinkCard title="Snooze Incident" href="#snooze-incident" description="Snooze an acknowledged incident in PagerDuty" />
   <LinkCard title="Update Incident" href="#update-incident" description="Update an existing incident in PagerDuty" />
@@ -511,6 +512,227 @@ Returns the created incident object including:
       "updated_at": "2015-10-06T21:40:23Z",
       "urgency": "high"
     }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "pagerduty.incident"
+}
+```
+
+<a id="get-incident"></a>
+
+## Get Incident
+
+The Get Incident component retrieves a specific incident from PagerDuty by its ID, along with related alerts, notes, and log entries.
+
+### Use Cases
+
+- **Incident lookup**: Fetch incident details for processing or display
+- **Workflow automation**: Get incident information to make decisions in workflows
+- **Data enrichment**: Retrieve incident data to combine with other information
+- **Status checking**: Check incident status before performing actions
+
+### Configuration
+
+- **Incident ID**: The ID of the incident to retrieve (e.g., PT4KHLK)
+
+### Output
+
+Returns the incident object along with related data:
+- **incident**: Complete incident information including title, description, urgency, status, assignments, teams, priority, escalation policy
+- **alerts**: Alerts that triggered or are associated with the incident
+- **notes**: Annotations/notes added to the incident
+- **log_entries**: Timeline of all changes and actions on the incident
+
+Note: If fetching alerts, notes, or log entries fails, they will be omitted from the response but the incident data will still be returned.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alerts": [
+      {
+        "alert_key": "cpu_high_alert_001",
+        "created_at": "2015-10-06T21:30:42Z",
+        "html_url": "https://subdomain.pagerduty.com/alerts/PT4KHLK:0",
+        "id": "PT4KHLK:0",
+        "incident": {
+          "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK",
+          "id": "PT4KHLK",
+          "self": "https://api.pagerduty.com/incidents/PT4KHLK",
+          "summary": "[#1234] The server is on fire.",
+          "type": "incident_reference"
+        },
+        "self": "https://api.pagerduty.com/alerts/PT4KHLK:0",
+        "service": {
+          "html_url": "https://subdomain.pagerduty.com/service-directory/PWIXJZS",
+          "id": "PWIXJZS",
+          "self": "https://api.pagerduty.com/services/PWIXJZS",
+          "summary": "My Mail Service",
+          "type": "service_reference"
+        },
+        "severity": "critical",
+        "status": "triggered",
+        "summary": "CPU usage exceeded 90%",
+        "type": "alert"
+      }
+    ],
+    "incident": {
+      "assigned_via": "escalation_policy",
+      "assignments": [
+        {
+          "assignee": {
+            "html_url": "https://subdomain.pagerduty.com/users/PXPGF42",
+            "id": "PXPGF42",
+            "self": "https://api.pagerduty.com/users/PXPGF42",
+            "summary": "Earline Greenholt",
+            "type": "user_reference"
+          },
+          "at": "2015-11-10T00:31:52Z"
+        }
+      ],
+      "created_at": "2015-10-06T21:30:42Z",
+      "escalation_policy": {
+        "html_url": "https://subdomain.pagerduty.com/escalation_policies/PT20YPA",
+        "id": "PT20YPA",
+        "self": "https://api.pagerduty.com/escalation_policies/PT20YPA",
+        "summary": "Another Escalation Policy",
+        "type": "escalation_policy_reference"
+      },
+      "first_trigger_log_entry": {
+        "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK/log_entries/Q02JTSNZWHSEKV",
+        "id": "Q02JTSNZWHSEKV",
+        "self": "https://api.pagerduty.com/log_entries/Q02JTSNZWHSEKV?incident_id=PT4KHLK",
+        "summary": "Triggered through the API",
+        "type": "trigger_log_entry_reference"
+      },
+      "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK",
+      "id": "PT4KHLK",
+      "incident_key": "baf7cf21b1da41b4b0221008339ff357",
+      "incident_number": 1234,
+      "last_status_change_at": "2015-10-06T21:38:23Z",
+      "last_status_change_by": {
+        "html_url": "https://subdomain.pagerduty.com/users/PXPGF42",
+        "id": "PXPGF42",
+        "self": "https://api.pagerduty.com/users/PXPGF42",
+        "summary": "Earline Greenholt",
+        "type": "user_reference"
+      },
+      "priority": {
+        "id": "P53ZZH5",
+        "self": "https://api.pagerduty.com/priorities/P53ZZH5",
+        "summary": "P2",
+        "type": "priority_reference"
+      },
+      "resolved_at": null,
+      "self": "https://api.pagerduty.com/incidents/PT4KHLK",
+      "service": {
+        "html_url": "https://subdomain.pagerduty.com/service-directory/PWIXJZS",
+        "id": "PWIXJZS",
+        "self": "https://api.pagerduty.com/services/PWIXJZS",
+        "summary": "My Mail Service",
+        "type": "service_reference"
+      },
+      "status": "triggered",
+      "summary": "[#1234] The server is on fire.",
+      "teams": [
+        {
+          "html_url": "https://subdomain.pagerduty.com/teams/PQ9K7I8",
+          "id": "PQ9K7I8",
+          "self": "https://api.pagerduty.com/teams/PQ9K7I8",
+          "summary": "Engineering",
+          "type": "team_reference"
+        }
+      ],
+      "title": "The server is on fire.",
+      "type": "incident",
+      "updated_at": "2015-10-06T21:40:23Z",
+      "urgency": "high"
+    },
+    "log_entries": [
+      {
+        "agent": {
+          "html_url": "https://subdomain.pagerduty.com/service-directory/PWIXJZS",
+          "id": "PWIXJZS",
+          "self": "https://api.pagerduty.com/services/PWIXJZS",
+          "summary": "My Mail Service",
+          "type": "service_reference"
+        },
+        "channel": {
+          "type": "api"
+        },
+        "created_at": "2015-10-06T21:30:42Z",
+        "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK/log_entries/Q02JTSNZWHSEKV",
+        "id": "Q02JTSNZWHSEKV",
+        "incident": {
+          "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK",
+          "id": "PT4KHLK",
+          "self": "https://api.pagerduty.com/incidents/PT4KHLK",
+          "summary": "[#1234] The server is on fire.",
+          "type": "incident_reference"
+        },
+        "self": "https://api.pagerduty.com/log_entries/Q02JTSNZWHSEKV",
+        "summary": "Triggered through the API",
+        "type": "trigger_log_entry"
+      },
+      {
+        "agent": {
+          "html_url": "https://subdomain.pagerduty.com/escalation_policies/PT20YPA",
+          "id": "PT20YPA",
+          "self": "https://api.pagerduty.com/escalation_policies/PT20YPA",
+          "summary": "Another Escalation Policy",
+          "type": "escalation_policy_reference"
+        },
+        "assignees": [
+          {
+            "html_url": "https://subdomain.pagerduty.com/users/PXPGF42",
+            "id": "PXPGF42",
+            "self": "https://api.pagerduty.com/users/PXPGF42",
+            "summary": "Earline Greenholt",
+            "type": "user_reference"
+          }
+        ],
+        "created_at": "2015-10-06T21:30:42Z",
+        "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK/log_entries/Q02JTSNZWHSEKY",
+        "id": "Q02JTSNZWHSEKY",
+        "incident": {
+          "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK",
+          "id": "PT4KHLK",
+          "self": "https://api.pagerduty.com/incidents/PT4KHLK",
+          "summary": "[#1234] The server is on fire.",
+          "type": "incident_reference"
+        },
+        "self": "https://api.pagerduty.com/log_entries/Q02JTSNZWHSEKY",
+        "summary": "Assigned to Earline Greenholt",
+        "type": "assign_log_entry"
+      }
+    ],
+    "notes": [
+      {
+        "content": "Investigating the root cause. Initial analysis suggests a database connection timeout.",
+        "created_at": "2015-10-06T21:35:00Z",
+        "id": "PNQ2YA7",
+        "user": {
+          "html_url": "https://subdomain.pagerduty.com/users/PXPGF42",
+          "id": "PXPGF42",
+          "self": "https://api.pagerduty.com/users/PXPGF42",
+          "summary": "Earline Greenholt",
+          "type": "user_reference"
+        }
+      },
+      {
+        "content": "Restarted the database connection pool. Monitoring for improvement.",
+        "created_at": "2015-10-06T21:38:00Z",
+        "id": "PNQ2YA8",
+        "user": {
+          "html_url": "https://subdomain.pagerduty.com/users/PXPGF42",
+          "id": "PXPGF42",
+          "self": "https://api.pagerduty.com/users/PXPGF42",
+          "summary": "Earline Greenholt",
+          "type": "user_reference"
+        }
+      }
+    ]
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "pagerduty.incident"
