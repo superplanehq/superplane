@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -56,7 +55,7 @@ type Registry struct {
 func NewRegistry(encryptor crypto.Encryptor) *Registry {
 	r := &Registry{
 		Encryptor:    encryptor,
-		httpClient:   &http.Client{Timeout: 30 * time.Second},
+		httpClient:   NewSSRFSafeHTTPClient(),
 		Components:   map[string]core.Component{},
 		Triggers:     map[string]core.Trigger{},
 		Integrations: map[string]core.Integration{},
