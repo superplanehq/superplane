@@ -487,7 +487,7 @@ func Test__OnEvent__HandleWebhook_Filters(t *testing.T) {
 	t.Run("filter by services - matching", func(t *testing.T) {
 		config := map[string]any{
 			"events":   []string{"incident_event.created"},
-			"services": []string{"api-gateway"},
+			"services": "api-gateway",
 		}
 
 		body := []byte(`{
@@ -515,7 +515,7 @@ func Test__OnEvent__HandleWebhook_Filters(t *testing.T) {
 	t.Run("filter by services - not matching", func(t *testing.T) {
 		config := map[string]any{
 			"events":   []string{"incident_event.created"},
-			"services": []string{"database"},
+			"services": "database",
 		}
 
 		body := []byte(`{
@@ -543,7 +543,7 @@ func Test__OnEvent__HandleWebhook_Filters(t *testing.T) {
 	t.Run("filter by teams - matching", func(t *testing.T) {
 		config := map[string]any{
 			"events": []string{"incident_event.created"},
-			"teams":  []string{"platform"},
+			"teams":  "platform",
 		}
 
 		body := []byte(`{
@@ -571,7 +571,7 @@ func Test__OnEvent__HandleWebhook_Filters(t *testing.T) {
 	t.Run("filter by teams - not matching", func(t *testing.T) {
 		config := map[string]any{
 			"events": []string{"incident_event.created"},
-			"teams":  []string{"infrastructure"},
+			"teams":  "infrastructure",
 		}
 
 		body := []byte(`{
@@ -813,9 +813,14 @@ func Test__OnEvent__Metadata(t *testing.T) {
 }
 
 func Test__matchesEventFilters(t *testing.T) {
-	t.Run("nil data returns true", func(t *testing.T) {
-		config := OnEventConfiguration{Statuses: []string{"started"}}
+	t.Run("nil data with no filters returns true", func(t *testing.T) {
+		config := OnEventConfiguration{}
 		assert.True(t, matchesEventFilters(nil, config))
+	})
+
+	t.Run("nil data with filters returns false", func(t *testing.T) {
+		config := OnEventConfiguration{Statuses: []string{"started"}}
+		assert.False(t, matchesEventFilters(nil, config))
 	})
 
 	t.Run("empty config matches everything", func(t *testing.T) {
@@ -832,7 +837,7 @@ func Test__matchesEventFilters(t *testing.T) {
 		config := OnEventConfiguration{Statuses: []string{"started"}}
 		data := map[string]any{"kind": "note"}
 		// Should not match because incident is missing
-		assert.True(t, matchesEventFilters(data, config))
+		assert.False(t, matchesEventFilters(data, config))
 	})
 }
 

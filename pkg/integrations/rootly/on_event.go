@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -19,11 +20,31 @@ type OnEventConfiguration struct {
 	Events     []string `json:"events" mapstructure:"events"`
 	Statuses   []string `json:"statuses" mapstructure:"statuses"`
 	Severities []string `json:"severities" mapstructure:"severities"`
-	Services   []string `json:"services" mapstructure:"services"`
-	Teams      []string `json:"teams" mapstructure:"teams"`
+	Services   string   `json:"services" mapstructure:"services"`
+	Teams      string   `json:"teams" mapstructure:"teams"`
 	Sources    []string `json:"sources" mapstructure:"sources"`
 	Visibility string   `json:"visibility" mapstructure:"visibility"`
 	EventKinds []string `json:"event_kinds" mapstructure:"event_kinds"`
+}
+
+// parseCommaSeparated splits a comma-separated string into a slice of trimmed strings.
+// Returns nil if the input is empty.
+func parseCommaSeparated(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
 }
 
 func (t *OnEvent) Name() string {
@@ -284,55 +305,61 @@ func (t *OnEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 }
 
 // EventWebhookPayload represents the Rootly webhook payload for timeline events.
+// It reuses WebhookEvent from on_incident.go since the structure is identical.
 type EventWebhookPayload struct {
-	Event EventWebhookEvent `json:"event"`
-	Data  map[string]any    `json:"data"`
-}
-
-// EventWebhookEvent represents the event metadata in a Rootly timeline event webhook.
-type EventWebhookEvent struct {
-	ID       string `json:"id"`
-	Type     string `json:"type"`
-	IssuedAt string `json:"issued_at"`
+	Event WebhookEvent   `json:"event"`
+	Data  map[string]any `json:"data"`
 }
 
 // matchesEventFilters checks if the event data matches the configured filters.
+// When a filter is configured but the corresponding field is missing from the data,
+// the event does NOT match (returns false).
 func matchesEventFilters(data map[string]any, config OnEventConfiguration) bool {
+	// If no data, only match if no filters are configured
 	if data == nil {
-		return true
+		return len(config.Statuses) == 0 &&
+			len(config.Severities) == 0 &&
+			config.Services == "" &&
+			config.Teams == "" &&
+			len(config.Sources) == 0 &&
+			config.Visibility == "" &&
+			len(config.EventKinds) == 0
 	}
 
 	// Filter by incident status
 	if len(config.Statuses) > 0 {
-		if incident, ok := data["incident"].(map[string]any); ok {
-			if status, ok := incident["status"].(string); ok {
-				if !slices.Contains(config.Statuses, status) {
-					return false
-				}
-			}
+		incident, hasIncident := data["incident"].(map[string]any)
+		if !hasIncident {
+			return false
+		}
+		status, hasStatus := incident["status"].(string)
+		if !hasStatus || !slices.Contains(config.Statuses, status) {
+			return false
 		}
 	}
 
 	// Filter by severity
 	if len(config.Severities) > 0 {
-		if incident, ok := data["incident"].(map[string]any); ok {
-			if severity, ok := incident["severity"].(string); ok {
-				if !slices.Contains(config.Severities, severity) {
-					return false
-				}
-			}
+		incident, hasIncident := data["incident"].(map[string]any)
+		if !hasIncident {
+			return false
+		}
+		severity, hasSeverity := incident["severity"].(string)
+		if !hasSeverity || !slices.Contains(config.Severities, severity) {
+			return false
 		}
 	}
 
-	// Filter by service
-	if len(config.Services) > 0 {
+	// Filter by service (comma-separated string config)
+	serviceFilters := parseCommaSeparated(config.Services)
+	if len(serviceFilters) > 0 {
 		matched := false
 		if incident, ok := data["incident"].(map[string]any); ok {
 			if services, ok := incident["services"].([]any); ok {
 				for _, s := range services {
 					if service, ok := s.(map[string]any); ok {
 						if name, ok := service["name"].(string); ok {
-							if slices.Contains(config.Services, name) {
+							if slices.Contains(serviceFilters, name) {
 								matched = true
 								break
 							}
@@ -346,15 +373,16 @@ func matchesEventFilters(data map[string]any, config OnEventConfiguration) bool 
 		}
 	}
 
-	// Filter by team
-	if len(config.Teams) > 0 {
+	// Filter by team (comma-separated string config)
+	teamFilters := parseCommaSeparated(config.Teams)
+	if len(teamFilters) > 0 {
 		matched := false
 		if incident, ok := data["incident"].(map[string]any); ok {
 			if teams, ok := incident["teams"].([]any); ok {
 				for _, t := range teams {
 					if team, ok := t.(map[string]any); ok {
 						if name, ok := team["name"].(string); ok {
-							if slices.Contains(config.Teams, name) {
+							if slices.Contains(teamFilters, name) {
 								matched = true
 								break
 							}
@@ -370,28 +398,25 @@ func matchesEventFilters(data map[string]any, config OnEventConfiguration) bool 
 
 	// Filter by event source
 	if len(config.Sources) > 0 {
-		if source, ok := data["source"].(string); ok {
-			if !slices.Contains(config.Sources, source) {
-				return false
-			}
+		source, hasSource := data["source"].(string)
+		if !hasSource || !slices.Contains(config.Sources, source) {
+			return false
 		}
 	}
 
 	// Filter by visibility
 	if config.Visibility != "" {
-		if visibility, ok := data["visibility"].(string); ok {
-			if visibility != config.Visibility {
-				return false
-			}
+		visibility, hasVisibility := data["visibility"].(string)
+		if !hasVisibility || visibility != config.Visibility {
+			return false
 		}
 	}
 
 	// Filter by event kind
 	if len(config.EventKinds) > 0 {
-		if kind, ok := data["kind"].(string); ok {
-			if !slices.Contains(config.EventKinds, kind) {
-				return false
-			}
+		kind, hasKind := data["kind"].(string)
+		if !hasKind || !slices.Contains(config.EventKinds, kind) {
+			return false
 		}
 	}
 
