@@ -29,6 +29,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitHub repository" />
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
+  <LinkCard title="Get Repository Issues" href="#get-repository-issues" description="List issues from a GitHub repository" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
@@ -1117,6 +1118,107 @@ Returns the complete issue object including:
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.issue"
+}
+```
+
+<a id="get-repository-issues"></a>
+
+## Get Repository Issues
+
+The Get Repository Issues component retrieves a list of issues from a GitHub repository.
+
+### Use Cases
+
+- **Issue tracking**: Get all open issues for processing or reporting
+- **Workflow automation**: List issues matching specific criteria
+- **Dashboard integration**: Fetch issues to display in a status dashboard
+- **Batch processing**: Process multiple issues in a workflow
+
+### Configuration
+
+- **Repository**: Select the GitHub repository to list issues from
+- **State**: Filter by issue state (open, closed, or all)
+- **Labels**: Filter by one or more labels (optional)
+- **Sort**: Sort by created, updated, or comments
+- **Direction**: Sort direction (ascending or descending)
+- **Per Page**: Number of issues to return (max 100)
+
+### Output
+
+Returns a list of issues, each containing:
+- Issue number, title, and body
+- State (open/closed)
+- Labels and assignees
+- Created and updated timestamps
+- Author information
+- Comments count
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "assignees": [
+        {
+          "avatar_url": "https://github.com/images/error/octocat_happy.gif",
+          "html_url": "https://github.com/janedoe",
+          "id": 67890,
+          "login": "janedoe"
+        }
+      ],
+      "body": "The login button doesn't respond when clicked on mobile devices.",
+      "comments_count": 3,
+      "created_at": "2026-01-10T10:00:00Z",
+      "html_url": "https://github.com/acme/widgets/issues/42",
+      "id": 1001,
+      "labels": [
+        {
+          "color": "d73a4a",
+          "id": 1,
+          "name": "bug"
+        }
+      ],
+      "locked": false,
+      "number": 42,
+      "state": "open",
+      "title": "Bug: Login button not working",
+      "updated_at": "2026-01-15T14:30:00Z",
+      "user": {
+        "avatar_url": "https://github.com/images/error/octocat_happy.gif",
+        "html_url": "https://github.com/johndoe",
+        "id": 12345,
+        "login": "johndoe"
+      }
+    },
+    {
+      "body": "Would be great to have a dark mode option in the settings.",
+      "comments_count": 7,
+      "created_at": "2026-01-12T09:00:00Z",
+      "html_url": "https://github.com/acme/widgets/issues/43",
+      "id": 1002,
+      "labels": [
+        {
+          "color": "a2eeef",
+          "id": 2,
+          "name": "enhancement"
+        }
+      ],
+      "locked": false,
+      "number": 43,
+      "state": "open",
+      "title": "Feature: Add dark mode support",
+      "updated_at": "2026-01-16T11:00:00Z",
+      "user": {
+        "avatar_url": "https://github.com/images/error/octocat_happy.gif",
+        "html_url": "https://github.com/contributor",
+        "id": 11111,
+        "login": "contributor"
+      }
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.issues"
 }
 ```
 
