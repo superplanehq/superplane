@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent, canvasesInvokeNodeTriggerAction } from "@/api-client";
 import { getColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
-import { TriggerRenderer, CustomFieldRenderer } from "./types";
+import { TriggerRenderer, CustomFieldRenderer, NodeInfo } from "./types";
 import { TriggerProps } from "@/ui/trigger";
 import { Icon } from "@/components/Icon";
 import { useQueryClient } from "@tanstack/react-query";
@@ -294,9 +294,9 @@ const ResetAuthButton: React.FC<{
  * Custom field renderer for webhook component configuration
  */
 export const webhookCustomFieldRenderer: CustomFieldRenderer = {
-  render: (node: ComponentsNode, configuration: Record<string, unknown>) => {
+  render: (node: NodeInfo) => {
     const metadata = node.metadata as WebhookMetadata | undefined;
-    const config = configuration as WebhookConfiguration | undefined;
+    const config = node.configuration as WebhookConfiguration | undefined;
     const authMethod = config?.authentication || "none";
     const webhookUrl = metadata?.url || "[URL GENERATED ONCE THE CANVAS IS SAVED]";
 

@@ -405,9 +405,9 @@ Frontend mappers render triggers and components in the UI. They define how event
 Create a new file in `web_src/src/pages/workflowv2/mappers/<app-name>/` (e.g., `on_event.ts`):
 
 ```typescript
-import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
+import { WorkflowsWorkflowEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerRenderer } from "../types";
+import { TriggerRenderer, NodeInfo, ComponentDefinition } from "../types";
 import appIcon from "@/assets/icons/integrations/<app-name>.svg";
 import { TriggerProps } from "@/ui/trigger";
 
@@ -446,7 +446,7 @@ export const onEventTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
+  getTriggerProps: (node: NodeInfo, definition: ComponentDefinition, lastEvent: WorkflowsWorkflowEvent) => {
     const metadata = node.metadata as unknown as OnEventMetadata;
     const configuration = node.configuration as unknown as OnEventConfiguration;
     const metadataItems = [];
@@ -469,9 +469,9 @@ export const onEventTriggerRenderer: TriggerRenderer = {
       title: node.name!,
       iconSrc: appIcon,
       iconBackground: "bg-white",
-      iconColor: getColorClass(trigger.color),
-      headerColor: getBackgroundColorClass(trigger.color),
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      iconColor: getColorClass(definition.color),
+      headerColor: getBackgroundColorClass(definition.color),
+      collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: metadataItems,
     };
 

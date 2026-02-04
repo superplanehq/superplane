@@ -5,7 +5,7 @@ import {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
-import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, StateFunction } from "../types";
+import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, NodeInfo, StateFunction } from "../types";
 import {
   ComponentBaseProps,
   ComponentBaseSpec,
@@ -294,8 +294,8 @@ run-name: "My workflow - \${{ inputs.superplane_execution_id }}"`;
  * Custom field renderer for GitHub Run Workflow component configuration
  */
 export const runWorkflowCustomFieldRenderer: CustomFieldRenderer = {
-  render: (_node: ComponentsNode, configuration: Record<string, unknown>) => {
-    const inputs = configuration?.inputs as Array<{ name: string; value: string }> | undefined;
+  render: (node: NodeInfo) => {
+    const inputs = node.configuration?.inputs as Array<{ name: string; value: string }> | undefined;
     const yamlSnippet = generateWorkflowYamlSnippet(inputs);
 
     return (

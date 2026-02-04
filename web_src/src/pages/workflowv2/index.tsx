@@ -115,7 +115,10 @@ export function WorkflowPageV2() {
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
   const { data: widgets = [], isLoading: widgetsLoading } = useWidgets();
   const { data: availableIntegrations = [], isLoading: integrationsLoading } = useAvailableIntegrations();
-  const { data: integrations = [] } = useConnectedIntegrations(organizationId!);
+  const canReadIntegrations = canAct("integrations", "read");
+  const canCreateIntegrations = canAct("integrations", "create");
+  const canUpdateIntegrations = canAct("integrations", "update");
+  const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
   const { data: canvas, isLoading: canvasLoading, error: canvasError } = useCanvas(organizationId!, canvasId!);
   const { data: canvasEventsResponse } = useCanvasEvents(canvasId!);
   const canUpdateCanvas = canAct("canvases", "update");
@@ -2707,8 +2710,16 @@ export function WorkflowPageV2() {
       if (!renderer) return null;
 
       // Return a function that takes the current configuration
-      return (configuration: Record<string, unknown>) => {
-        return renderer.render(node, configuration, onRun ? { onRun } : undefined);
+      return () => {
+        return renderer.render(
+          {
+            id: node.id!,
+            name: node.name!,
+            configuration: node.configuration,
+            metadata: node.metadata,
+          },
+          onRun ? { onRun } : undefined,
+        );
       };
     },
     [canvas],
@@ -2770,6 +2781,14 @@ export function WorkflowPageV2() {
   const saveButtonHidden = isTemplate || !canUpdateCanvas || !hasUnsavedChanges;
   const saveIsPrimary = hasUnsavedChanges && !isTemplate && canUpdateCanvas;
   const canUndo = !isTemplate && canUpdateCanvas && !isAutoSaveEnabled && initialWorkflowSnapshot !== null;
+  const runDisabled = hasRunBlockingChanges || isTemplate || !canUpdateCanvas;
+  const runDisabledTooltip = !canUpdateCanvas
+    ? "You don't have permission to emit events on this canvas."
+    : isTemplate
+      ? "Templates are read-only"
+      : hasRunBlockingChanges
+        ? "Save canvas changes before running"
+        : undefined;
 
   return (
     <>
@@ -2818,7 +2837,10 @@ export function WorkflowPageV2() {
         onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
         onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}
         onPlaceholderConfigure={!isReadOnly ? handlePlaceholderConfigure : undefined}
-        integrations={integrations}
+        integrations={canReadIntegrations ? integrations : []}
+        canReadIntegrations={canReadIntegrations}
+        canCreateIntegrations={canCreateIntegrations}
+        canUpdateIntegrations={canUpdateIntegrations}
         readOnly={isReadOnly}
         hasFitToViewRef={hasFitToViewRef}
         hasUserToggledSidebarRef={hasUserToggledSidebarRef}
@@ -2838,14 +2860,8 @@ export function WorkflowPageV2() {
         autoSaveDisabledTooltip={autoSaveDisabledTooltip}
         onExportYamlCopy={isDev ? handleExportYamlCopy : undefined}
         onExportYamlDownload={isDev ? handleExportYamlDownload : undefined}
-        runDisabled={hasRunBlockingChanges || isTemplate}
-        runDisabledTooltip={
-          isTemplate
-            ? "Templates are read-only"
-            : hasRunBlockingChanges
-              ? "Save canvas changes before running"
-              : undefined
-        }
+        runDisabled={runDisabled}
+        runDisabledTooltip={runDisabledTooltip}
         onCancelQueueItem={onCancelQueueItem}
         onPushThrough={onPushThrough}
         supportsPushThrough={supportsPushThrough}
@@ -2858,7 +2874,7 @@ export function WorkflowPageV2() {
         getAllQueueEvents={getAllQueueEvents}
         getHasMoreQueue={getHasMoreQueue}
         getLoadingMoreQueue={getLoadingMoreQueue}
-        onReEmit={handleReEmit}
+        onReEmit={canUpdateCanvas ? handleReEmit : undefined}
         loadExecutionChain={loadExecutionChain}
         getExecutionState={getExecutionState}
         workflowNodes={canvas?.spec?.nodes}
@@ -2866,7 +2882,7 @@ export function WorkflowPageV2() {
         triggers={triggers}
         blueprints={blueprints}
         logEntries={logEntries}
-        onResolveExecutionErrors={handleResolveExecutionErrors}
+        onResolveExecutionErrors={canUpdateCanvas ? handleResolveExecutionErrors : undefined}
         focusRequest={focusRequest}
         onExecutionChainHandled={handleExecutionChainHandled}
         breadcrumbs={[
@@ -3060,7 +3076,21 @@ function prepareTriggerNode(
   const triggerMetadata = triggers.find((t) => t.name === node.trigger?.name);
   const renderer = getTriggerRenderer(node.trigger?.name || "");
   const lastEvent = nodeEventsMap[node.id!]?.[0];
-  const triggerProps = renderer.getTriggerProps(node, triggerMetadata || {}, lastEvent);
+  const triggerProps = renderer.getTriggerProps(
+    {
+      id: node.id!,
+      name: node.trigger?.name || "",
+      configuration: node.configuration,
+      metadata: node.metadata,
+    },
+    {
+      label: triggerMetadata?.label || "",
+      description: triggerMetadata?.description || "",
+      icon: triggerMetadata?.icon || "",
+      color: triggerMetadata?.color || "",
+    },
+    lastEvent,
+  );
 
   // Use node name if available, otherwise fall back to trigger label (from metadata)
   const displayLabel = node.name || triggerMetadata?.label || node.trigger?.name || "Trigger";
