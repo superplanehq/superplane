@@ -8,6 +8,7 @@ import { ComponentBaseProps } from "@/ui/componentBase";
 import { ComponentBaseMapper, OutputPayload } from "../types";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
+import { MetadataItem } from "@/ui/metadataList";
 
 interface BillableUsage {
   total_ms?: number;
@@ -31,6 +32,11 @@ interface WorkflowUsageOutput {
   };
 }
 
+interface GetWorkflowUsageConfiguration {
+  repository?: string;
+  workflowFile?: string;
+}
+
 function formatMs(ms: number): string {
   const hours = Math.floor(ms / 3600000);
   const minutes = Math.floor((ms % 3600000) / 60000);
@@ -38,6 +44,24 @@ function formatMs(ms: number): string {
     return `${hours}h ${minutes}m`;
   }
   return `${minutes}m`;
+}
+
+function getWorkflowUsageMetadataList(node: ComponentsNode): MetadataItem[] {
+  const metadata: MetadataItem[] = [];
+  const configuration = node.configuration as GetWorkflowUsageConfiguration | undefined;
+  const nodeMetadata = node.metadata as { repository?: { name?: string } } | undefined;
+
+  if (nodeMetadata?.repository?.name) {
+    metadata.push({ icon: "book", label: nodeMetadata.repository.name });
+  }
+
+  if (configuration?.workflowFile) {
+    metadata.push({ icon: "workflow", label: configuration.workflowFile });
+  } else {
+    metadata.push({ icon: "workflow", label: "All workflows" });
+  }
+
+  return metadata;
 }
 
 export const getWorkflowUsageMapper: ComponentBaseMapper = {
@@ -48,7 +72,12 @@ export const getWorkflowUsageMapper: ComponentBaseMapper = {
     lastExecutions: CanvasesCanvasNodeExecution[],
     queueItems: CanvasesCanvasNodeQueueItem[],
   ): ComponentBaseProps {
-    return baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
+    const base = baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
+
+    return {
+      ...base,
+      metadata: getWorkflowUsageMetadataList(node),
+    };
   },
   subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
