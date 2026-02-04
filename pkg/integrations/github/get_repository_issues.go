@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/google/go-github/v74/github"
@@ -20,7 +21,7 @@ type GetRepositoryIssuesConfiguration struct {
 	Labels     *string `mapstructure:"labels,omitempty"`
 	Sort       string  `mapstructure:"sort"`
 	Direction  string  `mapstructure:"direction"`
-	PerPage    *int    `mapstructure:"perPage,omitempty"`
+	PerPage    *string `mapstructure:"perPage,omitempty"`
 }
 
 func (c *GetRepositoryIssues) Name() string {
@@ -152,9 +153,9 @@ func (c *GetRepositoryIssues) Configuration() []configuration.Field {
 		{
 			Name:        "perPage",
 			Label:       "Results Per Page",
-			Type:        configuration.FieldTypeNumber,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Default:     30,
+			Default:     "30",
 			Placeholder: "30",
 			Description: "Number of issues to return (max 100)",
 		},
@@ -210,11 +211,16 @@ func (c *GetRepositoryIssues) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
-	if config.PerPage != nil && *config.PerPage > 0 {
-		if *config.PerPage > 100 {
+	if config.PerPage != nil && *config.PerPage != "" {
+		perPage, err := strconv.Atoi(*config.PerPage)
+		if err != nil {
+			return fmt.Errorf("invalid perPage value '%s': must be a valid number", *config.PerPage)
+		}
+
+		if perPage > 100 {
 			opts.ListOptions.PerPage = 100
-		} else {
-			opts.ListOptions.PerPage = *config.PerPage
+		} else if perPage > 0 {
+			opts.ListOptions.PerPage = perPage
 		}
 	}
 
