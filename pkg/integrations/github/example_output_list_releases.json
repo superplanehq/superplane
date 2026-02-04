@@ -1,0 +1,13 @@
+{
+  "releases": [
+    {
+      "id": 12345678,
+      "tag_name": "v1.2.0",
+      "name": "Release v1.2.0",
+      "body": "## What's Changed\n* Feature A\n* Bug fix B",
+      "draft": false,
+      "prerelease": false,
+      "published_at": "2024-01-15T10:30:00Z"
+    }
+  ]
+}
