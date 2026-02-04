@@ -183,10 +183,27 @@ func (c *GetPackageVersion) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to describe package version: %w", err)
 	}
 
+	assets, err := client.ListPackageVersionAssets(ListPackageVersionAssetsInput{
+		Domain:         config.Domain,
+		Repository:     config.Repository,
+		Format:         config.Format,
+		Namespace:      config.Namespace,
+		Package:        config.Package,
+		PackageVersion: config.Version,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list package version assets: %w", err)
+	}
+
+	output := map[string]any{
+		"package": result,
+		"assets":  assets,
+	}
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"aws.codeartifact.package.version",
-		[]any{result},
+		[]any{output},
 	)
 }
 

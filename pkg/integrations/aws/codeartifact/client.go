@@ -41,6 +41,12 @@ type PackageVersionDescription struct {
 	Version              string                `json:"version"`
 }
 
+type PackageVersionAsset struct {
+	Hashes map[string]string `json:"hashes"`
+	Name   string            `json:"name"`
+	Size   int64             `json:"size"`
+}
+
 type PackageLicense struct {
 	Name string `json:"name"`
 	URL  string `json:"url"`
@@ -61,6 +67,15 @@ type DescribePackageVersionResponse struct {
 }
 
 type DescribePackageVersionInput struct {
+	Domain         string
+	Repository     string
+	Format         string
+	Namespace      string
+	Package        string
+	PackageVersion string
+}
+
+type ListPackageVersionAssetsInput struct {
 	Domain         string
 	Repository     string
 	Format         string
@@ -270,6 +285,76 @@ func (c *Client) DescribePackageVersion(input DescribePackageVersionInput) (*Pac
 	}
 
 	return &response.PackageVersion, nil
+}
+
+type ListPackageVersionAssetsResponse struct {
+	Assets    []PackageVersionAsset `json:"assets"`
+	NextToken string                `json:"nextToken"`
+}
+
+func (c *Client) ListPackageVersionAssets(input ListPackageVersionAssetsInput) ([]PackageVersionAsset, error) {
+	endpoint := fmt.Sprintf("https://codeartifact.%s.amazonaws.com/v1/package/version/assets", c.region)
+	assets := []PackageVersionAsset{}
+	nextToken := ""
+
+	for {
+		req, err := http.NewRequest(http.MethodPost, endpoint, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build list package version assets request: %w", err)
+		}
+
+		query := url.Values{}
+		query.Set("domain", input.Domain)
+		query.Set("format", input.Format)
+		query.Set("package", input.Package)
+		query.Set("repository", input.Repository)
+		query.Set("version", input.PackageVersion)
+		query.Set("max-results", "1000")
+
+		if strings.TrimSpace(input.Namespace) != "" {
+			query.Set("namespace", strings.TrimSpace(input.Namespace))
+		}
+		if strings.TrimSpace(nextToken) != "" {
+			query.Set("next-token", strings.TrimSpace(nextToken))
+		}
+
+		req.URL.RawQuery = query.Encode()
+
+		if err := c.signRequest(req, []byte{}); err != nil {
+			return nil, err
+		}
+
+		res, err := c.http.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("list package version assets request failed: %w", err)
+		}
+
+		body, err := io.ReadAll(res.Body)
+		res.Body.Close()
+		if err != nil {
+			return nil, fmt.Errorf("failed to read list package version assets response: %w", err)
+		}
+
+		if res.StatusCode < 200 || res.StatusCode >= 300 {
+			if awsErr := common.ParseError(body); awsErr != nil {
+				return nil, awsErr
+			}
+			return nil, fmt.Errorf("list package version assets failed with %d: %s", res.StatusCode, string(body))
+		}
+
+		response := ListPackageVersionAssetsResponse{}
+		if err := json.Unmarshal(body, &response); err != nil {
+			return nil, fmt.Errorf("failed to decode list package version assets response: %w", err)
+		}
+
+		assets = append(assets, response.Assets...)
+		if strings.TrimSpace(response.NextToken) == "" {
+			break
+		}
+		nextToken = response.NextToken
+	}
+
+	return assets, nil
 }
 
 func (c *Client) signRequest(req *http.Request, payload []byte) error {

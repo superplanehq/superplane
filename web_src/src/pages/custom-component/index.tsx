@@ -495,7 +495,7 @@ export const CustomComponent = () => {
       // Check if this component is from an application
       let appName: string | undefined;
       const componentApp = availableIntegrations.find((i) =>
-        i.components?.some((c) => c.name === (node.data as any)._originalComponent),
+        i.components?.some((c: ComponentsComponent) => c.name === (node.data as any)._originalComponent),
       );
       if (componentApp) {
         appName = componentApp.name;
