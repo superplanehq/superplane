@@ -24,6 +24,7 @@ func TestSSRF__ValidateURLForSSRF__BlocksLocalhost(t *testing.T) {
 		{"127.0.0.1 with port", "http://127.0.0.1:3000/api", true},
 		{"loopback IPv6", "http://[::1]/api", true},
 		{"0.0.0.0", "http://0.0.0.0/api", true},
+		{"IPv6 unspecified", "http://[::]/api", true},
 		{"external IP", "http://8.8.8.8/api", false},
 	}
 
@@ -194,18 +195,17 @@ func TestSSRF__RedirectBlocking(t *testing.T) {
 }
 
 func TestSSRF__RedirectBlocking__EndToEnd(t *testing.T) {
-	// Create a server that redirects to a private IP
-	redirectServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "http://169.254.169.254/latest/meta-data/", http.StatusFound)
-	}))
-	defer redirectServer.Close()
+	// The SSRF-safe client uses a custom dialer that blocks private IPs at connection time.
+	// This prevents DNS rebinding attacks by validating the resolved IP just before connecting.
+	// As a result, we can't even connect to localhost test servers with the SSRF-safe client.
+	// Instead, we verify the dialer blocks connections to private IPs directly.
 
-	// Use SSRF-safe client
 	client := registry.NewSSRFSafeHTTPClient(5 * time.Second)
 
-	resp, err := client.Get(redirectServer.URL)
+	// Try to connect to a private IP - should be blocked at connection time
+	resp, err := client.Get("http://127.0.0.1:12345/")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "redirect blocked")
+	assert.Contains(t, err.Error(), "connection blocked")
 	if resp != nil {
 		resp.Body.Close()
 	}
