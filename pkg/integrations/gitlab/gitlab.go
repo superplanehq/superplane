@@ -239,9 +239,6 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 			ctx.Logger.Errorf("Failed to decode metadata while setting state: %v", err)
 		}
 
-		//
-		// If state is already set, reuse it to avoid race conditions.
-		//
 		state := metadata.State
 		if state == "" {
 			var err error
