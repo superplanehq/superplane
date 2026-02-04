@@ -22,7 +22,7 @@ var _ MappedNullable = &ComponentsEdge{}
 type ComponentsEdge struct {
 	SourceId *string `json:"sourceId,omitempty"`
 	TargetId *string `json:"targetId,omitempty"`
-	Channel  *string `json:"channel,omitempty"`
+	Channel *string `json:"channel,omitempty"`
 }
 
 // NewComponentsEdge instantiates a new ComponentsEdge object
@@ -139,7 +139,7 @@ func (o *ComponentsEdge) SetChannel(v string) {
 }
 
 func (o ComponentsEdge) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -195,3 +195,5 @@ func (v *NullableComponentsEdge) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

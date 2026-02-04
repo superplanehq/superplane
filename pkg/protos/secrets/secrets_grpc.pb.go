@@ -19,13 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Secrets_CreateSecret_FullMethodName    = "/Superplane.Secrets.Secrets/CreateSecret"
-	Secrets_DescribeSecret_FullMethodName  = "/Superplane.Secrets.Secrets/DescribeSecret"
-	Secrets_ListSecrets_FullMethodName     = "/Superplane.Secrets.Secrets/ListSecrets"
-	Secrets_UpdateSecret_FullMethodName    = "/Superplane.Secrets.Secrets/UpdateSecret"
-	Secrets_DeleteSecret_FullMethodName    = "/Superplane.Secrets.Secrets/DeleteSecret"
-	Secrets_SetSecretKey_FullMethodName    = "/Superplane.Secrets.Secrets/SetSecretKey"
-	Secrets_DeleteSecretKey_FullMethodName = "/Superplane.Secrets.Secrets/DeleteSecretKey"
+	Secrets_CreateSecret_FullMethodName     = "/Superplane.Secrets.Secrets/CreateSecret"
+	Secrets_DescribeSecret_FullMethodName   = "/Superplane.Secrets.Secrets/DescribeSecret"
+	Secrets_ListSecrets_FullMethodName      = "/Superplane.Secrets.Secrets/ListSecrets"
+	Secrets_UpdateSecret_FullMethodName     = "/Superplane.Secrets.Secrets/UpdateSecret"
+	Secrets_DeleteSecret_FullMethodName     = "/Superplane.Secrets.Secrets/DeleteSecret"
+	Secrets_SetSecretKey_FullMethodName     = "/Superplane.Secrets.Secrets/SetSecretKey"
+	Secrets_DeleteSecretKey_FullMethodName  = "/Superplane.Secrets.Secrets/DeleteSecretKey"
+	Secrets_UpdateSecretName_FullMethodName = "/Superplane.Secrets.Secrets/UpdateSecretName"
 )
 
 // SecretsClient is the client API for Secrets service.
@@ -39,6 +40,7 @@ type SecretsClient interface {
 	DeleteSecret(ctx context.Context, in *DeleteSecretRequest, opts ...grpc.CallOption) (*DeleteSecretResponse, error)
 	SetSecretKey(ctx context.Context, in *SetSecretKeyRequest, opts ...grpc.CallOption) (*SetSecretKeyResponse, error)
 	DeleteSecretKey(ctx context.Context, in *DeleteSecretKeyRequest, opts ...grpc.CallOption) (*DeleteSecretKeyResponse, error)
+	UpdateSecretName(ctx context.Context, in *UpdateSecretNameRequest, opts ...grpc.CallOption) (*UpdateSecretNameResponse, error)
 }
 
 type secretsClient struct {
@@ -119,6 +121,16 @@ func (c *secretsClient) DeleteSecretKey(ctx context.Context, in *DeleteSecretKey
 	return out, nil
 }
 
+func (c *secretsClient) UpdateSecretName(ctx context.Context, in *UpdateSecretNameRequest, opts ...grpc.CallOption) (*UpdateSecretNameResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateSecretNameResponse)
+	err := c.cc.Invoke(ctx, Secrets_UpdateSecretName_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SecretsServer is the server API for Secrets service.
 // All implementations should embed UnimplementedSecretsServer
 // for forward compatibility.
@@ -130,6 +142,7 @@ type SecretsServer interface {
 	DeleteSecret(context.Context, *DeleteSecretRequest) (*DeleteSecretResponse, error)
 	SetSecretKey(context.Context, *SetSecretKeyRequest) (*SetSecretKeyResponse, error)
 	DeleteSecretKey(context.Context, *DeleteSecretKeyRequest) (*DeleteSecretKeyResponse, error)
+	UpdateSecretName(context.Context, *UpdateSecretNameRequest) (*UpdateSecretNameResponse, error)
 }
 
 // UnimplementedSecretsServer should be embedded to have
@@ -159,6 +172,9 @@ func (UnimplementedSecretsServer) SetSecretKey(context.Context, *SetSecretKeyReq
 }
 func (UnimplementedSecretsServer) DeleteSecretKey(context.Context, *DeleteSecretKeyRequest) (*DeleteSecretKeyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteSecretKey not implemented")
+}
+func (UnimplementedSecretsServer) UpdateSecretName(context.Context, *UpdateSecretNameRequest) (*UpdateSecretNameResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateSecretName not implemented")
 }
 func (UnimplementedSecretsServer) testEmbeddedByValue() {}
 
@@ -306,6 +322,24 @@ func _Secrets_DeleteSecretKey_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Secrets_UpdateSecretName_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateSecretNameRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SecretsServer).UpdateSecretName(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Secrets_UpdateSecretName_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SecretsServer).UpdateSecretName(ctx, req.(*UpdateSecretNameRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Secrets_ServiceDesc is the grpc.ServiceDesc for Secrets service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -340,6 +374,10 @@ var Secrets_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteSecretKey",
 			Handler:    _Secrets_DeleteSecretKey_Handler,
+		},
+		{
+			MethodName: "UpdateSecretName",
+			Handler:    _Secrets_UpdateSecretName_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

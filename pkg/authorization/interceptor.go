@@ -43,8 +43,9 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbSecrets.Secrets_DescribeSecret_FullMethodName:   {Resource: "secrets", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbSecrets.Secrets_ListSecrets_FullMethodName:     {Resource: "secrets", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbSecrets.Secrets_DeleteSecret_FullMethodName:    {Resource: "secrets", Action: "delete", DomainType: models.DomainTypeOrganization},
-		pbSecrets.Secrets_SetSecretKey_FullMethodName:    {Resource: "secrets", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbSecrets.Secrets_DeleteSecretKey_FullMethodName: {Resource: "secrets", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbSecrets.Secrets_SetSecretKey_FullMethodName:     {Resource: "secrets", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbSecrets.Secrets_DeleteSecretKey_FullMethodName:  {Resource: "secrets", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbSecrets.Secrets_UpdateSecretName_FullMethodName: {Resource: "secrets", Action: "update", DomainType: models.DomainTypeOrganization},
 
 		// Groups rules
 		pbGroups.Groups_CreateGroup_FullMethodName:         {Resource: "groups", Action: "create", DomainType: models.DomainTypeOrganization},

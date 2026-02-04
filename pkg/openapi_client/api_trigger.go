@@ -20,13 +20,14 @@ import (
 	"strings"
 )
 
+
 // TriggerAPIService TriggerAPI service
 type TriggerAPIService service
 
 type ApiTriggersDescribeTriggerRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *TriggerAPIService
-	name       string
+	name string
 }
 
 func (r ApiTriggersDescribeTriggerRequest) Execute() (*TriggersDescribeTriggerResponse, *http.Response, error) {
@@ -38,27 +39,26 @@ TriggersDescribeTrigger Describe trigger
 
 Returns a trigger by its name
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param name
-	@return ApiTriggersDescribeTriggerRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param name
+ @return ApiTriggersDescribeTriggerRequest
 */
 func (a *TriggerAPIService) TriggersDescribeTrigger(ctx context.Context, name string) ApiTriggersDescribeTriggerRequest {
 	return ApiTriggersDescribeTriggerRequest{
 		ApiService: a,
-		ctx:        ctx,
-		name:       name,
+		ctx: ctx,
+		name: name,
 	}
 }
 
 // Execute executes the request
-//
-//	@return TriggersDescribeTriggerResponse
+//  @return TriggersDescribeTriggerResponse
 func (a *TriggerAPIService) TriggersDescribeTriggerExecute(r ApiTriggersDescribeTriggerRequest) (*TriggersDescribeTriggerResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *TriggersDescribeTriggerResponse
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *TriggersDescribeTriggerResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "TriggerAPIService.TriggersDescribeTrigger")
@@ -112,14 +112,14 @@ func (a *TriggerAPIService) TriggersDescribeTriggerExecute(r ApiTriggersDescribe
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
@@ -136,7 +136,7 @@ func (a *TriggerAPIService) TriggersDescribeTriggerExecute(r ApiTriggersDescribe
 }
 
 type ApiTriggersListTriggersRequest struct {
-	ctx        context.Context
+	ctx context.Context
 	ApiService *TriggerAPIService
 }
 
@@ -149,25 +149,24 @@ TriggersListTriggers List triggers
 
 Returns a list of all available triggers
 
-	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ApiTriggersListTriggersRequest
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiTriggersListTriggersRequest
 */
 func (a *TriggerAPIService) TriggersListTriggers(ctx context.Context) ApiTriggersListTriggersRequest {
 	return ApiTriggersListTriggersRequest{
 		ApiService: a,
-		ctx:        ctx,
+		ctx: ctx,
 	}
 }
 
 // Execute executes the request
-//
-//	@return TriggersListTriggersResponse
+//  @return TriggersListTriggersResponse
 func (a *TriggerAPIService) TriggersListTriggersExecute(r ApiTriggersListTriggersRequest) (*TriggersListTriggersResponse, *http.Response, error) {
 	var (
-		localVarHTTPMethod  = http.MethodGet
-		localVarPostBody    interface{}
-		formFiles           []formFile
-		localVarReturnValue *TriggersListTriggersResponse
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *TriggersListTriggersResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "TriggerAPIService.TriggersListTriggers")
@@ -220,14 +219,14 @@ func (a *TriggerAPIService) TriggersListTriggersExecute(r ApiTriggersListTrigger
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-		var v GooglerpcStatus
-		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-		if err != nil {
-			newErr.error = err.Error()
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-		newErr.model = v
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
 		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 

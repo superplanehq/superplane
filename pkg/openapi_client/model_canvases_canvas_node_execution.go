@@ -21,24 +21,24 @@ var _ MappedNullable = &CanvasesCanvasNodeExecution{}
 
 // CanvasesCanvasNodeExecution struct for CanvasesCanvasNodeExecution
 type CanvasesCanvasNodeExecution struct {
-	Id                  *string                          `json:"id,omitempty"`
-	CanvasId            *string                          `json:"canvasId,omitempty"`
-	NodeId              *string                          `json:"nodeId,omitempty"`
-	ParentExecutionId   *string                          `json:"parentExecutionId,omitempty"`
-	PreviousExecutionId *string                          `json:"previousExecutionId,omitempty"`
-	State               *CanvasNodeExecutionState        `json:"state,omitempty"`
-	Result              *CanvasNodeExecutionResult       `json:"result,omitempty"`
-	ResultReason        *CanvasNodeExecutionResultReason `json:"resultReason,omitempty"`
-	ResultMessage       *string                          `json:"resultMessage,omitempty"`
-	Input               map[string]interface{}           `json:"input,omitempty"`
-	Outputs             map[string]interface{}           `json:"outputs,omitempty"`
-	CreatedAt           *time.Time                       `json:"createdAt,omitempty"`
-	UpdatedAt           *time.Time                       `json:"updatedAt,omitempty"`
-	Metadata            map[string]interface{}           `json:"metadata,omitempty"`
-	Configuration       map[string]interface{}           `json:"configuration,omitempty"`
-	ChildExecutions     []CanvasesCanvasNodeExecution    `json:"childExecutions,omitempty"`
-	RootEvent           *CanvasesCanvasEvent             `json:"rootEvent,omitempty"`
-	CancelledBy         *SuperplaneCanvasesUserRef       `json:"cancelledBy,omitempty"`
+	Id *string `json:"id,omitempty"`
+	CanvasId *string `json:"canvasId,omitempty"`
+	NodeId *string `json:"nodeId,omitempty"`
+	ParentExecutionId *string `json:"parentExecutionId,omitempty"`
+	PreviousExecutionId *string `json:"previousExecutionId,omitempty"`
+	State *CanvasNodeExecutionState `json:"state,omitempty"`
+	Result *CanvasNodeExecutionResult `json:"result,omitempty"`
+	ResultReason *CanvasNodeExecutionResultReason `json:"resultReason,omitempty"`
+	ResultMessage *string `json:"resultMessage,omitempty"`
+	Input map[string]interface{} `json:"input,omitempty"`
+	Outputs map[string]interface{} `json:"outputs,omitempty"`
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	Configuration map[string]interface{} `json:"configuration,omitempty"`
+	ChildExecutions []CanvasesCanvasNodeExecution `json:"childExecutions,omitempty"`
+	RootEvent *CanvasesCanvasEvent `json:"rootEvent,omitempty"`
+	CancelledBy *SuperplaneCanvasesUserRef `json:"cancelledBy,omitempty"`
 }
 
 // NewCanvasesCanvasNodeExecution instantiates a new CanvasesCanvasNodeExecution object
@@ -647,7 +647,7 @@ func (o *CanvasesCanvasNodeExecution) SetCancelledBy(v SuperplaneCanvasesUserRef
 }
 
 func (o CanvasesCanvasNodeExecution) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -748,3 +748,5 @@ func (v *NullableCanvasesCanvasNodeExecution) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

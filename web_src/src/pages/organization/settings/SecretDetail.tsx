@@ -13,6 +13,7 @@ import {
   useSecret,
   useSetSecretKey,
   useDeleteSecretKey,
+  useUpdateSecretName,
 } from "@/hooks/useSecrets";
 
 interface SecretDetailProps {
@@ -28,10 +29,13 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
   const [isAddingKey, setIsAddingKey] = useState(false);
   const [newKey, setNewKey] = useState("");
   const [newValue, setNewValue] = useState("");
+  const [editingSecretName, setEditingSecretName] = useState(false);
+  const [editingSecretNameValue, setEditingSecretNameValue] = useState("");
 
   const { data: secret, isLoading, error } = useSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
   const setSecretKeyMutation = useSetSecretKey(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
   const deleteSecretKeyMutation = useDeleteSecretKey(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
+  const updateSecretNameMutation = useUpdateSecretName(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
   const deleteSecretMutation = useDeleteSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION");
 
   const handleSaveEdit = async () => {
@@ -67,6 +71,37 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
     setEditingKey(null);
     setEditingKeyName("");
     setEditingValue("");
+  };
+
+  const handleStartEditSecretName = () => {
+    setEditingSecretNameValue(secret?.metadata?.name || "");
+    setEditingSecretName(true);
+  };
+
+  const handleSaveSecretName = async () => {
+    const name = editingSecretNameValue.trim();
+    if (!name) {
+      showErrorToast("Secret name is required");
+      return;
+    }
+    if (name === secret?.metadata?.name) {
+      setEditingSecretName(false);
+      setEditingSecretNameValue("");
+      return;
+    }
+    try {
+      await updateSecretNameMutation.mutateAsync(name);
+      showSuccessToast("Secret name updated");
+      setEditingSecretName(false);
+      setEditingSecretNameValue("");
+    } catch (err) {
+      showErrorToast(`Failed to update name: ${getApiErrorMessage(err)}`);
+    }
+  };
+
+  const handleCancelEditSecretName = () => {
+    setEditingSecretName(false);
+    setEditingSecretNameValue("");
   };
 
   const handleAddKey = async () => {
@@ -135,7 +170,10 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
     }
   };
 
-  const isUpdating = setSecretKeyMutation.isPending || deleteSecretKeyMutation.isPending;
+  const isUpdating =
+    setSecretKeyMutation.isPending ||
+    deleteSecretKeyMutation.isPending ||
+    updateSecretNameMutation.isPending;
   const handleBackToSecrets = () => navigate(`/${organizationId}/settings/secrets`);
 
   if (isLoading || !secretId) {
@@ -193,11 +231,48 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
 
       <div className="bg-slate-50 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <Key className="w-5 h-5 text-gray-500 dark:text-gray-400 shrink-0" />
-            <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 truncate">
-              {secret.metadata?.name || "Unnamed Secret"}
-            </h2>
+            {editingSecretName ? (
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <Input
+                  type="text"
+                  value={editingSecretNameValue}
+                  onChange={(e) => setEditingSecretNameValue(e.target.value)}
+                  placeholder="Secret name"
+                  className="text-lg font-semibold max-w-sm"
+                  data-testid="secret-detail-edit-name-input"
+                  autoFocus
+                />
+                <Button
+                  size="sm"
+                  onClick={handleSaveSecretName}
+                  disabled={!editingSecretNameValue.trim() || isUpdating}
+                  data-testid="secret-detail-edit-name-save"
+                >
+                  {isUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleCancelEditSecretName}>
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <>
+                <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 truncate">
+                  {secret.metadata?.name || "Unnamed Secret"}
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleStartEditSecretName}
+                  className="shrink-0 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  title="Edit secret name"
+                  data-testid="secret-detail-edit-name"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </Button>
+              </>
+            )}
           </div>
           <Button
             variant="outline"

@@ -62,3 +62,9 @@ func (s *SecretService) DeleteSecretKey(ctx context.Context, req *pb.DeleteSecre
 	domainId := ctx.Value(authorization.DomainIdContextKey).(string)
 	return secrets.DeleteSecretKey(ctx, s.encryptor, domainType, domainId, req.IdOrName, req.KeyName)
 }
+
+func (s *SecretService) UpdateSecretName(ctx context.Context, req *pb.UpdateSecretNameRequest) (*pb.UpdateSecretNameResponse, error) {
+	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
+	domainId := ctx.Value(authorization.DomainIdContextKey).(string)
+	return secrets.UpdateSecretName(ctx, s.encryptor, domainType, domainId, req.IdOrName, req.Name)
+}

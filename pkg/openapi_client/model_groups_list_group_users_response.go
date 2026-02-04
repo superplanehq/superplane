@@ -21,7 +21,7 @@ var _ MappedNullable = &GroupsListGroupUsersResponse{}
 // GroupsListGroupUsersResponse struct for GroupsListGroupUsersResponse
 type GroupsListGroupUsersResponse struct {
 	Users []SuperplaneUsersUser `json:"users,omitempty"`
-	Group *GroupsGroup          `json:"group,omitempty"`
+	Group *GroupsGroup `json:"group,omitempty"`
 }
 
 // NewGroupsListGroupUsersResponse instantiates a new GroupsListGroupUsersResponse object
@@ -106,7 +106,7 @@ func (o *GroupsListGroupUsersResponse) SetGroup(v GroupsGroup) {
 }
 
 func (o GroupsListGroupUsersResponse) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -159,3 +159,5 @@ func (v *NullableGroupsListGroupUsersResponse) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

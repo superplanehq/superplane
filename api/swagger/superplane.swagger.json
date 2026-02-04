@@ -2717,6 +2717,46 @@
         ]
       }
     },
+    "/api/v1/secrets/{idOrName}/name": {
+      "patch": {
+        "summary": "Update secret name",
+        "description": "Updates only the name of the secret. Name must be unique within the domain.",
+        "operationId": "Secrets_UpdateSecretName",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SecretsUpdateSecretNameResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SecretsUpdateSecretNameBody"
+            }
+          }
+        ],
+        "tags": [
+          "Secret"
+        ]
+      }
+    },
     "/api/v1/triggers": {
       "get": {
         "summary": "List triggers",
@@ -5047,6 +5087,28 @@
         },
         "domainId": {
           "type": "string"
+        }
+      }
+    },
+    "SecretsUpdateSecretNameBody": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        }
+      }
+    },
+    "SecretsUpdateSecretNameResponse": {
+      "type": "object",
+      "properties": {
+        "secret": {
+          "$ref": "#/definitions/SecretsSecret"
         }
       }
     },

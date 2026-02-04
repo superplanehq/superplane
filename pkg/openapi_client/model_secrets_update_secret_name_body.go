@@ -15,71 +15,71 @@ import (
 	"encoding/json"
 )
 
-// checks if the SecretsCreateSecretRequest type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &SecretsCreateSecretRequest{}
+// checks if the SecretsUpdateSecretNameBody type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &SecretsUpdateSecretNameBody{}
 
-// SecretsCreateSecretRequest struct for SecretsCreateSecretRequest
-type SecretsCreateSecretRequest struct {
-	Secret *SecretsSecret `json:"secret,omitempty"`
+// SecretsUpdateSecretNameBody struct for SecretsUpdateSecretNameBody
+type SecretsUpdateSecretNameBody struct {
+	Name *string `json:"name,omitempty"`
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
 	DomainId *string `json:"domainId,omitempty"`
 }
 
-// NewSecretsCreateSecretRequest instantiates a new SecretsCreateSecretRequest object
+// NewSecretsUpdateSecretNameBody instantiates a new SecretsUpdateSecretNameBody object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewSecretsCreateSecretRequest() *SecretsCreateSecretRequest {
-	this := SecretsCreateSecretRequest{}
+func NewSecretsUpdateSecretNameBody() *SecretsUpdateSecretNameBody {
+	this := SecretsUpdateSecretNameBody{}
 	var domainType AuthorizationDomainType = AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED
 	this.DomainType = &domainType
 	return &this
 }
 
-// NewSecretsCreateSecretRequestWithDefaults instantiates a new SecretsCreateSecretRequest object
+// NewSecretsUpdateSecretNameBodyWithDefaults instantiates a new SecretsUpdateSecretNameBody object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewSecretsCreateSecretRequestWithDefaults() *SecretsCreateSecretRequest {
-	this := SecretsCreateSecretRequest{}
+func NewSecretsUpdateSecretNameBodyWithDefaults() *SecretsUpdateSecretNameBody {
+	this := SecretsUpdateSecretNameBody{}
 	var domainType AuthorizationDomainType = AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED
 	this.DomainType = &domainType
 	return &this
 }
 
-// GetSecret returns the Secret field value if set, zero value otherwise.
-func (o *SecretsCreateSecretRequest) GetSecret() SecretsSecret {
-	if o == nil || IsNil(o.Secret) {
-		var ret SecretsSecret
+// GetName returns the Name field value if set, zero value otherwise.
+func (o *SecretsUpdateSecretNameBody) GetName() string {
+	if o == nil || IsNil(o.Name) {
+		var ret string
 		return ret
 	}
-	return *o.Secret
+	return *o.Name
 }
 
-// GetSecretOk returns a tuple with the Secret field value if set, nil otherwise
+// GetNameOk returns a tuple with the Name field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SecretsCreateSecretRequest) GetSecretOk() (*SecretsSecret, bool) {
-	if o == nil || IsNil(o.Secret) {
+func (o *SecretsUpdateSecretNameBody) GetNameOk() (*string, bool) {
+	if o == nil || IsNil(o.Name) {
 		return nil, false
 	}
-	return o.Secret, true
+	return o.Name, true
 }
 
-// HasSecret returns a boolean if a field has been set.
-func (o *SecretsCreateSecretRequest) HasSecret() bool {
-	if o != nil && !IsNil(o.Secret) {
+// HasName returns a boolean if a field has been set.
+func (o *SecretsUpdateSecretNameBody) HasName() bool {
+	if o != nil && !IsNil(o.Name) {
 		return true
 	}
 
 	return false
 }
 
-// SetSecret gets a reference to the given SecretsSecret and assigns it to the Secret field.
-func (o *SecretsCreateSecretRequest) SetSecret(v SecretsSecret) {
-	o.Secret = &v
+// SetName gets a reference to the given string and assigns it to the Name field.
+func (o *SecretsUpdateSecretNameBody) SetName(v string) {
+	o.Name = &v
 }
 
 // GetDomainType returns the DomainType field value if set, zero value otherwise.
-func (o *SecretsCreateSecretRequest) GetDomainType() AuthorizationDomainType {
+func (o *SecretsUpdateSecretNameBody) GetDomainType() AuthorizationDomainType {
 	if o == nil || IsNil(o.DomainType) {
 		var ret AuthorizationDomainType
 		return ret
@@ -89,7 +89,7 @@ func (o *SecretsCreateSecretRequest) GetDomainType() AuthorizationDomainType {
 
 // GetDomainTypeOk returns a tuple with the DomainType field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SecretsCreateSecretRequest) GetDomainTypeOk() (*AuthorizationDomainType, bool) {
+func (o *SecretsUpdateSecretNameBody) GetDomainTypeOk() (*AuthorizationDomainType, bool) {
 	if o == nil || IsNil(o.DomainType) {
 		return nil, false
 	}
@@ -97,7 +97,7 @@ func (o *SecretsCreateSecretRequest) GetDomainTypeOk() (*AuthorizationDomainType
 }
 
 // HasDomainType returns a boolean if a field has been set.
-func (o *SecretsCreateSecretRequest) HasDomainType() bool {
+func (o *SecretsUpdateSecretNameBody) HasDomainType() bool {
 	if o != nil && !IsNil(o.DomainType) {
 		return true
 	}
@@ -106,12 +106,12 @@ func (o *SecretsCreateSecretRequest) HasDomainType() bool {
 }
 
 // SetDomainType gets a reference to the given AuthorizationDomainType and assigns it to the DomainType field.
-func (o *SecretsCreateSecretRequest) SetDomainType(v AuthorizationDomainType) {
+func (o *SecretsUpdateSecretNameBody) SetDomainType(v AuthorizationDomainType) {
 	o.DomainType = &v
 }
 
 // GetDomainId returns the DomainId field value if set, zero value otherwise.
-func (o *SecretsCreateSecretRequest) GetDomainId() string {
+func (o *SecretsUpdateSecretNameBody) GetDomainId() string {
 	if o == nil || IsNil(o.DomainId) {
 		var ret string
 		return ret
@@ -121,7 +121,7 @@ func (o *SecretsCreateSecretRequest) GetDomainId() string {
 
 // GetDomainIdOk returns a tuple with the DomainId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SecretsCreateSecretRequest) GetDomainIdOk() (*string, bool) {
+func (o *SecretsUpdateSecretNameBody) GetDomainIdOk() (*string, bool) {
 	if o == nil || IsNil(o.DomainId) {
 		return nil, false
 	}
@@ -129,7 +129,7 @@ func (o *SecretsCreateSecretRequest) GetDomainIdOk() (*string, bool) {
 }
 
 // HasDomainId returns a boolean if a field has been set.
-func (o *SecretsCreateSecretRequest) HasDomainId() bool {
+func (o *SecretsUpdateSecretNameBody) HasDomainId() bool {
 	if o != nil && !IsNil(o.DomainId) {
 		return true
 	}
@@ -138,11 +138,11 @@ func (o *SecretsCreateSecretRequest) HasDomainId() bool {
 }
 
 // SetDomainId gets a reference to the given string and assigns it to the DomainId field.
-func (o *SecretsCreateSecretRequest) SetDomainId(v string) {
+func (o *SecretsUpdateSecretNameBody) SetDomainId(v string) {
 	o.DomainId = &v
 }
 
-func (o SecretsCreateSecretRequest) MarshalJSON() ([]byte, error) {
+func (o SecretsUpdateSecretNameBody) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -150,10 +150,10 @@ func (o SecretsCreateSecretRequest) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o SecretsCreateSecretRequest) ToMap() (map[string]interface{}, error) {
+func (o SecretsUpdateSecretNameBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.Secret) {
-		toSerialize["secret"] = o.Secret
+	if !IsNil(o.Name) {
+		toSerialize["name"] = o.Name
 	}
 	if !IsNil(o.DomainType) {
 		toSerialize["domainType"] = o.DomainType
@@ -164,38 +164,38 @@ func (o SecretsCreateSecretRequest) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableSecretsCreateSecretRequest struct {
-	value *SecretsCreateSecretRequest
+type NullableSecretsUpdateSecretNameBody struct {
+	value *SecretsUpdateSecretNameBody
 	isSet bool
 }
 
-func (v NullableSecretsCreateSecretRequest) Get() *SecretsCreateSecretRequest {
+func (v NullableSecretsUpdateSecretNameBody) Get() *SecretsUpdateSecretNameBody {
 	return v.value
 }
 
-func (v *NullableSecretsCreateSecretRequest) Set(val *SecretsCreateSecretRequest) {
+func (v *NullableSecretsUpdateSecretNameBody) Set(val *SecretsUpdateSecretNameBody) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableSecretsCreateSecretRequest) IsSet() bool {
+func (v NullableSecretsUpdateSecretNameBody) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableSecretsCreateSecretRequest) Unset() {
+func (v *NullableSecretsUpdateSecretNameBody) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableSecretsCreateSecretRequest(val *SecretsCreateSecretRequest) *NullableSecretsCreateSecretRequest {
-	return &NullableSecretsCreateSecretRequest{value: val, isSet: true}
+func NewNullableSecretsUpdateSecretNameBody(val *SecretsUpdateSecretNameBody) *NullableSecretsUpdateSecretNameBody {
+	return &NullableSecretsUpdateSecretNameBody{value: val, isSet: true}
 }
 
-func (v NullableSecretsCreateSecretRequest) MarshalJSON() ([]byte, error) {
+func (v NullableSecretsUpdateSecretNameBody) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableSecretsCreateSecretRequest) UnmarshalJSON(src []byte) error {
+func (v *NullableSecretsUpdateSecretNameBody) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

@@ -20,11 +20,11 @@ var _ MappedNullable = &OrganizationsIntegrationStatus{}
 
 // OrganizationsIntegrationStatus struct for OrganizationsIntegrationStatus
 type OrganizationsIntegrationStatus struct {
-	State            *string                     `json:"state,omitempty"`
-	StateDescription *string                     `json:"stateDescription,omitempty"`
-	Metadata         map[string]interface{}      `json:"metadata,omitempty"`
-	BrowserAction    *OrganizationsBrowserAction `json:"browserAction,omitempty"`
-	UsedIn           []IntegrationNodeRef        `json:"usedIn,omitempty"`
+	State *string `json:"state,omitempty"`
+	StateDescription *string `json:"stateDescription,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	BrowserAction *OrganizationsBrowserAction `json:"browserAction,omitempty"`
+	UsedIn []IntegrationNodeRef `json:"usedIn,omitempty"`
 }
 
 // NewOrganizationsIntegrationStatus instantiates a new OrganizationsIntegrationStatus object
@@ -205,7 +205,7 @@ func (o *OrganizationsIntegrationStatus) SetUsedIn(v []IntegrationNodeRef) {
 }
 
 func (o OrganizationsIntegrationStatus) MarshalJSON() ([]byte, error) {
-	toSerialize, err := o.ToMap()
+	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -267,3 +267,5 @@ func (v *NullableOrganizationsIntegrationStatus) UnmarshalJSON(src []byte) error
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+
+

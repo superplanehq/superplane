@@ -54,6 +54,19 @@ func TestSecrets(t *testing.T) {
 		steps.assertSecretSavedInDB("E2E Test Secret 4", map[string]string{"KEY1": "new-value"})
 	})
 
+	t.Run("updating the secret name", func(t *testing.T) {
+		steps.start()
+		steps.visitSecretsPage()
+		steps.givenASecretExists("E2E Test Secret 5", map[string]string{"KEY1": "value1"})
+		steps.clickEditSecret("E2E Test Secret 5")
+		steps.clickEditSecretName()
+		steps.fillSecretNameInput("E2E Test Secret 5 Renamed")
+		steps.submitEditSecretName()
+		steps.assertSecretSavedInDB("E2E Test Secret 5 Renamed", map[string]string{"KEY1": "value1"})
+		steps.assertSecretVisibleInList("E2E Test Secret 5 Renamed")
+		steps.assertSecretNotVisibleInList("E2E Test Secret 5")
+	})
+
 	t.Run("deleting a secret", func(t *testing.T) {
 		steps.start()
 		steps.visitSecretsPage()
@@ -196,6 +209,37 @@ func (s *SecretsSteps) submitEditKey() {
 	s.session.Sleep(500)
 }
 
+// clickEditSecretName clicks the edit-name (pencil) button on the secret detail page to show the name input.
+func (s *SecretsSteps) clickEditSecretName() {
+	page := s.session.Page()
+	editNameBtn := page.GetByTestId("secret-detail-edit-name")
+	if err := editNameBtn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible}); err != nil {
+		s.t.Fatalf("waiting for Edit secret name button: %v", err)
+	}
+	if err := editNameBtn.Click(); err != nil {
+		s.t.Fatalf("clicking Edit secret name button: %v", err)
+	}
+	s.session.Sleep(300)
+}
+
+// fillSecretNameInput fills the secret name input in the inline edit form on the secret detail page.
+func (s *SecretsSteps) fillSecretNameInput(name string) {
+	page := s.session.Page()
+	if err := page.GetByTestId("secret-detail-edit-name-input").Fill(name); err != nil {
+		s.t.Fatalf("filling secret name input: %v", err)
+	}
+	s.session.Sleep(200)
+}
+
+// submitEditSecretName clicks Save in the secret name edit form on the secret detail page.
+func (s *SecretsSteps) submitEditSecretName() {
+	page := s.session.Page()
+	if err := page.GetByTestId("secret-detail-edit-name-save").Click(); err != nil {
+		s.t.Fatalf("clicking Save in secret name edit form: %v", err)
+	}
+	s.session.Sleep(500)
+}
+
 func (s *SecretsSteps) removeKeyValuePair(index int) {
 	page := s.session.Page()
 	if err := page.GetByTestId("secrets-create-remove-pair").Nth(index).Click(); err != nil {
@@ -294,7 +338,8 @@ func (s *SecretsSteps) assertSecretVisibleInList(name string) {
 func (s *SecretsSteps) assertSecretNotVisibleInList(name string) {
 	s.visitSecretsPage()
 	s.session.Sleep(500)
-	locator := s.session.Page().Locator("text=" + name)
+	// Use exact match so "E2E Test Secret 5" does not match "E2E Test Secret 5 Renamed"
+	locator := s.session.Page().GetByText(name, pw.PageGetByTextOptions{Exact: pw.Bool(true)})
 	count, err := locator.Count()
 	require.NoError(s.t, err)
 	require.Equal(s.t, 0, count, "secret %q should not be visible in the list", name)

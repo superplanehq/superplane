@@ -7,6 +7,7 @@ import {
   secretsDeleteSecret,
   secretsSetSecretKey,
   secretsDeleteSecretKey,
+  secretsUpdateSecretName,
 } from "@/api-client/sdk.gen";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import type { AuthorizationDomainType, SecretsCreateSecretData, SecretsUpdateSecretData } from "@/api-client/types.gen";
@@ -239,6 +240,33 @@ export const useDeleteSecretKey = (
         withOrganizationHeader({
           path: { idOrName: secretId, keyName },
           query: { domainId, domainType },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: secretKeys.byDomain(domainId, domainType),
+      });
+      queryClient.invalidateQueries({
+        queryKey: secretKeys.detail(domainId, domainType, secretId),
+      });
+    },
+  });
+};
+
+export const useUpdateSecretName = (
+  domainId: string,
+  domainType: AuthorizationDomainType,
+  secretId: string,
+) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (name: string) => {
+      return await secretsUpdateSecretName(
+        withOrganizationHeader({
+          path: { idOrName: secretId },
+          body: { name, domainType, domainId },
         }),
       );
     },

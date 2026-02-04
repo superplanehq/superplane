@@ -22,7 +22,7 @@ type SecretProvider string
 // List of SecretProvider
 const (
 	SECRETPROVIDER_PROVIDER_UNKNOWN SecretProvider = "PROVIDER_UNKNOWN"
-	SECRETPROVIDER_PROVIDER_LOCAL   SecretProvider = "PROVIDER_LOCAL"
+	SECRETPROVIDER_PROVIDER_LOCAL SecretProvider = "PROVIDER_LOCAL"
 )
 
 // All allowed values of SecretProvider enum
@@ -109,3 +109,4 @@ func (v *NullableSecretProvider) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
+

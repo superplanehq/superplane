@@ -867,6 +867,118 @@ func (x *DeleteSecretKeyResponse) GetSecret() *Secret {
 	return nil
 }
 
+type UpdateSecretNameRequest struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	IdOrName      string                   `protobuf:"bytes,1,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
+	Name          string                   `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	DomainType    authorization.DomainType `protobuf:"varint,3,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
+	DomainId      string                   `protobuf:"bytes,4,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateSecretNameRequest) Reset() {
+	*x = UpdateSecretNameRequest{}
+	mi := &file_secrets_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateSecretNameRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateSecretNameRequest) ProtoMessage() {}
+
+func (x *UpdateSecretNameRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_secrets_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateSecretNameRequest.ProtoReflect.Descriptor instead.
+func (*UpdateSecretNameRequest) Descriptor() ([]byte, []int) {
+	return file_secrets_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *UpdateSecretNameRequest) GetIdOrName() string {
+	if x != nil {
+		return x.IdOrName
+	}
+	return ""
+}
+
+func (x *UpdateSecretNameRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *UpdateSecretNameRequest) GetDomainType() authorization.DomainType {
+	if x != nil {
+		return x.DomainType
+	}
+	return authorization.DomainType(0)
+}
+
+func (x *UpdateSecretNameRequest) GetDomainId() string {
+	if x != nil {
+		return x.DomainId
+	}
+	return ""
+}
+
+type UpdateSecretNameResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Secret        *Secret                `protobuf:"bytes,1,opt,name=secret,proto3" json:"secret,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateSecretNameResponse) Reset() {
+	*x = UpdateSecretNameResponse{}
+	mi := &file_secrets_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateSecretNameResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateSecretNameResponse) ProtoMessage() {}
+
+func (x *UpdateSecretNameResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_secrets_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateSecretNameResponse.ProtoReflect.Descriptor instead.
+func (*UpdateSecretNameResponse) Descriptor() ([]byte, []int) {
+	return file_secrets_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *UpdateSecretNameResponse) GetSecret() *Secret {
+	if x != nil {
+		return x.Secret
+	}
+	return nil
+}
+
 // Local secrets are stored and managed by SuperPlane itself.
 type Secret_Local struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -877,7 +989,7 @@ type Secret_Local struct {
 
 func (x *Secret_Local) Reset() {
 	*x = Secret_Local{}
-	mi := &file_secrets_proto_msgTypes[15]
+	mi := &file_secrets_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -889,7 +1001,7 @@ func (x *Secret_Local) String() string {
 func (*Secret_Local) ProtoMessage() {}
 
 func (x *Secret_Local) ProtoReflect() protoreflect.Message {
-	mi := &file_secrets_proto_msgTypes[15]
+	mi := &file_secrets_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -925,7 +1037,7 @@ type Secret_Metadata struct {
 
 func (x *Secret_Metadata) Reset() {
 	*x = Secret_Metadata{}
-	mi := &file_secrets_proto_msgTypes[16]
+	mi := &file_secrets_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -937,7 +1049,7 @@ func (x *Secret_Metadata) String() string {
 func (*Secret_Metadata) ProtoMessage() {}
 
 func (x *Secret_Metadata) ProtoReflect() protoreflect.Message {
-	mi := &file_secrets_proto_msgTypes[16]
+	mi := &file_secrets_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -998,7 +1110,7 @@ type Secret_Spec struct {
 
 func (x *Secret_Spec) Reset() {
 	*x = Secret_Spec{}
-	mi := &file_secrets_proto_msgTypes[17]
+	mi := &file_secrets_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1010,7 +1122,7 @@ func (x *Secret_Spec) String() string {
 func (*Secret_Spec) ProtoMessage() {}
 
 func (x *Secret_Spec) ProtoReflect() protoreflect.Message {
-	mi := &file_secrets_proto_msgTypes[17]
+	mi := &file_secrets_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1122,7 +1234,16 @@ const file_secrets_proto_rawDesc = "" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x04 \x01(\tR\bdomainId\"M\n" +
 	"\x17DeleteSecretKeyResponse\x122\n" +
-	"\x06secret\x18\x01 \x01(\v2\x1a.Superplane.Secrets.SecretR\x06secret2\x94\f\n" +
+	"\x06secret\x18\x01 \x01(\v2\x1a.Superplane.Secrets.SecretR\x06secret\"\xaf\x01\n" +
+	"\x17UpdateSecretNameRequest\x12\x1c\n" +
+	"\n" +
+	"id_or_name\x18\x01 \x01(\tR\bidOrName\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12E\n" +
+	"\vdomain_type\x18\x03 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
+	"domainType\x12\x1b\n" +
+	"\tdomain_id\x18\x04 \x01(\tR\bdomainId\"N\n" +
+	"\x18UpdateSecretNameResponse\x122\n" +
+	"\x06secret\x18\x01 \x01(\v2\x1a.Superplane.Secrets.SecretR\x06secret2\x9f\x0e\n" +
 	"\aSecrets\x12\xb3\x01\n" +
 	"\fCreateSecret\x12'.Superplane.Secrets.CreateSecretRequest\x1a(.Superplane.Secrets.CreateSecretResponse\"P\x92A3\n" +
 	"\x06Secret\x12\x13Create a new secret\x1a\x14Creates a new secret\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/api/v1/secrets\x12\xd6\x01\n" +
@@ -1137,7 +1258,9 @@ const file_secrets_proto_rawDesc = "" +
 	"\fSetSecretKey\x12'.Superplane.Secrets.SetSecretKeyRequest\x1a(.Superplane.Secrets.SetSecretKeyResponse\"\xbe\x01\x92A\x83\x01\n" +
 	"\x06Secret\x12)Set or overwrite a single key in a secret\x1aNSets the value for one key. Creates the key if missing, overwrites if present.\x82\xd3\xe4\x93\x021:\x01*\x1a,/api/v1/secrets/{id_or_name}/keys/{key_name}\x12\x97\x02\n" +
 	"\x0fDeleteSecretKey\x12*.Superplane.Secrets.DeleteSecretKeyRequest\x1a+.Superplane.Secrets.DeleteSecretKeyResponse\"\xaa\x01\x92As\n" +
-	"\x06Secret\x12\x1aRemove a key from a secret\x1aMRemoves one key from the secret. Secret must have at least one key remaining.\x82\xd3\xe4\x93\x02.*,/api/v1/secrets/{id_or_name}/keys/{key_name}B\xc5\x01\x92A\x8a\x01\x12`\n" +
+	"\x06Secret\x12\x1aRemove a key from a secret\x1aMRemoves one key from the secret. Secret must have at least one key remaining.\x82\xd3\xe4\x93\x02.*,/api/v1/secrets/{id_or_name}/keys/{key_name}\x12\x88\x02\n" +
+	"\x10UpdateSecretName\x12+.Superplane.Secrets.UpdateSecretNameRequest\x1a,.Superplane.Secrets.UpdateSecretNameResponse\"\x98\x01\x92Ai\n" +
+	"\x06Secret\x12\x12Update secret name\x1aKUpdates only the name of the secret. Name must be unique within the domain.\x82\xd3\xe4\x93\x02&:\x01*2!/api/v1/secrets/{id_or_name}/nameB\xc5\x01\x92A\x8a\x01\x12`\n" +
 	"\x16Superplane Secrets API\x12\x1aAPI for Superplane Secrets\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ5github.com/superplanehq/superplane/pkg/protos/secretsb\x06proto3"
 
@@ -1154,73 +1277,79 @@ func file_secrets_proto_rawDescGZIP() []byte {
 }
 
 var file_secrets_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_secrets_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_secrets_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_secrets_proto_goTypes = []any{
-	(Secret_Provider)(0),            // 0: Superplane.Secrets.Secret.Provider
-	(*Secret)(nil),                  // 1: Superplane.Secrets.Secret
-	(*CreateSecretRequest)(nil),     // 2: Superplane.Secrets.CreateSecretRequest
-	(*CreateSecretResponse)(nil),    // 3: Superplane.Secrets.CreateSecretResponse
-	(*UpdateSecretRequest)(nil),     // 4: Superplane.Secrets.UpdateSecretRequest
-	(*UpdateSecretResponse)(nil),    // 5: Superplane.Secrets.UpdateSecretResponse
-	(*DescribeSecretRequest)(nil),   // 6: Superplane.Secrets.DescribeSecretRequest
-	(*DescribeSecretResponse)(nil),  // 7: Superplane.Secrets.DescribeSecretResponse
-	(*ListSecretsRequest)(nil),      // 8: Superplane.Secrets.ListSecretsRequest
-	(*ListSecretsResponse)(nil),     // 9: Superplane.Secrets.ListSecretsResponse
-	(*DeleteSecretRequest)(nil),     // 10: Superplane.Secrets.DeleteSecretRequest
-	(*DeleteSecretResponse)(nil),    // 11: Superplane.Secrets.DeleteSecretResponse
-	(*SetSecretKeyRequest)(nil),     // 12: Superplane.Secrets.SetSecretKeyRequest
-	(*SetSecretKeyResponse)(nil),    // 13: Superplane.Secrets.SetSecretKeyResponse
-	(*DeleteSecretKeyRequest)(nil),  // 14: Superplane.Secrets.DeleteSecretKeyRequest
-	(*DeleteSecretKeyResponse)(nil), // 15: Superplane.Secrets.DeleteSecretKeyResponse
-	(*Secret_Local)(nil),            // 16: Superplane.Secrets.Secret.Local
-	(*Secret_Metadata)(nil),         // 17: Superplane.Secrets.Secret.Metadata
-	(*Secret_Spec)(nil),             // 18: Superplane.Secrets.Secret.Spec
-	nil,                             // 19: Superplane.Secrets.Secret.Local.DataEntry
-	(authorization.DomainType)(0),   // 20: Superplane.Authorization.DomainType
-	(*timestamp.Timestamp)(nil),     // 21: google.protobuf.Timestamp
+	(Secret_Provider)(0),             // 0: Superplane.Secrets.Secret.Provider
+	(*Secret)(nil),                   // 1: Superplane.Secrets.Secret
+	(*CreateSecretRequest)(nil),      // 2: Superplane.Secrets.CreateSecretRequest
+	(*CreateSecretResponse)(nil),     // 3: Superplane.Secrets.CreateSecretResponse
+	(*UpdateSecretRequest)(nil),      // 4: Superplane.Secrets.UpdateSecretRequest
+	(*UpdateSecretResponse)(nil),     // 5: Superplane.Secrets.UpdateSecretResponse
+	(*DescribeSecretRequest)(nil),    // 6: Superplane.Secrets.DescribeSecretRequest
+	(*DescribeSecretResponse)(nil),   // 7: Superplane.Secrets.DescribeSecretResponse
+	(*ListSecretsRequest)(nil),       // 8: Superplane.Secrets.ListSecretsRequest
+	(*ListSecretsResponse)(nil),      // 9: Superplane.Secrets.ListSecretsResponse
+	(*DeleteSecretRequest)(nil),      // 10: Superplane.Secrets.DeleteSecretRequest
+	(*DeleteSecretResponse)(nil),     // 11: Superplane.Secrets.DeleteSecretResponse
+	(*SetSecretKeyRequest)(nil),      // 12: Superplane.Secrets.SetSecretKeyRequest
+	(*SetSecretKeyResponse)(nil),     // 13: Superplane.Secrets.SetSecretKeyResponse
+	(*DeleteSecretKeyRequest)(nil),   // 14: Superplane.Secrets.DeleteSecretKeyRequest
+	(*DeleteSecretKeyResponse)(nil),  // 15: Superplane.Secrets.DeleteSecretKeyResponse
+	(*UpdateSecretNameRequest)(nil),  // 16: Superplane.Secrets.UpdateSecretNameRequest
+	(*UpdateSecretNameResponse)(nil), // 17: Superplane.Secrets.UpdateSecretNameResponse
+	(*Secret_Local)(nil),             // 18: Superplane.Secrets.Secret.Local
+	(*Secret_Metadata)(nil),          // 19: Superplane.Secrets.Secret.Metadata
+	(*Secret_Spec)(nil),              // 20: Superplane.Secrets.Secret.Spec
+	nil,                              // 21: Superplane.Secrets.Secret.Local.DataEntry
+	(authorization.DomainType)(0),    // 22: Superplane.Authorization.DomainType
+	(*timestamp.Timestamp)(nil),      // 23: google.protobuf.Timestamp
 }
 var file_secrets_proto_depIdxs = []int32{
-	17, // 0: Superplane.Secrets.Secret.metadata:type_name -> Superplane.Secrets.Secret.Metadata
-	18, // 1: Superplane.Secrets.Secret.spec:type_name -> Superplane.Secrets.Secret.Spec
+	19, // 0: Superplane.Secrets.Secret.metadata:type_name -> Superplane.Secrets.Secret.Metadata
+	20, // 1: Superplane.Secrets.Secret.spec:type_name -> Superplane.Secrets.Secret.Spec
 	1,  // 2: Superplane.Secrets.CreateSecretRequest.secret:type_name -> Superplane.Secrets.Secret
-	20, // 3: Superplane.Secrets.CreateSecretRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	22, // 3: Superplane.Secrets.CreateSecretRequest.domain_type:type_name -> Superplane.Authorization.DomainType
 	1,  // 4: Superplane.Secrets.CreateSecretResponse.secret:type_name -> Superplane.Secrets.Secret
 	1,  // 5: Superplane.Secrets.UpdateSecretRequest.secret:type_name -> Superplane.Secrets.Secret
-	20, // 6: Superplane.Secrets.UpdateSecretRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	22, // 6: Superplane.Secrets.UpdateSecretRequest.domain_type:type_name -> Superplane.Authorization.DomainType
 	1,  // 7: Superplane.Secrets.UpdateSecretResponse.secret:type_name -> Superplane.Secrets.Secret
-	20, // 8: Superplane.Secrets.DescribeSecretRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	22, // 8: Superplane.Secrets.DescribeSecretRequest.domain_type:type_name -> Superplane.Authorization.DomainType
 	1,  // 9: Superplane.Secrets.DescribeSecretResponse.secret:type_name -> Superplane.Secrets.Secret
-	20, // 10: Superplane.Secrets.ListSecretsRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	22, // 10: Superplane.Secrets.ListSecretsRequest.domain_type:type_name -> Superplane.Authorization.DomainType
 	1,  // 11: Superplane.Secrets.ListSecretsResponse.secrets:type_name -> Superplane.Secrets.Secret
-	20, // 12: Superplane.Secrets.DeleteSecretRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	20, // 13: Superplane.Secrets.SetSecretKeyRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	22, // 12: Superplane.Secrets.DeleteSecretRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	22, // 13: Superplane.Secrets.SetSecretKeyRequest.domain_type:type_name -> Superplane.Authorization.DomainType
 	1,  // 14: Superplane.Secrets.SetSecretKeyResponse.secret:type_name -> Superplane.Secrets.Secret
-	20, // 15: Superplane.Secrets.DeleteSecretKeyRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	22, // 15: Superplane.Secrets.DeleteSecretKeyRequest.domain_type:type_name -> Superplane.Authorization.DomainType
 	1,  // 16: Superplane.Secrets.DeleteSecretKeyResponse.secret:type_name -> Superplane.Secrets.Secret
-	19, // 17: Superplane.Secrets.Secret.Local.data:type_name -> Superplane.Secrets.Secret.Local.DataEntry
-	20, // 18: Superplane.Secrets.Secret.Metadata.domain_type:type_name -> Superplane.Authorization.DomainType
-	21, // 19: Superplane.Secrets.Secret.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	0,  // 20: Superplane.Secrets.Secret.Spec.provider:type_name -> Superplane.Secrets.Secret.Provider
-	16, // 21: Superplane.Secrets.Secret.Spec.local:type_name -> Superplane.Secrets.Secret.Local
-	2,  // 22: Superplane.Secrets.Secrets.CreateSecret:input_type -> Superplane.Secrets.CreateSecretRequest
-	6,  // 23: Superplane.Secrets.Secrets.DescribeSecret:input_type -> Superplane.Secrets.DescribeSecretRequest
-	8,  // 24: Superplane.Secrets.Secrets.ListSecrets:input_type -> Superplane.Secrets.ListSecretsRequest
-	4,  // 25: Superplane.Secrets.Secrets.UpdateSecret:input_type -> Superplane.Secrets.UpdateSecretRequest
-	10, // 26: Superplane.Secrets.Secrets.DeleteSecret:input_type -> Superplane.Secrets.DeleteSecretRequest
-	12, // 27: Superplane.Secrets.Secrets.SetSecretKey:input_type -> Superplane.Secrets.SetSecretKeyRequest
-	14, // 28: Superplane.Secrets.Secrets.DeleteSecretKey:input_type -> Superplane.Secrets.DeleteSecretKeyRequest
-	3,  // 29: Superplane.Secrets.Secrets.CreateSecret:output_type -> Superplane.Secrets.CreateSecretResponse
-	7,  // 30: Superplane.Secrets.Secrets.DescribeSecret:output_type -> Superplane.Secrets.DescribeSecretResponse
-	9,  // 31: Superplane.Secrets.Secrets.ListSecrets:output_type -> Superplane.Secrets.ListSecretsResponse
-	5,  // 32: Superplane.Secrets.Secrets.UpdateSecret:output_type -> Superplane.Secrets.UpdateSecretResponse
-	11, // 33: Superplane.Secrets.Secrets.DeleteSecret:output_type -> Superplane.Secrets.DeleteSecretResponse
-	13, // 34: Superplane.Secrets.Secrets.SetSecretKey:output_type -> Superplane.Secrets.SetSecretKeyResponse
-	15, // 35: Superplane.Secrets.Secrets.DeleteSecretKey:output_type -> Superplane.Secrets.DeleteSecretKeyResponse
-	29, // [29:36] is the sub-list for method output_type
-	22, // [22:29] is the sub-list for method input_type
-	22, // [22:22] is the sub-list for extension type_name
-	22, // [22:22] is the sub-list for extension extendee
-	0,  // [0:22] is the sub-list for field type_name
+	22, // 17: Superplane.Secrets.UpdateSecretNameRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	1,  // 18: Superplane.Secrets.UpdateSecretNameResponse.secret:type_name -> Superplane.Secrets.Secret
+	21, // 19: Superplane.Secrets.Secret.Local.data:type_name -> Superplane.Secrets.Secret.Local.DataEntry
+	22, // 20: Superplane.Secrets.Secret.Metadata.domain_type:type_name -> Superplane.Authorization.DomainType
+	23, // 21: Superplane.Secrets.Secret.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	0,  // 22: Superplane.Secrets.Secret.Spec.provider:type_name -> Superplane.Secrets.Secret.Provider
+	18, // 23: Superplane.Secrets.Secret.Spec.local:type_name -> Superplane.Secrets.Secret.Local
+	2,  // 24: Superplane.Secrets.Secrets.CreateSecret:input_type -> Superplane.Secrets.CreateSecretRequest
+	6,  // 25: Superplane.Secrets.Secrets.DescribeSecret:input_type -> Superplane.Secrets.DescribeSecretRequest
+	8,  // 26: Superplane.Secrets.Secrets.ListSecrets:input_type -> Superplane.Secrets.ListSecretsRequest
+	4,  // 27: Superplane.Secrets.Secrets.UpdateSecret:input_type -> Superplane.Secrets.UpdateSecretRequest
+	10, // 28: Superplane.Secrets.Secrets.DeleteSecret:input_type -> Superplane.Secrets.DeleteSecretRequest
+	12, // 29: Superplane.Secrets.Secrets.SetSecretKey:input_type -> Superplane.Secrets.SetSecretKeyRequest
+	14, // 30: Superplane.Secrets.Secrets.DeleteSecretKey:input_type -> Superplane.Secrets.DeleteSecretKeyRequest
+	16, // 31: Superplane.Secrets.Secrets.UpdateSecretName:input_type -> Superplane.Secrets.UpdateSecretNameRequest
+	3,  // 32: Superplane.Secrets.Secrets.CreateSecret:output_type -> Superplane.Secrets.CreateSecretResponse
+	7,  // 33: Superplane.Secrets.Secrets.DescribeSecret:output_type -> Superplane.Secrets.DescribeSecretResponse
+	9,  // 34: Superplane.Secrets.Secrets.ListSecrets:output_type -> Superplane.Secrets.ListSecretsResponse
+	5,  // 35: Superplane.Secrets.Secrets.UpdateSecret:output_type -> Superplane.Secrets.UpdateSecretResponse
+	11, // 36: Superplane.Secrets.Secrets.DeleteSecret:output_type -> Superplane.Secrets.DeleteSecretResponse
+	13, // 37: Superplane.Secrets.Secrets.SetSecretKey:output_type -> Superplane.Secrets.SetSecretKeyResponse
+	15, // 38: Superplane.Secrets.Secrets.DeleteSecretKey:output_type -> Superplane.Secrets.DeleteSecretKeyResponse
+	17, // 39: Superplane.Secrets.Secrets.UpdateSecretName:output_type -> Superplane.Secrets.UpdateSecretNameResponse
+	32, // [32:40] is the sub-list for method output_type
+	24, // [24:32] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_secrets_proto_init() }
@@ -1234,7 +1363,7 @@ func file_secrets_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_secrets_proto_rawDesc), len(file_secrets_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   19,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
