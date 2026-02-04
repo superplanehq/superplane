@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/google/go-github/v74/github"
 	"github.com/google/uuid"
@@ -15,7 +16,7 @@ type CreateIssueComment struct{}
 
 type CreateIssueCommentConfiguration struct {
 	Repository  string `mapstructure:"repository"`
-	IssueNumber int    `mapstructure:"issueNumber"`
+	IssueNumber string `mapstructure:"issueNumber"`
 	Body        string `mapstructure:"body"`
 }
 
@@ -92,9 +93,9 @@ func (c *CreateIssueComment) Configuration() []configuration.Field {
 		{
 			Name:        "issueNumber",
 			Label:       "Issue Number",
-			Type:        configuration.FieldTypeNumber,
+			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Placeholder: "e.g., 42",
+			Placeholder: "e.g., 42 or {{$.data.number}}",
 			Description: "The issue or PR number to comment on",
 		},
 		{
@@ -132,12 +133,17 @@ func (c *CreateIssueComment) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
+	issueNumber, err := strconv.Atoi(config.IssueNumber)
+	if err != nil {
+		return fmt.Errorf("invalid issue number %q: %w", config.IssueNumber, err)
+	}
+
 	// Create the comment
 	comment, _, err := client.Issues.CreateComment(
 		context.Background(),
 		appMetadata.Owner,
 		config.Repository,
-		config.IssueNumber,
+		issueNumber,
 		&github.IssueComment{
 			Body: &config.Body,
 		},
