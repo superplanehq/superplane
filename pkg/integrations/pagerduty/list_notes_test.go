@@ -124,8 +124,8 @@ func Test__ListNotes__Execute(t *testing.T) {
 		assert.Contains(t, httpContext.Requests[0].URL.String(), "/incidents/PT4KHLK/notes")
 
 		// Verify response contains expected data
-		require.Len(t, execCtx.Data, 1)
-		responseData, ok := execCtx.Data[0].(map[string]any)
+		require.Len(t, execCtx.Payloads, 1)
+		responseData, ok := execCtx.Payloads[0].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, 2, responseData["total"])
 	})
@@ -166,8 +166,8 @@ func Test__ListNotes__Execute(t *testing.T) {
 		assert.True(t, execCtx.Passed)
 
 		// Verify response contains expected data
-		require.Len(t, execCtx.Data, 1)
-		responseData, ok := execCtx.Data[0].(map[string]any)
+		require.Len(t, execCtx.Payloads, 1)
+		responseData, ok := execCtx.Payloads[0].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, 0, responseData["total"])
 	})
