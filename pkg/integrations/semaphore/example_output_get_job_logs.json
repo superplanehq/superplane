@@ -1,0 +1,31 @@
+{
+  "events": [
+    {
+      "event": "job_started",
+      "timestamp": 1706000000000
+    },
+    {
+      "event": "cmd_started",
+      "timestamp": 1706000001000,
+      "directive": "echo 'Running tests'"
+    },
+    {
+      "event": "cmd_output",
+      "timestamp": 1706000001500,
+      "output": "Running tests\n"
+    },
+    {
+      "event": "cmd_finished",
+      "timestamp": 1706000002000,
+      "exit_code": 0
+    },
+    {
+      "event": "job_finished",
+      "timestamp": 1706000003000,
+      "result": "passed"
+    }
+  ],
+  "output": "Running tests\n",
+  "lineCount": 1,
+  "result": "passed"
+}

@@ -382,3 +382,37 @@ func (c *Client) CreateWebhookSecret(name, key string) (*Secret, error) {
 
 	return &response, nil
 }
+
+// JobLogEvent represents a single log event from a Semaphore job
+type JobLogEvent struct {
+	Event      string `json:"event"`
+	Timestamp  int64  `json:"timestamp"`
+	Output     string `json:"output,omitempty"`
+	Directive  string `json:"directive,omitempty"`
+	ExitCode   int    `json:"exit_code,omitempty"`
+	StartedAt  int64  `json:"started_at,omitempty"`
+	FinishedAt int64  `json:"finished_at,omitempty"`
+	Result     string `json:"result,omitempty"`
+}
+
+// JobLogsResponse represents the response from the job logs API
+type JobLogsResponse struct {
+	Events []JobLogEvent `json:"events"`
+}
+
+// GetJobLogs retrieves the log output for a Semaphore job by job ID
+func (c *Client) GetJobLogs(jobID string) (*JobLogsResponse, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/logs/%s", c.OrgURL, jobID)
+	responseBody, err := c.execRequest(http.MethodGet, URL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response JobLogsResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling job logs response: %v", err)
+	}
+
+	return &response, nil
+}
