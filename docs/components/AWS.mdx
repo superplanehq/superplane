@@ -215,29 +215,40 @@ The Get Package Version component retrieves metadata for a specific package vers
 ```json
 {
   "data": {
-    "displayName": "example-package",
-    "format": "npm",
-    "homePage": "https://example.com/example-package",
-    "licenses": [
+    "assets": [
       {
-        "name": "MIT",
-        "url": "https://opensource.org/licenses/MIT"
+        "hashes": {
+          "sha256": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+        },
+        "name": "example-package-1.2.3.tgz",
+        "size": 1234567890
       }
     ],
-    "namespace": "@scope",
-    "origin": {
-      "domainEntryPoint": {
-        "externalConnectionName": "npmjs",
-        "repositoryName": "example-repo"
+    "package": {
+      "displayName": "example-package",
+      "format": "npm",
+      "homePage": "https://example.com/example-package",
+      "licenses": [
+        {
+          "name": "MIT",
+          "url": "https://opensource.org/licenses/MIT"
+        }
+      ],
+      "namespace": "@scope",
+      "origin": {
+        "domainEntryPoint": {
+          "externalConnectionName": "npmjs",
+          "repositoryName": "example-repo"
+        },
+        "originType": "EXTERNAL"
       },
-      "originType": "EXTERNAL"
-    },
-    "packageName": "@scope/example-package",
-    "revision": "E30D52B451F42F41",
-    "sourceCodeRepository": "https://github.com/example/example-package",
-    "status": "Published",
-    "summary": "Example package for demonstration.",
-    "version": "1.2.3"
+      "packageName": "@scope/example-package",
+      "revision": "E30D52B451F42F41",
+      "sourceCodeRepository": "https://github.com/example/example-package",
+      "status": "Published",
+      "summary": "Example package for demonstration.",
+      "version": "1.2.3"
+    }
   },
   "timestamp": "2026-02-03T12:00:00Z",
   "type": "aws.codeartifact.package.version"
