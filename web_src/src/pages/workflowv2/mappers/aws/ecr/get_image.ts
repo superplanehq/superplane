@@ -10,6 +10,7 @@ import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import { formatTimeAgo } from "@/utils/date";
+import { formatTimestampInUserTimezone } from "@/utils/timezone";
 import { MetadataItem } from "@/ui/metadataList";
 import { EcrImageDetail, EcrRepositoryConfiguration, EcrRepositoryMetadata } from "./types";
 import { formatTags, getRepositoryLabel } from "./utils";
@@ -52,6 +53,7 @@ export const getImageMapper: ComponentBaseMapper = {
       "Image Digest": stringOrDash(result.imageDigest),
       "Image Tags": formatTags(result.imageTags),
       "Image Size": formatBytes(result.imageSizeInBytes),
+      "Image Pushed At": result.imagePushedAt ? formatTimestampInUserTimezone(result.imagePushedAt) : "-",
       "Manifest Media Type": stringOrDash(result.imageManifestMediaType),
       "Artifact Media Type": stringOrDash(result.artifactMediaType),
       "Registry ID": stringOrDash(result.registryId),

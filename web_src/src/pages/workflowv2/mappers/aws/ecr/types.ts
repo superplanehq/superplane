@@ -24,6 +24,7 @@ export interface EcrImageDetail {
   imageDigest?: string;
   imageTags?: string[];
   imageSizeInBytes?: number;
+  imagePushedAt?: string;
   imageManifestMediaType?: string;
   artifactMediaType?: string;
 }
