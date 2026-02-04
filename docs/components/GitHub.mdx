@@ -29,6 +29,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitHub repository" />
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
+  <LinkCard title="Get Workflow Usage" href="#get-workflow-usage" description="Get GitHub Actions workflow usage and billing information" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
@@ -1117,6 +1118,70 @@ Returns the complete issue object including:
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.issue"
+}
+```
+
+<a id="get-workflow-usage"></a>
+
+## Get Workflow Usage
+
+The Get Workflow Usage component retrieves billable usage information for GitHub Actions workflows.
+
+### Use Cases
+
+- **Cost monitoring**: Track workflow execution time and billable minutes
+- **Usage reporting**: Generate reports on workflow usage across runner types
+- **Budget tracking**: Monitor GitHub Actions spend against budgets
+- **Optimization**: Identify workflows consuming the most resources
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Workflow File**: Specific workflow file to get usage for (optional). If not specified, returns usage for all workflows.
+
+### Output
+
+Returns workflow usage information including:
+- Total billable milliseconds per runner type (Ubuntu, macOS, Windows)
+- Workflow identification (ID, name, path)
+
+### Notes
+
+- Usage data reflects billable minutes consumed by workflow runs
+- Different runner types have different billing rates
+- Self-hosted runners are not included in billable usage
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "billable": {
+        "macos": {
+          "total_ms": 1800000
+        },
+        "ubuntu": {
+          "total_ms": 3600000
+        },
+        "windows": {
+          "total_ms": 900000
+        }
+      },
+      "workflow": {
+        "badge_url": "https://github.com/acme/widgets/workflows/CI/badge.svg",
+        "created_at": "2025-01-01T00:00:00Z",
+        "html_url": "https://github.com/acme/widgets/actions/workflows/ci.yml",
+        "id": 12345678,
+        "name": "CI",
+        "path": ".github/workflows/ci.yml",
+        "state": "active",
+        "updated_at": "2026-01-15T12:00:00Z"
+      }
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.workflowUsage"
 }
 ```
 
