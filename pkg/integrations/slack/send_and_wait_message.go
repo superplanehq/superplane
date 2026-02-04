@@ -281,9 +281,10 @@ func (c *SendAndWaitMessage) Configuration() []configuration.Field {
 			Required: false,
 		},
 		{
-			Name:  "buttons",
-			Label: "Buttons",
-			Type:  configuration.FieldTypeList,
+			Name:     "buttons",
+			Label:    "Buttons",
+			Type:     configuration.FieldTypeList,
+			Required: true,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Button",
