@@ -85,11 +85,15 @@ func (f *FlyIO) Configuration() []configuration.Field {
 }
 
 func (f *FlyIO) Components() []core.Component {
-	return []core.Component{}
+	return []core.Component{
+		&ListApps{},
+	}
 }
 
 func (f *FlyIO) Triggers() []core.Trigger {
-	return []core.Trigger{}
+	return []core.Trigger{
+		&OnAppStateChange{},
+	}
 }
 
 func (f *FlyIO) Sync(ctx core.SyncContext) error {
@@ -97,12 +101,6 @@ func (f *FlyIO) Sync(ctx core.SyncContext) error {
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		return fmt.Errorf("failed to decode config: %v", err)
-	}
-
-	// API Token is stored encrypted, retrieve it properly
-	apiToken, err := ctx.Integration.GetConfig("apiToken")
-	if err != nil || len(apiToken) == 0 {
-		return fmt.Errorf("apiToken is required")
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
