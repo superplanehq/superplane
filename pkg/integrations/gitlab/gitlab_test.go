@@ -188,6 +188,43 @@ func Test__GitLab__Sync(t *testing.T) {
 		assert.Equal(t, "https://gitlab.com/api/v4/groups/123/projects?include_subgroups=true&per_page=100&page=1", mockHTTP.Requests[2].URL.String())
 	})
 
+	t.Run("oauth - access token present but no refresh token - success", func(t *testing.T) {
+		ctx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"authType":     AuthTypeAppOAuth,
+				"groupId":      "123",
+				"clientId":     "id",
+				"clientSecret": "secret",
+			},
+			Secrets: map[string]core.IntegrationSecret{
+				OAuthAccessToken: {Name: OAuthAccessToken, Value: []byte("existing-access-token")},
+			},
+		}
+
+		mockHTTP := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				// No token refresh request expected
+				GitlabMockResponse(http.StatusOK, `{"id": 1}`),
+				GitlabMockResponse(http.StatusOK, `[{"id": 1, "path_with_namespace": "group/project1", "web_url": "https://gitlab.com/group/project1"}]`),
+			},
+		}
+
+		err := g.Sync(core.SyncContext{
+			Configuration: ctx.Configuration,
+			Integration:   ctx,
+			HTTP:          mockHTTP,
+			Logger:        logrus.NewEntry(logrus.New()),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "ready", ctx.State)
+
+		// Verification: Should skip token endpoint and go straight to API calls
+		require.Len(t, mockHTTP.Requests, 2)
+		assert.Equal(t, "https://gitlab.com/api/v4/user", mockHTTP.Requests[0].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/groups/123/projects?include_subgroups=true&per_page=100&page=1", mockHTTP.Requests[1].URL.String())
+	})
+
 	t.Run("error cases", func(t *testing.T) {
 		t.Run("missing authType", func(t *testing.T) {
 			ctx := &contexts.IntegrationContext{

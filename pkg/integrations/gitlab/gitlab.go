@@ -233,7 +233,9 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 
 	// Case 2: Has credentials but no tokens - show auth button
 	refreshToken, _ := findSecret(ctx.Integration, OAuthRefreshToken)
-	if refreshToken == "" {
+	accessToken, _ := findSecret(ctx.Integration, OAuthAccessToken)
+
+	if refreshToken == "" && accessToken == "" {
 		metadata := Metadata{}
 		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
 			ctx.Logger.Errorf("Failed to decode metadata while setting state: %v", err)
@@ -269,36 +271,40 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 		return nil
 	}
 
-	// STEP 3: Has tokens - refresh them and set ready
-	auth := NewAuth(ctx.HTTP)
-	tokenResponse, err := auth.RefreshToken(baseURL, configuration.ClientID, configuration.ClientSecret, refreshToken)
+	// STEP 3: Has tokens - refresh them if possible, then update metadata
+	if refreshToken != "" {
+		auth := NewAuth(ctx.HTTP)
+		tokenResponse, err := auth.RefreshToken(baseURL, configuration.ClientID, configuration.ClientSecret, refreshToken)
 
-	if err != nil {
-		ctx.Integration.Error(fmt.Sprintf("Failed to refresh token: %v", err))
+		if err != nil {
+			ctx.Integration.Error(fmt.Sprintf("Failed to refresh token: %v", err))
 
-		// This will force re-authentication on the next sync
-		_ = ctx.Integration.SetSecret(OAuthRefreshToken, []byte(""))
-		_ = ctx.Integration.SetSecret(OAuthAccessToken, []byte(""))
-		return nil
-	}
-
-	if tokenResponse.AccessToken != "" {
-		if err := ctx.Integration.SetSecret(OAuthAccessToken, []byte(tokenResponse.AccessToken)); err != nil {
-			ctx.Integration.Error("Failed to save access token")
+			_ = ctx.Integration.SetSecret(OAuthRefreshToken, []byte(""))
+			_ = ctx.Integration.SetSecret(OAuthAccessToken, []byte(""))
 			return nil
 		}
-	}
 
-	if tokenResponse.RefreshToken != "" {
-		if err := ctx.Integration.SetSecret(OAuthRefreshToken, []byte(tokenResponse.RefreshToken)); err != nil {
-			ctx.Integration.Error("Failed to save refresh token")
+		if tokenResponse.AccessToken != "" {
+			if err := ctx.Integration.SetSecret(OAuthAccessToken, []byte(tokenResponse.AccessToken)); err != nil {
+				ctx.Integration.Error("Failed to save access token")
+				return nil
+			}
+		}
+
+		if tokenResponse.RefreshToken != "" {
+			if err := ctx.Integration.SetSecret(OAuthRefreshToken, []byte(tokenResponse.RefreshToken)); err != nil {
+				ctx.Integration.Error("Failed to save refresh token")
+				return nil
+			}
+		}
+
+		if err := ctx.Integration.ScheduleResync(tokenResponse.GetExpiration()); err != nil {
+			ctx.Integration.Error("Failed to schedule resync")
 			return nil
 		}
-	}
-
-	if err := ctx.Integration.ScheduleResync(tokenResponse.GetExpiration()); err != nil {
-		ctx.Integration.Error("Failed to schedule resync")
-		return nil
+	} else {
+		// No refresh token, but we have an access token.
+		ctx.Logger.Warn("GitLab integration has access token but no refresh token. Token refresh will not be possible.")
 	}
 
 	if err := g.updateMetadata(ctx); err != nil {
