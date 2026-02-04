@@ -1,0 +1,28 @@
+---
+title: "GitLab"
+sidebar:
+  order: 9
+---
+
+Manage and react to changes in your GitLab repositories
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitLab project" />
+</CardGrid>
+
+## Instructions
+
+For **App OAuth**, leave **Client ID** and **Secret** empty to start the setup wizard.
+
+For **Personal Access Token**, use scopes: api, read_user, read_api, write_repository, read_repository.
+
+<a id="create-issue"></a>
+
+## Create Issue
+
+The Create Issue component creates a new issue in a specified GitLab project.
+
