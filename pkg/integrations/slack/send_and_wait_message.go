@@ -14,7 +14,8 @@ import (
 type SendAndWaitMessage struct{}
 
 type SendAndWaitMessageMetadata struct {
-	Channel *ChannelMetadata `json:"channel" mapstructure:"channel"`
+	Channel           *ChannelMetadata `json:"channel,omitempty" mapstructure:"channel,omitempty"`
+	AppSubscriptionID *string          `json:"appSubscriptionID,omitempty" mapstructure:"appSubscriptionID,omitempty"`
 }
 
 type SendAndWaitMessageConfiguration struct {
@@ -92,6 +93,11 @@ func (c *SendAndWaitMessage) OutputChannels(configuration any) []core.OutputChan
 }
 
 func (c *SendAndWaitMessage) Setup(ctx core.SetupContext) error {
+	var metadata SendAndWaitMessageMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
 	var config SendAndWaitMessageConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
@@ -119,21 +125,23 @@ func (c *SendAndWaitMessage) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("channel validation failed: %w", err)
 	}
 
-	metadata := SendAndWaitMessageMetadata{
-		Channel: &ChannelMetadata{
-			ID:   channelInfo.ID,
-			Name: channelInfo.Name,
-		},
+	metadata.Channel = &ChannelMetadata{
+		ID:   channelInfo.ID,
+		Name: channelInfo.Name,
 	}
 
-	if err := ctx.Metadata.Set(metadata); err != nil {
-		return fmt.Errorf("failed to set metadata: %w", err)
+	if metadata.AppSubscriptionID == nil {
+		subscriptionID, err := ctx.Integration.Subscribe(SubscriptionConfiguration{
+			EventTypes: []string{"interaction"},
+		})
+		if err != nil {
+			return fmt.Errorf("failed to subscribe to interactions: %w", err)
+		}
+		s := subscriptionID.String()
+		metadata.AppSubscriptionID = &s
 	}
 
-	_, err = ctx.Integration.Subscribe(SubscriptionConfiguration{
-		EventTypes: []string{"interaction"},
-	})
-	return err
+	return ctx.Metadata.Set(metadata)
 }
 
 func (c *SendAndWaitMessage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
