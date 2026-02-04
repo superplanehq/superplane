@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -16,7 +17,7 @@ type GetReleaseConfiguration struct {
 	Repository      string  `mapstructure:"repository"`
 	ReleaseStrategy string  `mapstructure:"releaseStrategy"`
 	TagName         *string `mapstructure:"tagName,omitempty"`
-	ReleaseID       *int64  `mapstructure:"releaseId,omitempty"`
+	ReleaseID       *string `mapstructure:"releaseId,omitempty"`
 }
 
 func (c *GetRelease) Name() string {
@@ -141,8 +142,8 @@ func (c *GetRelease) Configuration() []configuration.Field {
 		{
 			Name:        "releaseId",
 			Label:       "Release ID",
-			Type:        configuration.FieldTypeNumber,
-			Placeholder: "e.g., 12345678",
+			Type:        configuration.FieldTypeString,
+			Placeholder: "e.g., 12345678 or {{$.data.release_id}}",
 			Description: "Numeric release ID. Supports template variables from previous steps.",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{
@@ -175,7 +176,7 @@ func (c *GetRelease) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Validate required fields based on strategy BEFORE creating client
-	if config.ReleaseStrategy == "byId" && config.ReleaseID == nil {
+	if config.ReleaseStrategy == "byId" && (config.ReleaseID == nil || *config.ReleaseID == "") {
 		return fmt.Errorf("release ID is required when using byId strategy")
 	}
 	if config.ReleaseStrategy == "specific" && (config.TagName == nil || *config.TagName == "") {
@@ -203,16 +204,21 @@ func (c *GetRelease) Execute(ctx core.ExecutionContext) error {
 	var release any
 
 	if config.ReleaseStrategy == "byId" {
-		// Validation already done above
+		// Parse release ID from string to int64
+		releaseID, err := strconv.ParseInt(*config.ReleaseID, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid release ID '%s': must be a valid number", *config.ReleaseID)
+		}
+
 		// Fetch by release ID
 		r, _, err := client.Repositories.GetRelease(
 			context.Background(),
 			appMetadata.Owner,
 			config.Repository,
-			*config.ReleaseID,
+			releaseID,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to get release with ID %d: %w", *config.ReleaseID, err)
+			return fmt.Errorf("failed to get release with ID %d: %w", releaseID, err)
 		}
 		release = r
 	} else if config.ReleaseStrategy == "specific" {
