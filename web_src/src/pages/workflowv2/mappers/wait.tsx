@@ -5,7 +5,14 @@ import {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
-import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, NodeInfo, OutputPayload, StateFunction } from "./types";
+import {
+  ComponentBaseMapper,
+  CustomFieldRenderer,
+  EventStateRegistry,
+  NodeInfo,
+  OutputPayload,
+  StateFunction,
+} from "./types";
 import {
   ComponentBaseProps,
   EventSection,

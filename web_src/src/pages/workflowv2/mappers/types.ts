@@ -20,7 +20,6 @@ import { ReactNode } from "react";
  * 3. Export it from index.ts and add it to the registry
  */
 export interface TriggerRenderer {
-
   /**
    * Converts node and trigger metadata from the backend into props for the Trigger UI component.
    *
@@ -130,10 +129,7 @@ export interface CustomFieldRenderer {
    * @param context Optional context with additional handlers (e.g., onRun for triggering the emit modal with initial data)
    * @returns React node to render
    */
-  render(
-    node: NodeInfo,
-    context?: { onRun?: (initialData?: string) => void },
-  ): ReactNode;
+  render(node: NodeInfo, context?: { onRun?: (initialData?: string) => void }): ReactNode;
 }
 
 export interface OutputPayload {

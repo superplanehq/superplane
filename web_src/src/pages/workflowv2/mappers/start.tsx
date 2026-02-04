@@ -84,10 +84,7 @@ export const startTriggerRenderer: TriggerRenderer = {
  * This is only used internally by startTriggerRenderer, not registered in the global registry
  */
 const startCustomFieldRenderer: CustomFieldRenderer = {
-  render: (
-    node: NodeInfo,
-    context?: { onRun?: (initialData?: string) => void },
-  ): React.ReactNode => {
+  render: (node: NodeInfo, context?: { onRun?: (initialData?: string) => void }): React.ReactNode => {
     const config = node.configuration as StartConfiguration;
     const templates = config?.templates || [];
 
