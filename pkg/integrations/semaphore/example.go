@@ -13,11 +13,17 @@ var exampleOutputRunWorkflowBytes []byte
 //go:embed example_data_on_pipeline_done.json
 var exampleDataOnPipelineDoneBytes []byte
 
+//go:embed example_output_list_pipelines.json
+var exampleOutputListPipelinesBytes []byte
+
 var exampleOutputOnce sync.Once
 var exampleOutput map[string]any
 
 var exampleDataOnce sync.Once
 var exampleData map[string]any
+
+var exampleOutputListPipelinesOnce sync.Once
+var exampleOutputListPipelines []map[string]any
 
 func (c *RunWorkflow) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputOnce, exampleOutputRunWorkflowBytes, &exampleOutput)
@@ -25,4 +31,9 @@ func (c *RunWorkflow) ExampleOutput() map[string]any {
 
 func (t *OnPipelineDone) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnce, exampleDataOnPipelineDoneBytes, &exampleData)
+}
+
+func (c *ListPipelines) ExampleOutput() any {
+	utils.UnmarshalEmbeddedJSONSlice(&exampleOutputListPipelinesOnce, exampleOutputListPipelinesBytes, &exampleOutputListPipelines)
+	return exampleOutputListPipelines
 }
