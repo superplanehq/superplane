@@ -478,26 +478,3 @@ func buildEventPayload(webhook EventWebhookPayload) map[string]any {
 func (t *OnEvent) Cleanup(ctx core.TriggerContext) error {
 	return nil
 }
-
-// ExampleData returns example data for documentation and UI purposes.
-func (t *OnEvent) ExampleData() map[string]any {
-	return map[string]any{
-		"id":                "evt-timeline-123",
-		"event":             "incident_event.created",
-		"event_id":          "evt-123456",
-		"issued_at":         "2026-01-19T12:00:00Z",
-		"kind":              "note",
-		"occurred_at":       "2026-01-19T11:58:00Z",
-		"created_at":        "2026-01-19T12:00:00Z",
-		"user_display_name": "John Doe",
-		"body":              "Initial investigation shows the issue is related to a recent deployment.",
-		"source":            "web",
-		"visibility":        "internal",
-		"incident": map[string]any{
-			"id":       "inc-abc123",
-			"title":    "API latency spike detected",
-			"status":   "started",
-			"severity": "sev2",
-		},
-	}
-}
