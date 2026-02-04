@@ -711,11 +711,11 @@ func (c *Client) SnoozeIncident(incidentID string, fromEmail string, duration in
 
 // Note represents a note on a PagerDuty incident
 type Note struct {
-	ID        string      `json:"id"`
-	User      *ServiceRef `json:"user"`
+	ID        string       `json:"id"`
+	User      *ServiceRef  `json:"user"`
 	Channel   *NoteChannel `json:"channel"`
-	Content   string      `json:"content"`
-	CreatedAt string      `json:"created_at"`
+	Content   string       `json:"content"`
+	CreatedAt string       `json:"created_at"`
 }
 
 // NoteChannel represents the channel through which a note was created
