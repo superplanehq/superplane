@@ -26,15 +26,15 @@ func TestSecrets(t *testing.T) {
 		steps.assertSecretVisibleInList("E2E Test Secret")
 	})
 
-	// t.Run("adding a key/value pair to a secret", func(t *testing.T) {
-	// 	steps.start()
-	// 	steps.visitSecretsPage()
-	// 	steps.givenASecretExists("E2E Test Secret 2", map[string]string{"KEY1": "value1"})
-	// 	steps.clickAddKey()
-	// 	steps.fillAddKeyForm("KEY2", "value2")
-	// 	steps.submitAddKey()
-	// 	steps.assertSecretSavedInDB("E2E Test Secret 2", map[string]string{"KEY1": "value1", "KEY2": "value2"})
-	// })
+	t.Run("adding a key/value pair to a secret", func(t *testing.T) {
+		steps.start()
+		steps.visitSecretsPage()
+		steps.givenASecretExists("E2E Test Secret 2", map[string]string{"KEY1": "value1"})
+		steps.clickAddKey()
+		steps.fillAddKeyForm("KEY2", "value2")
+		steps.submitAddKey()
+		steps.assertSecretSavedInDB("E2E Test Secret 2", map[string]string{"KEY1": "value1", "KEY2": "value2"})
+	})
 
 	t.Run("removing a key/value pair from a secret", func(t *testing.T) {
 		steps.start()
@@ -54,19 +54,15 @@ func TestSecrets(t *testing.T) {
 		steps.assertSecretSavedInDB("E2E Test Secret 4", map[string]string{"KEY1": "new-value"})
 	})
 
-	// t.Run("change the name of the secret", func(t *testing.T) {
-	// 	t.Skip("secret name editing is not implemented in the UI")
-	// })
-
-	// t.Run("deleting a secret", func(t *testing.T) {
-	// 	steps.start()
-	// 	steps.visitSecretsPage()
-	// 	steps.givenASecretExists("E2E Test Secret 6", map[string]string{"KEY1": "value1"})
-	// 	steps.assertSecretVisibleInList("E2E Test Secret 6")
-	// 	steps.clickDeleteSecret("E2E Test Secret 6")
-	// 	steps.assertSecretDeletedFromDB("E2E Test Secret 6")
-	// 	steps.assertSecretNotVisibleInList("E2E Test Secret 6")
-	// })
+	t.Run("deleting a secret", func(t *testing.T) {
+		steps.start()
+		steps.visitSecretsPage()
+		steps.givenASecretExists("E2E Test Secret 6", map[string]string{"KEY1": "value1"})
+		steps.assertSecretVisibleInList("E2E Test Secret 6")
+		steps.clickDeleteSecret("E2E Test Secret 6")
+		steps.assertSecretDeletedFromDB("E2E Test Secret 6")
+		steps.assertSecretNotVisibleInList("E2E Test Secret 6")
+	})
 }
 
 type SecretsSteps struct {
