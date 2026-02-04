@@ -132,6 +132,12 @@ type IntegrationMessageContext struct {
 	HTTP          HTTPContext
 	Integration   IntegrationContext
 	Events        EventContext
+
+	//
+	// Return an execution context for a given execution,
+	// through a referencing key-value pair.
+	//
+	FindExecutionByKV func(key string, value string) (*ExecutionContext, error)
 }
 
 type IntegrationResource struct {

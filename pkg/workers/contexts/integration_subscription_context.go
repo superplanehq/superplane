@@ -3,6 +3,7 @@ package contexts
 import (
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -78,6 +79,30 @@ func (c *IntegrationSubscriptionContext) sendMessageToComponent(message any) err
 		Events:        NewEventContext(c.tx, c.node),
 		Message:       message,
 		Logger:        logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
+		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
+			execution, err := models.FirstNodeExecutionByKVInTransaction(c.tx, c.node.WorkflowID, c.node.NodeID, key, value)
+			if err != nil {
+				if err == gorm.ErrRecordNotFound {
+					return nil, nil
+				}
+
+				return nil, err
+			}
+
+			return &core.ExecutionContext{
+				ID:             execution.ID,
+				WorkflowID:     execution.WorkflowID.String(),
+				NodeID:         execution.NodeID,
+				Configuration:  execution.Configuration.Data(),
+				HTTP:           NewHTTPContext(c.registry.GetHTTPClient()),
+				Metadata:       NewExecutionMetadataContext(c.tx, execution),
+				NodeMetadata:   NewNodeMetadataContext(c.tx, c.node),
+				ExecutionState: NewExecutionStateContext(c.tx, execution),
+				Requests:       NewExecutionRequestContext(c.tx, execution),
+				Logger:         logging.WithExecution(logging.ForNode(*c.node), execution, nil),
+				Notifications:  NewNotificationContext(c.tx, uuid.Nil, execution.WorkflowID),
+			}, nil
+		},
 	})
 }
 
@@ -106,5 +131,29 @@ func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error
 		Message:       message,
 		Events:        NewEventContext(c.tx, c.node),
 		Logger:        logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
+		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
+			execution, err := models.FirstNodeExecutionByKVInTransaction(c.tx, c.node.WorkflowID, c.node.NodeID, key, value)
+			if err != nil {
+				if err == gorm.ErrRecordNotFound {
+					return nil, nil
+				}
+
+				return nil, err
+			}
+
+			return &core.ExecutionContext{
+				ID:             execution.ID,
+				WorkflowID:     execution.WorkflowID.String(),
+				NodeID:         execution.NodeID,
+				Configuration:  execution.Configuration.Data(),
+				HTTP:           NewHTTPContext(c.registry.GetHTTPClient()),
+				Metadata:       NewExecutionMetadataContext(c.tx, execution),
+				NodeMetadata:   NewNodeMetadataContext(c.tx, c.node),
+				ExecutionState: NewExecutionStateContext(c.tx, execution),
+				Requests:       NewExecutionRequestContext(c.tx, execution),
+				Logger:         logging.WithExecution(logging.ForNode(*c.node), execution, nil),
+				Notifications:  NewNotificationContext(c.tx, uuid.Nil, execution.WorkflowID),
+			}, nil
+		},
 	})
 }
