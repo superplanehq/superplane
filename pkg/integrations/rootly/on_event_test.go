@@ -804,8 +804,14 @@ func Test__OnEvent__Metadata(t *testing.T) {
 	})
 
 	t.Run("ExampleData returns valid structure", func(t *testing.T) {
-		data := trigger.ExampleData()
-		assert.NotNil(t, data)
+		example := trigger.ExampleData()
+		assert.NotNil(t, example)
+		assert.Equal(t, "rootly.onEvent", example["type"])
+		assert.NotNil(t, example["data"])
+		assert.NotNil(t, example["timestamp"])
+
+		data, ok := example["data"].(map[string]any)
+		require.True(t, ok)
 		assert.NotEmpty(t, data["event"])
 		assert.NotEmpty(t, data["kind"])
 		assert.NotNil(t, data["incident"])
