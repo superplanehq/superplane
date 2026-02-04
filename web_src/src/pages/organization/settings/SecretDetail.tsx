@@ -8,9 +8,12 @@ import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { Edit2, Key, Loader2, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useDeleteSecret, useSecret, useUpdateSecret, type UpdateSecretParams } from "@/hooks/useSecrets";
-
-const MASKED_VALUE_PLACEHOLDER = "***";
+import {
+  useDeleteSecret,
+  useSecret,
+  useSetSecretKey,
+  useDeleteSecretKey,
+} from "@/hooks/useSecrets";
 
 interface SecretDetailProps {
   organizationId: string;
@@ -27,7 +30,8 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
   const [newValue, setNewValue] = useState("");
 
   const { data: secret, isLoading, error } = useSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
-  const updateSecretMutation = useUpdateSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
+  const setSecretKeyMutation = useSetSecretKey(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
+  const deleteSecretKeyMutation = useDeleteSecretKey(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
   const deleteSecretMutation = useDeleteSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION");
 
   const handleSaveEdit = async () => {
@@ -43,18 +47,13 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
       showErrorToast("Key already exists");
       return;
     }
-    const envVars = [
-      ...otherKeys.map((k) => ({ name: k, value: MASKED_VALUE_PLACEHOLDER })),
-      { name: newName, value: editingValue.trim() },
-    ];
     try {
-      const params: UpdateSecretParams = {
-        name: secret.metadata?.name || "",
-        environmentVariables: envVars,
-        provider: secret.spec?.provider ?? "PROVIDER_LOCAL",
-        secretId: secret.metadata?.id,
-      };
-      await updateSecretMutation.mutateAsync(params);
+      if (newName !== editingKey) {
+        await deleteSecretKeyMutation.mutateAsync(editingKey);
+        await setSecretKeyMutation.mutateAsync({ keyName: newName, value: editingValue.trim() });
+      } else {
+        await setSecretKeyMutation.mutateAsync({ keyName: newName, value: editingValue.trim() });
+      }
       showSuccessToast(newName !== editingKey ? "Key updated" : "Value updated");
       setEditingKey(null);
       setEditingKeyName("");
@@ -80,18 +79,11 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
       showErrorToast("Key already exists");
       return;
     }
-    const envVars = [
-      ...Object.entries(secretData).map(([k]) => ({ name: k, value: MASKED_VALUE_PLACEHOLDER })),
-      { name: newKey.trim(), value: newValue.trim() },
-    ];
     try {
-      const params: UpdateSecretParams = {
-        name: secret.metadata?.name || "",
-        environmentVariables: envVars,
-        provider: secret.spec?.provider ?? "PROVIDER_LOCAL",
-        secretId: secret.metadata?.id,
-      };
-      await updateSecretMutation.mutateAsync(params);
+      await setSecretKeyMutation.mutateAsync({
+        keyName: newKey.trim(),
+        value: newValue.trim(),
+      });
       showSuccessToast("Key added");
       setIsAddingKey(false);
       setNewKey("");
@@ -110,21 +102,13 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
   const handleRemoveKey = async (keyToRemove: string) => {
     if (!secret) return;
     const secretData = secret.spec?.local?.data || {};
-    const remaining = Object.entries(secretData)
-      .filter(([k]) => k !== keyToRemove)
-      .map(([k]) => ({ name: k, value: MASKED_VALUE_PLACEHOLDER }));
-    if (remaining.length === 0) {
+    const remainingCount = Object.keys(secretData).filter((k) => k !== keyToRemove).length;
+    if (remainingCount === 0) {
       showErrorToast("Secret must have at least one key");
       return;
     }
     try {
-      const params: UpdateSecretParams = {
-        name: secret.metadata?.name || "",
-        environmentVariables: remaining,
-        provider: secret.spec?.provider ?? "PROVIDER_LOCAL",
-        secretId: secret.metadata?.id,
-      };
-      await updateSecretMutation.mutateAsync(params);
+      await deleteSecretKeyMutation.mutateAsync(keyToRemove);
       showSuccessToast("Key removed");
       if (editingKey === keyToRemove) {
         setEditingKey(null);
@@ -151,7 +135,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
     }
   };
 
-  const isUpdating = updateSecretMutation.isPending;
+  const isUpdating = setSecretKeyMutation.isPending || deleteSecretKeyMutation.isPending;
   const handleBackToSecrets = () => navigate(`/${organizationId}/settings/secrets`);
 
   if (isLoading || !secretId) {

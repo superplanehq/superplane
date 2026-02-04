@@ -5,6 +5,8 @@ import {
   secretsDescribeSecret,
   secretsUpdateSecret,
   secretsDeleteSecret,
+  secretsSetSecretKey,
+  secretsDeleteSecretKey,
 } from "@/api-client/sdk.gen";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import type { AuthorizationDomainType, SecretsCreateSecretData, SecretsUpdateSecretData } from "@/api-client/types.gen";
@@ -183,6 +185,69 @@ export const useDeleteSecret = (domainId: string, domainType: AuthorizationDomai
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: secretKeys.byDomain(domainId, domainType),
+      });
+    },
+  });
+};
+
+export interface SetSecretKeyParams {
+  keyName: string;
+  value: string;
+}
+
+export const useSetSecretKey = (
+  domainId: string,
+  domainType: AuthorizationDomainType,
+  secretId: string,
+) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: SetSecretKeyParams) => {
+      return await secretsSetSecretKey(
+        withOrganizationHeader({
+          path: { idOrName: secretId, keyName: params.keyName },
+          body: {
+            value: params.value,
+            domainType,
+            domainId,
+          },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: secretKeys.byDomain(domainId, domainType),
+      });
+      queryClient.invalidateQueries({
+        queryKey: secretKeys.detail(domainId, domainType, secretId),
+      });
+    },
+  });
+};
+
+export const useDeleteSecretKey = (
+  domainId: string,
+  domainType: AuthorizationDomainType,
+  secretId: string,
+) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (keyName: string) => {
+      return await secretsDeleteSecretKey(
+        withOrganizationHeader({
+          path: { idOrName: secretId, keyName },
+          query: { domainId, domainType },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: secretKeys.byDomain(domainId, domainType),
+      });
+      queryClient.invalidateQueries({
+        queryKey: secretKeys.detail(domainId, domainType, secretId),
       });
     },
   });
