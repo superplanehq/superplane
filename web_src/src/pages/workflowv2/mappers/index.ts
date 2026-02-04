@@ -24,6 +24,10 @@ import {
   customFieldRenderers as githubCustomFieldRenderers,
 } from "./github/index";
 import {
+  componentMappers as gitlabComponentMappers,
+  eventStateRegistry as gitlabEventStateRegistry,
+} from "./gitlab/index";
+import {
   componentMappers as pagerdutyComponentMappers,
   triggerRenderers as pagerdutyTriggerRenderers,
   eventStateRegistry as pagerdutyEventStateRegistry,
@@ -111,6 +115,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   cloudflare: cloudflareComponentMappers,
   semaphore: semaphoreComponentMappers,
   github: githubComponentMappers,
+  gitlab: gitlabComponentMappers,
   pagerduty: pagerdutyComponentMappers,
   dash0: dash0ComponentMappers,
   daytona: daytonaComponentMappers,
@@ -153,6 +158,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   rootly: rootlyEventStateRegistry,
   openai: openaiEventStateRegistry,
   aws: awsEventStateRegistry,
+  gitlab: gitlabEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
