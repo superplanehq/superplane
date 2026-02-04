@@ -1,11 +1,12 @@
-import {
-  ComponentsNode,
-  ComponentsComponent,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
 import { ComponentBaseProps } from "@/ui/componentBase";
-import { ComponentBaseMapper, OutputPayload } from "../types";
+import {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  NodeInfo,
+  OutputPayload,
+  SubtitleContext,
+} from "../types";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
 import { MetadataItem } from "@/ui/metadataList";
@@ -24,15 +25,9 @@ interface CommentOutput {
   };
 }
 
-interface CreateIssueCommentConfiguration {
-  repository?: string;
-  issueNumber?: string;
-  body?: string;
-}
-
-function getCreateIssueCommentMetadataList(node: ComponentsNode): MetadataItem[] {
+function getCreateIssueCommentMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as CreateIssueCommentConfiguration | undefined;
+  const configuration = node.configuration as { repository?: string; issueNumber?: string } | undefined;
   const nodeMetadata = node.metadata as { repository?: { name?: string } } | undefined;
 
   if (nodeMetadata?.repository?.name) {
@@ -47,30 +42,24 @@ function getCreateIssueCommentMetadataList(node: ComponentsNode): MetadataItem[]
 }
 
 export const createIssueCommentMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    queueItems: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
-    const base = baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const base = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
 
     return {
       ...base,
-      metadata: getCreateIssueCommentMetadataList(node),
+      metadata: getCreateIssueCommentMetadataList(context.node),
     };
   },
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    return buildGithubExecutionSubtitle(execution);
+  subtitle(context: SubtitleContext): string {
+    return buildGithubExecutionSubtitle(context.execution);
   },
 
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const details: Record<string, string> = {};
 
     Object.assign(details, {
-      "Created At": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : "-",
+      "Created At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",
     });
 
     if (outputs?.default && outputs.default.length > 0) {
@@ -87,7 +76,6 @@ export const createIssueCommentMapper: ComponentBaseMapper = {
         }
 
         if (comment.body) {
-          // Truncate body for display
           const truncated = comment.body.length > 100 ? comment.body.substring(0, 100) + "..." : comment.body;
           details["Body"] = truncated;
         }
