@@ -236,6 +236,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
             disabled={deleteSecretMutation.isPending}
             className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 shrink-0"
             title="Delete secret"
+            data-testid="secret-detail-delete"
           >
             {deleteSecretMutation.isPending ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -271,6 +272,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
                         onChange={(e) => setEditingKeyName(e.target.value)}
                         placeholder="Key name"
                         className="font-mono text-sm"
+                        data-testid="secret-detail-edit-key-name"
                       />
                       <Label className="text-xs text-gray-500 dark:text-gray-400 font-normal block mt-2">
                         Value
@@ -282,12 +284,14 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
                         rows={8}
                         className="font-mono text-sm resize-y bg-white dark:bg-gray-900"
                         autoFocus
+                        data-testid="secret-detail-edit-value"
                       />
                       <div className="flex gap-2 mt-2">
                         <Button
                           size="sm"
                           onClick={handleSaveEdit}
                           disabled={!editingKeyName.trim() || !editingValue.trim() || isUpdating}
+                          data-testid="secret-detail-edit-save"
                         >
                           {isUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
                         </Button>
@@ -313,18 +317,20 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
                         }}
                       className="shrink-0 text-gray-600 dark:text-gray-300"
                       title="Edit value"
+                      data-testid="secret-detail-edit-key"
                     >
                       <Edit2 className="w-3 h-3" />
                     </Button>
                     {keys.length > 1 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveKey(keyName)}
-                        disabled={isUpdating}
-                        className="shrink-0 text-red-600 hover:text-red-700 dark:text-red-400"
-                        title="Remove key"
-                      >
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveKey(keyName)}
+                          disabled={isUpdating}
+                          className="shrink-0 text-red-600 hover:text-red-700 dark:text-red-400"
+                          title="Remove key"
+                          data-testid="secret-detail-remove-key"
+                        >
                         <Trash2 className="w-3 h-3" />
                       </Button>
                     )}
@@ -343,6 +349,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
                   onChange={(e) => setNewKey(e.target.value)}
                   placeholder="Key name"
                   className="font-mono text-sm"
+                  data-testid="secret-detail-add-key-name"
                 />
                 <Label className="text-xs text-gray-500 dark:text-gray-400 font-normal block mt-2">
                   Value
@@ -353,12 +360,14 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
                   placeholder="Value"
                   rows={8}
                   className="font-mono text-sm resize-y bg-white dark:bg-gray-900"
+                  data-testid="secret-detail-add-value"
                 />
                 <div className="flex gap-2 mt-2">
                   <Button
                     size="sm"
                     onClick={handleAddKey}
                     disabled={!newKey.trim() || !newValue.trim() || isUpdating}
+                    data-testid="secret-detail-add-save"
                   >
                     {isUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
                   </Button>
@@ -380,6 +389,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
               setNewValue("");
             }}
             className="mt-3 text-xs"
+            data-testid="secret-detail-add-key"
           >
             <Plus className="w-3 h-3 mr-1" />
             Add key

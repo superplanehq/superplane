@@ -139,6 +139,7 @@ export function Secrets({ organizationId }: SecretsProps) {
                 className="flex items-center"
                 onClick={handleCreateClick}
                 disabled={!canCreateSecrets}
+                data-testid="secrets-create-btn"
               >
                 <Icon name="plus" />
                 Create Secret
@@ -161,6 +162,7 @@ export function Secrets({ organizationId }: SecretsProps) {
                   className="mt-4 flex items-center"
                   onClick={handleCreateClick}
                   disabled={!canCreateSecrets}
+                  data-testid="secrets-create-btn"
                 >
                   <Icon name="plus" />
                   Create Secret
@@ -188,6 +190,7 @@ export function Secrets({ organizationId }: SecretsProps) {
                           <Link
                             href={getSecretDetailPath(secretId)}
                             className="cursor-pointer text-sm !font-semibold text-gray-800 !underline underline-offset-2"
+                            data-testid="secrets-secret-link"
                           >
                             {secret.metadata?.name || "Unnamed Secret"}
                           </Link>
@@ -218,6 +221,7 @@ export function Secrets({ organizationId }: SecretsProps) {
                 e.preventDefault();
                 handleCreate();
               }}
+              data-testid="secrets-create-form"
             >
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -248,6 +252,7 @@ export function Secrets({ organizationId }: SecretsProps) {
                     placeholder="e.g., production-api-keys"
                     required
                     disabled={!canCreateSecrets}
+                    data-testid="secrets-create-name"
                   />
                 </div>
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
@@ -264,6 +269,7 @@ export function Secrets({ organizationId }: SecretsProps) {
                             placeholder="Key"
                             className="mb-2"
                             disabled={!canCreateSecrets}
+                            data-testid="secrets-create-key"
                           />
                           <Textarea
                             defaultValue={pair.value}
@@ -271,6 +277,7 @@ export function Secrets({ organizationId }: SecretsProps) {
                             rows={3}
                             className="font-mono text-sm"
                             disabled={!canCreateSecrets}
+                            data-testid="secrets-create-value"
                           />
                         </div>
                         {keyValuePairs.length > 1 && (
@@ -281,6 +288,7 @@ export function Secrets({ organizationId }: SecretsProps) {
                             onClick={() => removeKeyValuePair(index)}
                             className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 mt-0"
                             title="Remove pair"
+                            data-testid="secrets-create-remove-pair"
                           >
                             <Trash2 className="w-3 h-3" />
                           </Button>
@@ -288,7 +296,7 @@ export function Secrets({ organizationId }: SecretsProps) {
                       </div>
                     ))}
                   </div>
-                  <Button type="button" variant="outline" size="sm" onClick={addKeyValuePair} className="mt-3 text-xs" disabled={!canCreateSecrets}>
+                  <Button type="button" variant="outline" size="sm" onClick={addKeyValuePair} className="mt-3 text-xs" disabled={!canCreateSecrets} data-testid="secrets-create-add-pair">
                     <Plus className="w-3 h-3 mr-1" />
                     Add Pair
                   </Button>
@@ -301,6 +309,7 @@ export function Secrets({ organizationId }: SecretsProps) {
                   color="blue"
                   disabled={createSecretMutation.isPending || !secretName?.trim() || !canCreateSecrets}
                   className="flex items-center gap-2"
+                  data-testid="secrets-create-submit"
                 >
                   {createSecretMutation.isPending ? (
                     <>
