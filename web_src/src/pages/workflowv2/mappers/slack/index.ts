@@ -3,6 +3,8 @@ import { onAppMentionTriggerRenderer } from "./on_app_mention";
 import { sendTextMessageMapper } from "./send_text_message";
 import { sendAndWaitMessageMapper } from "./send_and_wait_message";
 import { buildActionStateRegistry } from "../utils";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { defaultStateFunction } from "../stateRegistry";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   sendTextMessage: sendTextMessageMapper,
