@@ -2707,8 +2707,13 @@ export function WorkflowPageV2() {
       if (!renderer) return null;
 
       // Return a function that takes the current configuration
-      return (configuration: Record<string, unknown>) => {
-        return renderer.render(node, configuration, onRun ? { onRun } : undefined);
+      return () => {
+        return renderer.render({
+          id: node.id!,
+          name: node.name!,
+          configuration: node.configuration,
+          metadata: node.metadata,
+        }, onRun ? { onRun } : undefined);
       };
     },
     [canvas],
@@ -3060,7 +3065,20 @@ function prepareTriggerNode(
   const triggerMetadata = triggers.find((t) => t.name === node.trigger?.name);
   const renderer = getTriggerRenderer(node.trigger?.name || "");
   const lastEvent = nodeEventsMap[node.id!]?.[0];
-  const triggerProps = renderer.getTriggerProps(node, triggerMetadata || {}, lastEvent);
+  const triggerProps = renderer.getTriggerProps(
+    {
+      id: node.id!,
+      name: node.trigger?.name || "",
+      configuration: node.configuration,
+      metadata: node.metadata,
+    },
+    {
+      label: triggerMetadata?.label || "",
+      description: triggerMetadata?.description || "",
+      icon: triggerMetadata?.icon || "",
+      color: triggerMetadata?.color || "",
+    },
+    lastEvent);
 
   // Use node name if available, otherwise fall back to trigger label (from metadata)
   const displayLabel = node.name || triggerMetadata?.label || node.trigger?.name || "Trigger";

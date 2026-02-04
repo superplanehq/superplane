@@ -5,7 +5,7 @@ import {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
-import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, OutputPayload, StateFunction } from "./types";
+import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, NodeInfo, OutputPayload, StateFunction } from "./types";
 import {
   ComponentBaseProps,
   EventSection,
@@ -370,8 +370,8 @@ function formatDateValue(value?: string): string | undefined {
  * Custom field renderer for wait component configuration
  */
 export const waitCustomFieldRenderer: CustomFieldRenderer = {
-  render: (_node: ComponentsNode, configuration: Record<string, unknown>) => {
-    const mode = configuration?.mode as string;
+  render: (node: NodeInfo) => {
+    const mode = node.configuration?.mode as string;
 
     let content: React.ReactNode;
     let title: string;

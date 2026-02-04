@@ -1,6 +1,6 @@
-import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
+import { CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerRenderer, CustomFieldRenderer } from "./types";
+import { TriggerRenderer, CustomFieldRenderer, NodeInfo, ComponentDefinition } from "./types";
 import { TriggerProps } from "@/ui/trigger";
 import { flattenObject } from "@/lib/utils";
 import { formatTimeAgo } from "@/utils/date";
@@ -29,15 +29,14 @@ export const startTriggerRenderer: TriggerRenderer = {
     return flattenObject(event.data || {});
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
-    const configuration = (node.configuration || {}) as Record<string, unknown>;
-    const nodeId = node.id!;
+  getTriggerProps: (node: NodeInfo, definition: ComponentDefinition, lastEvent: CanvasesCanvasEvent) => {
+    const nodeId = node.id;
 
     // Create customField as a function that will receive onRun when ComponentBase renders it
     // We'll create a wrapper that captures nodeId and allows passing initialData
     const customField = (onRunBase?: () => void) => {
       if (!onRunBase) {
-        return startCustomFieldRenderer.render(node, configuration, undefined);
+        return startCustomFieldRenderer.render(node);
       }
 
       // Create a wrapper onRun that can accept initialData
@@ -53,14 +52,14 @@ export const startTriggerRenderer: TriggerRenderer = {
         }, 100);
       };
 
-      return startCustomFieldRenderer.render(node, configuration, { onRun: onRunWithContext });
+      return startCustomFieldRenderer.render(node, { onRun: onRunWithContext });
     };
 
     const props: TriggerProps = {
-      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
-      iconSlug: trigger.icon || "play",
+      title: node.name || definition.label || "Unnamed trigger",
+      iconSlug: definition.icon || "play",
       iconColor: getColorClass("purple"),
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: [],
       customField: customField,
       customFieldPosition: "before",
@@ -86,12 +85,11 @@ export const startTriggerRenderer: TriggerRenderer = {
  */
 const startCustomFieldRenderer: CustomFieldRenderer = {
   render: (
-    _node: ComponentsNode,
-    configuration: Record<string, unknown>,
+    node: NodeInfo,
     context?: { onRun?: (initialData?: string) => void },
   ): React.ReactNode => {
-    const config = configuration as StartConfiguration;
-    const templates = config.templates || [];
+    const config = node.configuration as StartConfiguration;
+    const templates = config?.templates || [];
 
     if (templates.length === 0) {
       return null;
