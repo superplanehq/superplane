@@ -200,6 +200,7 @@ type UpdateIncidentPayload struct {
 	Title            string               `json:"title,omitempty"`
 	Priority         *PriorityReference   `json:"priority,omitempty"`
 	EscalationPolicy *EscalationPolicyRef `json:"escalation_policy,omitempty"`
+	EscalationLevel  int                  `json:"escalation_level,omitempty"`
 	Assignments      []AssignmentPayload  `json:"assignments,omitempty"`
 	Body             *IncidentBody        `json:"body,omitempty"`
 }
