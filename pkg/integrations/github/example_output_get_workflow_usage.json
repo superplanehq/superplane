@@ -1,0 +1,29 @@
+{
+  "data": [
+    {
+      "workflow": {
+        "id": 12345678,
+        "name": "CI",
+        "path": ".github/workflows/ci.yml",
+        "state": "active",
+        "html_url": "https://github.com/acme/widgets/actions/workflows/ci.yml",
+        "badge_url": "https://github.com/acme/widgets/workflows/CI/badge.svg",
+        "created_at": "2025-01-01T00:00:00Z",
+        "updated_at": "2026-01-15T12:00:00Z"
+      },
+      "billable": {
+        "ubuntu": {
+          "total_ms": 3600000
+        },
+        "macos": {
+          "total_ms": 1800000
+        },
+        "windows": {
+          "total_ms": 900000
+        }
+      }
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.workflowUsage"
+}
