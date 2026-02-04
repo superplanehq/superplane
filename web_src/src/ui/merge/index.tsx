@@ -3,6 +3,7 @@ import { ComponentActionsProps } from "../types/componentActions";
 
 export interface MergeComponentProps extends ComponentActionsProps {
   title?: string;
+  showHeader?: boolean;
   lastEvent?: Omit<EventSection, "title">;
   // Show the next queued item for this merge node
   nextInQueue?: {
@@ -20,6 +21,7 @@ export interface MergeComponentProps extends ComponentActionsProps {
 
 export const MergeComponent: React.FC<MergeComponentProps> = ({
   title = "Merge",
+  showHeader,
   lastEvent,
   collapsed = false,
   selected = false,
@@ -50,6 +52,7 @@ export const MergeComponent: React.FC<MergeComponentProps> = ({
     <ComponentBase
       title={title}
       iconSlug="git-merge"
+      showHeader={showHeader}
       eventSections={eventSections}
       collapsed={collapsed}
       collapsedBackground={collapsedBackground}
