@@ -192,7 +192,7 @@ func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.Canva
 		configBuilder = configBuilder.WithConfigurationFields(configFields)
 	}
 
-	// Do not resolve secrets here: persisted config must store only secret IDs (references).
+	// Do not resolve secrets here: persisted config must store only secret references.
 	config, err := configBuilder.Build(firstNode.Configuration)
 
 	if err != nil {
@@ -274,7 +274,7 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		return fmt.Errorf("failed to find workflow: %v", err)
 	}
 
-	// Resolve secret references in memory only; persisted config stores only secret IDs.
+	// Resolve secret references in memory only; persisted config stores only references.
 	config := execution.Configuration.Data()
 	configFields := component.Configuration()
 	if len(configFields) > 0 {

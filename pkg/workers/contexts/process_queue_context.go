@@ -44,7 +44,7 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 	if len(configFields) > 0 {
 		configBuilder = configBuilder.WithConfigurationFields(configFields)
 	}
-	// Do not resolve secrets here: persisted config must store only secret IDs (references).
+	// Do not resolve secrets here: persisted config must store only secret references.
 
 	if node.ParentNodeID != nil {
 		parent, err := models.FindCanvasNode(tx, node.WorkflowID, *node.ParentNodeID)

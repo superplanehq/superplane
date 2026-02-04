@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// NewSecretResolver returns a SecretResolver that looks up secrets by ID in the given
+// NewSecretResolver returns a SecretResolver that looks up secrets by reference in the given
 // transaction and domain, decrypts the secret data, and returns it as a map.
 // The resolved value is the secret's local data (map of key-value pairs).
 func NewSecretResolver(tx *gorm.DB, domainType string, domainID uuid.UUID, encryptor crypto.Encryptor) SecretResolver {
@@ -43,7 +43,7 @@ func NewSecretResolver(tx *gorm.DB, domainType string, domainID uuid.UUID, encry
 
 // ResolveSecretReferencesInConfig resolves only secret field references in config to their
 // decrypted values. All other fields are copied as-is. Used at execution time so that
-// persisted config stores only secret IDs; resolution happens in memory when running the component.
+// persisted config stores only secret references; resolution happens in memory when running the component.
 func ResolveSecretReferencesInConfig(config map[string]any, fields []configuration.Field, resolver SecretResolver) (map[string]any, error) {
 	if resolver == nil {
 		return config, nil

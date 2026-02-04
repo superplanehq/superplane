@@ -638,7 +638,7 @@ func validateFieldValue(field Field, value any) error {
 		}
 
 	case FieldTypeSecret:
-		// Secret field stores the reference (secret ID) as a string
+		// Secret field stores the reference as a string
 		if _, ok := value.(string); !ok {
 			return fmt.Errorf("must be a string (secret reference)")
 		}

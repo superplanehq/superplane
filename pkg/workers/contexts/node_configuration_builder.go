@@ -20,7 +20,7 @@ import (
 var expressionRegex = regexp.MustCompile(`\{\{(.*?)\}\}`)
 var previousDepthRegex = regexp.MustCompile(`\bprevious\s*\(([^)]*)\)`)
 
-// SecretResolver resolves a secret reference (ID) to the secret's decrypted data.
+// SecretResolver resolves a secret reference to the secret's decrypted data.
 // Used when building configuration for fields of type secret.
 type SecretResolver func(secretID string) (any, error)
 

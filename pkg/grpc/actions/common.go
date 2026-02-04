@@ -1012,7 +1012,7 @@ func defaultValueFromProto(fieldType, defaultValue string) any {
 	case configuration.FieldTypeGroup:
 		fallthrough
 	case configuration.FieldTypeSecret:
-		// String-like types: preserve the raw string (secret stores reference/ID).
+		// String-like types: preserve the raw string (secret stores a reference).
 		return defaultValue
 
 	case configuration.FieldTypeMultiSelect:
