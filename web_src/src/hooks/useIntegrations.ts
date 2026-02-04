@@ -8,7 +8,9 @@ import {
   organizationsUpdateIntegration,
   organizationsDeleteIntegration,
 } from "@/api-client/sdk.gen";
+import type { IntegrationsIntegrationDefinition } from "@/api-client/types.gen";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 
 export const integrationKeys = {
   all: ["integrations"] as const,
@@ -20,13 +22,21 @@ export const integrationKeys = {
     [...integrationKeys.integration(organizationId, integrationId), "resources", resourceType] as const,
 };
 
-// Hook to fetch available integrations (catalog)
+// Hook to fetch available integrations (catalog).
+// Normalizes each integration's label (e.g. "github" -> "GitHub") so consumers get correct display names.
 export const useAvailableIntegrations = () => {
   return useQuery({
     queryKey: integrationKeys.available(),
     queryFn: async () => {
       const response = await integrationsListIntegrations(withOrganizationHeader({}));
-      return response.data?.integrations || [];
+      const list: IntegrationsIntegrationDefinition[] = response.data?.integrations || [];
+      return list.map((integration: IntegrationsIntegrationDefinition) => {
+        // Support both camelCase and PascalCase (API may send either)
+        const rawLabel = integration.label;
+        const rawName = integration.name;
+        const displayLabel = getIntegrationTypeDisplayName(rawLabel, rawName) || rawLabel || rawName || "";
+        return { ...integration, label: displayLabel } as IntegrationsIntegrationDefinition;
+      });
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
