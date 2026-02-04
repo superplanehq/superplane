@@ -1,0 +1,23 @@
+[
+  {
+    "ppl_id": "d7f8b9c0-1234-5678-90ab-cdef12345678",
+    "name": "Build and Test",
+    "wf_id": "a1b2c3d4-5678-90ab-cdef-123456789012",
+    "state": "done",
+    "result": "passed"
+  },
+  {
+    "ppl_id": "e8f9a0b1-2345-6789-01bc-def234567890",
+    "name": "Deploy to Production",
+    "wf_id": "b2c3d4e5-6789-01ab-cdef-234567890123",
+    "state": "done",
+    "result": "failed"
+  },
+  {
+    "ppl_id": "f9a0b1c2-3456-7890-12cd-ef3456789012",
+    "name": "Nightly Tests",
+    "wf_id": "c3d4e5f6-7890-12ab-cdef-345678901234",
+    "state": "running",
+    "result": ""
+  }
+]
