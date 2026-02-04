@@ -1,11 +1,10 @@
-import { CanvasesCanvasNodeExecution } from "@/api-client";
 import { DEFAULT_EVENT_STATE_MAP, EventState } from "@/ui/componentBase";
-import { EventStateRegistry, StateFunction } from "./types";
+import { EventStateRegistry, ExecutionInfo, StateFunction } from "./types";
 
 /**
  * Default state logic function used by most components
  */
-export const defaultStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
+export const defaultStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
   if (

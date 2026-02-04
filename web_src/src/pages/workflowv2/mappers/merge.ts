@@ -1,10 +1,13 @@
 import {
-  ComponentsComponent,
-  ComponentsNode,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
-import { ComponentBaseMapper, EventStateRegistry, StateFunction } from "./types";
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  EventStateRegistry,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  StateFunction,
+  SubtitleContext,
+} from "./types";
 import {
   ComponentBaseProps,
   EventSection,
@@ -61,7 +64,7 @@ interface MergeAdditionalData {
  * Determines which output channel has data, indicating the merge outcome.
  * Returns the channel name or null if no output found.
  */
-function getActiveChannel(execution: CanvasesCanvasNodeExecution): string | null {
+function getActiveChannel(execution: ExecutionInfo): string | null {
   const outputs = execution.outputs as MergeOutputs | undefined;
   if (!outputs) return null;
 
@@ -110,7 +113,7 @@ export const MERGE_STATE_MAP: EventStateMap = {
 /**
  * Merge-specific state logic function
  */
-export const mergeStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
+export const mergeStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
   // Check for cancellation
@@ -155,68 +158,55 @@ export const MERGE_STATE_REGISTRY: EventStateRegistry = {
 };
 
 export const mergeMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    _nodeQueueItems?: CanvasesCanvasNodeQueueItem[],
-    additionalData?: unknown,
-  ): ComponentBaseProps {
-    const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
 
     return {
-      iconSlug: componentDefinition?.icon || "git-merge",
-      iconColor: getColorClass(componentDefinition?.color || "gray"),
+      iconSlug: context.componentDefinition?.icon || "git-merge",
+      iconColor: getColorClass(context.componentDefinition?.color || "gray"),
       collapsedBackground: getBackgroundColorClass("white"),
-      collapsed: node.isCollapsed,
-      title: node.name || componentDefinition?.label || "Merge",
-      eventSections: lastExecution ? getMergeEventSections(nodes, lastExecution, additionalData) : undefined,
+      collapsed: context.node.isCollapsed,
+      title: context.node.name || context.componentDefinition?.label || "Merge",
+      eventSections: lastExecution
+        ? getMergeEventSections(context.nodes, lastExecution, context.additionalData)
+        : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: MERGE_STATE_MAP,
     };
   },
 
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution, additionalData?: unknown): string {
-    return getMergeSubtitle(execution, additionalData);
+  subtitle(context: SubtitleContext): string {
+    return getMergeSubtitle(context.execution);
   },
 
-  getExecutionDetails(
-    execution: CanvasesCanvasNodeExecution,
-    _node: ComponentsNode,
-    nodes?: ComponentsNode[],
-  ): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
     const details: Record<string, any> = {};
-    const metadata = execution.metadata as MergeExecutionMetadata | undefined;
+    const metadata = context.execution.metadata as MergeExecutionMetadata | undefined;
 
-    if (execution.createdAt) {
-      details["Started at"] = new Date(execution.createdAt).toLocaleString();
+    if (context.execution.createdAt) {
+      details["Started at"] = new Date(context.execution.createdAt).toLocaleString();
     }
 
-    if (execution.state === "STATE_FINISHED" && execution.updatedAt) {
-      details["Finished at"] = new Date(execution.updatedAt).toLocaleString();
+    if (context.execution.state === "STATE_FINISHED" && context.execution.updatedAt) {
+      details["Finished at"] = new Date(context.execution.updatedAt).toLocaleString();
     }
 
     // Build timeline for events received
     if (metadata?.sources && metadata.sources.length > 0) {
-      details["Events"] = buildMergeTimeline(metadata, execution, nodes);
+      details["Events"] = buildMergeTimeline(metadata, context.execution, context.nodes);
     }
 
     return details;
   },
 };
 
-function getMergeEventSections(
-  nodes: ComponentsNode[],
-  execution: CanvasesCanvasNodeExecution,
-  additionalData?: unknown,
-): EventSection[] {
+function getMergeEventSections(nodes: NodeInfo[], execution: ExecutionInfo, additionalData?: unknown): EventSection[] {
   const sections: EventSection[] = [];
 
   // Add the main execution section
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  const { title: eventTitle } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title: eventTitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   const eventSubtitle = getMergeSubtitle(execution, additionalData);
 
@@ -231,7 +221,7 @@ function getMergeEventSections(
   return sections;
 }
 
-function getMergeSubtitle(execution: CanvasesCanvasNodeExecution, additionalData?: unknown): string {
+function getMergeSubtitle(execution: ExecutionInfo, additionalData?: unknown): string {
   const metadata = execution.metadata as MergeExecutionMetadata | undefined;
   const mergeData = additionalData as MergeAdditionalData | undefined;
 
@@ -279,8 +269,8 @@ interface MergeTimelineEntry {
  */
 function buildMergeTimeline(
   metadata: MergeExecutionMetadata,
-  execution: CanvasesCanvasNodeExecution,
-  nodes?: ComponentsNode[],
+  execution: ExecutionInfo,
+  nodes?: NodeInfo[],
 ): MergeTimelineEntry[] {
   const timeline: MergeTimelineEntry[] = [];
 
@@ -289,7 +279,7 @@ function buildMergeTimeline(
     metadata.sources.forEach((sourceId) => {
       // Look up the source node to get its label/name
       const sourceNode = nodes?.find((n) => n.id === sourceId);
-      const sourceLabel = sourceNode?.name || sourceNode?.component?.name || `Node ${sourceId.substring(0, 8)}...`;
+      const sourceLabel = sourceNode?.name || sourceNode?.componentName || `Node ${sourceId.substring(0, 8)}...`;
 
       // Format timestamp in "ago" style
       const timestampFormatted = execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)) : undefined;

@@ -1,13 +1,14 @@
-import {
-  ComponentsNode,
-  ComponentsComponent,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import { ComponentBaseMapper } from "../types";
+import {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  SubtitleContext,
+} from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
 import { BaseNodeMetadata } from "./types";
@@ -15,38 +16,33 @@ import { buildIncidentExecutionDetails } from "./base";
 import { formatTimeAgo } from "@/utils/date";
 
 export const createIncidentMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    _?: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
-    const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition.name || node.component?.name || "unknown";
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+    const componentName = context.componentDefinition.name ?? "pagerduty";
 
     return {
       iconSrc: pdIcon,
-      collapsedBackground: getBackgroundColorClass(componentDefinition.color),
-      collapsed: node.isCollapsed,
-      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
-      eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
-      metadata: metadataList(node),
+      collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
+      collapsed: context.node.isCollapsed,
+      title: context.node.name || context.componentDefinition.label || "Unnamed component",
+      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
+      metadata: metadataList(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
   },
 
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _: ComponentsNode): Record<string, any> {
-    return buildIncidentExecutionDetails(execution);
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+    return buildIncidentExecutionDetails(context.execution);
   },
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    if (!execution.createdAt) return "";
-    return formatTimeAgo(new Date(execution.createdAt));
+
+  subtitle(context: SubtitleContext): string {
+    if (!context.execution.createdAt) return "";
+    return formatTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
-function metadataList(node: ComponentsNode): MetadataItem[] {
+function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as BaseNodeMetadata;
   const configuration = node.configuration as any;
@@ -62,14 +58,10 @@ function metadataList(node: ComponentsNode): MetadataItem[] {
   return metadata;
 }
 
-function baseEventSections(
-  nodes: ComponentsNode[],
-  execution: CanvasesCanvasNodeExecution,
-  componentName: string,
-): EventSection[] {
+function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   return [
     {
