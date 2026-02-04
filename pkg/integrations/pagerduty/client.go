@@ -405,6 +405,54 @@ func (c *Client) GetIncident(incidentID string) (any, error) {
 	return response, nil
 }
 
+func (c *Client) GetIncidentAlerts(incidentID string) (any, error) {
+	url := fmt.Sprintf("%s/incidents/%s/alerts", c.BaseURL, incidentID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]any
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response, nil
+}
+
+func (c *Client) GetIncidentNotes(incidentID string) (any, error) {
+	url := fmt.Sprintf("%s/incidents/%s/notes", c.BaseURL, incidentID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]any
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response, nil
+}
+
+func (c *Client) GetIncidentLogEntries(incidentID string) (any, error) {
+	url := fmt.Sprintf("%s/incidents/%s/log_entries", c.BaseURL, incidentID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]any
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response, nil
+}
+
 type WebhookSubscription struct {
 	ID             string         `json:"id"`
 	Events         []string       `json:"events"`
