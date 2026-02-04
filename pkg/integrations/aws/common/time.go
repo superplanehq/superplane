@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -78,10 +77,7 @@ func floatToTime(value float64) time.Time {
 	if value == 0 {
 		return time.Time{}
 	}
-
-	seconds, frac := math.Modf(value)
-	nanos := int64(frac * float64(time.Second))
-	return time.Unix(int64(seconds), nanos).UTC()
+	return time.Unix(int64(value), 0).UTC()
 }
 
 func looksNumeric(value string) bool {
