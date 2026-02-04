@@ -108,7 +108,9 @@ func (s *WaitSteps) runManualTrigger() {
 }
 
 func (s *WaitSteps) openSidebarForNode(node string) {
-	s.session.Click(q.TestID("node", node, "header"))
+	header := q.TestID("node", node, "header")
+	s.session.AssertVisible(header)
+	s.session.Click(header)
 }
 
 func (s *WaitSteps) pushThroughFirstItemFromSidebar() {
