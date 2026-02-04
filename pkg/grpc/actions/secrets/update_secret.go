@@ -2,7 +2,6 @@ package secrets
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -12,8 +11,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
-
-const maskedValuePlaceholder = "***"
 
 func UpdateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType, domainID, idOrName string, spec *pb.Secret) (*pb.UpdateSecretResponse, error) {
 	err := actions.ValidateUUIDs(idOrName)
@@ -45,7 +42,7 @@ func UpdateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType, d
 		return nil, status.Error(codes.InvalidArgument, "cannot update provider")
 	}
 
-	data, err := prepareSecretDataForUpdate(ctx, encryptor, *secret, spec)
+	data, err := prepareSecretData(ctx, encryptor, spec)
 	if err != nil {
 		return nil, err
 	}
@@ -61,40 +58,4 @@ func UpdateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType, d
 	}
 
 	return &pb.UpdateSecretResponse{Secret: s}, nil
-}
-
-// prepareSecretDataForUpdate merges incoming spec with existing secret data: keys sent as "***"
-// keep their existing value so the UI can update a single key without sending others.
-func prepareSecretDataForUpdate(ctx context.Context, encryptor crypto.Encryptor, existing models.Secret, spec *pb.Secret) ([]byte, error) {
-	if spec.Spec == nil || spec.Spec.Local == nil || spec.Spec.Local.Data == nil {
-		return nil, status.Error(codes.InvalidArgument, "missing data")
-	}
-	incoming := spec.Spec.Local.Data
-
-	existingDecrypted, err := encryptor.Decrypt(ctx, existing.Data, []byte(existing.Name))
-	if err != nil {
-		return nil, err
-	}
-	var merged map[string]string
-	if err := json.Unmarshal(existingDecrypted, &merged); err != nil {
-		merged = make(map[string]string)
-	}
-	if merged == nil {
-		merged = make(map[string]string)
-	}
-
-	result := make(map[string]string)
-	for k, v := range incoming {
-		if v != maskedValuePlaceholder {
-			result[k] = v
-		} else if existingVal, ok := merged[k]; ok {
-			result[k] = existingVal
-		}
-	}
-
-	data, err := json.Marshal(result)
-	if err != nil {
-		return nil, err
-	}
-	return encryptor.Encrypt(ctx, data, []byte(spec.Metadata.Name))
 }

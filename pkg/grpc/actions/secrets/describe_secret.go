@@ -69,15 +69,13 @@ func serializeSecret(ctx context.Context, encryptor crypto.Encryptor, secret mod
 func serializeLocalSecretData(ctx context.Context, encryptor crypto.Encryptor, secret models.Secret) (*pb.Secret_Local, error) {
 	data, err := encryptor.Decrypt(ctx, secret.Data, []byte(secret.Name))
 	if err != nil {
-		// Return empty local data so list/describe still succeed (e.g. secret created with different encryptor)
-		return &pb.Secret_Local{Data: map[string]string{}}, nil
+		return nil, err
 	}
 
 	var values map[string]string
 	err = json.Unmarshal(data, &values)
 	if err != nil {
-		// Return empty local data so list/describe still succeed (e.g. corrupted or wrong format)
-		return &pb.Secret_Local{Data: map[string]string{}}, nil
+		return nil, err
 	}
 
 	local := &pb.Secret_Local{

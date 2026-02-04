@@ -107,10 +107,6 @@ export const useCreateSecret = (domainId: string, domainType: AuthorizationDomai
 export interface UpdateSecretParams {
   name: string;
   environmentVariables: Array<{ name: string; value: string }>;
-  /** Resend the secret's provider so the backend accepts the update (required for PATCH). */
-  provider?: "PROVIDER_UNKNOWN" | "PROVIDER_LOCAL";
-  /** Secret id for the path (use when calling from context where hook's secretId may be empty). */
-  secretId?: string;
 }
 
 export const useUpdateSecret = (domainId: string, domainType: AuthorizationDomainType, secretId: string) => {
@@ -118,7 +114,6 @@ export const useUpdateSecret = (domainId: string, domainType: AuthorizationDomai
 
   return useMutation({
     mutationFn: async (params: UpdateSecretParams) => {
-      const id = params.secretId ?? secretId;
       const data: { [key: string]: string } = {};
       params.environmentVariables.forEach((env) => {
         data[env.name] = env.value;
@@ -128,13 +123,13 @@ export const useUpdateSecret = (domainId: string, domainType: AuthorizationDomai
         secret: {
           metadata: {
             name: params.name,
-            id: id,
+            id: secretId,
             domainId: domainId,
             domainType: domainType,
             createdAt: new Date().toISOString(),
           },
           spec: {
-            provider: params.provider ?? "PROVIDER_LOCAL",
+            provider: "PROVIDER_LOCAL",
             local: {
               data,
             },
@@ -152,18 +147,17 @@ export const useUpdateSecret = (domainId: string, domainType: AuthorizationDomai
             domainType,
           },
           path: {
-            idOrName: id,
+            idOrName: secretId,
           },
         }),
       );
     },
-    onSuccess: (_data, variables) => {
-      const id = variables.secretId ?? secretId;
+    onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: secretKeys.byDomain(domainId, domainType),
       });
       queryClient.invalidateQueries({
-        queryKey: secretKeys.detail(domainId, domainType, id),
+        queryKey: secretKeys.detail(domainId, domainType, secretId),
       });
     },
   });

@@ -29,11 +29,6 @@ type TestSession struct {
 	Account *models.Account
 }
 
-// TimeoutMs returns the session's default timeout in milliseconds.
-func (s *TestSession) TimeoutMs() float64 {
-	return s.timeoutMs
-}
-
 func NewTestSession(t *testing.T, context pw.BrowserContext, page pw.Page, timeoutMs float64, baseURL string) *TestSession {
 	sess := &TestSession{
 		t:         t,
