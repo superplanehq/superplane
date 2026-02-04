@@ -56,7 +56,7 @@ type Registry struct {
 func NewRegistry(encryptor crypto.Encryptor) *Registry {
 	r := &Registry{
 		Encryptor:    encryptor,
-		httpClient:   &http.Client{Timeout: 30 * time.Second},
+		httpClient:   NewSSRFSafeHTTPClient(30 * time.Second),
 		Components:   map[string]core.Component{},
 		Triggers:     map[string]core.Trigger{},
 		Integrations: map[string]core.Integration{},
