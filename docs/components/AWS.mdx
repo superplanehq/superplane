@@ -9,6 +9,7 @@ Manage resources and execute AWS commands in workflows
 ## Triggers
 
 <CardGrid>
+  <LinkCard title="CodeArtifact • On Package Version" href="#code-artifact-•-on-package-version" description="Listen to AWS CodeArtifact package version events" />
   <LinkCard title="ECR • On Image Push" href="#ecr-•-on-image-push" description="Listen to AWS ECR image push events" />
   <LinkCard title="ECR • On Image Scan" href="#ecr-•-on-image-scan" description="Listen to AWS ECR image scan events" />
 </CardGrid>
@@ -18,6 +19,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="CodeArtifact • Get Package Version" href="#code-artifact-•-get-package-version" description="Describe an AWS CodeArtifact package version" />
   <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
   <LinkCard title="ECR • Scan Image" href="#ecr-•-scan-image" description="Scan an ECR image for vulnerabilities" />
@@ -27,6 +29,61 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Instructions
 
 Initially, you can leave the **"IAM Role ARN"** field empty, as you will be guided through the identity provider and IAM role creation process.
+
+<a id="code-artifact-•-on-package-version"></a>
+
+## CodeArtifact • On Package Version
+
+The On Package Version trigger starts a workflow execution when a package version is created, modified, or deleted in AWS CodeArtifact.
+
+### Use Cases
+
+- **Release automation**: Trigger downstream workflows when a new package version is published
+- **Dependency monitoring**: Notify teams about changes to shared libraries
+- **Compliance checks**: Validate artifacts before promotion
+
+### Example Data
+
+```json
+{
+  "data": {
+    "account": "123456789012",
+    "detail": {
+      "changes": {
+        "assetsAdded": 1,
+        "assetsRemoved": 0,
+        "assetsUpdated": 0,
+        "metadataUpdated": false,
+        "statusChanged": true
+      },
+      "domainName": "example-domain",
+      "domainOwner": "123456789012",
+      "eventDeduplicationId": "5f87d1a3-2c1f-4ab0-8f55-8f4c2b4a5c76",
+      "operationType": "Created",
+      "packageFormat": "npm",
+      "packageName": "@scope/example-package",
+      "packageNamespace": null,
+      "packageVersion": "1.2.3",
+      "packageVersionRevision": "E30D52B451F42F41",
+      "packageVersionState": "Published",
+      "repositoryAdministrator": "arn:aws:sts::123456789012:assumed-role/ExampleRole/example-user",
+      "repositoryName": "example-repo",
+      "sequenceNumber": 1
+    },
+    "detail-type": "CodeArtifact Package Version State Change",
+    "id": "d9e9ff4a-3514-3d2c-b6b8-1fb5e0b9d3b2",
+    "region": "us-east-1",
+    "resources": [
+      "arn:aws:codeartifact:us-east-1:123456789012:repository/example-domain/example-repo"
+    ],
+    "source": "aws.codeartifact",
+    "time": "2024-11-20T20:35:33Z",
+    "version": "0"
+  },
+  "timestamp": "2026-03-10T14:25:30.31254162Z",
+  "type": "aws.codeartifact.package.version"
+}
+```
 
 <a id="ecr-•-on-image-push"></a>
 
@@ -138,6 +195,52 @@ Each image scan event includes:
   },
   "timestamp": "2026-03-10T14:25:30.31254162Z",
   "type": "aws.ecr.image.scan"
+}
+```
+
+<a id="code-artifact-•-get-package-version"></a>
+
+## CodeArtifact • Get Package Version
+
+The Get Package Version component retrieves metadata for a specific package version in AWS CodeArtifact.
+
+### Use Cases
+
+- **Release automation**: Resolve package metadata before promotion
+- **Audit trails**: Capture version details for reporting
+- **Dependency checks**: Validate status and origin of package versions
+
+### Example Output
+
+```json
+{
+  "data": {
+    "displayName": "example-package",
+    "format": "npm",
+    "homePage": "https://example.com/example-package",
+    "licenses": [
+      {
+        "name": "MIT",
+        "url": "https://opensource.org/licenses/MIT"
+      }
+    ],
+    "namespace": "@scope",
+    "origin": {
+      "domainEntryPoint": {
+        "externalConnectionName": "npmjs",
+        "repositoryName": "example-repo"
+      },
+      "originType": "EXTERNAL"
+    },
+    "packageName": "@scope/example-package",
+    "revision": "E30D52B451F42F41",
+    "sourceCodeRepository": "https://github.com/example/example-package",
+    "status": "Published",
+    "summary": "Example package for demonstration.",
+    "version": "1.2.3"
+  },
+  "timestamp": "2026-02-03T12:00:00Z",
+  "type": "aws.codeartifact.package.version"
 }
 ```
 

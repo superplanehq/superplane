@@ -1,26 +1,7 @@
 import { MetadataItem } from "@/ui/metadataList";
 import { formatTimeAgo } from "@/utils/date";
 import { CanvasesCanvasNodeExecution } from "@/api-client";
-
-export type PredicateType = "equals" | "notEquals" | "matches";
-
-export interface Predicate {
-  type: PredicateType;
-  value: string;
-}
-
-export function formatPredicate(predicate: Predicate): string {
-  switch (predicate.type) {
-    case "equals":
-      return `=${predicate.value}`;
-    case "notEquals":
-      return `!=${predicate.value}`;
-    case "matches":
-      return `~${predicate.value}`;
-    default:
-      return predicate.value;
-  }
-}
+import { Predicate, formatPredicate } from "../utils";
 
 export function createGithubMetadataItems(
   repositoryName: string | undefined,
