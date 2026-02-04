@@ -16,7 +16,7 @@ type CreateIssueConfiguration struct {
 	Project   string   `mapstructure:"project"`
 	Title     string   `mapstructure:"title"`
 	Body      string   `mapstructure:"body"`
-	Assignees []int    `mapstructure:"assignees"`
+	Assignees []string `mapstructure:"assignees"`
 	Labels    []string `mapstructure:"labels"`
 }
 
@@ -80,15 +80,14 @@ func (c *CreateIssue) Configuration() []configuration.Field {
 		},
 		{
 			Name:     "assignees",
-			Label:    "Assignee IDs",
-			Type:     configuration.FieldTypeList,
+			Label:    "Assignees",
+			Type:     configuration.FieldTypeIntegrationResource,
 			Required: false,
 			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel: "Assignee ID",
-					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeNumber,
-					},
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "member",
+					Multi:          true,
+					UseNameAsValue: false,
 				},
 			},
 		},
@@ -141,11 +140,20 @@ func (c *CreateIssue) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize GitLab client: %w", err)
 	}
 
+	// Convert assignees from []string to []int
+	var assigneeIDs []int
+	for _, idStr := range config.Assignees {
+		var id int
+		if _, err := fmt.Sscanf(idStr, "%d", &id); err == nil {
+			assigneeIDs = append(assigneeIDs, id)
+		}
+	}
+
 	req := &IssueRequest{
 		Title:       config.Title,
 		Description: config.Body,
 		Labels:      config.Labels,
-		AssigneeIDs: config.Assignees,
+		AssigneeIDs: assigneeIDs,
 	}
 
 	issue, err := client.CreateIssue(context.Background(), config.Project, req)

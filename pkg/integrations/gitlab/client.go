@@ -228,6 +228,31 @@ func (c *Client) getCurrentUser() (*User, error) {
 	return &user, nil
 }
 
+func (c *Client) ListGroupMembers(groupID string) ([]User, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/groups/%s/members", c.baseURL, apiVersion, url.PathEscape(groupID))
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to list group members: status %d", resp.StatusCode)
+	}
+
+	var members []User
+	if err := json.NewDecoder(resp.Body).Decode(&members); err != nil {
+		return nil, fmt.Errorf("failed to decode members: %v", err)
+	}
+
+	return members, nil
+}
+
 func (c *Client) FetchIntegrationData() (*User, []Project, error) {
 	user, err := c.getCurrentUser()
 	if err != nil {

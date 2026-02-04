@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,6 +20,36 @@ func Test__GitLab__ListResources(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Empty(t, resources)
+	})
+
+	t.Run("returns list of members", func(t *testing.T) {
+		ctx := core.ListResourcesContext{
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseUrl":             "https://gitlab.com",
+					"groupId":             "123",
+					"authType":            AuthTypePersonalAccessToken,
+					"personalAccessToken": "token",
+				},
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					GitlabMockResponse(http.StatusOK, `[
+						{"id": 101, "name": "User One", "username": "user1"},
+						{"id": 102, "name": "User Two", "username": "user2"}
+					]`),
+				},
+			},
+		}
+
+		resources, err := g.ListResources("member", ctx)
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 2)
+		assert.Equal(t, "101", resources[0].ID)
+		assert.Equal(t, "User One (@user1)", resources[0].Name)
+		assert.Equal(t, "member", resources[0].Type)
+		assert.Equal(t, "102", resources[1].ID)
 	})
 
 	t.Run("returns list of repositories from metadata", func(t *testing.T) {

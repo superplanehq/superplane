@@ -65,9 +65,10 @@ func Test__CreateIssue__Execute(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{}
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
-				"project": "123",
-				"title":   "Issue Title",
-				"body":    "Issue Body",
+				"project":   "123",
+				"title":     "Issue Title",
+				"body":      "Issue Body",
+				"assignees": []string{"99"},
 			},
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{
