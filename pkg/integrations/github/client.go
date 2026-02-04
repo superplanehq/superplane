@@ -53,11 +53,3 @@ func findSecret(ctx core.IntegrationContext, secretName string) (string, error) 
 
 	return "", fmt.Errorf("secret %s not found", secretName)
 }
-
-type contextRoundTripper struct {
-	ctx core.HTTPContext
-}
-
-func (crt *contextRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	return crt.ctx.Do(req)
-}
