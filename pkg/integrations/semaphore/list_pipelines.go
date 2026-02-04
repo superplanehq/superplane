@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -44,10 +45,10 @@ func (c *ListPipelines) Icon() string {
 }
 
 func (c *ListPipelines) Color() string {
-	return "#222034"
+	return "gray"
 }
 
-func (c *ListPipelines) OutputChannels() []core.OutputChannel {
+func (c *ListPipelines) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
@@ -55,56 +56,56 @@ func (c *ListPipelines) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "project",
-			Type:        configuration.TypeString,
+			Type:        configuration.FieldTypeString,
 			Label:       "Project",
 			Description: "Semaphore project ID or name",
 			Required:    true,
 		},
 		{
 			Name:        "branchName",
-			Type:        configuration.TypeString,
+			Type:        configuration.FieldTypeString,
 			Label:       "Branch Name",
 			Description: "Filter pipelines by branch name",
 			Required:    false,
 		},
 		{
 			Name:        "ymlFilePath",
-			Type:        configuration.TypeString,
+			Type:        configuration.FieldTypeString,
 			Label:       "YAML File Path",
 			Description: "Filter pipelines by pipeline YAML file path",
 			Required:    false,
 		},
 		{
 			Name:        "createdAfter",
-			Type:        configuration.TypeString,
+			Type:        configuration.FieldTypeString,
 			Label:       "Created After",
 			Description: "Filter pipelines created after this date (ISO 8601 or Unix timestamp)",
 			Required:    false,
 		},
 		{
 			Name:        "createdBefore",
-			Type:        configuration.TypeString,
+			Type:        configuration.FieldTypeString,
 			Label:       "Created Before",
 			Description: "Filter pipelines created before this date (ISO 8601 or Unix timestamp)",
 			Required:    false,
 		},
 		{
 			Name:        "doneAfter",
-			Type:        configuration.TypeString,
+			Type:        configuration.FieldTypeString,
 			Label:       "Done After",
 			Description: "Filter pipelines completed after this date (ISO 8601 or Unix timestamp)",
 			Required:    false,
 		},
 		{
 			Name:        "doneBefore",
-			Type:        configuration.TypeString,
+			Type:        configuration.FieldTypeString,
 			Label:       "Done Before",
 			Description: "Filter pipelines completed before this date (ISO 8601 or Unix timestamp)",
 			Required:    false,
 		},
 		{
 			Name:        "limit",
-			Type:        configuration.TypeNumber,
+			Type:        configuration.FieldTypeNumber,
 			Label:       "Limit",
 			Description: "Maximum number of pipelines to return (max 100)",
 			Required:    false,
@@ -184,22 +185,26 @@ func (c *ListPipelines) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *ListPipelines) ProcessQueueItem(ctx core.ProcessQueueItemContext) (*core.ProcessQueueItemResult, error) {
+func (c *ListPipelines) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (c *ListPipelines) ValidateWebhookPayload(ctx core.ValidateWebhookPayloadContext) (bool, error) {
-	return false, nil
+func (c *ListPipelines) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return 200, nil
 }
 
-func (c *ListPipelines) ProcessWebhookPayload(ctx core.ProcessWebhookPayloadContext) (*core.ProcessWebhookPayloadResult, error) {
-	return nil, nil
+func (c *ListPipelines) Actions() []core.Action {
+	return []core.Action{}
 }
 
-func (c *ListPipelines) CreateWebhook(ctx core.CreateWebhookContext) (*core.CreateWebhookResult, error) {
-	return nil, nil
+func (c *ListPipelines) HandleAction(ctx core.ActionContext) error {
+	return nil
 }
 
-func (c *ListPipelines) DeleteWebhook(ctx core.DeleteWebhookContext) error {
+func (c *ListPipelines) Cancel(ctx core.ExecutionContext) error {
+	return nil
+}
+
+func (c *ListPipelines) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
