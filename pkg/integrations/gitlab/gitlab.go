@@ -497,9 +497,10 @@ func normalizeBaseURL(url string) string {
 		return "https://gitlab.com"
 	}
 	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-		return "https://" + url
+		url = "https://" + url
 	}
-	return url
+
+	return strings.TrimSuffix(url, "/")
 }
 
 func (g *GitLab) Actions() []core.Action {

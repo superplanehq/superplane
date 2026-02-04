@@ -329,6 +329,7 @@ func Test__GitLab__BaseURLNormalization(t *testing.T) {
 		{"gitlab.com", "https://gitlab.com"},
 		{"http://gitlab.com", "http://gitlab.com"},
 		{"https://gitlab.com", "https://gitlab.com"},
+		{"https://gitlab.com/", "https://gitlab.com"},
 		{"", "https://gitlab.com"},
 	}
 
