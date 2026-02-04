@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -164,6 +165,27 @@ func (c *Client) ListPipelines(projectID string) ([]any, error) {
 	err = json.Unmarshal(response, &pipelines)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return pipelines, nil
+}
+
+// ListPipelinesWithParams retrieves pipelines with query parameters for filtering
+func (c *Client) ListPipelinesWithParams(params url.Values) ([]Pipeline, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/pipelines", c.OrgURL)
+	if len(params) > 0 {
+		URL += "?" + params.Encode()
+	}
+
+	responseBody, err := c.execRequest(http.MethodGet, URL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var pipelines []Pipeline
+	err = json.Unmarshal(responseBody, &pipelines)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling pipelines response: %v", err)
 	}
 
 	return pipelines, nil
