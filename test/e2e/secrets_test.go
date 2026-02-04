@@ -99,39 +99,34 @@ func (s *SecretsSteps) visitSecretsPage() {
 func (s *SecretsSteps) clickCreateSecret() {
 	page := s.session.Page()
 	createBtn := page.GetByTestId("secrets-create-btn")
-	if err := createBtn.First().Click(); err != nil {
-		s.t.Fatalf("clicking create secret button: %v", err)
-	}
+	err := createBtn.First().Click()
+	require.NoError(s.t, err)
 	s.session.Sleep(500)
 }
 
 func (s *SecretsSteps) fillSecretName(name string) {
 	page := s.session.Page()
-	if err := page.GetByTestId("secrets-create-name").Fill(name); err != nil {
-		s.t.Fatalf("filling secret name: %v", err)
-	}
+	err := page.GetByTestId("secrets-create-name").Fill(name)
+	require.NoError(s.t, err)
 	s.session.Sleep(300)
 }
 
 func (s *SecretsSteps) fillKeyValuePair(index int, key, value string) {
 	page := s.session.Page()
 	keyInput := page.GetByTestId("secrets-create-key").Nth(index)
-	if err := keyInput.Fill(key); err != nil {
-		s.t.Fatalf("filling key at index %d: %v", index, err)
-	}
+	err := keyInput.Fill(key)
+	require.NoError(s.t, err)
 	s.session.Sleep(200)
 	valueTextarea := page.GetByTestId("secrets-create-value").Nth(index)
-	if err := valueTextarea.Fill(value); err != nil {
-		s.t.Fatalf("filling value at index %d: %v", index, err)
-	}
+	err = valueTextarea.Fill(value)
+	require.NoError(s.t, err)
 	s.session.Sleep(200)
 }
 
 func (s *SecretsSteps) clickAddPair() {
 	page := s.session.Page()
-	if err := page.GetByTestId("secrets-create-add-pair").Click(); err != nil {
-		s.t.Fatalf("clicking Add Pair: %v", err)
-	}
+	err := page.GetByTestId("secrets-create-add-pair").Click()
+	require.NoError(s.t, err)
 	s.session.Sleep(300)
 }
 
@@ -139,34 +134,29 @@ func (s *SecretsSteps) clickAddPair() {
 func (s *SecretsSteps) clickAddKey() {
 	page := s.session.Page()
 	addKeyBtn := page.GetByTestId("secret-detail-add-key")
-	if err := addKeyBtn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible}); err != nil {
-		s.t.Fatalf("waiting for Add key button: %v", err)
-	}
-	if err := addKeyBtn.Click(); err != nil {
-		s.t.Fatalf("clicking Add key button: %v", err)
-	}
+	err := addKeyBtn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible})
+	require.NoError(s.t, err)
+	err = addKeyBtn.Click()
+	require.NoError(s.t, err)
 	s.session.Sleep(300)
 }
 
 // fillAddKeyForm fills the key name and value in the add-key form on the secret detail page.
 func (s *SecretsSteps) fillAddKeyForm(key, value string) {
 	page := s.session.Page()
-	if err := page.GetByTestId("secret-detail-add-key-name").Fill(key); err != nil {
-		s.t.Fatalf("filling add-key form key: %v", err)
-	}
+	err := page.GetByTestId("secret-detail-add-key-name").Fill(key)
+	require.NoError(s.t, err)
 	s.session.Sleep(200)
-	if err := page.GetByTestId("secret-detail-add-value").Fill(value); err != nil {
-		s.t.Fatalf("filling add-key form value: %v", err)
-	}
+	err = page.GetByTestId("secret-detail-add-value").Fill(value)
+	require.NoError(s.t, err)
 	s.session.Sleep(200)
 }
 
 // submitAddKey clicks Save in the add-key form on the secret detail page.
 func (s *SecretsSteps) submitAddKey() {
 	page := s.session.Page()
-	if err := page.GetByTestId("secret-detail-add-save").Click(); err != nil {
-		s.t.Fatalf("clicking Save in add-key form: %v", err)
-	}
+	err := page.GetByTestId("secret-detail-add-save").Click()
+	require.NoError(s.t, err)
 	s.session.Sleep(500)
 }
 
@@ -174,9 +164,8 @@ func (s *SecretsSteps) submitAddKey() {
 func (s *SecretsSteps) clickRemoveKeyOnDetail(index int) {
 	page := s.session.Page()
 	removeBtn := page.GetByTestId("secret-detail-remove-key").Nth(index)
-	if err := removeBtn.Click(); err != nil {
-		s.t.Fatalf("clicking Remove key at index %d: %v", index, err)
-	}
+	err := removeBtn.Click()
+	require.NoError(s.t, err)
 	s.session.Sleep(500)
 }
 
@@ -184,30 +173,26 @@ func (s *SecretsSteps) clickRemoveKeyOnDetail(index int) {
 func (s *SecretsSteps) clickEditKeyOnDetail(index int) {
 	page := s.session.Page()
 	editBtn := page.GetByTestId("secret-detail-edit-key").Nth(index)
-	if err := editBtn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible}); err != nil {
-		s.t.Fatalf("waiting for Edit value button at index %d: %v", index, err)
-	}
-	if err := editBtn.Click(); err != nil {
-		s.t.Fatalf("clicking Edit value at index %d: %v", index, err)
-	}
+	err := editBtn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible})
+	require.NoError(s.t, err)
+	err = editBtn.Click()
+	require.NoError(s.t, err)
 	s.session.Sleep(300)
 }
 
 // fillEditingValue fills the value textarea in the edit form on the secret detail page.
 func (s *SecretsSteps) fillEditingValue(value string) {
 	page := s.session.Page()
-	if err := page.GetByTestId("secret-detail-edit-value").Fill(value); err != nil {
-		s.t.Fatalf("filling editing value: %v", err)
-	}
+	err := page.GetByTestId("secret-detail-edit-value").Fill(value)
+	require.NoError(s.t, err)
 	s.session.Sleep(200)
 }
 
 // submitEditKey clicks Save in the edit form on the secret detail page.
 func (s *SecretsSteps) submitEditKey() {
 	page := s.session.Page()
-	if err := page.GetByTestId("secret-detail-edit-save").Click(); err != nil {
-		s.t.Fatalf("clicking Save in edit form: %v", err)
-	}
+	err := page.GetByTestId("secret-detail-edit-save").Click()
+	require.NoError(s.t, err)
 	s.session.Sleep(500)
 }
 
@@ -215,51 +200,44 @@ func (s *SecretsSteps) submitEditKey() {
 func (s *SecretsSteps) clickEditSecretName() {
 	page := s.session.Page()
 	editNameBtn := page.GetByTestId("secret-detail-edit-name")
-	if err := editNameBtn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible}); err != nil {
-		s.t.Fatalf("waiting for Edit secret name button: %v", err)
-	}
-	if err := editNameBtn.Click(); err != nil {
-		s.t.Fatalf("clicking Edit secret name button: %v", err)
-	}
+	err := editNameBtn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible})
+	require.NoError(s.t, err)
+	err = editNameBtn.Click()
+	require.NoError(s.t, err)
 	s.session.Sleep(300)
 }
 
 // fillSecretNameInput fills the secret name input in the inline edit form on the secret detail page.
 func (s *SecretsSteps) fillSecretNameInput(name string) {
 	page := s.session.Page()
-	if err := page.GetByTestId("secret-detail-edit-name-input").Fill(name); err != nil {
-		s.t.Fatalf("filling secret name input: %v", err)
-	}
+	err := page.GetByTestId("secret-detail-edit-name-input").Fill(name)
+	require.NoError(s.t, err)
 	s.session.Sleep(200)
 }
 
 // submitEditSecretName clicks Save in the secret name edit form on the secret detail page.
 func (s *SecretsSteps) submitEditSecretName() {
 	page := s.session.Page()
-	if err := page.GetByTestId("secret-detail-edit-name-save").Click(); err != nil {
-		s.t.Fatalf("clicking Save in secret name edit form: %v", err)
-	}
+	err := page.GetByTestId("secret-detail-edit-name-save").Click()
+	require.NoError(s.t, err)
 	s.session.Sleep(500)
 }
 
 func (s *SecretsSteps) removeKeyValuePair(index int) {
 	page := s.session.Page()
-	if err := page.GetByTestId("secrets-create-remove-pair").Nth(index).Click(); err != nil {
-		s.t.Fatalf("clicking remove pair at index %d: %v", index, err)
-	}
+	err := page.GetByTestId("secrets-create-remove-pair").Nth(index).Click()
+	require.NoError(s.t, err)
 	s.session.Sleep(300)
 }
 
 func (s *SecretsSteps) submitCreateSecret() {
 	page := s.session.Page()
 	createBtn := page.GetByTestId("secrets-create-submit")
-	if err := createBtn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible}); err != nil {
-		s.t.Fatalf("waiting for create secret button: %v", err)
-	}
+	err := createBtn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible})
+	require.NoError(s.t, err)
 	s.session.Sleep(300)
-	if err := createBtn.Click(); err != nil {
-		s.t.Fatalf("clicking submit create secret button: %v", err)
-	}
+	err = createBtn.Click()
+	require.NoError(s.t, err)
 
 	// Wait for the modal to close (indicating success) or for an error message
 	// The modal has class "fixed inset-0", so we wait for it to disappear
@@ -294,18 +272,16 @@ func (s *SecretsSteps) clickEditSecret(secretName string) {
 	s.visitSecretsPage()
 	page := s.session.Page()
 	link := page.GetByTestId("secrets-secret-link").GetByText(secretName, pw.LocatorGetByTextOptions{Exact: pw.Bool(true)})
-	if err := link.Click(); err != nil {
-		s.t.Fatalf("clicking secret link for %q: %v", secretName, err)
-	}
+	err := link.Click()
+	require.NoError(s.t, err)
 	s.session.Sleep(500)
 }
 
 func (s *SecretsSteps) clickDeleteSecret(secretName string) {
 	s.clickEditSecret(secretName)
 	page := s.session.Page()
-	if err := page.GetByTestId("secret-detail-delete").Click(); err != nil {
-		s.t.Fatalf("clicking delete button for secret %q: %v", secretName, err)
-	}
+	err := page.GetByTestId("secret-detail-delete").Click()
+	require.NoError(s.t, err)
 	s.session.Sleep(500)
 }
 
