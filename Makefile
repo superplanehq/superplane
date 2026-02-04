@@ -23,7 +23,7 @@ GOTESTSUM=docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_t
 #
 
 lint:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app revive -formatter friendly -config lint.toml ./...
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app revive -formatter friendly -config lint.toml -exclude ./tmp/... ./...
 
 tidy:
 	docker compose $(DOCKER_COMPOSE_OPTS) exec app go mod tidy
@@ -77,10 +77,10 @@ setup.playwright:
 #
 
 format.go:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app gofmt -s -w .
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "find . -name '*.go' -not -path './tmp/*' -print0 | xargs -0 gofmt -s -w"
 
 format.go.check:
-	docker compose $(DOCKER_COMPOSE_OPTS) exec app gofmt -s -l . | tee /dev/stderr | if read; then exit 1; else exit 0; fi
+	docker compose $(DOCKER_COMPOSE_OPTS) exec app bash -c "find . -name '*.go' -not -path './tmp/*' -print0 | xargs -0 gofmt -s -l | tee /dev/stderr | if read; then exit 1; else exit 0; fi"
 
 format.js:
 	cd web_src && npm run format
