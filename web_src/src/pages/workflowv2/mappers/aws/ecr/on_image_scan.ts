@@ -1,6 +1,5 @@
-import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { TriggerRenderer } from "../../types";
+import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
 import { TriggerProps } from "@/ui/trigger";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import { EcrImageScanEvent, EcrTriggerConfiguration, EcrTriggerMetadata } from "./types";
@@ -13,20 +12,20 @@ import { numberOrZero, stringOrDash } from "../../utils";
  * Renderer for the "aws.ecr.onImageScan" trigger
  */
 export const onImageScanTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as EcrImageScanEvent;
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+    const eventData = context.event?.data as EcrImageScanEvent;
     const detail = eventData?.detail;
     const repository = getRepositoryLabel(undefined, undefined, detail?.["repository-name"]);
     const tagLabel = formatTagLabel(detail?.["image-tags"]);
 
     const title = repository ? `${repository}${tagLabel ? `:${tagLabel}` : ""}` : "ECR image scan";
-    const subtitle = event.createdAt ? formatTimeAgo(new Date(event.createdAt)) : "";
+    const subtitle = context.event?.createdAt ? formatTimeAgo(new Date(context.event?.createdAt || "")) : "";
 
     return { title, subtitle };
   },
 
-  getRootEventValues: (event: CanvasesCanvasEvent): Record<string, string> => {
-    const eventData = event.data?.data as EcrImageScanEvent;
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
+    const eventData = context.event?.data as EcrImageScanEvent;
     const detail = eventData?.detail as EcrImageScanDetail;
 
     let values: Record<string, string> = {
@@ -49,26 +48,27 @@ export const onImageScanTriggerRenderer: TriggerRenderer = {
     return values;
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
+  getTriggerProps: (context: TriggerRendererContext) => {
+    const { node, definition, lastEvent } = context;
     const metadata = node.metadata as EcrTriggerMetadata | undefined;
     const configuration = node.configuration as EcrTriggerConfiguration | undefined;
     const metadataItems = buildRepositoryMetadataItems(metadata, configuration);
 
     const props: TriggerProps = {
-      title: node.name!,
+      title: node.name || definition.label || "Unnamed trigger",
       iconSrc: awsEcrIcon,
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: metadataItems,
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onImageScanTriggerRenderer.getTitleAndSubtitle(lastEvent);
+      const { title, subtitle } = onImageScanTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
       props.lastEventData = {
         title,
         subtitle,
-        receivedAt: new Date(lastEvent.createdAt!),
+        receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
-        eventId: lastEvent.id!,
+        eventId: lastEvent.id,
       };
     }
 

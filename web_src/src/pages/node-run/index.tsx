@@ -8,6 +8,7 @@ import { useChildExecutions, useCanvas } from "@/hooks/useCanvasData";
 import { getTriggerRenderer } from "@/pages/workflowv2/mappers";
 import { CanvasEdge, CanvasNode, CanvasPage } from "@/ui/CanvasPage";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { buildEventInfo } from "../workflowv2/utils";
 
 export function NodeRunPage() {
   const { organizationId, canvasId, nodeId, executionId } = useParams();
@@ -185,7 +186,7 @@ function useBreadcrumbs() {
     const rootNode = canvas?.spec?.nodes?.find((n) => n.id === selectedExecution.rootEvent?.nodeId);
     const renderer = getTriggerRenderer(rootNode?.trigger?.name || "");
     if (selectedExecution.rootEvent) {
-      return renderer.getTitleAndSubtitle(selectedExecution.rootEvent).title;
+      return renderer.getTitleAndSubtitle({ event: buildEventInfo(selectedExecution.rootEvent!) }).title;
     }
     return "Execution";
   })();
