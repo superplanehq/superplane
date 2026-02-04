@@ -10,6 +10,7 @@ import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import { formatTimeAgo } from "@/utils/date";
+import { formatTimestampInUserTimezone } from "@/utils/timezone";
 import { MetadataItem } from "@/ui/metadataList";
 import { EcrImageScanFindingsResponse, EcrRepositoryConfiguration, EcrRepositoryMetadata } from "./types";
 import { getRepositoryLabel } from "./utils";
@@ -55,7 +56,12 @@ export const getImageScanFindingsMapper: ComponentBaseMapper = {
       "Image Tag": stringOrDash(result.imageId?.imageTag),
       "Scan Status": stringOrDash(result.imageScanStatus?.status),
       "Status Description": stringOrDash(result.imageScanStatus?.description),
-      "Scan Completed At": formatDate(result.imageScanFindings?.imageScanCompletedAt),
+      "Scan Completed At": result.imageScanFindings?.imageScanCompletedAt
+        ? formatTimestampInUserTimezone(result.imageScanFindings.imageScanCompletedAt)
+        : "-",
+      "Vulnerability Source Updated At": result.imageScanFindings?.vulnerabilitySourceUpdatedAt
+        ? formatTimestampInUserTimezone(result.imageScanFindings.vulnerabilitySourceUpdatedAt)
+        : "-",
       "Findings Count": numberOrZero(result.imageScanFindings?.findings?.length).toString(),
       Critical: numberOrZero(counts.CRITICAL).toString(),
       High: numberOrZero(counts.HIGH).toString(),
@@ -104,15 +110,4 @@ function getScanEventSections(
       eventId: execution.rootEvent!.id!,
     },
   ];
-}
-
-function formatDate(value?: string): string {
-  if (!value) {
-    return "-";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "-";
-  }
-  return date.toLocaleString();
 }
