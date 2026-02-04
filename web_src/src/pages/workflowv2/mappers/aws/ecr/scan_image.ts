@@ -10,6 +10,7 @@ import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import { formatTimeAgo } from "@/utils/date";
+import { formatTimestampInUserTimezone } from "@/utils/timezone";
 import { MetadataItem } from "@/ui/metadataList";
 import { EcrImageScanFindingsResponse, EcrRepositoryConfiguration, EcrRepositoryMetadata } from "./types";
 import { getRepositoryLabel } from "./utils";
@@ -53,6 +54,12 @@ export const scanImageMapper: ComponentBaseMapper = {
       Repository: stringOrDash(result.repositoryName),
       "Image Digest": stringOrDash(result.imageId?.imageDigest),
       "Scan Status": stringOrDash(result.imageScanStatus?.status),
+      "Scan Completed At": result.imageScanFindings?.imageScanCompletedAt
+        ? formatTimestampInUserTimezone(result.imageScanFindings.imageScanCompletedAt)
+        : "-",
+      "Vulnerability Source Updated At": result.imageScanFindings?.vulnerabilitySourceUpdatedAt
+        ? formatTimestampInUserTimezone(result.imageScanFindings.vulnerabilitySourceUpdatedAt)
+        : "-",
       "Total Findings": numberOrZero(result.imageScanFindings?.findings?.length).toString(),
       Critical: numberOrZero(counts.CRITICAL).toString(),
       High: numberOrZero(counts.HIGH).toString(),
