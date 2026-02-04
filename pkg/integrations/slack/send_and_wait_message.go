@@ -13,6 +13,10 @@ import (
 
 type SendAndWaitMessage struct{}
 
+type SendAndWaitMessageMetadata struct {
+	Channel *ChannelMetadata `json:"channel" mapstructure:"channel"`
+}
+
 type SendAndWaitMessageConfiguration struct {
 	Channel string   `json:"channel" mapstructure:"channel"`
 	Message string   `json:"message" mapstructure:"message"`
@@ -93,6 +97,10 @@ func (c *SendAndWaitMessage) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	if config.Channel == "" {
+		return fmt.Errorf("channel is required")
+	}
+
 	if len(config.Buttons) == 0 {
 		return fmt.Errorf("at least one button must be configured")
 	}
@@ -101,7 +109,28 @@ func (c *SendAndWaitMessage) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("a maximum of 4 buttons can be configured")
 	}
 
-	_, err := ctx.Integration.Subscribe(SubscriptionConfiguration{
+	client, err := NewClient(ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create Slack client: %w", err)
+	}
+
+	channelInfo, err := client.GetChannelInfo(config.Channel)
+	if err != nil {
+		return fmt.Errorf("channel validation failed: %w", err)
+	}
+
+	metadata := SendAndWaitMessageMetadata{
+		Channel: &ChannelMetadata{
+			ID:   channelInfo.ID,
+			Name: channelInfo.Name,
+		},
+	}
+
+	if err := ctx.Metadata.Set(metadata); err != nil {
+		return fmt.Errorf("failed to set metadata: %w", err)
+	}
+
+	_, err = ctx.Integration.Subscribe(SubscriptionConfiguration{
 		EventTypes: []string{"interaction"},
 	})
 	return err
@@ -133,7 +162,8 @@ func (c *SendAndWaitMessage) Execute(ctx core.ExecutionContext) error {
 				"type": "plain_text",
 				"text": b.Name,
 			},
-			"value": fmt.Sprintf("sp_exec:%s:%s", ctx.ID.String(), b.Value),
+			"action_id": fmt.Sprintf("button_%d", i),
+			"value":     fmt.Sprintf("sp_exec:%s:%s", ctx.ID.String(), b.Value),
 		})
 	}
 
