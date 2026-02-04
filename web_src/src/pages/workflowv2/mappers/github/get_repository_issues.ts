@@ -1,12 +1,11 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
 import {
-  ComponentBaseContext,
-  ComponentBaseMapper,
-  ExecutionDetailsContext,
-  NodeInfo,
-  OutputPayload,
-  SubtitleContext,
-} from "../types";
+  ComponentsNode,
+  ComponentsComponent,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
+} from "@/api-client";
+import { ComponentBaseProps } from "@/ui/componentBase";
+import { ComponentBaseMapper, OutputPayload } from "../types";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
 import { MetadataItem } from "@/ui/metadataList";
@@ -33,9 +32,18 @@ interface IssueOutput {
   }>;
 }
 
-function getRepositoryIssuesMetadataList(node: NodeInfo): MetadataItem[] {
+interface GetRepositoryIssuesConfiguration {
+  repository?: string;
+  state?: string;
+  labels?: string;
+  sort?: string;
+  direction?: string;
+  perPage?: number;
+}
+
+function getRepositoryIssuesMetadataList(node: ComponentsNode): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as { repository?: string; state?: string; labels?: string } | undefined;
+  const configuration = node.configuration as GetRepositoryIssuesConfiguration | undefined;
   const nodeMetadata = node.metadata as { repository?: { name?: string } } | undefined;
 
   if (nodeMetadata?.repository?.name) {
@@ -54,30 +62,36 @@ function getRepositoryIssuesMetadataList(node: NodeInfo): MetadataItem[] {
 }
 
 export const getRepositoryIssuesMapper: ComponentBaseMapper = {
-  props(context: ComponentBaseContext): ComponentBaseProps {
-    const base = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+  props(
+    nodes: ComponentsNode[],
+    node: ComponentsNode,
+    componentDefinition: ComponentsComponent,
+    lastExecutions: CanvasesCanvasNodeExecution[],
+    queueItems: CanvasesCanvasNodeQueueItem[],
+  ): ComponentBaseProps {
+    const base = baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
 
     return {
       ...base,
-      metadata: getRepositoryIssuesMetadataList(context.node),
+      metadata: getRepositoryIssuesMetadataList(node),
     };
   },
-  subtitle(context: SubtitleContext): string {
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
+    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
     if (outputs?.default && Array.isArray(outputs.default[0]?.data)) {
       const issues = outputs.default[0].data as IssueOutput[];
       const count = issues.length;
-      return buildGithubExecutionSubtitle(context.execution, `${count} issue${count !== 1 ? "s" : ""}`);
+      return buildGithubExecutionSubtitle(execution, `${count} issue${count !== 1 ? "s" : ""}`);
     }
-    return buildGithubExecutionSubtitle(context.execution);
+    return buildGithubExecutionSubtitle(execution);
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
+    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
     const details: Record<string, string> = {};
 
     Object.assign(details, {
-      "Retrieved At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",
+      "Retrieved At": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : "-",
     });
 
     if (outputs?.default && Array.isArray(outputs.default[0]?.data)) {
