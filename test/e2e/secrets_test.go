@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"sort"
 	"testing"
 
 	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/secrets"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 )
@@ -21,7 +21,10 @@ func TestSecrets(t *testing.T) {
 	t.Run("creating a new secret", func(t *testing.T) {
 		steps.start()
 		steps.visitSecretsPage()
-		steps.givenASecretExists("E2E Test Secret", map[string]string{"API_KEY": "test-api-key-value"})
+		steps.clickCreateSecret()
+		steps.fillSecretName("E2E Test Secret")
+		steps.fillKeyValuePair(0, "API_KEY", "test-api-key-value")
+		steps.submitCreateSecret()
 		steps.assertSecretSavedInDB("E2E Test Secret", map[string]string{"API_KEY": "test-api-key-value"})
 		steps.assertSecretVisibleInList("E2E Test Secret")
 	})
@@ -58,7 +61,6 @@ func TestSecrets(t *testing.T) {
 		steps.start()
 		steps.visitSecretsPage()
 		steps.givenASecretExists("E2E Test Secret 5", map[string]string{"KEY1": "value1"})
-		steps.clickEditSecret("E2E Test Secret 5")
 		steps.clickEditSecretName()
 		steps.fillSecretNameInput("E2E Test Secret 5 Renamed")
 		steps.submitEditSecretName()
@@ -358,21 +360,15 @@ func encryptorFromEnv() crypto.Encryptor {
 	return crypto.NewAESGCMEncryptor([]byte(key))
 }
 
-// givenASecretExists creates a secret via the UI: Create Secret modal, name, key/value pairs, submit.
-// Call after visitSecretsPage(). Keys are filled in sorted order so row indices are deterministic.
+// givenASecretExists creates a secret directly in the DB (same format as app), then opens the secret detail page.
+// Call after visitSecretsPage(); leaves the user on the secret detail page.
 func (s *SecretsSteps) givenASecretExists(name string, data map[string]string) {
-	s.clickCreateSecret()
-	s.fillSecretName(name)
-	keys := make([]string, 0, len(data))
-	for k := range data {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for i, k := range keys {
-		if i > 0 {
-			s.clickAddPair()
-		}
-		s.fillKeyValuePair(i, k, data[k])
-	}
-	s.submitCreateSecret()
+	encryptor := encryptorFromEnv()
+	raw, err := json.Marshal(data)
+	require.NoError(s.t, err)
+	encrypted, err := encryptor.Encrypt(context.Background(), raw, []byte(name))
+	require.NoError(s.t, err)
+	_, err = models.CreateSecret(name, secrets.ProviderLocal, s.session.Account.ID.String(), models.DomainTypeOrganization, s.session.OrgID, encrypted)
+	require.NoError(s.t, err)
+	s.clickEditSecret(name)
 }
