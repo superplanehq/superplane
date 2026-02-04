@@ -169,6 +169,16 @@ func (c *Client) ListPipelines(projectID string) ([]any, error) {
 	return pipelines, nil
 }
 
+func (c *Client) GetJobLogs(jobID string) (string, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/jobs/%s/logs", c.OrgURL, jobID)
+	responseBody, err := c.execRequest(http.MethodGet, URL, nil)
+	if err != nil {
+		return "", err
+	}
+
+	return string(responseBody), nil
+}
+
 type CreateWorkflowResponse struct {
 	WorkflowID string `json:"workflow_id"`
 	PipelineID string `json:"pipeline_id"`
