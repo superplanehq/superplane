@@ -5,11 +5,7 @@ import {
   CanvasesCanvasNodeQueueItem,
 } from "@/api-client";
 import { ComponentBaseMapper, OutputPayload } from "../types";
-import {
-  ComponentBaseProps,
-  DEFAULT_EVENT_STATE_MAP,
-  EventSection,
-} from "@/ui/componentBase";
+import { ComponentBaseProps, DEFAULT_EVENT_STATE_MAP, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
 import { getTriggerRenderer } from "..";
