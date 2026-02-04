@@ -40,6 +40,10 @@ export const createIssueMapper: ComponentBaseMapper = {
       return details;
     }
 
+    if (!outputs.default[0].data) {
+      return details;
+    }
+
     const issue = outputs.default[0].data as Issue;
     return { ...getDetailsForIssue(issue), ...details };
   },

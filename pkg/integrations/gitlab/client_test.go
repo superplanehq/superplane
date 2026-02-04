@@ -231,3 +231,38 @@ func Test__Client__CreateIssue(t *testing.T) {
 		assert.Equal(t, "https://gitlab.com/api/v4/projects/1/issues", mockClient.Requests[0].URL.String())
 	})
 }
+
+func Test__Client__ListGroupMembers(t *testing.T) {
+	t.Run("pagination", func(t *testing.T) {
+		resp1 := GitlabMockResponse(http.StatusOK, `[{"id": 1, "username": "user1"}]`)
+		resp1.Header.Set("X-Next-Page", "2")
+
+		resp2 := GitlabMockResponse(http.StatusOK, `[{"id": 2, "username": "user2"}]`)
+
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				resp1,
+				resp2,
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		members, err := client.ListGroupMembers("123")
+		require.NoError(t, err)
+
+		require.Len(t, mockClient.Requests, 2)
+		assert.Equal(t, "https://gitlab.com/api/v4/groups/123/members?per_page=100&page=1", mockClient.Requests[0].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/groups/123/members?per_page=100&page=2", mockClient.Requests[1].URL.String())
+
+		require.Len(t, members, 2)
+		assert.Equal(t, "user1", members[0].Username)
+		assert.Equal(t, "user2", members[1].Username)
+	})
+}

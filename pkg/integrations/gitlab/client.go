@@ -229,28 +229,49 @@ func (c *Client) getCurrentUser() (*User, error) {
 }
 
 func (c *Client) ListGroupMembers(groupID string) ([]User, error) {
-	apiURL := fmt.Sprintf("%s/api/%s/groups/%s/members", c.baseURL, apiVersion, url.PathEscape(groupID))
+	allMembers := []User{}
+	page := 1
+
+	for {
+		members, nextPage, err := c.fetchGroupMembersPage(groupID, page)
+		if err != nil {
+			return nil, err
+		}
+
+		allMembers = append(allMembers, members...)
+
+		if nextPage == "" {
+			break
+		}
+		page++
+	}
+
+	return allMembers, nil
+}
+
+func (c *Client) fetchGroupMembersPage(groupID string, page int) ([]User, string, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/groups/%s/members?per_page=100&page=%d", c.baseURL, apiVersion, url.PathEscape(groupID), page)
 	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	resp, err := c.do(req)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to list group members: status %d", resp.StatusCode)
+		return nil, "", fmt.Errorf("failed to list group members: status %d", resp.StatusCode)
 	}
 
 	var members []User
 	if err := json.NewDecoder(resp.Body).Decode(&members); err != nil {
-		return nil, fmt.Errorf("failed to decode members: %v", err)
+		return nil, "", fmt.Errorf("failed to decode members: %v", err)
 	}
 
-	return members, nil
+	return members, resp.Header.Get("X-Next-Page"), nil
 }
 
 func (c *Client) FetchIntegrationData() (*User, []Project, error) {

@@ -424,6 +424,7 @@ func (g *GitLab) handleCallback(ctx core.HTTPRequestContext, config *Configurati
 	tokenResponse, err := auth.HandleCallback(ctx.Request, config, metadata.State, redirectURI)
 
 	if err != nil {
+		ctx.Logger.Errorf("Callback error: %v", err)
 		http.Redirect(ctx.Response, ctx.Request,
 			fmt.Sprintf("%s/%s/settings/integrations/%s", redirectBaseURL, ctx.OrganizationID, ctx.Integration.ID().String()),
 			http.StatusSeeOther)
