@@ -65,10 +65,10 @@ export const sendAndWaitMessageMapper: ComponentBaseMapper = {
     }
 
     if (outputs?.timeout && outputs.timeout.length > 0) {
-        return {
-            Status: "Timed Out",
-            "Timed Out At": execution.updatedAt ? new Date(execution.updatedAt).toLocaleString() : "-",
-        };
+      return {
+        Status: "Timed Out",
+        "Timed Out At": execution.updatedAt ? new Date(execution.updatedAt).toLocaleString() : "-",
+      };
     }
 
     return {
@@ -92,7 +92,7 @@ function sendAndWaitMessageMetadataList(node: ComponentsNode): MetadataItem[] {
   }
 
   if (configuration?.timeout) {
-      metadata.push({ icon: "clock", label: `${configuration.timeout}s timeout` });
+    metadata.push({ icon: "clock", label: `${configuration.timeout}s timeout` });
   }
 
   return metadata;
@@ -113,13 +113,13 @@ function sendAndWaitMessageSpecs(node: ComponentsNode): ComponentBaseSpec[] {
   }
 
   if (configuration?.buttons && configuration.buttons.length > 0) {
-      specs.push({
-          title: "buttons",
-          tooltipTitle: "buttons",
-          iconSlug: "list",
-          value: configuration.buttons.map(b => b.name).join(", "),
-          contentType: "text",
-      });
+    specs.push({
+      title: "buttons",
+      tooltipTitle: "buttons",
+      iconSlug: "list",
+      value: configuration.buttons.map((b) => b.name).join(", "),
+      contentType: "text",
+    });
   }
 
   return specs;
