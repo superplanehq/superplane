@@ -20,7 +20,7 @@ export const onPackageVersionTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
     const eventData = event.data?.data as CodeArtifactPackageVersionEvent;
     const detail = eventData?.detail;
-    const packageLabel = formatPackageLabel(undefined, undefined, detail);
+    const packageLabel = formatPackageLabel(detail);
 
     const title = packageLabel || "CodeArtifact package version";
     const subtitle = event.createdAt ? formatTimeAgo(new Date(event.createdAt)) : "";

@@ -34,7 +34,6 @@ type PackageVersionDescription struct {
 	Namespace            string                `json:"namespace"`
 	Origin               *PackageVersionOrigin `json:"origin"`
 	PackageName          string                `json:"packageName"`
-	PublishedTime        float64               `json:"publishedTime"`
 	Revision             string                `json:"revision"`
 	SourceCodeRepository string                `json:"sourceCodeRepository"`
 	Status               string                `json:"status"`
@@ -63,7 +62,6 @@ type DescribePackageVersionResponse struct {
 
 type DescribePackageVersionInput struct {
 	Domain         string
-	DomainOwner    string
 	Repository     string
 	Format         string
 	Namespace      string
@@ -233,16 +231,15 @@ func (c *Client) DescribePackageVersion(input DescribePackageVersionInput) (*Pac
 
 	query := url.Values{}
 	query.Set("domain", input.Domain)
-	if strings.TrimSpace(input.DomainOwner) != "" {
-		query.Set("domain-owner", strings.TrimSpace(input.DomainOwner))
-	}
 	query.Set("format", input.Format)
-	if strings.TrimSpace(input.Namespace) != "" {
-		query.Set("namespace", strings.TrimSpace(input.Namespace))
-	}
 	query.Set("package", input.Package)
 	query.Set("repository", input.Repository)
 	query.Set("version", input.PackageVersion)
+
+	if strings.TrimSpace(input.Namespace) != "" {
+		query.Set("namespace", strings.TrimSpace(input.Namespace))
+	}
+
 	req.URL.RawQuery = query.Encode()
 
 	if err := c.signRequest(req, []byte{}); err != nil {

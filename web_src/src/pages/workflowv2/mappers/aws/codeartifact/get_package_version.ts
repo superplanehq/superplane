@@ -57,15 +57,11 @@ export const getPackageVersionMapper: ComponentBaseMapper = {
       Format: stringOrDash(result.format),
       Status: stringOrDash(result.status),
       Revision: stringOrDash(result.revision),
-      "Published At": formatPublishedTime(result.publishedTime),
       "Display Name": stringOrDash(result.displayName),
       Summary: stringOrDash(result.summary),
+      Licenses: formatLicenses(result.licenses),
       "Home Page": stringOrDash(result.homePage),
       "Source Code": stringOrDash(result.sourceCodeRepository),
-      Licenses: formatLicenses(result.licenses),
-      "Origin Type": stringOrDash(result.origin?.originType),
-      "Origin Repository": stringOrDash(result.origin?.domainEntryPoint?.repositoryName),
-      "Origin External Connection": stringOrDash(result.origin?.domainEntryPoint?.externalConnectionName),
     };
   },
 
@@ -100,20 +96,6 @@ function getPackageVersionEventSections(
       eventId: execution.rootEvent!.id!,
     },
   ];
-}
-
-function formatPublishedTime(value?: number): string {
-  if (!value) {
-    return "-";
-  }
-
-  const normalized = value < 1_000_000_000_000 ? value * 1000 : value;
-  const date = new Date(normalized);
-  if (Number.isNaN(date.getTime())) {
-    return "-";
-  }
-
-  return date.toLocaleString();
 }
 
 function formatLicenses(licenses?: CodeArtifactPackageLicense[]): string {

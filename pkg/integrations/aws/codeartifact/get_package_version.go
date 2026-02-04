@@ -75,7 +75,8 @@ func (c *GetPackageVersion) Configuration() []configuration.Field {
 			Required: true,
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: "codeartifact.domain",
+					Type:           "codeartifact.domain",
+					UseNameAsValue: true,
 				},
 			},
 		},
@@ -86,13 +87,20 @@ func (c *GetPackageVersion) Configuration() []configuration.Field {
 			Required: true,
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: "codeartifact.repository",
+					Type:           "codeartifact.repository",
+					UseNameAsValue: true,
 				},
 			},
 		},
 		{
 			Name:     "package",
 			Label:    "Package",
+			Type:     configuration.FieldTypeString,
+			Required: true,
+		},
+		{
+			Name:     "version",
+			Label:    "Version",
 			Type:     configuration.FieldTypeString,
 			Required: true,
 		},
@@ -107,12 +115,6 @@ func (c *GetPackageVersion) Configuration() []configuration.Field {
 			Label:    "Namespace",
 			Type:     configuration.FieldTypeString,
 			Required: false,
-		},
-		{
-			Name:     "version",
-			Label:    "Version",
-			Type:     configuration.FieldTypeString,
-			Required: true,
 		},
 	}
 }
@@ -146,10 +148,6 @@ func (c *GetPackageVersion) Setup(ctx core.SetupContext) error {
 
 	if config.Version == "" {
 		return fmt.Errorf("version is required")
-	}
-
-	if requiresNamespace(config.Format) && config.Namespace == "" {
-		return fmt.Errorf("namespace is required for format %s", config.Format)
 	}
 
 	return nil
@@ -221,13 +219,4 @@ func (c *GetPackageVersion) normalizeConfig(config GetPackageVersionConfiguratio
 	config.Namespace = strings.TrimSpace(config.Namespace)
 	config.Version = strings.TrimSpace(config.Version)
 	return config
-}
-
-func requiresNamespace(format string) bool {
-	switch strings.ToLower(strings.TrimSpace(format)) {
-	case "maven", "swift", "generic":
-		return true
-	default:
-		return false
-	}
 }

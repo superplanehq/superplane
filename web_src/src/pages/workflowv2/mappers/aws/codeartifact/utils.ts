@@ -1,17 +1,11 @@
 import { MetadataItem } from "@/ui/metadataList";
+import { Predicate, formatPredicate } from "../../utils";
 import {
   CodeArtifactPackageVersionConfiguration,
   CodeArtifactPackageVersionDetail,
   CodeArtifactTriggerConfiguration,
   CodeArtifactTriggerMetadata,
 } from "./types";
-
-function resolveFilters(
-  metadata?: CodeArtifactTriggerMetadata,
-  configuration?: CodeArtifactTriggerConfiguration,
-): CodeArtifactTriggerConfiguration {
-  return metadata?.filters ?? configuration ?? {};
-}
 
 export function formatPackageName(namespace?: string | null, name?: string): string | undefined {
   if (!name) {
@@ -25,21 +19,13 @@ export function formatPackageName(namespace?: string | null, name?: string): str
   return `${namespace}/${name}`;
 }
 
-export function formatPackageLabel(
-  metadata?: CodeArtifactTriggerMetadata,
-  configuration?: CodeArtifactTriggerConfiguration,
-  detail?: CodeArtifactPackageVersionDetail,
-): string | undefined {
-  const filters = resolveFilters(metadata, configuration);
-  const packageName = formatPackageName(
-    filters.packageNamespace ?? detail?.packageNamespace,
-    filters.packageName ?? detail?.packageName,
-  );
+export function formatPackageLabel(detail?: CodeArtifactPackageVersionDetail): string | undefined {
+  const packageName = formatPackageName(detail?.packageNamespace, detail?.packageName);
   if (!packageName) {
     return undefined;
   }
 
-  const version = filters.packageVersion ?? detail?.packageVersion;
+  const version = detail?.packageVersion;
   if (!version) {
     return packageName;
   }
@@ -47,32 +33,49 @@ export function formatPackageLabel(
   return `${packageName}@${version}`;
 }
 
+function formatPredicateList(predicates?: Predicate[]): string | undefined {
+  if (!predicates || predicates.length === 0) {
+    return undefined;
+  }
+
+  const formatted = predicates.map((predicate) => formatPredicate(predicate)).join(", ");
+  return formatted.trim().length > 0 ? formatted : undefined;
+}
+
 export function buildCodeArtifactMetadataItems(
   metadata?: CodeArtifactTriggerMetadata,
   configuration?: CodeArtifactTriggerConfiguration,
 ): MetadataItem[] {
-  const filters = resolveFilters(metadata, configuration);
   const items: MetadataItem[] = [];
 
-  if (filters.domainName) {
+  if (metadata?.repository?.domainName) {
     items.push({
       icon: "database",
-      label: filters.domainName,
+      label: `Domain: ${metadata?.repository?.domainName}`,
     });
   }
 
-  if (filters.repositoryName) {
+  const repositoryLabel = metadata?.repository?.name || configuration?.repository;
+  if (repositoryLabel) {
+    items.push({
+      icon: "boxes",
+      label: `Repository: ${repositoryLabel}`,
+    });
+  }
+
+  const packagesLabel = formatPredicateList(configuration?.packages);
+  if (packagesLabel) {
     items.push({
       icon: "package",
-      label: filters.repositoryName,
+      label: `Packages: ${packagesLabel}`,
     });
   }
 
-  const packageLabel = formatPackageLabel(metadata, configuration);
-  if (packageLabel) {
+  const versionsLabel = formatPredicateList(configuration?.versions);
+  if (versionsLabel) {
     items.push({
       icon: "tag",
-      label: packageLabel,
+      label: `Versions: ${versionsLabel}`,
     });
   }
 
@@ -93,7 +96,7 @@ export function buildCodeArtifactPackageMetadataItems(
 
   if (configuration?.repository) {
     items.push({
-      icon: "package",
+      icon: "boxes",
       label: configuration.repository,
     });
   }
@@ -102,7 +105,7 @@ export function buildCodeArtifactPackageMetadataItems(
   if (packageName) {
     const label = configuration?.version ? `${packageName}@${configuration.version}` : packageName;
     items.push({
-      icon: "tag",
+      icon: "package",
       label,
     });
   }

@@ -1,20 +1,22 @@
+import { Predicate } from "../../utils";
+
+export interface CodeArtifactRepository {
+  name?: string;
+  arn?: string;
+  domainName?: string;
+}
+
 export interface CodeArtifactTriggerConfiguration {
   region?: string;
-  domainName?: string;
-  domainOwner?: string;
-  repositoryName?: string;
-  packageFormat?: string;
-  packageNamespace?: string | null;
-  packageName?: string;
-  packageVersion?: string;
-  packageVersionState?: string;
-  operationType?: string;
+  repository?: string;
+  packages?: Predicate[];
+  versions?: Predicate[];
 }
 
 export interface CodeArtifactTriggerMetadata {
   region?: string;
   subscriptionId?: string;
-  filters?: CodeArtifactTriggerConfiguration;
+  repository?: CodeArtifactRepository;
 }
 
 export interface CodeArtifactPackageVersionChanges {
@@ -65,25 +67,13 @@ export interface CodeArtifactPackageLicense {
   url?: string;
 }
 
-export interface CodeArtifactPackageVersionDomainEntryPoint {
-  externalConnectionName?: string;
-  repositoryName?: string;
-}
-
-export interface CodeArtifactPackageVersionOrigin {
-  domainEntryPoint?: CodeArtifactPackageVersionDomainEntryPoint;
-  originType?: string;
-}
-
 export interface CodeArtifactPackageVersionDescription {
   displayName?: string;
   format?: string;
   homePage?: string;
   licenses?: CodeArtifactPackageLicense[];
   namespace?: string;
-  origin?: CodeArtifactPackageVersionOrigin;
   packageName?: string;
-  publishedTime?: number;
   revision?: string;
   sourceCodeRepository?: string;
   status?: string;

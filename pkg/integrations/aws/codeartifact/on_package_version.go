@@ -88,7 +88,12 @@ func (p *OnPackageVersion) Configuration() []configuration.Field {
 			Label:    "Packages",
 			Type:     configuration.FieldTypeAnyPredicateList,
 			Required: false,
-			Default:  []any{},
+			Default: []map[string]any{
+				{
+					"type":  configuration.PredicateTypeMatches,
+					"value": ".*",
+				},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
 					Operators: configuration.AllPredicateOperators,
@@ -100,7 +105,12 @@ func (p *OnPackageVersion) Configuration() []configuration.Field {
 			Label:    "Versions",
 			Type:     configuration.FieldTypeAnyPredicateList,
 			Required: false,
-			Default:  []any{},
+			Default: []map[string]any{
+				{
+					"type":  configuration.PredicateTypeMatches,
+					"value": ".*",
+				},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
 					Operators: configuration.AllPredicateOperators,
@@ -189,10 +199,10 @@ func (p *OnPackageVersion) subscriptionPattern(region string) *common.EventBridg
 		Region:     region,
 		DetailType: DetailTypePackageVersionStateChange,
 		Source:     Source,
-		// Detail: map[string]any{
-		// 	"operationType":       "CREATED",
-		// 	"packageVersionState": "Published",
-		// },
+		Detail: map[string]any{
+			"operationType":       "Created",
+			"packageVersionState": "Published",
+		},
 	}
 }
 
@@ -265,13 +275,13 @@ func (p *OnPackageVersion) OnIntegrationMessage(ctx core.IntegrationMessageConte
 		return fmt.Errorf("failed to decode message: %w", err)
 	}
 
-	packageName, ok := event.Detail["packageName"].(string)
-	if !ok || packageName == "" {
-		return fmt.Errorf("missing package name")
+	fullPackageName, err := fullPackageName(event.Detail)
+	if err != nil {
+		return fmt.Errorf("failed to get full package name: %w", err)
 	}
 
-	if len(config.Packages) > 0 && !configuration.MatchesAnyPredicate(config.Packages, packageName) {
-		ctx.Logger.Infof("Skipping event for package %s, does not match any packages", packageName)
+	if !configuration.MatchesAnyPredicate(config.Packages, fullPackageName) {
+		ctx.Logger.Infof("Skipping event for package %s, does not match any predicate: %v", fullPackageName, config.Packages)
 		return nil
 	}
 
@@ -280,8 +290,8 @@ func (p *OnPackageVersion) OnIntegrationMessage(ctx core.IntegrationMessageConte
 		return fmt.Errorf("missing package version")
 	}
 
-	if len(config.Versions) > 0 && !configuration.MatchesAnyPredicate(config.Versions, version) {
-		ctx.Logger.Infof("Skipping event for version %s, does not match any versions", version)
+	if !configuration.MatchesAnyPredicate(config.Versions, version) {
+		ctx.Logger.Infof("Skipping event for version %s, does not match any predicate: %v", version, config.Versions)
 		return nil
 	}
 
@@ -294,4 +304,21 @@ func (p *OnPackageVersion) HandleWebhook(ctx core.WebhookRequestContext) (int, e
 
 func (p *OnPackageVersion) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+func fullPackageName(detail map[string]any) (string, error) {
+	packageName, ok := detail["packageName"].(string)
+	if !ok || packageName == "" {
+		return "", fmt.Errorf("missing package name")
+	}
+
+	//
+	// Package namespace can be empty.
+	//
+	packageNamespace, ok := detail["packageNamespace"].(string)
+	if ok {
+		return fmt.Sprintf("%s/%s", packageNamespace, packageName), nil
+	}
+
+	return packageName, nil
 }
