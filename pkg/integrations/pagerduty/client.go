@@ -200,6 +200,7 @@ type UpdateIncidentPayload struct {
 	Title            string               `json:"title,omitempty"`
 	Priority         *PriorityReference   `json:"priority,omitempty"`
 	EscalationPolicy *EscalationPolicyRef `json:"escalation_policy,omitempty"`
+	EscalationLevel  int                  `json:"escalation_level,omitempty"`
 	Assignments      []AssignmentPayload  `json:"assignments,omitempty"`
 	Body             *IncidentBody        `json:"body,omitempty"`
 }
@@ -707,4 +708,95 @@ func (c *Client) SnoozeIncident(incidentID string, fromEmail string, duration in
 	}
 
 	return response, nil
+}
+
+func (c *Client) EscalateIncident(incidentID string, fromEmail string, escalationLevel int) (any, error) {
+	request := UpdateIncidentRequest{
+		Incident: UpdateIncidentPayload{
+			Type:            "incident_reference",
+			EscalationLevel: escalationLevel,
+		},
+	}
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/incidents/%s", c.BaseURL, incidentID)
+
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("error building request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/vnd.pagerduty+json;version=2")
+
+	if fromEmail != "" {
+		req.Header.Set("From", fromEmail)
+	}
+
+	if c.AuthType == AuthTypeAppOAuth {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.Token))
+	} else {
+		req.Header.Set("Authorization", fmt.Sprintf("Token token=%s", c.Token))
+	}
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error executing request: %v", err)
+	}
+	defer res.Body.Close()
+
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading body: %v", err)
+	}
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+	}
+
+	var escalateResponse map[string]any
+	err = json.Unmarshal(responseBody, &escalateResponse)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return escalateResponse, nil
+}
+
+// Note represents a note on a PagerDuty incident
+type Note struct {
+	ID        string      `json:"id"`
+	User      *ServiceRef `json:"user"`
+	Channel   *NoteChannel `json:"channel"`
+	Content   string      `json:"content"`
+	CreatedAt string      `json:"created_at"`
+}
+
+// NoteChannel represents the channel through which a note was created
+type NoteChannel struct {
+	Type string `json:"type"`
+}
+
+// ListIncidentNotes retrieves all notes for a given incident
+func (c *Client) ListIncidentNotes(incidentID string) ([]Note, error) {
+	apiURL := fmt.Sprintf("%s/incidents/%s/notes", c.BaseURL, incidentID)
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Notes []Note `json:"notes"`
+	}
+
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Notes, nil
 }
