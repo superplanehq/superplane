@@ -172,3 +172,10 @@ func fetchReleaseByStrategy(client *github.Client, owner, repo, strategy, tagNam
 		return nil, fmt.Errorf("invalid release strategy: %s", strategy)
 	}
 }
+
+// normalizeWorkflowPath strips the .github/workflows/ prefix from a workflow path.
+// GitHub Actions API expects just the filename (e.g., "ci.yml"), but users may provide
+// the full path (e.g., ".github/workflows/ci.yml"). This helper ensures consistency.
+func normalizeWorkflowPath(path string) string {
+	return strings.Replace(path, ".github/workflows/", "", 1)
+}
