@@ -214,8 +214,8 @@ The wait component shows custom UI in the settings panel:
 
 ```typescript
 export const waitCustomFieldRenderer: CustomFieldRenderer = {
-  render: (_node: ComponentsNode, configuration: Record<string, unknown>) => {
-    const mode = configuration?.mode as string;
+  render: (node: NodeInfo) => {
+    const mode = node.configuration?.mode as string;
 
     let content: string;
     let title: string;
@@ -355,7 +355,7 @@ To create a new component with custom behaviors:
 Create `web_src/src/pages/workflowv2/mappers/mycomponent.ts`:
 
 ```typescript
-import { ComponentBaseMapper, EventStateRegistry, CustomFieldRenderer } from "./types";
+import { ComponentBaseMapper, EventStateRegistry, NodeInfo, CustomFieldRenderer } from "./types";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 
 // Custom state map (optional)
@@ -400,7 +400,7 @@ export const myComponentMapper: ComponentBaseMapper = {
 
 // Custom field renderer (optional)
 export const myComponentCustomFieldRenderer: CustomFieldRenderer = {
-  render: (node, configuration) => {
+  render: (node: NodeInfo) => {
     return (
       <div className="p-4">
         <p>Custom configuration UI for {node.name}</p>

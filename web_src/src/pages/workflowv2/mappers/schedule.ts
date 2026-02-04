@@ -1,8 +1,8 @@
-import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
+import { CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass } from "@/utils/colors";
 import { formatTimestampInUserTimezone } from "@/utils/timezone";
 import { getNextCronExecution } from "@/utils/cron";
-import { TriggerRenderer, CustomFieldRenderer } from "./types";
+import { TriggerRenderer, CustomFieldRenderer, NodeInfo, ComponentDefinition } from "./types";
 import { TriggerProps } from "@/ui/trigger";
 import React from "react";
 import { formatTimeAgo } from "@/utils/date";
@@ -333,10 +333,10 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent?: CanvasesCanvasEvent) => {
+  getTriggerProps: (node: NodeInfo, definition: ComponentDefinition, lastEvent?: CanvasesCanvasEvent) => {
     const props: TriggerProps = {
-      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
-      iconSlug: trigger.icon,
+      title: node.name || definition.label || "Unnamed trigger",
+      iconSlug: definition.icon,
       iconColor: getColorClass("black"),
       collapsedBackground: "bg-white",
       metadata: [
@@ -380,8 +380,8 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
  * Custom field renderer for schedule trigger configuration
  */
 export const scheduleCustomFieldRenderer: CustomFieldRenderer = {
-  render: (_node: ComponentsNode, configuration: Record<string, unknown>) => {
-    const scheduleConfig = configuration as unknown as ScheduleConfiguration;
+  render: (node: NodeInfo) => {
+    const scheduleConfig = node.configuration as unknown as ScheduleConfiguration;
     const scheduleDescription = formatScheduleDescription(scheduleConfig);
     const nextTrigger = formatNextTrigger(scheduleConfig, undefined);
 
