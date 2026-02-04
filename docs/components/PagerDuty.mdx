@@ -550,6 +550,33 @@ Note: If fetching alerts, notes, or log entries fails, they will be omitted from
 ```json
 {
   "data": {
+    "alerts": [
+      {
+        "alert_key": "cpu_high_alert_001",
+        "created_at": "2015-10-06T21:30:42Z",
+        "html_url": "https://subdomain.pagerduty.com/alerts/PT4KHLK:0",
+        "id": "PT4KHLK:0",
+        "incident": {
+          "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK",
+          "id": "PT4KHLK",
+          "self": "https://api.pagerduty.com/incidents/PT4KHLK",
+          "summary": "[#1234] The server is on fire.",
+          "type": "incident_reference"
+        },
+        "self": "https://api.pagerduty.com/alerts/PT4KHLK:0",
+        "service": {
+          "html_url": "https://subdomain.pagerduty.com/service-directory/PWIXJZS",
+          "id": "PWIXJZS",
+          "self": "https://api.pagerduty.com/services/PWIXJZS",
+          "summary": "My Mail Service",
+          "type": "service_reference"
+        },
+        "severity": "critical",
+        "status": "triggered",
+        "summary": "CPU usage exceeded 90%",
+        "type": "alert"
+      }
+    ],
     "incident": {
       "assigned_via": "escalation_policy",
       "assignments": [
@@ -622,39 +649,88 @@ Note: If fetching alerts, notes, or log entries fails, they will be omitted from
       "updated_at": "2015-10-06T21:40:23Z",
       "urgency": "high"
     },
-    "alerts": [
+    "log_entries": [
       {
-        "id": "PT4KHLK:0",
-        "type": "alert",
-        "summary": "CPU usage exceeded 90%",
+        "agent": {
+          "html_url": "https://subdomain.pagerduty.com/service-directory/PWIXJZS",
+          "id": "PWIXJZS",
+          "self": "https://api.pagerduty.com/services/PWIXJZS",
+          "summary": "My Mail Service",
+          "type": "service_reference"
+        },
+        "channel": {
+          "type": "api"
+        },
         "created_at": "2015-10-06T21:30:42Z",
-        "status": "triggered",
-        "severity": "critical"
+        "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK/log_entries/Q02JTSNZWHSEKV",
+        "id": "Q02JTSNZWHSEKV",
+        "incident": {
+          "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK",
+          "id": "PT4KHLK",
+          "self": "https://api.pagerduty.com/incidents/PT4KHLK",
+          "summary": "[#1234] The server is on fire.",
+          "type": "incident_reference"
+        },
+        "self": "https://api.pagerduty.com/log_entries/Q02JTSNZWHSEKV",
+        "summary": "Triggered through the API",
+        "type": "trigger_log_entry"
+      },
+      {
+        "agent": {
+          "html_url": "https://subdomain.pagerduty.com/escalation_policies/PT20YPA",
+          "id": "PT20YPA",
+          "self": "https://api.pagerduty.com/escalation_policies/PT20YPA",
+          "summary": "Another Escalation Policy",
+          "type": "escalation_policy_reference"
+        },
+        "assignees": [
+          {
+            "html_url": "https://subdomain.pagerduty.com/users/PXPGF42",
+            "id": "PXPGF42",
+            "self": "https://api.pagerduty.com/users/PXPGF42",
+            "summary": "Earline Greenholt",
+            "type": "user_reference"
+          }
+        ],
+        "created_at": "2015-10-06T21:30:42Z",
+        "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK/log_entries/Q02JTSNZWHSEKY",
+        "id": "Q02JTSNZWHSEKY",
+        "incident": {
+          "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK",
+          "id": "PT4KHLK",
+          "self": "https://api.pagerduty.com/incidents/PT4KHLK",
+          "summary": "[#1234] The server is on fire.",
+          "type": "incident_reference"
+        },
+        "self": "https://api.pagerduty.com/log_entries/Q02JTSNZWHSEKY",
+        "summary": "Assigned to Earline Greenholt",
+        "type": "assign_log_entry"
       }
     ],
     "notes": [
       {
-        "id": "PNQ2YA7",
         "content": "Investigating the root cause. Initial analysis suggests a database connection timeout.",
         "created_at": "2015-10-06T21:35:00Z",
+        "id": "PNQ2YA7",
         "user": {
+          "html_url": "https://subdomain.pagerduty.com/users/PXPGF42",
           "id": "PXPGF42",
-          "summary": "Earline Greenholt"
+          "self": "https://api.pagerduty.com/users/PXPGF42",
+          "summary": "Earline Greenholt",
+          "type": "user_reference"
         }
-      }
-    ],
-    "log_entries": [
-      {
-        "id": "Q02JTSNZWHSEKV",
-        "type": "trigger_log_entry",
-        "summary": "Triggered through the API",
-        "created_at": "2015-10-06T21:30:42Z"
       },
       {
-        "id": "Q02JTSNZWHSEKY",
-        "type": "assign_log_entry",
-        "summary": "Assigned to Earline Greenholt",
-        "created_at": "2015-10-06T21:30:42Z"
+        "content": "Restarted the database connection pool. Monitoring for improvement.",
+        "created_at": "2015-10-06T21:38:00Z",
+        "id": "PNQ2YA8",
+        "user": {
+          "html_url": "https://subdomain.pagerduty.com/users/PXPGF42",
+          "id": "PXPGF42",
+          "self": "https://api.pagerduty.com/users/PXPGF42",
+          "summary": "Earline Greenholt",
+          "type": "user_reference"
+        }
       }
     ]
   },
