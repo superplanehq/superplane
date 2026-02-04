@@ -181,6 +181,12 @@ func (c *SendAndWaitMessage) Execute(ctx core.ExecutionContext) error {
 		},
 	}
 
+	// Store execution ID in KV for lookup when interaction arrives
+	err = ctx.ExecutionState.SetKV("execution_id", ctx.ID.String())
+	if err != nil {
+		return fmt.Errorf("failed to set execution ID in KV: %w", err)
+	}
+
 	_, err = client.PostMessage(ChatPostMessageRequest{
 		Channel: config.Channel,
 		Text:    config.Message,
@@ -189,12 +195,6 @@ func (c *SendAndWaitMessage) Execute(ctx core.ExecutionContext) error {
 
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
-	}
-
-	// Store execution ID in KV for lookup when interaction arrives
-	err = ctx.ExecutionState.SetKV("execution_id", ctx.ID.String())
-	if err != nil {
-		return fmt.Errorf("failed to set execution ID in KV: %w", err)
 	}
 
 	if config.Timeout > 0 {
