@@ -436,7 +436,7 @@ export function CreateRolePage() {
         await createRoleMutation.mutateAsync({
           role: {
             metadata: {
-              name: roleName,
+              name: roleName.toLowerCase().replace(/\s+/g, "_"),
             },
             spec: {
               permissions: permissions,
@@ -509,13 +509,13 @@ export function CreateRolePage() {
                 </div>
               )}
 
-              <div className="space-y-6">
+              <div className="space-y-1">
                 {/* Role Name */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Role Name *</label>
                   <Input
                     type="text"
-                    placeholder="Enter role name"
+                    placeholder={isEditMode ? "Enter role display name" : "Enter role name"}
                     value={roleName}
                     onChange={(e) => setRoleName(e.target.value)}
                     onKeyDown={(e) => {
@@ -525,13 +525,8 @@ export function CreateRolePage() {
                       }
                     }}
                     className="max-w-lg"
-                    disabled={isEditMode}
+                    disabled={isReadOnly}
                   />
-                  {isEditMode && !isReadOnly && (
-                    <Text className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Role name cannot be changed when editing
-                    </Text>
-                  )}
                 </div>
 
                 {/* Permissions */}
