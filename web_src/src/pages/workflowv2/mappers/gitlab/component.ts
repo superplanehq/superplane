@@ -45,7 +45,7 @@ export const createIssueMapper: ComponentBaseMapper = {
   },
 };
 
-export function baseProps(
+function baseProps(
   nodes: ComponentsNode[],
   node: ComponentsNode,
   componentDefinition: ComponentsComponent,
@@ -68,7 +68,7 @@ export function baseProps(
   };
 }
 
-export function getDetailsForIssue(issue: Issue): Record<string, string> {
+function getDetailsForIssue(issue: Issue): Record<string, string> {
   const details: Record<string, string> = {};
   Object.assign(details, {
     "Created At": issue?.created_at ? new Date(issue.created_at).toLocaleString() : "-",

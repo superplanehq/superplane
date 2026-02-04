@@ -23,7 +23,10 @@ import {
   eventStateRegistry as githubEventStateRegistry,
   customFieldRenderers as githubCustomFieldRenderers,
 } from "./github/index";
-import { componentMappers as gitlabComponentMappers } from "./gitlab/index";
+import {
+  componentMappers as gitlabComponentMappers,
+  eventStateRegistry as gitlabEventStateRegistry,
+} from "./gitlab/index";
 import {
   componentMappers as pagerdutyComponentMappers,
   triggerRenderers as pagerdutyTriggerRenderers,
@@ -155,6 +158,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   rootly: rootlyEventStateRegistry,
   openai: openaiEventStateRegistry,
   aws: awsEventStateRegistry,
+  gitlab: gitlabEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
