@@ -86,7 +86,7 @@ func (s *WaitSteps) givenACanvasWithManualTriggerWaitAndOutput() {
 
 	s.canvas.Create()
 	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
-	s.canvas.AddWait("Wait", models.Position{X: 1000, Y: 200}, 60, "Seconds")
+	s.canvas.AddWait("Wait", models.Position{X: 1000, Y: 200}, 10, "Seconds")
 	s.canvas.AddNoop("Output", models.Position{X: 1400, Y: 200})
 
 	s.canvas.Connect("Start", "Wait")
