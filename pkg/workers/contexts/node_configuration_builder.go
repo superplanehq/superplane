@@ -20,6 +20,10 @@ import (
 var expressionRegex = regexp.MustCompile(`\{\{(.*?)\}\}`)
 var previousDepthRegex = regexp.MustCompile(`\bprevious\s*\(([^)]*)\)`)
 
+// SecretResolver resolves a secret reference (ID) to the secret's decrypted data.
+// Used when building configuration for fields of type secret.
+type SecretResolver func(secretID string) (any, error)
+
 type NodeConfigurationBuilder struct {
 	tx                  *gorm.DB
 	workflowID          uuid.UUID
@@ -29,6 +33,7 @@ type NodeConfigurationBuilder struct {
 	input               any
 	parentBlueprintNode *models.CanvasNode
 	configurationFields []configuration.Field
+	secretResolver      SecretResolver
 }
 
 func NewNodeConfigurationBuilder(tx *gorm.DB, workflowID uuid.UUID) *NodeConfigurationBuilder {
@@ -65,6 +70,11 @@ func (b *NodeConfigurationBuilder) WithInput(input any) *NodeConfigurationBuilde
 
 func (b *NodeConfigurationBuilder) WithConfigurationFields(fields []configuration.Field) *NodeConfigurationBuilder {
 	b.configurationFields = fields
+	return b
+}
+
+func (b *NodeConfigurationBuilder) WithSecretResolver(resolver SecretResolver) *NodeConfigurationBuilder {
+	b.secretResolver = resolver
 	return b
 }
 
@@ -125,6 +135,17 @@ func (b *NodeConfigurationBuilder) resolveWithSchema(config map[string]any, fiel
 
 func (b *NodeConfigurationBuilder) resolveFieldValue(value any, field configuration.Field) (any, error) {
 	if field.DisallowExpression {
+		return value, nil
+	}
+
+	if field.Type == configuration.FieldTypeSecret && b.secretResolver != nil {
+		if ref, ok := value.(string); ok && ref != "" {
+			resolved, err := b.secretResolver(ref)
+			if err != nil {
+				return nil, fmt.Errorf("resolving secret %q: %w", ref, err)
+			}
+			return resolved, nil
+		}
 		return value, nil
 	}
 

@@ -192,6 +192,13 @@ func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.Canva
 		configBuilder = configBuilder.WithConfigurationFields(configFields)
 	}
 
+	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID)
+	if err == nil {
+		configBuilder = configBuilder.WithSecretResolver(
+			contexts.NewSecretResolver(tx, models.DomainTypeOrganization, workflow.OrganizationID, w.encryptor),
+		)
+	}
+
 	config, err := configBuilder.Build(firstNode.Configuration)
 
 	if err != nil {

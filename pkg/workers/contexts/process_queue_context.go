@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
@@ -30,7 +31,7 @@ func (e *ConfigurationBuildError) Unwrap() error {
 	return e.Err
 }
 
-func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models.CanvasNode, queueItem *models.CanvasNodeQueueItem, configFields []configuration.Field) (*core.ProcessQueueContext, error) {
+func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models.CanvasNode, queueItem *models.CanvasNodeQueueItem, configFields []configuration.Field, encryptor crypto.Encryptor) (*core.ProcessQueueContext, error) {
 	event, err := models.FindCanvasEventInTransaction(tx, queueItem.EventID)
 	if err != nil {
 		return nil, err
@@ -43,6 +44,14 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 		WithInput(map[string]any{event.NodeID: event.Data.Data()})
 	if len(configFields) > 0 {
 		configBuilder = configBuilder.WithConfigurationFields(configFields)
+	}
+	if encryptor != nil {
+		workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, node.WorkflowID)
+		if err == nil {
+			configBuilder = configBuilder.WithSecretResolver(
+				NewSecretResolver(tx, models.DomainTypeOrganization, workflow.OrganizationID, encryptor),
+			)
+		}
 	}
 
 	if node.ParentNodeID != nil {

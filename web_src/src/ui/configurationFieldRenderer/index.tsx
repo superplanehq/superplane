@@ -23,6 +23,7 @@ import { UserFieldRenderer } from "./UserFieldRenderer";
 import { RoleFieldRenderer } from "./RoleFieldRenderer";
 import { GroupFieldRenderer } from "./GroupFieldRenderer";
 import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
+import { SecretFieldRenderer } from "./SecretFieldRenderer";
 import { TimezoneFieldRenderer } from "./TimezoneFieldRenderer";
 import { AnyPredicateListFieldRenderer } from "./AnyPredicateListFieldRenderer";
 import { DaysOfWeekFieldRenderer } from "./DaysOfWeekFieldRenderer";
@@ -110,6 +111,8 @@ export const ConfigurationFieldRenderer = ({
           );
         } else if (field.type === "number") {
           onChange(typeof parsedDefaultValue === "number" ? parsedDefaultValue : 0);
+        } else if (field.type === "secret") {
+          onChange(parsedDefaultValue ?? "");
         } else if (field.type === "boolean") {
           onChange(typeof parsedDefaultValue === "boolean" ? parsedDefaultValue : false);
         } else {
@@ -305,6 +308,25 @@ export const ConfigurationFieldRenderer = ({
 
       case "git-ref":
         return <GitRefFieldRenderer {...commonProps} />;
+
+      case "secret":
+        if (!domainId || !domainType) {
+          return (
+            <div className="text-sm text-red-500 dark:text-red-400">
+              Secret field requires domainId and domainType props
+            </div>
+          );
+        }
+        return (
+          <SecretFieldRenderer
+            field={field}
+            value={value as string}
+            onChange={onChange}
+            domainId={domainId}
+            domainType={domainType}
+            allValues={allValues}
+          />
+        );
 
       case "user":
         if (!domainId) {
