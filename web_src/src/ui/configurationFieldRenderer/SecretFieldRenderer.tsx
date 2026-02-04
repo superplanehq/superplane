@@ -9,20 +9,12 @@ interface SecretFieldRendererProps extends FieldRendererProps {
   domainType: AuthorizationDomainType;
 }
 
-export const SecretFieldRenderer = ({
-  field,
-  value,
-  onChange,
-  domainId,
-  domainType,
-}: SecretFieldRendererProps) => {
+export const SecretFieldRenderer = ({ field, value, onChange, domainId, domainType }: SecretFieldRendererProps) => {
   const { data: secrets, isLoading, error } = useSecrets(domainId, domainType);
 
   if (!domainId || !domainType) {
     return (
-      <div className="text-sm text-red-500 dark:text-red-400">
-        Secret field requires domainId and domainType props
-      </div>
+      <div className="text-sm text-red-500 dark:text-red-400">Secret field requires domainId and domainType props</div>
     );
   }
 
@@ -42,7 +34,10 @@ export const SecretFieldRenderer = ({
     return (
       <div className="space-y-2">
         <Select disabled>
-          <SelectTrigger className="w-full" data-testid={field.name ? toTestId(`field-${field.name}-secret`) : undefined}>
+          <SelectTrigger
+            className="w-full"
+            data-testid={field.name ? toTestId(`field-${field.name}-secret`) : undefined}
+          >
             <SelectValue placeholder="No secrets available" />
           </SelectTrigger>
         </Select>
