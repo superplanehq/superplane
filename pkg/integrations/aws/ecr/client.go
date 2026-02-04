@@ -93,13 +93,14 @@ type DescribeImageResponse struct {
 }
 
 type ImageDetail struct {
-	RegistryID             string   `json:"registryId"`
-	RepositoryName         string   `json:"repositoryName"`
-	ImageDigest            string   `json:"imageDigest"`
-	ImageTags              []string `json:"imageTags"`
-	ImageSizeInBytes       int64    `json:"imageSizeInBytes"`
-	ImageManifestMediaType string   `json:"imageManifestMediaType"`
-	ArtifactMediaType      string   `json:"artifactMediaType"`
+	RegistryID             string           `json:"registryId"`
+	RepositoryName         string           `json:"repositoryName"`
+	ImageDigest            string           `json:"imageDigest"`
+	ImageTags              []string         `json:"imageTags"`
+	ImageSizeInBytes       int64            `json:"imageSizeInBytes"`
+	ImagePushedAt          common.FloatTime `json:"imagePushedAt,omitempty"`
+	ImageManifestMediaType string           `json:"imageManifestMediaType"`
+	ArtifactMediaType      string           `json:"artifactMediaType"`
 }
 
 func (c *Client) DescribeImage(repositoryName string, imageDigest string, imageTag string) (*ImageDetail, error) {
@@ -154,8 +155,10 @@ type ImageScanStatus struct {
 }
 
 type ImageScanFindings struct {
-	Findings              []ImageScanFinding `json:"findings"`
-	FindingSeverityCounts map[string]int     `json:"findingSeverityCounts"`
+	Findings                     []ImageScanFinding `json:"findings"`
+	ImageScanCompletedAt         common.FloatTime   `json:"imageScanCompletedAt,omitempty"`
+	VulnerabilitySourceUpdatedAt common.FloatTime   `json:"vulnerabilitySourceUpdatedAt,omitempty"`
+	FindingSeverityCounts        map[string]int     `json:"findingSeverityCounts"`
 }
 
 type ImageScanFinding struct {

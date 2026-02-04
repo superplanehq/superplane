@@ -34,6 +34,7 @@ type PackageVersionDescription struct {
 	Namespace            string                `json:"namespace"`
 	Origin               *PackageVersionOrigin `json:"origin"`
 	PackageName          string                `json:"packageName"`
+	PublishedTime        common.FloatTime      `json:"publishedTime,omitempty"`
 	Revision             string                `json:"revision"`
 	SourceCodeRepository string                `json:"sourceCodeRepository"`
 	Status               string                `json:"status"`

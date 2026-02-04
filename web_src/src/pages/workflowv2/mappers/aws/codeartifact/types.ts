@@ -74,6 +74,7 @@ export interface CodeArtifactPackageVersionDescription {
   licenses?: CodeArtifactPackageLicense[];
   namespace?: string;
   packageName?: string;
+  publishedTime?: string;
   revision?: string;
   sourceCodeRepository?: string;
   status?: string;

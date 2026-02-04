@@ -10,6 +10,7 @@ import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import { formatTimeAgo } from "@/utils/date";
+import { formatTimestampInUserTimezone } from "@/utils/timezone";
 import { MetadataItem } from "@/ui/metadataList";
 import {
   CodeArtifactPackageVersionConfiguration,
@@ -58,6 +59,7 @@ export const getPackageVersionMapper: ComponentBaseMapper = {
       Status: stringOrDash(result.status),
       Revision: stringOrDash(result.revision),
       "Display Name": stringOrDash(result.displayName),
+      "Published At": result.publishedTime ? formatTimestampInUserTimezone(result.publishedTime) : "-",
       Summary: stringOrDash(result.summary),
       Licenses: formatLicenses(result.licenses),
       "Home Page": stringOrDash(result.homePage),
