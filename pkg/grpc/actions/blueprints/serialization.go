@@ -37,7 +37,7 @@ func SerializeBlueprint(in *models.Blueprint) *pb.Blueprint {
 		UpdatedAt:      timestamppb.New(*in.UpdatedAt),
 		Icon:           in.Icon,
 		Color:          in.Color,
-		Nodes:          actions.NodesToProto(in.Nodes),
+		Nodes:          actions.NodeDefinitionsToProto(in.Nodes),
 		Edges:          actions.EdgesToProto(in.Edges),
 		Configuration:  ConfigurationToProto(in.Configuration),
 		OutputChannels: OutputChannelsToProto(in.OutputChannels),
@@ -74,8 +74,9 @@ func ParseBlueprint(registry *registry.Registry, organizationID string, blueprin
 		}
 	}
 
+	// TODO: warnings?
 	// Find shadowed names within connected components
-	nodeWarnings := actions.FindShadowedNameWarnings(blueprint.Nodes, blueprint.Edges)
+	// nodeWarnings := actions.FindShadowedNameWarnings(blueprint.Nodes, blueprint.Edges)
 
 	for i, edge := range blueprint.Edges {
 		if edge.SourceId == "" || edge.TargetId == "" {
@@ -91,28 +92,13 @@ func ParseBlueprint(registry *registry.Registry, organizationID string, blueprin
 		return nil, nil, err
 	}
 
-	// Convert proto nodes to models, adding validation errors and warnings where applicable
-	nodes := actions.ProtoToNodes(blueprint.Nodes)
-	for i := range nodes {
-		if errorMsg, hasError := nodeValidationErrors[nodes[i].ID]; hasError {
-			nodes[i].ErrorMessage = &errorMsg
-		} else {
-			nodes[i].ErrorMessage = nil
-		}
-
-		if warningMsg, hasWarning := nodeWarnings[nodes[i].ID]; hasWarning {
-			nodes[i].WarningMessage = &warningMsg
-		} else {
-			nodes[i].WarningMessage = nil
-		}
-	}
-
+	nodes := actions.ProtoToNodeDefinitions(blueprint.Nodes)
 	return nodes, actions.ProtoToEdges(blueprint.Edges), nil
 }
 
-func validateNodeRef(registry *registry.Registry, organizationID string, node *componentpb.Node) error {
+func validateNodeRef(registry *registry.Registry, organizationID string, node *componentpb.NodeDefinition) error {
 	switch node.Type {
-	case componentpb.Node_TYPE_COMPONENT:
+	case componentpb.NodeDefinition_TYPE_COMPONENT:
 		if node.Component == nil {
 			return fmt.Errorf("component reference is required for component ref type")
 		}
@@ -168,7 +154,7 @@ func validateIntegration(organizationID string, ref *componentpb.IntegrationRef)
 	return nil
 }
 
-func validateAcyclic(nodes []*componentpb.Node, edges []*componentpb.Edge) error {
+func validateAcyclic(nodes []*componentpb.NodeDefinition, edges []*componentpb.Edge) error {
 	// Build adjacency list
 	graph := make(map[string][]string)
 	inDegree := make(map[string]int)

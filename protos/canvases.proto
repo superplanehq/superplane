@@ -292,19 +292,27 @@ message Canvas {
   }
 
   message Spec {
-    repeated Components.Node nodes = 1;
+    repeated Components.NodeDefinition nodes = 1;
     repeated Components.Edge edges = 2;
   }
 
   message Status {
-    repeated CanvasNodeExecution last_executions = 1;
-    repeated CanvasNodeQueueItem next_queue_items = 2;
-    repeated CanvasEvent last_events = 3;
+    repeated CanvasNodeState nodes = 1;
+    repeated CanvasNodeExecution last_executions = 2;
+    repeated CanvasNodeQueueItem next_queue_items = 3;
+    repeated CanvasEvent last_events = 4;
   }
 
   Metadata metadata = 1;
   Spec spec = 2;
   Status status = 3;
+}
+
+message CanvasNodeState {
+  string id = 1;
+  string state = 2;
+  string state_reason = 3;
+  google.protobuf.Struct metadata = 4;
 }
 
 message ListNodeEventsRequest {
@@ -361,7 +369,7 @@ message UpdateNodePauseRequest {
 }
 
 message UpdateNodePauseResponse {
-  Components.Node node = 1;
+  CanvasNodeState node = 1;
 }
 
 message ListNodeExecutionsRequest {

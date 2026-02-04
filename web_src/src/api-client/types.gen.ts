@@ -15,7 +15,7 @@ export type BlueprintsBlueprint = {
   description?: string;
   createdAt?: string;
   updatedAt?: string;
-  nodes?: Array<ComponentsNode>;
+  nodes?: Array<ComponentsNodeDefinition>;
   edges?: Array<ComponentsEdge>;
   configuration?: Array<ConfigurationField>;
   outputChannels?: Array<SuperplaneBlueprintsOutputChannel>;
@@ -151,12 +151,22 @@ export type CanvasesCanvasNodeQueueItem = {
   createdAt?: string;
 };
 
+export type CanvasesCanvasNodeState = {
+  id?: string;
+  state?: string;
+  stateReason?: string;
+  metadata?: {
+    [key: string]: unknown;
+  };
+};
+
 export type CanvasesCanvasSpec = {
-  nodes?: Array<ComponentsNode>;
+  nodes?: Array<ComponentsNodeDefinition>;
   edges?: Array<ComponentsEdge>;
 };
 
 export type CanvasesCanvasStatus = {
+  nodes?: Array<CanvasesCanvasNodeState>;
   lastExecutions?: Array<CanvasesCanvasNodeExecution>;
   nextQueueItems?: Array<CanvasesCanvasNodeQueueItem>;
   lastEvents?: Array<CanvasesCanvasEvent>;
@@ -280,7 +290,7 @@ export type CanvasesUpdateNodePauseBody = {
 };
 
 export type CanvasesUpdateNodePauseResponse = {
-  node?: ComponentsNode;
+  node?: CanvasesCanvasNodeState;
 };
 
 export type ComponentsComponent = {
@@ -325,29 +335,23 @@ export type ComponentsListComponentsResponse = {
   components?: Array<ComponentsComponent>;
 };
 
-export type ComponentsNode = {
+export type ComponentsNodeDefinition = {
   id?: string;
   name?: string;
-  type?: ComponentsNodeType;
+  type?: ComponentsNodeDefinitionType;
   configuration?: {
     [key: string]: unknown;
   };
-  metadata?: {
-    [key: string]: unknown;
-  };
   position?: ComponentsPosition;
-  component?: NodeComponentRef;
-  blueprint?: NodeBlueprintRef;
-  trigger?: NodeTriggerRef;
-  widget?: NodeWidgetRef;
+  component?: NodeDefinitionComponentRef;
+  blueprint?: NodeDefinitionBlueprintRef;
+  trigger?: NodeDefinitionTriggerRef;
+  widget?: NodeDefinitionWidgetRef;
   isCollapsed?: boolean;
   integration?: ComponentsIntegrationRef;
-  errorMessage?: string;
-  warningMessage?: string;
-  paused?: boolean;
 };
 
-export type ComponentsNodeType = "TYPE_COMPONENT" | "TYPE_BLUEPRINT" | "TYPE_TRIGGER" | "TYPE_WIDGET";
+export type ComponentsNodeDefinitionType = "TYPE_COMPONENT" | "TYPE_BLUEPRINT" | "TYPE_TRIGGER" | "TYPE_WIDGET";
 
 export type ComponentsPosition = {
   x?: number;
@@ -577,19 +581,19 @@ export type MeRegenerateTokenResponse = {
   token?: string;
 };
 
-export type NodeBlueprintRef = {
+export type NodeDefinitionBlueprintRef = {
   id?: string;
 };
 
-export type NodeComponentRef = {
+export type NodeDefinitionComponentRef = {
   name?: string;
 };
 
-export type NodeTriggerRef = {
+export type NodeDefinitionTriggerRef = {
   name?: string;
 };
 
-export type NodeWidgetRef = {
+export type NodeDefinitionWidgetRef = {
   name?: string;
 };
 

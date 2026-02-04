@@ -20,6 +20,7 @@ var _ MappedNullable = &CanvasesCanvasStatus{}
 
 // CanvasesCanvasStatus struct for CanvasesCanvasStatus
 type CanvasesCanvasStatus struct {
+	Nodes          []CanvasesCanvasNodeState     `json:"nodes,omitempty"`
 	LastExecutions []CanvasesCanvasNodeExecution `json:"lastExecutions,omitempty"`
 	NextQueueItems []CanvasesCanvasNodeQueueItem `json:"nextQueueItems,omitempty"`
 	LastEvents     []CanvasesCanvasEvent         `json:"lastEvents,omitempty"`
@@ -40,6 +41,38 @@ func NewCanvasesCanvasStatus() *CanvasesCanvasStatus {
 func NewCanvasesCanvasStatusWithDefaults() *CanvasesCanvasStatus {
 	this := CanvasesCanvasStatus{}
 	return &this
+}
+
+// GetNodes returns the Nodes field value if set, zero value otherwise.
+func (o *CanvasesCanvasStatus) GetNodes() []CanvasesCanvasNodeState {
+	if o == nil || IsNil(o.Nodes) {
+		var ret []CanvasesCanvasNodeState
+		return ret
+	}
+	return o.Nodes
+}
+
+// GetNodesOk returns a tuple with the Nodes field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesCanvasStatus) GetNodesOk() ([]CanvasesCanvasNodeState, bool) {
+	if o == nil || IsNil(o.Nodes) {
+		return nil, false
+	}
+	return o.Nodes, true
+}
+
+// HasNodes returns a boolean if a field has been set.
+func (o *CanvasesCanvasStatus) HasNodes() bool {
+	if o != nil && !IsNil(o.Nodes) {
+		return true
+	}
+
+	return false
+}
+
+// SetNodes gets a reference to the given []CanvasesCanvasNodeState and assigns it to the Nodes field.
+func (o *CanvasesCanvasStatus) SetNodes(v []CanvasesCanvasNodeState) {
+	o.Nodes = v
 }
 
 // GetLastExecutions returns the LastExecutions field value if set, zero value otherwise.
@@ -148,6 +181,9 @@ func (o CanvasesCanvasStatus) MarshalJSON() ([]byte, error) {
 
 func (o CanvasesCanvasStatus) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
+	if !IsNil(o.Nodes) {
+		toSerialize["nodes"] = o.Nodes
+	}
 	if !IsNil(o.LastExecutions) {
 		toSerialize["lastExecutions"] = o.LastExecutions
 	}

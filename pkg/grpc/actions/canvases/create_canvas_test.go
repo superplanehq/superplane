@@ -22,7 +22,7 @@ func TestCreateCanvasDuplicateName(t *testing.T) {
 			Name: "Duplicate Canvas",
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{},
+			Nodes: []*componentpb.NodeDefinition{},
 			Edges: []*componentpb.Edge{},
 		},
 	}

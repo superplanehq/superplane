@@ -2924,7 +2924,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsNode"
+            "$ref": "#/definitions/ComponentsNodeDefinition"
           }
         },
         "edges": {
@@ -3244,6 +3244,23 @@
         }
       }
     },
+    "CanvasesCanvasNodeState": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "stateReason": {
+          "type": "string"
+        },
+        "metadata": {
+          "type": "object"
+        }
+      }
+    },
     "CanvasesCanvasSpec": {
       "type": "object",
       "properties": {
@@ -3251,7 +3268,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsNode"
+            "$ref": "#/definitions/ComponentsNodeDefinition"
           }
         },
         "edges": {
@@ -3266,6 +3283,13 @@
     "CanvasesCanvasStatus": {
       "type": "object",
       "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasNodeState"
+          }
+        },
         "lastExecutions": {
           "type": "array",
           "items": {
@@ -3538,7 +3562,7 @@
       "type": "object",
       "properties": {
         "node": {
-          "$ref": "#/definitions/ComponentsNode"
+          "$ref": "#/definitions/CanvasesCanvasNodeState"
         }
       }
     },
@@ -3654,7 +3678,7 @@
         }
       }
     },
-    "ComponentsNode": {
+    "ComponentsNodeDefinition": {
       "type": "object",
       "properties": {
         "id": {
@@ -3664,47 +3688,35 @@
           "type": "string"
         },
         "type": {
-          "$ref": "#/definitions/ComponentsNodeType"
+          "$ref": "#/definitions/ComponentsNodeDefinitionType"
         },
         "configuration": {
-          "type": "object"
-        },
-        "metadata": {
           "type": "object"
         },
         "position": {
           "$ref": "#/definitions/ComponentsPosition"
         },
         "component": {
-          "$ref": "#/definitions/NodeComponentRef"
+          "$ref": "#/definitions/NodeDefinitionComponentRef"
         },
         "blueprint": {
-          "$ref": "#/definitions/NodeBlueprintRef"
+          "$ref": "#/definitions/NodeDefinitionBlueprintRef"
         },
         "trigger": {
-          "$ref": "#/definitions/NodeTriggerRef"
+          "$ref": "#/definitions/NodeDefinitionTriggerRef"
         },
         "widget": {
-          "$ref": "#/definitions/NodeWidgetRef"
+          "$ref": "#/definitions/NodeDefinitionWidgetRef"
         },
         "isCollapsed": {
           "type": "boolean"
         },
         "integration": {
           "$ref": "#/definitions/ComponentsIntegrationRef"
-        },
-        "errorMessage": {
-          "type": "string"
-        },
-        "warningMessage": {
-          "type": "string"
-        },
-        "paused": {
-          "type": "boolean"
         }
       }
     },
-    "ComponentsNodeType": {
+    "ComponentsNodeDefinitionType": {
       "type": "string",
       "enum": [
         "TYPE_COMPONENT",
@@ -4294,7 +4306,7 @@
         }
       }
     },
-    "NodeBlueprintRef": {
+    "NodeDefinitionBlueprintRef": {
       "type": "object",
       "properties": {
         "id": {
@@ -4302,7 +4314,7 @@
         }
       }
     },
-    "NodeComponentRef": {
+    "NodeDefinitionComponentRef": {
       "type": "object",
       "properties": {
         "name": {
@@ -4310,7 +4322,7 @@
         }
       }
     },
-    "NodeTriggerRef": {
+    "NodeDefinitionTriggerRef": {
       "type": "object",
       "properties": {
         "name": {
@@ -4318,7 +4330,7 @@
         }
       }
     },
-    "NodeWidgetRef": {
+    "NodeDefinitionWidgetRef": {
       "type": "object",
       "properties": {
         "name": {

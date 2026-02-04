@@ -206,8 +206,6 @@ gen:
 	$(MAKE) openapi.spec.gen
 	$(MAKE) openapi.client.gen
 	$(MAKE) openapi.web.client.gen
-	$(MAKE) format.go
-	$(MAKE) format.js
 
 gen.components.docs:
 	rm -rf docs/components
@@ -222,6 +220,7 @@ REST_API_MODULES := authorization,organizations,integrations,secrets,users,group
 pb.gen:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
+	$(MAKE) format.go
 
 openapi.spec.gen:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
@@ -240,10 +239,12 @@ openapi.client.gen:
 	rm -rf pkg/openapi_client/.travis.yml
 	rm -rf pkg/openapi_client/README.md
 	rm -rf pkg/openapi_client/git_push.sh
+	$(MAKE) format.go
 
 openapi.web.client.gen:
 	rm -rf web_src/src/api-client
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -c "cd web_src && npm run generate:api"
+	$(MAKE) format.js
 
 #
 # Image and CLI build

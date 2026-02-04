@@ -15,33 +15,33 @@ import (
 	"encoding/json"
 )
 
-// checks if the NodeComponentRef type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &NodeComponentRef{}
+// checks if the NodeDefinitionComponentRef type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &NodeDefinitionComponentRef{}
 
-// NodeComponentRef struct for NodeComponentRef
-type NodeComponentRef struct {
+// NodeDefinitionComponentRef struct for NodeDefinitionComponentRef
+type NodeDefinitionComponentRef struct {
 	Name *string `json:"name,omitempty"`
 }
 
-// NewNodeComponentRef instantiates a new NodeComponentRef object
+// NewNodeDefinitionComponentRef instantiates a new NodeDefinitionComponentRef object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewNodeComponentRef() *NodeComponentRef {
-	this := NodeComponentRef{}
+func NewNodeDefinitionComponentRef() *NodeDefinitionComponentRef {
+	this := NodeDefinitionComponentRef{}
 	return &this
 }
 
-// NewNodeComponentRefWithDefaults instantiates a new NodeComponentRef object
+// NewNodeDefinitionComponentRefWithDefaults instantiates a new NodeDefinitionComponentRef object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewNodeComponentRefWithDefaults() *NodeComponentRef {
-	this := NodeComponentRef{}
+func NewNodeDefinitionComponentRefWithDefaults() *NodeDefinitionComponentRef {
+	this := NodeDefinitionComponentRef{}
 	return &this
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
-func (o *NodeComponentRef) GetName() string {
+func (o *NodeDefinitionComponentRef) GetName() string {
 	if o == nil || IsNil(o.Name) {
 		var ret string
 		return ret
@@ -51,7 +51,7 @@ func (o *NodeComponentRef) GetName() string {
 
 // GetNameOk returns a tuple with the Name field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *NodeComponentRef) GetNameOk() (*string, bool) {
+func (o *NodeDefinitionComponentRef) GetNameOk() (*string, bool) {
 	if o == nil || IsNil(o.Name) {
 		return nil, false
 	}
@@ -59,7 +59,7 @@ func (o *NodeComponentRef) GetNameOk() (*string, bool) {
 }
 
 // HasName returns a boolean if a field has been set.
-func (o *NodeComponentRef) HasName() bool {
+func (o *NodeDefinitionComponentRef) HasName() bool {
 	if o != nil && !IsNil(o.Name) {
 		return true
 	}
@@ -68,11 +68,11 @@ func (o *NodeComponentRef) HasName() bool {
 }
 
 // SetName gets a reference to the given string and assigns it to the Name field.
-func (o *NodeComponentRef) SetName(v string) {
+func (o *NodeDefinitionComponentRef) SetName(v string) {
 	o.Name = &v
 }
 
-func (o NodeComponentRef) MarshalJSON() ([]byte, error) {
+func (o NodeDefinitionComponentRef) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -80,7 +80,7 @@ func (o NodeComponentRef) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o NodeComponentRef) ToMap() (map[string]interface{}, error) {
+func (o NodeDefinitionComponentRef) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
@@ -88,38 +88,38 @@ func (o NodeComponentRef) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableNodeComponentRef struct {
-	value *NodeComponentRef
+type NullableNodeDefinitionComponentRef struct {
+	value *NodeDefinitionComponentRef
 	isSet bool
 }
 
-func (v NullableNodeComponentRef) Get() *NodeComponentRef {
+func (v NullableNodeDefinitionComponentRef) Get() *NodeDefinitionComponentRef {
 	return v.value
 }
 
-func (v *NullableNodeComponentRef) Set(val *NodeComponentRef) {
+func (v *NullableNodeDefinitionComponentRef) Set(val *NodeDefinitionComponentRef) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableNodeComponentRef) IsSet() bool {
+func (v NullableNodeDefinitionComponentRef) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableNodeComponentRef) Unset() {
+func (v *NullableNodeDefinitionComponentRef) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableNodeComponentRef(val *NodeComponentRef) *NullableNodeComponentRef {
-	return &NullableNodeComponentRef{value: val, isSet: true}
+func NewNullableNodeDefinitionComponentRef(val *NodeDefinitionComponentRef) *NullableNodeDefinitionComponentRef {
+	return &NullableNodeDefinitionComponentRef{value: val, isSet: true}
 }
 
-func (v NullableNodeComponentRef) MarshalJSON() ([]byte, error) {
+func (v NullableNodeDefinitionComponentRef) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableNodeComponentRef) UnmarshalJSON(src []byte) error {
+func (v *NullableNodeDefinitionComponentRef) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

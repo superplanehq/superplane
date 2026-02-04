@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	compb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -104,16 +103,6 @@ func Test__DescribeCanvas(t *testing.T) {
 		assert.Equal(t, "node-2", response.Canvas.Spec.Nodes[1].Id)
 		assert.Equal(t, "Second Node", response.Canvas.Spec.Nodes[1].Name)
 
-		var pausedNode *compb.Node
-		for _, node := range response.Canvas.Spec.Nodes {
-			if node.Id == "node-1" {
-				pausedNode = node
-				break
-			}
-		}
-		require.NotNil(t, pausedNode)
-		assert.True(t, pausedNode.Paused)
-
 		assert.Len(t, response.Canvas.Spec.Edges, 1)
 		assert.Equal(t, "node-1", response.Canvas.Spec.Edges[0].SourceId)
 		assert.Equal(t, "node-2", response.Canvas.Spec.Edges[0].TargetId)
@@ -126,6 +115,17 @@ func Test__DescribeCanvas(t *testing.T) {
 		assert.NotNil(t, response.Canvas.Status.LastExecutions)
 		assert.NotNil(t, response.Canvas.Status.NextQueueItems)
 		assert.NotNil(t, response.Canvas.Status.LastEvents)
+
+		//
+		// Verify node states
+		//
+		assert.Len(t, response.Canvas.Status.Nodes, 2)
+		assert.Equal(t, "node-1", response.Canvas.Status.Nodes[0].Id)
+		assert.Equal(t, "node-2", response.Canvas.Status.Nodes[1].Id)
+		assert.Equal(t, "paused", response.Canvas.Status.Nodes[0].State)
+		assert.Equal(t, "paused", response.Canvas.Status.Nodes[1].State)
+		assert.Empty(t, response.Canvas.Status.Nodes[0].StateReason)
+		assert.Empty(t, response.Canvas.Status.Nodes[1].StateReason)
 	})
 
 	t.Run("status includes last execution per node", func(t *testing.T) {

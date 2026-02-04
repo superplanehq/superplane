@@ -459,20 +459,20 @@ func (*DeleteBlueprintResponse) Descriptor() ([]byte, []int) {
 }
 
 type Blueprint struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	OrganizationId string                 `protobuf:"bytes,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
-	Name           string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Description    string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
-	CreatedAt      *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt      *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	Nodes          []*components.Node     `protobuf:"bytes,7,rep,name=nodes,proto3" json:"nodes,omitempty"`
-	Edges          []*components.Edge     `protobuf:"bytes,8,rep,name=edges,proto3" json:"edges,omitempty"`
-	Configuration  []*configuration.Field `protobuf:"bytes,9,rep,name=configuration,proto3" json:"configuration,omitempty"`
-	OutputChannels []*OutputChannel       `protobuf:"bytes,10,rep,name=output_channels,json=outputChannels,proto3" json:"output_channels,omitempty"`
-	Icon           string                 `protobuf:"bytes,11,opt,name=icon,proto3" json:"icon,omitempty"`
-	Color          string                 `protobuf:"bytes,12,opt,name=color,proto3" json:"color,omitempty"`
-	CreatedBy      *UserRef               `protobuf:"bytes,13,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	state          protoimpl.MessageState       `protogen:"open.v1"`
+	Id             string                       `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	OrganizationId string                       `protobuf:"bytes,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	Name           string                       `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Description    string                       `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	CreatedAt      *timestamp.Timestamp         `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt      *timestamp.Timestamp         `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Nodes          []*components.NodeDefinition `protobuf:"bytes,7,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	Edges          []*components.Edge           `protobuf:"bytes,8,rep,name=edges,proto3" json:"edges,omitempty"`
+	Configuration  []*configuration.Field       `protobuf:"bytes,9,rep,name=configuration,proto3" json:"configuration,omitempty"`
+	OutputChannels []*OutputChannel             `protobuf:"bytes,10,rep,name=output_channels,json=outputChannels,proto3" json:"output_channels,omitempty"`
+	Icon           string                       `protobuf:"bytes,11,opt,name=icon,proto3" json:"icon,omitempty"`
+	Color          string                       `protobuf:"bytes,12,opt,name=color,proto3" json:"color,omitempty"`
+	CreatedBy      *UserRef                     `protobuf:"bytes,13,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -549,7 +549,7 @@ func (x *Blueprint) GetUpdatedAt() *timestamp.Timestamp {
 	return nil
 }
 
-func (x *Blueprint) GetNodes() []*components.Node {
+func (x *Blueprint) GetNodes() []*components.NodeDefinition {
 	if x != nil {
 		return x.Nodes
 	}
@@ -735,7 +735,7 @@ const file_blueprints_proto_rawDesc = "" +
 	"\tblueprint\x18\x01 \x01(\v2 .Superplane.Blueprints.BlueprintR\tblueprint\"(\n" +
 	"\x16DeleteBlueprintRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x19\n" +
-	"\x17DeleteBlueprintResponse\"\xd5\x04\n" +
+	"\x17DeleteBlueprintResponse\"\xdf\x04\n" +
 	"\tBlueprint\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
 	"\x0forganization_id\x18\x02 \x01(\tR\x0eorganizationId\x12\x12\n" +
@@ -744,8 +744,8 @@ const file_blueprints_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x121\n" +
-	"\x05nodes\x18\a \x03(\v2\x1b.Superplane.Components.NodeR\x05nodes\x121\n" +
+	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12;\n" +
+	"\x05nodes\x18\a \x03(\v2%.Superplane.Components.NodeDefinitionR\x05nodes\x121\n" +
 	"\x05edges\x18\b \x03(\v2\x1b.Superplane.Components.EdgeR\x05edges\x12E\n" +
 	"\rconfiguration\x18\t \x03(\v2\x1f.Superplane.Configuration.FieldR\rconfiguration\x12M\n" +
 	"\x0foutput_channels\x18\n" +
@@ -804,7 +804,7 @@ var file_blueprints_proto_goTypes = []any{
 	(*OutputChannel)(nil),             // 11: Superplane.Blueprints.OutputChannel
 	(*UserRef)(nil),                   // 12: Superplane.Blueprints.UserRef
 	(*timestamp.Timestamp)(nil),       // 13: google.protobuf.Timestamp
-	(*components.Node)(nil),           // 14: Superplane.Components.Node
+	(*components.NodeDefinition)(nil), // 14: Superplane.Components.NodeDefinition
 	(*components.Edge)(nil),           // 15: Superplane.Components.Edge
 	(*configuration.Field)(nil),       // 16: Superplane.Configuration.Field
 }
@@ -817,7 +817,7 @@ var file_blueprints_proto_depIdxs = []int32{
 	10, // 5: Superplane.Blueprints.UpdateBlueprintResponse.blueprint:type_name -> Superplane.Blueprints.Blueprint
 	13, // 6: Superplane.Blueprints.Blueprint.created_at:type_name -> google.protobuf.Timestamp
 	13, // 7: Superplane.Blueprints.Blueprint.updated_at:type_name -> google.protobuf.Timestamp
-	14, // 8: Superplane.Blueprints.Blueprint.nodes:type_name -> Superplane.Components.Node
+	14, // 8: Superplane.Blueprints.Blueprint.nodes:type_name -> Superplane.Components.NodeDefinition
 	15, // 9: Superplane.Blueprints.Blueprint.edges:type_name -> Superplane.Components.Edge
 	16, // 10: Superplane.Blueprints.Blueprint.configuration:type_name -> Superplane.Configuration.Field
 	11, // 11: Superplane.Blueprints.Blueprint.output_channels:type_name -> Superplane.Blueprints.OutputChannel

@@ -106,7 +106,7 @@ message ListComponentActionsResponse {
   repeated ComponentAction actions = 1;
 }
 
-message Node {
+message NodeDefinition {
   enum Type {
     TYPE_COMPONENT = 0;
     TYPE_BLUEPRINT = 1;
@@ -134,17 +134,13 @@ message Node {
   string name = 2;
   Type type = 3;
   google.protobuf.Struct configuration = 4;
-  google.protobuf.Struct metadata = 5;
-  Position position = 6;
-  ComponentRef component = 7;
-  BlueprintRef blueprint = 8;
-  TriggerRef trigger = 9;
-  WidgetRef widget = 10;
-  bool is_collapsed = 11;
-  IntegrationRef integration = 12;
-  string error_message = 13;
-  string warning_message = 14;
-  bool paused = 15;
+  Position position = 5;
+  ComponentRef component = 6;
+  BlueprintRef blueprint = 7;
+  TriggerRef trigger = 8;
+  WidgetRef widget = 9;
+  bool is_collapsed = 10;
+  IntegrationRef integration = 11;
 }
 
 message Position {

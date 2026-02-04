@@ -59,12 +59,12 @@ func TestUpdateCanvas_NodeRemovalUseSoftDelete(t *testing.T) {
 			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{
+			Nodes: []*componentpb.NodeDefinition{
 				{
 					Id:   "node-1",
 					Name: "Node 1",
-					Type: componentpb.Node_TYPE_COMPONENT,
-					Component: &componentpb.Node_ComponentRef{
+					Type: componentpb.NodeDefinition_TYPE_COMPONENT,
+					Component: &componentpb.NodeDefinition_ComponentRef{
 						Name: "noop",
 					},
 				},
@@ -152,12 +152,12 @@ func TestUpdateCanvas_RemapConflictingNodeIDs(t *testing.T) {
 			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{
+			Nodes: []*componentpb.NodeDefinition{
 				{
 					Id:   "node-2",
 					Name: "Node 2",
-					Type: componentpb.Node_TYPE_COMPONENT,
-					Component: &componentpb.Node_ComponentRef{
+					Type: componentpb.NodeDefinition_TYPE_COMPONENT,
+					Component: &componentpb.NodeDefinition_ComponentRef{
 						Name: "noop",
 					},
 				},
@@ -183,20 +183,20 @@ func TestUpdateCanvas_RemapConflictingNodeIDs(t *testing.T) {
 			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{
+			Nodes: []*componentpb.NodeDefinition{
 				{
 					Id:   "node-1",
 					Name: "Node 1",
-					Type: componentpb.Node_TYPE_COMPONENT,
-					Component: &componentpb.Node_ComponentRef{
+					Type: componentpb.NodeDefinition_TYPE_COMPONENT,
+					Component: &componentpb.NodeDefinition_ComponentRef{
 						Name: "noop",
 					},
 				},
 				{
 					Id:   "node-2",
 					Name: "Node 2",
-					Type: componentpb.Node_TYPE_COMPONENT,
-					Component: &componentpb.Node_ComponentRef{
+					Type: componentpb.NodeDefinition_TYPE_COMPONENT,
+					Component: &componentpb.NodeDefinition_ComponentRef{
 						Name: "noop",
 					},
 				},
@@ -224,7 +224,7 @@ func TestUpdateCanvas_RemapConflictingNodeIDs(t *testing.T) {
 	require.NotNil(t, response.Canvas)
 	require.NotNil(t, response.Canvas.Spec)
 
-	var remappedNode *componentpb.Node
+	var remappedNode *componentpb.NodeDefinition
 	for _, node := range response.Canvas.Spec.Nodes {
 		if node.GetName() == "Node 1" {
 			remappedNode = node
@@ -297,20 +297,20 @@ func TestUpdateCanvas_ErroredNodesCanExist(t *testing.T) {
 			Description: canvas.Description + " Updated",
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{
+			Nodes: []*componentpb.NodeDefinition{
 				{
 					Id:   "node-1",
 					Name: "Node 1 Updated",
-					Type: componentpb.Node_TYPE_COMPONENT,
-					Component: &componentpb.Node_ComponentRef{
+					Type: componentpb.NodeDefinition_TYPE_COMPONENT,
+					Component: &componentpb.NodeDefinition_ComponentRef{
 						Name: "noop",
 					},
 				},
 				{
 					Id:   "node-2",
 					Name: "Node 2 Updated",
-					Type: componentpb.Node_TYPE_COMPONENT,
-					Component: &componentpb.Node_ComponentRef{
+					Type: componentpb.NodeDefinition_TYPE_COMPONENT,
+					Component: &componentpb.NodeDefinition_ComponentRef{
 						Name: "noop",
 					},
 				},
@@ -387,12 +387,12 @@ func TestUpdateWorkflow_ErroredNodeResetOnUpdate(t *testing.T) {
 			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{
+			Nodes: []*componentpb.NodeDefinition{
 				{
 					Id:   "node-1",
 					Name: "Node 1 Updated",
-					Type: componentpb.Node_TYPE_COMPONENT,
-					Component: &componentpb.Node_ComponentRef{
+					Type: componentpb.NodeDefinition_TYPE_COMPONENT,
+					Component: &componentpb.NodeDefinition_ComponentRef{
 						Name: "noop",
 					},
 				},
@@ -474,28 +474,28 @@ func TestUpdateCanvas_NonErroredNodesKeepState(t *testing.T) {
 			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{
+			Nodes: []*componentpb.NodeDefinition{
 				{
 					Id:   "ready-node",
 					Name: "Ready Node Updated",
-					Type: componentpb.Node_TYPE_COMPONENT,
-					Component: &componentpb.Node_ComponentRef{
+					Type: componentpb.NodeDefinition_TYPE_COMPONENT,
+					Component: &componentpb.NodeDefinition_ComponentRef{
 						Name: "noop",
 					},
 				},
 				{
 					Id:   "processing-node",
 					Name: "Processing Node Updated",
-					Type: componentpb.Node_TYPE_COMPONENT,
-					Component: &componentpb.Node_ComponentRef{
+					Type: componentpb.NodeDefinition_TYPE_COMPONENT,
+					Component: &componentpb.NodeDefinition_ComponentRef{
 						Name: "noop",
 					},
 				},
 				{
 					Id:   "errored-node",
 					Name: "Errored Node Updated",
-					Type: componentpb.Node_TYPE_COMPONENT,
-					Component: &componentpb.Node_ComponentRef{
+					Type: componentpb.NodeDefinition_TYPE_COMPONENT,
+					Component: &componentpb.NodeDefinition_ComponentRef{
 						Name: "noop",
 					},
 				},
@@ -555,20 +555,20 @@ func TestUpdateCanvas_ValidationErrorsPersisted(t *testing.T) {
 			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{
+			Nodes: []*componentpb.NodeDefinition{
 				{
 					Id:   "valid-node",
 					Name: "Valid Node",
-					Type: componentpb.Node_TYPE_COMPONENT,
-					Component: &componentpb.Node_ComponentRef{
+					Type: componentpb.NodeDefinition_TYPE_COMPONENT,
+					Component: &componentpb.NodeDefinition_ComponentRef{
 						Name: "noop",
 					},
 				},
 				{
 					Id:   "invalid-node",
 					Name: "Invalid Node",
-					Type: componentpb.Node_TYPE_COMPONENT,
-					Component: &componentpb.Node_ComponentRef{
+					Type: componentpb.NodeDefinition_TYPE_COMPONENT,
+					Component: &componentpb.NodeDefinition_ComponentRef{
 						Name: "nonexistent-component",
 					},
 				},
@@ -636,12 +636,12 @@ func TestUpdateCanvas_SetupErrorsPersistedInResponse(t *testing.T) {
 			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{
+			Nodes: []*componentpb.NodeDefinition{
 				{
 					Id:   "blueprint-node",
 					Name: "Blueprint Node",
-					Type: componentpb.Node_TYPE_BLUEPRINT,
-					Blueprint: &componentpb.Node_BlueprintRef{
+					Type: componentpb.NodeDefinition_TYPE_BLUEPRINT,
+					Blueprint: &componentpb.NodeDefinition_BlueprintRef{
 						Id: blueprint.ID.String(),
 					},
 				},
@@ -661,16 +661,10 @@ func TestUpdateCanvas_SetupErrorsPersistedInResponse(t *testing.T) {
 	)
 	require.NoError(t, err, "UpdateCanvas should succeed even with setup errors")
 
-	var blueprintNode *componentpb.Node
-	for _, node := range response.Canvas.Spec.Nodes {
-		if node.Id == "blueprint-node" {
-			blueprintNode = node
-			break
-		}
-	}
-	require.NotNil(t, blueprintNode, "should find blueprint node in response")
-	assert.NotEmpty(t, blueprintNode.ErrorMessage, "blueprint node should carry setup error message")
-	assert.Contains(t, blueprintNode.ErrorMessage, "url is required", "error message should include setup failure")
+	assert.Len(t, response.Canvas.Status.Nodes, 1)
+	assert.Equal(t, "blueprint-node", response.Canvas.Status.Nodes[0].Id)
+	assert.Equal(t, models.CanvasNodeStateError, response.Canvas.Status.Nodes[0].State)
+	assert.Contains(t, response.Canvas.Status.Nodes[0].StateReason, "url is required")
 }
 
 func TestUpdateCanvas_ErroredNodeBecomesValidAgain(t *testing.T) {
@@ -691,12 +685,12 @@ func TestUpdateCanvas_ErroredNodeBecomesValidAgain(t *testing.T) {
 			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{
+			Nodes: []*componentpb.NodeDefinition{
 				{
 					Id:   "test-node",
 					Name: "Test Node",
-					Type: componentpb.Node_TYPE_COMPONENT,
-					Component: &componentpb.Node_ComponentRef{
+					Type: componentpb.NodeDefinition_TYPE_COMPONENT,
+					Component: &componentpb.NodeDefinition_ComponentRef{
 						Name: "nonexistent-component",
 					},
 				},
@@ -728,12 +722,12 @@ func TestUpdateCanvas_ErroredNodeBecomesValidAgain(t *testing.T) {
 			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{
+			Nodes: []*componentpb.NodeDefinition{
 				{
 					Id:   "test-node",
 					Name: "Test Node",
-					Type: componentpb.Node_TYPE_COMPONENT,
-					Component: &componentpb.Node_ComponentRef{
+					Type: componentpb.NodeDefinition_TYPE_COMPONENT,
+					Component: &componentpb.NodeDefinition_ComponentRef{
 						Name: "noop",
 					},
 				},
@@ -782,21 +776,21 @@ func TestUpdateCanvas_WidgetNodesHandled(t *testing.T) {
 			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{
+			Nodes: []*componentpb.NodeDefinition{
 				{
 					Id:            "annotation-1",
 					Name:          "Workflow Note",
-					Type:          componentpb.Node_TYPE_WIDGET,
+					Type:          componentpb.NodeDefinition_TYPE_WIDGET,
 					Configuration: annotationConfig,
-					Widget: &componentpb.Node_WidgetRef{
+					Widget: &componentpb.NodeDefinition_WidgetRef{
 						Name: "annotation",
 					},
 				},
 				{
 					Id:   "component-1",
 					Name: "Regular Component",
-					Type: componentpb.Node_TYPE_COMPONENT,
-					Component: &componentpb.Node_ComponentRef{
+					Type: componentpb.NodeDefinition_TYPE_COMPONENT,
+					Component: &componentpb.NodeDefinition_ComponentRef{
 						Name: "noop",
 					},
 				},
@@ -826,7 +820,7 @@ func TestUpdateCanvas_WidgetNodesHandled(t *testing.T) {
 	assert.Equal(t, models.NodeTypeComponent, componentNode.Type, "component node should have correct type")
 
 	assert.NotNil(t, updatedCanvas.Canvas.Spec.Nodes, "workflow should have nodes in spec")
-	var foundWidget *componentpb.Node
+	var foundWidget *componentpb.NodeDefinition
 	for _, node := range updatedCanvas.Canvas.Spec.Nodes {
 		if node.Id == "annotation-1" {
 			foundWidget = node
@@ -834,7 +828,7 @@ func TestUpdateCanvas_WidgetNodesHandled(t *testing.T) {
 		}
 	}
 	require.NotNil(t, foundWidget, "should find widget in workflow nodes JSON")
-	assert.Equal(t, componentpb.Node_TYPE_WIDGET, foundWidget.Type, "widget should have correct type")
+	assert.Equal(t, componentpb.NodeDefinition_TYPE_WIDGET, foundWidget.Type, "widget should have correct type")
 	assert.Equal(t, "annotation", foundWidget.Widget.Name, "widget should have correct name")
 	assert.Equal(t, annotationText, foundWidget.Configuration.AsMap()["text"], "widget text should match")
 
@@ -849,21 +843,21 @@ func TestUpdateCanvas_WidgetNodesHandled(t *testing.T) {
 			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{
+			Nodes: []*componentpb.NodeDefinition{
 				{
 					Id:            "annotation-1",
 					Name:          "Workflow Note Updated",
-					Type:          componentpb.Node_TYPE_WIDGET,
+					Type:          componentpb.NodeDefinition_TYPE_WIDGET,
 					Configuration: updatedAnnotationConfig,
-					Widget: &componentpb.Node_WidgetRef{
+					Widget: &componentpb.NodeDefinition_WidgetRef{
 						Name: "annotation",
 					},
 				},
 				{
 					Id:   "component-1",
 					Name: "Regular Component",
-					Type: componentpb.Node_TYPE_COMPONENT,
-					Component: &componentpb.Node_ComponentRef{
+					Type: componentpb.NodeDefinition_TYPE_COMPONENT,
+					Component: &componentpb.NodeDefinition_ComponentRef{
 						Name: "noop",
 					},
 				},
@@ -884,7 +878,7 @@ func TestUpdateCanvas_WidgetNodesHandled(t *testing.T) {
 	require.NoError(t, err, "UpdateCanvas should succeed when updating widget nodes")
 
 	// Verify updated widget is in JSON
-	var updatedWidget *componentpb.Node
+	var updatedWidget *componentpb.NodeDefinition
 	for _, node := range finalUpdatedCanvas.Canvas.Spec.Nodes {
 		if node.Id == "annotation-1" {
 			updatedWidget = node
@@ -918,21 +912,21 @@ func TestUpdateCanvas_WidgetNodesCannotConnect(t *testing.T) {
 			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{
+			Nodes: []*componentpb.NodeDefinition{
 				{
 					Id:            "annotation-1",
 					Name:          "Annotation Note",
-					Type:          componentpb.Node_TYPE_WIDGET,
+					Type:          componentpb.NodeDefinition_TYPE_WIDGET,
 					Configuration: annotationConfig,
-					Widget: &componentpb.Node_WidgetRef{
+					Widget: &componentpb.NodeDefinition_WidgetRef{
 						Name: "annotation",
 					},
 				},
 				{
 					Id:   "component-1",
 					Name: "Component",
-					Type: componentpb.Node_TYPE_COMPONENT,
-					Component: &componentpb.Node_ComponentRef{
+					Type: componentpb.NodeDefinition_TYPE_COMPONENT,
+					Component: &componentpb.NodeDefinition_ComponentRef{
 						Name: "noop",
 					},
 				},
@@ -965,21 +959,21 @@ func TestUpdateCanvas_WidgetNodesCannotConnect(t *testing.T) {
 			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{
+			Nodes: []*componentpb.NodeDefinition{
 				{
 					Id:   "component-1",
 					Name: "Component",
-					Type: componentpb.Node_TYPE_COMPONENT,
-					Component: &componentpb.Node_ComponentRef{
+					Type: componentpb.NodeDefinition_TYPE_COMPONENT,
+					Component: &componentpb.NodeDefinition_ComponentRef{
 						Name: "noop",
 					},
 				},
 				{
 					Id:            "annotation-1",
 					Name:          "Annotation Note",
-					Type:          componentpb.Node_TYPE_WIDGET,
+					Type:          componentpb.NodeDefinition_TYPE_WIDGET,
 					Configuration: annotationConfig,
-					Widget: &componentpb.Node_WidgetRef{
+					Widget: &componentpb.NodeDefinition_WidgetRef{
 						Name: "annotation",
 					},
 				},
@@ -1031,13 +1025,13 @@ func TestUpdateCanvas_WidgetTextLengthValidation(t *testing.T) {
 			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{
+			Nodes: []*componentpb.NodeDefinition{
 				{
 					Id:            "annotation-1",
 					Name:          "Long Annotation",
-					Type:          componentpb.Node_TYPE_WIDGET,
+					Type:          componentpb.NodeDefinition_TYPE_WIDGET,
 					Configuration: longAnnotationConfig,
-					Widget: &componentpb.Node_WidgetRef{
+					Widget: &componentpb.NodeDefinition_WidgetRef{
 						Name: "annotation",
 					},
 				},
@@ -1055,17 +1049,12 @@ func TestUpdateCanvas_WidgetTextLengthValidation(t *testing.T) {
 		workflowWithLongAnnotation,
 		"http://localhost:3000/api/v1",
 	)
-	require.NoError(t, err)
 
-	var annotationNode *componentpb.Node
-	for _, node := range response.Canvas.Spec.Nodes {
-		if node.Id == "annotation-1" {
-			annotationNode = node
-			break
-		}
-	}
-	require.NotNil(t, annotationNode)
-	require.Equal(t, annotationNode.ErrorMessage, "field 'text': must be at most 5000 characters")
+	require.NoError(t, err)
+	require.Len(t, response.Canvas.Status.Nodes, 1)
+	assert.Equal(t, models.CanvasNodeStateError, response.Canvas.Status.Nodes[0].State)
+	assert.NotNil(t, response.Canvas.Status.Nodes[0].StateReason)
+	assert.Contains(t, response.Canvas.Status.Nodes[0].StateReason, "field 'text': must be at most 5000 characters")
 
 	// Test text at exactly max length (5000 characters)
 	exactlyMaxText := strings.Repeat("b", 5000)
@@ -1079,13 +1068,13 @@ func TestUpdateCanvas_WidgetTextLengthValidation(t *testing.T) {
 			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{
+			Nodes: []*componentpb.NodeDefinition{
 				{
 					Id:            "annotation-2",
 					Name:          "Max Length Annotation",
-					Type:          componentpb.Node_TYPE_WIDGET,
+					Type:          componentpb.NodeDefinition_TYPE_WIDGET,
 					Configuration: maxAnnotationConfig,
-					Widget: &componentpb.Node_WidgetRef{
+					Widget: &componentpb.NodeDefinition_WidgetRef{
 						Name: "annotation",
 					},
 				},
@@ -1106,7 +1095,7 @@ func TestUpdateCanvas_WidgetTextLengthValidation(t *testing.T) {
 	require.NoError(t, err, "UpdateWorkflow should succeed with max length annotation text")
 
 	// Verify the max length annotation is in JSON
-	var maxFoundAnnotation *componentpb.Node
+	var maxFoundAnnotation *componentpb.NodeDefinition
 	for _, node := range maxUpdatedCanvas.Canvas.Spec.Nodes {
 		if node.Id == "annotation-2" {
 			maxFoundAnnotation = node

@@ -20,8 +20,8 @@ var _ MappedNullable = &CanvasesCanvasSpec{}
 
 // CanvasesCanvasSpec struct for CanvasesCanvasSpec
 type CanvasesCanvasSpec struct {
-	Nodes []ComponentsNode `json:"nodes,omitempty"`
-	Edges []ComponentsEdge `json:"edges,omitempty"`
+	Nodes []ComponentsNodeDefinition `json:"nodes,omitempty"`
+	Edges []ComponentsEdge           `json:"edges,omitempty"`
 }
 
 // NewCanvasesCanvasSpec instantiates a new CanvasesCanvasSpec object
@@ -42,9 +42,9 @@ func NewCanvasesCanvasSpecWithDefaults() *CanvasesCanvasSpec {
 }
 
 // GetNodes returns the Nodes field value if set, zero value otherwise.
-func (o *CanvasesCanvasSpec) GetNodes() []ComponentsNode {
+func (o *CanvasesCanvasSpec) GetNodes() []ComponentsNodeDefinition {
 	if o == nil || IsNil(o.Nodes) {
-		var ret []ComponentsNode
+		var ret []ComponentsNodeDefinition
 		return ret
 	}
 	return o.Nodes
@@ -52,7 +52,7 @@ func (o *CanvasesCanvasSpec) GetNodes() []ComponentsNode {
 
 // GetNodesOk returns a tuple with the Nodes field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CanvasesCanvasSpec) GetNodesOk() ([]ComponentsNode, bool) {
+func (o *CanvasesCanvasSpec) GetNodesOk() ([]ComponentsNodeDefinition, bool) {
 	if o == nil || IsNil(o.Nodes) {
 		return nil, false
 	}
@@ -68,8 +68,8 @@ func (o *CanvasesCanvasSpec) HasNodes() bool {
 	return false
 }
 
-// SetNodes gets a reference to the given []ComponentsNode and assigns it to the Nodes field.
-func (o *CanvasesCanvasSpec) SetNodes(v []ComponentsNode) {
+// SetNodes gets a reference to the given []ComponentsNodeDefinition and assigns it to the Nodes field.
+func (o *CanvasesCanvasSpec) SetNodes(v []ComponentsNodeDefinition) {
 	o.Nodes = v
 }
 

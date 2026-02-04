@@ -75,7 +75,7 @@ func CreateBlueprint(ctx context.Context, registry *registry.Registry, organizat
 	}, nil
 }
 
-func ParseOutputChannels(registry *registry.Registry, nodes []*componentpb.Node, outputChannels []*pb.OutputChannel) ([]models.BlueprintOutputChannel, error) {
+func ParseOutputChannels(registry *registry.Registry, nodes []*componentpb.NodeDefinition, outputChannels []*pb.OutputChannel) ([]models.BlueprintOutputChannel, error) {
 	channels := []models.BlueprintOutputChannel{}
 	for _, outputChannel := range outputChannels {
 		if outputChannel.Name == "" {
@@ -105,7 +105,7 @@ func ParseOutputChannels(registry *registry.Registry, nodes []*componentpb.Node,
 	return channels, nil
 }
 
-func validateOutputChannelReference(registry *registry.Registry, nodes []*componentpb.Node, outputChannel *pb.OutputChannel) error {
+func validateOutputChannelReference(registry *registry.Registry, nodes []*componentpb.NodeDefinition, outputChannel *pb.OutputChannel) error {
 	//
 	// Check if the node referenced exists
 	//
@@ -131,7 +131,7 @@ func validateOutputChannelReference(registry *registry.Registry, nodes []*compon
 	return fmt.Errorf("output channel %s references an output channel that does not exist on node %s", outputChannel.NodeOutputChannel, outputChannel.NodeId)
 }
 
-func findNode(nodes []*componentpb.Node, id string) *componentpb.Node {
+func findNode(nodes []*componentpb.NodeDefinition, id string) *componentpb.NodeDefinition {
 	for _, node := range nodes {
 		if node.Id == id {
 			return node

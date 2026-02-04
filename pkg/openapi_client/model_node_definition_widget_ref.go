@@ -15,33 +15,33 @@ import (
 	"encoding/json"
 )
 
-// checks if the NodeTriggerRef type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &NodeTriggerRef{}
+// checks if the NodeDefinitionWidgetRef type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &NodeDefinitionWidgetRef{}
 
-// NodeTriggerRef struct for NodeTriggerRef
-type NodeTriggerRef struct {
+// NodeDefinitionWidgetRef struct for NodeDefinitionWidgetRef
+type NodeDefinitionWidgetRef struct {
 	Name *string `json:"name,omitempty"`
 }
 
-// NewNodeTriggerRef instantiates a new NodeTriggerRef object
+// NewNodeDefinitionWidgetRef instantiates a new NodeDefinitionWidgetRef object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewNodeTriggerRef() *NodeTriggerRef {
-	this := NodeTriggerRef{}
+func NewNodeDefinitionWidgetRef() *NodeDefinitionWidgetRef {
+	this := NodeDefinitionWidgetRef{}
 	return &this
 }
 
-// NewNodeTriggerRefWithDefaults instantiates a new NodeTriggerRef object
+// NewNodeDefinitionWidgetRefWithDefaults instantiates a new NodeDefinitionWidgetRef object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewNodeTriggerRefWithDefaults() *NodeTriggerRef {
-	this := NodeTriggerRef{}
+func NewNodeDefinitionWidgetRefWithDefaults() *NodeDefinitionWidgetRef {
+	this := NodeDefinitionWidgetRef{}
 	return &this
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
-func (o *NodeTriggerRef) GetName() string {
+func (o *NodeDefinitionWidgetRef) GetName() string {
 	if o == nil || IsNil(o.Name) {
 		var ret string
 		return ret
@@ -51,7 +51,7 @@ func (o *NodeTriggerRef) GetName() string {
 
 // GetNameOk returns a tuple with the Name field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *NodeTriggerRef) GetNameOk() (*string, bool) {
+func (o *NodeDefinitionWidgetRef) GetNameOk() (*string, bool) {
 	if o == nil || IsNil(o.Name) {
 		return nil, false
 	}
@@ -59,7 +59,7 @@ func (o *NodeTriggerRef) GetNameOk() (*string, bool) {
 }
 
 // HasName returns a boolean if a field has been set.
-func (o *NodeTriggerRef) HasName() bool {
+func (o *NodeDefinitionWidgetRef) HasName() bool {
 	if o != nil && !IsNil(o.Name) {
 		return true
 	}
@@ -68,11 +68,11 @@ func (o *NodeTriggerRef) HasName() bool {
 }
 
 // SetName gets a reference to the given string and assigns it to the Name field.
-func (o *NodeTriggerRef) SetName(v string) {
+func (o *NodeDefinitionWidgetRef) SetName(v string) {
 	o.Name = &v
 }
 
-func (o NodeTriggerRef) MarshalJSON() ([]byte, error) {
+func (o NodeDefinitionWidgetRef) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -80,7 +80,7 @@ func (o NodeTriggerRef) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o NodeTriggerRef) ToMap() (map[string]interface{}, error) {
+func (o NodeDefinitionWidgetRef) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
@@ -88,38 +88,38 @@ func (o NodeTriggerRef) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableNodeTriggerRef struct {
-	value *NodeTriggerRef
+type NullableNodeDefinitionWidgetRef struct {
+	value *NodeDefinitionWidgetRef
 	isSet bool
 }
 
-func (v NullableNodeTriggerRef) Get() *NodeTriggerRef {
+func (v NullableNodeDefinitionWidgetRef) Get() *NodeDefinitionWidgetRef {
 	return v.value
 }
 
-func (v *NullableNodeTriggerRef) Set(val *NodeTriggerRef) {
+func (v *NullableNodeDefinitionWidgetRef) Set(val *NodeDefinitionWidgetRef) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableNodeTriggerRef) IsSet() bool {
+func (v NullableNodeDefinitionWidgetRef) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableNodeTriggerRef) Unset() {
+func (v *NullableNodeDefinitionWidgetRef) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableNodeTriggerRef(val *NodeTriggerRef) *NullableNodeTriggerRef {
-	return &NullableNodeTriggerRef{value: val, isSet: true}
+func NewNullableNodeDefinitionWidgetRef(val *NodeDefinitionWidgetRef) *NullableNodeDefinitionWidgetRef {
+	return &NullableNodeDefinitionWidgetRef{value: val, isSet: true}
 }
 
-func (v NullableNodeTriggerRef) MarshalJSON() ([]byte, error) {
+func (v NullableNodeDefinitionWidgetRef) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableNodeTriggerRef) UnmarshalJSON(src []byte) error {
+func (v *NullableNodeDefinitionWidgetRef) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

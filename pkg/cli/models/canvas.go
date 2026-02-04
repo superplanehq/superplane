@@ -16,6 +16,7 @@ type Canvas struct {
 	Kind       string                                 `json:"kind" yaml:"kind"`
 	Metadata   *openapi_client.CanvasesCanvasMetadata `json:"metadata" yaml:"metadata"`
 	Spec       *openapi_client.CanvasesCanvasSpec     `json:"spec,omitempty" yaml:"spec,omitempty"`
+	Status     *openapi_client.CanvasesCanvasStatus   `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
 func ParseCanvas(raw []byte) (*Canvas, error) {
@@ -52,12 +53,13 @@ func CanvasResourceFromCanvas(canvas openapi_client.CanvasesCanvas) Canvas {
 		Kind:       CanvasKind,
 		Metadata:   canvas.Metadata,
 		Spec:       canvas.Spec,
+		Status:     canvas.Status,
 	}
 }
 
 func EmptyCanvasSpec() *openapi_client.CanvasesCanvasSpec {
 	return &openapi_client.CanvasesCanvasSpec{
-		Nodes: []openapi_client.ComponentsNode{},
+		Nodes: []openapi_client.ComponentsNodeDefinition{},
 		Edges: []openapi_client.ComponentsEdge{},
 	}
 }

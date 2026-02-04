@@ -6,10 +6,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	compb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -70,40 +68,7 @@ func UpdateNodePause(ctx context.Context, registry *registry.Registry, canvasID,
 		return nil, err
 	}
 
-	serializedNode, err := serializeCanvasNode(canvasNode)
-	if err != nil {
-		return nil, err
-	}
-
 	return &pb.UpdateNodePauseResponse{
-		Node: serializedNode,
+		Node: serializeCanvasNodeState(canvasNode),
 	}, nil
-}
-
-func serializeCanvasNode(node *models.CanvasNode) (*compb.Node, error) {
-	var integrationID *string
-	if node.AppInstallationID != nil {
-		id := node.AppInstallationID.String()
-		integrationID = &id
-	}
-
-	modelNode := models.Node{
-		ID:            node.NodeID,
-		Name:          node.Name,
-		Type:          node.Type,
-		Ref:           node.Ref.Data(),
-		Configuration: node.Configuration.Data(),
-		Metadata:      node.Metadata.Data(),
-		Position:      node.Position.Data(),
-		IsCollapsed:   node.IsCollapsed,
-		IntegrationID: integrationID,
-	}
-
-	serialized := actions.NodesToProto([]models.Node{modelNode})
-	if len(serialized) == 0 {
-		return nil, status.Error(codes.Internal, "failed to serialize node")
-	}
-
-	serialized[0].Paused = node.State == models.CanvasNodeStatePaused
-	return serialized[0], nil
 }

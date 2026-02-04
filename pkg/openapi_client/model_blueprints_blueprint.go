@@ -27,7 +27,7 @@ type BlueprintsBlueprint struct {
 	Description    *string                             `json:"description,omitempty"`
 	CreatedAt      *time.Time                          `json:"createdAt,omitempty"`
 	UpdatedAt      *time.Time                          `json:"updatedAt,omitempty"`
-	Nodes          []ComponentsNode                    `json:"nodes,omitempty"`
+	Nodes          []ComponentsNodeDefinition          `json:"nodes,omitempty"`
 	Edges          []ComponentsEdge                    `json:"edges,omitempty"`
 	Configuration  []ConfigurationField                `json:"configuration,omitempty"`
 	OutputChannels []SuperplaneBlueprintsOutputChannel `json:"outputChannels,omitempty"`
@@ -246,9 +246,9 @@ func (o *BlueprintsBlueprint) SetUpdatedAt(v time.Time) {
 }
 
 // GetNodes returns the Nodes field value if set, zero value otherwise.
-func (o *BlueprintsBlueprint) GetNodes() []ComponentsNode {
+func (o *BlueprintsBlueprint) GetNodes() []ComponentsNodeDefinition {
 	if o == nil || IsNil(o.Nodes) {
-		var ret []ComponentsNode
+		var ret []ComponentsNodeDefinition
 		return ret
 	}
 	return o.Nodes
@@ -256,7 +256,7 @@ func (o *BlueprintsBlueprint) GetNodes() []ComponentsNode {
 
 // GetNodesOk returns a tuple with the Nodes field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *BlueprintsBlueprint) GetNodesOk() ([]ComponentsNode, bool) {
+func (o *BlueprintsBlueprint) GetNodesOk() ([]ComponentsNodeDefinition, bool) {
 	if o == nil || IsNil(o.Nodes) {
 		return nil, false
 	}
@@ -272,8 +272,8 @@ func (o *BlueprintsBlueprint) HasNodes() bool {
 	return false
 }
 
-// SetNodes gets a reference to the given []ComponentsNode and assigns it to the Nodes field.
-func (o *BlueprintsBlueprint) SetNodes(v []ComponentsNode) {
+// SetNodes gets a reference to the given []ComponentsNodeDefinition and assigns it to the Nodes field.
+func (o *BlueprintsBlueprint) SetNodes(v []ComponentsNodeDefinition) {
 	o.Nodes = v
 }
 

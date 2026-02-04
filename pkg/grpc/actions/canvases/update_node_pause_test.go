@@ -40,7 +40,7 @@ func Test_UpdateNodePause(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Node)
-		assert.True(t, response.Node.Paused)
+		assert.Equal(t, models.CanvasNodeStatePaused, response.Node.State)
 
 		node, err := models.FindCanvasNode(database.Conn(), canvas.ID, "node-1")
 		require.NoError(t, err)
@@ -50,7 +50,7 @@ func Test_UpdateNodePause(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Node)
-		assert.False(t, response.Node.Paused)
+		assert.Equal(t, models.CanvasNodeStateReady, response.Node.State)
 
 		node, err = models.FindCanvasNode(database.Conn(), canvas.ID, "node-1")
 		require.NoError(t, err)
@@ -75,7 +75,7 @@ func Test_UpdateNodePause(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Node)
-		assert.False(t, response.Node.Paused)
+		assert.Equal(t, models.CanvasNodeStateProcessing, response.Node.State)
 
 		node, err := models.FindCanvasNode(database.Conn(), canvas.ID, "node-1")
 		require.NoError(t, err)

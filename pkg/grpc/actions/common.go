@@ -622,7 +622,7 @@ func ProtoToConfigurationField(pbField *configpb.Field) configuration.Field {
 	return field
 }
 
-func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
+func ProtoToNodeDefinitions(nodes []*componentpb.NodeDefinition) []models.Node {
 	result := make([]models.Node, len(nodes))
 	for i, node := range nodes {
 		var integrationID *string
@@ -630,36 +630,24 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			integrationID = &node.Integration.Id
 		}
 
-		var errorMessage *string
-		if node.ErrorMessage != "" {
-			errorMessage = &node.ErrorMessage
-		}
-
-		var warningMessage *string
-		if node.WarningMessage != "" {
-			warningMessage = &node.WarningMessage
-		}
-
 		result[i] = models.Node{
-			ID:             node.Id,
-			Name:           node.Name,
-			Type:           ProtoToNodeType(node.Type),
-			Ref:            ProtoToNodeRef(node),
-			Configuration:  node.Configuration.AsMap(),
-			Position:       ProtoToPosition(node.Position),
-			IsCollapsed:    node.IsCollapsed,
-			IntegrationID:  integrationID,
-			ErrorMessage:   errorMessage,
-			WarningMessage: warningMessage,
+			ID:            node.Id,
+			Name:          node.Name,
+			Type:          ProtoToNodeType(node.Type),
+			Ref:           ProtoToNodeRef(node),
+			Configuration: node.Configuration.AsMap(),
+			Position:      ProtoToPosition(node.Position),
+			IsCollapsed:   node.IsCollapsed,
+			IntegrationID: integrationID,
 		}
 	}
 	return result
 }
 
-func NodesToProto(nodes []models.Node) []*componentpb.Node {
-	result := make([]*componentpb.Node, len(nodes))
+func NodeDefinitionsToProto(nodes []models.Node) []*componentpb.NodeDefinition {
+	result := make([]*componentpb.NodeDefinition, len(nodes))
 	for i, node := range nodes {
-		result[i] = &componentpb.Node{
+		result[i] = &componentpb.NodeDefinition{
 			Id:          node.ID,
 			Name:        node.Name,
 			Type:        NodeTypeToProto(node.Type),
@@ -668,25 +656,25 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 		}
 
 		if node.Ref.Component != nil {
-			result[i].Component = &componentpb.Node_ComponentRef{
+			result[i].Component = &componentpb.NodeDefinition_ComponentRef{
 				Name: node.Ref.Component.Name,
 			}
 		}
 
 		if node.Ref.Blueprint != nil {
-			result[i].Blueprint = &componentpb.Node_BlueprintRef{
+			result[i].Blueprint = &componentpb.NodeDefinition_BlueprintRef{
 				Id: node.Ref.Blueprint.ID,
 			}
 		}
 
 		if node.Ref.Trigger != nil {
-			result[i].Trigger = &componentpb.Node_TriggerRef{
+			result[i].Trigger = &componentpb.NodeDefinition_TriggerRef{
 				Name: node.Ref.Trigger.Name,
 			}
 		}
 
 		if node.Ref.Widget != nil {
-			result[i].Widget = &componentpb.Node_WidgetRef{
+			result[i].Widget = &componentpb.NodeDefinition_WidgetRef{
 				Name: node.Ref.Widget.Name,
 			}
 		}
@@ -695,22 +683,10 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 			result[i].Configuration, _ = structpb.NewStruct(node.Configuration)
 		}
 
-		if node.Metadata != nil {
-			result[i].Metadata, _ = structpb.NewStruct(node.Metadata)
-		}
-
 		if node.IntegrationID != nil && *node.IntegrationID != "" {
 			result[i].Integration = &componentpb.IntegrationRef{
 				Id: *node.IntegrationID,
 			}
-		}
-
-		if node.ErrorMessage != nil && *node.ErrorMessage != "" {
-			result[i].ErrorMessage = *node.ErrorMessage
-		}
-
-		if node.WarningMessage != nil && *node.WarningMessage != "" {
-			result[i].WarningMessage = *node.WarningMessage
 		}
 	}
 
@@ -744,7 +720,7 @@ func EdgesToProto(edges []models.Edge) []*componentpb.Edge {
 // FindShadowedNameWarnings detects nodes with duplicate names within connected components.
 // Only nodes that are connected (directly or transitively) and share the same name will be flagged.
 // Returns a map of node ID -> warning message.
-func FindShadowedNameWarnings(nodes []*componentpb.Node, edges []*componentpb.Edge) map[string]string {
+func FindShadowedNameWarnings(nodes []*componentpb.NodeDefinition, edges []*componentpb.Edge) map[string]string {
 	warnings := make(map[string]string)
 
 	if len(nodes) == 0 {
@@ -756,7 +732,7 @@ func FindShadowedNameWarnings(nodes []*componentpb.Node, edges []*componentpb.Ed
 	nodeNameByID := make(map[string]string)
 
 	for _, node := range nodes {
-		if node.Type == componentpb.Node_TYPE_WIDGET {
+		if node.Type == componentpb.NodeDefinition_TYPE_WIDGET {
 			continue // Skip widgets
 		}
 		nodeIDs[node.Id] = true
@@ -822,57 +798,57 @@ func FindShadowedNameWarnings(nodes []*componentpb.Node, edges []*componentpb.Ed
 	return warnings
 }
 
-func ProtoToNodeType(nodeType componentpb.Node_Type) string {
+func ProtoToNodeType(nodeType componentpb.NodeDefinition_Type) string {
 	switch nodeType {
-	case componentpb.Node_TYPE_COMPONENT:
+	case componentpb.NodeDefinition_TYPE_COMPONENT:
 		return models.NodeTypeComponent
-	case componentpb.Node_TYPE_BLUEPRINT:
+	case componentpb.NodeDefinition_TYPE_BLUEPRINT:
 		return models.NodeTypeBlueprint
-	case componentpb.Node_TYPE_TRIGGER:
+	case componentpb.NodeDefinition_TYPE_TRIGGER:
 		return models.NodeTypeTrigger
-	case componentpb.Node_TYPE_WIDGET:
+	case componentpb.NodeDefinition_TYPE_WIDGET:
 		return models.NodeTypeWidget
 	default:
 		return ""
 	}
 }
 
-func NodeTypeToProto(nodeType string) componentpb.Node_Type {
+func NodeTypeToProto(nodeType string) componentpb.NodeDefinition_Type {
 	switch nodeType {
 	case models.NodeTypeBlueprint:
-		return componentpb.Node_TYPE_BLUEPRINT
+		return componentpb.NodeDefinition_TYPE_BLUEPRINT
 	case models.NodeTypeTrigger:
-		return componentpb.Node_TYPE_TRIGGER
+		return componentpb.NodeDefinition_TYPE_TRIGGER
 	case models.NodeTypeWidget:
-		return componentpb.Node_TYPE_WIDGET
+		return componentpb.NodeDefinition_TYPE_WIDGET
 	default:
-		return componentpb.Node_TYPE_COMPONENT
+		return componentpb.NodeDefinition_TYPE_COMPONENT
 	}
 }
 
-func ProtoToNodeRef(node *componentpb.Node) models.NodeRef {
+func ProtoToNodeRef(node *componentpb.NodeDefinition) models.NodeRef {
 	ref := models.NodeRef{}
 
 	switch node.Type {
-	case componentpb.Node_TYPE_COMPONENT:
+	case componentpb.NodeDefinition_TYPE_COMPONENT:
 		if node.Component != nil {
 			ref.Component = &models.ComponentRef{
 				Name: node.Component.Name,
 			}
 		}
-	case componentpb.Node_TYPE_BLUEPRINT:
+	case componentpb.NodeDefinition_TYPE_BLUEPRINT:
 		if node.Blueprint != nil {
 			ref.Blueprint = &models.BlueprintRef{
 				ID: node.Blueprint.Id,
 			}
 		}
-	case componentpb.Node_TYPE_TRIGGER:
+	case componentpb.NodeDefinition_TYPE_TRIGGER:
 		if node.Trigger != nil {
 			ref.Trigger = &models.TriggerRef{
 				Name: node.Trigger.Name,
 			}
 		}
-	case componentpb.Node_TYPE_WIDGET:
+	case componentpb.NodeDefinition_TYPE_WIDGET:
 		if node.Widget != nil {
 			ref.Widget = &models.WidgetRef{
 				Name: node.Widget.Name,
@@ -902,7 +878,7 @@ func ProtoToPosition(position *componentpb.Position) models.Position {
 
 // Verify if the workflow is acyclic using
 // topological sort algorithm - kahn's - to detect cycles
-func CheckForCycles(nodes []*componentpb.Node, edges []*componentpb.Edge) error {
+func CheckForCycles(nodes []*componentpb.NodeDefinition, edges []*componentpb.Edge) error {
 
 	//
 	// Build adjacency list

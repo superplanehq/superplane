@@ -14,11 +14,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, error) {
-	serializedNodes, err := serializeCanvasNodes(canvas)
+func SerializeCanvas(canvas *models.Canvas, includeAdditionalStatusData bool) (*pb.Canvas, error) {
+	nodeDefinitions, nodeStates, err := serializeCanvasNodes(canvas)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +34,10 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 		createdBy = &pb.UserRef{Id: idStr, Name: name}
 	}
 
-	if !includeStatus {
+	//
+	// If we are not including information about events / executions / queue items, just return it.
+	//
+	if !includeAdditionalStatusData {
 		return &pb.Canvas{
 			Metadata: &pb.Canvas_Metadata{
 				Id:             canvas.ID.String(),
@@ -46,14 +50,18 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 				IsTemplate:     canvas.IsTemplate,
 			},
 			Spec: &pb.Canvas_Spec{
-				Nodes: serializedNodes,
+				Nodes: nodeDefinitions,
 				Edges: actions.EdgesToProto(canvas.Edges),
 			},
-			Status: nil,
+			Status: &pb.Canvas_Status{
+				Nodes: nodeStates,
+			},
 		}, nil
 	}
 
-	// Fetch last executions per node
+	//
+	// Otherwise, fetch all the information needed before returning.
+	//
 	lastExecutions, err := models.FindLastExecutionPerNode(canvas.ID)
 	if err != nil {
 		return nil, err
@@ -108,10 +116,11 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 			IsTemplate:     canvas.IsTemplate,
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: serializedNodes,
+			Nodes: nodeDefinitions,
 			Edges: actions.EdgesToProto(canvas.Edges),
 		},
 		Status: &pb.Canvas_Status{
+			Nodes:          nodeStates,
 			LastExecutions: serializedExecutions,
 			NextQueueItems: serializedQueueItems,
 			LastEvents:     serializedEvents,
@@ -119,29 +128,43 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 	}, nil
 }
 
-func serializeCanvasNodes(canvas *models.Canvas) ([]*compb.Node, error) {
-	serialized := actions.NodesToProto(canvas.Nodes)
-	if len(serialized) == 0 {
-		return serialized, nil
-	}
-
+func serializeCanvasNodes(canvas *models.Canvas) ([]*compb.NodeDefinition, []*pb.CanvasNodeState, error) {
 	canvasNodes, err := models.FindCanvasNodes(canvas.ID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	pausedByID := make(map[string]bool, len(canvasNodes))
-	for _, node := range canvasNodes {
-		pausedByID[node.NodeID] = node.State == models.CanvasNodeStatePaused
+	if len(canvasNodes) == 0 {
+		return []*compb.NodeDefinition{}, []*pb.CanvasNodeState{}, nil
 	}
 
-	for _, node := range serialized {
-		if paused, ok := pausedByID[node.Id]; ok {
-			node.Paused = paused
-		}
+	nodeDefinitions := actions.NodeDefinitionsToProto(canvas.Nodes)
+	nodeStates := serializeCanvasNodeStates(canvasNodes)
+	return nodeDefinitions, nodeStates, nil
+}
+
+func serializeCanvasNodeStates(canvasNodes []models.CanvasNode) []*pb.CanvasNodeState {
+	states := make([]*pb.CanvasNodeState, len(canvasNodes))
+	for i, node := range canvasNodes {
+		states[i] = serializeCanvasNodeState(&node)
 	}
 
-	return serialized, nil
+	return states
+}
+
+func serializeCanvasNodeState(node *models.CanvasNode) *pb.CanvasNodeState {
+	state := &pb.CanvasNodeState{
+		Id:    node.NodeID,
+		State: node.State,
+	}
+
+	if node.StateReason != nil {
+		state.StateReason = *node.StateReason
+	}
+
+	metadata, _ := structpb.NewStruct(node.Metadata.Data())
+	state.Metadata = metadata
+	return state
 }
 
 func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) ([]models.Node, []models.Edge, error) {
@@ -163,7 +186,7 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 	}
 
 	nodeIDs := make(map[string]bool)
-	nodeTypeByID := make(map[string]compb.Node_Type)
+	nodeTypeByID := make(map[string]compb.NodeDefinition_Type)
 	nodeValidationErrors := make(map[string]string)
 
 	for i, node := range canvas.Spec.Nodes {
@@ -187,8 +210,9 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 		}
 	}
 
+	// TODO: warnings?
 	// Find shadowed names within connected components
-	nodeWarnings := actions.FindShadowedNameWarnings(canvas.Spec.Nodes, canvas.Spec.Edges)
+	// nodeWarnings := actions.FindShadowedNameWarnings(canvas.Spec.Nodes, canvas.Spec.Edges)
 
 	for i, edge := range canvas.Spec.Edges {
 		if edge.SourceId == "" || edge.TargetId == "" {
@@ -203,11 +227,11 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target node %s not found", i, edge.TargetId)
 		}
 
-		if nodeTypeByID[edge.SourceId] == compb.Node_TYPE_WIDGET {
+		if nodeTypeByID[edge.SourceId] == compb.NodeDefinition_TYPE_WIDGET {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as source nodes", i)
 		}
 
-		if nodeTypeByID[edge.TargetId] == compb.Node_TYPE_WIDGET {
+		if nodeTypeByID[edge.TargetId] == compb.NodeDefinition_TYPE_WIDGET {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as target nodes", i)
 		}
 	}
@@ -216,28 +240,12 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 		return nil, nil, err
 	}
 
-	// Convert proto nodes to models, adding validation errors and warnings where applicable
-	nodes := actions.ProtoToNodes(canvas.Spec.Nodes)
-	for i := range nodes {
-		if errorMsg, hasError := nodeValidationErrors[nodes[i].ID]; hasError {
-			nodes[i].ErrorMessage = &errorMsg
-		} else {
-			nodes[i].ErrorMessage = nil
-		}
-
-		if warningMsg, hasWarning := nodeWarnings[nodes[i].ID]; hasWarning {
-			nodes[i].WarningMessage = &warningMsg
-		} else {
-			nodes[i].WarningMessage = nil
-		}
-	}
-
-	return nodes, actions.ProtoToEdges(canvas.Spec.Edges), nil
+	return actions.ProtoToNodeDefinitions(canvas.Spec.Nodes), actions.ProtoToEdges(canvas.Spec.Edges), nil
 }
 
-func validateNodeRef(registry *registry.Registry, organizationID string, node *compb.Node) error {
+func validateNodeRef(registry *registry.Registry, organizationID string, node *compb.NodeDefinition) error {
 	switch node.Type {
-	case compb.Node_TYPE_COMPONENT:
+	case compb.NodeDefinition_TYPE_COMPONENT:
 		if node.Component == nil {
 			return fmt.Errorf("component reference is required for component ref type")
 		}
@@ -253,7 +261,7 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 
 		return configuration.ValidateConfiguration(component.Configuration(), node.Configuration.AsMap())
 
-	case compb.Node_TYPE_BLUEPRINT:
+	case compb.NodeDefinition_TYPE_BLUEPRINT:
 		if node.Blueprint == nil {
 			return fmt.Errorf("blueprint reference is required for blueprint ref type")
 		}
@@ -269,7 +277,7 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 
 		return configuration.ValidateConfiguration(blueprint.Configuration, node.Configuration.AsMap())
 
-	case compb.Node_TYPE_TRIGGER:
+	case compb.NodeDefinition_TYPE_TRIGGER:
 		if node.Trigger == nil {
 			return fmt.Errorf("trigger reference is required for trigger ref type")
 		}
@@ -285,7 +293,7 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 
 		return configuration.ValidateConfiguration(trigger.Configuration(), node.Configuration.AsMap())
 
-	case compb.Node_TYPE_WIDGET:
+	case compb.NodeDefinition_TYPE_WIDGET:
 		if node.Widget == nil {
 			return fmt.Errorf("widget reference is required for widget ref type")
 		}
@@ -306,7 +314,7 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 	}
 }
 
-func findAndValidateTrigger(registry *registry.Registry, organizationID string, node *compb.Node) (core.Trigger, error) {
+func findAndValidateTrigger(registry *registry.Registry, organizationID string, node *compb.NodeDefinition) (core.Trigger, error) {
 	parts := strings.SplitN(node.Trigger.Name, ".", 2)
 	if len(parts) > 2 {
 		return nil, fmt.Errorf("invalid trigger name: %s", node.Trigger.Name)
@@ -324,7 +332,7 @@ func findAndValidateTrigger(registry *registry.Registry, organizationID string, 
 	return registry.GetIntegrationTrigger(parts[0], node.Trigger.Name)
 }
 
-func findAndValidateWidget(registry *registry.Registry, organizationID string, node *compb.Node) (core.Widget, error) {
+func findAndValidateWidget(registry *registry.Registry, organizationID string, node *compb.NodeDefinition) (core.Widget, error) {
 	if node.Widget != nil && node.Widget.Name == "" {
 		return nil, fmt.Errorf("widget name is required")
 	}
@@ -332,7 +340,7 @@ func findAndValidateWidget(registry *registry.Registry, organizationID string, n
 	return registry.GetWidget(node.Widget.Name)
 }
 
-func findAndValidateComponent(registry *registry.Registry, organizationID string, node *compb.Node) (core.Component, error) {
+func findAndValidateComponent(registry *registry.Registry, organizationID string, node *compb.NodeDefinition) (core.Component, error) {
 	parts := strings.SplitN(node.Component.Name, ".", 2)
 	if len(parts) > 2 {
 		return nil, fmt.Errorf("invalid component name: %s", node.Component.Name)

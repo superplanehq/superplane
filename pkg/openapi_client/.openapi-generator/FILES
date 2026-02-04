@@ -43,6 +43,7 @@ docs/CanvasesCanvasEventWithExecutions.md
 docs/CanvasesCanvasMetadata.md
 docs/CanvasesCanvasNodeExecution.md
 docs/CanvasesCanvasNodeQueueItem.md
+docs/CanvasesCanvasNodeState.md
 docs/CanvasesCanvasSpec.md
 docs/CanvasesCanvasStatus.md
 docs/CanvasesCreateCanvasRequest.md
@@ -73,8 +74,8 @@ docs/ComponentsEdge.md
 docs/ComponentsIntegrationRef.md
 docs/ComponentsListComponentActionsResponse.md
 docs/ComponentsListComponentsResponse.md
-docs/ComponentsNode.md
-docs/ComponentsNodeType.md
+docs/ComponentsNodeDefinition.md
+docs/ComponentsNodeDefinitionType.md
 docs/ComponentsPosition.md
 docs/ConfigurationAnyPredicateListTypeOptions.md
 docs/ConfigurationDateTimeTypeOptions.md
@@ -116,10 +117,10 @@ docs/IntegrationNodeRef.md
 docs/IntegrationsIntegrationDefinition.md
 docs/MeAPI.md
 docs/MeRegenerateTokenResponse.md
-docs/NodeBlueprintRef.md
-docs/NodeComponentRef.md
-docs/NodeTriggerRef.md
-docs/NodeWidgetRef.md
+docs/NodeDefinitionBlueprintRef.md
+docs/NodeDefinitionComponentRef.md
+docs/NodeDefinitionTriggerRef.md
+docs/NodeDefinitionWidgetRef.md
 docs/OrganizationAPI.md
 docs/OrganizationsBrowserAction.md
 docs/OrganizationsCreateIntegrationBody.md
@@ -216,6 +217,7 @@ model_canvases_canvas_event_with_executions.go
 model_canvases_canvas_metadata.go
 model_canvases_canvas_node_execution.go
 model_canvases_canvas_node_queue_item.go
+model_canvases_canvas_node_state.go
 model_canvases_canvas_spec.go
 model_canvases_canvas_status.go
 model_canvases_create_canvas_request.go
@@ -245,8 +247,8 @@ model_components_edge.go
 model_components_integration_ref.go
 model_components_list_component_actions_response.go
 model_components_list_components_response.go
-model_components_node.go
-model_components_node_type.go
+model_components_node_definition.go
+model_components_node_definition_type.go
 model_components_position.go
 model_configuration_any_predicate_list_type_options.go
 model_configuration_date_time_type_options.go
@@ -285,10 +287,10 @@ model_groups_update_group_response.go
 model_integration_node_ref.go
 model_integrations_integration_definition.go
 model_me_regenerate_token_response.go
-model_node_blueprint_ref.go
-model_node_component_ref.go
-model_node_trigger_ref.go
-model_node_widget_ref.go
+model_node_definition_blueprint_ref.go
+model_node_definition_component_ref.go
+model_node_definition_trigger_ref.go
+model_node_definition_widget_ref.go
 model_organizations_browser_action.go
 model_organizations_create_integration_body.go
 model_organizations_create_integration_response.go
