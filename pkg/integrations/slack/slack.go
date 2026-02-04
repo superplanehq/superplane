@@ -106,6 +106,7 @@ func (s *Slack) HandleAction(ctx core.IntegrationActionContext) error {
 func (s *Slack) Components() []core.Component {
 	return []core.Component{
 		&SendTextMessage{},
+		&SendAndWaitMessage{},
 	}
 }
 
@@ -357,7 +358,46 @@ func (s *Slack) handleChallenge(ctx core.HTTPRequestContext, payload EventPayloa
 }
 
 func (s *Slack) handleInteractivity(ctx core.HTTPRequestContext, body []byte) {
-	// TODO
+	values, err := url.ParseQuery(string(body))
+	if err != nil {
+		ctx.Logger.Errorf("error parsing interactivity payload: %v", err)
+		ctx.Response.WriteHeader(400)
+		return
+	}
+
+	payloadJSON := values.Get("payload")
+	if payloadJSON == "" {
+		ctx.Logger.Errorf("missing payload in interactivity request")
+		ctx.Response.WriteHeader(400)
+		return
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(payloadJSON), &payload); err != nil {
+		ctx.Logger.Errorf("error unmarshaling interactivity payload: %v", err)
+		ctx.Response.WriteHeader(400)
+		return
+	}
+
+	subscriptions, err := ctx.Integration.ListSubscriptions()
+	if err != nil {
+		ctx.Logger.Errorf("error listing subscriptions: %v", err)
+		ctx.Response.WriteHeader(500)
+		return
+	}
+
+	for _, subscription := range subscriptions {
+		if !s.subscriptionApplies(ctx, subscription, "interaction") {
+			continue
+		}
+
+		err = subscription.SendMessage(payload)
+		if err != nil {
+			ctx.Logger.Errorf("error sending interaction message from app: %v", err)
+		}
+	}
+
+	ctx.Response.WriteHeader(200)
 }
 
 func (s *Slack) parseEventCallback(eventPayload EventPayload) (string, any, error) {
