@@ -206,10 +206,12 @@ func (c *GetWorkflowUsage) getAllWorkflowsUsage(ctx core.ExecutionContext, clien
 		usageList = append(usageList, usageData)
 	}
 
+	// Wrap usageList in []any so the entire list is emitted as ONE output item
+	// Emit() processes each element of payloads as a separate output
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"github.workflowUsage",
-		usageList,
+		[]any{usageList},
 	)
 }
 
