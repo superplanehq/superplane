@@ -234,3 +234,84 @@ func (c *Client) CreateIssue(req *CreateIssueRequest) (*CreateIssueResponse, err
 
 	return &response, nil
 }
+
+// WebhookRegistrationRequest is the request body for registering webhooks.
+type WebhookRegistrationRequest struct {
+	URL      string        `json:"url"`
+	Webhooks []WebhookSpec `json:"webhooks"`
+}
+
+// WebhookSpec defines a single webhook configuration.
+type WebhookSpec struct {
+	JQLFilter string   `json:"jqlFilter"`
+	Events    []string `json:"events"`
+}
+
+// WebhookRegistrationResponse is the response from registering webhooks.
+type WebhookRegistrationResponse struct {
+	WebhookRegistrationResult []WebhookRegistrationResult `json:"webhookRegistrationResult"`
+}
+
+// WebhookRegistrationResult contains the result of a single webhook registration.
+type WebhookRegistrationResult struct {
+	CreatedWebhookID int64    `json:"createdWebhookId"`
+	Errors           []string `json:"errors,omitempty"`
+}
+
+// RegisterWebhook registers a new webhook in Jira.
+func (c *Client) RegisterWebhook(webhookURL, jqlFilter string, events []string) (*WebhookRegistrationResponse, error) {
+	url := fmt.Sprintf("%s/rest/api/3/webhook", c.BaseURL)
+
+	req := WebhookRegistrationRequest{
+		URL: webhookURL,
+		Webhooks: []WebhookSpec{
+			{
+				JQLFilter: jqlFilter,
+				Events:    events,
+			},
+		},
+	}
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response WebhookRegistrationResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing webhook registration response: %v", err)
+	}
+
+	return &response, nil
+}
+
+// WebhookDeletionRequest is the request body for deleting webhooks.
+type WebhookDeletionRequest struct {
+	WebhookIDs []int64 `json:"webhookIds"`
+}
+
+// DeleteWebhook removes webhooks from Jira.
+func (c *Client) DeleteWebhook(webhookIDs []int64) error {
+	url := fmt.Sprintf("%s/rest/api/3/webhook", c.BaseURL)
+
+	req := WebhookDeletionRequest{
+		WebhookIDs: webhookIDs,
+	}
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	_, err = c.execRequest(http.MethodDelete, url, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

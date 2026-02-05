@@ -6,6 +6,12 @@ sidebar:
 
 Manage and react to issues in Jira
 
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Issue Created" href="#on-issue-created" description="Listen for new issues created in Jira" />
+</CardGrid>
+
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Actions
@@ -13,6 +19,83 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in Jira" />
 </CardGrid>
+
+<a id="on-issue-created"></a>
+
+## On Issue Created
+
+The On Issue Created trigger starts a workflow execution when a new issue is created in a Jira project.
+
+### Use Cases
+
+- **Issue automation**: Automate responses to new issues
+- **Notification workflows**: Send notifications when issues are created
+- **Task management**: Sync issues with external task management systems
+- **Triage automation**: Automatically categorize or assign new issues
+
+### Configuration
+
+- **Project**: Select the Jira project to monitor
+- **Issue Types**: Optionally filter by issue type (Task, Bug, Story, etc.)
+
+### Event Data
+
+Each issue created event includes:
+- **webhookEvent**: The event type (jira:issue_created)
+- **issue**: Complete issue information including key, summary, fields
+- **user**: User who created the issue
+
+### Webhook Setup
+
+This trigger automatically sets up a Jira webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "issue": {
+      "fields": {
+        "creator": {
+          "displayName": "John Doe"
+        },
+        "issuetype": {
+          "id": "10001",
+          "name": "Task"
+        },
+        "priority": {
+          "name": "Medium"
+        },
+        "project": {
+          "id": "10000",
+          "key": "PROJ",
+          "name": "My Project"
+        },
+        "reporter": {
+          "displayName": "John Doe"
+        },
+        "status": {
+          "name": "To Do"
+        },
+        "summary": "Implement new feature"
+      },
+      "id": "10001",
+      "key": "PROJ-123",
+      "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
+    },
+    "issue_event_type_name": "issue_created",
+    "timestamp": 1612345678901,
+    "user": {
+      "accountId": "557058:abcd1234-5678-efgh-ijkl-mnopqrstuvwx",
+      "displayName": "John Doe",
+      "emailAddress": "john.doe@example.com"
+    },
+    "webhookEvent": "jira:issue_created"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.issueCreated"
+}
+```
 
 <a id="create-issue"></a>
 
