@@ -10,7 +10,6 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -52,7 +51,7 @@ type Spec struct {
 	Authentication   AuthSpec `json:"authentication" mapstructure:"authentication"`
 	Command          string   `json:"command" mapstructure:"command"`
 	WorkingDirectory string   `json:"workingDirectory,omitempty" mapstructure:"workingDirectory"`
-	Timeout          *int     `json:"timeout,omitempty" mapstructure:"timeout"` // optional; when set, command runs with this limit in seconds
+	Timeout          int      `json:"timeout" mapstructure:"timeout"` // command timeout in seconds (default 60)
 }
 
 type ExecutionMetadata struct {
@@ -79,7 +78,7 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 - **Host**, **Port** (default 22), **Username**: Connection details.
 - **Command**: The command to run (supports expressions).
 - **Working directory**: Optional; runs "cd <dir> && <command>".
-- **Timeout (seconds)**: Optional. When set, limits how long the command may run.
+- **Timeout (seconds)**: How long the command may run (default 60).
 
 ## Output
 
@@ -212,8 +211,8 @@ func (c *SSHCommand) Configuration() []configuration.Field {
 			Name:        "timeout",
 			Label:       "Timeout (seconds)",
 			Type:        configuration.FieldTypeNumber,
-			Required:    false,
-			Togglable:   true,
+			Required:    true,
+			Default:     60,
 			Description: "Limit how long the command may run (seconds).",
 		},
 	}
@@ -237,6 +236,9 @@ func (c *SSHCommand) Setup(ctx core.SetupContext) error {
 	if spec.Port != 0 && (spec.Port < 1 || spec.Port > 65535) {
 		return fmt.Errorf("invalid port: %d", spec.Port)
 	}
+	if spec.Timeout < 1 {
+		return errors.New("timeout is required and must be at least 1 second")
+	}
 
 	switch spec.Authentication.Method {
 	case AuthMethodSSHKey:
@@ -259,24 +261,15 @@ func (c *SSHCommand) Setup(ctx core.SetupContext) error {
 func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 	var spec Spec
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
-		return ctx.ExecutionState.Fail(
-			models.CanvasNodeExecutionResultReasonError,
-			fmt.Sprintf("decode configuration: %v", err),
-		)
+		return fmt.Errorf("decode configuration: %w", err)
 	}
 
 	if spec.Host == "" || spec.User == "" || spec.Command == "" {
-		return ctx.ExecutionState.Fail(
-			models.CanvasNodeExecutionResultReasonError,
-			"host, username, and command are required",
-		)
+		return fmt.Errorf("host, username, and command are required")
 	}
 
 	if ctx.Secrets == nil {
-		return ctx.ExecutionState.Fail(
-			models.CanvasNodeExecutionResultReasonError,
-			"secrets context not available",
-		)
+		return fmt.Errorf("secrets context not available")
 	}
 
 	port := spec.Port
@@ -289,23 +282,14 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 	case AuthMethodSSHKey:
 		secretRef, keyName := parseSecretKeyValue(spec.Authentication.PrivateKey)
 		if secretRef == "" || keyName == "" {
-			return ctx.ExecutionState.Fail(
-				models.CanvasNodeExecutionResultReasonError,
-				"private key credential is required",
-			)
+			return fmt.Errorf("private key credential is required")
 		}
 		privateKey, err := ctx.Secrets.GetKey(secretRef, keyName)
 		if err != nil {
 			if errors.Is(err, core.ErrSecretKeyNotFound) {
-				return ctx.ExecutionState.Fail(
-					models.CanvasNodeExecutionResultReasonError,
-					"private key could not be resolved from the selected credential",
-				)
+				return fmt.Errorf("private key could not be resolved from the selected credential")
 			}
-			return ctx.ExecutionState.Fail(
-				models.CanvasNodeExecutionResultReasonError,
-				fmt.Sprintf("resolve private key: %v", err),
-			)
+			return fmt.Errorf("resolve private key: %w", err)
 		}
 
 		var passphrase []byte
@@ -321,32 +305,20 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 	case AuthMethodPassword:
 		secretRef, keyName := parseSecretKeyValue(spec.Authentication.Password)
 		if secretRef == "" || keyName == "" {
-			return ctx.ExecutionState.Fail(
-				models.CanvasNodeExecutionResultReasonError,
-				"password credential is required",
-			)
+			return fmt.Errorf("password credential is required")
 		}
 		password, err := ctx.Secrets.GetKey(secretRef, keyName)
 		if err != nil {
 			if errors.Is(err, core.ErrSecretKeyNotFound) {
-				return ctx.ExecutionState.Fail(
-					models.CanvasNodeExecutionResultReasonError,
-					"password could not be resolved from the selected credential",
-				)
+				return fmt.Errorf("password could not be resolved from the selected credential")
 			}
-			return ctx.ExecutionState.Fail(
-				models.CanvasNodeExecutionResultReasonError,
-				fmt.Sprintf("resolve password: %v", err),
-			)
+			return fmt.Errorf("resolve password: %w", err)
 		}
 
 		client = NewClientPassword(spec.Host, port, spec.User, password)
 
 	default:
-		return ctx.ExecutionState.Fail(
-			models.CanvasNodeExecutionResultReasonError,
-			fmt.Sprintf("invalid auth method: %s", spec.Authentication.Method),
-		)
+		return fmt.Errorf("invalid auth method: %s", spec.Authentication.Method)
 	}
 
 	defer func() { _ = client.Close() }()
@@ -356,26 +328,21 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 		command = fmt.Sprintf("cd %s && %s", spec.WorkingDirectory, command)
 	}
 
-	var timeout time.Duration
-	if spec.Timeout != nil && *spec.Timeout > 0 {
-		timeout = time.Duration(*spec.Timeout) * time.Second
+	timeoutSec := spec.Timeout
+	if timeoutSec <= 0 {
+		timeoutSec = 60
 	}
+	timeout := time.Duration(timeoutSec) * time.Second
 
 	ctx.Logger.Infof("Executing SSH command on %s@%s:%d: %s", spec.User, spec.Host, port, command)
 
 	result, err := client.ExecuteCommand(command, timeout)
 	if err != nil {
-		return ctx.ExecutionState.Fail(
-			models.CanvasNodeExecutionResultReasonError,
-			fmt.Sprintf("SSH execution failed: %v", err),
-		)
+		return fmt.Errorf("SSH execution failed: %w", err)
 	}
 
 	if err := ctx.Metadata.Set(ExecutionMetadata{Result: result}); err != nil {
-		return ctx.ExecutionState.Fail(
-			models.CanvasNodeExecutionResultReasonError,
-			fmt.Sprintf("set metadata: %v", err),
-		)
+		return fmt.Errorf("set metadata: %w", err)
 	}
 
 	if result.ExitCode == 0 {
