@@ -1613,7 +1613,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
     ],
   },
   {
-    name: "Datadog",
+    name: "DataDog",
     blocks: [
       {
         name: "datadog-metric-query",
@@ -1687,7 +1687,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
       {
         name: "datadog-event-create",
         label: "Create Event",
-        description: "Create a Datadog event",
+        description: "Create a DataDog event",
         type: "component",
         outputChannels: [{ id: "created", label: "Created" } as any],
         configuration: [
@@ -1756,7 +1756,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
       {
         name: "datadog-event-stream-trigger",
         label: "Event Stream Trigger",
-        description: "Trigger on Datadog events matching filters",
+        description: "Trigger on DataDog events matching filters",
         type: "trigger",
         outputChannels: [{ id: "event", label: "Event" } as any],
         configuration: [
@@ -2527,6 +2527,23 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
           { key: "repository", label: "Repository", type: "string", required: true },
           { key: "imageTag", label: "Image Tag", type: "string", required: false },
           { key: "region", label: "Region", type: "string", required: false },
+        ],
+        icon: "cloud",
+        color: "orange",
+      },
+      {
+        name: "aws-codeartifact-package-version-trigger",
+        label: "CodeArtifact Package Version Trigger",
+        description: "Trigger when a CodeArtifact package version changes state",
+        type: "trigger",
+        outputChannels: [{ id: "packageVersion", label: "PackageVersion" } as any],
+        configuration: [
+          { key: "region", label: "Region", type: "string", required: true },
+          { key: "domainName", label: "Domain Name", type: "string", required: false },
+          { key: "repositoryName", label: "Repository Name", type: "string", required: false },
+          { key: "packageFormat", label: "Package Format", type: "string", required: false },
+          { key: "packageName", label: "Package Name", type: "string", required: false },
+          { key: "packageVersionState", label: "Package Version State", type: "string", required: false },
         ],
         icon: "cloud",
         color: "orange",

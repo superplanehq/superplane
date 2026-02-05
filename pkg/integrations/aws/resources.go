@@ -2,6 +2,7 @@ package aws
 
 import (
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/codeartifact"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ecr"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/lambda"
 )
@@ -12,8 +13,13 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return lambda.ListFunctions(ctx, resourceType)
 
 	case "ecr.repository":
-		ctx.Logger.Infof("listing ECR repositories")
 		return ecr.ListRepositories(ctx, resourceType)
+
+	case "codeartifact.repository":
+		return codeartifact.ListRepositories(ctx, resourceType)
+
+	case "codeartifact.domain":
+		return codeartifact.ListDomains(ctx, resourceType)
 
 	default:
 		return []core.IntegrationResource{}, nil

@@ -1,17 +1,18 @@
 package e2e
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
 )
 
-// TODO: Add e2e tests for role and group approval when RBAC is enabled
 func TestApprovals(t *testing.T) {
 	t.Run("adding an approval component to a canvas", func(t *testing.T) {
 		steps := &ApprovalSteps{t: t}
@@ -21,12 +22,13 @@ func TestApprovals(t *testing.T) {
 		steps.verifyApprovalSavedToDB("TestApproval")
 	})
 
-	t.Run("configuring approvals for a user", func(t *testing.T) {
+	t.Run("configuring approvals for a user role and group", func(t *testing.T) {
 		steps := &ApprovalSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
-		steps.addApprovalToCanvas("ReleaseApproval")
-		steps.verifyApprovalConfigurationPersisted()
+		groupName := steps.createApprovalGroup()
+		steps.addApprovalWithUserRoleGroup("ReleaseApproval", models.Position{X: 600, Y: 200}, models.DisplayNameOwner, groupName)
+		steps.verifyApprovalConfigurationPersisted(models.RoleOrgOwner, groupName)
 	})
 
 	t.Run("running and approving on a canvas", func(t *testing.T) {
@@ -46,6 +48,26 @@ func TestApprovals(t *testing.T) {
 		steps.approveAnyoneRequirement()
 		steps.waitForApprovalMetadata("Approval", 1, 1, "user")
 		steps.assertNoApproveButtons()
+	})
+
+	t.Run("running and approving a role requirement", func(t *testing.T) {
+		steps := &ApprovalSteps{t: t}
+		steps.start()
+		steps.givenCanvasWithManualTriggerRoleApprovalAndNoop(models.DisplayNameOwner)
+		steps.runManualTrigger()
+		steps.approveFirstPendingRequirement()
+		steps.assertApprovalExecutionFinishedAndOutputNodeProcessed()
+	})
+
+	t.Run("running and approving a group requirement", func(t *testing.T) {
+		steps := &ApprovalSteps{t: t}
+		steps.start()
+		groupName := steps.createApprovalGroup()
+		steps.addCurrentUserToGroup(groupName)
+		steps.givenCanvasWithManualTriggerGroupApprovalAndNoop(groupName)
+		steps.runManualTrigger()
+		steps.approveFirstPendingRequirement()
+		steps.assertApprovalExecutionFinishedAndOutputNodeProcessed()
 	})
 }
 
@@ -80,19 +102,39 @@ func (s *ApprovalSteps) verifyApprovalSavedToDB(nodeName string) {
 	require.NotNil(s.t, node, "approval node not found in DB")
 }
 
-// TODO: Update to test role and group configuration when RBAC is enabled
-func (s *ApprovalSteps) verifyApprovalConfigurationPersisted() {
+func (s *ApprovalSteps) verifyApprovalConfigurationPersisted(expectedRole string, expectedGroup string) {
 	node := s.canvas.GetNodeFromDB("ReleaseApproval")
 	require.NotNil(s.t, node, "approval node not found in DB")
 
 	data := node.Configuration.Data()
 	items := data["items"].([]any)
-	require.Len(s.t, items, 1)
+	require.Len(s.t, items, 3)
 
-	itemCfg, ok := items[0].(map[string]any)
-	require.True(s.t, ok, "expected item configuration to be a map")
-	require.Equal(s.t, "user", itemCfg["type"])
-	require.NotEmpty(s.t, itemCfg["user"])
+	var userItem map[string]any
+	var roleItem map[string]any
+	var groupItem map[string]any
+
+	for _, rawItem := range items {
+		itemCfg, ok := rawItem.(map[string]any)
+		require.True(s.t, ok, "expected item configuration to be a map")
+
+		itemType, _ := itemCfg["type"].(string)
+		switch itemType {
+		case "user":
+			userItem = itemCfg
+		case "role":
+			roleItem = itemCfg
+		case "group":
+			groupItem = itemCfg
+		}
+	}
+
+	require.NotNil(s.t, userItem, "expected user approver configuration")
+	require.NotNil(s.t, roleItem, "expected role approver configuration")
+	require.NotNil(s.t, groupItem, "expected group approver configuration")
+	require.NotEmpty(s.t, userItem["user"])
+	require.Equal(s.t, expectedRole, roleItem["role"])
+	require.Equal(s.t, expectedGroup, groupItem["group"])
 }
 
 func (s *ApprovalSteps) givenCanvasWithManualTriggerApprovalAndNoop() {
@@ -102,6 +144,36 @@ func (s *ApprovalSteps) givenCanvasWithManualTriggerApprovalAndNoop() {
 
 	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
 	s.canvas.AddApproval("Approval", models.Position{X: 1000, Y: 200})
+	s.canvas.AddNoop("Output", models.Position{X: 1600, Y: 200})
+
+	s.canvas.Connect("Start", "Approval")
+	s.canvas.Connect("Approval", "Output")
+
+	s.saveCanvas()
+}
+
+func (s *ApprovalSteps) givenCanvasWithManualTriggerRoleApprovalAndNoop(roleLabel string) {
+	s.canvas = shared.NewCanvasSteps("Approval Canvas", s.t, s.session)
+	s.canvas.Create()
+	s.canvas.Visit()
+
+	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
+	s.addApprovalWithRole("Approval", models.Position{X: 1000, Y: 200}, roleLabel)
+	s.canvas.AddNoop("Output", models.Position{X: 1600, Y: 200})
+
+	s.canvas.Connect("Start", "Approval")
+	s.canvas.Connect("Approval", "Output")
+
+	s.saveCanvas()
+}
+
+func (s *ApprovalSteps) givenCanvasWithManualTriggerGroupApprovalAndNoop(groupLabel string) {
+	s.canvas = shared.NewCanvasSteps("Approval Canvas", s.t, s.session)
+	s.canvas.Create()
+	s.canvas.Visit()
+
+	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
+	s.addApprovalWithGroup("Approval", models.Position{X: 1000, Y: 200}, groupLabel)
 	s.canvas.AddNoop("Output", models.Position{X: 1600, Y: 200})
 
 	s.canvas.Connect("Start", "Approval")
@@ -152,6 +224,91 @@ func (s *ApprovalSteps) addApprovalWithAnyAndSpecificUser(nodeName string, pos m
 		s.t.Fatalf("opening user select: %v", err)
 	}
 	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
+
+	s.session.Click(q.TestID("save-node-button"))
+	s.session.Sleep(500)
+}
+
+func (s *ApprovalSteps) addApprovalWithRole(nodeName string, pos models.Position, roleLabel string) {
+	s.canvas.OpenBuildingBlocksSidebar()
+
+	source := q.TestID("building-block-approval")
+	target := q.TestID("rf__wrapper")
+
+	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.session.Sleep(300)
+
+	s.session.FillIn(q.TestID("node-name-input"), nodeName)
+
+	s.session.Click(q.TestID("field-type-select"))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("Role")`))
+
+	s.session.Click(q.Locator(`button:has-text("Select role")`))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("` + roleLabel + `")`))
+
+	s.session.Click(q.TestID("save-node-button"))
+	s.session.Sleep(500)
+}
+
+func (s *ApprovalSteps) addApprovalWithGroup(nodeName string, pos models.Position, groupLabel string) {
+	s.canvas.OpenBuildingBlocksSidebar()
+
+	source := q.TestID("building-block-approval")
+	target := q.TestID("rf__wrapper")
+
+	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.session.Sleep(300)
+
+	s.session.FillIn(q.TestID("node-name-input"), nodeName)
+
+	s.session.Click(q.TestID("field-type-select"))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("Group")`))
+
+	s.session.Click(q.Locator(`button:has-text("Select group")`))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("` + groupLabel + `")`))
+
+	s.session.Click(q.TestID("save-node-button"))
+	s.session.Sleep(500)
+}
+
+func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models.Position, roleLabel string, groupLabel string) {
+	s.canvas.OpenBuildingBlocksSidebar()
+
+	source := q.TestID("building-block-approval")
+	target := q.TestID("rf__wrapper")
+
+	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.session.Sleep(300)
+
+	s.session.FillIn(q.TestID("node-name-input"), nodeName)
+	s.session.Click(q.Locator(`button:has-text("Add Approver")`))
+	s.session.Click(q.Locator(`button:has-text("Add Approver")`))
+	s.session.Sleep(200)
+
+	typeSelects := s.session.Page().Locator(`[data-testid="field-type-select"]`)
+	if err := typeSelects.Nth(0).Click(); err != nil {
+		s.t.Fatalf("clicking first approver type select: %v", err)
+	}
+	s.session.Click(q.Locator(`div[role="option"]:has-text("Specific user")`))
+
+	if err := typeSelects.Nth(1).Click(); err != nil {
+		s.t.Fatalf("clicking second approver type select: %v", err)
+	}
+	s.session.Click(q.Locator(`div[role="option"]:has-text("Role")`))
+
+	if err := typeSelects.Nth(2).Click(); err != nil {
+		s.t.Fatalf("clicking third approver type select: %v", err)
+	}
+	s.session.Click(q.Locator(`div[role="option"]:has-text("Group")`))
+
+	s.session.Click(q.Locator(`button:has-text("Select user")`))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("` + s.session.Account.Email + `")`))
+
+	s.session.Click(q.Locator(`button:has-text("Select role")`))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("` + roleLabel + `")`))
+
+	s.session.Click(q.Locator(`button:has-text("Select group")`))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("` + groupLabel + `")`))
 
 	s.session.Click(q.TestID("save-node-button"))
 	s.session.Sleep(500)
@@ -244,4 +401,33 @@ func (s *ApprovalSteps) assertApprovalExecutionFinishedAndOutputNodeProcessed() 
 
 	require.Len(s.t, approvaExecs, 1, "expected one execution for approval node")
 	require.Len(s.t, outputExecs, 1, "expected one execution for output node")
+}
+
+func (s *ApprovalSteps) createApprovalGroup() string {
+	groupName := fmt.Sprintf("approval_group_%d", time.Now().UnixNano())
+	authService, err := authorization.NewAuthService()
+	require.NoError(s.t, err)
+
+	err = authService.CreateGroup(
+		s.session.OrgID.String(),
+		models.DomainTypeOrganization,
+		groupName,
+		models.RoleOrgOwner,
+		groupName,
+		"",
+	)
+	require.NoError(s.t, err)
+
+	return groupName
+}
+
+func (s *ApprovalSteps) addCurrentUserToGroup(groupName string) {
+	authService, err := authorization.NewAuthService()
+	require.NoError(s.t, err)
+
+	user, err := models.FindActiveUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
+	require.NoError(s.t, err)
+
+	err = authService.AddUserToGroup(s.session.OrgID.String(), models.DomainTypeOrganization, user.ID.String(), groupName)
+	require.NoError(s.t, err)
 }
