@@ -1,9 +1,8 @@
-import { ComponentBaseMapper, EventStateRegistry, StateFunction, TriggerRenderer } from "../types";
+import { ComponentBaseMapper, EventStateRegistry, ExecutionInfo, StateFunction, TriggerRenderer } from "../types";
 import { sendEmailMapper } from "./send_email";
 import { DEFAULT_EVENT_STATE_MAP, EventState, EventStateMap } from "@/ui/componentBase";
 import { defaultStateFunction } from "../stateRegistry";
 import { onEmailEventTriggerRenderer } from "./on_email_event";
-import { CanvasesCanvasNodeExecution } from "@/api-client";
 import { createOrUpdateContactMapper } from "./create_or_update_contact";
 
 export const SEND_EMAIL_STATE_MAP: EventStateMap = {
@@ -16,7 +15,7 @@ export const SEND_EMAIL_STATE_MAP: EventStateMap = {
   },
 };
 
-export const sendEmailStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
+export const sendEmailStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
   const outputs = execution.outputs as { failed?: { data?: unknown }[] } | undefined;
@@ -42,9 +41,7 @@ export const CREATE_OR_UPDATE_CONTACT_STATE_MAP: EventStateMap = {
   },
 };
 
-export const createOrUpdateContactStateFunction: StateFunction = (
-  execution: CanvasesCanvasNodeExecution,
-): EventState => {
+export const createOrUpdateContactStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
   const outputs = execution.outputs as { failed?: { data?: unknown }[] } | undefined;
