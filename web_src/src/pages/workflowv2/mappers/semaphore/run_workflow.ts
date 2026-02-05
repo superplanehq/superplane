@@ -1,10 +1,14 @@
 import {
-  ComponentsComponent,
-  ComponentsNode,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
-import { ComponentBaseMapper, EventStateRegistry, OutputPayload, StateFunction } from "../types";
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  EventStateRegistry,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  OutputPayload,
+  StateFunction,
+  SubtitleContext,
+} from "../types";
 import {
   ComponentBaseProps,
   ComponentBaseSpec,
@@ -18,6 +22,7 @@ import { MetadataItem } from "@/ui/metadataList";
 import { getTriggerRenderer } from "..";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { formatTimeAgo } from "@/utils/date";
+import { CanvasesCanvasNodeExecution } from "@/api-client";
 
 interface ExecutionMetadata {
   workflow?: {
@@ -104,34 +109,34 @@ export const RUN_WORKFLOW_STATE_REGISTRY: EventStateRegistry = {
 };
 
 export const runWorkflowMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    _nodeQueueItems?: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+
     return {
-      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
+      title:
+        context.node.name ||
+        context.componentDefinition.label ||
+        context.componentDefinition.name ||
+        "Unnamed component",
       iconSrc: SemaphoreLogo,
-      iconSlug: componentDefinition.icon || "workflow",
-      iconColor: getColorClass(componentDefinition?.color || "gray"),
-      collapsed: node.isCollapsed,
+      iconSlug: context.componentDefinition.icon || "workflow",
+      iconColor: getColorClass(context.componentDefinition?.color || "gray"),
+      collapsed: context.node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
-      eventSections: runWorkflowEventSections(nodes, lastExecutions[0]),
-      includeEmptyState: !lastExecutions[0],
-      metadata: runWorkflowMetadataList(node),
-      specs: runWorkflowSpecs(node),
+      eventSections: lastExecution ? runWorkflowEventSections(context.nodes, lastExecution) : undefined,
+      includeEmptyState: !lastExecution,
+      metadata: runWorkflowMetadataList(context.node),
+      specs: runWorkflowSpecs(context.node),
       eventStateMap: RUN_WORKFLOW_STATE_MAP,
     };
   },
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    const timestamp = execution.updatedAt || execution.createdAt;
+  subtitle(context: SubtitleContext): string {
+    const timestamp = context.execution.updatedAt || context.execution.createdAt;
     return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
   },
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
     const details: Record<string, any> = {};
-    const outputs = execution.outputs as
+    const outputs = context.execution.outputs as
       | { passed?: OutputPayload[]; failed?: OutputPayload[]; default?: OutputPayload[] }
       | undefined;
     const payload =
@@ -143,8 +148,8 @@ export const runWorkflowMapper: ComponentBaseMapper = {
         ? payload.data
         : payload;
     const metadataFallback =
-      (!payloadData || typeof payloadData !== "object") && execution.metadata
-        ? (execution.metadata as Record<string, any>)
+      (!payloadData || typeof payloadData !== "object") && context.execution.metadata
+        ? (context.execution.metadata as Record<string, any>)
         : undefined;
 
     const sourceData =
@@ -173,7 +178,10 @@ export const runWorkflowMapper: ComponentBaseMapper = {
     };
 
     addDetail("Done At", formatDate(pipeline?.done_at));
-    addDetail("Workflow URL", (execution.metadata as Record<string, any> | undefined)?.workflow?.url || workflow?.url);
+    addDetail(
+      "Workflow URL",
+      (context.execution.metadata as ExecutionMetadata | undefined)?.workflow?.url || workflow?.url,
+    );
     addDetail("Repository URL", repository?.url);
     addDetail("Project", project?.name);
     addDetail("Organization", organization?.name);
@@ -189,7 +197,7 @@ export const runWorkflowMapper: ComponentBaseMapper = {
   },
 };
 
-function runWorkflowMetadataList(node: ComponentsNode): MetadataItem[] {
+function runWorkflowMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as any;
   const nodeMetadata = node.metadata as any;
@@ -215,7 +223,7 @@ function runWorkflowMetadataList(node: ComponentsNode): MetadataItem[] {
   return metadata;
 }
 
-function runWorkflowSpecs(node: ComponentsNode): ComponentBaseSpec[] {
+function runWorkflowSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
   const configuration = node.configuration as any;
 
@@ -245,10 +253,7 @@ function runWorkflowSpecs(node: ComponentsNode): ComponentBaseSpec[] {
   return specs;
 }
 
-function runWorkflowEventSections(
-  nodes: ComponentsNode[],
-  execution: CanvasesCanvasNodeExecution,
-): EventSection[] | undefined {
+function runWorkflowEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] | undefined {
   if (!execution) {
     return undefined;
   }
@@ -256,8 +261,8 @@ function runWorkflowEventSections(
   const sections: EventSection[] = [];
 
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
   const executionState = runWorkflowStateFunction(execution);
   const subtitleTimestamp =
     executionState === "running" ? execution.createdAt : execution.updatedAt || execution.createdAt;

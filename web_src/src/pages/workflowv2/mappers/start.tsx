@@ -1,6 +1,5 @@
-import { CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerRenderer, CustomFieldRenderer, NodeInfo, ComponentDefinition } from "./types";
+import { TriggerRenderer, CustomFieldRenderer, NodeInfo, TriggerRendererContext, TriggerEventContext } from "./types";
 import { TriggerProps } from "@/ui/trigger";
 import { flattenObject } from "@/lib/utils";
 import { formatTimeAgo } from "@/utils/date";
@@ -21,15 +20,16 @@ interface StartConfiguration {
  * Default renderer for the start trigger
  */
 export const startTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    return { title: `Event received at ${new Date(event.createdAt!).toLocaleString()}`, subtitle: "" };
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+    return { title: `Event received at ${new Date(context.event?.createdAt || "").toLocaleString()}`, subtitle: "" };
   },
 
-  getRootEventValues: (event: CanvasesCanvasEvent): Record<string, string> => {
-    return flattenObject(event.data || {});
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
+    return flattenObject(context.event?.data || {});
   },
 
-  getTriggerProps: (node: NodeInfo, definition: ComponentDefinition, lastEvent: CanvasesCanvasEvent) => {
+  getTriggerProps: (context: TriggerRendererContext) => {
+    const { node, definition, lastEvent } = context;
     const nodeId = node.id;
 
     // Create customField as a function that will receive onRun when ComponentBase renders it
@@ -68,10 +68,10 @@ export const startTriggerRenderer: TriggerRenderer = {
     if (lastEvent) {
       props.lastEventData = {
         title: "Event emitted by trigger",
-        subtitle: formatTimeAgo(new Date(lastEvent.createdAt!)),
+        subtitle: formatTimeAgo(new Date(lastEvent.createdAt)),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
-        eventId: lastEvent.id!,
+        eventId: lastEvent.id,
       };
     }
 
