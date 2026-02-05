@@ -27,6 +27,8 @@ interface OnEmailEventData {
   event?: string;
   email?: string;
   category?: string[] | string;
+  sg_message_id?: string;
+  timestamp?: string;
 }
 
 export const onEmailEventTriggerRenderer: TriggerRenderer = {
@@ -45,9 +47,11 @@ export const onEmailEventTriggerRenderer: TriggerRenderer = {
     const eventData = lastEvent.data?.data as OnEmailEventData;
     const category = Array.isArray(eventData?.category) ? eventData?.category.join(", ") : eventData?.category;
     return {
+      "Received At": eventData?.timestamp ? new Date(Number(eventData.timestamp) * 1000).toLocaleString() : "-",
       Event: eventData?.event || "-",
       Email: eventData?.email || "-",
       Category: category || "-",
+      "Message ID": eventData?.sg_message_id || "-",
     };
   },
 
