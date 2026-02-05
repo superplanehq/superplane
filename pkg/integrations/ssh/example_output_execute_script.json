@@ -1,7 +1,0 @@
-{
-  "result": {
-    "stdout": "Starting deployment script...\nBuilding application...\nDeployment completed successfully!\n",
-    "stderr": "",
-    "exitCode": 0
-  }
-}
