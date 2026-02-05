@@ -111,6 +111,16 @@ func (c *GetImage) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Placeholder: "sha256:...",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "region",
+					Values: []string{"*"},
+				},
+				{
+					Field:  "repository",
+					Values: []string{"*"},
+				},
+			},
 		},
 		{
 			Name:        "imageTag",
@@ -118,6 +128,16 @@ func (c *GetImage) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Placeholder: "latest",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "region",
+					Values: []string{"*"},
+				},
+				{
+					Field:  "repository",
+					Values: []string{"*"},
+				},
+			},
 		},
 	}
 }

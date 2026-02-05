@@ -8,7 +8,7 @@ import {
   organizationsUpdateIntegration,
   organizationsDeleteIntegration,
 } from "@/api-client/sdk.gen";
-import type { IntegrationsIntegrationDefinition, OrganizationsListIntegrationResourcesData } from "@/api-client/types.gen";
+import type { IntegrationsIntegrationDefinition } from "@/api-client/types.gen";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 
@@ -18,12 +18,19 @@ export const integrationKeys = {
   connected: (organizationId: string) => [...integrationKeys.all, "connected", organizationId] as const,
   integration: (organizationId: string, integrationId: string) =>
     [...integrationKeys.connected(organizationId), integrationId] as const,
-  resources: (organizationId: string, integrationId: string, resourceType: string, parameters?: string) =>
+  resources: (
+    organizationId: string,
+    integrationId: string,
+    resourceType: string,
+    parameters?: Record<string, string>,
+  ) =>
     [
       ...integrationKeys.integration(organizationId, integrationId),
       "resources",
       resourceType,
-      parameters ?? "",
+      Object.entries(parameters ?? {})
+        .map(([k, v]) => `${k}=${v}`)
+        .join("&"),
     ] as const,
 };
 
@@ -91,14 +98,17 @@ export const useIntegrationResources = (
   resourceType: string,
   parameters?: Record<string, string>,
 ) => {
-  const parametersValue = parameters ? new URLSearchParams(parameters).toString() : "";
   return useQuery({
-    queryKey: integrationKeys.resources(organizationId, integrationId, resourceType, parametersValue),
+    queryKey: integrationKeys.resources(organizationId, integrationId, resourceType, parameters),
     queryFn: async () => {
-      const query = {
+      const query: Record<string, string> = {
         type: resourceType,
-        parameters: parametersValue || undefined,
-      } as OrganizationsListIntegrationResourcesData["query"];
+      };
+
+      for (const [k, v] of Object.entries(parameters ?? {})) {
+        query[k] = v;
+      }
+
       const response = await organizationsListIntegrationResources(
         withOrganizationHeader({
           path: { id: organizationId, integrationId },

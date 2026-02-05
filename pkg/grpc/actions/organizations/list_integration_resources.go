@@ -2,8 +2,6 @@ package organizations
 
 import (
 	"context"
-	"net/url"
-	"strings"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -20,10 +18,9 @@ import (
 func ListIntegrationResources(
 	ctx context.Context,
 	registry *registry.Registry,
-	orgID,
-	integrationID,
-	resourceType string,
-	parameters string,
+	orgID string,
+	integrationID string,
+	parameters map[string]string,
 ) (*pb.ListIntegrationResourcesResponse, error) {
 	org, err := uuid.Parse(orgID)
 	if err != nil {
@@ -33,6 +30,11 @@ func ListIntegrationResources(
 	ID, err := uuid.Parse(integrationID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid installation ID")
+	}
+
+	resourceType := parameters["type"]
+	if resourceType == "" {
+		return nil, status.Error(codes.InvalidArgument, "resource type is required")
 	}
 
 	instance, err := models.FindIntegration(org, ID)
@@ -53,6 +55,9 @@ func ListIntegrationResources(
 		registry,
 	)
 
+	log.Infof("Resource type: %s", resourceType)
+	log.Infof("Parameters: %s", parameters)
+
 	listCtx := core.ListResourcesContext{
 		Logger: log.WithFields(log.Fields{
 			"integration_id":   instance.ID.String(),
@@ -61,7 +66,7 @@ func ListIntegrationResources(
 		}),
 		HTTP:        contexts.NewHTTPContext(registry.GetHTTPClient()),
 		Integration: integrationCtx,
-		Parameters:  parseParameters(parameters),
+		Parameters:  parameters,
 	}
 
 	resources, err := integration.ListResources(resourceType, listCtx)
@@ -73,39 +78,6 @@ func ListIntegrationResources(
 	return &pb.ListIntegrationResourcesResponse{
 		Resources: serializeIntegrationResources(resources),
 	}, nil
-}
-
-func parseParameters(parameters string) map[string]string {
-	if parameters == "" {
-		return nil
-	}
-
-	trimmed := strings.TrimPrefix(parameters, "?")
-	values, err := url.ParseQuery(trimmed)
-	if err != nil {
-		log.WithError(err).Warn("invalid integration resource parameters")
-		return nil
-	}
-
-	out := make(map[string]string, len(values))
-	for name, entries := range values {
-		if name == "" {
-			continue
-		}
-		if len(entries) == 0 {
-			continue
-		}
-		if len(entries) == 1 {
-			out[name] = entries[0]
-			continue
-		}
-		out[name] = strings.Join(entries, ",")
-	}
-
-	if len(out) == 0 {
-		return nil
-	}
-	return out
 }
 
 func serializeIntegrationResources(resources []core.IntegrationResource) []*pb.IntegrationResourceRef {

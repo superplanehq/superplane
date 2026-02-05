@@ -101,7 +101,7 @@ export const IntegrationResourceFieldRenderer = ({
       }
     }
 
-    return Object.keys(parameters).length > 0 ? parameters : undefined;
+    return parameters;
   }, [resourceParameters, allValues]);
 
   const {

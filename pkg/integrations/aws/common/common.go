@@ -21,6 +21,10 @@ var AllRegions = []configuration.FieldOption{
 		Value: "us-east-1",
 	},
 	{
+		Label: "us-east-2",
+		Value: "us-east-2",
+	},
+	{
 		Label: "us-west-1",
 		Value: "us-west-1",
 	},
