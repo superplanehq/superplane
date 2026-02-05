@@ -1,0 +1,229 @@
+---
+title: "Docker Hub"
+sidebar:
+  order: 8
+---
+
+Interact with Docker Hub container registry
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Image Pushed" href="#on-image-pushed" description="Trigger when a new image is pushed to Docker Hub" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="List Tags" href="#list-tags" description="List tags for a Docker Hub repository" />
+</CardGrid>
+
+## Instructions
+
+To configure Docker Hub to work with SuperPlane:
+
+1. **Get Access Token**: In Docker Hub, go to Account Settings → Security → New Access Token
+2. **Set Scopes**: Choose appropriate scopes (Read, Write, Delete as needed for your use case)
+3. **Enter Credentials**: Provide your Docker Hub username and access token in the integration configuration
+
+<a id="on-image-pushed"></a>
+
+## On Image Pushed
+
+The On Image Pushed trigger starts a workflow when a new image is pushed to a Docker Hub repository.
+
+### Use Cases
+
+- **Deploy to staging or production**: Automatically deploy when a new image is pushed
+- **Notify team**: Send Slack notifications when base images are updated
+- **Trigger scans**: Run vulnerability scans when images are pushed
+- **Promote images**: Trigger promotion workflows when images are pushed to a repository
+
+### Configuration
+
+- **Repository**: Docker Hub repository to watch (e.g., `myorg/myapp`)
+- **Tag Filter**: Only trigger for tags matching a pattern (optional, e.g., `v*`, `main`)
+
+### Event Data
+
+Each push event includes:
+- **repository**: Repository information (name, namespace, owner, etc.)
+- **push_data**: Push details including tag, pusher, and timestamp
+- **callback_url**: Docker Hub callback URL
+
+### Webhook Setup
+
+1. Go to your Docker Hub repository settings
+2. Navigate to Webhooks
+3. Add a new webhook with the URL provided by SuperPlane
+4. The trigger will receive events when images are pushed
+
+### Example Data
+
+```json
+{
+  "data": {
+    "callback_url": "https://registry.hub.docker.com/u/myorg/myapp/hook/...",
+    "push_data": {
+      "images": [
+        "sha256:abc123def456789..."
+      ],
+      "pushed_at": 1706803200,
+      "pusher": "johndoe",
+      "tag": "v1.2.3"
+    },
+    "repository": {
+      "comment_count": 0,
+      "date_created": 1640995200,
+      "description": "My application container image",
+      "dockerfile": "",
+      "full_description": "# My Application\n\nThis is my application container image.",
+      "is_official": false,
+      "is_private": false,
+      "is_trusted": true,
+      "name": "myapp",
+      "namespace": "myorg",
+      "owner": "myorg",
+      "repo_name": "myorg/myapp",
+      "repo_url": "https://hub.docker.com/r/myorg/myapp",
+      "star_count": 42,
+      "status": "Active"
+    }
+  },
+  "timestamp": "2026-02-01T12:00:00Z"
+}
+```
+
+<a id="list-tags"></a>
+
+## List Tags
+
+The List Tags component retrieves tags for a Docker Hub repository.
+
+### Use Cases
+
+- **Find latest tag**: Discover the most recent image version for deployment automation
+- **Audit versions**: Review available versions before promoting an image
+- **Cleanup automation**: List tags for retention policy enforcement
+
+### Configuration
+
+- **Repository**: The Docker Hub repository name (e.g., `library/nginx` or `myorg/myapp`)
+- **Page Size**: Number of results to return (optional, defaults to Docker Hub's default)
+- **Name Filter**: Filter tags by name pattern (optional)
+
+### Outputs
+
+The component emits a list of tags, each containing:
+- `name`: The tag name
+- `last_updated`: When the tag was last updated
+- `full_size`: The full size of the image in bytes
+- `digest`: The image digest
+- `images`: Array of platform-specific images with architecture and OS info
+
+### Example Output
+
+```json
+{
+  "data": {
+    "count": 3,
+    "results": [
+      {
+        "content_type": "image",
+        "creator": 12345,
+        "digest": "sha256:abc123def456789...",
+        "full_size": 142857600,
+        "id": 98765,
+        "images": [
+          {
+            "architecture": "amd64",
+            "digest": "sha256:def456789abc123...",
+            "features": "",
+            "last_pushed": "2026-02-01T10:30:00.000000Z",
+            "os": "linux",
+            "size": 71428800,
+            "status": "active"
+          },
+          {
+            "architecture": "arm64",
+            "digest": "sha256:789abc123def456...",
+            "features": "",
+            "last_pushed": "2026-02-01T10:30:00.000000Z",
+            "os": "linux",
+            "size": 68500000,
+            "status": "active"
+          }
+        ],
+        "last_updated": "2026-02-01T10:30:00.000000Z",
+        "last_updater": 12345,
+        "last_updater_username": "johndoe",
+        "media_type": "application/vnd.docker.distribution.manifest.list.v2+json",
+        "name": "latest",
+        "repository": 54321,
+        "tag_last_pushed": "2026-02-01T10:30:00.000000Z",
+        "tag_status": "active",
+        "v2": true
+      },
+      {
+        "content_type": "image",
+        "creator": 12345,
+        "digest": "sha256:xyz789abc123def...",
+        "full_size": 140000000,
+        "id": 98764,
+        "images": [
+          {
+            "architecture": "amd64",
+            "digest": "sha256:123def456789abc...",
+            "features": "",
+            "last_pushed": "2026-01-28T15:45:00.000000Z",
+            "os": "linux",
+            "size": 70000000,
+            "status": "active"
+          }
+        ],
+        "last_updated": "2026-01-28T15:45:00.000000Z",
+        "last_updater": 12345,
+        "last_updater_username": "johndoe",
+        "media_type": "application/vnd.docker.distribution.manifest.list.v2+json",
+        "name": "v1.2.3",
+        "repository": 54321,
+        "tag_last_pushed": "2026-01-28T15:45:00.000000Z",
+        "tag_status": "active",
+        "v2": true
+      },
+      {
+        "content_type": "image",
+        "creator": 12345,
+        "digest": "sha256:old789abc123def...",
+        "full_size": 138000000,
+        "id": 98763,
+        "images": [
+          {
+            "architecture": "amd64",
+            "digest": "sha256:old123def456789...",
+            "features": "",
+            "last_pushed": "2026-01-20T09:15:00.000000Z",
+            "os": "linux",
+            "size": 69000000,
+            "status": "active"
+          }
+        ],
+        "last_updated": "2026-01-20T09:15:00.000000Z",
+        "last_updater": 12345,
+        "last_updater_username": "johndoe",
+        "media_type": "application/vnd.docker.distribution.manifest.list.v2+json",
+        "name": "v1.2.2",
+        "repository": 54321,
+        "tag_last_pushed": "2026-01-20T09:15:00.000000Z",
+        "tag_status": "active",
+        "v2": true
+      }
+    ]
+  },
+  "timestamp": "2026-02-01T12:00:00Z",
+  "type": "dockerhub.tags"
+}
+```
+
