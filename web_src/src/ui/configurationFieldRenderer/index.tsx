@@ -24,7 +24,6 @@ import { RoleFieldRenderer } from "./RoleFieldRenderer";
 import { GroupFieldRenderer } from "./GroupFieldRenderer";
 import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
 import { TimezoneFieldRenderer } from "./TimezoneFieldRenderer";
-import { SecretKeyFieldRenderer, type SecretKeyRefValue } from "./SecretKeyFieldRenderer";
 import { AnyPredicateListFieldRenderer } from "./AnyPredicateListFieldRenderer";
 import { DaysOfWeekFieldRenderer } from "./DaysOfWeekFieldRenderer";
 import { TimeRangeFieldRenderer } from "./TimeRangeFieldRenderer";
@@ -370,23 +369,6 @@ export const ConfigurationFieldRenderer = ({
 
       case "timezone":
         return <TimezoneFieldRenderer {...commonProps} />;
-
-      case "secret-key":
-        if (!domainId && !organizationId) {
-          return (
-            <div className="text-sm text-red-500 dark:text-red-400">
-              Secret key field requires domain or organization context.
-            </div>
-          );
-        }
-        return (
-          <SecretKeyFieldRenderer
-            value={value as SecretKeyRefValue}
-            onChange={(v) => onChange(v)}
-            organizationId={organizationId ?? domainId}
-            placeholder={field.placeholder ?? "Select credential"}
-          />
-        );
 
       default:
         // Fallback to text input

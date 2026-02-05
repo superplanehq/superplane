@@ -15,4 +15,3 @@ vendor/bundle
 .claude/settings.local.json
 CLAUDE.local.md
 .env
-.idea/

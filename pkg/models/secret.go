@@ -93,13 +93,9 @@ func FindSecretByNameInTransaction(tx *gorm.DB, domainType string, domainID uuid
 }
 
 func FindSecretByID(domainType string, domainID uuid.UUID, id string) (*Secret, error) {
-	return FindSecretByIDInTransaction(database.Conn(), domainType, domainID, id)
-}
-
-func FindSecretByIDInTransaction(tx *gorm.DB, domainType string, domainID uuid.UUID, id string) (*Secret, error) {
 	var secret Secret
 
-	err := tx.
+	err := database.Conn().
 		Where("domain_type = ?", domainType).
 		Where("domain_id = ?", domainID).
 		Where("id = ?", id).

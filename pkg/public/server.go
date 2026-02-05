@@ -409,7 +409,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	//
 	publicRoute.
 		HandleFunc(s.BasePath+"/webhooks/{webhookID}", s.HandleWebhook).
-		HeadersRegexp("Content-Type", `^application/json(?:;\s*charset=utf-8)?$`).
+		Headers("Content-Type", "application/json").
 		Methods("POST")
 
 	//
