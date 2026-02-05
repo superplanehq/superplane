@@ -2,7 +2,6 @@ package registry
 
 import (
 	"fmt"
-	"net/http"
 	"sort"
 	"strings"
 	"sync"
@@ -44,7 +43,7 @@ func RegisterWidget(name string, w core.Widget) {
 }
 
 type Registry struct {
-	httpClient   *http.Client
+	httpCtx      *HTTPContext
 	Encryptor    crypto.Encryptor
 	Integrations map[string]core.Integration
 	Components   map[string]core.Component
@@ -52,10 +51,15 @@ type Registry struct {
 	Widgets      map[string]core.Widget
 }
 
-func NewRegistry(encryptor crypto.Encryptor) *Registry {
+func NewRegistry(encryptor crypto.Encryptor, httpOptions HTTPOptions) (*Registry, error) {
+	httpCtx, err := NewHTTPContext(httpOptions)
+	if err != nil {
+		return nil, err
+	}
+
 	r := &Registry{
 		Encryptor:    encryptor,
-		httpClient:   NewSSRFSafeHTTPClient(),
+		httpCtx:      httpCtx,
 		Components:   map[string]core.Component{},
 		Triggers:     map[string]core.Trigger{},
 		Integrations: map[string]core.Integration{},
@@ -64,7 +68,7 @@ func NewRegistry(encryptor crypto.Encryptor) *Registry {
 
 	r.Init()
 
-	return r
+	return r, nil
 }
 
 func (r *Registry) Init() {
@@ -95,8 +99,8 @@ func (r *Registry) Init() {
 	}
 }
 
-func (r *Registry) GetHTTPClient() *http.Client {
-	return r.httpClient
+func (r *Registry) HTTPContext() *HTTPContext {
+	return r.httpCtx
 }
 
 func (r *Registry) ListTriggers() []core.Trigger {

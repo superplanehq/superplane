@@ -64,20 +64,22 @@ func Setup(t *testing.T) *ResourceRegistry {
 func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, database.TruncateTables())
 
+	encryptor := crypto.NewNoOpEncryptor()
+	registry, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
+	require.NoError(t, err)
+
 	//
 	// Set up initial test resource registry
 	//
-	encryptor := crypto.NewNoOpEncryptor()
 	r := ResourceRegistry{
 		Encryptor:   encryptor,
-		Registry:    registry.NewRegistry(encryptor),
+		Registry:    registry,
 		AuthService: AuthService(t),
 	}
 
 	//
 	// Create organization and user
 	//
-	var err error
 	tx := database.Conn().Begin()
 	organization, err := models.CreateOrganizationInTransaction(tx, RandomName("org"), RandomName("org-display"))
 	if !assert.NoError(t, err) {

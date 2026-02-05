@@ -623,7 +623,6 @@ func (e *HTTP) executeRequest(httpCtx core.HTTPContext, spec Spec, timeout time.
 		}
 	}
 
-	// Use the shared HTTPContext which has SSRF protection
 	resp, err := httpCtx.Do(req)
 	if err != nil {
 		return nil, err

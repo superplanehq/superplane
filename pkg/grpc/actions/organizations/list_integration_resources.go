@@ -50,7 +50,7 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 			"integration_name": instance.AppName,
 			"resource_type":    resourceType,
 		}),
-		HTTP:        contexts.NewHTTPContext(registry.GetHTTPClient()),
+		HTTP:        registry.HTTPContext(),
 		Integration: integrationCtx,
 	}
 
