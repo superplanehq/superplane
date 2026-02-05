@@ -39,6 +39,11 @@ import {
   eventStateRegistry as daytonaEventStateRegistry,
 } from "./daytona/index";
 import {
+  componentMappers as jiraComponentMappers,
+  triggerRenderers as jiraTriggerRenderers,
+  eventStateRegistry as jiraEventStateRegistry,
+} from "./jira/index";
+import {
   componentMappers as datadogComponentMappers,
   triggerRenderers as datadogTriggerRenderers,
   eventStateRegistry as datadogEventStateRegistry,
@@ -100,6 +105,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   dash0: dash0ComponentMappers,
   daytona: daytonaComponentMappers,
   datadog: datadogComponentMappers,
+  jira: jiraComponentMappers,
   slack: slackComponentMappers,
   smtp: smtpComponentMappers,
   rootly: rootlyComponentMappers,
@@ -114,6 +120,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   dash0: dash0TriggerRenderers,
   daytona: daytonaTriggerRenderers,
   datadog: datadogTriggerRenderers,
+  jira: jiraTriggerRenderers,
   slack: slackTriggerRenderers,
   smtp: smtpTriggerRenderers,
   rootly: rootlyTriggerRenderers,
@@ -128,6 +135,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   dash0: dash0EventStateRegistry,
   daytona: daytonaEventStateRegistry,
   datadog: datadogEventStateRegistry,
+  jira: jiraEventStateRegistry,
   slack: slackEventStateRegistry,
   smtp: smtpEventStateRegistry,
   discord: discordEventStateRegistry,
