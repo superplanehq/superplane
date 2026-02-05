@@ -99,6 +99,13 @@ dev.setup:
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 
+dev.setup.no.cache:
+	docker compose $(DOCKER_COMPOSE_OPTS) down -v --remove-orphans
+	rm -rf tmp
+	docker compose $(DOCKER_COMPOSE_OPTS) build --no-cache
+	$(MAKE) db.create DB_NAME=superplane_dev
+	$(MAKE) db.migrate DB_NAME=superplane_dev
+
 dev.start.fg:
 	docker compose $(DOCKER_COMPOSE_OPTS) up
 
