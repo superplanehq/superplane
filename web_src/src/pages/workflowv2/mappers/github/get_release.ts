@@ -1,11 +1,12 @@
-import {
-  ComponentsNode,
-  ComponentsComponent,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
 import { ComponentBaseProps } from "@/ui/componentBase";
-import { ComponentBaseMapper, OutputPayload } from "../types";
+import {
+  ComponentBaseMapper,
+  ComponentBaseContext,
+  SubtitleContext,
+  ExecutionDetailsContext,
+  OutputPayload,
+  NodeInfo,
+} from "../types";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
 import { MetadataItem } from "@/ui/metadataList";
@@ -37,17 +38,15 @@ interface GetReleaseConfiguration {
   releaseId?: string;
 }
 
-function getReleaseMetadataList(node: ComponentsNode): MetadataItem[] {
+function getReleaseMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as GetReleaseConfiguration | undefined;
   const nodeMetadata = node.metadata as { repository?: { name?: string } } | undefined;
 
-  // Show repository name
   if (nodeMetadata?.repository?.name) {
     metadata.push({ icon: "book", label: nodeMetadata.repository.name });
   }
 
-  // Show release strategy info
   if (configuration?.releaseStrategy) {
     switch (configuration.releaseStrategy) {
       case "latest":
@@ -76,34 +75,27 @@ function getReleaseMetadataList(node: ComponentsNode): MetadataItem[] {
 }
 
 export const getReleaseMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    queueItems: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
-    // Get base props (includes proper event title inheritance from root event)
-    const base = baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const base = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
 
-    // Override metadata to include release configuration display
     return {
       ...base,
-      metadata: getReleaseMetadataList(node),
+      metadata: getReleaseMetadataList(context.node),
     };
   },
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    return buildGithubExecutionSubtitle(execution);
+
+  subtitle(context: SubtitleContext): string {
+    return buildGithubExecutionSubtitle(context.execution);
   },
 
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const details: Record<string, string> = {};
 
     if (outputs && outputs.default && outputs.default.length > 0) {
       const release = outputs.default[0].data as ReleaseOutput;
       Object.assign(details, {
-        "Retrieved At": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : "-",
+        "Retrieved At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",
       });
 
       details["Release URL"] = release?.html_url || "";
