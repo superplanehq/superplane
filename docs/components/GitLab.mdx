@@ -8,6 +8,12 @@ Manage and react to changes in your GitLab repositories
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Issue" href="#on-issue" description="Trigger workflows when issues are created, closed, reopened, or updated" />
+</CardGrid>
+
 ## Actions
 
 <CardGrid>
@@ -19,6 +25,46 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 For **App OAuth**, leave **Client ID** and **Secret** empty to start the setup wizard.
 
 For **Personal Access Token**, use scopes: api, read_user, read_api, write_repository, read_repository.
+
+<a id="on-issue"></a>
+
+## On Issue
+
+The On Issue trigger fires when issue events occur in a GitLab project.
+
+### Configuration
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| **Project** | Resource | Yes | The GitLab project to monitor |
+| **Actions** | Multi-select | Yes | Issue actions to trigger on: `open`, `close`, `reopen`, `update` |
+
+### Example Payload
+
+```json
+{
+  "object_kind": "issue",
+  "event_type": "issue",
+  "object_attributes": {
+    "id": 301,
+    "iid": 1,
+    "title": "Example Issue",
+    "state": "opened",
+    "action": "open",
+    "url": "https://gitlab.com/group/project/-/issues/1"
+  },
+  "user": {
+    "id": 1,
+    "name": "John Doe",
+    "username": "johndoe"
+  },
+  "project": {
+    "id": 15,
+    "name": "my-project",
+    "path_with_namespace": "group/my-project"
+  }
+}
+```
 
 <a id="create-issue"></a>
 

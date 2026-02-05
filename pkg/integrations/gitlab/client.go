@@ -31,36 +31,15 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 	baseURLBytes, _ := ctx.GetConfig("baseUrl")
 	baseURL := normalizeBaseURL(string(baseURLBytes))
 
-	var token string
-
 	groupIDBytes, err := ctx.GetConfig("groupId")
 	if err != nil || len(groupIDBytes) == 0 {
 		return nil, fmt.Errorf("groupId is required")
 	}
 	groupID := string(groupIDBytes)
 
-	switch authType {
-	case AuthTypePersonalAccessToken:
-		tokenBytes, err := ctx.GetConfig("personalAccessToken")
-		if err != nil {
-			return nil, err
-		}
-		token = string(tokenBytes)
-		if token == "" {
-			return nil, fmt.Errorf("personal access token not found")
-		}
-
-	case AuthTypeAppOAuth:
-		token, err = findSecret(ctx, OAuthAccessToken)
-		if err != nil {
-			return nil, err
-		}
-		if token == "" {
-			return nil, fmt.Errorf("OAuth access token not found")
-		}
-
-	default:
-		return nil, fmt.Errorf("unknown auth type: %s", authType)
+	token, err := getAuthToken(ctx, authType)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Client{
@@ -73,11 +52,7 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 }
 
 func (c *Client) do(req *http.Request) (*http.Response, error) {
-	if c.authType == AuthTypePersonalAccessToken {
-		req.Header.Set("PRIVATE-TOKEN", c.token)
-	} else {
-		req.Header.Set("Authorization", "Bearer "+c.token)
-	}
+	setAuthHeaders(req, c.authType, c.token)
 	return c.httpClient.Do(req)
 }
 

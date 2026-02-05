@@ -185,7 +185,9 @@ func (g *GitLab) Components() []core.Component {
 }
 
 func (g *GitLab) Triggers() []core.Trigger {
-	return []core.Trigger{}
+	return []core.Trigger{
+		&OnIssue{},
+	}
 }
 
 func (g *GitLab) Sync(ctx core.SyncContext) error {
@@ -487,14 +489,90 @@ func findSecret(integration core.IntegrationContext, name string) (string, error
 }
 
 func (g *GitLab) CompareWebhookConfig(a, b any) (bool, error) {
-	return false, nil
+	configA := WebhookConfiguration{}
+	configB := WebhookConfiguration{}
+
+	if err := mapstructure.Decode(a, &configA); err != nil {
+		return false, err
+	}
+
+	if err := mapstructure.Decode(b, &configB); err != nil {
+		return false, err
+	}
+
+	if configA.ProjectID != configB.ProjectID {
+		return false, nil
+	}
+
+	if configA.EventType != configB.EventType {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (g *GitLab) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	return nil, nil
+	hooksClient, err := NewHooksClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create hooks client: %v", err)
+	}
+
+	config := WebhookConfiguration{}
+	if err := mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config); err != nil {
+		return nil, fmt.Errorf("failed to decode webhook config: %v", err)
+	}
+
+	secret, err := ctx.Webhook.GetSecret()
+	if err != nil {
+		return nil, fmt.Errorf("error getting webhook secret: %v", err)
+	}
+
+	events := HookEvents{}
+	switch config.EventType {
+	case "issues":
+		events.IssuesEvents = true
+	case "merge_requests":
+		events.MergeRequestsEvents = true
+	case "push":
+		events.PushEvents = true
+	case "tag_push":
+		events.TagPushEvents = true
+	case "note":
+		events.NoteEvents = true
+	case "pipeline":
+		events.PipelineEvents = true
+	case "releases":
+		events.ReleasesEvents = true
+	}
+
+	hook, err := hooksClient.CreateHook(config.ProjectID, ctx.Webhook.GetURL(), string(secret), events)
+	if err != nil {
+		return nil, fmt.Errorf("error creating webhook: %v", err)
+	}
+
+	return &WebhookMetadata{ID: hook.ID}, nil
 }
 
 func (g *GitLab) CleanupWebhook(ctx core.CleanupWebhookContext) error {
+	hooksClient, err := NewHooksClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create hooks client: %v", err)
+	}
+
+	webhook := WebhookMetadata{}
+	if err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &webhook); err != nil {
+		return fmt.Errorf("failed to decode webhook metadata: %v", err)
+	}
+
+	config := WebhookConfiguration{}
+	if err := mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config); err != nil {
+		return fmt.Errorf("failed to decode webhook config: %v", err)
+	}
+
+	if err := hooksClient.DeleteHook(config.ProjectID, webhook.ID); err != nil {
+		return fmt.Errorf("error deleting webhook: %v", err)
+	}
+
 	return nil
 }
 

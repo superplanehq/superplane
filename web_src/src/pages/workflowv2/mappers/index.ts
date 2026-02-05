@@ -25,6 +25,7 @@ import {
 } from "./github/index";
 import {
   componentMappers as gitlabComponentMappers,
+  triggerRenderers as gitlabTriggerRenderers,
   eventStateRegistry as gitlabEventStateRegistry,
 } from "./gitlab/index";
 import {
@@ -132,6 +133,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   cloudflare: cloudflareTriggerRenderers,
   semaphore: semaphoreTriggerRenderers,
   github: githubTriggerRenderers,
+  gitlab: gitlabTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
   dash0: dash0TriggerRenderers,
   daytona: daytonaTriggerRenderers,
