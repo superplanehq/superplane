@@ -51,16 +51,18 @@ export const sendEmailMapper: ComponentBaseMapper = {
     const outputs = context.execution.outputs as { default?: OutputPayload[]; failed?: OutputPayload[] } | undefined;
     const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
     const failed = outputs?.failed?.[0]?.data as Record<string, unknown> | undefined;
+    const sentAt = formatTimestamp(context.execution.updatedAt, context.execution.createdAt);
 
     if (failed) {
       return {
-        Error: stringOrDash(failed.error),
+        "Sent At": sentAt,
         Status: stringOrDash(failed.statusCode),
+        Error: stringOrDash(failed.error),
       };
     }
 
     return {
-      "Sent At": new Date(context.execution.updatedAt!).toLocaleString(),
+      "Sent At": sentAt,
       Status: stringOrDash(result?.status),
       "Message ID": stringOrDash(result?.messageId),
       To: stringOrDash(result?.to),
@@ -117,4 +119,13 @@ function stringOrDash(value?: unknown): string {
   }
 
   return String(value);
+}
+
+function formatTimestamp(updatedAt?: string, createdAt?: string): string {
+  const timestamp = updatedAt || createdAt;
+  if (!timestamp) {
+    return "-";
+  }
+
+  return new Date(timestamp).toLocaleString();
 }
