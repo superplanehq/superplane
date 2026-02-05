@@ -122,7 +122,7 @@ func (c *ListReleases) Execute(ctx core.ExecutionContext) error {
 
 	client, err := NewClientWithTransport(
 		ctx.Integration,
-		ctx.HTTP,
+		&HTTPContextAdapter{ctx: ctx.HTTP},
 		appMetadata.GitHubApp.ID,
 		appMetadata.InstallationID,
 	)

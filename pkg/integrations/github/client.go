@@ -10,6 +10,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+type HTTPContextAdapter struct {
+	ctx core.HTTPContext
+}
+
+func (h *HTTPContextAdapter) RoundTrip(req *http.Request) (*http.Response, error) {
+	return h.ctx.Do(req)
+}
+
 func NewClient(ctx core.IntegrationContext, ghAppID int64, installationID string) (*github.Client, error) {
 	return NewClientWithTransport(ctx, http.DefaultTransport, ghAppID, installationID)
 }
