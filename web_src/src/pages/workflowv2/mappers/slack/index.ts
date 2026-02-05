@@ -45,10 +45,13 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
       if (state !== "success") return state;
 
       const outputs = execution.outputs as { received?: unknown[]; timeout?: unknown[] } | undefined;
+      if (outputs?.received && outputs.received.length > 0) {
+        return "received";
+      }
       if (outputs?.timeout && outputs.timeout.length > 0) {
         return "timeout";
       }
-      return "received";
+      return "success";
     },
   },
 };
