@@ -1,10 +1,12 @@
 import {
-  ComponentsComponent,
-  ComponentsNode,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
-import { ComponentBaseMapper, OutputPayload } from "../types";
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  OutputPayload,
+  SubtitleContext,
+} from "../types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
@@ -25,33 +27,33 @@ interface SendTextMessageMetadata {
 }
 
 export const sendTextMessageMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    _items?: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
-    const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition.name || node.component?.name || "unknown";
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+    const componentName = context.componentDefinition.name || "unknown";
 
     return {
-      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
+      title:
+        context.node.name ||
+        context.componentDefinition.label ||
+        context.componentDefinition.name ||
+        "Unnamed component",
       iconSrc: slackIcon,
       iconSlug: "slack",
-      iconColor: getColorClass(componentDefinition.color),
-      collapsedBackground: getBackgroundColorClass(componentDefinition.color),
-      collapsed: node.isCollapsed,
-      eventSections: lastExecution ? sendTextMessageEventSections(nodes, lastExecution, componentName) : undefined,
+      iconColor: getColorClass(context.componentDefinition.color),
+      collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
+      collapsed: context.node.isCollapsed,
+      eventSections: lastExecution
+        ? sendTextMessageEventSections(context.nodes, lastExecution, componentName)
+        : undefined,
       includeEmptyState: !lastExecution,
-      metadata: sendTextMessageMetadataList(node),
-      specs: sendTextMessageSpecs(node),
+      metadata: sendTextMessageMetadataList(context.node),
+      specs: sendTextMessageSpecs(context.node),
       eventStateMap: getStateMap(componentName),
     };
   },
 
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const message = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
 
     return {
@@ -61,13 +63,13 @@ export const sendTextMessageMapper: ComponentBaseMapper = {
       Text: stringOrDash(message?.text),
     };
   },
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    if (!execution.createdAt) return "";
-    return formatTimeAgo(new Date(execution.createdAt));
+  subtitle(context: SubtitleContext): string {
+    if (!context.execution.createdAt) return "";
+    return formatTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
-function sendTextMessageMetadataList(node: ComponentsNode): MetadataItem[] {
+function sendTextMessageMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as SendTextMessageMetadata | undefined;
   const configuration = node.configuration as SendTextMessageConfiguration | undefined;
@@ -80,7 +82,7 @@ function sendTextMessageMetadataList(node: ComponentsNode): MetadataItem[] {
   return metadata;
 }
 
-function sendTextMessageSpecs(node: ComponentsNode): ComponentBaseSpec[] {
+function sendTextMessageSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
   const configuration = node.configuration as SendTextMessageConfiguration | undefined;
 
@@ -98,13 +100,13 @@ function sendTextMessageSpecs(node: ComponentsNode): ComponentBaseSpec[] {
 }
 
 function sendTextMessageEventSections(
-  nodes: ComponentsNode[],
-  execution: CanvasesCanvasNodeExecution,
+  nodes: NodeInfo[],
+  execution: ExecutionInfo,
   componentName: string,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [
     {

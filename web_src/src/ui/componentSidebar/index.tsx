@@ -133,6 +133,9 @@ interface ComponentSidebarProps {
   integrationName?: string;
   integrationRef?: ComponentsIntegrationRef;
   integrations?: OrganizationsIntegration[];
+  canReadIntegrations?: boolean;
+  canCreateIntegrations?: boolean;
+  canUpdateIntegrations?: boolean;
   autocompleteExampleObj?: Record<string, unknown> | null;
 
   // Workflow metadata for ExecutionChainPage
@@ -150,6 +153,7 @@ interface ComponentSidebarProps {
   executionChainTriggerEvent?: SidebarEvent | null;
   executionChainRequestId?: number;
   onExecutionChainHandled?: () => void;
+  readOnly?: boolean;
 }
 
 export const ComponentSidebar = ({
@@ -212,6 +216,9 @@ export const ComponentSidebar = ({
   integrationName,
   integrationRef,
   integrations,
+  canReadIntegrations,
+  canCreateIntegrations,
+  canUpdateIntegrations,
   autocompleteExampleObj,
   workflowNodes = [],
   components = [],
@@ -223,6 +230,7 @@ export const ComponentSidebar = ({
   executionChainTriggerEvent,
   executionChainRequestId,
   onExecutionChainHandled,
+  readOnly = false,
 }: ComponentSidebarProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
@@ -754,6 +762,10 @@ export const ComponentSidebar = ({
                   integrationName={integrationName}
                   integrationRef={integrationRef}
                   integrations={integrations}
+                  readOnly={readOnly}
+                  canReadIntegrations={canReadIntegrations}
+                  canCreateIntegrations={canCreateIntegrations}
+                  canUpdateIntegrations={canUpdateIntegrations}
                   integrationDefinition={createIntegrationDefinition}
                   autocompleteExampleObj={resolvedAutocompleteExampleObj}
                   onOpenCreateIntegrationDialog={handleOpenCreateIntegrationDialog}

@@ -1,0 +1,236 @@
+package jira
+
+import (
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+
+	"github.com/superplanehq/superplane/pkg/core"
+)
+
+type Client struct {
+	Email   string
+	Token   string
+	BaseURL string
+	http    core.HTTPContext
+}
+
+func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
+	baseURL, err := ctx.GetConfig("baseUrl")
+	if err != nil {
+		return nil, fmt.Errorf("error getting baseUrl: %v", err)
+	}
+
+	email, err := ctx.GetConfig("email")
+	if err != nil {
+		return nil, fmt.Errorf("error getting email: %v", err)
+	}
+
+	apiToken, err := ctx.GetConfig("apiToken")
+	if err != nil {
+		return nil, fmt.Errorf("error getting apiToken: %v", err)
+	}
+
+	return &Client{
+		Email:   string(email),
+		Token:   string(apiToken),
+		BaseURL: string(baseURL),
+		http:    httpCtx,
+	}, nil
+}
+
+func (c *Client) authHeader() string {
+	credentials := fmt.Sprintf("%s:%s", c.Email, c.Token)
+	return fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(credentials)))
+}
+
+func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error) {
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return nil, fmt.Errorf("error building request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", c.authHeader())
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error executing request: %v", err)
+	}
+	defer res.Body.Close()
+
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading body: %v", err)
+	}
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+	}
+
+	return responseBody, nil
+}
+
+// User represents a Jira user from the /myself endpoint.
+type User struct {
+	AccountID   string `json:"accountId"`
+	DisplayName string `json:"displayName"`
+	EmailAddr   string `json:"emailAddress"`
+}
+
+// GetCurrentUser verifies credentials by fetching the authenticated user.
+func (c *Client) GetCurrentUser() (*User, error) {
+	url := fmt.Sprintf("%s/rest/api/3/myself", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var user User
+	if err := json.Unmarshal(responseBody, &user); err != nil {
+		return nil, fmt.Errorf("error parsing user response: %v", err)
+	}
+
+	return &user, nil
+}
+
+// Project represents a Jira project.
+type Project struct {
+	ID   string `json:"id"`
+	Key  string `json:"key"`
+	Name string `json:"name"`
+}
+
+// ListProjects returns all projects accessible to the authenticated user.
+func (c *Client) ListProjects() ([]Project, error) {
+	url := fmt.Sprintf("%s/rest/api/3/project", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var projects []Project
+	if err := json.Unmarshal(responseBody, &projects); err != nil {
+		return nil, fmt.Errorf("error parsing projects response: %v", err)
+	}
+
+	return projects, nil
+}
+
+// Issue represents a Jira issue.
+type Issue struct {
+	ID     string         `json:"id"`
+	Key    string         `json:"key"`
+	Self   string         `json:"self"`
+	Fields map[string]any `json:"fields"`
+}
+
+// GetIssue fetches a single issue by its key.
+func (c *Client) GetIssue(issueKey string) (*Issue, error) {
+	url := fmt.Sprintf("%s/rest/api/3/issue/%s", c.BaseURL, issueKey)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var issue Issue
+	if err := json.Unmarshal(responseBody, &issue); err != nil {
+		return nil, fmt.Errorf("error parsing issue response: %v", err)
+	}
+
+	return &issue, nil
+}
+
+// CreateIssueRequest is the request body for creating an issue.
+type CreateIssueRequest struct {
+	Fields CreateIssueFields `json:"fields"`
+}
+
+// CreateIssueFields contains the fields for creating an issue.
+type CreateIssueFields struct {
+	Project     ProjectRef `json:"project"`
+	IssueType   IssueType  `json:"issuetype"`
+	Summary     string     `json:"summary"`
+	Description *ADFDoc    `json:"description,omitempty"`
+}
+
+// ProjectRef references a project by key.
+type ProjectRef struct {
+	Key string `json:"key"`
+}
+
+// IssueType specifies the issue type by name.
+type IssueType struct {
+	Name string `json:"name"`
+}
+
+// ADFDoc represents an Atlassian Document Format document.
+type ADFDoc struct {
+	Type    string    `json:"type"`
+	Version int       `json:"version"`
+	Content []ADFNode `json:"content"`
+}
+
+// ADFNode represents a node in an ADF document.
+type ADFNode struct {
+	Type    string    `json:"type"`
+	Content []ADFText `json:"content,omitempty"`
+}
+
+// ADFText represents a text node in ADF.
+type ADFText struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+// WrapInADF wraps plain text in a minimal ADF document.
+func WrapInADF(text string) *ADFDoc {
+	if text == "" {
+		return nil
+	}
+	return &ADFDoc{
+		Type:    "doc",
+		Version: 1,
+		Content: []ADFNode{
+			{
+				Type: "paragraph",
+				Content: []ADFText{
+					{Type: "text", Text: text},
+				},
+			},
+		},
+	}
+}
+
+// CreateIssueResponse is the response from creating an issue.
+type CreateIssueResponse struct {
+	ID   string `json:"id"`
+	Key  string `json:"key"`
+	Self string `json:"self"`
+}
+
+// CreateIssue creates a new issue in Jira.
+func (c *Client) CreateIssue(req *CreateIssueRequest) (*CreateIssueResponse, error) {
+	url := fmt.Sprintf("%s/rest/api/3/issue", c.BaseURL)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response CreateIssueResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing create issue response: %v", err)
+	}
+
+	return &response, nil
+}

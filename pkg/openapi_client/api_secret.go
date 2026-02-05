@@ -275,6 +275,143 @@ func (a *SecretAPIService) SecretsDeleteSecretExecute(r ApiSecretsDeleteSecretRe
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiSecretsDeleteSecretKeyRequest struct {
+	ctx        context.Context
+	ApiService *SecretAPIService
+	idOrName   string
+	keyName    string
+	domainType *string
+	domainId   *string
+}
+
+func (r ApiSecretsDeleteSecretKeyRequest) DomainType(domainType string) ApiSecretsDeleteSecretKeyRequest {
+	r.domainType = &domainType
+	return r
+}
+
+func (r ApiSecretsDeleteSecretKeyRequest) DomainId(domainId string) ApiSecretsDeleteSecretKeyRequest {
+	r.domainId = &domainId
+	return r
+}
+
+func (r ApiSecretsDeleteSecretKeyRequest) Execute() (*SecretsDeleteSecretKeyResponse, *http.Response, error) {
+	return r.ApiService.SecretsDeleteSecretKeyExecute(r)
+}
+
+/*
+SecretsDeleteSecretKey Remove a key from a secret
+
+Removes one key from the secret. Secret must have at least one key remaining.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param idOrName
+	@param keyName
+	@return ApiSecretsDeleteSecretKeyRequest
+*/
+func (a *SecretAPIService) SecretsDeleteSecretKey(ctx context.Context, idOrName string, keyName string) ApiSecretsDeleteSecretKeyRequest {
+	return ApiSecretsDeleteSecretKeyRequest{
+		ApiService: a,
+		ctx:        ctx,
+		idOrName:   idOrName,
+		keyName:    keyName,
+	}
+}
+
+// Execute executes the request
+//
+//	@return SecretsDeleteSecretKeyResponse
+func (a *SecretAPIService) SecretsDeleteSecretKeyExecute(r ApiSecretsDeleteSecretKeyRequest) (*SecretsDeleteSecretKeyResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodDelete
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *SecretsDeleteSecretKeyResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SecretAPIService.SecretsDeleteSecretKey")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/secrets/{idOrName}/keys/{keyName}"
+	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"keyName"+"}", url.PathEscape(parameterValueToString(r.keyName, "keyName")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	if r.domainType != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domainType", r.domainType, "", "")
+	} else {
+		var defaultValue string = "DOMAIN_TYPE_UNSPECIFIED"
+		r.domainType = &defaultValue
+	}
+	if r.domainId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domainId", r.domainId, "", "")
+	}
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
 type ApiSecretsDescribeSecretRequest struct {
 	ctx        context.Context
 	ApiService *SecretAPIService
@@ -537,6 +674,133 @@ func (a *SecretAPIService) SecretsListSecretsExecute(r ApiSecretsListSecretsRequ
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiSecretsSetSecretKeyRequest struct {
+	ctx        context.Context
+	ApiService *SecretAPIService
+	idOrName   string
+	keyName    string
+	body       *SecretsSetSecretKeyBody
+}
+
+func (r ApiSecretsSetSecretKeyRequest) Body(body SecretsSetSecretKeyBody) ApiSecretsSetSecretKeyRequest {
+	r.body = &body
+	return r
+}
+
+func (r ApiSecretsSetSecretKeyRequest) Execute() (*SecretsSetSecretKeyResponse, *http.Response, error) {
+	return r.ApiService.SecretsSetSecretKeyExecute(r)
+}
+
+/*
+SecretsSetSecretKey Set or overwrite a single key in a secret
+
+Sets the value for one key. Creates the key if missing, overwrites if present.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param idOrName
+	@param keyName
+	@return ApiSecretsSetSecretKeyRequest
+*/
+func (a *SecretAPIService) SecretsSetSecretKey(ctx context.Context, idOrName string, keyName string) ApiSecretsSetSecretKeyRequest {
+	return ApiSecretsSetSecretKeyRequest{
+		ApiService: a,
+		ctx:        ctx,
+		idOrName:   idOrName,
+		keyName:    keyName,
+	}
+}
+
+// Execute executes the request
+//
+//	@return SecretsSetSecretKeyResponse
+func (a *SecretAPIService) SecretsSetSecretKeyExecute(r ApiSecretsSetSecretKeyRequest) (*SecretsSetSecretKeyResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPut
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *SecretsSetSecretKeyResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SecretAPIService.SecretsSetSecretKey")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/secrets/{idOrName}/keys/{keyName}"
+	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"keyName"+"}", url.PathEscape(parameterValueToString(r.keyName, "keyName")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.body == nil {
+		return localVarReturnValue, nil, reportError("body is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.body
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
 type ApiSecretsUpdateSecretRequest struct {
 	ctx        context.Context
 	ApiService *SecretAPIService
@@ -587,6 +851,129 @@ func (a *SecretAPIService) SecretsUpdateSecretExecute(r ApiSecretsUpdateSecretRe
 	}
 
 	localVarPath := localBasePath + "/api/v1/secrets/{idOrName}"
+	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.body == nil {
+		return localVarReturnValue, nil, reportError("body is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.body
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiSecretsUpdateSecretNameRequest struct {
+	ctx        context.Context
+	ApiService *SecretAPIService
+	idOrName   string
+	body       *SecretsUpdateSecretNameBody
+}
+
+func (r ApiSecretsUpdateSecretNameRequest) Body(body SecretsUpdateSecretNameBody) ApiSecretsUpdateSecretNameRequest {
+	r.body = &body
+	return r
+}
+
+func (r ApiSecretsUpdateSecretNameRequest) Execute() (*SecretsUpdateSecretNameResponse, *http.Response, error) {
+	return r.ApiService.SecretsUpdateSecretNameExecute(r)
+}
+
+/*
+SecretsUpdateSecretName Update secret name
+
+Updates only the name of the secret. Name must be unique within the domain.
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param idOrName
+	@return ApiSecretsUpdateSecretNameRequest
+*/
+func (a *SecretAPIService) SecretsUpdateSecretName(ctx context.Context, idOrName string) ApiSecretsUpdateSecretNameRequest {
+	return ApiSecretsUpdateSecretNameRequest{
+		ApiService: a,
+		ctx:        ctx,
+		idOrName:   idOrName,
+	}
+}
+
+// Execute executes the request
+//
+//	@return SecretsUpdateSecretNameResponse
+func (a *SecretAPIService) SecretsUpdateSecretNameExecute(r ApiSecretsUpdateSecretNameRequest) (*SecretsUpdateSecretNameResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPatch
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *SecretsUpdateSecretNameResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SecretAPIService.SecretsUpdateSecretName")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/secrets/{idOrName}/name"
 	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)

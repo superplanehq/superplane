@@ -18,13 +18,25 @@ export const integrationKeys = {
   connected: (organizationId: string) => [...integrationKeys.all, "connected", organizationId] as const,
   integration: (organizationId: string, integrationId: string) =>
     [...integrationKeys.connected(organizationId), integrationId] as const,
-  resources: (organizationId: string, integrationId: string, resourceType: string) =>
-    [...integrationKeys.integration(organizationId, integrationId), "resources", resourceType] as const,
+  resources: (
+    organizationId: string,
+    integrationId: string,
+    resourceType: string,
+    parameters?: Record<string, string>,
+  ) =>
+    [
+      ...integrationKeys.integration(organizationId, integrationId),
+      "resources",
+      resourceType,
+      Object.entries(parameters ?? {})
+        .map(([k, v]) => `${k}=${v}`)
+        .join("&"),
+    ] as const,
 };
 
 // Hook to fetch available integrations (catalog).
 // Normalizes each integration's label (e.g. "github" -> "GitHub") so consumers get correct display names.
-export const useAvailableIntegrations = () => {
+export const useAvailableIntegrations = (options?: { enabled?: boolean }) => {
   return useQuery({
     queryKey: integrationKeys.available(),
     queryFn: async () => {
@@ -40,11 +52,12 @@ export const useAvailableIntegrations = () => {
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
+    enabled: options?.enabled ?? true,
   });
 };
 
 // Hook to fetch connected integrations for an organization
-export const useConnectedIntegrations = (organizationId: string) => {
+export const useConnectedIntegrations = (organizationId: string, options?: { enabled?: boolean }) => {
   return useQuery({
     queryKey: integrationKeys.connected(organizationId),
     queryFn: async () => {
@@ -57,7 +70,7 @@ export const useConnectedIntegrations = (organizationId: string) => {
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
-    enabled: !!organizationId,
+    enabled: !!organizationId && (options?.enabled ?? true),
   });
 };
 
@@ -79,14 +92,27 @@ export const useIntegration = (organizationId: string, integrationId: string) =>
   });
 };
 
-export const useIntegrationResources = (organizationId: string, integrationId: string, resourceType: string) => {
+export const useIntegrationResources = (
+  organizationId: string,
+  integrationId: string,
+  resourceType: string,
+  parameters?: Record<string, string>,
+) => {
   return useQuery({
-    queryKey: integrationKeys.resources(organizationId, integrationId, resourceType),
+    queryKey: integrationKeys.resources(organizationId, integrationId, resourceType, parameters),
     queryFn: async () => {
+      const query: Record<string, string> = {
+        type: resourceType,
+      };
+
+      for (const [k, v] of Object.entries(parameters ?? {})) {
+        query[k] = v;
+      }
+
       const response = await organizationsListIntegrationResources(
         withOrganizationHeader({
           path: { id: organizationId, integrationId },
-          query: { type: resourceType },
+          query,
         }),
       );
       return response.data?.resources || [];

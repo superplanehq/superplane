@@ -23,6 +23,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -167,6 +168,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 
 	grpcGatewayMux := runtime.NewServeMux(
 		runtime.WithIncomingHeaderMatcher(headersMatcher),
+		runtime.SetQueryParameterParser(&grpc.QueryParser{}),
 	)
 
 	opts := []grpcLib.DialOption{grpcLib.WithTransportCredentials(insecure.NewCredentials())}
@@ -407,7 +409,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	//
 	publicRoute.
 		HandleFunc(s.BasePath+"/webhooks/{webhookID}", s.HandleWebhook).
-		Headers("Content-Type", "application/json").
+		HeadersRegexp("Content-Type", `^application/json(?:;\s*charset=utf-8)?$`).
 		Methods("POST")
 
 	//

@@ -44,6 +44,29 @@ func (s *Secret) UpdateData(data []byte) (*Secret, error) {
 	return s, nil
 }
 
+func (s *Secret) UpdateName(name string) (*Secret, error) {
+	now := time.Now()
+
+	err := database.Conn().
+		Model(s).
+		Clauses(clause.Returning{}).
+		Where("id = ?", s.ID).
+		Update("name", name).
+		Update("updated_at", &now).
+		Error
+
+	if err != nil {
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+			return nil, ErrNameAlreadyUsed
+		}
+		return nil, err
+	}
+
+	s.Name = name
+	s.UpdatedAt = &now
+	return s, nil
+}
+
 func (s *Secret) Delete() error {
 	return database.Conn().Delete(s).Error
 }
@@ -70,9 +93,13 @@ func FindSecretByNameInTransaction(tx *gorm.DB, domainType string, domainID uuid
 }
 
 func FindSecretByID(domainType string, domainID uuid.UUID, id string) (*Secret, error) {
+	return FindSecretByIDInTransaction(database.Conn(), domainType, domainID, id)
+}
+
+func FindSecretByIDInTransaction(tx *gorm.DB, domainType string, domainID uuid.UUID, id string) (*Secret, error) {
 	var secret Secret
 
-	err := database.Conn().
+	err := tx.
 		Where("domain_type = ?", domainType).
 		Where("domain_id = ?", domainID).
 		Where("id = ?", id).

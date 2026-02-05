@@ -237,9 +237,6 @@ func Test__AWS__ListResources(t *testing.T) {
 
 	t.Run("lambda.function without region returns error", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"region": "   ",
-			},
 			Secrets: map[string]core.IntegrationSecret{
 				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
@@ -275,9 +272,6 @@ func Test__AWS__ListResources(t *testing.T) {
 		}
 
 		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"region": "us-east-1",
-			},
 			Secrets: map[string]core.IntegrationSecret{
 				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
@@ -289,6 +283,7 @@ func Test__AWS__ListResources(t *testing.T) {
 			Integration: integrationCtx,
 			Logger:      logrus.NewEntry(logrus.New()),
 			HTTP:        httpContext,
+			Parameters:  map[string]string{"region": "us-east-1"},
 		})
 
 		require.NoError(t, err)
@@ -321,9 +316,7 @@ func Test__AWS__ListResources(t *testing.T) {
 		}
 
 		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"region": "us-east-1",
-			},
+			Configuration: map[string]any{},
 			Secrets: map[string]core.IntegrationSecret{
 				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
@@ -335,6 +328,7 @@ func Test__AWS__ListResources(t *testing.T) {
 			Integration: integrationCtx,
 			Logger:      logrus.NewEntry(logrus.New()),
 			HTTP:        httpContext,
+			Parameters:  map[string]string{"region": "us-east-1"},
 		})
 
 		require.NoError(t, err)
