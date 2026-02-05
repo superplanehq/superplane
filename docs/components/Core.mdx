@@ -25,6 +25,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="If" href="#if" description="Route events based on expression" />
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
+  <LinkCard title="SSH Command" href="#ssh-command" description="Run a command on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
   <LinkCard title="Wait" href="#wait" description="Wait for a certain amount of time" />
 </CardGrid>
@@ -492,6 +493,43 @@ When executed, the No Operation component immediately emits the incoming event d
   "data": {},
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "noop.finished"
+}
+```
+
+<a id="ssh-command"></a>
+
+## SSH Command
+
+Run a single command on a remote host via SSH.
+
+### Authentication
+
+Choose **SSH key** or **Password**, then select the organization Secret and the key name within that secret that holds the credential.
+
+- **SSH key**: Secret key containing the private key (PEM/OpenSSH). Optionally a second secret+key for passphrase if the key is encrypted.
+- **Password**: Secret key containing the password.
+
+### Configuration
+
+- **Host**, **Port** (default 22), **Username**: Connection details.
+- **Command**: The command to run (supports expressions).
+- **Working directory**: Optional; runs "cd <dir> && <command>".
+- **Timeout (seconds)**: How long the command may run (default 60).
+
+### Output
+
+- **success**: Exit code 0
+- **failed**: Non-zero exit code
+
+### Example Output
+
+```json
+{
+  "result": {
+    "exitCode": 0,
+    "stderr": "",
+    "stdout": "Hello, World!\n"
+  }
 }
 ```
 
