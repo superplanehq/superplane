@@ -34,7 +34,7 @@ func (j *Jira) Label() string {
 }
 
 func (j *Jira) Icon() string {
-	return "clipboard-list"
+	return "jira"
 }
 
 func (j *Jira) Description() string {
@@ -73,7 +73,9 @@ func (j *Jira) Configuration() []configuration.Field {
 }
 
 func (j *Jira) Components() []core.Component {
-	return []core.Component{}
+	return []core.Component{
+		&CreateIssue{},
+	}
 }
 
 func (j *Jira) Triggers() []core.Trigger {

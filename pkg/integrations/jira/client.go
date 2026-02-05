@@ -1,6 +1,7 @@
 package jira
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -118,4 +119,118 @@ func (c *Client) ListProjects() ([]Project, error) {
 	}
 
 	return projects, nil
+}
+
+// Issue represents a Jira issue.
+type Issue struct {
+	ID     string         `json:"id"`
+	Key    string         `json:"key"`
+	Self   string         `json:"self"`
+	Fields map[string]any `json:"fields"`
+}
+
+// GetIssue fetches a single issue by its key.
+func (c *Client) GetIssue(issueKey string) (*Issue, error) {
+	url := fmt.Sprintf("%s/rest/api/3/issue/%s", c.BaseURL, issueKey)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var issue Issue
+	if err := json.Unmarshal(responseBody, &issue); err != nil {
+		return nil, fmt.Errorf("error parsing issue response: %v", err)
+	}
+
+	return &issue, nil
+}
+
+// CreateIssueRequest is the request body for creating an issue.
+type CreateIssueRequest struct {
+	Fields CreateIssueFields `json:"fields"`
+}
+
+// CreateIssueFields contains the fields for creating an issue.
+type CreateIssueFields struct {
+	Project     ProjectRef  `json:"project"`
+	IssueType   IssueType   `json:"issuetype"`
+	Summary     string      `json:"summary"`
+	Description *ADFDoc     `json:"description,omitempty"`
+}
+
+// ProjectRef references a project by key.
+type ProjectRef struct {
+	Key string `json:"key"`
+}
+
+// IssueType specifies the issue type by name.
+type IssueType struct {
+	Name string `json:"name"`
+}
+
+// ADFDoc represents an Atlassian Document Format document.
+type ADFDoc struct {
+	Type    string    `json:"type"`
+	Version int       `json:"version"`
+	Content []ADFNode `json:"content"`
+}
+
+// ADFNode represents a node in an ADF document.
+type ADFNode struct {
+	Type    string    `json:"type"`
+	Content []ADFText `json:"content,omitempty"`
+}
+
+// ADFText represents a text node in ADF.
+type ADFText struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+// WrapInADF wraps plain text in a minimal ADF document.
+func WrapInADF(text string) *ADFDoc {
+	if text == "" {
+		return nil
+	}
+	return &ADFDoc{
+		Type:    "doc",
+		Version: 1,
+		Content: []ADFNode{
+			{
+				Type: "paragraph",
+				Content: []ADFText{
+					{Type: "text", Text: text},
+				},
+			},
+		},
+	}
+}
+
+// CreateIssueResponse is the response from creating an issue.
+type CreateIssueResponse struct {
+	ID   string `json:"id"`
+	Key  string `json:"key"`
+	Self string `json:"self"`
+}
+
+// CreateIssue creates a new issue in Jira.
+func (c *Client) CreateIssue(req *CreateIssueRequest) (*CreateIssueResponse, error) {
+	url := fmt.Sprintf("%s/rest/api/3/issue", c.BaseURL)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response CreateIssueResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing create issue response: %v", err)
+	}
+
+	return &response, nil
 }
