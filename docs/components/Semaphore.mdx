@@ -17,6 +17,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Get Job Logs" href="#get-job-logs" description="Get Semaphore job log output" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run Semaphore workflow" />
 </CardGrid>
 
@@ -126,6 +127,73 @@ This trigger automatically sets up a Semaphore webhook when configured. The webh
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "semaphore.pipeline.done"
+}
+```
+
+<a id="get-job-logs"></a>
+
+## Get Job Logs
+
+The Get Job Logs component retrieves the log output for a Semaphore job by job ID.
+
+### Use Cases
+
+- **Failure Analysis**: When a pipeline fails, fetch the failing job's logs and send them in a Slack or PagerDuty notification
+- **Debugging**: Attach job logs to a ticket or runbook step for debugging
+- **Log Parsing**: Parse job logs in a workflow to extract test summaries or error lines and branch based on content
+
+### Configuration
+
+- **Job ID**: The Semaphore job ID (e.g., from pipeline/block event data or from Run Workflow output). Accepts expressions.
+- **Limit**: Optional maximum number of log lines to return. Default returns all logs, max 1000 lines.
+
+### Output
+
+Returns job log content including:
+- Event types (job_started, cmd_started, cmd_output, cmd_finished, job_finished)
+- Timestamps for each event
+- Command output text
+- Exit codes and results
+
+### Notes
+
+- Job IDs can be found in pipeline event data under blocks[].jobs[].id
+- Logs are returned as structured events that can be parsed or formatted downstream
+- Use with On Pipeline Done or Run Workflow components to react to job failures
+
+### Example Output
+
+```json
+{
+  "events": [
+    {
+      "event": "job_started",
+      "timestamp": 1706000000000
+    },
+    {
+      "directive": "echo 'Running tests'",
+      "event": "cmd_started",
+      "timestamp": 1706000001000
+    },
+    {
+      "event": "cmd_output",
+      "output": "Running tests\n",
+      "timestamp": 1706000001500
+    },
+    {
+      "event": "cmd_finished",
+      "exit_code": 0,
+      "timestamp": 1706000002000
+    },
+    {
+      "event": "job_finished",
+      "result": "passed",
+      "timestamp": 1706000003000
+    }
+  ],
+  "lineCount": 1,
+  "output": "Running tests\n",
+  "result": "passed"
 }
 ```
 
