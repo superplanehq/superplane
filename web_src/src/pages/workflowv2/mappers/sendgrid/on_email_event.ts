@@ -18,6 +18,8 @@ const eventLabels: Record<string, string> = {
   group_resubscribe: "Group Resubscribe",
 };
 
+const allEventTypes = Object.keys(eventLabels);
+
 function formatEventLabel(event: string): string {
   return eventLabels[event] || event;
 }
@@ -34,10 +36,11 @@ export const onEmailEventTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
     const eventData = context.event?.data as OnEmailEventData;
     const eventType = eventData?.event ? formatEventLabel(eventData.event) : "Email Event";
-    const subtitle = buildSubtitle(eventData?.email, context.event?.createdAt);
+    const title = buildTitle(eventData?.email, eventType);
+    const subtitle = buildSubtitle(context.event?.createdAt);
 
     return {
-      title: eventType,
+      title,
       subtitle,
     };
   },
@@ -46,7 +49,11 @@ export const onEmailEventTriggerRenderer: TriggerRenderer = {
     const eventData = context.event?.data as OnEmailEventData;
     const category = Array.isArray(eventData?.category) ? eventData?.category.join(", ") : eventData?.category;
     return {
-      "Received At": eventData?.timestamp ? new Date(Number(eventData.timestamp) * 1000).toLocaleString() : "-",
+      "Received At": eventData?.timestamp
+        ? new Date(Number(eventData.timestamp) * 1000).toLocaleString()
+        : context.event?.createdAt
+          ? new Date(context.event.createdAt).toLocaleString()
+          : "-",
       Event: eventData?.event || "-",
       Email: eventData?.email || "-",
       Category: category || "-",
@@ -59,18 +66,22 @@ export const onEmailEventTriggerRenderer: TriggerRenderer = {
     const configuration = node.configuration as { eventTypes?: string[]; categoryFilter?: string } | undefined;
     const metadataItems = [];
 
-    if (configuration?.eventTypes?.length) {
-      const formattedEvents = configuration.eventTypes.map(formatEventLabel).join(", ");
+    if (shouldDisplayEventTypes(configuration?.eventTypes)) {
+      const formattedEvents = configuration!.eventTypes!.map(formatEventLabel);
+      const label =
+        formattedEvents.length > 3
+          ? `Events: ${formattedEvents.length} selected`
+          : `Events: ${formattedEvents.join(", ")}`;
       metadataItems.push({
         icon: "funnel",
-        label: `Events: ${formattedEvents}`,
+        label,
       });
     }
 
-    if (configuration?.categoryFilter) {
+    if (shouldDisplayCategoryFilter(configuration?.categoryFilter)) {
       metadataItems.push({
         icon: "tag",
-        label: `Category: ${configuration.categoryFilter}`,
+        label: `Category: ${configuration!.categoryFilter}`,
       });
     }
 
@@ -85,10 +96,11 @@ export const onEmailEventTriggerRenderer: TriggerRenderer = {
     if (lastEvent) {
       const eventData = lastEvent.data as OnEmailEventData;
       const eventType = eventData?.event ? formatEventLabel(eventData.event) : "Email Event";
-      const subtitle = buildSubtitle(eventData?.email, lastEvent.createdAt);
+      const title = buildTitle(eventData?.email, eventType);
+      const subtitle = buildSubtitle(lastEvent.createdAt);
 
       props.lastEventData = {
-        title: eventType,
+        title,
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
@@ -100,11 +112,38 @@ export const onEmailEventTriggerRenderer: TriggerRenderer = {
   },
 };
 
-function buildSubtitle(content: string | undefined, createdAt?: string): string {
-  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
-  if (content && timeAgo) {
-    return `${content} · ${timeAgo}`;
+function buildTitle(email: string | undefined, eventType: string): string {
+  if (email) {
+    return `${email} · ${eventType}`;
   }
 
-  return content || timeAgo;
+  return `Email Event · ${eventType}`;
+}
+
+function buildSubtitle(createdAt?: string): string {
+  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
+  return timeAgo;
+}
+
+function shouldDisplayEventTypes(eventTypes?: string[]): boolean {
+  if (!eventTypes || eventTypes.length === 0) {
+    return false;
+  }
+
+  const normalizedEventTypes = eventTypes.map((value) => value.toLowerCase().trim());
+  if (normalizedEventTypes.length !== allEventTypes.length) {
+    return true;
+  }
+
+  const allSelected = allEventTypes.every((eventType) => normalizedEventTypes.includes(eventType));
+  return !allSelected;
+}
+
+function shouldDisplayCategoryFilter(categoryFilter?: string): boolean {
+  if (!categoryFilter) {
+    return false;
+  }
+
+  const trimmed = categoryFilter.trim();
+  return trimmed !== "" && trimmed !== "*";
 }
