@@ -10,7 +10,19 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+type HTTPContextAdapter struct {
+	ctx core.HTTPContext
+}
+
+func (h *HTTPContextAdapter) RoundTrip(req *http.Request) (*http.Response, error) {
+	return h.ctx.Do(req)
+}
+
 func NewClient(ctx core.IntegrationContext, ghAppID int64, installationID string) (*github.Client, error) {
+	return NewClientWithTransport(ctx, http.DefaultTransport, ghAppID, installationID)
+}
+
+func NewClientWithTransport(ctx core.IntegrationContext, tr http.RoundTripper, ghAppID int64, installationID string) (*github.Client, error) {
 	ID, err := strconv.Atoi(installationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse installation ID: %v", err)
@@ -22,7 +34,7 @@ func NewClient(ctx core.IntegrationContext, ghAppID int64, installationID string
 	}
 
 	itr, err := ghinstallation.New(
-		http.DefaultTransport,
+		tr,
 		ghAppID,
 		int64(ID),
 		[]byte(pem),
