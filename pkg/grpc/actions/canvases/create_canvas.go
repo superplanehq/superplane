@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -26,12 +27,30 @@ func CreateCanvas(ctx context.Context, registry *registry.Registry, organization
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
+	if pbCanvas.Metadata == nil {
+		return nil, status.Error(codes.InvalidArgument, "canvas metadata is required")
+	}
+
+	if pbCanvas.Metadata.Name == "" {
+		return nil, status.Error(codes.InvalidArgument, "canvas name is required")
+	}
+
+	if pbCanvas.Spec == nil {
+		return nil, status.Error(codes.InvalidArgument, "canvas spec is required")
+	}
+
+	if err := actions.CheckForCycles(pbCanvas.Spec.Nodes, pbCanvas.Spec.Edges); err != nil {
+		return nil, err
+	}
+
+	edges, err := ValidateEdges(pbCanvas)
 	if err != nil {
 		return nil, err
 	}
 
-	expandedNodes, err := expandNodes(organizationID, nodes)
+	nodes := actions.ProtoToNodeDefinitions(pbCanvas.Spec.Nodes)
+	nodeValidationErrors := ApplyNodeValidations(registry, organizationID, pbCanvas)
+	expandedNodes, err := ExpandNodes(organizationID, nodes)
 	if err != nil {
 		return nil, err
 	}
@@ -87,13 +106,19 @@ func CreateCanvas(ctx context.Context, registry *registry.Registry, organization
 				NodeID:        node.ID,
 				ParentNodeID:  parentNodeID,
 				Name:          node.Name,
-				State:         models.CanvasNodeStateReady,
 				Type:          node.Type,
 				Ref:           datatypes.NewJSONType(node.Ref),
 				Configuration: datatypes.NewJSONType(node.Configuration),
-				Metadata:      datatypes.NewJSONType(node.Metadata),
 				CreatedAt:     &now,
 				UpdatedAt:     &now,
+			}
+
+			//
+			// If the node has validation errors, set the node to an error state.
+			//
+			if err, ok := nodeValidationErrors[node.ID]; ok {
+				canvasNode.State = models.CanvasNodeStateError
+				canvasNode.StateReason = &err
 			}
 
 			if err := tx.Create(&canvasNode).Error; err != nil {

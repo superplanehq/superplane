@@ -153,7 +153,7 @@ func Test__EventRouter_CustomComponent_RespectsOutputChannels(t *testing.T) {
 	blueprint := support.CreateBlueprint(
 		t,
 		r.Organization.ID,
-		[]models.Node{
+		[]models.NodeDefinition{
 			{ID: "if-1", Type: models.NodeTypeComponent},
 		},
 		[]models.Edge{},
@@ -256,7 +256,7 @@ func TestEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
 	blueprint := support.CreateBlueprint(
 		t,
 		r.Organization.ID,
-		[]models.Node{
+		[]models.NodeDefinition{
 			{ID: "filter-1", Type: models.NodeTypeComponent},
 		},
 		[]models.Edge{},

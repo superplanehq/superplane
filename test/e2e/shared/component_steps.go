@@ -228,7 +228,7 @@ func (s *ComponentSteps) AssertOutputChannelExists(channelName, nodeName, nodeOu
 	require.NotNil(s.t, blueprint, "blueprint not found in database")
 
 	// Find the node by name to get its ID
-	var targetNode *models.Node
+	var targetNode *models.NodeDefinition
 	for _, node := range blueprint.Nodes {
 		if node.Name == nodeName {
 			targetNode = &node

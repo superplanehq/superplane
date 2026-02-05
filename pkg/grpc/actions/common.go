@@ -622,15 +622,15 @@ func ProtoToConfigurationField(pbField *configpb.Field) configuration.Field {
 	return field
 }
 
-func ProtoToNodeDefinitions(nodes []*componentpb.NodeDefinition) []models.Node {
-	result := make([]models.Node, len(nodes))
+func ProtoToNodeDefinitions(nodes []*componentpb.NodeDefinition) []models.NodeDefinition {
+	result := make([]models.NodeDefinition, len(nodes))
 	for i, node := range nodes {
 		var integrationID *string
 		if node.Integration != nil && node.Integration.Id != "" {
 			integrationID = &node.Integration.Id
 		}
 
-		result[i] = models.Node{
+		result[i] = models.NodeDefinition{
 			ID:            node.Id,
 			Name:          node.Name,
 			Type:          ProtoToNodeType(node.Type),
@@ -644,7 +644,7 @@ func ProtoToNodeDefinitions(nodes []*componentpb.NodeDefinition) []models.Node {
 	return result
 }
 
-func NodeDefinitionsToProto(nodes []models.Node) []*componentpb.NodeDefinition {
+func NodeDefinitionsToProto(nodes []models.NodeDefinition) []*componentpb.NodeDefinition {
 	result := make([]*componentpb.NodeDefinition, len(nodes))
 	for i, node := range nodes {
 		result[i] = &componentpb.NodeDefinition{

@@ -45,7 +45,7 @@ func SerializeBlueprint(in *models.Blueprint) *pb.Blueprint {
 	}
 }
 
-func ParseBlueprint(registry *registry.Registry, organizationID string, blueprint *pb.Blueprint) ([]models.Node, []models.Edge, error) {
+func ParseBlueprint(registry *registry.Registry, organizationID string, blueprint *pb.Blueprint) ([]models.NodeDefinition, []models.Edge, error) {
 	if blueprint.Name == "" {
 		return nil, nil, status.Error(codes.InvalidArgument, "blueprint name is required")
 	}

@@ -52,7 +52,7 @@ func (c *CanvasNode) TableName() string {
 
 var nodeIDSanitizer = regexp.MustCompile(`[^a-z0-9]`)
 
-func GenerateUniqueNodeID(node Node, reservedIDs map[string]bool) string {
+func GenerateUniqueNodeID(node NodeDefinition, reservedIDs map[string]bool) string {
 	blockName := NodeTypeName(node)
 	nodeName := node.Name
 	if nodeName == "" {
@@ -74,7 +74,7 @@ func GenerateNodeID(blockName string, nodeName string) string {
 	return fmt.Sprintf("%s-%s-%s", sanitizedBlock, sanitizedName, randomChars)
 }
 
-func NodeTypeName(node Node) string {
+func NodeTypeName(node NodeDefinition) string {
 	if node.Ref.Component != nil && node.Ref.Component.Name != "" {
 		return node.Ref.Component.Name
 	}

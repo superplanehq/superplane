@@ -123,7 +123,7 @@ func Test__NodeQueueWorker_BlueprintNodeQueueIsProcessed(t *testing.T) {
 	blueprint := support.CreateBlueprint(
 		t,
 		r.Organization.ID,
-		[]models.Node{
+		[]models.NodeDefinition{
 			{
 				ID:   "noop1",
 				Type: models.NodeTypeComponent,
@@ -667,7 +667,7 @@ func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure_PropagateToParent(t
 	blueprint := support.CreateBlueprint(
 		t,
 		r.Organization.ID,
-		[]models.Node{
+		[]models.NodeDefinition{
 			{
 				ID:   "noop1",
 				Type: models.NodeTypeComponent,

@@ -21,7 +21,7 @@ type Canvas struct {
 	CreatedAt      *time.Time
 	UpdatedAt      *time.Time
 	DeletedAt      gorm.DeletedAt `gorm:"index"`
-	Nodes          datatypes.JSONSlice[Node]
+	Nodes          datatypes.JSONSlice[NodeDefinition]
 	Edges          datatypes.JSONSlice[Edge]
 }
 

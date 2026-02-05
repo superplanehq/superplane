@@ -11,8 +11,8 @@ import (
  * internal nodes from referenced blueprints. Internal nodes are namespaced as
  * "<parentNodeID>:<internalNodeID>".
  */
-func expandNodes(organizationID string, nodes []models.Node) ([]models.Node, error) {
-	expanded := make([]models.Node, 0, len(nodes))
+func ExpandNodes(organizationID string, nodes []models.NodeDefinition) ([]models.NodeDefinition, error) {
+	expanded := make([]models.NodeDefinition, 0, len(nodes))
 
 	for _, n := range nodes {
 		expanded = append(expanded, n)
@@ -32,13 +32,12 @@ func expandNodes(organizationID string, nodes []models.Node) ([]models.Node, err
 		}
 
 		for _, bn := range b.Nodes {
-			internal := models.Node{
+			internal := models.NodeDefinition{
 				ID:            n.ID + ":" + bn.ID,
 				Name:          bn.Name,
 				Type:          bn.Type,
 				Ref:           bn.Ref,
 				Configuration: bn.Configuration,
-				Metadata:      cloneMetadata(bn.Metadata),
 				Position:      bn.Position,
 				IsCollapsed:   bn.IsCollapsed,
 				IntegrationID: bn.IntegrationID,
@@ -49,16 +48,4 @@ func expandNodes(organizationID string, nodes []models.Node) ([]models.Node, err
 	}
 
 	return expanded, nil
-}
-
-func ExpandNodes(organizationID string, nodes []models.Node) ([]models.Node, error) {
-	return expandNodes(organizationID, nodes)
-}
-
-func cloneMetadata(md map[string]any) map[string]any {
-	out := map[string]any{}
-	for k, v := range md {
-		out[k] = v
-	}
-	return out
 }

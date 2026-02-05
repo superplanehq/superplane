@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -45,24 +44,46 @@ func UpdateCanvas(ctx context.Context, encryptor crypto.Encryptor, registry *reg
 		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
 	}
 
-	nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
-	if err != nil {
-		return nil, actions.ToStatus(err)
+	if pbCanvas.Metadata == nil {
+		return nil, status.Error(codes.InvalidArgument, "canvas metadata is required")
 	}
 
+	if pbCanvas.Metadata.Name == "" {
+		return nil, status.Error(codes.InvalidArgument, "canvas name is required")
+	}
+
+	if pbCanvas.Spec == nil {
+		return nil, status.Error(codes.InvalidArgument, "canvas spec is required")
+	}
+
+	if err := actions.CheckForCycles(pbCanvas.Spec.Nodes, pbCanvas.Spec.Edges); err != nil {
+		return nil, err
+	}
+
+	//
+	// Apply hard validation rules to the canvas.
+	//
+	edges, err := ValidateEdges(pbCanvas)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := ValidateNodes(pbCanvas); err != nil {
+		return nil, err
+	}
+
+	//
+	// From this point on, if there are validation errors, we will set the node to an error state.
+	//
+	nodes := actions.ProtoToNodeDefinitions(pbCanvas.Spec.Nodes)
+	nodeValidationErrors := ApplyNodeValidations(registry, organizationID, pbCanvas)
 	existingNodesUnscoped, err := models.FindCanvasNodesUnscoped(canvasID)
 	if err != nil {
 		return nil, actions.ToStatus(err)
 	}
 
 	nodes, edges, _ = remapNodeIDsForConflicts(nodes, edges, existingNodesUnscoped)
-
-	parentNodesByNodeID := make(map[string]*models.Node)
-	for i := range nodes {
-		parentNodesByNodeID[nodes[i].ID] = &nodes[i]
-	}
-
-	expandedNodes, err := expandNodes(organizationID, nodes)
+	expandedNodes, err := ExpandNodes(organizationID, nodes)
 	if err != nil {
 		return nil, actions.ToStatus(err)
 	}
@@ -83,52 +104,61 @@ func UpdateCanvas(ctx context.Context, encryptor crypto.Encryptor, registry *reg
 		// and tracking which nodes we've seen, to delete nodes that are no longer in the workflow at the end.
 		//
 		for _, node := range expandedNodes {
+
+			//
 			// Widgets are not persisted in workflow_nodes table and don't have any logic to execute and to setup.
+			//
 			if node.Type == models.NodeTypeWidget {
 				continue
 			}
 
-			workflowNode, err := upsertNode(tx, existingNodes, node, canvasID)
+			canvasNode, err := upsertNode(tx, existingNodes, node, canvasID, nodeValidationErrors)
 			if err != nil {
 				return err
 			}
 
-			err = setupNode(ctx, tx, encryptor, registry, workflowNode, webhookBaseURL)
-			if err != nil {
-				workflowNode.State = models.CanvasNodeStateError
-				errorMsg := err.Error()
-				workflowNode.StateReason = &errorMsg
-				if saveErr := tx.Save(workflowNode).Error; saveErr != nil {
-					return saveErr
-				}
-
-				errorNodeID := node.ID
-				if workflowNode.ParentNodeID != nil {
-					errorNodeID = *workflowNode.ParentNodeID
-				}
-
-				parentNode, ok := parentNodesByNodeID[errorNodeID]
-				if !ok {
-					log.Errorf("Parent node %s not found for node setup error", errorNodeID)
-				} else {
-					parentNode.ErrorMessage = &errorMsg
-				}
-			} else {
-				log.Infof("Node %s setup successfully", workflowNode.NodeID)
-				workflowNode.State = models.CanvasNodeStateReady
-				workflowNode.StateReason = nil
-				if err := tx.Save(workflowNode).Error; err != nil {
+			//
+			// If the node has validation errors, set the node to an error state,
+			// and don't even call component/trigger Setup().
+			//
+			if err, ok := nodeValidationErrors[node.ID]; ok {
+				canvasNode.State = models.CanvasNodeStateError
+				canvasNode.StateReason = &err
+				if err := tx.Save(canvasNode).Error; err != nil {
 					return err
 				}
+				continue
 			}
 
-			if workflowNode.ParentNodeID == nil {
-				parentNode, ok := parentNodesByNodeID[workflowNode.NodeID]
-				if !ok {
-					log.Errorf("Parent node %s not found", workflowNode.NodeID)
-					return status.Errorf(codes.Internal, "It was not possible to find the parent node %s", workflowNode.NodeID)
+			//
+			// Call component/trigger Setup().
+			//
+			err = setupNode(ctx, tx, encryptor, registry, canvasNode, webhookBaseURL)
+
+			//
+			// If an error is returned, we move the node to an error state.
+			//
+			if err != nil {
+				canvasNode.State = models.CanvasNodeStateError
+				errorMsg := err.Error()
+				canvasNode.StateReason = &errorMsg
+				if err := tx.Save(canvasNode).Error; err != nil {
+					return err
 				}
-				parentNode.Metadata = workflowNode.Metadata.Data()
+
+				continue
+			}
+
+			//
+			// If no error is returned, we move the node back to ready,
+			// if it was previously in an error state.
+			//
+			if canvasNode.State == models.CanvasNodeStateError {
+				canvasNode.State = models.CanvasNodeStateReady
+				canvasNode.StateReason = nil
+				if err := tx.Save(canvasNode).Error; err != nil {
+					return err
+				}
 			}
 		}
 
@@ -166,10 +196,10 @@ func UpdateCanvas(ctx context.Context, encryptor crypto.Encryptor, registry *reg
 // can preserve historical records while still allowing new nodes with similar
 // names to be created in the same workflow.
 func remapNodeIDsForConflicts(
-	nodes []models.Node,
+	nodes []models.NodeDefinition,
 	edges []models.Edge,
 	existingNodes []models.CanvasNode,
-) ([]models.Node, []models.Edge, map[string]string) {
+) ([]models.NodeDefinition, []models.Edge, map[string]string) {
 	reservedIDs := make(map[string]bool, len(existingNodes))
 	deletedIDs := make(map[string]bool, len(existingNodes))
 
@@ -218,7 +248,7 @@ func findNode(nodes []models.CanvasNode, nodeID string) *models.CanvasNode {
 	return nil
 }
 
-func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node, workflowID uuid.UUID) (*models.CanvasNode, error) {
+func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.NodeDefinition, workflowID uuid.UUID, nodeValidationErrors map[string]string) (*models.CanvasNode, error) {
 	now := time.Now()
 
 	var appInstallationID *uuid.UUID
@@ -242,6 +272,15 @@ func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node
 		existingNode.Position = datatypes.NewJSONType(node.Position)
 		existingNode.IsCollapsed = node.IsCollapsed
 		existingNode.AppInstallationID = appInstallationID
+
+		//
+		// If the node has validation errors, set the node to an error state.
+		// Otherwise, don't touch the existing node state.
+		//
+		if err, ok := nodeValidationErrors[node.ID]; ok {
+			existingNode.State = models.CanvasNodeStateError
+			existingNode.StateReason = &err
+		}
 
 		// Set parent if internal namespaced id
 		if idx := strings.Index(node.ID, ":"); idx != -1 {
@@ -275,17 +314,24 @@ func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node
 		NodeID:            node.ID,
 		ParentNodeID:      parentNodeID,
 		Name:              node.Name,
-		State:             models.CanvasNodeStateReady,
-		StateReason:       nil,
 		Type:              node.Type,
 		Ref:               datatypes.NewJSONType(node.Ref),
 		Configuration:     datatypes.NewJSONType(node.Configuration),
 		Position:          datatypes.NewJSONType(node.Position),
 		IsCollapsed:       node.IsCollapsed,
-		Metadata:          datatypes.NewJSONType(node.Metadata),
 		AppInstallationID: appInstallationID,
 		CreatedAt:         &now,
 		UpdatedAt:         &now,
+	}
+
+	//
+	// If the node has validation errors, set the node to an error state.
+	//
+	if err, ok := nodeValidationErrors[node.ID]; ok {
+		canvasNode.State = models.CanvasNodeStateError
+		canvasNode.StateReason = &err
+	} else {
+		canvasNode.State = models.CanvasNodeStateReady
 	}
 
 	err := tx.Create(&canvasNode).Error
@@ -302,9 +348,6 @@ func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, reg
 		return setupTrigger(ctx, tx, encryptor, registry, node, webhookBaseURL)
 	case models.NodeTypeComponent:
 		return setupComponent(tx, encryptor, registry, node)
-	case models.NodeTypeWidget:
-		// Widgets are not persisted and don't have any logic to execute and to setup.
-		return nil
 	}
 
 	return nil
@@ -392,9 +435,9 @@ func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.
 	return tx.Save(node).Error
 }
 
-func deleteNodes(tx *gorm.DB, existingNodes []models.CanvasNode, newNodes []models.Node) error {
+func deleteNodes(tx *gorm.DB, existingNodes []models.CanvasNode, newNodes []models.NodeDefinition) error {
 	for _, existingNode := range existingNodes {
-		if !slices.ContainsFunc(newNodes, func(n models.Node) bool { return n.ID == existingNode.NodeID }) {
+		if !slices.ContainsFunc(newNodes, func(n models.NodeDefinition) bool { return n.ID == existingNode.NodeID }) {
 			err := models.DeleteCanvasNode(tx, existingNode)
 			if err != nil {
 				return err

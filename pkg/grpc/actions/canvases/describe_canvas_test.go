@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/google/uuid"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -120,12 +122,21 @@ func Test__DescribeCanvas(t *testing.T) {
 		// Verify node states
 		//
 		assert.Len(t, response.Canvas.Status.Nodes, 2)
-		assert.Equal(t, "node-1", response.Canvas.Status.Nodes[0].Id)
-		assert.Equal(t, "node-2", response.Canvas.Status.Nodes[1].Id)
-		assert.Equal(t, "paused", response.Canvas.Status.Nodes[0].State)
-		assert.Equal(t, "paused", response.Canvas.Status.Nodes[1].State)
-		assert.Empty(t, response.Canvas.Status.Nodes[0].StateReason)
-		assert.Empty(t, response.Canvas.Status.Nodes[1].StateReason)
+		nodeStates := response.Canvas.Status.Nodes
+
+		//
+		// First node is paused
+		//
+		assert.True(t, slices.ContainsFunc(nodeStates, func(nodeState *pb.CanvasNodeState) bool {
+			return nodeState.Id == "node-1" && nodeState.State == "paused" && nodeState.StateReason == ""
+		}))
+
+		//
+		// Second node is ready
+		//
+		assert.True(t, slices.ContainsFunc(nodeStates, func(nodeState *pb.CanvasNodeState) bool {
+			return nodeState.Id == "node-2" && nodeState.State == "ready" && nodeState.StateReason == ""
+		}))
 	})
 
 	t.Run("status includes last execution per node", func(t *testing.T) {

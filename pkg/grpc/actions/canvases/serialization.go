@@ -167,80 +167,76 @@ func serializeCanvasNodeState(node *models.CanvasNode) *pb.CanvasNodeState {
 	return state
 }
 
-func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) ([]models.Node, []models.Edge, error) {
-	if canvas.Metadata == nil {
-		return nil, nil, status.Error(codes.InvalidArgument, "canvas metadata is required")
-	}
-
-	if canvas.Metadata.Name == "" {
-		return nil, nil, status.Error(codes.InvalidArgument, "canvas name is required")
-	}
-
-	if canvas.Spec == nil {
-		return nil, nil, status.Error(codes.InvalidArgument, "canvas spec is required")
-	}
-
-	// Allow empty canvases
-	if len(canvas.Spec.Nodes) == 0 {
-		return []models.Node{}, []models.Edge{}, nil
-	}
-
+func ValidateEdges(canvas *pb.Canvas) ([]models.Edge, error) {
+	//
+	// Build a map of node IDs and their types.
+	//
 	nodeIDs := make(map[string]bool)
 	nodeTypeByID := make(map[string]compb.NodeDefinition_Type)
-	nodeValidationErrors := make(map[string]string)
+	for _, node := range canvas.Spec.Nodes {
+		nodeIDs[node.Id] = true
+		nodeTypeByID[node.Id] = node.Type
+	}
+
+	//
+	// Validate each edge.
+	//
+	for i, edge := range canvas.Spec.Edges {
+		if edge.SourceId == "" || edge.TargetId == "" {
+			return nil, status.Errorf(codes.InvalidArgument, "edge %d: source_id and target_id are required", i)
+		}
+
+		if !nodeIDs[edge.SourceId] {
+			return nil, status.Errorf(codes.InvalidArgument, "edge %d: source node %s not found", i, edge.SourceId)
+		}
+
+		if !nodeIDs[edge.TargetId] {
+			return nil, status.Errorf(codes.InvalidArgument, "edge %d: target node %s not found", i, edge.TargetId)
+		}
+
+		if nodeTypeByID[edge.SourceId] == compb.NodeDefinition_TYPE_WIDGET {
+			return nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as source nodes", i)
+		}
+
+		if nodeTypeByID[edge.TargetId] == compb.NodeDefinition_TYPE_WIDGET {
+			return nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as target nodes", i)
+		}
+	}
+
+	return actions.ProtoToEdges(canvas.Spec.Edges), nil
+}
+
+func ValidateNodes(canvas *pb.Canvas) error {
+	nodeIDs := make(map[string]bool)
 
 	for i, node := range canvas.Spec.Nodes {
 		if node.Id == "" {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "node %d: id is required", i)
+			return status.Errorf(codes.InvalidArgument, "node %d: id is required", i)
 		}
 
 		if node.Name == "" {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "node %s: name is required", node.Id)
+			return status.Errorf(codes.InvalidArgument, "node %s: name is required", node.Id)
 		}
 
 		if nodeIDs[node.Id] {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "node %s: duplicate node id", node.Id)
+			return status.Errorf(codes.InvalidArgument, "node %s: duplicate node id", node.Id)
 		}
 
 		nodeIDs[node.Id] = true
-		nodeTypeByID[node.Id] = node.Type
+	}
 
+	return nil
+}
+
+func ApplyNodeValidations(registry *registry.Registry, orgID string, canvas *pb.Canvas) map[string]string {
+	nodeValidationErrors := make(map[string]string)
+	for _, node := range canvas.Spec.Nodes {
 		if err := validateNodeRef(registry, orgID, node); err != nil {
 			nodeValidationErrors[node.Id] = err.Error()
 		}
 	}
 
-	// TODO: warnings?
-	// Find shadowed names within connected components
-	// nodeWarnings := actions.FindShadowedNameWarnings(canvas.Spec.Nodes, canvas.Spec.Edges)
-
-	for i, edge := range canvas.Spec.Edges {
-		if edge.SourceId == "" || edge.TargetId == "" {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source_id and target_id are required", i)
-		}
-
-		if !nodeIDs[edge.SourceId] {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source node %s not found", i, edge.SourceId)
-		}
-
-		if !nodeIDs[edge.TargetId] {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target node %s not found", i, edge.TargetId)
-		}
-
-		if nodeTypeByID[edge.SourceId] == compb.NodeDefinition_TYPE_WIDGET {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as source nodes", i)
-		}
-
-		if nodeTypeByID[edge.TargetId] == compb.NodeDefinition_TYPE_WIDGET {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as target nodes", i)
-		}
-	}
-
-	if err := actions.CheckForCycles(canvas.Spec.Nodes, canvas.Spec.Edges); err != nil {
-		return nil, nil, err
-	}
-
-	return actions.ProtoToNodeDefinitions(canvas.Spec.Nodes), actions.ProtoToEdges(canvas.Spec.Edges), nil
+	return nodeValidationErrors
 }
 
 func validateNodeRef(registry *registry.Registry, organizationID string, node *compb.NodeDefinition) error {
@@ -302,7 +298,7 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 			return fmt.Errorf("widget name is required")
 		}
 
-		widget, err := findAndValidateWidget(registry, organizationID, node)
+		widget, err := findAndValidateWidget(registry, node)
 		if err != nil {
 			return err
 		}
@@ -332,7 +328,7 @@ func findAndValidateTrigger(registry *registry.Registry, organizationID string, 
 	return registry.GetIntegrationTrigger(parts[0], node.Trigger.Name)
 }
 
-func findAndValidateWidget(registry *registry.Registry, organizationID string, node *compb.NodeDefinition) (core.Widget, error) {
+func findAndValidateWidget(registry *registry.Registry, node *compb.NodeDefinition) (core.Widget, error) {
 	if node.Widget != nil && node.Widget.Name == "" {
 		return nil, fmt.Errorf("widget name is required")
 	}

@@ -214,7 +214,7 @@ func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.Canva
 	return err
 }
 
-func (w *NodeExecutor) configurationFieldsForBlueprintNode(tx *gorm.DB, node models.Node) ([]configuration.Field, error) {
+func (w *NodeExecutor) configurationFieldsForBlueprintNode(tx *gorm.DB, node models.NodeDefinition) ([]configuration.Field, error) {
 	switch {
 	case node.Ref.Component != nil && node.Ref.Component.Name != "":
 		comp, err := w.registry.GetComponent(node.Ref.Component.Name)

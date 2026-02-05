@@ -21,7 +21,7 @@ type Blueprint struct {
 	CreatedBy      *uuid.UUID
 	CreatedAt      *time.Time
 	UpdatedAt      *time.Time
-	Nodes          datatypes.JSONSlice[Node]
+	Nodes          datatypes.JSONSlice[NodeDefinition]
 	Edges          datatypes.JSONSlice[Edge]
 	Configuration  datatypes.JSONSlice[configuration.Field]
 	OutputChannels datatypes.JSONSlice[BlueprintOutputChannel]
@@ -33,7 +33,7 @@ type BlueprintOutputChannel struct {
 	NodeOutputChannel string `json:"node_output_channel"`
 }
 
-func (b *Blueprint) FindNode(id string) (*Node, error) {
+func (b *Blueprint) FindNode(id string) (*NodeDefinition, error) {
 	for _, node := range b.Nodes {
 		if node.ID == id {
 			return &node, nil
@@ -55,7 +55,7 @@ func (b *Blueprint) FindEdges(sourceID string, channel string) []Edge {
 	return edges
 }
 
-func (b *Blueprint) FindRootNode() *Node {
+func (b *Blueprint) FindRootNode() *NodeDefinition {
 	hasIncoming := make(map[string]bool)
 	for _, edge := range b.Edges {
 		hasIncoming[edge.TargetID] = true
@@ -118,18 +118,15 @@ func FindUnscopedBlueprintInTransaction(tx *gorm.DB, id string) (*Blueprint, err
 	return &blueprint, nil
 }
 
-type Node struct {
-	ID             string         `json:"id"`
-	Name           string         `json:"name"`
-	Type           string         `json:"type"`
-	Ref            NodeRef        `json:"ref"`
-	Configuration  map[string]any `json:"configuration"`
-	Metadata       map[string]any `json:"metadata"`
-	Position       Position       `json:"position"`
-	IsCollapsed    bool           `json:"isCollapsed"`
-	IntegrationID  *string        `json:"integrationId,omitempty"`
-	ErrorMessage   *string        `json:"errorMessage,omitempty"`
-	WarningMessage *string        `json:"warningMessage,omitempty"`
+type NodeDefinition struct {
+	ID            string         `json:"id"`
+	Name          string         `json:"name"`
+	Type          string         `json:"type"`
+	Ref           NodeRef        `json:"ref"`
+	Configuration map[string]any `json:"configuration"`
+	Position      Position       `json:"position"`
+	IsCollapsed   bool           `json:"isCollapsed"`
+	IntegrationID *string        `json:"integrationId,omitempty"`
 }
 
 type Position struct {

@@ -93,7 +93,7 @@ func Test__NodeExecutor_BlueprintNodeExecution(t *testing.T) {
 	blueprint := support.CreateBlueprint(
 		t,
 		r.Organization.ID,
-		[]models.Node{
+		[]models.NodeDefinition{
 			{
 				ID:   "noop1",
 				Type: models.NodeTypeComponent,
@@ -317,7 +317,7 @@ func Test__NodeExecutor_BlueprintNodeExecutionFailsWhenConfigurationCannotBeBuil
 	blueprint := support.CreateBlueprint(
 		t,
 		r.Organization.ID,
-		[]models.Node{
+		[]models.NodeDefinition{
 			{
 				ID:            "noop1",
 				Type:          models.NodeTypeComponent,

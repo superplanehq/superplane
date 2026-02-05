@@ -151,7 +151,7 @@ func Test__ListCanvases__DoesNotReturnCanvasesFromOtherOrganizations(t *testing.
 	assert.NotEqual(t, otherCanvas.ID.String(), response.Canvases[0].Metadata.Id)
 }
 
-func Test__ListCanvases__ReturnsCanvasesWithoutStatusInformation(t *testing.T) {
+func Test__ListCanvases__ReturnsCanvasesWithOnlyNodeStatusInformation(t *testing.T) {
 	r := support.Setup(t)
 
 	//
@@ -191,9 +191,16 @@ func Test__ListCanvases__ReturnsCanvasesWithoutStatusInformation(t *testing.T) {
 	require.Len(t, response.Canvases, 1)
 
 	//
-	// Verify status is nil (not loaded)
+	// Verify only node status information is present
 	//
-	assert.Nil(t, response.Canvases[0].Status)
+	assert.NotNil(t, response.Canvases[0].Status)
+	assert.Len(t, response.Canvases[0].Status.Nodes, 1)
+	assert.Equal(t, "node-1", response.Canvases[0].Status.Nodes[0].Id)
+	assert.Equal(t, "ready", response.Canvases[0].Status.Nodes[0].State)
+	assert.Empty(t, response.Canvases[0].Status.Nodes[0].StateReason)
+	assert.Nil(t, response.Canvases[0].Status.LastExecutions)
+	assert.Nil(t, response.Canvases[0].Status.NextQueueItems)
+	assert.Nil(t, response.Canvases[0].Status.LastEvents)
 }
 
 func Test__ListCanvases__ReturnsCanvasesWithMetadataAndSpec(t *testing.T) {
@@ -271,9 +278,12 @@ func Test__ListCanvases__ReturnsCanvasesWithMetadataAndSpec(t *testing.T) {
 	assert.Equal(t, "default", listedCanvas.Spec.Edges[0].Channel)
 
 	//
-	// Verify status is NOT present
+	// Verify status is present with only node status information
 	//
-	assert.Nil(t, listedCanvas.Status)
+	assert.NotNil(t, listedCanvas.Status)
+	assert.Nil(t, listedCanvas.Status.LastExecutions)
+	assert.Nil(t, listedCanvas.Status.NextQueueItems)
+	assert.Nil(t, listedCanvas.Status.LastEvents)
 }
 
 func Test__ListCanvases__DoesNotReturnSoftDeletedCanvasesWhenIncludingTemplates(t *testing.T) {
@@ -322,7 +332,7 @@ func Test__ListCanvases__DoesNotReturnSoftDeletedCanvasesWhenIncludingTemplates(
 		IsTemplate:     true,
 		Name:           support.RandomName("template"),
 		Description:    "Template workflow",
-		Nodes:          datatypes.NewJSONSlice([]models.Node{}),
+		Nodes:          datatypes.NewJSONSlice([]models.NodeDefinition{}),
 		Edges:          datatypes.NewJSONSlice([]models.Edge{}),
 		CreatedAt:      &now,
 		UpdatedAt:      &now,

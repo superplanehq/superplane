@@ -722,7 +722,7 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Root(t *testing.T) {
 	blueprint := support.CreateBlueprint(
 		t,
 		r.Organization.ID,
-		[]models.Node{
+		[]models.NodeDefinition{
 			{
 				ID:   "bp-node-1",
 				Name: "bp-node-1",
@@ -816,7 +816,7 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Chain(t *testing.T) {
 	blueprint := support.CreateBlueprint(
 		t,
 		r.Organization.ID,
-		[]models.Node{
+		[]models.NodeDefinition{
 			{
 				ID:   "bp-node-1",
 				Name: "bp-node-1",
@@ -947,7 +947,7 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Config(t *testing.T) {
 	blueprint := support.CreateBlueprint(
 		t,
 		r.Organization.ID,
-		[]models.Node{
+		[]models.NodeDefinition{
 			{
 				ID:   "bp-node-1",
 				Name: "bp-node-1",

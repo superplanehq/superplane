@@ -10,6 +10,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -139,11 +140,35 @@ func deleteAllTemplateWorkflows(tx *gorm.DB) error {
 
 func createTemplateCanvas(tx *gorm.DB, registry *registry.Registry, template *pb.Canvas) error {
 	organizationID := models.TemplateOrganizationID.String()
-	nodes, edges, err := canvases.ParseCanvas(registry, organizationID, template)
+	if template.Metadata == nil {
+		return fmt.Errorf("template %s missing metadata", template.Metadata.Name)
+	}
+
+	if template.Metadata.Name == "" {
+		return fmt.Errorf("template %s missing name", template.Metadata.Name)
+	}
+
+	if template.Spec == nil {
+		return fmt.Errorf("template %s missing spec", template.Metadata.Name)
+	}
+
+	if err := actions.CheckForCycles(template.Spec.Nodes, template.Spec.Edges); err != nil {
+		return err
+	}
+
+	//
+	// Apply hard validation rules to the canvas.
+	//
+	edges, err := canvases.ValidateEdges(template)
 	if err != nil {
 		return err
 	}
 
+	if err := canvases.ValidateNodes(template); err != nil {
+		return err
+	}
+
+	nodes := actions.ProtoToNodeDefinitions(template.Spec.Nodes)
 	expandedNodes, err := canvases.ExpandNodes(organizationID, nodes)
 	if err != nil {
 		return err
@@ -182,7 +207,6 @@ func createTemplateCanvas(tx *gorm.DB, registry *registry.Registry, template *pb
 			Type:          node.Type,
 			Ref:           datatypes.NewJSONType(node.Ref),
 			Configuration: datatypes.NewJSONType(node.Configuration),
-			Metadata:      datatypes.NewJSONType(node.Metadata),
 			CreatedAt:     &now,
 			UpdatedAt:     &now,
 		}

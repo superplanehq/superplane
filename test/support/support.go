@@ -2,7 +2,6 @@ package support
 
 import (
 	"encoding/json"
-	"maps"
 	"strings"
 	"testing"
 	"time"
@@ -297,15 +296,14 @@ func CreateNextNodeExecution(
 func CreateCanvas(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []models.CanvasNode, edges []models.Edge) (*models.Canvas, []models.CanvasNode) {
 	now := time.Now()
 
-	inputNodes := make([]models.Node, len(nodes))
+	inputNodes := make([]models.NodeDefinition, len(nodes))
 	for i, node := range nodes {
-		inputNodes[i] = models.Node{
+		inputNodes[i] = models.NodeDefinition{
 			ID:            node.NodeID,
 			Name:          node.Name,
 			Type:          node.Type,
 			Ref:           node.Ref.Data(),
 			Configuration: node.Configuration.Data(),
-			Metadata:      node.Metadata.Data(),
 			Position:      node.Position.Data(),
 			IsCollapsed:   node.IsCollapsed,
 		}
@@ -352,7 +350,6 @@ func CreateCanvas(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []model
 			Ref:           datatypes.NewJSONType(node.Ref),
 			Configuration: datatypes.NewJSONType(node.Configuration),
 			Position:      datatypes.NewJSONType(node.Position),
-			Metadata:      datatypes.NewJSONType(node.Metadata),
 			IsCollapsed:   node.IsCollapsed,
 			CreatedAt:     &now,
 			UpdatedAt:     &now,
@@ -365,7 +362,7 @@ func CreateCanvas(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []model
 	return workflow, createdNodes
 }
 
-func CreateBlueprint(t *testing.T, orgID uuid.UUID, nodes []models.Node, edges []models.Edge, outputChannels []models.BlueprintOutputChannel) *models.Blueprint {
+func CreateBlueprint(t *testing.T, orgID uuid.UUID, nodes []models.NodeDefinition, edges []models.Edge, outputChannels []models.BlueprintOutputChannel) *models.Blueprint {
 	now := time.Now()
 
 	blueprint := models.Blueprint{
@@ -479,8 +476,8 @@ func ensureCanvasNodeExists(t *testing.T, workflowID uuid.UUID, nodeID string) {
 	require.NoError(t, database.Conn().Create(&node).Error)
 }
 
-func expandBlueprintNodes(t *testing.T, orgID uuid.UUID, nodes []models.Node) ([]models.Node, error) {
-	expanded := make([]models.Node, 0, len(nodes))
+func expandBlueprintNodes(t *testing.T, orgID uuid.UUID, nodes []models.NodeDefinition) ([]models.NodeDefinition, error) {
+	expanded := make([]models.NodeDefinition, 0, len(nodes))
 
 	for _, n := range nodes {
 		expanded = append(expanded, n)
@@ -500,13 +497,12 @@ func expandBlueprintNodes(t *testing.T, orgID uuid.UUID, nodes []models.Node) ([
 		}
 
 		for _, bn := range b.Nodes {
-			internal := models.Node{
+			internal := models.NodeDefinition{
 				ID:            n.ID + ":" + bn.ID,
 				Name:          bn.Name,
 				Type:          bn.Type,
 				Ref:           bn.Ref,
 				Configuration: bn.Configuration,
-				Metadata:      maps.Clone(bn.Metadata),
 				Position:      bn.Position,
 				IsCollapsed:   bn.IsCollapsed,
 			}

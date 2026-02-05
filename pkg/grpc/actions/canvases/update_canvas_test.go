@@ -2,7 +2,6 @@ package canvases
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +15,7 @@ import (
 	"gorm.io/datatypes"
 )
 
-func TestUpdateCanvas_NodeRemovalUseSoftDelete(t *testing.T) {
+func Test__UpdateCanvas__NodeRemovalUseSoftDelete(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -115,7 +114,7 @@ func TestUpdateCanvas_NodeRemovalUseSoftDelete(t *testing.T) {
 	assert.Equal(t, int64(1), executionCount, "execution should still exist (FK constraint satisfied by soft deleted node)")
 }
 
-func TestUpdateCanvas_RemapConflictingNodeIDs(t *testing.T) {
+func Test__UpdateCanvas__RemapConflictingNodeIDs(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -257,7 +256,7 @@ func TestUpdateCanvas_RemapConflictingNodeIDs(t *testing.T) {
 	assert.Equal(t, int64(1), remappedCount, "remapped node should be active")
 }
 
-func TestUpdateCanvas_ErroredNodesCanExist(t *testing.T) {
+func Test__UpdateCanvas__ErroredNodesCanExist(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -345,7 +344,7 @@ func TestUpdateCanvas_ErroredNodesCanExist(t *testing.T) {
 	assert.Equal(t, "Node 2 Updated", previouslyErroredNode.Name, "previously errored node name should be updated")
 }
 
-func TestUpdateWorkflow_ErroredNodeResetOnUpdate(t *testing.T) {
+func Test__UpdateCanvas__ErroredNodeResetOnUpdate(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -420,7 +419,7 @@ func TestUpdateWorkflow_ErroredNodeResetOnUpdate(t *testing.T) {
 	assert.Equal(t, "Node 1 Updated", updatedNode.Name, "node name should be updated")
 }
 
-func TestUpdateCanvas_NonErroredNodesKeepState(t *testing.T) {
+func Test__UpdateCanvas__NonErroredNodesKeepState(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -515,29 +514,26 @@ func TestUpdateCanvas_NonErroredNodesKeepState(t *testing.T) {
 	)
 	require.NoError(t, err, "UpdateWorkflow should succeed")
 
-	var readyNode models.CanvasNode
-	err = database.Conn().Where("workflow_id = ? AND node_id = ?", canvas.ID, "ready-node").First(&readyNode).Error
+	readyNode, err := models.FindCanvasNode(database.Conn(), canvas.ID, "ready-node")
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasNodeStateReady, readyNode.State, "ready node should stay ready")
 	assert.Nil(t, readyNode.StateReason, "ready node should not have error reason")
 	assert.Equal(t, "Ready Node Updated", readyNode.Name, "ready node name should be updated")
 
-	var processingNode models.CanvasNode
-	err = database.Conn().Where("workflow_id = ? AND node_id = ?", canvas.ID, "processing-node").First(&processingNode).Error
+	processingNode, err := models.FindCanvasNode(database.Conn(), canvas.ID, "processing-node")
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasNodeStateProcessing, processingNode.State, "processing node should stay processing")
 	assert.Nil(t, processingNode.StateReason, "processing node should not have error reason")
 	assert.Equal(t, "Processing Node Updated", processingNode.Name, "processing node name should be updated")
 
-	var erroredNode models.CanvasNode
-	err = database.Conn().Where("workflow_id = ? AND node_id = ?", canvas.ID, "errored-node").First(&erroredNode).Error
+	erroredNode, err := models.FindCanvasNode(database.Conn(), canvas.ID, "errored-node")
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasNodeStateReady, erroredNode.State, "errored node should be reset to ready")
 	assert.Nil(t, erroredNode.StateReason, "errored node error reason should be cleared")
 	assert.Equal(t, "Errored Node Updated", erroredNode.Name, "errored node name should be updated")
 }
 
-func TestUpdateCanvas_ValidationErrorsPersisted(t *testing.T) {
+func Test__UpdateCanvas__ValidationErrorsPersisted(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -588,86 +584,19 @@ func TestUpdateCanvas_ValidationErrorsPersisted(t *testing.T) {
 	)
 	require.NoError(t, err, "UpdateCanvas should succeed even with validation errors")
 
-	var validNode models.CanvasNode
-	err = database.Conn().Where("workflow_id = ? AND node_id = ?", canvas.ID, "valid-node").First(&validNode).Error
+	validNode, err := models.FindCanvasNode(database.Conn(), canvas.ID, "valid-node")
 	require.NoError(t, err, "should be able to find valid node")
 	assert.Equal(t, models.CanvasNodeStateReady, validNode.State, "valid node should be ready")
 	assert.Nil(t, validNode.StateReason, "valid node should not have error reason")
 
-	var invalidNode models.CanvasNode
-	err = database.Conn().Where("workflow_id = ? AND node_id = ?", canvas.ID, "invalid-node").First(&invalidNode).Error
+	invalidNode, err := models.FindCanvasNode(database.Conn(), canvas.ID, "invalid-node")
 	require.NoError(t, err, "should be able to find invalid node")
 	assert.Equal(t, models.CanvasNodeStateError, invalidNode.State, "invalid node should be in error state")
 	assert.NotNil(t, invalidNode.StateReason, "invalid node should have error reason")
 	assert.Contains(t, *invalidNode.StateReason, "nonexistent-component", "error reason should mention the invalid component")
 }
 
-func TestUpdateCanvas_SetupErrorsPersistedInResponse(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	blueprint := support.CreateBlueprint(
-		t,
-		r.Organization.ID,
-		[]models.Node{
-			{
-				ID:            "internal-http",
-				Name:          "Internal HTTP",
-				Type:          models.NodeTypeComponent,
-				Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "http"}},
-				Configuration: map[string]any{"method": "GET"},
-			},
-		},
-		[]models.Edge{},
-		[]models.BlueprintOutputChannel{},
-	)
-
-	canvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{},
-		[]models.Edge{},
-	)
-
-	updatedCanvasPB := &pb.Canvas{
-		Metadata: &pb.Canvas_Metadata{
-			Name:        canvas.Name,
-			Description: canvas.Description,
-		},
-		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.NodeDefinition{
-				{
-					Id:   "blueprint-node",
-					Name: "Blueprint Node",
-					Type: componentpb.NodeDefinition_TYPE_BLUEPRINT,
-					Blueprint: &componentpb.NodeDefinition_BlueprintRef{
-						Id: blueprint.ID.String(),
-					},
-				},
-			},
-			Edges: []*componentpb.Edge{},
-		},
-	}
-
-	response, err := UpdateCanvas(
-		context.Background(),
-		r.Encryptor,
-		r.Registry,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		updatedCanvasPB,
-		"http://localhost:3000/api/v1",
-	)
-	require.NoError(t, err, "UpdateCanvas should succeed even with setup errors")
-
-	assert.Len(t, response.Canvas.Status.Nodes, 1)
-	assert.Equal(t, "blueprint-node", response.Canvas.Status.Nodes[0].Id)
-	assert.Equal(t, models.CanvasNodeStateError, response.Canvas.Status.Nodes[0].State)
-	assert.Contains(t, response.Canvas.Status.Nodes[0].StateReason, "url is required")
-}
-
-func TestUpdateCanvas_ErroredNodeBecomesValidAgain(t *testing.T) {
+func Test__UpdateCanvas__ErroredNodeBecomesValidAgain(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -753,7 +682,7 @@ func TestUpdateCanvas_ErroredNodeBecomesValidAgain(t *testing.T) {
 	assert.Nil(t, testNode.StateReason, "node should not have error reason")
 }
 
-func TestUpdateCanvas_WidgetNodesHandled(t *testing.T) {
+func Test__UpdateCanvas__WidgetNodesHandled(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -890,7 +819,7 @@ func TestUpdateCanvas_WidgetNodesHandled(t *testing.T) {
 	assert.Equal(t, updatedAnnotationText, updatedWidget.Configuration.AsMap()["text"], "widget text should be updated")
 }
 
-func TestUpdateCanvas_WidgetNodesCannotConnect(t *testing.T) {
+func Test__UpdateCanvas__WidgetNodesCannotConnect(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -999,114 +928,4 @@ func TestUpdateCanvas_WidgetNodesCannotConnect(t *testing.T) {
 	)
 	require.Error(t, err, "UpdateCanvas should fail when widget node is used as target")
 	assert.Contains(t, err.Error(), "widget nodes cannot be used as target nodes")
-}
-
-func TestUpdateCanvas_WidgetTextLengthValidation(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	canvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{},
-		[]models.Edge{},
-	)
-
-	// Test text exceeding max length (5001 characters)
-	longText := strings.Repeat("a", 5001)
-	longAnnotationConfig, _ := structpb.NewStruct(map[string]interface{}{
-		"text": longText,
-	})
-
-	workflowWithLongAnnotation := &pb.Canvas{
-		Metadata: &pb.Canvas_Metadata{
-			Name:        canvas.Name,
-			Description: canvas.Description,
-		},
-		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.NodeDefinition{
-				{
-					Id:            "annotation-1",
-					Name:          "Long Annotation",
-					Type:          componentpb.NodeDefinition_TYPE_WIDGET,
-					Configuration: longAnnotationConfig,
-					Widget: &componentpb.NodeDefinition_WidgetRef{
-						Name: "annotation",
-					},
-				},
-			},
-			Edges: []*componentpb.Edge{},
-		},
-	}
-
-	response, err := UpdateCanvas(
-		context.Background(),
-		r.Encryptor,
-		r.Registry,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		workflowWithLongAnnotation,
-		"http://localhost:3000/api/v1",
-	)
-
-	require.NoError(t, err)
-	require.Len(t, response.Canvas.Status.Nodes, 1)
-	assert.Equal(t, models.CanvasNodeStateError, response.Canvas.Status.Nodes[0].State)
-	assert.NotNil(t, response.Canvas.Status.Nodes[0].StateReason)
-	assert.Contains(t, response.Canvas.Status.Nodes[0].StateReason, "field 'text': must be at most 5000 characters")
-
-	// Test text at exactly max length (5000 characters)
-	exactlyMaxText := strings.Repeat("b", 5000)
-	maxAnnotationConfig, _ := structpb.NewStruct(map[string]interface{}{
-		"text": exactlyMaxText,
-	})
-
-	workflowWithMaxAnnotation := &pb.Canvas{
-		Metadata: &pb.Canvas_Metadata{
-			Name:        canvas.Name,
-			Description: canvas.Description,
-		},
-		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.NodeDefinition{
-				{
-					Id:            "annotation-2",
-					Name:          "Max Length Annotation",
-					Type:          componentpb.NodeDefinition_TYPE_WIDGET,
-					Configuration: maxAnnotationConfig,
-					Widget: &componentpb.NodeDefinition_WidgetRef{
-						Name: "annotation",
-					},
-				},
-			},
-			Edges: []*componentpb.Edge{},
-		},
-	}
-
-	maxUpdatedCanvas, err := UpdateCanvas(
-		context.Background(),
-		r.Encryptor,
-		r.Registry,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		workflowWithMaxAnnotation,
-		"http://localhost:3000/api/v1",
-	)
-	require.NoError(t, err, "UpdateWorkflow should succeed with max length annotation text")
-
-	// Verify the max length annotation is in JSON
-	var maxFoundAnnotation *componentpb.NodeDefinition
-	for _, node := range maxUpdatedCanvas.Canvas.Spec.Nodes {
-		if node.Id == "annotation-2" {
-			maxFoundAnnotation = node
-			break
-		}
-	}
-	require.NotNil(t, maxFoundAnnotation, "should find max annotation in workflow nodes JSON")
-	assert.Equal(t, exactlyMaxText, maxFoundAnnotation.Configuration.AsMap()["text"], "annotation text should match")
-
-	// Widgets should NOT be persisted in workflow_nodes table
-	var annotationNodeCount int64
-	database.Conn().Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, "annotation-2").Count(&annotationNodeCount)
-	assert.Equal(t, int64(0), annotationNodeCount, "widget nodes should not be persisted in workflow_nodes table")
 }

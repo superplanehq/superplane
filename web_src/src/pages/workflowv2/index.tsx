@@ -3265,7 +3265,7 @@ function prepareNode(
       return compositeNode;
 
     case "TYPE_WIDGET":
-      return prepareAnnotationNode(node, nodeState);
+      return prepareAnnotationNode(node);
 
     default:
       return prepareComponentNode(
@@ -3285,7 +3285,7 @@ function prepareNode(
   }
 }
 
-function prepareAnnotationNode(node: ComponentsNodeDefinition, nodeState: CanvasesCanvasNodeState): CanvasNode {
+function prepareAnnotationNode(node: ComponentsNodeDefinition): CanvasNode {
   const width = (node.configuration?.width as number) || 320;
   const height = (node.configuration?.height as number) || 200;
   return {
@@ -3296,8 +3296,8 @@ function prepareAnnotationNode(node: ComponentsNodeDefinition, nodeState: Canvas
     data: {
       type: "annotation",
       label: node.name || "Annotation",
-      state: nodeState.state,
-      stateReason: nodeState.stateReason,
+      state: "ready",
+      stateReason: "",
       outputChannels: [], // Annotation nodes don't have output channels
       annotation: {
         title: node.name || "Annotation",
