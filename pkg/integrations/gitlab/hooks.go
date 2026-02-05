@@ -110,11 +110,10 @@ func (c *HooksClient) CreateHook(projectID string, webhookURL string, secret str
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		bodyBytes, _ := json.Marshal(payload)
 		respBody := make([]byte, 1024)
 		n, _ := resp.Body.Read(respBody)
-		return nil, fmt.Errorf("failed to create hook: status %d, request: %s, response: %s", 
-			resp.StatusCode, string(bodyBytes), string(respBody[:n]))
+		return nil, fmt.Errorf("failed to create hook for project %s: status %d, response: %s",
+			projectID, resp.StatusCode, string(respBody[:n]))
 	}
 
 	var hook Hook
