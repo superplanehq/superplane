@@ -52,7 +52,12 @@ export const sendAndWaitMessageMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
+  getExecutionDetails(
+    executionOrContext: any,
+    _node?: ComponentsNode,
+    _nodes?: ComponentsNode[],
+  ): Record<string, any> {
+    const execution = executionOrContext.execution || executionOrContext;
     const outputs = execution.outputs as { received?: OutputPayload[]; timeout?: OutputPayload[] } | undefined;
 
     if (outputs?.received && outputs.received.length > 0) {
@@ -75,9 +80,14 @@ export const sendAndWaitMessageMapper: ComponentBaseMapper = {
       Status: "Waiting",
     };
   },
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    if (!execution.createdAt) return "";
-    return formatTimeAgo(new Date(execution.createdAt));
+  subtitle(
+    nodeOrContext: any,
+    execution?: CanvasesCanvasNodeExecution,
+    _additionalData?: unknown,
+  ): string | React.ReactNode {
+    const exec = nodeOrContext.execution || execution || nodeOrContext;
+    if (!exec || !exec.createdAt) return "";
+    return formatTimeAgo(new Date(exec.createdAt));
   },
 };
 
@@ -132,14 +142,16 @@ function sendAndWaitMessageEventSections(
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const rootEvent = execution.rootEvent!;
+  const triggerContext = (rootEvent as any).event ? rootEvent : { event: rootEvent };
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle(triggerContext as any);
 
   return [
     {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
       eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
-      eventState: getState(componentName)(execution),
+      eventState: getState(componentName)(execution as any),
       eventId: execution.rootEvent!.id!,
     },
   ];
