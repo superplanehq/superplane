@@ -494,7 +494,7 @@ func (e *HTTP) Execute(ctx core.ExecutionContext) error {
 func (e *HTTP) executeHTTPRequest(ctx core.ExecutionContext, spec Spec, retryMetadata RetryMetadata) error {
 	currentTimeout := e.calculateTimeoutForAttempt(retryMetadata.TimeoutStrategy, retryMetadata.TimeoutSeconds, retryMetadata.Attempt)
 
-	resp, err := e.executeRequest(spec, currentTimeout)
+	resp, err := e.executeRequest(ctx.HTTP, spec, currentTimeout)
 	if err != nil {
 		if retryMetadata.Attempt < retryMetadata.MaxRetries {
 			return e.scheduleRetry(ctx, err.Error(), retryMetadata)
@@ -556,6 +556,7 @@ func (e *HTTP) handleRetryRequest(ctx core.ActionContext) error {
 		Metadata:       ctx.Metadata,
 		Requests:       ctx.Requests,
 		Auth:           ctx.Auth,
+		HTTP:           ctx.HTTP,
 	}
 
 	return e.executeHTTPRequest(execCtx, spec, retryMetadata)
@@ -577,7 +578,7 @@ func (e *HTTP) calculateTimeoutForAttempt(strategy string, timeoutSeconds int, a
 	return baseTimeout
 }
 
-func (e *HTTP) executeRequest(spec Spec, timeout time.Duration) (*http.Response, error) {
+func (e *HTTP) executeRequest(httpCtx core.HTTPContext, spec Spec, timeout time.Duration) (*http.Response, error) {
 	var body io.Reader
 	var contentType string
 	var err error
@@ -622,7 +623,7 @@ func (e *HTTP) executeRequest(spec Spec, timeout time.Duration) (*http.Response,
 		}
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpCtx.Do(req)
 	if err != nil {
 		return nil, err
 	}
