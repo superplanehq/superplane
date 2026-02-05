@@ -32,7 +32,8 @@ export const sendAndWaitMessageMapper: ComponentBaseMapper = {
     node: ComponentsNode,
     componentDefinition: ComponentsComponent,
     lastExecutions: CanvasesCanvasNodeExecution[],
-    _items?: CanvasesCanvasNodeQueueItem[],
+    _nodeQueueItems?: CanvasesCanvasNodeQueueItem[],
+    _additionalData?: unknown,
   ): ComponentBaseProps {
     const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
     const componentName = componentDefinition.name || node.component?.name || "unknown";
@@ -53,11 +54,10 @@ export const sendAndWaitMessageMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(
-    executionOrContext: any,
-    _node?: ComponentsNode,
+    execution: CanvasesCanvasNodeExecution,
+    _node: ComponentsNode,
     _nodes?: ComponentsNode[],
   ): Record<string, any> {
-    const execution = executionOrContext.execution || executionOrContext;
     const outputs = execution.outputs as { received?: OutputPayload[]; timeout?: OutputPayload[] } | undefined;
 
     if (outputs?.received && outputs.received.length > 0) {
@@ -81,13 +81,12 @@ export const sendAndWaitMessageMapper: ComponentBaseMapper = {
     };
   },
   subtitle(
-    nodeOrContext: any,
-    execution?: CanvasesCanvasNodeExecution,
+    _node: ComponentsNode,
+    execution: CanvasesCanvasNodeExecution,
     _additionalData?: unknown,
   ): string | React.ReactNode {
-    const exec = nodeOrContext.execution || execution || nodeOrContext;
-    if (!exec || !exec.createdAt) return "";
-    return formatTimeAgo(new Date(exec.createdAt));
+    if (!execution || !execution.createdAt) return "";
+    return formatTimeAgo(new Date(execution.createdAt));
   },
 };
 
