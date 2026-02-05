@@ -1,10 +1,12 @@
 import {
-  ComponentsComponent,
-  ComponentsNode,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
-import { ComponentBaseMapper, OutputPayload } from "../types";
+  ComponentBaseMapper,
+  ComponentBaseContext,
+  SubtitleContext,
+  ExecutionDetailsContext,
+  OutputPayload,
+  NodeInfo,
+  ExecutionInfo,
+} from "../types";
 import { ComponentBaseProps, DEFAULT_EVENT_STATE_MAP, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
@@ -21,13 +23,8 @@ interface PipelineItem {
 }
 
 export const listPipelinesMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    _nodeQueueItems?: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const { nodes, node, componentDefinition, lastExecutions } = context;
     return {
       title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
       iconSrc: SemaphoreLogo,
@@ -42,21 +39,21 @@ export const listPipelinesMapper: ComponentBaseMapper = {
       eventStateMap: DEFAULT_EVENT_STATE_MAP,
     };
   },
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  subtitle(context: SubtitleContext): string {
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     if (outputs?.default?.[0]?.data) {
       const data = outputs.default[0].data;
       if (Array.isArray(data)) {
         const count = data.length;
-        const timeStr = formatTimeAgo(new Date(execution.updatedAt || execution.createdAt || ""));
+        const timeStr = formatTimeAgo(new Date(context.execution.updatedAt || context.execution.createdAt || ""));
         return `${count} pipeline${count !== 1 ? "s" : ""} \u00b7 ${timeStr}`;
       }
     }
-    const timestamp = execution.updatedAt || execution.createdAt;
+    const timestamp = context.execution.updatedAt || context.execution.createdAt;
     return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
   },
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, any> {
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const details: Record<string, any> = {};
 
     if (outputs?.default?.[0]?.data) {
@@ -79,7 +76,7 @@ export const listPipelinesMapper: ComponentBaseMapper = {
   },
 };
 
-function listPipelinesMetadataList(node: ComponentsNode): MetadataItem[] {
+function listPipelinesMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as any;
 
@@ -95,8 +92,8 @@ function listPipelinesMetadataList(node: ComponentsNode): MetadataItem[] {
 }
 
 function listPipelinesEventSections(
-  nodes: ComponentsNode[],
-  execution: CanvasesCanvasNodeExecution,
+  nodes: NodeInfo[],
+  execution: ExecutionInfo,
 ): EventSection[] | undefined {
   if (!execution) {
     return undefined;
@@ -105,8 +102,8 @@ function listPipelinesEventSections(
   const sections: EventSection[] = [];
 
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   let eventState: "neutral" | "success" | "error" | "cancelled" = "neutral";
   if (execution.resultReason === "RESULT_REASON_ERROR") {
