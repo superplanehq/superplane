@@ -44,8 +44,9 @@ const sshStateFunction = (execution: ExecutionInfo): EventState => {
 
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
     const metadata = execution.metadata as Record<string, unknown> | undefined;
-    const result = metadata?.result as { exitCode?: number } | undefined;
-    if (result?.exitCode === 0) {
+    const result = metadata?.result as { exitCode?: number; ExitCode?: number } | undefined;
+    const code = result?.exitCode ?? result?.ExitCode;
+    if (code === 0) {
       return "success";
     }
     return "failed";

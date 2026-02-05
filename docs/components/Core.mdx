@@ -265,7 +265,7 @@ The SSH Command component runs a single command on a remote host via SSH. Authen
 - **Authentication**: SSH key or Password. For SSH key, specify the Secret and key name for the private key (and optionally for passphrase). For Password, specify the Secret and key name for the password.
 - **Command**: The command to run (supports expressions).
 - **Working directory**: Optional; runs `cd <dir> && <command>`.
-- **Timeout (seconds)**: 0 = no timeout.
+- **Timeout (seconds)**: Optional. When set, limits how long the command may run. Leave empty for no timeout.
 
 ### Output Channels
 

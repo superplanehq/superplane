@@ -33,9 +33,9 @@ type Client struct {
 
 // CommandResult holds the result of a single command execution.
 type CommandResult struct {
-	Stdout   string
-	Stderr   string
-	ExitCode int
+	Stdout   string `json:"stdout"`
+	Stderr   string `json:"stderr"`
+	ExitCode int    `json:"exitCode"`
 }
 
 // NewClient builds a client for key-based auth.
@@ -122,10 +122,11 @@ func (c *Client) getSigner() (ssh.Signer, error) {
 	if looksLikeBase64(string(keyBytes)) && !looksLikePrivateKeyBlock(string(keyBytes)) {
 		if decoded, decErr := decodeBase64(string(keyBytes)); decErr == nil {
 			decoded = normalizePrivateKey(decoded)
-			if signer2, err2 := parseSigner(decoded, c.Passphrase); err2 == nil {
+			signer2, parseErr := parseSigner(decoded, c.Passphrase)
+			if parseErr == nil {
 				return signer2, nil
 			}
-			return nil, err2
+			return nil, parseErr
 		}
 	}
 

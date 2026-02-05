@@ -3,6 +3,7 @@ package ssh
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +14,16 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
+// parseSecretKeyValue splits "secretRef::keyName" into (secretRef, keyName). Returns empty strings if invalid.
+func parseSecretKeyValue(v string) (secretRef, keyName string) {
+	v = strings.TrimSpace(v)
+	idx := strings.Index(v, secretKeyDelimiter)
+	if idx < 0 {
+		return "", ""
+	}
+	return strings.TrimSpace(v[:idx]), strings.TrimSpace(v[idx+len(secretKeyDelimiter):])
+}
+
 const (
 	channelSuccess = "success"
 	channelFailed  = "failed"
@@ -22,23 +33,26 @@ func init() {
 	registry.RegisterComponent("ssh", &SSHCommand{})
 }
 
+const secretKeyDelimiter = "::"
+
 type SSHCommand struct{}
 
-type Spec struct {
-	Host   string `json:"host"`
-	Port   int    `json:"port"`
-	User   string `json:"username"`
-	Method string `json:"authMethod"`
+// AuthSpec is the authentication config group (SSH key or password, credential references).
+type AuthSpec struct {
+	Method     string `json:"authMethod" mapstructure:"authMethod"`
+	PrivateKey string `json:"privateKey" mapstructure:"privateKey"` // stores "secretRef::keyName" for SSH key
+	Passphrase string `json:"passphrase" mapstructure:"passphrase"`   // optional, "secretRef::keyName"
+	Password   string `json:"password" mapstructure:"password"`       // stores "secretRef::keyName" for password auth
+}
 
-	PrivateKeySecretRef  string `json:"privateKeySecretRef,omitempty"`
-	PrivateKeyKeyName    string `json:"privateKeyKeyName,omitempty"`
-	PassphraseSecretRef  string `json:"passphraseSecretRef,omitempty"`
-	PassphraseKeyName    string `json:"passphraseKeyName,omitempty"`
-	PasswordSecretRef    string `json:"passwordSecretRef,omitempty"`
-	PasswordKeyName      string `json:"passwordKeyName,omitempty"`
-	Command              string `json:"command"`
-	WorkingDirectory     string `json:"workingDirectory,omitempty"`
-	Timeout              int    `json:"timeout,omitempty"`
+type Spec struct {
+	Host             string   `json:"host" mapstructure:"host"`
+	Port             int      `json:"port" mapstructure:"port"`
+	User             string   `json:"username" mapstructure:"username"`
+	Authentication   AuthSpec `json:"authentication" mapstructure:"authentication"`
+	Command          string   `json:"command" mapstructure:"command"`
+	WorkingDirectory string   `json:"workingDirectory,omitempty" mapstructure:"workingDirectory"`
+	Timeout          *int     `json:"timeout,omitempty" mapstructure:"timeout"` // optional; when set, command runs with this limit in seconds
 }
 
 type ExecutionMetadata struct {
@@ -64,8 +78,8 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 
 - **Host**, **Port** (default 22), **Username**: Connection details.
 - **Command**: The command to run (supports expressions).
-- **Working directory**: Optional; runs \`cd <dir> && <command>\`.
-- **Timeout (seconds)**: 0 = no timeout.
+- **Working directory**: Optional; runs "cd <dir> && <command>".
+- **Timeout (seconds)**: Optional. When set, limits how long the command may run.
 
 ## Output
 
@@ -102,7 +116,7 @@ func (c *SSHCommand) Configuration() []configuration.Field {
 			Name:        "host",
 			Label:       "Host",
 			Type:        configuration.FieldTypeString,
-			Description: "SSH hostname or IP address",
+			Description: "Hostname or IP address of the SSH server",
 			Placeholder: "e.g. example.com or 192.168.1.100",
 			Required:    true,
 		},
@@ -119,81 +133,64 @@ func (c *SSHCommand) Configuration() []configuration.Field {
 			Name:        "username",
 			Label:       "Username",
 			Type:        configuration.FieldTypeString,
-			Description: "SSH username",
+			Description: "User to log in as on the remote host",
 			Placeholder: "e.g. root, ubuntu",
 			Required:    true,
 		},
 		{
-			Name:        "authMethod",
+			Name:        "authentication",
 			Label:       "Authentication",
-			Type:        configuration.FieldTypeSelect,
-			Description: "How to authenticate to the host",
+			Type:        configuration.FieldTypeObject,
+			Description: "How to authenticate to the host and which credentials to use",
 			Required:    true,
-			Default:     AuthMethodSSHKey,
 			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "SSH key", Value: AuthMethodSSHKey},
-						{Label: "Password", Value: AuthMethodPassword},
+				Object: &configuration.ObjectTypeOptions{
+					Schema: []configuration.Field{
+						{
+							Name:        "authMethod",
+							Label:       "Method",
+							Type:        configuration.FieldTypeSelect,
+							Description: "Authentication method",
+							Required:    true,
+							Default:     AuthMethodSSHKey,
+							TypeOptions: &configuration.TypeOptions{
+								Select: &configuration.SelectTypeOptions{
+									Options: []configuration.FieldOption{
+										{Label: "SSH key", Value: AuthMethodSSHKey},
+										{Label: "Password", Value: AuthMethodPassword},
+									},
+								},
+							},
+						},
+						{
+							Name:                 "privateKey",
+							Label:                "Private key",
+							Type:                 configuration.FieldTypeSecretKey,
+							Description:          "Stored credential that holds the SSH private key (PEM/OpenSSH)",
+							Required:             false,
+							RequiredConditions:   []configuration.RequiredCondition{{Field: "authMethod", Values: []string{AuthMethodSSHKey}}},
+							VisibilityConditions: sshKeyOnly,
+						},
+						{
+							Name:                 "passphrase",
+							Label:                "Passphrase",
+							Type:                 configuration.FieldTypeSecretKey,
+							Description:          "Stored credential for the key passphrase, if the key is encrypted",
+							Required:             false,
+							VisibilityConditions: sshKeyOnly,
+						},
+						{
+							Name:                 "password",
+							Label:                "Password",
+							Type:                 configuration.FieldTypeSecretKey,
+							Description:          "Stored credential that holds the login password",
+							Required:             false,
+							RequiredConditions:   []configuration.RequiredCondition{{Field: "authMethod", Values: []string{AuthMethodPassword}}},
+							VisibilityConditions: passwordOnly,
+						},
 					},
 				},
 			},
-		},
-		{
-			Name:                 "privateKeySecretRef",
-			Label:                "Secret (private key)",
-			Type:                 configuration.FieldTypeString,
-			Description:          "Organization Secret name or ID that contains the private key",
-			Placeholder:          "e.g. prod-ssh",
-			Required:             false,
-			RequiredConditions:   []configuration.RequiredCondition{{Field: "authMethod", Values: []string{AuthMethodSSHKey}}},
-			VisibilityConditions: sshKeyOnly,
-		},
-		{
-			Name:                 "privateKeyKeyName",
-			Label:                "Key name (private key)",
-			Type:                 configuration.FieldTypeString,
-			Description:          "Key name within the secret that holds the private key value",
-			Placeholder:          "e.g. private_key",
-			Required:             false,
-			RequiredConditions:   []configuration.RequiredCondition{{Field: "authMethod", Values: []string{AuthMethodSSHKey}}},
-			VisibilityConditions: sshKeyOnly,
-		},
-		{
-			Name:                 "passphraseSecretRef",
-			Label:                "Secret (passphrase, optional)",
-			Type:                 configuration.FieldTypeString,
-			Description:          "Secret containing passphrase for encrypted key",
-			Required:             false,
-			VisibilityConditions: sshKeyOnly,
-		},
-		{
-			Name:                 "passphraseKeyName",
-			Label:                "Key name (passphrase)",
-			Type:                 configuration.FieldTypeString,
-			Description:          "Key name for passphrase value",
-			Required:             false,
-			VisibilityConditions: sshKeyOnly,
-		},
-		{
-			Name:                 "passwordSecretRef",
-			Label:                "Secret (password)",
-			Type:                 configuration.FieldTypeString,
-			Description:          "Organization Secret that contains the password",
-			Placeholder:          "e.g. prod-ssh",
-			Required:             false,
-			RequiredConditions:   []configuration.RequiredCondition{{Field: "authMethod", Values: []string{AuthMethodPassword}}},
-			VisibilityConditions: passwordOnly,
-		},
-		{
-			Name:                 "passwordKeyName",
-			Label:                "Key name (password)",
-			Type:                 configuration.FieldTypeString,
-			Description:          "Key name within the secret that holds the password",
-			Placeholder:          "e.g. password",
-			Required:             false,
-			RequiredConditions:   []configuration.RequiredCondition{{Field: "authMethod", Values: []string{AuthMethodPassword}}},
-			VisibilityConditions: passwordOnly,
 		},
 		{
 			Name:        "command",
@@ -216,8 +213,8 @@ func (c *SSHCommand) Configuration() []configuration.Field {
 			Label:       "Timeout (seconds)",
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
-			Description: "Command timeout; 0 = no timeout",
-			Default:     0,
+			Togglable:   true,
+			Description: "Limit how long the command may run (seconds).",
 		},
 	}
 }
@@ -241,17 +238,19 @@ func (c *SSHCommand) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("invalid port: %d", spec.Port)
 	}
 
-	switch spec.Method {
+	switch spec.Authentication.Method {
 	case AuthMethodSSHKey:
-		if spec.PrivateKeySecretRef == "" || spec.PrivateKeyKeyName == "" {
-			return errors.New("for SSH key auth, secret and key name for the private key are required")
+		ref, key := parseSecretKeyValue(spec.Authentication.PrivateKey)
+		if ref == "" || key == "" {
+			return errors.New("for SSH key auth, private key credential is required")
 		}
 	case AuthMethodPassword:
-		if spec.PasswordSecretRef == "" || spec.PasswordKeyName == "" {
-			return errors.New("for password auth, secret and key name for the password are required")
+		ref, key := parseSecretKeyValue(spec.Authentication.Password)
+		if ref == "" || key == "" {
+			return errors.New("for password auth, password credential is required")
 		}
 	default:
-		return fmt.Errorf("invalid auth method: %s", spec.Method)
+		return fmt.Errorf("invalid auth method: %s", spec.Authentication.Method)
 	}
 
 	return nil
@@ -261,21 +260,21 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 	var spec Spec
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return ctx.ExecutionState.Fail(
-			models.WorkflowNodeExecutionResultReasonError,
+			models.CanvasNodeExecutionResultReasonError,
 			fmt.Sprintf("decode configuration: %v", err),
 		)
 	}
 
 	if spec.Host == "" || spec.User == "" || spec.Command == "" {
 		return ctx.ExecutionState.Fail(
-			models.WorkflowNodeExecutionResultReasonError,
+			models.CanvasNodeExecutionResultReasonError,
 			"host, username, and command are required",
 		)
 	}
 
 	if ctx.Secrets == nil {
 		return ctx.ExecutionState.Fail(
-			models.WorkflowNodeExecutionResultReasonError,
+			models.CanvasNodeExecutionResultReasonError,
 			"secrets context not available",
 		)
 	}
@@ -286,40 +285,57 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 	}
 
 	var client *Client
-	switch spec.Method {
+	switch spec.Authentication.Method {
 	case AuthMethodSSHKey:
-		privateKey, err := ctx.Secrets.GetKey(spec.PrivateKeySecretRef, spec.PrivateKeyKeyName)
+		secretRef, keyName := parseSecretKeyValue(spec.Authentication.PrivateKey)
+		if secretRef == "" || keyName == "" {
+			return ctx.ExecutionState.Fail(
+				models.CanvasNodeExecutionResultReasonError,
+				"private key credential is required",
+			)
+		}
+		privateKey, err := ctx.Secrets.GetKey(secretRef, keyName)
 		if err != nil {
 			if errors.Is(err, core.ErrSecretKeyNotFound) {
 				return ctx.ExecutionState.Fail(
-					models.WorkflowNodeExecutionResultReasonError,
-					"private key could not be resolved from the selected secret and key",
+					models.CanvasNodeExecutionResultReasonError,
+					"private key could not be resolved from the selected credential",
 				)
 			}
 			return ctx.ExecutionState.Fail(
-				models.WorkflowNodeExecutionResultReasonError,
+				models.CanvasNodeExecutionResultReasonError,
 				fmt.Sprintf("resolve private key: %v", err),
 			)
 		}
 
 		var passphrase []byte
-		if spec.PassphraseSecretRef != "" && spec.PassphraseKeyName != "" {
-			passphrase, _ = ctx.Secrets.GetKey(spec.PassphraseSecretRef, spec.PassphraseKeyName)
+		if spec.Authentication.Passphrase != "" {
+			pref, pkey := parseSecretKeyValue(spec.Authentication.Passphrase)
+			if pref != "" && pkey != "" {
+				passphrase, _ = ctx.Secrets.GetKey(pref, pkey)
+			}
 		}
 
 		client = NewClientKey(spec.Host, port, spec.User, privateKey, passphrase)
 
 	case AuthMethodPassword:
-		password, err := ctx.Secrets.GetKey(spec.PasswordSecretRef, spec.PasswordKeyName)
+		secretRef, keyName := parseSecretKeyValue(spec.Authentication.Password)
+		if secretRef == "" || keyName == "" {
+			return ctx.ExecutionState.Fail(
+				models.CanvasNodeExecutionResultReasonError,
+				"password credential is required",
+			)
+		}
+		password, err := ctx.Secrets.GetKey(secretRef, keyName)
 		if err != nil {
 			if errors.Is(err, core.ErrSecretKeyNotFound) {
 				return ctx.ExecutionState.Fail(
-					models.WorkflowNodeExecutionResultReasonError,
-					"password could not be resolved from the selected secret and key",
+					models.CanvasNodeExecutionResultReasonError,
+					"password could not be resolved from the selected credential",
 				)
 			}
 			return ctx.ExecutionState.Fail(
-				models.WorkflowNodeExecutionResultReasonError,
+				models.CanvasNodeExecutionResultReasonError,
 				fmt.Sprintf("resolve password: %v", err),
 			)
 		}
@@ -328,8 +344,8 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 
 	default:
 		return ctx.ExecutionState.Fail(
-			models.WorkflowNodeExecutionResultReasonError,
-			fmt.Sprintf("invalid auth method: %s", spec.Method),
+			models.CanvasNodeExecutionResultReasonError,
+			fmt.Sprintf("invalid auth method: %s", spec.Authentication.Method),
 		)
 	}
 
@@ -341,8 +357,8 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 	}
 
 	var timeout time.Duration
-	if spec.Timeout > 0 {
-		timeout = time.Duration(spec.Timeout) * time.Second
+	if spec.Timeout != nil && *spec.Timeout > 0 {
+		timeout = time.Duration(*spec.Timeout) * time.Second
 	}
 
 	ctx.Logger.Infof("Executing SSH command on %s@%s:%d: %s", spec.User, spec.Host, port, command)
@@ -350,14 +366,14 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 	result, err := client.ExecuteCommand(command, timeout)
 	if err != nil {
 		return ctx.ExecutionState.Fail(
-			models.WorkflowNodeExecutionResultReasonError,
+			models.CanvasNodeExecutionResultReasonError,
 			fmt.Sprintf("SSH execution failed: %v", err),
 		)
 	}
 
 	if err := ctx.Metadata.Set(ExecutionMetadata{Result: result}); err != nil {
 		return ctx.ExecutionState.Fail(
-			models.WorkflowNodeExecutionResultReasonError,
+			models.CanvasNodeExecutionResultReasonError,
 			fmt.Sprintf("set metadata: %v", err),
 		)
 	}

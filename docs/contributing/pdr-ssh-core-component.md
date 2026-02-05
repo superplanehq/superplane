@@ -83,7 +83,7 @@ Execution flow is integration-centric: user installs the SSH integration, config
      - **Command** – the command to run (string, supports expressions).
    - **Optional:**
      - **Working directory** – if set, run `cd <dir> && <command>`.
-     - **Timeout (seconds)** – 0 = no timeout.
+     - **Timeout (seconds)** – Optional. When set, limits how long the command may run; leave empty for no timeout.
 
 3. **Authentication: explicit method and secret/key references**  
    - The user **explicitly chooses** the auth method (SSH key or Password). There is no inference from the contents of a secret.
