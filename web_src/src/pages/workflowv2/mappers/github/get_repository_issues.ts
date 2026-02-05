@@ -1,11 +1,12 @@
-import {
-  ComponentsNode,
-  ComponentsComponent,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
 import { ComponentBaseProps } from "@/ui/componentBase";
-import { ComponentBaseMapper, OutputPayload } from "../types";
+import {
+  ComponentBaseMapper,
+  ComponentBaseContext,
+  SubtitleContext,
+  ExecutionDetailsContext,
+  OutputPayload,
+  NodeInfo,
+} from "../types";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
 import { MetadataItem } from "@/ui/metadataList";
@@ -38,10 +39,10 @@ interface GetRepositoryIssuesConfiguration {
   labels?: string;
   sort?: string;
   direction?: string;
-  perPage?: number;
+  perPage?: string;
 }
 
-function getRepositoryIssuesMetadataList(node: ComponentsNode): MetadataItem[] {
+function getRepositoryIssuesMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as GetRepositoryIssuesConfiguration | undefined;
   const nodeMetadata = node.metadata as { repository?: { name?: string } } | undefined;
@@ -62,36 +63,31 @@ function getRepositoryIssuesMetadataList(node: ComponentsNode): MetadataItem[] {
 }
 
 export const getRepositoryIssuesMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    queueItems: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
-    const base = baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const base = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
 
     return {
       ...base,
-      metadata: getRepositoryIssuesMetadataList(node),
+      metadata: getRepositoryIssuesMetadataList(context.node),
     };
   },
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+
+  subtitle(context: SubtitleContext): string {
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     if (outputs?.default && Array.isArray(outputs.default[0]?.data)) {
       const issues = outputs.default[0].data as IssueOutput[];
       const count = issues.length;
-      return buildGithubExecutionSubtitle(execution, `${count} issue${count !== 1 ? "s" : ""}`);
+      return buildGithubExecutionSubtitle(context.execution, `${count} issue${count !== 1 ? "s" : ""}`);
     }
-    return buildGithubExecutionSubtitle(execution);
+    return buildGithubExecutionSubtitle(context.execution);
   },
 
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const details: Record<string, string> = {};
 
     Object.assign(details, {
-      "Retrieved At": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : "-",
+      "Retrieved At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",
     });
 
     if (outputs?.default && Array.isArray(outputs.default[0]?.data)) {
@@ -104,7 +100,6 @@ export const getRepositoryIssuesMapper: ComponentBaseMapper = {
         if (openCount > 0) details["Open"] = openCount.toString();
         if (closedCount > 0) details["Closed"] = closedCount.toString();
 
-        // Show first issue as preview
         const first = issues[0];
         if (first.html_url) {
           details["First Issue"] = first.html_url;
