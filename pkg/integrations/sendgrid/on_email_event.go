@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
-	"path"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -39,8 +39,13 @@ var sendGridEventTypes = []configuration.FieldOption{
 type OnEmailEvent struct{}
 
 type OnEmailEventConfiguration struct {
+	EventTypes     []string                  `json:"eventTypes" mapstructure:"eventTypes"`
+	CategoryFilter []configuration.Predicate `json:"categoryFilter" mapstructure:"categoryFilter"`
+}
+
+type onEmailEventConfigurationRaw struct {
 	EventTypes     []string `json:"eventTypes" mapstructure:"eventTypes"`
-	CategoryFilter string   `json:"categoryFilter" mapstructure:"categoryFilter"`
+	CategoryFilter any      `json:"categoryFilter" mapstructure:"categoryFilter"`
 }
 
 func (t *OnEmailEvent) Name() string {
@@ -67,7 +72,7 @@ func (t *OnEmailEvent) Documentation() string {
 ## Configuration
 
 - **Event Types**: Optional filter for specific SendGrid events (processed, delivered, bounce, open, click, etc.)
-- **Category Filter**: Optional category filter (supports ` + "`*`" + ` wildcards)
+- **Category Filter**: Optional list of predicates (` + "`equals`" + `, ` + "`notEquals`" + `, ` + "`matches`" + ` regex)
 
 ## Webhook Verification
 
@@ -117,21 +122,26 @@ func (t *OnEmailEvent) Configuration() []configuration.Field {
 			Description: "Only emit events for these SendGrid event types (leave empty for all)",
 		},
 		{
-			Name:        "categoryFilter",
-			Label:       "Category Filter",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Default:     "*",
-			Description: "Optional category filter (supports * wildcards)",
+			Name:     "categoryFilter",
+			Label:    "Category Filter",
+			Type:     configuration.FieldTypeAnyPredicateList,
+			Required: false,
+			Default:  []map[string]any{},
+			TypeOptions: &configuration.TypeOptions{
+				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
+					Operators: configuration.AllPredicateOperators,
+				},
+			},
+			Description: "Optional category filter (leave empty for all categories)",
 		},
 		{},
 	}
 }
 
 func (t *OnEmailEvent) Setup(ctx core.TriggerContext) error {
-	config := OnEmailEventConfiguration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
+	config, err := decodeOnEmailEventConfiguration(ctx.Configuration)
+	if err != nil {
+		return err
 	}
 
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
@@ -149,9 +159,9 @@ func (t *OnEmailEvent) HandleAction(ctx core.TriggerActionContext) (map[string]a
 }
 
 func (t *OnEmailEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	config := OnEmailEventConfiguration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+	config, err := decodeOnEmailEventConfiguration(ctx.Configuration)
+	if err != nil {
+		return http.StatusInternalServerError, err
 	}
 
 	if err := verifySignedWebhook(ctx); err != nil {
@@ -174,7 +184,7 @@ func (t *OnEmailEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 			continue
 		}
 
-		if !matchesCategoryFilter(config.CategoryFilter, event["category"]) {
+		if !matchesCategoryPredicates(config.CategoryFilter, event["category"]) {
 			continue
 		}
 
@@ -196,8 +206,8 @@ func (t *OnEmailEvent) Cleanup(ctx core.TriggerContext) error {
 }
 
 type WebhookConfiguration struct {
-	EventTypes     []string `json:"eventTypes"`
-	CategoryFilter string   `json:"categoryFilter"`
+	EventTypes     []string                  `json:"eventTypes"`
+	CategoryFilter []configuration.Predicate `json:"categoryFilter"`
 }
 
 func parseWebhookEvents(body []byte) ([]map[string]any, error) {
@@ -218,6 +228,23 @@ func parseWebhookEvents(body []byte) ([]map[string]any, error) {
 	return []map[string]any{single}, nil
 }
 
+func decodeOnEmailEventConfiguration(raw any) (OnEmailEventConfiguration, error) {
+	rawConfig := onEmailEventConfigurationRaw{}
+	if err := mapstructure.Decode(raw, &rawConfig); err != nil {
+		return OnEmailEventConfiguration{}, fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	predicates, err := parseCategoryPredicates(rawConfig.CategoryFilter)
+	if err != nil {
+		return OnEmailEventConfiguration{}, fmt.Errorf("invalid category filter: %w", err)
+	}
+
+	return OnEmailEventConfiguration{
+		EventTypes:     rawConfig.EventTypes,
+		CategoryFilter: predicates,
+	}, nil
+}
+
 func extractString(event map[string]any, key string) string {
 	raw, ok := event[key]
 	if !ok {
@@ -230,12 +257,8 @@ func extractString(event map[string]any, key string) string {
 	return value
 }
 
-func matchesCategoryFilter(filter string, categoryValue any) bool {
-	filter = strings.TrimSpace(filter)
-	if filter == "" {
-		return true
-	}
-	if filter == "*" {
+func matchesCategoryPredicates(predicates []configuration.Predicate, categoryValue any) bool {
+	if len(predicates) == 0 {
 		return true
 	}
 
@@ -244,36 +267,53 @@ func matchesCategoryFilter(filter string, categoryValue any) bool {
 		return false
 	}
 
-	for _, filterValue := range splitFilters(filter) {
-		isWildcard := strings.ContainsAny(filterValue, "*?")
-		for _, category := range categories {
-			if isWildcard {
-				match, err := path.Match(strings.ToLower(filterValue), strings.ToLower(category))
-				if err == nil && match {
-					return true
-				}
-				continue
-			}
-
-			if strings.EqualFold(filterValue, category) {
-				return true
-			}
+	for _, category := range categories {
+		if configuration.MatchesAnyPredicate(predicates, category) {
+			return true
 		}
 	}
 
 	return false
 }
 
-func splitFilters(filter string) []string {
-	parts := strings.Split(filter, ",")
-	out := make([]string, 0, len(parts))
-	for _, part := range parts {
-		value := strings.TrimSpace(part)
-		if value != "" {
-			out = append(out, value)
-		}
+func parseCategoryPredicates(raw any) ([]configuration.Predicate, error) {
+	if raw == nil {
+		return nil, nil
 	}
-	return out
+
+	var predicates []configuration.Predicate
+	if err := mapstructure.Decode(raw, &predicates); err == nil {
+		return predicates, nil
+	}
+
+	filter, ok := raw.(string)
+	if !ok {
+		return nil, fmt.Errorf("must be a predicate list or string")
+	}
+
+	filter = strings.TrimSpace(filter)
+	if filter == "" || filter == "*" {
+		return nil, nil
+	}
+
+	parts := splitLegacyFilters(filter)
+	predicates = make([]configuration.Predicate, 0, len(parts))
+	for _, part := range parts {
+		if strings.ContainsAny(part, "*?") {
+			predicates = append(predicates, configuration.Predicate{
+				Type:  configuration.PredicateTypeMatches,
+				Value: globToRegex(part),
+			})
+			continue
+		}
+
+		predicates = append(predicates, configuration.Predicate{
+			Type:  configuration.PredicateTypeMatches,
+			Value: caseInsensitiveExactRegex(part),
+		})
+	}
+
+	return predicates, nil
 }
 
 func normalizeCategories(value any) []string {
@@ -302,6 +342,29 @@ func normalizeCategories(value any) []string {
 	default:
 		return nil
 	}
+}
+
+func splitLegacyFilters(filter string) []string {
+	parts := strings.Split(filter, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		value := strings.TrimSpace(part)
+		if value != "" {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func globToRegex(pattern string) string {
+	escaped := regexp.QuoteMeta(pattern)
+	escaped = strings.ReplaceAll(escaped, `\*`, ".*")
+	escaped = strings.ReplaceAll(escaped, `\?`, ".")
+	return "(?i)^" + escaped + "$"
+}
+
+func caseInsensitiveExactRegex(value string) string {
+	return "(?i)^" + regexp.QuoteMeta(value) + "$"
 }
 
 func verifySignedWebhook(ctx core.WebhookRequestContext) error {

@@ -73,6 +73,10 @@ available to them (e.g., requiring a Discord channel ID).
 When users can choose from existing resources (e.g., a GitHub repository), 
 prefer a dropdown selector over manual entry.
 
+### Trigger filters
+
+Trigger filters use `configuration.FieldTypeAnyPredicateList` when possible and match values via `configuration.MatchesAnyPredicate`. Avoid ad-hoc wildcard or comma parsing unless `any-predicate-list` cannot express the requirement (document the exception in the trigger file).
+
 ### Output channels
 
 The output channels shown in the UI include at least one channel 
