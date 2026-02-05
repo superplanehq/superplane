@@ -289,6 +289,7 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, nil, nil),
 		Notifications:  contexts.NewNotificationContext(tx, workflow.OrganizationID, execution.WorkflowID),
+		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
 	}
 	ctx.ExpressionEnv = func(expression string) (map[string]any, error) {
 		builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
