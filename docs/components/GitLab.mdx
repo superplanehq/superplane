@@ -30,39 +30,63 @@ For **Personal Access Token**, use scopes: api, read_user, read_api, write_repos
 
 ## On Issue
 
-The On Issue trigger fires when issue events occur in a GitLab project.
+The On Issue trigger starts a workflow execution when issue events occur in a GitLab project.
+
+### Use Cases
+
+- **Issue automation**: Automate responses to new or updated issues
+- **Notification workflows**: Send notifications when issues are created or closed
+- **Task management**: Sync issues with external task management systems
+- **Label automation**: Automatically label or categorize issues based on content
 
 ### Configuration
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| **Project** | Resource | Yes | The GitLab project to monitor |
-| **Actions** | Multi-select | Yes | Issue actions to trigger on: `open`, `close`, `reopen`, `update` |
+- **Project**: Select the GitLab project to monitor
+- **Actions**: Select which issue actions to trigger on: `open`, `close`, `reopen`, `update`
 
-### Example Payload
+### Event Data
+
+Each issue event includes:
+- **object_kind**: The type of event (issue)
+- **event_type**: The specific event type
+- **object_attributes**: Complete issue information including title, description, state, labels
+- **project**: Project information
+- **user**: User who triggered the event
+
+### Webhook Setup
+
+This trigger automatically sets up a GitLab webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
 
 ```json
 {
-  "object_kind": "issue",
-  "event_type": "issue",
-  "object_attributes": {
-    "id": 301,
-    "iid": 1,
-    "title": "Example Issue",
-    "state": "opened",
-    "action": "open",
-    "url": "https://gitlab.com/group/project/-/issues/1"
+  "data": {
+    "object_kind": "issue",
+    "event_type": "issue",
+    "object_attributes": {
+      "id": 301,
+      "iid": 1,
+      "title": "Example Issue",
+      "description": "This is the issue description",
+      "state": "opened",
+      "action": "open",
+      "url": "https://gitlab.com/group/project/-/issues/1"
+    },
+    "user": {
+      "id": 1,
+      "name": "John Doe",
+      "username": "johndoe"
+    },
+    "project": {
+      "id": 15,
+      "name": "my-project",
+      "path_with_namespace": "group/my-project",
+      "web_url": "https://gitlab.com/group/my-project"
+    }
   },
-  "user": {
-    "id": 1,
-    "name": "John Doe",
-    "username": "johndoe"
-  },
-  "project": {
-    "id": 15,
-    "name": "my-project",
-    "path_with_namespace": "group/my-project"
-  }
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "gitlab.issue"
 }
 ```
 
@@ -72,3 +96,58 @@ The On Issue trigger fires when issue events occur in a GitLab project.
 
 The Create Issue component creates a new issue in a specified GitLab project.
 
+### Use Cases
+
+- **Incident tracking**: Automatically create issues when incidents are detected
+- **Task creation**: Generate issues from workflow events or external systems
+- **Bug reports**: Create bug reports from automated testing or monitoring
+- **Feature requests**: Generate feature request issues from external inputs
+
+### Configuration
+
+- **Project**: Select the GitLab project to create the issue in
+- **Title**: The issue title (supports expressions)
+- **Description**: Optional issue description (supports expressions and markdown)
+- **Labels**: Optional comma-separated list of labels to apply
+- **Assignees**: Optional list of usernames to assign the issue to
+
+### Output
+
+Returns the created issue including:
+- **id**: The internal issue ID
+- **iid**: The project-specific issue number
+- **title**: The issue title
+- **state**: The issue state (opened)
+- **web_url**: URL to view the issue in GitLab
+
+### Notes
+
+- The GitLab integration must have write access to the project
+- Assignees must be project members
+- Labels are created automatically if they don't exist
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": 301,
+    "iid": 42,
+    "project_id": 15,
+    "title": "New Issue from SuperPlane",
+    "description": "This issue was created automatically",
+    "state": "opened",
+    "created_at": "2026-01-19T12:00:00Z",
+    "updated_at": "2026-01-19T12:00:00Z",
+    "labels": ["automated", "workflow"],
+    "web_url": "https://gitlab.com/group/project/-/issues/42",
+    "author": {
+      "id": 1,
+      "username": "johndoe",
+      "name": "John Doe"
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "gitlab.issue.created"
+}
+```
