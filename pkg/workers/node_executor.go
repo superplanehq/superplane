@@ -282,7 +282,7 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		BaseURL:        w.baseURL,
 		Configuration:  execution.Configuration.Data(),
 		Data:           input,
-		HTTP:           contexts.NewHTTPContext(w.registry.GetHTTPClient()),
+		HTTP:           w.registry.HTTPContext(),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 		NodeMetadata:   contexts.NewNodeMetadataContext(tx, node),
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution),
