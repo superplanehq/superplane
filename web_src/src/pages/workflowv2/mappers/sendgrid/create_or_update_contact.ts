@@ -7,7 +7,7 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import { MetadataItem } from "@/ui/metadataList";
@@ -40,6 +40,7 @@ export const createOrUpdateContactMapper: ComponentBaseMapper = {
       collapsed: context.node.isCollapsed,
       eventSections: lastExecution ? eventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
+      specs: contactSpecs(context.node),
       metadata: metadataList(context.node),
       eventStateMap: getStateMap(componentName),
     };
@@ -50,15 +51,18 @@ export const createOrUpdateContactMapper: ComponentBaseMapper = {
     const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
     const failed = outputs?.failed?.[0]?.data as Record<string, unknown> | undefined;
 
+    const updatedAt = formatTimestamp(context.execution.updatedAt, context.execution.createdAt);
+
     if (failed) {
       return {
-        Error: stringOrDash(failed.error),
+        "Updated At": updatedAt,
         Status: stringOrDash(failed.statusCode),
+        Error: stringOrDash(failed.error),
       };
     }
 
     return {
-      "Updated At": new Date(context.execution.updatedAt!).toLocaleString(),
+      "Updated At": updatedAt,
       Status: stringOrDash(result?.status),
       "Job ID": stringOrDash(result?.jobId),
       Email: stringOrDash(result?.email),
@@ -81,11 +85,30 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     metadata.push({ icon: "mail", label: `Email: ${email}` });
   }
 
-  if (configuration?.listIds?.length) {
-    metadata.push({ icon: "tag", label: `Lists: ${configuration.listIds.join(", ")}` });
+  return metadata;
+}
+
+function contactSpecs(node: NodeInfo): ComponentBaseSpec[] | undefined {
+  const configuration = node.configuration as CreateOrUpdateContactConfiguration | undefined;
+  if (!configuration?.listIds?.length) {
+    return undefined;
   }
 
-  return metadata;
+  return [
+    {
+      title: "List",
+      tooltipTitle: "Lists",
+      values: configuration.listIds.map((listId) => ({
+        badges: [
+          {
+            label: listId,
+            bgColor: "bg-gray-100",
+            textColor: "text-gray-700",
+          },
+        ],
+      })),
+    },
+  ];
 }
 
 function eventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
@@ -114,4 +137,13 @@ function stringOrDash(value?: unknown): string {
   }
 
   return String(value);
+}
+
+function formatTimestamp(updatedAt?: string, createdAt?: string): string {
+  const timestamp = updatedAt || createdAt;
+  if (!timestamp) {
+    return "-";
+  }
+
+  return new Date(timestamp).toLocaleString();
 }
