@@ -427,3 +427,84 @@ func (c *Client) DeleteWebhookEndpoint(id string) error {
 	_, err := c.execRequest(http.MethodDelete, url, nil)
 	return err
 }
+
+// IncidentEvent represents a Rootly incident timeline event
+type IncidentEvent struct {
+	ID          string `json:"id"`
+	Event       string `json:"event"`
+	Visibility  string `json:"visibility"`
+	OccurredAt  string `json:"occurred_at"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
+}
+
+type IncidentEventData struct {
+	ID         string                 `json:"id"`
+	Type       string                 `json:"type"`
+	Attributes IncidentEventAttributes `json:"attributes"`
+}
+
+type IncidentEventAttributes struct {
+	Event      string `json:"event"`
+	Visibility string `json:"visibility"`
+	OccurredAt string `json:"occurred_at"`
+	CreatedAt  string `json:"created_at"`
+	UpdatedAt  string `json:"updated_at"`
+}
+
+type IncidentEventResponse struct {
+	Data IncidentEventData `json:"data"`
+}
+
+// CreateIncidentEventRequest represents the request to create an incident event
+type CreateIncidentEventRequest struct {
+	Data CreateIncidentEventData `json:"data"`
+}
+
+type CreateIncidentEventData struct {
+	Type       string                        `json:"type"`
+	Attributes CreateIncidentEventAttributes `json:"attributes"`
+}
+
+type CreateIncidentEventAttributes struct {
+	Event      string `json:"event"`
+	Visibility string `json:"visibility,omitempty"`
+}
+
+func (c *Client) CreateIncidentEvent(incidentID, event, visibility string) (*IncidentEvent, error) {
+	request := CreateIncidentEventRequest{
+		Data: CreateIncidentEventData{
+			Type: "incident_events",
+			Attributes: CreateIncidentEventAttributes{
+				Event:      event,
+				Visibility: visibility,
+			},
+		},
+	}
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/incidents/%s/events", c.BaseURL, incidentID)
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response IncidentEventResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &IncidentEvent{
+		ID:         response.Data.ID,
+		Event:      response.Data.Attributes.Event,
+		Visibility: response.Data.Attributes.Visibility,
+		OccurredAt: response.Data.Attributes.OccurredAt,
+		CreatedAt:  response.Data.Attributes.CreatedAt,
+		UpdatedAt:  response.Data.Attributes.UpdatedAt,
+	}, nil
+}
