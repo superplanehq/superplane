@@ -1,0 +1,72 @@
+{
+    "type": "rootly.incident",
+    "data": {
+        "incident": {
+            "id": "abc123-def456",
+            "sequential_id": 42,
+            "title": "Database connection issues",
+            "slug": "database-connection-issues",
+            "status": "started",
+            "summary": "Users are experiencing slow database queries and connection timeouts.",
+            "severity": "sev1",
+            "url": "https://app.rootly.com/incidents/abc123-def456",
+            "started_at": "2026-01-19T12:00:00Z",
+            "mitigated_at": null,
+            "resolved_at": null,
+            "user": {
+                "id": "user-123",
+                "name": "Jane Doe",
+                "email": "jane.doe@example.com"
+            },
+            "started_by": {
+                "id": "user-123",
+                "name": "Jane Doe",
+                "email": "jane.doe@example.com"
+            },
+            "services": [
+                {
+                    "id": "svc-001",
+                    "name": "Database Service",
+                    "slug": "database-service"
+                },
+                {
+                    "id": "svc-002",
+                    "name": "API Gateway",
+                    "slug": "api-gateway"
+                }
+            ],
+            "groups": [
+                {
+                    "id": "grp-001",
+                    "name": "Platform Team",
+                    "slug": "platform-team"
+                }
+            ],
+            "events": [
+                {
+                    "id": "evt-001",
+                    "kind": "incident_created",
+                    "summary": "Incident created",
+                    "created_at": "2026-01-19T12:00:00Z"
+                },
+                {
+                    "id": "evt-002",
+                    "kind": "comment",
+                    "summary": "Investigating database connection pool",
+                    "created_at": "2026-01-19T12:05:00Z"
+                }
+            ],
+            "action_items": [
+                {
+                    "id": "ai-001",
+                    "summary": "Increase connection pool size",
+                    "description": "The current connection pool is too small for peak traffic",
+                    "status": "open",
+                    "priority": "high",
+                    "due_at": "2026-01-20T12:00:00Z"
+                }
+            ]
+        }
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}
