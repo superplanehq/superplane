@@ -187,6 +187,10 @@ const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer
  * Falls back to the default renderer if no specific renderer is registered.
  */
 export function getTriggerRenderer(name: string): TriggerRenderer {
+  if (!name) {
+    return defaultTriggerRenderer;
+  }
+
   const parts = name?.split(".");
   if (parts?.length == 1) {
     return withCustomName(triggerRenderers[name] || defaultTriggerRenderer);

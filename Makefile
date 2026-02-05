@@ -5,6 +5,8 @@ DB_PASSWORD=the-cake-is-a-lie
 DOCKER_COMPOSE_OPTS=-f docker-compose.dev.yml
 BASE_URL?=https://app.superplane.com
 
+export BUILDKIT_PROGRESS ?= plain
+
 PKG_TEST_PACKAGES := ./pkg/...
 E2E_TEST_PACKAGES := ./test/e2e/...
 
@@ -94,6 +96,13 @@ format.js.check:
 
 dev.setup:
 	docker compose $(DOCKER_COMPOSE_OPTS) build
+	$(MAKE) db.create DB_NAME=superplane_dev
+	$(MAKE) db.migrate DB_NAME=superplane_dev
+
+dev.setup.no.cache:
+	docker compose $(DOCKER_COMPOSE_OPTS) down -v --remove-orphans
+	rm -rf tmp
+	docker compose $(DOCKER_COMPOSE_OPTS) build --no-cache
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 
