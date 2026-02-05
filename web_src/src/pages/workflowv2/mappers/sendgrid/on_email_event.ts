@@ -1,7 +1,6 @@
-import { CanvasesCanvasEvent, ComponentsNode, TriggersTrigger } from "@/api-client";
-import { TriggerRenderer } from "../types";
+import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
-import { getBackgroundColorClass } from "@/utils/colors";
+import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 
@@ -32,10 +31,10 @@ interface OnEmailEventData {
 }
 
 export const onEmailEventTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as OnEmailEventData;
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+    const eventData = context.event?.data as OnEmailEventData;
     const eventType = eventData?.event ? formatEventLabel(eventData.event) : "Email Event";
-    const subtitle = buildSubtitle(eventData?.email, event.createdAt);
+    const subtitle = buildSubtitle(eventData?.email, context.event?.createdAt);
 
     return {
       title: eventType,
@@ -43,8 +42,8 @@ export const onEmailEventTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getRootEventValues: (lastEvent: CanvasesCanvasEvent): Record<string, string> => {
-    const eventData = lastEvent.data?.data as OnEmailEventData;
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
+    const eventData = context.event?.data as OnEmailEventData;
     const category = Array.isArray(eventData?.category) ? eventData?.category.join(", ") : eventData?.category;
     return {
       "Received At": eventData?.timestamp ? new Date(Number(eventData.timestamp) * 1000).toLocaleString() : "-",
@@ -55,8 +54,9 @@ export const onEmailEventTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
-    const configuration = node.configuration as { eventTypes?: string[]; categoryFilter?: string };
+  getTriggerProps: (context: TriggerRendererContext) => {
+    const { node, definition, lastEvent } = context;
+    const configuration = node.configuration as { eventTypes?: string[]; categoryFilter?: string } | undefined;
     const metadataItems = [];
 
     if (configuration?.eventTypes?.length) {
@@ -75,23 +75,24 @@ export const onEmailEventTriggerRenderer: TriggerRenderer = {
     }
 
     const props: TriggerProps = {
-      title: node.name!,
+      title: node.name || definition.label || "Unnamed trigger",
       iconSrc: sendgridIcon,
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      iconColor: getColorClass(definition.color),
+      collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: metadataItems,
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as OnEmailEventData;
+      const eventData = lastEvent.data as OnEmailEventData;
       const eventType = eventData?.event ? formatEventLabel(eventData.event) : "Email Event";
       const subtitle = buildSubtitle(eventData?.email, lastEvent.createdAt);
 
       props.lastEventData = {
         title: eventType,
         subtitle,
-        receivedAt: new Date(lastEvent.createdAt!),
+        receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
-        eventId: lastEvent.id!,
+        eventId: lastEvent.id,
       };
     }
 
