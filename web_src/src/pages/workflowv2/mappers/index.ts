@@ -85,6 +85,7 @@ import {
   componentMappers as dockerhubComponentMappers,
   triggerRenderers as dockerhubTriggerRenderers,
   eventStateRegistry as dockerhubEventStateRegistry,
+  customFieldRenderers as dockerhubCustomFieldRenderers,
 } from "./dockerhub";
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
@@ -188,6 +189,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
+  dockerhub: dockerhubCustomFieldRenderers,
 };
 
 /**

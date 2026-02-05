@@ -138,15 +138,15 @@ func Test__DockerHub__InterfaceMethods(t *testing.T) {
 		assert.Equal(t, "docker", integration.Icon())
 	})
 
-	t.Run("Components returns ListTags", func(t *testing.T) {
+	t.Run("Components returns DescribeImageTag", func(t *testing.T) {
 		components := integration.Components()
 		require.Len(t, components, 1)
-		assert.Equal(t, "dockerhub.listTags", components[0].Name())
+		assert.Equal(t, "dockerhub.describeImageTag", components[0].Name())
 	})
 
-	t.Run("Triggers returns OnImagePushed", func(t *testing.T) {
+	t.Run("Triggers returns OnImagePush", func(t *testing.T) {
 		triggers := integration.Triggers()
 		require.Len(t, triggers, 1)
-		assert.Equal(t, "dockerhub.onImagePushed", triggers[0].Name())
+		assert.Equal(t, "dockerhub.onImagePush", triggers[0].Name())
 	})
 }

@@ -232,3 +232,65 @@ type Repository struct {
 	MediaTypes        []string `json:"media_types,omitempty"`
 	ContentTypes      []string `json:"content_types,omitempty"`
 }
+
+// ListRepositoriesResponse represents the response from listing repositories
+type ListRepositoriesResponse struct {
+	Count    int          `json:"count"`
+	Next     string       `json:"next,omitempty"`
+	Previous string       `json:"previous,omitempty"`
+	Results  []Repository `json:"results"`
+}
+
+// ListRepositories lists repositories for a namespace
+func (c *Client) ListRepositories(namespace string) (*ListRepositoriesResponse, error) {
+	apiURL := fmt.Sprintf("%s/namespaces/%s/repositories", dockerHubAPIURL, namespace)
+
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response ListRepositoriesResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response, nil
+}
+
+// GetRepository fetches details of a specific repository
+func (c *Client) GetRepository(namespace, name string) (*Repository, error) {
+	apiURL := fmt.Sprintf("%s/repositories/%s/%s", dockerHubAPIURL, namespace, name)
+
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var repo Repository
+	err = json.Unmarshal(responseBody, &repo)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &repo, nil
+}
+
+// GetTag fetches details of a specific tag
+func (c *Client) GetTag(namespace, repository, tag string) (*Tag, error) {
+	apiURL := fmt.Sprintf("%s/repositories/%s/%s/tags/%s", dockerHubAPIURL, namespace, repository, tag)
+
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var tagResp Tag
+	err = json.Unmarshal(responseBody, &tagResp)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &tagResp, nil
+}

@@ -12,8 +12,8 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__ListTags__Setup(t *testing.T) {
-	component := &ListTags{}
+func Test__DescribeImageTag__Setup(t *testing.T) {
+	component := &DescribeImageTag{}
 
 	t.Run("invalid configuration -> decode error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
@@ -23,32 +23,48 @@ func Test__ListTags__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "error decoding configuration")
 	})
 
+	t.Run("missing namespace -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"namespace":  "",
+				"repository": "myapp",
+				"tag":        "latest",
+			},
+		})
+
+		require.ErrorContains(t, err, "namespace is required")
+	})
+
 	t.Run("missing repository -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
+				"namespace":  "myorg",
 				"repository": "",
+				"tag":        "latest",
 			},
 		})
 
 		require.ErrorContains(t, err, "repository is required")
 	})
 
-	t.Run("valid configuration -> success", func(t *testing.T) {
+	t.Run("missing tag -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"repository": "library/nginx",
+				"namespace":  "myorg",
+				"repository": "myapp",
+				"tag":        "",
 			},
 		})
 
-		require.NoError(t, err)
+		require.ErrorContains(t, err, "tag is required")
 	})
 
-	t.Run("valid configuration with optional fields -> success", func(t *testing.T) {
+	t.Run("valid configuration -> success", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"repository": "myorg/myapp",
-				"pageSize":   25,
-				"nameFilter": "v1.*",
+				"namespace":  "library",
+				"repository": "nginx",
+				"tag":        "latest",
 			},
 		})
 
@@ -56,10 +72,10 @@ func Test__ListTags__Setup(t *testing.T) {
 	})
 }
 
-func Test__ListTags__Execute(t *testing.T) {
-	component := &ListTags{}
+func Test__DescribeImageTag__Execute(t *testing.T) {
+	component := &DescribeImageTag{}
 
-	t.Run("successful tag listing", func(t *testing.T) {
+	t.Run("successful tag description", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				// Login response
@@ -67,23 +83,25 @@ func Test__ListTags__Execute(t *testing.T) {
 					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`{"token": "test-jwt-token"}`)),
 				},
-				// List tags response
+				// Get tag response
 				{
 					StatusCode: http.StatusOK,
 					Body: io.NopCloser(strings.NewReader(`{
-						"count": 2,
-						"results": [
+						"name": "latest",
+						"last_updated": "2026-02-01T10:30:00.000000Z",
+						"full_size": 142857600,
+						"digest": "sha256:abc123...",
+						"media_type": "application/vnd.docker.distribution.manifest.v2+json",
+						"images": [
 							{
-								"name": "latest",
-								"last_updated": "2026-02-01T10:30:00.000000Z",
-								"full_size": 142857600,
-								"digest": "sha256:abc123..."
+								"architecture": "amd64",
+								"os": "linux",
+								"size": 70000000
 							},
 							{
-								"name": "v1.2.3",
-								"last_updated": "2026-01-28T15:45:00.000000Z",
-								"full_size": 140000000,
-								"digest": "sha256:def456..."
+								"architecture": "arm64",
+								"os": "linux",
+								"size": 72000000
 							}
 						]
 					}`)),
@@ -104,7 +122,9 @@ func Test__ListTags__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"repository": "library/nginx",
+				"namespace":  "library",
+				"repository": "nginx",
+				"tag":        "latest",
 			},
 			HTTP:           httpContext,
 			Integration:    appCtx,
@@ -114,7 +134,7 @@ func Test__ListTags__Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, executionState.Passed)
 		assert.Equal(t, "default", executionState.Channel)
-		assert.Equal(t, "dockerhub.tags", executionState.Type)
+		assert.Equal(t, "dockerhub.tag", executionState.Type)
 
 		require.Len(t, httpContext.Requests, 2)
 
@@ -123,14 +143,14 @@ func Test__ListTags__Execute(t *testing.T) {
 		assert.Equal(t, http.MethodPost, loginReq.Method)
 		assert.Contains(t, loginReq.URL.String(), "users/login")
 
-		// Second request should be list tags
-		listReq := httpContext.Requests[1]
-		assert.Equal(t, http.MethodGet, listReq.Method)
-		assert.Contains(t, listReq.URL.String(), "/repositories/library/nginx/tags")
-		assert.Equal(t, "Bearer test-jwt-token", listReq.Header.Get("Authorization"))
+		// Second request should be get tag
+		getTagReq := httpContext.Requests[1]
+		assert.Equal(t, http.MethodGet, getTagReq.Method)
+		assert.Contains(t, getTagReq.URL.String(), "/repositories/library/nginx/tags/latest")
+		assert.Equal(t, "Bearer test-jwt-token", getTagReq.Header.Get("Authorization"))
 	})
 
-	t.Run("successful tag listing with filters", func(t *testing.T) {
+	t.Run("tag not found -> execution fails", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				// Login response
@@ -138,66 +158,10 @@ func Test__ListTags__Execute(t *testing.T) {
 					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`{"token": "test-jwt-token"}`)),
 				},
-				// List tags response
-				{
-					StatusCode: http.StatusOK,
-					Body: io.NopCloser(strings.NewReader(`{
-						"count": 1,
-						"results": [
-							{
-								"name": "v1.2.3",
-								"last_updated": "2026-01-28T15:45:00.000000Z",
-								"full_size": 140000000
-							}
-						]
-					}`)),
-				},
-			},
-		}
-
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"username":    "testuser",
-				"accessToken": "test-token",
-			},
-		}
-
-		executionState := &contexts.ExecutionStateContext{
-			KVs: make(map[string]string),
-		}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"repository": "myorg/myapp",
-				"pageSize":   10,
-				"nameFilter": "v1",
-			},
-			HTTP:           httpContext,
-			Integration:    appCtx,
-			ExecutionState: executionState,
-		})
-
-		require.NoError(t, err)
-		assert.True(t, executionState.Passed)
-
-		// Check query parameters
-		listReq := httpContext.Requests[1]
-		assert.Contains(t, listReq.URL.String(), "page_size=10")
-		assert.Contains(t, listReq.URL.String(), "name=v1")
-	})
-
-	t.Run("API error -> execution fails", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				// Login response
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"token": "test-jwt-token"}`)),
-				},
-				// List tags error response
+				// Get tag error response
 				{
 					StatusCode: http.StatusNotFound,
-					Body:       io.NopCloser(strings.NewReader(`{"message": "repository not found"}`)),
+					Body:       io.NopCloser(strings.NewReader(`{"message": "tag not found"}`)),
 				},
 			},
 		}
@@ -215,7 +179,9 @@ func Test__ListTags__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"repository": "nonexistent/repo",
+				"namespace":  "myorg",
+				"repository": "myapp",
+				"tag":        "nonexistent",
 			},
 			HTTP:           httpContext,
 			Integration:    appCtx,
@@ -224,5 +190,6 @@ func Test__ListTags__Execute(t *testing.T) {
 
 		require.NoError(t, err) // Component handles error gracefully
 		assert.False(t, executionState.Passed)
+		assert.Equal(t, "not_found", executionState.FailureReason)
 	})
 }

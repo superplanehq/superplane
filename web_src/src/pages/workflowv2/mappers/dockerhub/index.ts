@@ -1,16 +1,20 @@
-import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
-import { onImagePushedTriggerRenderer } from "./on_image_pushed";
-import { listTagsMapper } from "./list_tags";
+import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer, CustomFieldRenderer } from "../types";
+import { onImagePushTriggerRenderer, onImagePushCustomFieldRenderer } from "./on_image_push";
+import { describeImageTagMapper } from "./describe_image_tag";
 import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
-  listTags: listTagsMapper,
+  describeImageTag: describeImageTagMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
-  onImagePushed: onImagePushedTriggerRenderer,
+  onImagePush: onImagePushTriggerRenderer,
+};
+
+export const customFieldRenderers: Record<string, CustomFieldRenderer> = {
+  onImagePush: onImagePushCustomFieldRenderer,
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
-  listTags: buildActionStateRegistry("retrieved"),
+  describeImageTag: buildActionStateRegistry("retrieved"),
 };
