@@ -25,6 +25,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="If" href="#if" description="Route events based on expression" />
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
+  <LinkCard title="SSH Command" href="#ssh-command" description="Run a command on a remote host via SSH using Secrets for authentication" />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
   <LinkCard title="Wait" href="#wait" description="Wait for a certain amount of time" />
 </CardGrid>
@@ -249,6 +250,41 @@ The Approval component pauses workflow execution and waits for manual approval f
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "approval.finished"
+}
+```
+
+<a id="ssh-command"></a>
+
+## SSH Command
+
+The SSH Command component runs a single command on a remote host via SSH. Authentication uses organization Secrets: choose **SSH key** (private key, optional passphrase) or **Password**, and select the Secret and key name that holds the credential.
+
+### Configuration
+
+- **Host**, **Port** (default 22), **Username**: Connection details.
+- **Authentication**: SSH key or Password. For SSH key, specify the Secret and key name for the private key (and optionally for passphrase). For Password, specify the Secret and key name for the password.
+- **Command**: The command to run (supports expressions).
+- **Working directory**: Optional; runs `cd <dir> && <command>`.
+- **Timeout (seconds)**: Optional. When set, limits how long the command may run. Leave empty for no timeout.
+
+### Output Channels
+
+- **Success**: Exit code 0.
+- **Failed**: Non-zero exit code.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "result": {
+      "stdout": "Hello, World!\n",
+      "stderr": "",
+      "exitCode": 0
+    }
+  },
+  "timestamp": "2026-02-05T12:00:00.000Z",
+  "type": "ssh.command.executed"
 }
 ```
 
