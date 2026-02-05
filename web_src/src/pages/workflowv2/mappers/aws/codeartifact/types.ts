@@ -67,6 +67,12 @@ export interface CodeArtifactPackageLicense {
   url?: string;
 }
 
+export interface CodeArtifactPackageVersionAsset {
+  hashes?: Record<string, string>;
+  name?: string;
+  size?: number;
+}
+
 export interface CodeArtifactPackageVersionDescription {
   displayName?: string;
   format?: string;
@@ -74,9 +80,15 @@ export interface CodeArtifactPackageVersionDescription {
   licenses?: CodeArtifactPackageLicense[];
   namespace?: string;
   packageName?: string;
+  publishedTime?: string;
   revision?: string;
   sourceCodeRepository?: string;
   status?: string;
   summary?: string;
   version?: string;
+}
+
+export interface CodeArtifactPackageVersionPayload {
+  package?: CodeArtifactPackageVersionDescription;
+  assets?: CodeArtifactPackageVersionAsset[];
 }

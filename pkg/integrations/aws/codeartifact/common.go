@@ -3,9 +3,69 @@ package codeartifact
 import (
 	"fmt"
 
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 )
+
+/*
+ * CodeArtifact is only available in the following regions.
+ * See: https://docs.aws.amazon.com/general/latest/gr/codeartifact.html
+ */
+var RegionsForCodeArtifact = []configuration.FieldOption{
+	{
+		Label: "us-east-1",
+		Value: "us-east-1",
+	},
+	{
+		Label: "us-east-2",
+		Value: "us-east-2",
+	},
+	{
+		Label: "us-west-2",
+		Value: "us-west-2",
+	},
+	{
+		Label: "ap-south-1",
+		Value: "ap-south-1",
+	},
+	{
+		Label: "ap-southeast-1",
+		Value: "ap-southeast-1",
+	},
+	{
+		Label: "ap-southeast-2",
+		Value: "ap-southeast-2",
+	},
+	{
+		Label: "ap-northeast-1",
+		Value: "ap-northeast-1",
+	},
+	{
+		Label: "eu-central-1",
+		Value: "eu-central-1",
+	},
+	{
+		Label: "eu-west-1",
+		Value: "eu-west-1",
+	},
+	{
+		Label: "eu-west-2",
+		Value: "eu-west-2",
+	},
+	{
+		Label: "eu-south-1",
+		Value: "eu-south-1",
+	},
+	{
+		Label: "eu-west-3",
+		Value: "eu-west-3",
+	},
+	{
+		Label: "eu-north-1",
+		Value: "eu-north-1",
+	},
+}
 
 func validateRepository(ctx core.IntegrationContext, http core.HTTPContext, region string, repository string) (*Repository, error) {
 	credentials, err := common.CredentialsFromInstallation(ctx)
@@ -14,7 +74,7 @@ func validateRepository(ctx core.IntegrationContext, http core.HTTPContext, regi
 	}
 
 	client := NewClient(http, credentials, region)
-	repositories, err := client.ListRepositories()
+	repositories, err := client.ListRepositories("")
 	if err != nil {
 		return nil, err
 	}

@@ -8,6 +8,7 @@ SuperPlane uses [BountyHub](https://www.bountyhub.dev/) to offer paid bounties o
 - [Finding bounties](#finding-bounties)
 - [Claiming a bounty](#claiming-a-bounty)
 - [Working on a bounty](#working-on-a-bounty)
+- [How to approach bounty issues](#how-to-approach-bounty-issues)
 - [Review and acceptance](#review-and-acceptance)
 - [Disputes](#disputes)
 
@@ -19,16 +20,11 @@ We use [BountyHub](https://www.bountyhub.dev/) for bounties (see their site for 
 
 Each bounty issue has a **Bounty Details** section in its description (reward amount and any additional requirements or acceptance criteria). Read it before you start.
 
-You can browse all SuperPlane bounties on [BountyHub](https://www.bountyhub.dev/en/bounties) or find bountied issues in this repo by the `bounty` label.
-
 We may close an issue or withdraw a bounty; work in progress may not be paid if the bounty is no longer active.
 
 ## Finding bounties
 
-- **On BountyHub**: Go to [bountyhub.dev/en/bounties](https://www.bountyhub.dev/en/bounties) and search or filter for the SuperPlane repository.
-- **On GitHub**: [View all open issues with the `bounty` label](https://github.com/superplanehq/superplane/issues?q=state%3Aopen%20label%3Abounty). Only those issues have an active bounty on BountyHub.
-
-Confirm the bounty exists and is funded on BountyHub before investing significant time. Before you start, sign in to BountyHub with your GitHub account and connect Stripe (or add your PayPal email) so you can receive payouts when your claim is accepted.
+Browse open bounties at [superplane.com/bounties](https://superplane.com/bounties/); each listing links to the corresponding GitHub issue. Confirm the bounty exists and is funded on BountyHub before investing significant time. Before you start, sign in to BountyHub with your GitHub account and connect Stripe (or add your PayPal email) so you can receive payouts when your claim is accepted.
 
 ## Claiming a bounty
 
@@ -51,13 +47,27 @@ Bounty work must meet the same standards as any contribution to SuperPlane:
 - All commits must be [signed off](commit_sign-off.md).
 - Code and behavior must meet our [Quality Standards](quality.md).
 
-The [Integrations Board](https://github.com/orgs/superplanehq/projects/2/views/17) shows integration-related work; bountied issues are those with the `bounty` label.
+## How to approach bounty issues
+
+Human judgment and polish must drive the work. We welcome and encourage using AI tools to implement bounties, however—at the end of the day, code quality and the UX are what matter. Your contribution should meet our standards (see the guides linked above).
+
+Issue descriptions and specs define the requirements, but we expect you to go beyond the literal spec:
+
+- **Understand the tool** you’re integrating: its API, behavior, and typical use cases.
+- **Think about the context** of the SuperPlane app and the user experience—how the integration fits into workflows and the UI.
+- **Take freedom to explore and propose solutions**: you’re not limited to the spec as written. Suggest improvements, better UX, or alternative approaches when they make sense, and explain your choices in the PR.
 
 ## Review and acceptance
 
-1. **Code review** – We review your PR as we do any contribution: code quality, tests, documentation, and project standards. We may ask for changes; address feedback in the PR.
+**Required for review:** Pull requests for integration and component bounties **must** include a **video** showing the working integration and components. PRs that do not include such a video will be **automatically closed** and will not be reviewed for bounty acceptance.
 
-2. **Functionality and UX review** – Our team verifies that the integration and components work as expected: triggers fire correctly, actions behave as described, and the experience matches our quality bar. We may request changes based on this review.
+**Video requirement:** The video must show the component actually working as intended—for example, triggers firing, actions executing, and the correct user flow. A short, focused screen recording is sufficient.
+
+Once your PR includes the required video, we review as follows:
+
+1. **Functionality and UX review** – Our team verifies that the integration and components work as expected: triggers fire correctly, actions behave as described, and the experience matches our quality bar. We may request changes based on this review.
+
+2. **Code review** – We review your PR as we do any contribution: code quality, tests, documentation, and project standards. We may ask for changes; address feedback in the PR.
 
 3. **Acceptance on BountyHub** – Once the PR meets the bounty requirements, we (as bounty creator) approve the claim on BountyHub. BountyHub then pays you according to their process (Stripe or PayPal). We usually merge the PR first, then accept the claim on BountyHub.
 
@@ -65,10 +75,6 @@ We aim to complete review within **one week** of you submitting the claim on Bou
 
 ## Disputes
 
-If your claim is rejected and you believe your PR does solve the bounty:
-
-1. **Contact us first** – Reach out to maintainers via [Discord](https://discord.gg/KC78eCNsnw) or in the GitHub issue comments. Often a misunderstanding or missing feedback can be resolved there.
-
-2. **BountyHub dispute process** – If we still disagree, use BountyHub’s process. In your BountyHub dashboard, go to **My Bounties**, find the rejected claim, and click **Open Dispute**. Provide details on why your PR resolves the bounty. BountyHub will open a chat with all parties and manually review the dispute; their decision is binding. You will be notified by email about the outcome. BountyHub’s dispute option may require your PR to be merged; see their documentation for current rules.
+We do our best to guide you and provide feedback in pull requests so your work can meet the bounty requirements. We only pay out bounties for **merged** PRs, and we never reject claims for PRs we merge. If you believe your claim was rejected despite your PR being merged—an error may have occurred—please reach out via [Discord](https://discord.gg/KC78eCNsnw). As an alternative, BountyHub has a [dispute process](https://www.bountyhub.dev/) for such cases; see their documentation for current rules.
 
 For payout methods, fees, and BountyHub’s terms, see [BountyHub](https://www.bountyhub.dev/) and their documentation (e.g. [claiming a bounty](https://www.bountyhub.dev/docs/claim-bounty)).

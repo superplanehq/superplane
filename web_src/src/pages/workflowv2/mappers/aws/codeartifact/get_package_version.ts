@@ -1,51 +1,55 @@
 import {
-  ComponentsComponent,
-  ComponentsNode,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
-import { ComponentBaseMapper, OutputPayload } from "../../types";
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  OutputPayload,
+  SubtitleContext,
+} from "../../types";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import { formatTimeAgo } from "@/utils/date";
+import { formatTimestampInUserTimezone } from "@/utils/timezone";
 import { MetadataItem } from "@/ui/metadataList";
 import {
   CodeArtifactPackageVersionConfiguration,
   CodeArtifactPackageVersionDescription,
   CodeArtifactPackageLicense,
+  CodeArtifactPackageVersionPayload,
 } from "./types";
 import { buildCodeArtifactPackageMetadataItems, formatPackageName } from "./utils";
 import { stringOrDash } from "../../utils";
 
 export const getPackageVersionMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    _items?: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
-    const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition.name || node.component?.name || "unknown";
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
 
     return {
-      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
+      title:
+        context.node.name ||
+        context.componentDefinition.label ||
+        context.componentDefinition.name ||
+        "Unnamed component",
       iconSrc: awsCodeArtifactIcon,
-      iconColor: getColorClass(componentDefinition.color),
-      collapsedBackground: getBackgroundColorClass(componentDefinition.color),
-      collapsed: node.isCollapsed,
-      eventSections: lastExecution ? getPackageVersionEventSections(nodes, lastExecution, componentName) : undefined,
+      iconColor: getColorClass(context.componentDefinition.color),
+      collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
+      collapsed: context.node.isCollapsed,
+      eventSections: lastExecution
+        ? getPackageVersionEventSections(context.nodes, lastExecution, context.componentDefinition.name)
+        : undefined,
       includeEmptyState: !lastExecution,
-      metadata: getPackageVersionMetadataList(node),
-      eventStateMap: getStateMap(componentName),
+      metadata: getPackageVersionMetadataList(context.node),
+      eventStateMap: getStateMap(context.componentDefinition.name),
     };
   },
 
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as CodeArtifactPackageVersionDescription | undefined;
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+    const payload = outputs?.default?.[0]?.data as CodeArtifactPackageVersionPayload | undefined;
+    const result = payload?.package as CodeArtifactPackageVersionDescription | undefined;
 
     if (!result) {
       return {};
@@ -58,6 +62,7 @@ export const getPackageVersionMapper: ComponentBaseMapper = {
       Status: stringOrDash(result.status),
       Revision: stringOrDash(result.revision),
       "Display Name": stringOrDash(result.displayName),
+      "Published At": result.publishedTime ? formatTimestampInUserTimezone(result.publishedTime) : "-",
       Summary: stringOrDash(result.summary),
       Licenses: formatLicenses(result.licenses),
       "Home Page": stringOrDash(result.homePage),
@@ -65,27 +70,27 @@ export const getPackageVersionMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    if (!execution.createdAt) {
+  subtitle(context: SubtitleContext): string {
+    if (!context.execution.createdAt) {
       return "";
     }
-    return formatTimeAgo(new Date(execution.createdAt));
+    return formatTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
-function getPackageVersionMetadataList(node: ComponentsNode): MetadataItem[] {
+function getPackageVersionMetadataList(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as CodeArtifactPackageVersionConfiguration | undefined;
   return buildCodeArtifactPackageMetadataItems(configuration);
 }
 
 function getPackageVersionEventSections(
-  nodes: ComponentsNode[],
-  execution: CanvasesCanvasNodeExecution,
+  nodes: NodeInfo[],
+  execution: ExecutionInfo,
   componentName: string,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [
     {

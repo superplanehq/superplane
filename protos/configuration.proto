@@ -81,6 +81,17 @@ message ResourceTypeOptions {
   string type = 1;
   bool use_name_as_value = 2;
   bool multi = 3;
+  repeated ParameterRef parameters = 4;
+}
+
+message ParameterRef {
+  string name = 1;
+  string value = 2;
+  ParameterValueFrom value_from = 3;
+}
+
+message ParameterValueFrom {
+  string field = 1;
 }
 
 message ListTypeOptions {
