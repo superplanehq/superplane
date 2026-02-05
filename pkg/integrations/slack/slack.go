@@ -106,6 +106,7 @@ func (s *Slack) HandleAction(ctx core.IntegrationActionContext) error {
 func (s *Slack) Components() []core.Component {
 	return []core.Component{
 		&SendTextMessage{},
+		&SendAndWaitForResponse{},
 	}
 }
 
@@ -356,8 +357,138 @@ func (s *Slack) handleChallenge(ctx core.HTTPRequestContext, payload EventPayloa
 	}
 }
 
+// InteractionPayload represents the payload from Slack interactive components
+type InteractionPayload struct {
+	Type        string                   `json:"type"`
+	User        InteractionUser          `json:"user"`
+	Container   InteractionContainer     `json:"container"`
+	Channel     InteractionChannel       `json:"channel"`
+	Message     InteractionMessage       `json:"message"`
+	ResponseURL string                   `json:"response_url"`
+	Actions     []InteractionAction      `json:"actions"`
+}
+
+type InteractionUser struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
+	Name     string `json:"name"`
+}
+
+type InteractionContainer struct {
+	Type      string `json:"type"`
+	MessageTS string `json:"message_ts"`
+	ChannelID string `json:"channel_id"`
+}
+
+type InteractionChannel struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type InteractionMessage struct {
+	Type string `json:"type"`
+	TS   string `json:"ts"`
+	Text string `json:"text"`
+}
+
+type InteractionAction struct {
+	Type     string `json:"type"`
+	ActionID string `json:"action_id"`
+	BlockID  string `json:"block_id"`
+	Text     struct {
+		Type  string `json:"type"`
+		Text  string `json:"text"`
+		Emoji bool   `json:"emoji"`
+	} `json:"text"`
+	Value string `json:"value"`
+}
+
 func (s *Slack) handleInteractivity(ctx core.HTTPRequestContext, body []byte) {
-	// TODO
+	// Slack sends interaction payloads as form-encoded with a 'payload' field
+	payloadStr := ctx.Request.FormValue("payload")
+	if payloadStr == "" {
+		// Try parsing from body if form value is empty
+		// The body might be the raw payload string from URL decoding
+		bodyStr := string(body)
+		if strings.HasPrefix(bodyStr, "payload=") {
+			decoded, err := url.QueryUnescape(strings.TrimPrefix(bodyStr, "payload="))
+			if err != nil {
+				ctx.Logger.Errorf("error decoding payload: %v", err)
+				ctx.Response.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			payloadStr = decoded
+		} else {
+			ctx.Logger.Errorf("missing payload in interaction request")
+			ctx.Response.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	}
+
+	var payload InteractionPayload
+	if err := json.Unmarshal([]byte(payloadStr), &payload); err != nil {
+		ctx.Logger.Errorf("error parsing interaction payload: %v", err)
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Only handle block_actions (button clicks)
+	if payload.Type != "block_actions" {
+		ctx.Logger.Debugf("ignoring interaction type: %s", payload.Type)
+		ctx.Response.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Process each action (usually just one for button clicks)
+	for _, action := range payload.Actions {
+		// Check if this is a SuperPlane action
+		if !strings.HasPrefix(action.ActionID, "superplane_response_") {
+			continue
+		}
+
+		// Parse execution ID from action_id: superplane_response_{executionID}_{buttonIndex}
+		parts := strings.Split(action.ActionID, "_")
+		if len(parts) < 3 {
+			ctx.Logger.Warnf("invalid action_id format: %s", action.ActionID)
+			continue
+		}
+
+		// The execution ID is the third part
+		executionID := parts[2]
+
+		ctx.Logger.Infof("received button click for execution %s, button: %s, value: %s",
+			executionID, action.Text.Text, action.Value)
+
+		// Send message to component subscriptions for this interaction
+		subscriptions, err := ctx.Integration.ListSubscriptions()
+		if err != nil {
+			ctx.Logger.Errorf("error listing subscriptions: %v", err)
+			continue
+		}
+
+		interactionData := map[string]any{
+			"type":        "button_click",
+			"executionId": executionID,
+			"buttonName":  action.Text.Text,
+			"buttonValue": action.Value,
+			"userId":      payload.User.ID,
+			"username":    payload.User.Username,
+			"userName":    payload.User.Name,
+			"channelId":   payload.Channel.ID,
+			"channelName": payload.Channel.Name,
+			"messageTs":   payload.Message.TS,
+			"responseUrl": payload.ResponseURL,
+		}
+
+		for _, subscription := range subscriptions {
+			if err := subscription.SendMessage(interactionData); err != nil {
+				ctx.Logger.Errorf("error sending interaction to subscription: %v", err)
+			}
+		}
+	}
+
+	// Acknowledge the interaction immediately
+	ctx.Response.WriteHeader(http.StatusOK)
 }
 
 func (s *Slack) parseEventCallback(eventPayload EventPayload) (string, any, error) {

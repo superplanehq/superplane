@@ -1,0 +1,12 @@
+{
+  "button": {
+    "name": "Approve",
+    "value": "approved"
+  },
+  "user": {
+    "id": "U123456",
+    "username": "john.doe",
+    "name": "John Doe"
+  },
+  "clickedAt": "2024-01-15T10:30:00Z"
+}
