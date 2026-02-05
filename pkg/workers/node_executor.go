@@ -273,6 +273,20 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		return fmt.Errorf("failed to find workflow: %v", err)
 	}
 
+	config := execution.Configuration.Data()
+	if config != nil {
+		resolved, err := contexts.ResolveRuntimeConfig(config, contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
+			WithNodeID(node.NodeID).
+			WithRootEvent(&execution.RootEventID).
+			WithInput(map[string]any{inputEvent.NodeID: input}).
+			WithPreviousExecution(execution.PreviousExecutionID), tx, w.encryptor, workflow.OrganizationID)
+		if err != nil {
+			logger.Errorf("failed to resolve configuration at runtime: %v", err)
+			return execution.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, fmt.Sprintf("configuration resolution failed: %v", err))
+		}
+		config = resolved
+	}
+
 	ctx := core.ExecutionContext{
 		ID:             execution.ID,
 		WorkflowID:     execution.WorkflowID.String(),
@@ -280,7 +294,7 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		NodeID:         execution.NodeID,
 		SourceNodeID:   inputEvent.NodeID,
 		BaseURL:        w.baseURL,
-		Configuration:  execution.Configuration.Data(),
+		Configuration:  config,
 		Data:           input,
 		HTTP:           contexts.NewHTTPContext(w.registry.GetHTTPClient()),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),

@@ -1195,6 +1195,32 @@ func Test_NodeConfigurationBuilder_NoExpression(t *testing.T) {
 	assert.Nil(t, result["null_value"])
 }
 
+func Test_NodeConfigurationBuilder_ExpressionsContainingSecrets_LeftUnresolved(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent}},
+		[]models.Edge{},
+	)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithInput(map[string]any{"node-1": map[string]any{"x": "y"}})
+
+	configuration := map[string]any{
+		"api_key": `{{ secrets("my-secret").token }}`,
+		"mixed":   `prefix {{ secrets("other").key }} suffix`,
+	}
+
+	result, err := builder.Build(configuration)
+	require.NoError(t, err)
+	assert.Equal(t, `{{ secrets("my-secret").token }}`, result["api_key"])
+	assert.Equal(t, `prefix {{ secrets("other").key }} suffix`, result["mixed"])
+}
+
 func Test_NodeConfigurationBuilder_DisallowExpression_ListItems(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

@@ -215,6 +215,12 @@ func asAnyMap(value any) (map[string]any, bool) {
 	}
 }
 
+// expressionContainsSecrets reports whether the expression references secrets()
+// (and must be deferred to runtime resolution).
+func expressionContainsSecrets(expression string) bool {
+	return strings.Contains(expression, "secrets(")
+}
+
 func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, error) {
 	if !expressionRegex.MatchString(expression) {
 		return expression, nil
@@ -225,6 +231,11 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 	result := expressionRegex.ReplaceAllStringFunc(expression, func(match string) string {
 		matches := expressionRegex.FindStringSubmatch(match)
 		if len(matches) != 2 {
+			return match
+		}
+
+		inner := strings.TrimSpace(matches[1])
+		if expressionContainsSecrets(inner) {
 			return match
 		}
 
