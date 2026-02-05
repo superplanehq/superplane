@@ -18,6 +18,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run Semaphore workflow" />
+  <LinkCard title="List Pipelines" href="#list-pipelines" description="List pipelines for a Semaphore project" />
 </CardGrid>
 
 <a id="on-pipeline-done"></a>
@@ -246,5 +247,96 @@ The Run Workflow component triggers a Semaphore CI/CD workflow and waits for it 
   "timestamp": "2026-01-22T15:32:56.061430218Z",
   "type": "semaphore.workflow.finished"
 }
+```
+
+<a id="list-pipelines"></a>
+
+## List Pipelines
+
+The List Pipelines component retrieves a list of pipelines from a Semaphore project with optional filtering.
+
+### Use Cases
+
+- **Dashboard creation**: Build a dashboard or status node showing recent pipeline runs for a project
+- **Find latest pipeline**: Find the latest pipeline for a given branch or ref when the trigger only provides project context
+- **Iterate and process**: List pipelines then filter/iterate to trigger follow-up actions or report on failures
+- **Pipeline discovery**: Feed pipeline IDs into Get Pipeline or other nodes for further processing
+
+### How It Works
+
+1. Queries the Semaphore API for pipelines matching the specified criteria
+2. Optionally filters by branch name, pipeline file, and date ranges
+3. Emits a single array of pipeline objects to the default output channel
+4. Supports pagination with a maximum limit of 100 pipelines
+
+### Configuration
+
+- **Project** (required): Semaphore project ID or name
+- **Branch Name** (optional): Filter by branch name (e.g., `main`, `develop`)
+- **YML File Path** (optional): Filter by pipeline definition file (e.g., `.semaphore/semaphore.yml`)
+- **Created After** (optional): Only pipelines created after this time (Unix timestamp or ISO date)
+- **Created Before** (optional): Only pipelines created before this time (Unix timestamp or ISO date)
+- **Done After** (optional): Only pipelines finished after this time (Unix timestamp or ISO date)
+- **Done Before** (optional): Only pipelines finished before this time (Unix timestamp or ISO date)
+- **Limit** (optional): Maximum number of pipelines to return (default: 30, max: 100)
+
+### Output
+
+Emits a single array of pipeline objects with fields:
+- **ppl_id**: Pipeline ID
+- **wf_id**: Workflow ID
+- **name**: Pipeline name
+- **state**: Pipeline state (done, running, etc.)
+- **result**: Pipeline result (passed, failed, stopped, etc.)
+- **created_at**: Pipeline creation timestamp
+- **done_at**: Pipeline completion timestamp
+- **branch_name**: Branch name
+- **yml_file_path**: Pipeline definition file path
+
+### Notes
+
+- Filters are combined with AND logic
+- The component respects the API's pagination limits
+- Empty results will emit an empty array, not an error
+- All date filters accept Unix timestamps or ISO 8601 date strings
+
+### Example Output
+
+```json
+[
+  {
+    "ppl_id": "5e63f1a0e1230012a4c7ba1c",
+    "wf_id": "5e63f1a0e1230012a4c7ba1a",
+    "name": "Pipeline 1",
+    "state": "done",
+    "result": "passed",
+    "created_at": "2024-01-15T10:30:00Z",
+    "done_at": "2024-01-15T10:45:00Z",
+    "branch_name": "main",
+    "yml_file_path": ".semaphore/semaphore.yml"
+  },
+  {
+    "ppl_id": "5e63f1a0e1230012a4c7ba1d",
+    "wf_id": "5e63f1a0e1230012a4c7ba1b",
+    "name": "Pipeline 2",
+    "state": "done",
+    "result": "failed",
+    "created_at": "2024-01-14T15:20:00Z",
+    "done_at": "2024-01-14T15:35:00Z",
+    "branch_name": "develop",
+    "yml_file_path": ".semaphore/semaphore.yml"
+  },
+  {
+    "ppl_id": "5e63f1a0e1230012a4c7ba1e",
+    "wf_id": "5e63f1a0e1230012a4c7ba1c",
+    "name": "Pipeline 3",
+    "state": "done",
+    "result": "passed",
+    "created_at": "2024-01-13T08:15:00Z",
+    "done_at": "2024-01-13T08:22:00Z",
+    "branch_name": "feature/new-api",
+    "yml_file_path": ".semaphore/semaphore.yml"
+  }
+]
 ```
 

@@ -1,0 +1,40 @@
+{
+  "type": "semaphore.pipelines.listed",
+  "data": {
+    "pipelines": [
+      {
+        "ppl_id": "5e63f1a0e1230012a4c7ba1c",
+        "wf_id": "5e63f1a0e1230012a4c7ba1a",
+        "name": "Pipeline 1",
+        "state": "done",
+        "result": "passed",
+        "created_at": "2024-01-15T10:30:00Z",
+        "done_at": "2024-01-15T10:45:00Z",
+        "branch_name": "main",
+        "yml_file_path": ".semaphore/semaphore.yml"
+      },
+      {
+        "ppl_id": "5e63f1a0e1230012a4c7ba1d",
+        "wf_id": "5e63f1a0e1230012a4c7ba1b",
+        "name": "Pipeline 2",
+        "state": "done",
+        "result": "failed",
+        "created_at": "2024-01-14T15:20:00Z",
+        "done_at": "2024-01-14T15:35:00Z",
+        "branch_name": "develop",
+        "yml_file_path": ".semaphore/semaphore.yml"
+      },
+      {
+        "ppl_id": "5e63f1a0e1230012a4c7ba1e",
+        "wf_id": "5e63f1a0e1230012a4c7ba1c",
+        "name": "Pipeline 3",
+        "state": "done",
+        "result": "passed",
+        "created_at": "2024-01-13T08:15:00Z",
+        "done_at": "2024-01-13T08:22:00Z",
+        "branch_name": "feature/new-api",
+        "yml_file_path": ".semaphore/semaphore.yml"
+      }
+    ]
+  }
+}
