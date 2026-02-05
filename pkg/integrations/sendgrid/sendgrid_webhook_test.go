@@ -49,7 +49,7 @@ func Test__SendGrid__SetupWebhook_EnablesSignedWebhook(t *testing.T) {
 
 	webhookCtx := &testWebhookContext{
 		url:           "https://example.com/webhook",
-		configuration: WebhookConfiguration{},
+		configuration: struct{}{},
 	}
 
 	integrationCtx := &contexts.IntegrationContext{
@@ -93,7 +93,7 @@ func Test__SendGrid__CleanupWebhook_DisablesWebhook(t *testing.T) {
 
 	webhookCtx := &testWebhookContext{
 		url:           "https://example.com/webhook",
-		configuration: WebhookConfiguration{},
+		configuration: struct{}{},
 	}
 
 	err := integration.CleanupWebhook(core.CleanupWebhookContext{
@@ -141,7 +141,7 @@ func Test__SendGrid__CleanupWebhook_SkipsNonHTTPS(t *testing.T) {
 
 	webhookCtx := &testWebhookContext{
 		url:           "http://example.com/webhook",
-		configuration: WebhookConfiguration{},
+		configuration: struct{}{},
 	}
 
 	err := integration.CleanupWebhook(core.CleanupWebhookContext{
