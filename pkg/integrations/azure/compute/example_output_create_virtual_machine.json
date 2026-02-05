@@ -1,0 +1,7 @@
+{
+  "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myRG/providers/Microsoft.Compute/virtualMachines/myVM",
+  "name": "myVM",
+  "location": "eastus",
+  "provisioningState": "Succeeded",
+  "vmSize": "Standard_B2s"
+}
