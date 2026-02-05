@@ -382,3 +382,8 @@ func (c *Client) CreateWebhookSecret(name, key string) (*Secret, error) {
 
 	return &response, nil
 }
+
+func (c *Client) GetJobLogs(jobID string) ([]byte, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/jobs/%s/logs", c.OrgURL, jobID)
+	return c.execRequest(http.MethodGet, URL, nil)
+}
