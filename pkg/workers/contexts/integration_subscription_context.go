@@ -72,14 +72,13 @@ func (c *IntegrationSubscriptionContext) sendMessageToComponent(message any) err
 	}
 
 	return integrationComponent.OnIntegrationMessage(core.IntegrationMessageContext{
-		HTTP:              NewHTTPContext(c.registry.GetHTTPClient()),
-		Configuration:     c.node.Configuration.Data(),
-		NodeMetadata:      NewNodeMetadataContext(c.tx, c.node),
-		Integration:       c.integrationCtx,
-		Events:            NewEventContext(c.tx, c.node),
-		Message:           message,
-		Logger:            logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
-		FindExecutionByKV: c.findExecutionByKV,
+		HTTP:          c.registry.HTTPContext(),
+		Configuration: c.node.Configuration.Data(),
+		NodeMetadata:  NewNodeMetadataContext(c.tx, c.node),
+		Integration:   c.integrationCtx,
+		Events:        NewEventContext(c.tx, c.node),
+		Message:       message,
+		Logger:        logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
 	})
 }
 
@@ -126,13 +125,12 @@ func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error
 	}
 
 	return integrationTrigger.OnIntegrationMessage(core.IntegrationMessageContext{
-		HTTP:              NewHTTPContext(c.registry.GetHTTPClient()),
-		Configuration:     c.node.Configuration.Data(),
-		NodeMetadata:      NewNodeMetadataContext(c.tx, c.node),
-		Integration:       c.integrationCtx,
-		Message:           message,
-		Events:            NewEventContext(c.tx, c.node),
-		Logger:            logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
-		FindExecutionByKV: c.findExecutionByKV,
+		HTTP:          c.registry.HTTPContext(),
+		Configuration: c.node.Configuration.Data(),
+		NodeMetadata:  NewNodeMetadataContext(c.tx, c.node),
+		Integration:   c.integrationCtx,
+		Message:       message,
+		Events:        NewEventContext(c.tx, c.node),
+		Logger:        logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
 	})
 }
