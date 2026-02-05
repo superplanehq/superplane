@@ -1,6 +1,5 @@
-import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { TriggerRenderer } from "../../types";
+import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
 import { TriggerProps } from "@/ui/trigger";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import {
@@ -17,19 +16,18 @@ import { numberOrZero, stringOrDash } from "../../utils";
  * Renderer for the "aws.codeArtifact.onPackageVersion" trigger
  */
 export const onPackageVersionTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as CodeArtifactPackageVersionEvent;
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+    const eventData = context.event?.data?.data as CodeArtifactPackageVersionEvent;
     const detail = eventData?.detail;
     const packageLabel = formatPackageLabel(detail);
-
     const title = packageLabel || "CodeArtifact package version";
-    const subtitle = event.createdAt ? formatTimeAgo(new Date(event.createdAt)) : "";
+    const subtitle = formatTimeAgo(new Date(context.event?.createdAt || ""));
 
     return { title, subtitle };
   },
 
-  getRootEventValues: (event: CanvasesCanvasEvent): Record<string, string> => {
-    const eventData = event.data?.data as CodeArtifactPackageVersionEvent;
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
+    const eventData = context.event?.data?.data as CodeArtifactPackageVersionEvent;
     const detail = eventData?.detail as CodeArtifactPackageVersionDetail;
 
     const values: Record<string, string> = {
@@ -57,26 +55,27 @@ export const onPackageVersionTriggerRenderer: TriggerRenderer = {
     return values;
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
+  getTriggerProps: (context: TriggerRendererContext) => {
+    const { node, definition, lastEvent } = context;
     const metadata = node.metadata as CodeArtifactTriggerMetadata | undefined;
     const configuration = node.configuration as CodeArtifactTriggerConfiguration | undefined;
     const metadataItems = buildCodeArtifactMetadataItems(metadata, configuration);
 
     const props: TriggerProps = {
-      title: node.name!,
+      title: node.name || definition.label || "Unnamed trigger",
       iconSrc: awsCodeArtifactIcon,
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: metadataItems,
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onPackageVersionTriggerRenderer.getTitleAndSubtitle(lastEvent);
+      const { title, subtitle } = onPackageVersionTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
       props.lastEventData = {
         title,
         subtitle,
-        receivedAt: new Date(lastEvent.createdAt!),
+        receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
-        eventId: lastEvent.id!,
+        eventId: lastEvent.id,
       };
     }
 

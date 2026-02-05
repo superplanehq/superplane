@@ -197,6 +197,15 @@ import type {
   SecretsUpdateSecretData,
   SecretsUpdateSecretResponse2,
   SecretsUpdateSecretError,
+  SecretsDeleteSecretKeyData,
+  SecretsDeleteSecretKeyResponse2,
+  SecretsDeleteSecretKeyError,
+  SecretsSetSecretKeyData,
+  SecretsSetSecretKeyResponse2,
+  SecretsSetSecretKeyError,
+  SecretsUpdateSecretNameData,
+  SecretsUpdateSecretNameResponse2,
+  SecretsUpdateSecretNameError,
   TriggersListTriggersData,
   TriggersListTriggersResponse2,
   TriggersListTriggersError,
@@ -1353,6 +1362,61 @@ export const secretsUpdateSecret = <ThrowOnError extends boolean = true>(
 ) => {
   return (options.client ?? _heyApiClient).patch<SecretsUpdateSecretResponse2, SecretsUpdateSecretError, ThrowOnError>({
     url: "/api/v1/secrets/{idOrName}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+  });
+};
+
+/**
+ * Remove a key from a secret
+ * Removes one key from the secret. Secret must have at least one key remaining.
+ */
+export const secretsDeleteSecretKey = <ThrowOnError extends boolean = true>(
+  options: Options<SecretsDeleteSecretKeyData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).delete<
+    SecretsDeleteSecretKeyResponse2,
+    SecretsDeleteSecretKeyError,
+    ThrowOnError
+  >({
+    url: "/api/v1/secrets/{idOrName}/keys/{keyName}",
+    ...options,
+  });
+};
+
+/**
+ * Set or overwrite a single key in a secret
+ * Sets the value for one key. Creates the key if missing, overwrites if present.
+ */
+export const secretsSetSecretKey = <ThrowOnError extends boolean = true>(
+  options: Options<SecretsSetSecretKeyData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).put<SecretsSetSecretKeyResponse2, SecretsSetSecretKeyError, ThrowOnError>({
+    url: "/api/v1/secrets/{idOrName}/keys/{keyName}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+  });
+};
+
+/**
+ * Update secret name
+ * Updates only the name of the secret. Name must be unique within the domain.
+ */
+export const secretsUpdateSecretName = <ThrowOnError extends boolean = true>(
+  options: Options<SecretsUpdateSecretNameData, ThrowOnError>,
+) => {
+  return (options.client ?? _heyApiClient).patch<
+    SecretsUpdateSecretNameResponse2,
+    SecretsUpdateSecretNameError,
+    ThrowOnError
+  >({
+    url: "/api/v1/secrets/{idOrName}/name",
     ...options,
     headers: {
       "Content-Type": "application/json",
