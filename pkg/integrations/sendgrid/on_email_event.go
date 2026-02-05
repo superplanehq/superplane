@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -41,11 +40,6 @@ type OnEmailEvent struct{}
 type OnEmailEventConfiguration struct {
 	EventTypes     []string                  `json:"eventTypes" mapstructure:"eventTypes"`
 	CategoryFilter []configuration.Predicate `json:"categoryFilter" mapstructure:"categoryFilter"`
-}
-
-type onEmailEventConfigurationRaw struct {
-	EventTypes     []string `json:"eventTypes" mapstructure:"eventTypes"`
-	CategoryFilter any      `json:"categoryFilter" mapstructure:"categoryFilter"`
 }
 
 func (t *OnEmailEvent) Name() string {
@@ -139,14 +133,13 @@ func (t *OnEmailEvent) Configuration() []configuration.Field {
 }
 
 func (t *OnEmailEvent) Setup(ctx core.TriggerContext) error {
-	config, err := decodeOnEmailEventConfiguration(ctx.Configuration)
-	if err != nil {
-		return err
+	config := OnEmailEventConfiguration{}
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		EventTypes:     config.EventTypes,
-		CategoryFilter: config.CategoryFilter,
+		EventTypes: config.EventTypes,
 	})
 }
 
@@ -159,9 +152,9 @@ func (t *OnEmailEvent) HandleAction(ctx core.TriggerActionContext) (map[string]a
 }
 
 func (t *OnEmailEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	config, err := decodeOnEmailEventConfiguration(ctx.Configuration)
-	if err != nil {
-		return http.StatusInternalServerError, err
+	config := OnEmailEventConfiguration{}
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	if err := verifySignedWebhook(ctx); err != nil {
@@ -206,8 +199,7 @@ func (t *OnEmailEvent) Cleanup(ctx core.TriggerContext) error {
 }
 
 type WebhookConfiguration struct {
-	EventTypes     []string                  `json:"eventTypes"`
-	CategoryFilter []configuration.Predicate `json:"categoryFilter"`
+	EventTypes []string `json:"eventTypes"`
 }
 
 func parseWebhookEvents(body []byte) ([]map[string]any, error) {
@@ -226,23 +218,6 @@ func parseWebhookEvents(body []byte) ([]map[string]any, error) {
 	}
 
 	return []map[string]any{single}, nil
-}
-
-func decodeOnEmailEventConfiguration(raw any) (OnEmailEventConfiguration, error) {
-	rawConfig := onEmailEventConfigurationRaw{}
-	if err := mapstructure.Decode(raw, &rawConfig); err != nil {
-		return OnEmailEventConfiguration{}, fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	predicates, err := parseCategoryPredicates(rawConfig.CategoryFilter)
-	if err != nil {
-		return OnEmailEventConfiguration{}, fmt.Errorf("invalid category filter: %w", err)
-	}
-
-	return OnEmailEventConfiguration{
-		EventTypes:     rawConfig.EventTypes,
-		CategoryFilter: predicates,
-	}, nil
 }
 
 func extractString(event map[string]any, key string) string {
@@ -276,46 +251,6 @@ func matchesCategoryPredicates(predicates []configuration.Predicate, categoryVal
 	return false
 }
 
-func parseCategoryPredicates(raw any) ([]configuration.Predicate, error) {
-	if raw == nil {
-		return nil, nil
-	}
-
-	var predicates []configuration.Predicate
-	if err := mapstructure.Decode(raw, &predicates); err == nil {
-		return predicates, nil
-	}
-
-	filter, ok := raw.(string)
-	if !ok {
-		return nil, fmt.Errorf("must be a predicate list or string")
-	}
-
-	filter = strings.TrimSpace(filter)
-	if filter == "" || filter == "*" {
-		return nil, nil
-	}
-
-	parts := splitLegacyFilters(filter)
-	predicates = make([]configuration.Predicate, 0, len(parts))
-	for _, part := range parts {
-		if strings.ContainsAny(part, "*?") {
-			predicates = append(predicates, configuration.Predicate{
-				Type:  configuration.PredicateTypeMatches,
-				Value: globToRegex(part),
-			})
-			continue
-		}
-
-		predicates = append(predicates, configuration.Predicate{
-			Type:  configuration.PredicateTypeMatches,
-			Value: caseInsensitiveExactRegex(part),
-		})
-	}
-
-	return predicates, nil
-}
-
 func normalizeCategories(value any) []string {
 	if value == nil {
 		return nil
@@ -342,29 +277,6 @@ func normalizeCategories(value any) []string {
 	default:
 		return nil
 	}
-}
-
-func splitLegacyFilters(filter string) []string {
-	parts := strings.Split(filter, ",")
-	out := make([]string, 0, len(parts))
-	for _, part := range parts {
-		value := strings.TrimSpace(part)
-		if value != "" {
-			out = append(out, value)
-		}
-	}
-	return out
-}
-
-func globToRegex(pattern string) string {
-	escaped := regexp.QuoteMeta(pattern)
-	escaped = strings.ReplaceAll(escaped, `\*`, ".*")
-	escaped = strings.ReplaceAll(escaped, `\?`, ".")
-	return "(?i)^" + escaped + "$"
-}
-
-func caseInsensitiveExactRegex(value string) string {
-	return "(?i)^" + regexp.QuoteMeta(value) + "$"
 }
 
 func verifySignedWebhook(ctx core.WebhookRequestContext) error {

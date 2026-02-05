@@ -61,41 +61,6 @@ func Test__OnEmailEvent__HandleWebhook_Filters(t *testing.T) {
 	assert.Equal(t, EmailEventPayloadType, eventsCtx.Payloads[0].Type)
 }
 
-func Test__OnEmailEvent__HandleWebhook_LegacyCategoryFilterString(t *testing.T) {
-	trigger := &OnEmailEvent{}
-	eventsCtx := &contexts.EventContext{}
-
-	body := mustJSON(t, []map[string]any{
-		{
-			"event":    "delivered",
-			"email":    "delivered@example.com",
-			"category": []string{"order-confirmation"},
-		},
-		{
-			"event":    "bounce",
-			"email":    "bounced@example.com",
-			"category": []string{"order-cancelled"},
-		},
-	})
-
-	status, err := trigger.HandleWebhook(core.WebhookRequestContext{
-		Body:   body,
-		Events: eventsCtx,
-		Headers: http.Header{
-			"Content-Type": []string{"application/json"},
-		},
-		Configuration: map[string]any{
-			"eventTypes":     []string{"delivered"},
-			"categoryFilter": "order-*",
-		},
-	})
-
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, status)
-	require.Len(t, eventsCtx.Payloads, 1)
-	assert.Equal(t, EmailEventPayloadType, eventsCtx.Payloads[0].Type)
-}
-
 func Test__OnEmailEvent__HandleWebhook_Verification(t *testing.T) {
 	trigger := &OnEmailEvent{}
 	eventsCtx := &contexts.EventContext{}
