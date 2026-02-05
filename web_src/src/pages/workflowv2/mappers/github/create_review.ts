@@ -1,11 +1,12 @@
-import {
-  ComponentsNode,
-  ComponentsComponent,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
 import { ComponentBaseProps } from "@/ui/componentBase";
-import { ComponentBaseMapper, OutputPayload } from "../types";
+import {
+  ComponentBaseMapper,
+  ComponentBaseContext,
+  SubtitleContext,
+  ExecutionDetailsContext,
+  OutputPayload,
+  NodeInfo,
+} from "../types";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
 import { MetadataItem } from "@/ui/metadataList";
@@ -31,7 +32,7 @@ interface CreateReviewConfiguration {
   body?: string;
 }
 
-function getCreateReviewMetadataList(node: ComponentsNode): MetadataItem[] {
+function getCreateReviewMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as CreateReviewConfiguration | undefined;
   const nodeMetadata = node.metadata as { repository?: { name?: string } } | undefined;
@@ -57,38 +58,33 @@ function getCreateReviewMetadataList(node: ComponentsNode): MetadataItem[] {
 }
 
 export const createReviewMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    queueItems: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
-    const base = baseProps(nodes, node, componentDefinition, lastExecutions, queueItems);
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const base = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
 
     return {
       ...base,
-      metadata: getCreateReviewMetadataList(node),
+      metadata: getCreateReviewMetadataList(context.node),
     };
   },
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+
+  subtitle(context: SubtitleContext): string {
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     if (outputs?.default && outputs.default.length > 0) {
       const reviews = outputs.default[0].data as ReviewOutput | ReviewOutput[];
       const review = Array.isArray(reviews) ? reviews[0] : reviews;
       if (review?.state) {
-        return buildGithubExecutionSubtitle(execution, review.state);
+        return buildGithubExecutionSubtitle(context.execution, review.state);
       }
     }
-    return buildGithubExecutionSubtitle(execution);
+    return buildGithubExecutionSubtitle(context.execution);
   },
 
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const details: Record<string, string> = {};
 
     Object.assign(details, {
-      "Submitted At": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : "-",
+      "Submitted At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",
     });
 
     if (outputs?.default && outputs.default.length > 0) {
@@ -109,7 +105,6 @@ export const createReviewMapper: ComponentBaseMapper = {
         }
 
         if (review.body) {
-          // Truncate body for display
           const truncated = review.body.length > 100 ? review.body.substring(0, 100) + "..." : review.body;
           details["Body"] = truncated;
         }
