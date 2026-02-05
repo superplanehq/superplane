@@ -41,10 +41,7 @@ export const SecretKeyFieldRenderer = ({
   const { data: secrets = [], isLoading: secretsLoading, error: secretsError } = useSecrets(domainId, DOMAIN_TYPE_ORG);
 
   const secretRefs = React.useMemo(
-    () =>
-      secrets
-        .map((s) => s.metadata?.name ?? s.metadata?.id ?? "")
-        .filter((ref) => ref.length > 0),
+    () => secrets.map((s) => s.metadata?.name ?? s.metadata?.id ?? "").filter((ref) => ref.length > 0),
     [secrets],
   );
 
@@ -97,9 +94,7 @@ export const SecretKeyFieldRenderer = ({
   const isLoading = secretsLoading || (secrets.length > 0 && detailsLoading);
 
   if (!organizationId || organizationId.trim() === "") {
-    return (
-      <div className="text-sm text-red-500 dark:text-red-400">This field requires an organization context.</div>
-    );
+    return <div className="text-sm text-red-500 dark:text-red-400">This field requires an organization context.</div>;
   }
 
   if (secretsError) {

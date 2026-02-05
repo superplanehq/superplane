@@ -29,23 +29,14 @@ func NewSecretsContext(tx *gorm.DB, organizationID uuid.UUID, encryptor crypto.E
 }
 
 // GetKey implements core.SecretsContext.
-func (c *SecretsContext) GetKey(secretIDOrName, keyName string) ([]byte, error) {
-	if secretIDOrName == "" || keyName == "" {
+func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
+	if secretName == "" || keyName == "" {
 		return nil, core.ErrSecretKeyNotFound
 	}
 
-	var secret *models.Secret
-	if id, err := uuid.Parse(secretIDOrName); err == nil {
-		secret, err = models.FindSecretByIDInTransaction(c.tx, models.DomainTypeOrganization, c.organizationID, id.String())
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		var err error
-		secret, err = models.FindSecretByNameInTransaction(c.tx, models.DomainTypeOrganization, c.organizationID, secretIDOrName)
-		if err != nil {
-			return nil, err
-		}
+	secret, err := models.FindSecretByNameInTransaction(c.tx, models.DomainTypeOrganization, c.organizationID, secretName)
+	if err != nil {
+		return nil, err
 	}
 
 	data, err := c.decryptSecretData(secret)

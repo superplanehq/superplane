@@ -29,9 +29,9 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 	t.Run("missing host", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"username":      "root",
+				"username":       "root",
 				"authentication": authWithKey,
-				"command":      "ls",
+				"command":        "ls",
 			},
 		})
 		require.Error(t, err)

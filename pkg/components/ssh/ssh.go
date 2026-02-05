@@ -35,7 +35,7 @@ func (r SecretKeyRef) IsSet() bool {
 
 // AuthSpec is the authentication config group (SSH key or password, credential references).
 type AuthSpec struct {
-	Method     string      `json:"authMethod" mapstructure:"authMethod"`
+	Method     string       `json:"authMethod" mapstructure:"authMethod"`
 	PrivateKey SecretKeyRef `json:"privateKey" mapstructure:"privateKey"`
 	Passphrase SecretKeyRef `json:"passphrase" mapstructure:"passphrase"`
 	Password   SecretKeyRef `json:"password" mapstructure:"password"`

@@ -12,7 +12,6 @@ import (
 
 var DefaultOutputChannel = OutputChannel{Name: "default", Label: "Default"}
 
-// ErrSecretKeyNotFound is returned by SecretsContext.GetKey when the secret or key does not exist.
 var ErrSecretKeyNotFound = errors.New("secret or key not found")
 
 type Component interface {
@@ -321,12 +320,8 @@ type NotificationContext interface {
 	Send(title, body, url, urlLabel string, receivers NotificationReceivers) error
 }
 
-// SecretsContext allows components to resolve organization secret key values at execution time.
-// Used by core components that require credentials from Secrets (e.g. SSH).
 type SecretsContext interface {
-	// GetKey returns the value of the given key in the secret identified by idOrName (UUID or name).
-	// Returns an error if the secret or key is not found, or if decryption fails.
-	GetKey(secretIDOrName, keyName string) ([]byte, error)
+	GetKey(secretName, keyName string) ([]byte, error)
 }
 
 type User struct {

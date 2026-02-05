@@ -24,7 +24,7 @@ import { RoleFieldRenderer } from "./RoleFieldRenderer";
 import { GroupFieldRenderer } from "./GroupFieldRenderer";
 import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
 import { TimezoneFieldRenderer } from "./TimezoneFieldRenderer";
-import { SecretKeyFieldRenderer } from "./SecretKeyFieldRenderer";
+import { SecretKeyFieldRenderer, type SecretKeyRefValue } from "./SecretKeyFieldRenderer";
 import { AnyPredicateListFieldRenderer } from "./AnyPredicateListFieldRenderer";
 import { DaysOfWeekFieldRenderer } from "./DaysOfWeekFieldRenderer";
 import { TimeRangeFieldRenderer } from "./TimeRangeFieldRenderer";
@@ -380,7 +380,7 @@ export const ConfigurationFieldRenderer = ({
         }
         return (
           <SecretKeyFieldRenderer
-            value={value as import("./SecretKeyFieldRenderer").SecretKeyRefValue}
+            value={value as SecretKeyRefValue}
             onChange={(v) => onChange(v)}
             organizationId={organizationId ?? domainId}
             placeholder={field.placeholder ?? "Select credential"}
