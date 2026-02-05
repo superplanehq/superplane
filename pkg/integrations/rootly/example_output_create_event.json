@@ -1,0 +1,8 @@
+{
+  "id": "evt-1234567890abcdef",
+  "event": "Investigation started - checking application logs and recent deployments",
+  "visibility": "internal",
+  "occurred_at": "2026-02-04T12:30:00Z",
+  "created_at": "2026-02-04T12:30:00Z",
+  "updated_at": "2026-02-04T12:30:00Z"
+}
