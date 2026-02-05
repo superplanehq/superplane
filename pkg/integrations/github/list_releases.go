@@ -130,8 +130,11 @@ func (c *ListReleases) Execute(ctx core.ExecutionContext) error {
 	// Parse pagination options
 	perPage := 30
 	if config.PerPage != "" {
-		if p, err := strconv.Atoi(config.PerPage); err == nil && p > 0 && p <= 100 {
+		if p, err := strconv.Atoi(config.PerPage); err == nil && p > 0 {
 			perPage = p
+			if perPage > 100 {
+				perPage = 100 // GitHub API max
+			}
 		}
 	}
 
