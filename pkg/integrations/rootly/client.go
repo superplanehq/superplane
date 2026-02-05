@@ -427,3 +427,177 @@ func (c *Client) DeleteWebhookEndpoint(id string) error {
 	_, err := c.execRequest(http.MethodDelete, url, nil)
 	return err
 }
+
+// IncidentEvent represents a Rootly incident timeline event
+type IncidentEvent struct {
+	ID            string `json:"id"`
+	Event         string `json:"event"`
+	Visibility    string `json:"visibility"`
+	Kind          string `json:"kind"`
+	OccurredAt    string `json:"occurred_at"`
+	CreatedAt     string `json:"created_at"`
+	UpdatedAt     string `json:"updated_at"`
+	UserDisplayName string `json:"user_display_name"`
+}
+
+type IncidentEventData struct {
+	ID         string                  `json:"id"`
+	Type       string                  `json:"type"`
+	Attributes IncidentEventAttributes `json:"attributes"`
+}
+
+type IncidentEventAttributes struct {
+	Event           string `json:"event"`
+	Visibility      string `json:"visibility"`
+	Kind            string `json:"kind"`
+	OccurredAt      string `json:"occurred_at"`
+	CreatedAt       string `json:"created_at"`
+	UpdatedAt       string `json:"updated_at"`
+	UserDisplayName string `json:"user_display_name"`
+}
+
+type IncidentEventResponse struct {
+	Data IncidentEventData `json:"data"`
+}
+
+type IncidentEventsResponse struct {
+	Data []IncidentEventData `json:"data"`
+}
+
+// CreateIncidentEventRequest represents the request to create an incident event
+type CreateIncidentEventRequest struct {
+	Data CreateIncidentEventData `json:"data"`
+}
+
+type CreateIncidentEventData struct {
+	Type       string                        `json:"type"`
+	Attributes CreateIncidentEventAttributes `json:"attributes"`
+}
+
+type CreateIncidentEventAttributes struct {
+	Event      string `json:"event"`
+	Visibility string `json:"visibility,omitempty"`
+}
+
+// CreateIncidentEvent creates a new timeline event for an incident
+func (c *Client) CreateIncidentEvent(incidentID, event, visibility string) (*IncidentEvent, error) {
+	request := CreateIncidentEventRequest{
+		Data: CreateIncidentEventData{
+			Type: "incident_events",
+			Attributes: CreateIncidentEventAttributes{
+				Event:      event,
+				Visibility: visibility,
+			},
+		},
+	}
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/incidents/%s/events", c.BaseURL, incidentID)
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response IncidentEventResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &IncidentEvent{
+		ID:              response.Data.ID,
+		Event:           response.Data.Attributes.Event,
+		Visibility:      response.Data.Attributes.Visibility,
+		Kind:            response.Data.Attributes.Kind,
+		OccurredAt:      response.Data.Attributes.OccurredAt,
+		CreatedAt:       response.Data.Attributes.CreatedAt,
+		UpdatedAt:       response.Data.Attributes.UpdatedAt,
+		UserDisplayName: response.Data.Attributes.UserDisplayName,
+	}, nil
+}
+
+// UpdateIncidentEventRequest represents the request to update an incident event
+type UpdateIncidentEventRequest struct {
+	Data UpdateIncidentEventData `json:"data"`
+}
+
+type UpdateIncidentEventData struct {
+	Type       string                        `json:"type"`
+	Attributes UpdateIncidentEventAttributes `json:"attributes"`
+}
+
+type UpdateIncidentEventAttributes struct {
+	Event      string `json:"event,omitempty"`
+	Visibility string `json:"visibility,omitempty"`
+}
+
+// UpdateIncidentEvent updates an existing timeline event for an incident
+func (c *Client) UpdateIncidentEvent(incidentID, eventID, event, visibility string) (*IncidentEvent, error) {
+	request := UpdateIncidentEventRequest{
+		Data: UpdateIncidentEventData{
+			Type: "incident_events",
+			Attributes: UpdateIncidentEventAttributes{
+				Event:      event,
+				Visibility: visibility,
+			},
+		},
+	}
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/incidents/%s/events/%s", c.BaseURL, incidentID, eventID)
+	responseBody, err := c.execRequest(http.MethodPut, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response IncidentEventResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &IncidentEvent{
+		ID:              response.Data.ID,
+		Event:           response.Data.Attributes.Event,
+		Visibility:      response.Data.Attributes.Visibility,
+		Kind:            response.Data.Attributes.Kind,
+		OccurredAt:      response.Data.Attributes.OccurredAt,
+		CreatedAt:       response.Data.Attributes.CreatedAt,
+		UpdatedAt:       response.Data.Attributes.UpdatedAt,
+		UserDisplayName: response.Data.Attributes.UserDisplayName,
+	}, nil
+}
+
+// GetIncidentEvent retrieves an incident event by ID
+func (c *Client) GetIncidentEvent(incidentID, eventID string) (*IncidentEvent, error) {
+	url := fmt.Sprintf("%s/incidents/%s/events/%s", c.BaseURL, incidentID, eventID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response IncidentEventResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &IncidentEvent{
+		ID:              response.Data.ID,
+		Event:           response.Data.Attributes.Event,
+		Visibility:      response.Data.Attributes.Visibility,
+		Kind:            response.Data.Attributes.Kind,
+		OccurredAt:      response.Data.Attributes.OccurredAt,
+		CreatedAt:       response.Data.Attributes.CreatedAt,
+		UpdatedAt:       response.Data.Attributes.UpdatedAt,
+		UserDisplayName: response.Data.Attributes.UserDisplayName,
+	}, nil
+}
