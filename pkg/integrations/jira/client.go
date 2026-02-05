@@ -152,10 +152,10 @@ type CreateIssueRequest struct {
 
 // CreateIssueFields contains the fields for creating an issue.
 type CreateIssueFields struct {
-	Project     ProjectRef  `json:"project"`
-	IssueType   IssueType   `json:"issuetype"`
-	Summary     string      `json:"summary"`
-	Description *ADFDoc     `json:"description,omitempty"`
+	Project     ProjectRef `json:"project"`
+	IssueType   IssueType  `json:"issuetype"`
+	Summary     string     `json:"summary"`
+	Description *ADFDoc    `json:"description,omitempty"`
 }
 
 // ProjectRef references a project by key.
