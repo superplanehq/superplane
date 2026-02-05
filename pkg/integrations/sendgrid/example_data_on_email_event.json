@@ -1,0 +1,13 @@
+{
+  "data": {
+    "event": "delivered",
+    "email": "recipient@example.com",
+    "timestamp": 1700000000,
+    "sg_event_id": "ZGVmYXVsdC1ldmVudC1pZA",
+    "sg_message_id": "YWJjMTIzX2RlZmF1bHRfbXNnX2lk",
+    "category": ["order-confirmation"],
+    "response": "250 OK"
+  },
+  "timestamp": "2026-02-04T12:00:00Z",
+  "type": "sendgrid.email.event"
+}
