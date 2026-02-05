@@ -1,0 +1,184 @@
+---
+title: "SendGrid"
+sidebar:
+  order: 15
+---
+
+Send transactional and marketing email with SendGrid
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Email Event" href="#on-email-event" description="Listen to SendGrid email events (delivered, bounce, open, click)" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create or Update Contact" href="#create-or-update-contact" description="Create or update a SendGrid contact" />
+  <LinkCard title="Send Email" href="#send-email" description="Send an email via SendGrid" />
+</CardGrid>
+
+## Instructions
+
+### Connection
+
+Configure the SendGrid integration in SuperPlane with:
+- **API Key**: SendGrid API key with Mail Send and Mail Settings Read scopes
+- **Default From Email**: Required sender email address for SendGrid actions
+- **Default From Name**: Optional sender name for SendGrid actions
+
+### Actions and Triggers
+
+The SendGrid base integration establishes API access. Actions and triggers will be documented here once they are available.
+
+<a id="on-email-event"></a>
+
+## On Email Event
+
+The On Email Event trigger emits events when SendGrid posts delivery or engagement events to your webhook.
+
+### Use Cases
+
+- **Bounce handling**: Stop sending to bounced addresses and notify your team
+- **Delivery confirmations**: Trigger follow-ups when critical notifications are delivered
+- **Engagement tracking**: Update CRM records when recipients open or click emails
+
+### Configuration
+
+- **Event Types**: Optional filter for specific SendGrid events (processed, delivered, bounce, open, click, etc.)
+- **Category Filter**: Optional category filter (supports `*` wildcards)
+
+### Webhook Verification
+
+SuperPlane configures the SendGrid Event Webhook via API and enables Signed Event Webhook by default. The verification key is stored automatically. Verification uses:
+- `X-Twilio-Email-Event-Webhook-Signature` header
+- `X-Twilio-Email-Event-Webhook-Timestamp` header
+- Raw request body (no transformations)
+
+### Event Data
+
+Each event includes fields such as `event`, `email`, `timestamp`, `sg_event_id`, `sg_message_id`, `category` and event-specific properties like `reason`, `response`, `url`, `bounce_classification`.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "category": [
+      "order-confirmation"
+    ],
+    "email": "recipient@example.com",
+    "event": "delivered",
+    "response": "250 OK",
+    "sg_event_id": "ZGVmYXVsdC1ldmVudC1pZA",
+    "sg_message_id": "YWJjMTIzX2RlZmF1bHRfbXNnX2lk",
+    "timestamp": 1700000000
+  },
+  "timestamp": "2026-02-04T12:00:00Z",
+  "type": "sendgrid.email.event"
+}
+```
+
+<a id="create-or-update-contact"></a>
+
+## Create or Update Contact
+
+Create or update a contact in SendGrid using the Marketing Contacts API.
+
+### Use Cases
+
+- **Signup sync**: Add new signups to SendGrid lists for onboarding or newsletters
+- **CRM sync**: Keep SendGrid contacts updated from your CRM or database
+- **Post-purchase follow-up**: Add buyers to follow-up campaigns
+
+### Configuration
+
+- **Email**: Contact email address (unique identifier)
+- **First Name**: Optional contact first name
+- **Last Name**: Optional contact last name
+- **List IDs**: Optional SendGrid list IDs to add the contact to
+- **Custom Fields**: Optional custom fields map (must exist in SendGrid)
+
+### Output Channels
+
+- **Default**: Emitted when SendGrid accepts the upsert request
+- **Failed**: Emitted when validation fails or the API request is rejected
+
+### Notes
+
+- Requires a SendGrid API key with Marketing Contacts permissions
+
+### Example Output
+
+```json
+{
+  "data": {
+    "email": "recipient@example.com",
+    "jobId": "job-123",
+    "status": "202 Accepted",
+    "statusCode": 202
+  },
+  "timestamp": "2026-02-04T12:00:00Z",
+  "type": "sendgrid.contact.upserted"
+}
+```
+
+<a id="send-email"></a>
+
+## Send Email
+
+Send a single email via SendGrid's Mail Send API.
+
+### Use Cases
+
+- **Notifications**: Send alert or notification emails when workflows fail or complete
+- **Receipts**: Send order confirmations or receipts from workflow runs
+- **Reports**: Deliver scheduled digests or reports to stakeholders
+
+### Configuration
+
+- **To**: Recipient email address(es), comma-separated
+- **Subject**: Email subject line
+- **Sending Mode**: Choose text, HTML, or dynamic template
+- **Text Body**: Email body content (plain text)
+- **HTML Body**: Email body content (HTML)
+- **CC**: CC recipients, comma-separated
+- **BCC**: BCC recipients, comma-separated
+- **From Name**: Optional sender display name override
+- **From Email**: Optional sender email override (must be verified in SendGrid)
+- **Reply-To**: Reply-to email address
+- **Template ID**: SendGrid dynamic template ID (e.g. `d-xxxxxxxx`)
+- **Template Data**: JSON object of template substitution variables
+- **Categories**: Optional comma-separated list of category names. SendGrid attaches these to the message for tracking and filtering in the Email Activity feed and for use with the Event Webhook (e.g. to filter events by category in an On Email Event trigger).
+
+### Output Channels
+
+- **Default**: Emitted when SendGrid accepts the message
+- **Failed**: Emitted when validation fails or the API request is rejected
+
+### Notes
+
+- Requires a SendGrid API key configured on the integration
+- When using a template, SendGrid may override the subject and body
+
+### Example Output
+
+```json
+{
+  "data": {
+    "messageId": "YzQ2ODAtMTg5NC0xMWVmLTk0NGYtNTZlYjU5OGY4Y2Q3",
+    "status": "202 Accepted",
+    "statusCode": 202,
+    "subject": "Your receipt is ready",
+    "to": [
+      "recipient@example.com"
+    ]
+  },
+  "timestamp": "2026-02-04T12:00:00Z",
+  "type": "sendgrid.email.sent"
+}
+```
+

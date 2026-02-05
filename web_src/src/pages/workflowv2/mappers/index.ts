@@ -61,6 +61,11 @@ import {
   eventStateRegistry as smtpEventStateRegistry,
 } from "./smtp";
 import {
+  componentMappers as sendgridComponentMappers,
+  triggerRenderers as sendgridTriggerRenderers,
+  eventStateRegistry as sendgridEventStateRegistry,
+} from "./sendgrid";
+import {
   componentMappers as rootlyComponentMappers,
   triggerRenderers as rootlyTriggerRenderers,
   eventStateRegistry as rootlyEventStateRegistry,
@@ -122,6 +127,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   datadog: datadogComponentMappers,
   slack: slackComponentMappers,
   smtp: smtpComponentMappers,
+  sendgrid: sendgridComponentMappers,
   rootly: rootlyComponentMappers,
   aws: awsComponentMappers,
   discord: discordComponentMappers,
@@ -138,6 +144,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   datadog: datadogTriggerRenderers,
   slack: slackTriggerRenderers,
   smtp: smtpTriggerRenderers,
+  sendgrid: sendgridTriggerRenderers,
   rootly: rootlyTriggerRenderers,
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
@@ -154,6 +161,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   datadog: datadogEventStateRegistry,
   slack: slackEventStateRegistry,
   smtp: smtpEventStateRegistry,
+  sendgrid: sendgridEventStateRegistry,
   discord: discordEventStateRegistry,
   rootly: rootlyEventStateRegistry,
   openai: openaiEventStateRegistry,

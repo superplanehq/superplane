@@ -1,0 +1,10 @@
+{
+  "data": {
+    "jobId": "job-123",
+    "status": "202 Accepted",
+    "statusCode": 202,
+    "email": "recipient@example.com"
+  },
+  "timestamp": "2026-02-04T12:00:00Z",
+  "type": "sendgrid.contact.upserted"
+}

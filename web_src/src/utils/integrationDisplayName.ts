@@ -16,6 +16,7 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   dash0: "Dash0",
   aws: "AWS",
   smtp: "SMTP",
+  sendgrid: "SendGrid",
 };
 
 /**
