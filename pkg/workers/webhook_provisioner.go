@@ -96,7 +96,7 @@ func (w *WebhookProvisioner) processIntegrationWebhook(tx *gorm.DB, webhook *mod
 	}
 
 	webhookMetadata, err := integration.SetupWebhook(core.SetupWebhookContext{
-		HTTP:        contexts.NewHTTPContext(w.registry.GetHTTPClient()),
+		HTTP:        w.registry.HTTPContext(),
 		Webhook:     contexts.NewWebhookContext(tx, webhook, w.encryptor, w.baseURL),
 		Integration: contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry),
 	})
