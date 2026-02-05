@@ -61,6 +61,11 @@ import {
   eventStateRegistry as smtpEventStateRegistry,
 } from "./smtp";
 import {
+  componentMappers as sendgridComponentMappers,
+  triggerRenderers as sendgridTriggerRenderers,
+  eventStateRegistry as sendgridEventStateRegistry,
+} from "./sendgrid";
+import {
   componentMappers as rootlyComponentMappers,
   triggerRenderers as rootlyTriggerRenderers,
   eventStateRegistry as rootlyEventStateRegistry,
@@ -82,6 +87,7 @@ import {
   eventStateRegistry as openaiEventStateRegistry,
 } from "./openai/index";
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
+import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
 import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
@@ -103,6 +109,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   noop: noopMapper,
   if: ifMapper,
   http: httpMapper,
+  ssh: sshMapper,
   timeGate: timeGateMapper,
   filter: filterMapper,
   wait: waitMapper,
@@ -120,6 +127,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   datadog: datadogComponentMappers,
   slack: slackComponentMappers,
   smtp: smtpComponentMappers,
+  sendgrid: sendgridComponentMappers,
   rootly: rootlyComponentMappers,
   aws: awsComponentMappers,
   discord: discordComponentMappers,
@@ -136,6 +144,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   datadog: datadogTriggerRenderers,
   slack: slackTriggerRenderers,
   smtp: smtpTriggerRenderers,
+  sendgrid: sendgridTriggerRenderers,
   rootly: rootlyTriggerRenderers,
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
@@ -152,6 +161,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   datadog: datadogEventStateRegistry,
   slack: slackEventStateRegistry,
   smtp: smtpEventStateRegistry,
+  sendgrid: sendgridEventStateRegistry,
   discord: discordEventStateRegistry,
   rootly: rootlyEventStateRegistry,
   openai: openaiEventStateRegistry,
@@ -165,6 +175,7 @@ const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBui
 const eventStateRegistries: Record<string, EventStateRegistry> = {
   approval: APPROVAL_STATE_REGISTRY,
   http: HTTP_STATE_REGISTRY,
+  ssh: SSH_STATE_REGISTRY,
   filter: FILTER_STATE_REGISTRY,
   if: IF_STATE_REGISTRY,
   timeGate: TIME_GATE_STATE_REGISTRY,
