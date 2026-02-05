@@ -1,0 +1,7 @@
+{
+  "id": "evt-6e1916b2-9655-4b6e-9e7d-d5cadb4bf4b4",
+  "event": "Investigation started: checking API logs for error patterns",
+  "visibility": "internal",
+  "occurred_at": "2024-01-15T10:30:00.000Z",
+  "created_at": "2024-01-15T10:30:00.000Z"
+}
