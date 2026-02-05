@@ -2396,7 +2396,6 @@ export type OrganizationsListIntegrationResourcesData = {
     integrationId: string;
   };
   query?: {
-    type?: string;
     parameters?: string;
   };
   url: "/api/v1/organizations/{id}/integrations/{integrationId}/resources";
