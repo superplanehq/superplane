@@ -1,12 +1,13 @@
 import {
   ComponentsEdge,
-  ComponentsNode,
+  ComponentsNodeDefinition,
   CanvasesCanvas,
   CanvasesCanvasEvent,
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
   ComponentsComponent,
+  CanvasesCanvasNodeState,
 } from "@/api-client";
 import { flattenObject } from "@/lib/utils";
 import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
@@ -66,14 +67,17 @@ export function generateUniqueNodeName(componentName: string, existingNodeNames:
 
 export function mapTriggerEventsToSidebarEvents(
   events: CanvasesCanvasEvent[],
-  node: ComponentsNode,
+  node: ComponentsNodeDefinition,
   limit?: number,
 ): SidebarEvent[] {
   const eventsToMap = limit ? events.slice(0, limit) : events;
   return eventsToMap.map((event) => mapTriggerEventToSidebarEvent(event, node));
 }
 
-export function mapTriggerEventToSidebarEvent(event: CanvasesCanvasEvent, node: ComponentsNode): SidebarEvent {
+export function mapTriggerEventToSidebarEvent(
+  event: CanvasesCanvasEvent,
+  node: ComponentsNodeDefinition,
+): SidebarEvent {
   const triggerRenderer = getTriggerRenderer(node.trigger?.name || "");
   const { title, subtitle } = triggerRenderer.getTitleAndSubtitle({ event: buildEventInfo(event) });
   const values = triggerRenderer.getRootEventValues({ event: buildEventInfo(event) });
@@ -95,7 +99,8 @@ export function mapTriggerEventToSidebarEvent(event: CanvasesCanvasEvent, node: 
 
 export function mapExecutionsToSidebarEvents(
   executions: CanvasesCanvasNodeExecution[],
-  nodes: ComponentsNode[],
+  nodes: ComponentsNodeDefinition[],
+  nodeStates: CanvasesCanvasNodeState[],
   limit?: number,
   additionalData?: unknown,
 ): SidebarEvent[] {
@@ -103,6 +108,7 @@ export function mapExecutionsToSidebarEvents(
 
   return executionsToMap.map((execution) => {
     const currentComponentNode = nodes.find((n) => n.id === execution.nodeId);
+    const currentComponentNodeState = nodeStates.find((s) => s.id === execution.nodeId);
     const stateResolver = getState(currentComponentNode?.component?.name || "");
     const state = stateResolver(buildExecutionInfo(execution));
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
@@ -111,7 +117,7 @@ export function mapExecutionsToSidebarEvents(
     const componentName = currentComponentNode?.component?.name || "";
     const componentMapper = getComponentBaseMapper(componentName);
     const componentSubtitle = componentMapper.subtitle?.({
-      node: buildNodeInfo(currentComponentNode as ComponentsNode),
+      node: buildNodeInfo(currentComponentNode!, currentComponentNodeState!),
       execution: buildExecutionInfo(execution),
       additionalData,
     });
@@ -147,7 +153,7 @@ export function mapExecutionsToSidebarEvents(
 export function getNextInQueueInfo(
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]> | undefined,
   nodeId: string,
-  nodes: ComponentsNode[],
+  nodes: ComponentsNodeDefinition[],
 ): { title: string; subtitle: string; receivedAt: Date } | undefined {
   if (!nodeQueueItemsMap || !nodeQueueItemsMap[nodeId] || nodeQueueItemsMap[nodeId].length === 0) {
     return undefined;
@@ -179,7 +185,7 @@ export function getNextInQueueInfo(
 
 export function mapQueueItemsToSidebarEvents(
   queueItems: CanvasesCanvasNodeQueueItem[],
-  nodes: ComponentsNode[],
+  nodes: ComponentsNodeDefinition[],
   limit?: number,
 ): SidebarEvent[] {
   const queueItemsToMap = limit ? queueItems.slice(0, limit) : queueItems;
@@ -226,7 +232,7 @@ export function mapExecutionStateToLogType(
 
 export function buildRunItemFromExecution(options: {
   execution: CanvasesCanvasNodeExecution;
-  nodes: ComponentsNode[];
+  nodes: ComponentsNodeDefinition[];
   onNodeSelect: (nodeId: string) => void;
   onExecutionSelect?: (options: {
     nodeId: string;
@@ -308,7 +314,7 @@ export function buildRunItemFromExecution(options: {
 
 export function buildRunEntryFromEvent(options: {
   event: CanvasesCanvasEvent;
-  nodes: ComponentsNode[];
+  nodes: ComponentsNodeDefinition[];
   runItems?: LogRunItem[];
 }): LogEntry {
   const { event, nodes, runItems = [] } = options;
@@ -332,7 +338,7 @@ export function buildRunEntryFromEvent(options: {
 
 export function mapWorkflowEventsToRunLogEntries(options: {
   events: CanvasesCanvasEventWithExecutions[];
-  nodes: ComponentsNode[];
+  nodes: ComponentsNodeDefinition[];
   onNodeSelect: (nodeId: string) => void;
   onExecutionSelect?: (options: {
     nodeId: string;
@@ -364,18 +370,18 @@ export function mapWorkflowEventsToRunLogEntries(options: {
 }
 
 export function mapCanvasNodesToLogEntries(options: {
-  nodes: ComponentsNode[];
+  nodeStates: CanvasesCanvasNodeState[];
   workflowUpdatedAt: string;
   onNodeSelect: (nodeId: string) => void;
 }): LogEntry[] {
-  const { nodes, workflowUpdatedAt, onNodeSelect } = options;
+  const { nodeStates, workflowUpdatedAt, onNodeSelect } = options;
 
   const entries: LogEntry[] = [];
 
   // Add error entries for nodes with configuration errors
-  nodes
-    .filter((node: ComponentsNode) => node.errorMessage)
-    .forEach((node, index) => {
+  nodeStates
+    .filter((node: CanvasesCanvasNodeState) => node.state === "error")
+    .forEach((nodeState, index) => {
       const title = createElement(
         Fragment,
         null,
@@ -385,12 +391,12 @@ export function mapCanvasNodesToLogEntries(options: {
           {
             type: "button",
             className: "text-blue-600 underline hover:text-blue-700",
-            onClick: () => onNodeSelect(node.id || ""),
+            onClick: () => onNodeSelect(nodeState.id || ""),
           },
-          node.id,
+          nodeState.id,
         ),
         " - ",
-        node.errorMessage,
+        nodeState.stateReason,
       );
 
       entries.push({
@@ -399,39 +405,40 @@ export function mapCanvasNodesToLogEntries(options: {
         timestamp: workflowUpdatedAt,
         title,
         type: "warning",
-        searchText: `component not configured ${node.id} ${node.errorMessage}`,
+        searchText: `component not configured ${nodeState.id} ${nodeState.stateReason}`,
       } as LogEntry);
     });
 
+  // TODO
   // Add warning entries for nodes with warnings (like shadowed names)
-  nodes
-    .filter((node: ComponentsNode) => node.warningMessage)
-    .forEach((node, index) => {
-      const title = createElement(
-        Fragment,
-        null,
-        createElement(
-          "button",
-          {
-            type: "button",
-            className: "text-blue-600 underline hover:text-blue-700",
-            onClick: () => onNodeSelect(node.id || ""),
-          },
-          node.name || node.id,
-        ),
-        " - ",
-        node.warningMessage,
-      );
+  // nodes
+  //   .filter((node: ComponentsNode) => node.warningMessage)
+  //   .forEach((node, index) => {
+  //     const title = createElement(
+  //       Fragment,
+  //       null,
+  //       createElement(
+  //         "button",
+  //         {
+  //           type: "button",
+  //           className: "text-blue-600 underline hover:text-blue-700",
+  //           onClick: () => onNodeSelect(node.id || ""),
+  //         },
+  //         node.name || node.id,
+  //       ),
+  //       " - ",
+  //       node.warningMessage,
+  //     );
 
-      entries.push({
-        id: `warning-${index + 1}`,
-        source: "canvas",
-        timestamp: workflowUpdatedAt,
-        title,
-        type: "warning",
-        searchText: `${node.name} ${node.id} ${node.warningMessage}`,
-      } as LogEntry);
-    });
+  //     entries.push({
+  //       id: `warning-${index + 1}`,
+  //       source: "canvas",
+  //       timestamp: workflowUpdatedAt,
+  //       title,
+  //       type: "warning",
+  //       searchText: `${node.name} ${node.id} ${node.warningMessage}`,
+  //     } as LogEntry);
+  //   });
 
   return entries;
 }
@@ -458,11 +465,11 @@ export function buildCanvasStatusLogEntry(options: {
   };
 }
 
-function normalizeNodeConfiguration(node: ComponentsNode): Record<string, unknown> {
+function normalizeNodeConfiguration(node: ComponentsNodeDefinition): Record<string, unknown> {
   return node.configuration ? JSON.parse(JSON.stringify(node.configuration)) : {};
 }
 
-function getNodeLabel(node: ComponentsNode): string {
+function getNodeLabel(node: ComponentsNodeDefinition): string {
   if (node.name && node.id) {
     return `${node.name} (${node.id})`;
   }
@@ -480,12 +487,12 @@ function getEdgeKey(edge: ComponentsEdge, index: number): string {
 
 function buildConnectionListItems(
   edges: ComponentsEdge[],
-  nodesById: Map<string, ComponentsNode>,
+  nodesById: Map<string, ComponentsNodeDefinition>,
   onNodeSelect: (nodeId: string) => void,
   options?: {
     maxItems?: number;
     linkIds?: boolean;
-    existingNodesById?: Map<string, ComponentsNode>;
+    existingNodesById?: Map<string, ComponentsNodeDefinition>;
     listContext?: boolean;
   },
 ): { items: ReactNode[]; text: string } {
@@ -657,7 +664,7 @@ function buildConnectionListItems(
 }
 
 function buildNodeListItems(
-  nodes: ComponentsNode[],
+  nodes: ComponentsNodeDefinition[],
   onNodeSelect: (nodeId: string) => void,
   options?: { maxItems?: number; linkIds?: boolean; listContext?: boolean },
 ): { items: ReactNode[]; text: string } {
@@ -747,12 +754,12 @@ function buildNodeListItems(
 
 function renderConnectionSublist(
   edges: ComponentsEdge[],
-  nodesById: Map<string, ComponentsNode>,
+  nodesById: Map<string, ComponentsNodeDefinition>,
   onNodeSelect: (nodeId: string) => void,
   options?: {
     maxItems?: number;
     linkIds?: boolean;
-    existingNodesById?: Map<string, ComponentsNode>;
+    existingNodesById?: Map<string, ComponentsNodeDefinition>;
   },
 ): { content: ReactNode; text: string } {
   const { items, text } = buildConnectionListItems(edges, nodesById, onNodeSelect, { ...options, listContext: true });
@@ -764,7 +771,7 @@ function renderConnectionSublist(
 }
 
 function renderNodeSublist(
-  nodes: ComponentsNode[],
+  nodes: ComponentsNodeDefinition[],
   onNodeSelect: (nodeId: string) => void,
   options?: { maxItems?: number; linkIds?: boolean },
 ): { content: ReactNode; text: string } {
@@ -779,7 +786,7 @@ function renderNodeSublist(
 function formatSummaryEntry(
   action: string,
   noun: string,
-  nodes: ComponentsNode[],
+  nodes: ComponentsNodeDefinition[],
   onNodeSelect: (nodeId: string) => void,
   options?: { linkIds?: boolean },
 ): { title: string; body: ReactNode; text: string } | undefined {
@@ -800,7 +807,7 @@ function formatSummaryEntry(
 }
 
 function formatRemovedNodesEntry(options: {
-  nodes: ComponentsNode[];
+  nodes: ComponentsNodeDefinition[];
   onNodeSelect: (nodeId: string) => void;
 }): { title: string; body: ReactNode; text: string } | undefined {
   const { nodes, onNodeSelect } = options;
@@ -824,9 +831,9 @@ function formatSummaryConnectionEntry(
   action: string,
   noun: string,
   edges: ComponentsEdge[],
-  nodesById: Map<string, ComponentsNode>,
+  nodesById: Map<string, ComponentsNodeDefinition>,
   onNodeSelect: (nodeId: string) => void,
-  options?: { linkIds?: boolean; existingNodesById?: Map<string, ComponentsNode> },
+  options?: { linkIds?: boolean; existingNodesById?: Map<string, ComponentsNodeDefinition> },
 ): { title: string; body: ReactNode; text: string } | undefined {
   if (edges.length === 0) {
     return undefined;
@@ -858,8 +865,8 @@ export function summarizeWorkflowChanges(options: {
     return {};
   }
 
-  const beforeNodes = new Map<string, ComponentsNode>();
-  const afterNodes = new Map<string, ComponentsNode>();
+  const beforeNodes = new Map<string, ComponentsNodeDefinition>();
+  const afterNodes = new Map<string, ComponentsNodeDefinition>();
   const beforeEdges = new Map<string, ComponentsEdge>();
   const afterEdges = new Map<string, ComponentsEdge>();
 
@@ -887,10 +894,10 @@ export function summarizeWorkflowChanges(options: {
     afterEdges.set(getEdgeKey(edge, index), edge);
   });
 
-  const addedNodes: ComponentsNode[] = [];
-  const removedNodes: ComponentsNode[] = [];
-  const movedNodes: ComponentsNode[] = [];
-  const updatedNodes: ComponentsNode[] = [];
+  const addedNodes: ComponentsNodeDefinition[] = [];
+  const removedNodes: ComponentsNodeDefinition[] = [];
+  const movedNodes: ComponentsNodeDefinition[] = [];
+  const updatedNodes: ComponentsNodeDefinition[] = [];
   const addedConnections: ComponentsEdge[] = [];
   const removedConnections: ComponentsEdge[] = [];
   const updatedConnections: ComponentsEdge[] = [];
@@ -1006,7 +1013,7 @@ export function buildTabData(
   nodeId: string,
   event: SidebarEvent,
   options: {
-    workflowNodes: ComponentsNode[];
+    workflowNodes: ComponentsNodeDefinition[];
     nodeEventsMap: Record<string, CanvasesCanvasEvent[]>;
     nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>;
     nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>;
@@ -1177,13 +1184,13 @@ export function buildQueueItemInfo(queueItem: CanvasesCanvasNodeQueueItem): Queu
   };
 }
 
-export function buildNodeInfo(node: ComponentsNode): NodeInfo {
+export function buildNodeInfo(node: ComponentsNodeDefinition, state?: CanvasesCanvasNodeState): NodeInfo {
   return {
     id: node.id!,
     name: node.name || "",
     componentName: node.type === "TYPE_TRIGGER" ? node.trigger?.name || "" : node.component?.name || "",
     isCollapsed: node.isCollapsed || false,
     configuration: node.configuration,
-    metadata: node.metadata,
+    metadata: state?.metadata,
   };
 }

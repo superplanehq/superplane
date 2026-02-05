@@ -15,7 +15,7 @@ import "./blueprint-canvas-reset.css";
 
 import {
   ComponentsComponent,
-  ComponentsNode,
+  ComponentsNodeDefinition,
   ConfigurationField,
   SuperplaneBlueprintsOutputChannel,
   AuthorizationDomainType,
@@ -79,7 +79,7 @@ export interface CustomComponentBuilderPageProps {
   // Canvas
   nodes: Node[];
   edges: Edge[];
-  blueprintNodes?: ComponentsNode[]; // Backend blueprint nodes for error detection
+  blueprintNodes?: ComponentsNodeDefinition[];
   onNodesChange: (changes: any) => void;
   onEdgesChange: (changes: any) => void;
   onConnect: (connection: Connection) => void;

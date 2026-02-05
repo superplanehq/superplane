@@ -5,7 +5,7 @@ import ELK from "elkjs/lib/elk.bundled.js";
 import { AlertCircle, Component as ComponentIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ComponentsComponent, ComponentsIntegrationRef, ComponentsNode } from "../../api-client";
+import { ComponentsComponent, ComponentsIntegrationRef, ComponentsNodeDefinition } from "../../api-client";
 import { Heading } from "../../components/Heading/heading";
 import { Button } from "../../components/ui/button";
 import { useBlueprint, useComponents, useUpdateBlueprint } from "../../hooks/useBlueprintData";
@@ -77,7 +77,7 @@ const getBlockType = (componentName: string): BlockData["type"] => {
 };
 
 // Helper function to create minimal BlockData for a component
-const createBlockData = (node: any, component: ComponentsComponent | undefined): BlockData => {
+const createBlockData = (node: ComponentsNodeDefinition, component: ComponentsComponent | undefined): BlockData => {
   // Detect placeholder nodes (no component reference, name is "New Component")
   const isPlaceholder = !node.component?.name && node.name === "New Component";
 
@@ -85,9 +85,10 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
     // Render placeholder with puzzle icon and error state
     return {
       label: "New Component",
-      state: "pending",
       type: "component",
       outputChannels: ["default"],
+      state: "error",
+      stateReason: "Select a component from the sidebar",
       component: {
         iconSlug: "component",
         iconColor: "text-gray-500",
@@ -99,7 +100,6 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
           icon: ComponentIcon,
           title: "Select a component from the sidebar",
         },
-        error: "Select a component from the sidebar",
       },
     };
   }
@@ -110,7 +110,7 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
 
   const componentBaseProps = getComponentBaseMapper(component?.name!).props({
     nodes: [],
-    node: buildNodeInfo(node),
+    node: buildNodeInfo(node, undefined),
     componentDefinition: buildComponentDefinition(component!),
     lastExecutions: [],
     nodeQueueItems: [],
@@ -118,14 +118,13 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
   });
 
   const baseData: BlockData = {
-    label: node.name,
-    state: "pending",
+    label: node.name || "",
+    state: "ready",
     type: blockType,
     outputChannels: channels,
     component: {
       ...componentBaseProps,
       includeEmptyState: false, // Never show empty state in component editor
-      error: node.errorMessage,
     },
   };
 
@@ -256,7 +255,7 @@ export const CustomComponent = () => {
       });
 
       const allNodes: Node[] = (blueprint.nodes || [])
-        .map((node: ComponentsNode) => {
+        .map((node: ComponentsNodeDefinition) => {
           // Handle component nodes
           const component = allComponents.find((p: any) => p.name === node.component?.name);
           const blockData = createBlockData(node, component);
@@ -370,7 +369,7 @@ export const CustomComponent = () => {
           .filter((node) => !node.id.startsWith("template_") && !node.id.startsWith("pending_connection_")) // Exclude template and pending nodes
           .map((node) => {
             const nodeData = node.data as any;
-            const blueprintNode: ComponentsNode = {
+            const blueprintNode: ComponentsNodeDefinition = {
               id: node.id,
               name: nodeData.label as string,
               type: "TYPE_COMPONENT",
@@ -675,7 +674,7 @@ export const CustomComponent = () => {
         };
 
         if (nodeData.component) {
-          const updatedNode: ComponentsNode = {
+          const updatedNode: ComponentsNodeDefinition = {
             id: node.id,
             name: nodeName.trim(),
             type: "TYPE_COMPONENT",
@@ -892,13 +891,12 @@ export const CustomComponent = () => {
       const newNodeId = generateNodeId("component", "node");
 
       // Create placeholder node - will fail validation but still be saved
-      const newNode: ComponentsNode = {
+      const newNode: ComponentsNodeDefinition = {
         id: newNodeId,
         name: placeholderName,
         type: "TYPE_COMPONENT",
         // NO component reference - causes validation error
         configuration: {},
-        metadata: {},
         position: {
           x: Math.round(position.x),
           y: Math.round(position.y),
@@ -916,7 +914,7 @@ export const CustomComponent = () => {
         .filter((node) => !node.id.startsWith("template_") && !node.id.startsWith("pending_connection_"))
         .map((node) => {
           const nodeData = node.data as any;
-          const blueprintNode: ComponentsNode = {
+          const blueprintNode: ComponentsNodeDefinition = {
             id: node.id,
             name: nodeData.label as string,
             type: "TYPE_COMPONENT",
@@ -1027,7 +1025,7 @@ export const CustomComponent = () => {
 
       saveSnapshot();
 
-      const nodeIndex = blueprint.nodes?.findIndex((n: ComponentsNode) => n.id === data.placeholderId);
+      const nodeIndex = blueprint.nodes?.findIndex((n: ComponentsNodeDefinition) => n.id === data.placeholderId);
       if (nodeIndex === undefined || nodeIndex === -1) {
         return;
       }
@@ -1039,14 +1037,14 @@ export const CustomComponent = () => {
 
       // Get existing node names for unique name generation (exclude the placeholder being configured)
       const existingNodeNames = (blueprint.nodes || [])
-        .filter((n: ComponentsNode) => n.id !== data.placeholderId)
-        .map((n: ComponentsNode) => n.name || "")
+        .filter((n: ComponentsNodeDefinition) => n.id !== data.placeholderId)
+        .map((n: ComponentsNodeDefinition) => n.name || "")
         .filter(Boolean);
 
       // Generate unique node name based on component name + ordinal
       const uniqueNodeName = generateUniqueNodeName(data.buildingBlock.name || "node", existingNodeNames);
 
-      const updatedNode: ComponentsNode = {
+      const updatedNode: ComponentsNodeDefinition = {
         ...blueprint.nodes![nodeIndex],
         name: uniqueNodeName,
         type:
@@ -1119,7 +1117,7 @@ export const CustomComponent = () => {
       if (!templateNodeId) return;
 
       // Check if this is a placeholder node (persisted, not local-only)
-      const blueprintNode = blueprint?.nodes?.find((n: ComponentsNode) => n.id === templateNodeId);
+      const blueprintNode = blueprint?.nodes?.find((n: ComponentsNodeDefinition) => n.id === templateNodeId);
       const isPlaceholder = blueprintNode?.name === "New Component" && !blueprintNode.component?.name;
 
       if (isPlaceholder) {

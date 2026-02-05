@@ -29,12 +29,13 @@ import {
   AuthorizationDomainType,
   ConfigurationField,
   CanvasesCanvasNodeExecution,
-  ComponentsNode,
+  ComponentsNodeDefinition,
   ComponentsComponent,
   TriggersTrigger,
   BlueprintsBlueprint,
   OrganizationsIntegration,
   ComponentsIntegrationRef,
+  CanvasesCanvasNodeState,
 } from "@/api-client";
 import { EventState, EventStateMap } from "../componentBase";
 import { ReactNode } from "react";
@@ -139,7 +140,8 @@ interface ComponentSidebarProps {
   autocompleteExampleObj?: Record<string, unknown> | null;
 
   // Workflow metadata for ExecutionChainPage
-  workflowNodes?: ComponentsNode[];
+  workflowNodes?: ComponentsNodeDefinition[];
+  workflowNodeStates?: CanvasesCanvasNodeState[];
   components?: ComponentsComponent[];
   triggers?: TriggersTrigger[];
   blueprints?: BlueprintsBlueprint[];
@@ -221,6 +223,7 @@ export const ComponentSidebar = ({
   canUpdateIntegrations,
   autocompleteExampleObj,
   workflowNodes = [],
+  workflowNodeStates = [],
   components = [],
   triggers = [],
   blueprints = [],
@@ -708,7 +711,7 @@ export const ComponentSidebar = ({
                     }`}
                   >
                     Configuration
-                    {nodeId && workflowNodes.find((n) => n.id === nodeId)?.errorMessage && (
+                    {nodeId && workflowNodeStates?.find((n) => n.id === nodeId)?.state === "error" && (
                       <span className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
                     )}
                   </button>

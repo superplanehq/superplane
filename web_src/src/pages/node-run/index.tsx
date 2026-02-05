@@ -1,7 +1,7 @@
 import { useMemo, useRef } from "react";
 import { useParams } from "react-router-dom";
 
-import { BlueprintsBlueprint, ComponentsComponent, ComponentsEdge, ComponentsNode } from "@/api-client";
+import { BlueprintsBlueprint, ComponentsComponent, ComponentsEdge, ComponentsNodeDefinition } from "@/api-client";
 import { useBlueprint, useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useChildExecutions, useCanvas } from "@/hooks/useCanvasData";
@@ -94,7 +94,7 @@ function buildCanvasEdge(edge: ComponentsEdge): CanvasEdge {
 }
 
 function buildCanvasNode(
-  node: ComponentsNode,
+  node: ComponentsNodeDefinition,
   components: ComponentsComponent[],
   blueprint?: BlueprintsBlueprint,
   execution?: any,
@@ -147,7 +147,7 @@ function getRunItemState(execution: any): "success" | "failed" | "running" {
   return "failed";
 }
 
-function friendlyChildLabel(ce: any, nodes: ComponentsNode[]) {
+function friendlyChildLabel(ce: any, nodes: ComponentsNodeDefinition[]) {
   const meta: any = ce?.metadata || {};
   const metaLabel =
     meta.title || meta.nodeTitle || meta.nodeName || meta.nodeLabel || meta.displayName || meta.name || meta.label;

@@ -10,7 +10,7 @@ import { Textarea } from "../../components/ui/textarea";
 import { Button } from "../../components/ui/button";
 import { useCreateCanvas, useCanvasTemplates } from "../../hooks/useCanvasData";
 import { showErrorToast } from "../../utils/toast";
-import type { ComponentsEdge, ComponentsNode } from "@/api-client";
+import type { ComponentsEdge, ComponentsNodeDefinition } from "@/api-client";
 import { Rainbow } from "lucide-react";
 
 const MAX_CANVAS_NAME_LENGTH = 50;
@@ -192,7 +192,7 @@ interface TemplateCardProps {
 }
 
 function TemplateCard({ template, organizationId, navigate }: TemplateCardProps) {
-  const previewNodes = (template.spec?.nodes || []) as ComponentsNode[];
+  const previewNodes = (template.spec?.nodes || []) as ComponentsNodeDefinition[];
   const previewEdges = (template.spec?.edges || []) as ComponentsEdge[];
   const templateId = template.metadata?.id;
 
@@ -251,14 +251,14 @@ function TemplateCard({ template, organizationId, navigate }: TemplateCardProps)
 }
 
 interface CanvasMiniMapProps {
-  nodes?: ComponentsNode[];
+  nodes?: ComponentsNodeDefinition[];
   edges?: ComponentsEdge[];
 }
 
 function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
   const positionedNodes = nodes.filter(
     (node) => typeof node.position?.x === "number" && typeof node.position?.y === "number",
-  ) as Array<ComponentsNode & { position: { x: number; y: number } }>;
+  ) as Array<ComponentsNodeDefinition & { position: { x: number; y: number } }>;
 
   if (!positionedNodes.length) {
     return (

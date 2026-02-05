@@ -23,7 +23,7 @@ import { showErrorToast, showSuccessToast } from "../../utils/toast";
 import { Button } from "@/components/ui/button";
 import { useCreateCanvasModalState } from "./useCreateCanvasModalState";
 import { useCreateCustomComponentModalState } from "./useCreateCustomComponentModalState";
-import type { ComponentsEdge, ComponentsNode } from "@/api-client";
+import type { ComponentsEdge, ComponentsNodeDefinition } from "@/api-client";
 
 type TabType = "canvases" | "custom-components";
 interface BlueprintCardData {
@@ -42,7 +42,7 @@ interface CanvasCardData {
   createdAt: string;
   type: "canvases";
   createdBy?: { id?: string; name?: string };
-  nodes?: ComponentsNode[];
+  nodes?: ComponentsNodeDefinition[];
   edges?: ComponentsEdge[];
 }
 
@@ -601,14 +601,14 @@ function CanvasCard({
 }
 
 interface CanvasMiniMapProps {
-  nodes?: ComponentsNode[];
+  nodes?: ComponentsNodeDefinition[];
   edges?: ComponentsEdge[];
 }
 
 function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
   const positionedNodes = nodes.filter(
     (node) => typeof node.position?.x === "number" && typeof node.position?.y === "number",
-  ) as Array<ComponentsNode & { position: { x: number; y: number } }>;
+  ) as Array<ComponentsNodeDefinition & { position: { x: number; y: number } }>;
 
   if (!positionedNodes.length) {
     return (

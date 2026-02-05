@@ -3,9 +3,10 @@ import { useInfiniteNodeEvents, useInfiniteNodeExecutions } from "./useCanvasDat
 import { SidebarEvent } from "@/ui/componentSidebar/types";
 import {
   ComponentsComponent,
-  ComponentsNode,
+  ComponentsNodeDefinition,
   CanvasesListNodeEventsResponse,
   CanvasesListNodeExecutionsResponse,
+  CanvasesCanvasNodeState,
 } from "@/api-client";
 import {
   mapTriggerEventsToSidebarEvents,
@@ -25,7 +26,8 @@ interface UseNodeHistoryProps {
   components: ComponentsComponent[];
   nodeId: string;
   nodeType: string;
-  allNodes: ComponentsNode[];
+  allNodes: ComponentsNodeDefinition[];
+  allNodeStates: CanvasesCanvasNodeState[];
   enabled: boolean;
   queryClient: QueryClient;
 }
@@ -35,6 +37,7 @@ export const useNodeHistory = ({
   nodeId,
   nodeType,
   allNodes,
+  allNodeStates,
   enabled,
   organizationId,
   queryClient,
@@ -48,6 +51,7 @@ export const useNodeHistory = ({
   const executionsQuery = useInfiniteNodeExecutions(canvasId, nodeId, enabled && !isTriggerNode);
 
   const node = useMemo(() => allNodes.find((n) => n.id === nodeId), [allNodes, nodeId]);
+  const nodeState = useMemo(() => allNodeStates.find((s) => s.id === nodeId), [allNodeStates, nodeId]);
   const componentDef = useMemo(
     () => components.find((c) => c.name === node?.component?.name),
     [components, node?.component?.name],
@@ -95,8 +99,8 @@ export const useNodeHistory = ({
       return mapTriggerEventsToSidebarEvents(allEvents, node);
     } else {
       const additionalData = getComponentAdditionalDataBuilder(componentDef?.name || "")?.buildAdditionalData({
-        nodes: allNodes.map((n) => buildNodeInfo(n)),
-        node: buildNodeInfo(node),
+        nodes: allNodes.map((n) => buildNodeInfo(n, allNodeStates.find((s) => s.id === n.id)!)),
+        node: buildNodeInfo(node, nodeState!),
         componentDefinition: buildComponentDefinition(componentDef!),
         lastExecutions: allExecutions.map((e) => buildExecutionInfo(e)),
         canvasId: canvasId || "",
@@ -105,12 +109,13 @@ export const useNodeHistory = ({
         currentUser: account ? { id: account.id, email: account.email } : undefined,
       });
 
-      return mapExecutionsToSidebarEvents(allExecutions, allNodes, undefined, additionalData);
+      return mapExecutionsToSidebarEvents(allExecutions, allNodes, allNodeStates, undefined, additionalData);
     }
   }, [
     enabled,
     node,
     allNodes,
+    allNodeStates,
     isTriggerNode,
     eventsQuery.data,
     allExecutions,

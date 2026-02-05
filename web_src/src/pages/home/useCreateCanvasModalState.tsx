@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { useCreateCanvas, useUpdateCanvas, useCanvasTemplates } from "../../hooks/useCanvasData";
-import type { ComponentsEdge, ComponentsNode } from "@/api-client";
+import type { ComponentsEdge, ComponentsNodeDefinition } from "@/api-client";
 
 type ModalMode = "create" | "edit";
 
@@ -10,7 +10,7 @@ type WorkflowSummary = {
   id: string;
   name: string;
   description?: string;
-  nodes?: ComponentsNode[];
+  nodes?: ComponentsNodeDefinition[];
   edges?: ComponentsEdge[];
 };
 
@@ -18,7 +18,7 @@ type WorkflowTemplateSummary = {
   id: string;
   name: string;
   description?: string;
-  nodes?: ComponentsNode[];
+  nodes?: ComponentsNodeDefinition[];
   edges?: ComponentsEdge[];
 };
 

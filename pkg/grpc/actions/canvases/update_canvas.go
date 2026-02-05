@@ -93,37 +93,42 @@ func UpdateCanvas(ctx context.Context, encryptor crypto.Encryptor, registry *reg
 				return err
 			}
 
-			if workflowNode.State == models.CanvasNodeStateReady {
-				err = setupNode(ctx, tx, encryptor, registry, workflowNode, webhookBaseURL)
-				if err != nil {
-					workflowNode.State = models.CanvasNodeStateError
-					errorMsg := err.Error()
-					workflowNode.StateReason = &errorMsg
-					if saveErr := tx.Save(workflowNode).Error; saveErr != nil {
-						return saveErr
-					}
-
-					errorNodeID := node.ID
-					if workflowNode.ParentNodeID != nil {
-						errorNodeID = *workflowNode.ParentNodeID
-					}
-
-					parentNode, ok := parentNodesByNodeID[errorNodeID]
-					if !ok {
-						log.Errorf("Parent node %s not found for node setup error", errorNodeID)
-					} else {
-						parentNode.ErrorMessage = &errorMsg
-					}
+			err = setupNode(ctx, tx, encryptor, registry, workflowNode, webhookBaseURL)
+			if err != nil {
+				workflowNode.State = models.CanvasNodeStateError
+				errorMsg := err.Error()
+				workflowNode.StateReason = &errorMsg
+				if saveErr := tx.Save(workflowNode).Error; saveErr != nil {
+					return saveErr
 				}
 
-				if workflowNode.ParentNodeID == nil {
-					parentNode, ok := parentNodesByNodeID[workflowNode.NodeID]
-					if !ok {
-						log.Errorf("Parent node %s not found", workflowNode.NodeID)
-						return status.Errorf(codes.Internal, "It was not possible to find the parent node %s", workflowNode.NodeID)
-					}
-					parentNode.Metadata = workflowNode.Metadata.Data()
+				errorNodeID := node.ID
+				if workflowNode.ParentNodeID != nil {
+					errorNodeID = *workflowNode.ParentNodeID
 				}
+
+				parentNode, ok := parentNodesByNodeID[errorNodeID]
+				if !ok {
+					log.Errorf("Parent node %s not found for node setup error", errorNodeID)
+				} else {
+					parentNode.ErrorMessage = &errorMsg
+				}
+			} else {
+				log.Infof("Node %s setup successfully", workflowNode.NodeID)
+				workflowNode.State = models.CanvasNodeStateReady
+				workflowNode.StateReason = nil
+				if err := tx.Save(workflowNode).Error; err != nil {
+					return err
+				}
+			}
+
+			if workflowNode.ParentNodeID == nil {
+				parentNode, ok := parentNodesByNodeID[workflowNode.NodeID]
+				if !ok {
+					log.Errorf("Parent node %s not found", workflowNode.NodeID)
+					return status.Errorf(codes.Internal, "It was not possible to find the parent node %s", workflowNode.NodeID)
+				}
+				parentNode.Metadata = workflowNode.Metadata.Data()
 			}
 		}
 
@@ -238,14 +243,6 @@ func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node
 		existingNode.IsCollapsed = node.IsCollapsed
 		existingNode.AppInstallationID = appInstallationID
 
-		if node.ErrorMessage != nil && *node.ErrorMessage != "" {
-			existingNode.State = models.CanvasNodeStateError
-			existingNode.StateReason = node.ErrorMessage
-		} else if existingNode.State == models.CanvasNodeStateError {
-			existingNode.State = models.CanvasNodeStateReady
-			existingNode.StateReason = nil
-		}
-
 		// Set parent if internal namespaced id
 		if idx := strings.Index(node.ID, ":"); idx != -1 {
 			parent := node.ID[:idx]
@@ -273,21 +270,13 @@ func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node
 		parentNodeID = &parent
 	}
 
-	initialState := models.CanvasNodeStateReady
-	var stateReason *string
-
-	if node.ErrorMessage != nil && *node.ErrorMessage != "" {
-		initialState = models.CanvasNodeStateError
-		stateReason = node.ErrorMessage
-	}
-
 	canvasNode := models.CanvasNode{
 		WorkflowID:        workflowID,
 		NodeID:            node.ID,
 		ParentNodeID:      parentNodeID,
 		Name:              node.Name,
-		State:             initialState,
-		StateReason:       stateReason,
+		State:             models.CanvasNodeStateReady,
+		StateReason:       nil,
 		Type:              node.Type,
 		Ref:               datatypes.NewJSONType(node.Ref),
 		Configuration:     datatypes.NewJSONType(node.Configuration),

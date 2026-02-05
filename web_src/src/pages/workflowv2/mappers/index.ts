@@ -7,7 +7,7 @@ import {
   TriggerRendererContext,
   TriggerEventContext,
 } from "./types";
-import { ComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
+import { ComponentsNodeDefinition, CanvasesCanvasNodeExecution, CanvasesCanvasNodeState } from "@/api-client";
 import { defaultTriggerRenderer } from "./default";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
 import { webhookTriggerRenderer, webhookCustomFieldRenderer } from "./webhook";
@@ -293,8 +293,10 @@ export function getCustomFieldRenderer(componentName: string): CustomFieldRender
 export function getExecutionDetails(
   componentName: string,
   execution: CanvasesCanvasNodeExecution,
-  node: ComponentsNode,
-  nodes?: ComponentsNode[],
+  node: ComponentsNodeDefinition,
+  nodeState: CanvasesCanvasNodeState,
+  nodes?: ComponentsNodeDefinition[],
+  nodeStates?: CanvasesCanvasNodeState[],
 ): Record<string, any> | undefined {
   const parts = componentName?.split(".");
   let mapper: ComponentBaseMapper | undefined;
@@ -312,8 +314,8 @@ export function getExecutionDetails(
 
   return mapper?.getExecutionDetails?.({
     execution: buildExecutionInfo(execution),
-    node: buildNodeInfo(node),
-    nodes: nodes?.map((n) => buildNodeInfo(n)) || [],
+    node: buildNodeInfo(node, nodeState),
+    nodes: nodes?.map((n) => buildNodeInfo(n, nodeStates?.find((s) => s.id === n.id)!)) || [],
   });
 }
 

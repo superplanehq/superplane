@@ -12,7 +12,7 @@ import {
   ComponentsIntegrationRef,
   ComponentsComponent,
   ComponentsEdge,
-  ComponentsNode,
+  ComponentsNodeDefinition,
   TriggersTrigger,
   CanvasesListEventExecutionsResponse,
   CanvasesCanvas,
@@ -21,6 +21,7 @@ import {
   CanvasesCanvasNodeQueueItem,
   canvasesEmitNodeEvent,
   canvasesUpdateNodePause,
+  CanvasesCanvasNodeState,
 } from "@/api-client";
 import { useOrganizationGroups, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
@@ -638,6 +639,15 @@ export function WorkflowPageV2() {
       const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return null;
 
+      const nodeStates = canvas?.status?.nodes || [];
+      const nodeState = nodeStates.find((s) => s.id === nodeId);
+      const effectiveNodeState = nodeState || {
+        id: nodeId,
+        state: "ready",
+        stateReason: "",
+      };
+      const nodeStatesWithFallback = nodeState ? nodeStates : [...nodeStates, effectiveNodeState];
+
       // Get current data from store (don't trigger load here - that's done in useEffect)
       const nodeData = getNodeData(nodeId);
 
@@ -650,7 +660,9 @@ export function WorkflowPageV2() {
 
       const sidebarData = prepareSidebarData(
         node,
+        effectiveNodeState,
         canvas?.spec?.nodes || [],
+        nodeStatesWithFallback,
         blueprints,
         allComponents,
         allTriggers,
@@ -690,6 +702,10 @@ export function WorkflowPageV2() {
     (nodeId: string) => {
       const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return;
+
+      // If the node has not been persisted yet, there's no server data to load.
+      const nodeState = canvas?.status?.nodes?.find((s) => s.id === nodeId);
+      if (!nodeState) return;
 
       // Set current history node for tracking
       setCurrentHistoryNode({ nodeId, nodeType: node?.type || "TYPE_ACTION" });
@@ -862,6 +878,7 @@ export function WorkflowPageV2() {
 
   const logEntries = useMemo(() => {
     const nodes = canvas?.spec?.nodes || [];
+    const nodeStates = canvas?.status?.nodes || [];
     const rootEvents = canvasEventsResponse?.events || [];
 
     const runEntries = mapWorkflowEventsToRunLogEntries({
@@ -877,7 +894,7 @@ export function WorkflowPageV2() {
     const allRunEntries = Array.from(mergedRunEntries.values());
 
     const canvasEntries = mapCanvasNodesToLogEntries({
-      nodes,
+      nodeStates,
       workflowUpdatedAt: canvas?.metadata?.updatedAt || "",
       onNodeSelect: handleLogNodeSelect,
     });
@@ -927,6 +944,7 @@ export function WorkflowPageV2() {
     nodeId: currentHistoryNode?.nodeId || "",
     nodeType: currentHistoryNode?.nodeType || "TYPE_ACTION",
     allNodes: canvas?.spec?.nodes || [],
+    allNodeStates: canvas?.status?.nodes || [],
     enabled: !!currentHistoryNode && !!canvasId,
     components,
     organizationId: organizationId || "",
@@ -1682,7 +1700,7 @@ export function WorkflowPageV2() {
       const newNodeId = generateNodeId(buildingBlock.name || "node", uniqueNodeName);
 
       // Create the new node
-      const newNode: ComponentsNode = {
+      const newNode: ComponentsNodeDefinition = {
         id: newNodeId,
         name: uniqueNodeName,
         type:
@@ -1780,13 +1798,12 @@ export function WorkflowPageV2() {
       const newNodeId = generateNodeId("component", "node");
 
       // Create placeholder node - will fail validation but still be saved
-      const newNode: ComponentsNode = {
+      const newNode: ComponentsNodeDefinition = {
         id: newNodeId,
         name: placeholderName,
         type: "TYPE_COMPONENT",
         // NO component/blueprint/trigger reference - causes validation error
         configuration: {},
-        metadata: {},
         position: {
           x: Math.round(data.position.x),
           y: Math.round(data.position.y),
@@ -1864,7 +1881,7 @@ export function WorkflowPageV2() {
       const uniqueNodeName = generateUniqueNodeName(data.buildingBlock.name || "node", existingNodeNames);
 
       // Update placeholder with real component data
-      const updatedNode: ComponentsNode = {
+      const updatedNode: ComponentsNodeDefinition = {
         ...canvas.spec!.nodes![nodeIndex],
         name: uniqueNodeName,
         type:
@@ -2301,16 +2318,14 @@ export function WorkflowPageV2() {
   const handleTogglePause = useCallback(
     async (nodeId: string) => {
       if (!canvasId || !organizationId || !canvas) return;
+      const nodeSpec = canvas.spec?.nodes?.find((n) => n.id === nodeId);
+      const nodeState = canvas.status?.nodes?.find((n) => n.id === nodeId);
+      if (!nodeSpec || !nodeState) return;
 
-      const node = canvas.spec?.nodes?.find((n) => n.id === nodeId);
-      if (!node) return;
-
-      if (node.type === "TYPE_TRIGGER") {
+      if (nodeSpec.type === "TYPE_TRIGGER") {
         showErrorToast("Triggers cannot be paused");
         return;
       }
-
-      const nextPaused = !node.paused;
 
       try {
         const result = await canvasesUpdateNodePause(
@@ -2320,26 +2335,23 @@ export function WorkflowPageV2() {
               nodeId: nodeId,
             },
             body: {
-              paused: nextPaused,
+              paused: nodeState.state !== "paused",
             },
           }),
         );
 
-        const updatedPaused = result.data?.node?.paused ?? nextPaused;
-        const updatedNodes = (canvas.spec?.nodes || []).map((item) =>
-          item.id === nodeId ? { ...item, paused: updatedPaused } : item,
-        );
+        const newStatuses = (canvas.status?.nodes || []).map((item) => (item.id === nodeId ? result.data?.node : item));
 
         const updatedWorkflow = {
           ...canvas,
-          spec: {
-            ...canvas.spec,
-            nodes: updatedNodes,
+          status: {
+            ...canvas.status,
+            nodes: newStatuses,
           },
         };
 
         queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
-        showSuccessToast(updatedPaused ? "Component paused" : "Component resumed");
+        showSuccessToast(result.data?.node?.state === "paused" ? "Component paused" : "Component resumed");
       } catch (error) {
         let parsedError = error as { message: string };
         if (parsedError?.message) {
@@ -2397,7 +2409,7 @@ export function WorkflowPageV2() {
       const offsetX = 50;
       const offsetY = 50;
 
-      const duplicateNode: ComponentsNode = {
+      const duplicateNode: ComponentsNodeDefinition = {
         ...nodeToDuplicate,
         id: newNodeId,
         name: uniqueNodeName,
@@ -2700,7 +2712,9 @@ export function WorkflowPageV2() {
   const getCustomField = useCallback(
     (nodeId: string, onRun?: (initialData?: string) => void) => {
       const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
-      if (!node) return null;
+      const nodeState = canvas?.status?.nodes?.find((s) => s.id === nodeId);
+
+      if (!node || !nodeState) return null;
 
       let componentName = "";
       if (node.type === "TYPE_TRIGGER" && node.trigger?.name) {
@@ -2716,7 +2730,7 @@ export function WorkflowPageV2() {
 
       // Return a function that takes the current configuration
       return () => {
-        return renderer.render(buildNodeInfo(node), onRun ? { onRun } : undefined);
+        return renderer.render(buildNodeInfo(node, nodeState!), onRun ? { onRun } : undefined);
       };
     },
     [canvas],
@@ -3021,7 +3035,7 @@ function getNodesBeforeTarget(targetNodeId: string, workflow: CanvasesCanvas): S
 }
 
 function prepareData(
-  workflow: CanvasesCanvas,
+  canvas: CanvasesCanvas,
   triggers: TriggersTrigger[],
   blueprints: BlueprintsBlueprint[],
   components: ComponentsComponent[],
@@ -3036,14 +3050,18 @@ function prepareData(
   nodes: CanvasNode[];
   edges: CanvasEdge[];
 } {
-  const edges = workflow?.spec?.edges?.map(prepareEdge) || [];
-  const workflowEdges = workflow?.spec?.edges || [];
+  const edges = canvas?.spec?.edges?.map(prepareEdge) || [];
+  const workflowEdges = canvas?.spec?.edges || [];
+
   const nodes =
-    workflow?.spec?.nodes
-      ?.map((node) => {
+    canvas?.spec?.nodes
+      ?.map((nodeSpec) => {
+        const nodeState = canvas?.status?.nodes?.find((n) => n.id === nodeSpec.id);
         return prepareNode(
-          workflow?.spec?.nodes!,
-          node,
+          canvas?.spec?.nodes!,
+          canvas?.status?.nodes!,
+          nodeSpec,
+          nodeState!,
           triggers,
           blueprints,
           components,
@@ -3066,7 +3084,8 @@ function prepareData(
 }
 
 function prepareTriggerNode(
-  node: ComponentsNode,
+  node: ComponentsNodeDefinition,
+  nodeState: CanvasesCanvasNodeState | undefined,
   triggers: TriggersTrigger[],
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
 ): CanvasNode {
@@ -3074,7 +3093,7 @@ function prepareTriggerNode(
   const renderer = getTriggerRenderer(node.trigger?.name || "");
   const lastEvent = nodeEventsMap[node.id!]?.[0];
   const triggerProps = renderer.getTriggerProps({
-    node: buildNodeInfo(node),
+    node: buildNodeInfo(node, nodeState),
     definition: buildComponentDefinition(triggerMetadata!),
     lastEvent: buildEventInfo(lastEvent),
   });
@@ -3088,21 +3107,21 @@ function prepareTriggerNode(
     data: {
       type: "trigger",
       label: displayLabel,
-      state: "pending" as const,
+      state: nodeState?.state || "ready",
+      stateReason: nodeState?.stateReason || "",
       outputChannels: ["default"],
       trigger: {
         ...triggerProps,
         collapsed: node.isCollapsed,
-        error: node.errorMessage,
-        warning: node.warningMessage,
       },
     },
   };
 }
 
 function prepareCompositeNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
+  nodes: ComponentsNodeDefinition[],
+  node: ComponentsNodeDefinition,
+  nodeState: CanvasesCanvasNodeState | undefined,
   blueprints: BlueprintsBlueprint[],
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
@@ -3129,7 +3148,8 @@ function prepareCompositeNode(
     data: {
       type: "composite",
       label: displayLabel,
-      state: "pending" as const,
+      state: nodeState?.state || "ready",
+      stateReason: nodeState?.stateReason || "",
       outputChannels: blueprintMetadata?.outputChannels?.map((c) => c.name!) || ["default"],
       composite: {
         iconSlug: BUNDLE_ICON_SLUG,
@@ -3139,9 +3159,6 @@ function prepareCompositeNode(
         title: displayLabel,
         description: blueprintMetadata?.description,
         isMissing: isMissing,
-        error: node.errorMessage,
-        warning: node.warningMessage,
-        paused: !!node.paused,
         parameters:
           Object.keys(node.configuration!).length > 0
             ? [
@@ -3203,8 +3220,10 @@ function getRunItemState(execution: CanvasesCanvasNodeExecution): LastRunState {
 }
 
 function prepareNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
+  nodes: ComponentsNodeDefinition[],
+  nodeStates: CanvasesCanvasNodeState[],
+  node: ComponentsNodeDefinition,
+  nodeState: CanvasesCanvasNodeState,
   triggers: TriggersTrigger[],
   blueprints: BlueprintsBlueprint[],
   components: ComponentsComponent[],
@@ -3219,10 +3238,18 @@ function prepareNode(
 ): CanvasNode {
   switch (node.type) {
     case "TYPE_TRIGGER":
-      return prepareTriggerNode(node, triggers, nodeEventsMap);
+      return prepareTriggerNode(node, nodeState, triggers, nodeEventsMap);
+
     case "TYPE_BLUEPRINT":
       const componentMetadata = components.find((c) => c.name === node.component?.name);
-      const compositeNode = prepareCompositeNode(nodes, node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);
+      const compositeNode = prepareCompositeNode(
+        nodes,
+        node,
+        nodeState,
+        blueprints,
+        nodeExecutionsMap,
+        nodeQueueItemsMap,
+      );
 
       // Override outputChannels with component metadata if available
       if (componentMetadata?.outputChannels) {
@@ -3236,14 +3263,16 @@ function prepareNode(
       }
 
       return compositeNode;
+
     case "TYPE_WIDGET":
-      // support other widgets if necessary
-      return prepareAnnotationNode(node);
+      return prepareAnnotationNode(node, nodeState);
 
     default:
       return prepareComponentNode(
         nodes,
+        nodeStates,
         node,
+        nodeState,
         components,
         nodeExecutionsMap,
         nodeQueueItemsMap,
@@ -3256,7 +3285,7 @@ function prepareNode(
   }
 }
 
-function prepareAnnotationNode(node: ComponentsNode): CanvasNode {
+function prepareAnnotationNode(node: ComponentsNodeDefinition, nodeState: CanvasesCanvasNodeState): CanvasNode {
   const width = (node.configuration?.width as number) || 320;
   const height = (node.configuration?.height as number) || 200;
   return {
@@ -3267,7 +3296,8 @@ function prepareAnnotationNode(node: ComponentsNode): CanvasNode {
     data: {
       type: "annotation",
       label: node.name || "Annotation",
-      state: "pending" as const,
+      state: nodeState.state,
+      stateReason: nodeState.stateReason,
       outputChannels: [], // Annotation nodes don't have output channels
       annotation: {
         title: node.name || "Annotation",
@@ -3281,8 +3311,10 @@ function prepareAnnotationNode(node: ComponentsNode): CanvasNode {
 }
 
 function prepareComponentNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
+  nodes: ComponentsNodeDefinition[],
+  nodeStates: CanvasesCanvasNodeState[],
+  node: ComponentsNodeDefinition,
+  nodeState: CanvasesCanvasNodeState | undefined,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
@@ -3303,7 +3335,8 @@ function prepareComponentNode(
       data: {
         type: "component",
         label: "New Component",
-        state: "pending" as const,
+        state: nodeState?.state,
+        stateReason: nodeState?.stateReason,
         outputChannels: ["default"],
         component: {
           iconSlug: "box-dashed",
@@ -3328,12 +3361,14 @@ function prepareComponentNode(
   const componentName = componentNameParts[0];
 
   if (componentName == "merge") {
-    return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap, edges);
+    return prepareMergeNode(nodes, node, nodeState, components, nodeExecutionsMap, nodeQueueItemsMap, edges);
   }
 
   return prepareComponentBaseNode(
     nodes,
+    nodeStates,
     node,
+    nodeState,
     components,
     nodeExecutionsMap,
     nodeQueueItemsMap,
@@ -3345,8 +3380,10 @@ function prepareComponentNode(
 }
 
 function prepareComponentBaseNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
+  nodes: ComponentsNodeDefinition[],
+  nodeStates: CanvasesCanvasNodeState[],
+  node: ComponentsNodeDefinition,
+  nodeState: CanvasesCanvasNodeState | undefined,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
@@ -3367,8 +3404,11 @@ function prepareComponentBaseNode(
 
   const additionalData = componentDef
     ? getComponentAdditionalDataBuilder(node.component?.name || "")?.buildAdditionalData({
-        nodes: nodes.map((n) => buildNodeInfo(n)),
-        node: buildNodeInfo(node),
+        nodes: nodes.map((n) => {
+          const nodeState = nodeStates.find((s) => s.id === n.id);
+          return buildNodeInfo(n, nodeState!);
+        }),
+        node: buildNodeInfo(node, nodeState),
         componentDefinition: buildComponentDefinition(componentDef!),
         lastExecutions: executions.map((e) => buildExecutionInfo(e)),
         canvasId: workflowId,
@@ -3379,8 +3419,11 @@ function prepareComponentBaseNode(
     : undefined;
 
   const componentBaseProps = getComponentBaseMapper(node.component?.name || "").props({
-    nodes: nodes.map((n) => buildNodeInfo(n)),
-    node: buildNodeInfo(node),
+    nodes: nodes.map((n) => {
+      const nodeState = nodeStates.find((s) => s.id === n.id);
+      return buildNodeInfo(n, nodeState!);
+    }),
+    node: buildNodeInfo(node, nodeState),
     componentDefinition: buildComponentDefinition(fallbackComponentDef),
     lastExecutions: executions.map((e) => buildExecutionInfo(e)),
     nodeQueueItems: nodeQueueItems?.map((q) => buildQueueItemInfo(q)),
@@ -3388,7 +3431,7 @@ function prepareComponentBaseNode(
   });
 
   // If there's an error and empty state is shown, customize the message
-  const hasError = !!node.errorMessage;
+  const hasError = nodeState?.state === "error";
   const showingEmptyState = componentBaseProps.includeEmptyState;
   const emptyStateProps =
     hasError && showingEmptyState
@@ -3405,22 +3448,21 @@ function prepareComponentBaseNode(
     data: {
       type: "component",
       label: displayLabel,
-      state: "pending" as const,
+      state: nodeState?.state || "ready",
+      stateReason: nodeState?.stateReason || "",
       outputChannels: metadata?.outputChannels?.map((channel) => channel.name) || ["default"],
       component: {
         ...componentBaseProps,
         emptyStateProps,
-        error: node.errorMessage,
-        warning: node.warningMessage,
-        paused: !!node.paused,
       },
     },
   };
 }
 
 function prepareMergeNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
+  nodes: ComponentsNodeDefinition[],
+  node: ComponentsNodeDefinition,
+  nodeState: CanvasesCanvasNodeState | undefined,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
   nodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>,
@@ -3448,7 +3490,11 @@ function prepareMergeNode(
     const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: buildEventInfo(execution.rootEvent!) });
 
     // Get subtitle from the merge mapper with incoming sources count
-    const eventSubtitle = mergeMapper.subtitle({ node: buildNodeInfo(node), execution: executionInfo, additionalData });
+    const eventSubtitle = mergeMapper.subtitle({
+      node: buildNodeInfo(node, nodeState),
+      execution: executionInfo,
+      additionalData,
+    });
 
     lastEvent = {
       receivedAt: new Date(execution.createdAt!),
@@ -3467,7 +3513,8 @@ function prepareMergeNode(
     data: {
       type: "merge",
       label: displayLabel,
-      state: "pending" as const,
+      state: nodeState?.state || "ready",
+      stateReason: nodeState?.stateReason,
       outputChannels: componentDef?.outputChannels?.map((channel) => channel.name!) || ["default"],
       merge: {
         title: displayLabel,
@@ -3476,9 +3523,6 @@ function prepareMergeNode(
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
         eventStateMap: mergeStateMap,
-        error: node.errorMessage,
-        warning: node.warningMessage,
-        paused: !!node.paused,
       },
     },
   };
@@ -3496,8 +3540,10 @@ function prepareEdge(edge: ComponentsEdge): CanvasEdge {
 }
 
 function prepareSidebarData(
-  node: ComponentsNode,
-  nodes: ComponentsNode[],
+  node: ComponentsNodeDefinition,
+  nodeState: CanvasesCanvasNodeState,
+  nodes: ComponentsNodeDefinition[],
+  nodeStates: CanvasesCanvasNodeState[],
   blueprints: BlueprintsBlueprint[],
   components: ComponentsComponent[],
   triggers: TriggersTrigger[],
@@ -3540,8 +3586,11 @@ function prepareSidebarData(
   }
 
   const additionalData = getComponentAdditionalDataBuilder(node.component?.name || "")?.buildAdditionalData({
-    nodes: nodes.map((n) => buildNodeInfo(n)),
-    node: buildNodeInfo(node),
+    nodes: nodes.map((n) => {
+      const state = nodeStates.find((s) => s.id === n.id);
+      return buildNodeInfo(n, state!);
+    }),
+    node: buildNodeInfo(node, nodeState),
     componentDefinition: buildComponentDefinition(componentMetadata!),
     lastExecutions: executions.map((e) => buildExecutionInfo(e)),
     canvasId: workflowId || "",
@@ -3553,7 +3602,7 @@ function prepareSidebarData(
   const latestEvents =
     node.type === "TYPE_TRIGGER"
       ? mapTriggerEventsToSidebarEvents(events, node, 5)
-      : mapExecutionsToSidebarEvents(executions, nodes, 5, additionalData);
+      : mapExecutionsToSidebarEvents(executions, nodes, nodeStates, 5, additionalData);
 
   // Convert queue items to sidebar events (next in queue)
   const nextInQueueEvents = mapQueueItemsToSidebarEvents(queueItems, nodes, 5);

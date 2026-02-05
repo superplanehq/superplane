@@ -21,12 +21,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ConfigurationField,
   CanvasesCanvasNodeExecution,
-  ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
   BlueprintsBlueprint,
   ComponentsIntegrationRef,
   OrganizationsIntegration,
+  CanvasesCanvasNodeState,
+  ComponentsNodeDefinition,
 } from "@/api-client";
 import { parseDefaultValues } from "@/utils/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
@@ -246,7 +247,8 @@ export interface CanvasPageProps {
   ) => { map: EventStateMap; state: EventState };
 
   // Workflow metadata for ExecutionChainPage
-  workflowNodes?: ComponentsNode[];
+  workflowNodes?: ComponentsNodeDefinition[];
+  workflowNodeStates?: CanvasesCanvasNodeState[];
   components?: ComponentsComponent[];
   triggers?: TriggersTrigger[];
   blueprints?: BlueprintsBlueprint[];
@@ -923,6 +925,7 @@ function CanvasPage(props: CanvasPageProps) {
             getCustomField={props.getCustomField}
             integrations={props.integrations}
             workflowNodes={props.workflowNodes}
+            workflowNodeStates={props.workflowNodeStates}
             components={props.components}
             triggers={props.triggers}
             blueprints={props.blueprints}
@@ -997,6 +1000,7 @@ function Sidebar({
   getCustomField,
   integrations,
   workflowNodes,
+  workflowNodeStates,
   components,
   triggers,
   blueprints,
@@ -1049,7 +1053,8 @@ function Sidebar({
   organizationId?: string;
   getCustomField?: (nodeId: string) => ((configuration: Record<string, unknown>) => React.ReactNode) | null;
   integrations?: OrganizationsIntegration[];
-  workflowNodes?: ComponentsNode[];
+  workflowNodes?: ComponentsNodeDefinition[];
+  workflowNodeStates?: CanvasesCanvasNodeState[];
   components?: ComponentsComponent[];
   triggers?: TriggersTrigger[];
   blueprints?: BlueprintsBlueprint[];
@@ -1198,6 +1203,7 @@ function Sidebar({
       currentTab={isAnnotationNode ? "settings" : currentTab}
       onTabChange={onTabChange}
       workflowNodes={workflowNodes}
+      workflowNodeStates={workflowNodeStates}
       components={components}
       triggers={triggers}
       blueprints={blueprints}
@@ -1382,7 +1388,8 @@ function CanvasContent({
   onPendingConnectionNodeClick?: (nodeId: string) => void;
   onTemplateNodeClick?: (nodeId: string) => void;
   highlightedNodeIds: Set<string>;
-  workflowNodes?: ComponentsNode[];
+  workflowNodes?: ComponentsNodeDefinition[];
+  workflowNodeStates?: CanvasesCanvasNodeState[];
   setCurrentTab?: (tab: "latest" | "settings") => void;
   onUndo?: () => void;
   canUndo?: boolean;

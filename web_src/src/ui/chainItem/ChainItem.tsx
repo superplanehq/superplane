@@ -8,7 +8,12 @@ import {
   EventStateStyle,
   ComponentBaseSpecValue,
 } from "@/ui/componentBase";
-import { CanvasesCanvasNodeExecution, ComponentsNode, CanvasesCanvasEvent } from "@/api-client";
+import {
+  CanvasesCanvasNodeExecution,
+  ComponentsNodeDefinition,
+  CanvasesCanvasEvent,
+  CanvasesCanvasNodeState,
+} from "@/api-client";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { formatTimeAgo } from "@/utils/date";
@@ -39,7 +44,8 @@ export interface ChainItemData {
   originalExecution?: CanvasesCanvasNodeExecution; // Add execution data
   originalEvent?: CanvasesCanvasEvent; // Add event data for trigger events
   childExecutions?: ChildExecution[]; // Add child executions for composite components
-  workflowNode?: ComponentsNode; // Add workflow node for subtitle generation
+  workflowNode?: ComponentsNodeDefinition; // Add workflow node for subtitle generation
+  workflowNodeState?: CanvasesCanvasNodeState; // Add workflow node state for subtitle generation
   additionalData?: unknown; // Add additional data for subtitle generation
   tabData?: {
     current?: Record<string, any>;
@@ -165,7 +171,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
 
     // Pass a marker to indicate this is from ChainItem, so subtitle can skip issue counts
     const subtitle = mapper.subtitle?.({
-      node: buildNodeInfo(item.workflowNode),
+      node: buildNodeInfo(item.workflowNode, item.workflowNodeState!),
       execution: buildExecutionInfo(item.originalExecution),
       additionalData: { skipIssueCounts: true },
     });
@@ -176,7 +182,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
     }
 
     return "";
-  }, [item.workflowNode, item.originalExecution]);
+  }, [item.workflowNode, item.originalExecution, item.workflowNodeState]);
 
   const copyToClipboard = useCallback((text: string) => {
     navigator.clipboard.writeText(text);

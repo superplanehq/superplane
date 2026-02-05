@@ -6,10 +6,11 @@ import { SidebarEvent } from "../types";
 import { formatTimeAgo } from "@/utils/date";
 import {
   CanvasesCanvasNodeExecution,
-  ComponentsNode,
+  ComponentsNodeDefinition,
   ComponentsComponent,
   TriggersTrigger,
   BlueprintsBlueprint,
+  CanvasesCanvasNodeState,
 } from "@/api-client";
 import { EventState, EventStateMap } from "../../componentBase";
 import { ChildExecution } from "@/ui/chainItem/ChainItem";
@@ -17,15 +18,24 @@ import { getExecutionDetails } from "@/pages/workflowv2/mappers";
 
 function buildExecutionTabData(
   execution: CanvasesCanvasNodeExecution,
-  workflowNode: ComponentsNode,
-  workflowNodes: ComponentsNode[],
+  workflowNode: ComponentsNodeDefinition,
+  workflowNodeState: CanvasesCanvasNodeState,
+  workflowNodes: ComponentsNodeDefinition[],
+  workflowNodeStates: CanvasesCanvasNodeState[],
 ): { current?: Record<string, any>; payload?: any } {
   const tabData: { current?: Record<string, any>; payload?: any } = {};
 
   let currentData: Record<string, any> = {};
 
   if (workflowNode?.component?.name) {
-    const customDetails = getExecutionDetails(workflowNode.component.name, execution, workflowNode, workflowNodes);
+    const customDetails = getExecutionDetails(
+      workflowNode.component.name,
+      execution,
+      workflowNode,
+      workflowNodeState,
+      workflowNodes,
+      workflowNodeStates,
+    );
     if (customDetails && Object.keys(customDetails).length > 0) {
       currentData = { ...customDetails };
     }
@@ -85,7 +95,7 @@ function buildExecutionTabData(
 
 function convertSidebarEventToChainItem(
   triggerEvent: SidebarEvent,
-  workflowNodes: ComponentsNode[] = [],
+  workflowNodes: ComponentsNodeDefinition[] = [],
   _components: ComponentsComponent[] = [],
   triggers: TriggersTrigger[] = [],
   getTabData?: (event: SidebarEvent) => any,
@@ -146,7 +156,8 @@ interface ExecutionChainPageProps {
   ) => { map: EventStateMap; state: EventState };
   getTabData?: (event: SidebarEvent) => any;
   onEventClick?: (event: SidebarEvent) => void;
-  workflowNodes?: ComponentsNode[]; // Workflow spec nodes for metadata lookup
+  workflowNodes?: ComponentsNodeDefinition[]; // Workflow spec nodes for metadata lookup
+  workflowNodeStates?: CanvasesCanvasNodeState[]; // Workflow node states for metadata lookup
   components?: ComponentsComponent[]; // Component metadata
   triggers?: TriggersTrigger[]; // Trigger metadata
   blueprints?: BlueprintsBlueprint[]; // Blueprint metadata
@@ -163,6 +174,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   getExecutionState,
   getTabData,
   workflowNodes = [],
+  workflowNodeStates = [],
   components = [],
   triggers = [],
   blueprints = [],
@@ -227,7 +239,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
       const transformedItems: ChainItemData[] = rawExecutions.map((exec: any, index: number) => {
         // Find the workflow node for this execution
         const workflowNode = workflowNodes.find((node) => node.id === exec.nodeId);
-
+        const workflowNodeState = workflowNodeStates.find((state) => state.id === exec.nodeId);
         // Get metadata based on node type
         let nodeDisplayName = exec.componentName || exec.nodeId || "Unknown";
         let nodeIconSlug = "box";
@@ -320,7 +332,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
           originalExecution: exec, // Pass the full execution data
           childExecutions,
           workflowNode,
-          tabData: buildExecutionTabData(exec, workflowNode || ({} as ComponentsNode), workflowNodes),
+          tabData: buildExecutionTabData(exec, workflowNode!, workflowNodeState!, workflowNodes, workflowNodeStates),
         };
       });
 

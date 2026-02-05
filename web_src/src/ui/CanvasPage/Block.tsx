@@ -10,7 +10,7 @@ import { ComponentActionsProps } from "../types/componentActions";
 import { ComponentBase, ComponentBaseProps } from "../componentBase";
 import { AnnotationComponent, type AnnotationComponentProps } from "../annotationComponent";
 
-type BlockState = "pending" | "working" | "success" | "failed" | "running";
+type BlockState = "pending" | "ready" | "processing" | "error" | "paused";
 type BlockType = "trigger" | "component" | "composite" | "merge" | "switch" | "annotation";
 
 interface BlockAi {
@@ -24,6 +24,8 @@ export interface BlockData {
   label: string;
 
   state: BlockState;
+  stateReason?: string;
+
   type: BlockType;
 
   // last input event received by this block (for simulation display)
@@ -437,7 +439,8 @@ function BlockContent({
       return (
         <ComponentBase
           {...(data.component as ComponentBaseProps)}
-          paused={(data.component as ComponentBaseProps)?.paused}
+          paused={data.state == "paused"}
+          error={data.state == "error" ? data.stateReason : undefined}
           selected={selected}
           showHeader={showHeader}
           {...actionProps}
