@@ -18,6 +18,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run Semaphore workflow" />
+  <LinkCard title="Get Pipeline" href="#get-pipeline" description="Fetch a Semaphore pipeline by ID" />
 </CardGrid>
 
 <a id="on-pipeline-done"></a>
@@ -245,6 +246,53 @@ The Run Workflow component triggers a Semaphore CI/CD workflow and waits for it 
   },
   "timestamp": "2026-01-22T15:32:56.061430218Z",
   "type": "semaphore.workflow.finished"
+}
+```
+
+<a id="get-pipeline"></a>
+
+## Get Pipeline
+
+The Get Pipeline component fetches a Semaphore pipeline by ID and returns its current state, result, workflow ID, and metadata.
+
+### Use Cases
+
+- **Pipeline status check**: After Run Workflow starts a pipeline, poll or fetch its status in a loop or downstream node to decide when to proceed or notify.
+- **Pipeline lookup**: Look up the result of a specific pipeline (e.g., from On Pipeline Done event data) to get full details or confirm state.
+- **Status verification**: Build a status-check step that verifies a pipeline by ID before triggering a dependent action (e.g., deploy only if build pipeline passed).
+
+### Configuration
+
+- **Pipeline ID**: The Semaphore pipeline ID (e.g., from Run Workflow output or On Pipeline Done event). Accepts expressions.
+
+### Output
+
+Returns pipeline data including:
+- **name**: Pipeline name
+- **ppl_id**: Pipeline ID
+- **wf_id**: Workflow ID
+- **state**: Current state (e.g., running, done)
+- **result**: Pipeline result (e.g., passed, failed)
+
+### Notes
+
+- Branching on state/result is done downstream via expressions
+- Errors do not emit a payload (component fails)
+- Workflows can check pipeline state (e.g., running vs done) or result (passed/failed) without waiting for a webhook
+
+### Example Output
+
+```json
+{
+  "data": {
+    "name": "Initial Pipeline",
+    "ppl_id": "00000000-0000-0000-0000-000000000000",
+    "wf_id": "00000000-0000-0000-0000-000000000001",
+    "state": "done",
+    "result": "passed"
+  },
+  "timestamp": "2026-01-22T15:32:56.061430218Z",
+  "type": "semaphore.pipeline"
 }
 ```
 
