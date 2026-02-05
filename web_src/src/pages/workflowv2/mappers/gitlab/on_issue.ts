@@ -1,10 +1,9 @@
-import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerRenderer } from "../types";
+import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import { TriggerProps } from "@/ui/trigger";
 import { GitLabNodeMetadata } from "./types";
-import { formatTimeAgo } from "@/utils/date";
+import { buildGitlabSubtitle } from "./utils";
 
 interface OnIssueConfiguration {
   actions: string[];
@@ -38,17 +37,6 @@ interface OnIssueEventData {
   };
 }
 
-function buildGitLabSubtitle(action: string, createdAt: string | undefined): string {
-  const parts = [];
-  if (action) {
-    parts.push(action);
-  }
-  if (createdAt) {
-    parts.push(formatTimeAgo(new Date(createdAt)));
-  }
-  return parts.join(" · ");
-}
-
 function getDetailsForIssue(issue: GitLabIssue | undefined): Record<string, string> {
   if (!issue) {
     return {};
@@ -63,22 +51,19 @@ function getDetailsForIssue(issue: GitLabIssue | undefined): Record<string, stri
   };
 }
 
-/**
- * Renderer for the "gitlab.onIssue" trigger
- */
 export const onIssueTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as OnIssueEventData;
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+    const eventData = context.event?.data as OnIssueEventData;
     const issue = eventData?.object_attributes;
 
     return {
       title: `#${issue?.iid} - ${issue?.title || "Issue"}`,
-      subtitle: buildGitLabSubtitle(issue?.action || "", event.createdAt),
+      subtitle: buildGitlabSubtitle(issue?.action || "", context.event?.createdAt),
     };
   },
 
-  getRootEventValues: (lastEvent: CanvasesCanvasEvent): Record<string, string> => {
-    const eventData = lastEvent.data?.data as OnIssueEventData;
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
+    const eventData = context.event?.data as OnIssueEventData;
     const issue = eventData?.object_attributes;
     const values = getDetailsForIssue(issue);
 
@@ -93,7 +78,8 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     return values;
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
+  getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
+    const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as GitLabNodeMetadata;
     const configuration = node.configuration as unknown as OnIssueConfiguration;
     const metadataItems = [];
@@ -113,20 +99,20 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     }
 
     const props: TriggerProps = {
-      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
+      title: node.name || definition.label || "Unnamed trigger",
       iconSrc: gitlabIcon,
-      iconColor: getColorClass(trigger.color),
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      iconColor: getColorClass(definition.color),
+      collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: metadataItems,
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as OnIssueEventData;
+      const eventData = lastEvent.data as OnIssueEventData;
       const issue = eventData?.object_attributes;
 
       props.lastEventData = {
         title: `#${issue?.iid} - ${issue?.title || "Issue"}`,
-        subtitle: buildGitLabSubtitle(issue?.action || "", lastEvent.createdAt),
+        subtitle: buildGitlabSubtitle(issue?.action || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id!,
