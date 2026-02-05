@@ -141,6 +141,9 @@ func (l *ListPipelines) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("error finding project %s: %v", spec.Project, err)
 	}
+	if project == nil {
+		return fmt.Errorf("project %s not found", spec.Project)
+	}
 
 	pipelines, err := client.ListPipelines(project.Metadata.ProjectID)
 	if err != nil {
