@@ -15,13 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func ListIntegrationResources(
-	ctx context.Context,
-	registry *registry.Registry,
-	orgID string,
-	integrationID string,
-	parameters map[string]string,
-) (*pb.ListIntegrationResourcesResponse, error) {
+func ListIntegrationResources(ctx context.Context, registry *registry.Registry, orgID string, integrationID string, parameters map[string]string) (*pb.ListIntegrationResourcesResponse, error) {
 	org, err := uuid.Parse(orgID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
@@ -54,9 +48,6 @@ func ListIntegrationResources(
 		registry.Encryptor,
 		registry,
 	)
-
-	log.Infof("Resource type: %s", resourceType)
-	log.Infof("Parameters: %s", parameters)
 
 	listCtx := core.ListResourcesContext{
 		Logger: log.WithFields(log.Fields{
