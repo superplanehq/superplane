@@ -87,6 +87,7 @@ import {
   eventStateRegistry as openaiEventStateRegistry,
 } from "./openai/index";
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
+import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
 import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
@@ -108,6 +109,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   noop: noopMapper,
   if: ifMapper,
   http: httpMapper,
+  ssh: sshMapper,
   timeGate: timeGateMapper,
   filter: filterMapper,
   wait: waitMapper,
@@ -173,6 +175,7 @@ const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBui
 const eventStateRegistries: Record<string, EventStateRegistry> = {
   approval: APPROVAL_STATE_REGISTRY,
   http: HTTP_STATE_REGISTRY,
+  ssh: SSH_STATE_REGISTRY,
   filter: FILTER_STATE_REGISTRY,
   if: IF_STATE_REGISTRY,
   timeGate: TIME_GATE_STATE_REGISTRY,
