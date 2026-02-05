@@ -1,4 +1,5 @@
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import { formatPredicate, Predicate } from "../utils";
 import { TriggerProps } from "@/ui/trigger";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
@@ -63,7 +64,7 @@ export const onEmailEventTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
-    const configuration = node.configuration as { eventTypes?: string[]; categoryFilter?: string } | undefined;
+    const configuration = node.configuration as { eventTypes?: string[]; categoryFilter?: Predicate[] } | undefined;
     const metadataItems = [];
 
     if (shouldDisplayEventTypes(configuration?.eventTypes)) {
@@ -81,7 +82,7 @@ export const onEmailEventTriggerRenderer: TriggerRenderer = {
     if (shouldDisplayCategoryFilter(configuration?.categoryFilter)) {
       metadataItems.push({
         icon: "tag",
-        label: `Category: ${configuration!.categoryFilter}`,
+        label: formatCategoryFilter(configuration!.categoryFilter!),
       });
     }
 
@@ -139,11 +140,19 @@ function shouldDisplayEventTypes(eventTypes?: string[]): boolean {
   return !allSelected;
 }
 
-function shouldDisplayCategoryFilter(categoryFilter?: string): boolean {
-  if (!categoryFilter) {
+function shouldDisplayCategoryFilter(categoryFilter?: Predicate[]): boolean {
+  if (!categoryFilter || categoryFilter.length === 0) {
     return false;
   }
 
-  const trimmed = categoryFilter.trim();
-  return trimmed !== "" && trimmed !== "*";
+  return true;
+}
+
+function formatCategoryFilter(categoryFilter: Predicate[]): string {
+  const formatted = categoryFilter.map(formatPredicate);
+  if (formatted.length > 3) {
+    return `Category: ${formatted.length} filters`;
+  }
+
+  return `Category: ${formatted.join(", ")}`;
 }
