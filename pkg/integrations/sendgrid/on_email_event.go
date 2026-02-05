@@ -76,8 +76,6 @@ SuperPlane configures the SendGrid Event Webhook via API and enables Signed Even
 - ` + "`X-Twilio-Email-Event-Webhook-Timestamp`" + ` header
 - Raw request body (no transformations)
 
-If no verification key is configured, signature verification is skipped (not recommended for production).
-
 ## Event Data
 
 Each event includes fields such as ` + "`event`" + `, ` + "`email`" + `, ` + "`timestamp`" + `, ` + "`sg_event_id`" + `, ` + "`sg_message_id`" + `, ` + "`category`" + ` and event-specific properties like ` + "`reason`" + `, ` + "`response`" + `, ` + "`url`" + `, ` + "`bounce_classification`" + `.`

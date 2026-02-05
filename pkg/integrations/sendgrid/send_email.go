@@ -83,6 +83,7 @@ func (c *SendEmail) Documentation() string {
 - **Reply-To**: Reply-to email address
 - **Template ID**: SendGrid dynamic template ID (e.g. ` + "`d-xxxxxxxx`" + `)
 - **Template Data**: JSON object of template substitution variables
+- **Categories**: Optional comma-separated list of category names. SendGrid attaches these to the message for tracking and filtering in the Email Activity feed and for use with the Event Webhook (e.g. to filter events by category in an On Email Event trigger).
 
 ## Output Channels
 
@@ -231,7 +232,7 @@ func (c *SendEmail) Configuration() []configuration.Field {
 			Label:       "Categories",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "SendGrid categories (comma-separated)",
+			Description: "Category names for tracking and filtering in SendGrid (comma-separated). Shown in Email Activity and available for Event Webhook filters.",
 		},
 	}
 }
