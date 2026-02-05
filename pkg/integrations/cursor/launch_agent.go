@@ -1,0 +1,432 @@
+package cursor
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/models"
+)
+
+const AgentStatusPayloadType = "cursor.agent.status_change"
+const webhookEventStatusChange = "statusChange"
+const agentStatusFinished = "FINISHED"
+const agentStatusError = "ERROR"
+const waitForWebhookAction = "waitForWebhook"
+
+var errWebhookNotReady = errors.New("cursor webhook is not ready yet")
+
+const webhookRetryInterval = 5 * time.Second
+
+type LaunchAgent struct{}
+
+type LaunchAgentSpec struct {
+	Prompt       string `json:"prompt"`
+	Repository   string `json:"repository"`
+	Ref          string `json:"ref"`
+	AutoCreatePr bool   `json:"autoCreatePr"`
+	BranchName   string `json:"branchName"`
+}
+
+type LaunchAgentExecutionMetadata struct {
+	Agent  *LaunchAgentResponse `json:"agent,omitempty" mapstructure:"agent"`
+	Status *AgentStatusWebhook  `json:"status,omitempty" mapstructure:"status"`
+}
+
+type AgentStatusPayload struct {
+	Agent  *LaunchAgentResponse `json:"agent,omitempty"`
+	Status *AgentStatusWebhook  `json:"status,omitempty"`
+}
+
+type AgentStatusWebhook struct {
+	Event     string             `json:"event"`
+	Timestamp string             `json:"timestamp"`
+	ID        string             `json:"id"`
+	Status    string             `json:"status"`
+	Source    LaunchAgentSource  `json:"source"`
+	Target    *AgentStatusTarget `json:"target,omitempty"`
+	Summary   string             `json:"summary,omitempty"`
+}
+
+type AgentStatusTarget struct {
+	URL        string `json:"url,omitempty"`
+	BranchName string `json:"branchName,omitempty"`
+	PRURL      string `json:"prUrl,omitempty"`
+}
+
+func (l *LaunchAgent) Name() string {
+	return "cursor.launchAgent"
+}
+
+func (l *LaunchAgent) Label() string {
+	return "Launch Agent"
+}
+
+func (l *LaunchAgent) Description() string {
+	return "Start a Cursor Cloud Agent for a repository"
+}
+
+func (l *LaunchAgent) Documentation() string {
+	return `The Launch Agent component starts a Cursor Cloud Agent to make code changes in a repository.
+
+## Use Cases
+
+- **Automated code updates**: Generate or refactor code based on a prompt
+- **Documentation changes**: Update README or docs automatically
+- **Routine fixes**: Apply repetitive changes across files
+- **Assisted development**: Delegate a task to a Cursor Cloud Agent
+
+## How It Works
+
+1. Sends the prompt and repository details to Cursor
+2. Cursor launches an agent and starts working on the repository
+3. The component waits for status updates via webhook
+4. When finished, the final status payload is emitted
+
+## Configuration
+
+- **Prompt**: Describe the task for the agent
+- **Repository**: Git repository URL (e.g., https://github.com/org/repo)
+- **Git ref**: Branch, tag, or commit SHA to start from
+- **Auto-create PR**: Create a pull request when the agent completes
+- **Branch name**: Optional branch name for the agent's changes
+
+## Output
+
+Emits a ` + "`cursor.agent.status_change`" + ` payload when the agent finishes, including:
+- **agent**: Agent metadata (id, status, source/target)
+- **status**: Final status details and summary
+
+## Notes
+
+- Requires a Cursor API key configured in the integration settings
+- Webhooks must be enabled for status updates`
+}
+
+func (l *LaunchAgent) Icon() string {
+	return "bot"
+}
+
+func (l *LaunchAgent) Color() string {
+	return "gray"
+}
+
+func (l *LaunchAgent) OutputChannels(configuration any) []core.OutputChannel {
+	return []core.OutputChannel{core.DefaultOutputChannel}
+}
+
+func (l *LaunchAgent) Configuration() []configuration.Field {
+	return []configuration.Field{
+		{
+			Name:        "prompt",
+			Label:       "Prompt",
+			Type:        configuration.FieldTypeText,
+			Required:    true,
+			Placeholder: "Describe the task for the agent",
+		},
+		{
+			Name:        "repository",
+			Label:       "Repository",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Placeholder: "https://github.com/org/repo",
+		},
+		{
+			Name:        "ref",
+			Label:       "Git ref",
+			Type:        configuration.FieldTypeGitRef,
+			Required:    true,
+			Placeholder: "main",
+		},
+		{
+			Name:        "autoCreatePr",
+			Label:       "Auto-create PR",
+			Type:        configuration.FieldTypeBool,
+			Description: "Create a pull request when the agent completes",
+		},
+		{
+			Name:        "branchName",
+			Label:       "Branch name",
+			Type:        configuration.FieldTypeString,
+			Placeholder: "feature/add-readme",
+		},
+	}
+}
+
+func (l *LaunchAgent) Setup(ctx core.SetupContext) error {
+	spec := LaunchAgentSpec{}
+	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+		return fmt.Errorf("failed to decode configuration: %v", err)
+	}
+
+	if err := l.validateSpec(spec); err != nil {
+		return err
+	}
+
+	if ctx.Integration != nil {
+		if err := ctx.Integration.RequestWebhook(WebhookConfiguration{Event: webhookEventStatusChange}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (l *LaunchAgent) Execute(ctx core.ExecutionContext) error {
+	spec := LaunchAgentSpec{}
+	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+		return fmt.Errorf("failed to decode configuration: %v", err)
+	}
+
+	if err := l.validateSpec(spec); err != nil {
+		return err
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	webhook, err := l.lookupWebhook(ctx.Integration)
+	if err != nil {
+		if errors.Is(err, errWebhookNotReady) {
+			return ctx.Requests.ScheduleActionCall(waitForWebhookAction, map[string]any{}, webhookRetryInterval)
+		}
+		return err
+	}
+
+	request := LaunchAgentRequest{
+		Prompt: LaunchAgentPrompt{Text: spec.Prompt},
+		Source: LaunchAgentSource{
+			Repository: spec.Repository,
+			Ref:        spec.Ref,
+		},
+		Target:  buildLaunchAgentTarget(spec),
+		Webhook: webhook,
+	}
+
+	response, err := client.LaunchAgent(request)
+	if err != nil {
+		return err
+	}
+
+	if err := ctx.Metadata.Set(LaunchAgentExecutionMetadata{Agent: response}); err != nil {
+		return err
+	}
+
+	return ctx.ExecutionState.SetKV("agent", response.ID)
+}
+
+func (l *LaunchAgent) Cancel(ctx core.ExecutionContext) error {
+	return nil
+}
+
+func (l *LaunchAgent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+	return ctx.DefaultProcessing()
+}
+
+func (l *LaunchAgent) Actions() []core.Action {
+	return []core.Action{
+		{
+			Name:           waitForWebhookAction,
+			UserAccessible: false,
+		},
+	}
+}
+
+func (l *LaunchAgent) HandleAction(ctx core.ActionContext) error {
+	switch ctx.Name {
+	case waitForWebhookAction:
+		return l.retryLaunch(ctx)
+	default:
+		return fmt.Errorf("unknown action: %s", ctx.Name)
+	}
+}
+
+func (l *LaunchAgent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	signature := ctx.Headers.Get("X-Webhook-Signature")
+	if signature == "" {
+		return http.StatusForbidden, fmt.Errorf("invalid signature")
+	}
+
+	signature = strings.TrimPrefix(signature, "sha256=")
+	if signature == "" {
+		return http.StatusForbidden, fmt.Errorf("invalid signature")
+	}
+
+	secret, err := ctx.Webhook.GetSecret()
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
+	}
+
+	if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
+		return http.StatusForbidden, fmt.Errorf("invalid signature")
+	}
+
+	payload := AgentStatusWebhook{}
+	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
+		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+	}
+
+	if payload.Event != webhookEventStatusChange || payload.ID == "" {
+		return http.StatusOK, nil
+	}
+
+	executionCtx, err := ctx.FindExecutionByKV("agent", payload.ID)
+	if err != nil {
+		return http.StatusOK, nil
+	}
+
+	if executionCtx.ExecutionState.IsFinished() {
+		return http.StatusOK, nil
+	}
+
+	metadata := LaunchAgentExecutionMetadata{}
+	if err := mapstructure.Decode(executionCtx.Metadata.Get(), &metadata); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error decoding metadata: %v", err)
+	}
+
+	metadata.Status = &payload
+	if err := executionCtx.Metadata.Set(metadata); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
+	}
+
+	switch payload.Status {
+	case agentStatusFinished:
+		if err := executionCtx.ExecutionState.Emit(
+			core.DefaultOutputChannel.Name,
+			AgentStatusPayloadType,
+			[]any{AgentStatusPayload{Agent: metadata.Agent, Status: &payload}},
+		); err != nil {
+			return http.StatusInternalServerError, err
+		}
+		return http.StatusOK, nil
+	case agentStatusError:
+		if err := executionCtx.ExecutionState.Fail(
+			models.CanvasNodeExecutionResultReasonError,
+			"Cursor agent reported an error",
+		); err != nil {
+			return http.StatusInternalServerError, err
+		}
+		return http.StatusOK, nil
+	}
+
+	return http.StatusOK, nil
+}
+
+func (l *LaunchAgent) validateSpec(spec LaunchAgentSpec) error {
+	if spec.Prompt == "" {
+		return fmt.Errorf("prompt is required")
+	}
+
+	if spec.Repository == "" {
+		return fmt.Errorf("repository is required")
+	}
+
+	if spec.Ref == "" {
+		return fmt.Errorf("ref is required")
+	}
+
+	return nil
+}
+
+func buildLaunchAgentTarget(spec LaunchAgentSpec) *LaunchAgentTarget {
+	if !spec.AutoCreatePr && spec.BranchName == "" {
+		return nil
+	}
+
+	return &LaunchAgentTarget{
+		AutoCreatePr: spec.AutoCreatePr,
+		BranchName:   spec.BranchName,
+	}
+}
+
+func (l *LaunchAgent) lookupWebhook(integration core.IntegrationContext) (*LaunchAgentWebhook, error) {
+	if integration == nil {
+		return nil, fmt.Errorf("integration is required")
+	}
+
+	metadata := Metadata{}
+	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
+		return nil, fmt.Errorf("failed to decode integration metadata: %v", err)
+	}
+
+	if metadata.Webhook == nil || metadata.Webhook.URL == "" || metadata.Webhook.Secret == "" {
+		return nil, errWebhookNotReady
+	}
+
+	return &LaunchAgentWebhook{
+		URL:    metadata.Webhook.URL,
+		Secret: metadata.Webhook.Secret,
+	}, nil
+}
+
+func (l *LaunchAgent) retryLaunch(ctx core.ActionContext) error {
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
+	spec := LaunchAgentSpec{}
+	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+		return fmt.Errorf("failed to decode configuration: %v", err)
+	}
+
+	if err := l.validateSpec(spec); err != nil {
+		return err
+	}
+
+	metadata := LaunchAgentExecutionMetadata{}
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %v", err)
+	}
+
+	if metadata.Agent != nil {
+		return nil
+	}
+
+	webhook, err := l.lookupWebhook(ctx.Integration)
+	if err != nil {
+		if errors.Is(err, errWebhookNotReady) {
+			return ctx.Requests.ScheduleActionCall(waitForWebhookAction, map[string]any{}, webhookRetryInterval)
+		}
+		return err
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	request := LaunchAgentRequest{
+		Prompt: LaunchAgentPrompt{Text: spec.Prompt},
+		Source: LaunchAgentSource{
+			Repository: spec.Repository,
+			Ref:        spec.Ref,
+		},
+		Target:  buildLaunchAgentTarget(spec),
+		Webhook: webhook,
+	}
+
+	response, err := client.LaunchAgent(request)
+	if err != nil {
+		return err
+	}
+
+	if err := ctx.Metadata.Set(LaunchAgentExecutionMetadata{Agent: response}); err != nil {
+		return err
+	}
+
+	return ctx.ExecutionState.SetKV("agent", response.ID)
+}
+
+func (l *LaunchAgent) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

@@ -1,0 +1,32 @@
+{
+  "agent": {
+    "id": "agent_12345",
+    "name": "Update README instructions",
+    "status": "FINISHED",
+    "source": {
+      "repository": "https://github.com/acme/widgets",
+      "ref": "main"
+    },
+    "target": {
+      "autoCreatePr": true,
+      "branchName": "feature/update-readme"
+    },
+    "createdAt": "2026-02-05T12:34:56Z"
+  },
+  "status": {
+    "event": "statusChange",
+    "timestamp": "2026-02-05T12:40:10Z",
+    "id": "agent_12345",
+    "status": "FINISHED",
+    "source": {
+      "repository": "https://github.com/acme/widgets",
+      "ref": "main"
+    },
+    "target": {
+      "url": "https://github.com/acme/widgets/tree/feature/update-readme",
+      "branchName": "feature/update-readme",
+      "prUrl": "https://github.com/acme/widgets/pull/42"
+    },
+    "summary": "Updated README with setup instructions."
+  }
+}

@@ -32,6 +32,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/wait"
 	_ "github.com/superplanehq/superplane/pkg/integrations/aws"
 	_ "github.com/superplanehq/superplane/pkg/integrations/cloudflare"
+	_ "github.com/superplanehq/superplane/pkg/integrations/cursor"
 	_ "github.com/superplanehq/superplane/pkg/integrations/dash0"
 	_ "github.com/superplanehq/superplane/pkg/integrations/datadog"
 	_ "github.com/superplanehq/superplane/pkg/integrations/daytona"
