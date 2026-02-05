@@ -4,6 +4,7 @@
  */
 const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   github: "GitHub",
+  gitlab: "GitLab",
   openai: "OpenAI",
   pagerduty: "PagerDuty",
   slack: "Slack",
