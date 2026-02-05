@@ -94,6 +94,16 @@ func (l *ListPipelines) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UU
 }
 
 func (l *ListPipelines) Setup(ctx core.SetupContext) error {
+	spec := ListPipelinesSpec{}
+	err := mapstructure.Decode(ctx.Configuration, &spec)
+	if err != nil {
+		return err
+	}
+
+	if spec.Project == "" {
+		return fmt.Errorf("project is required")
+	}
+
 	return nil
 }
 

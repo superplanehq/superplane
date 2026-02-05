@@ -73,6 +73,16 @@ func (g *GetJobLogs) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID,
 }
 
 func (g *GetJobLogs) Setup(ctx core.SetupContext) error {
+	spec := GetJobLogsSpec{}
+	err := mapstructure.Decode(ctx.Configuration, &spec)
+	if err != nil {
+		return err
+	}
+
+	if spec.JobID == "" {
+		return fmt.Errorf("jobId is required")
+	}
+
 	return nil
 }
 
