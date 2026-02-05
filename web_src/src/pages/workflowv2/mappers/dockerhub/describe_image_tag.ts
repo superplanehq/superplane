@@ -12,16 +12,16 @@ import {
 } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
-import { ListTagsResponse, Tag } from "./types";
+import { Tag } from "./types";
 import { formatTimeAgo } from "@/utils/date";
 
-interface ListTagsConfiguration {
+interface DescribeImageTagConfiguration {
+  namespace?: string;
   repository?: string;
-  pageSize?: number;
-  nameFilter?: string;
+  tag?: string;
 }
 
-export const listTagsMapper: ComponentBaseMapper = {
+export const describeImageTagMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition.name ?? "dockerhub";
@@ -43,8 +43,8 @@ export const listTagsMapper: ComponentBaseMapper = {
     if (!outputs?.default?.[0]?.data) {
       return {};
     }
-    const data = outputs.default[0].data as ListTagsResponse;
-    return getDetailsForResponse(data);
+    const data = outputs.default[0].data as Tag;
+    return getDetailsForTag(data);
   },
 
   subtitle(context: SubtitleContext): string {
@@ -55,14 +55,14 @@ export const listTagsMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as ListTagsConfiguration;
+  const configuration = node.configuration as DescribeImageTagConfiguration;
 
-  if (configuration.repository) {
-    metadata.push({ icon: "box", label: configuration.repository });
+  if (configuration.namespace && configuration.repository) {
+    metadata.push({ icon: "box", label: `${configuration.namespace}/${configuration.repository}` });
   }
 
-  if (configuration.nameFilter) {
-    metadata.push({ icon: "filter", label: `Filter: ${configuration.nameFilter}` });
+  if (configuration.tag) {
+    metadata.push({ icon: "tag", label: configuration.tag });
   }
 
   return metadata;
@@ -86,23 +86,30 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   ];
 }
 
-function getDetailsForResponse(data: ListTagsResponse): Record<string, string> {
+function getDetailsForTag(data: Tag): Record<string, string> {
   const details: Record<string, string> = {};
 
-  if (data?.count !== undefined) {
-    details["Total Tags"] = String(data.count);
+  if (data?.name) {
+    details["Tag Name"] = data.name;
   }
 
-  if (data?.results && data.results.length > 0) {
-    details["Tags Retrieved"] = String(data.results.length);
+  if (data?.digest) {
+    details["Digest"] = data.digest.substring(0, 20) + "...";
+  }
 
-    const firstTag = data.results[0] as Tag;
-    if (firstTag?.name) {
-      details["First Tag"] = firstTag.name;
-    }
-    if (firstTag?.last_updated) {
-      details["First Tag Updated"] = new Date(firstTag.last_updated).toLocaleString();
-    }
+  if (data?.full_size !== undefined) {
+    // Convert to human readable size
+    const sizeInMB = (data.full_size / (1024 * 1024)).toFixed(2);
+    details["Size"] = `${sizeInMB} MB`;
+  }
+
+  if (data?.last_updated) {
+    details["Last Updated"] = formatTimeAgo(new Date(data.last_updated));
+  }
+
+  if (data?.images && data.images.length > 0) {
+    const platforms = data.images.map((img) => `${img.os}/${img.architecture}`).join(", ");
+    details["Platforms"] = platforms;
   }
 
   return details;

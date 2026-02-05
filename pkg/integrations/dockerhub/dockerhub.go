@@ -74,13 +74,13 @@ func (d *DockerHub) Configuration() []configuration.Field {
 
 func (d *DockerHub) Components() []core.Component {
 	return []core.Component{
-		&ListTags{},
+		&DescribeImageTag{},
 	}
 }
 
 func (d *DockerHub) Triggers() []core.Trigger {
 	return []core.Trigger{
-		&OnImagePushed{},
+		&OnImagePush{},
 	}
 }
 
@@ -145,7 +145,34 @@ func (d *DockerHub) CompareWebhookConfig(a, b any) (bool, error) {
 }
 
 func (d *DockerHub) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	return []core.IntegrationResource{}, nil
+	if resourceType != "repository" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	namespace := ctx.Parameters["namespace"]
+	if namespace == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	repos, err := client.ListRepositories(namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list repositories: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, len(repos.Results))
+	for i, repo := range repos.Results {
+		resources[i] = core.IntegrationResource{
+			ID:   repo.Name,
+			Name: repo.Name,
+		}
+	}
+
+	return resources, nil
 }
 
 func (d *DockerHub) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {

@@ -69,6 +69,26 @@ export interface ListTagsResponse {
   results?: Tag[];
 }
 
+export interface RepositoryMetadata {
+  namespace?: string;
+  name?: string;
+  fullName?: string;
+  url?: string;
+  description?: string;
+}
+
+export interface OnImagePushMetadata {
+  repository?: RepositoryMetadata;
+  webhookUrl?: string;
+}
+
+export interface OnImagePushConfiguration {
+  namespace?: string;
+  repository?: string;
+  tags?: { type?: string; value?: string }[];
+}
+
+// Legacy types for backwards compatibility
 export interface OnImagePushedMetadata {
   repository?: string;
 }
