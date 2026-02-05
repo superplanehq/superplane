@@ -217,6 +217,9 @@ func (s *Semaphore) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 func (s *Semaphore) Components() []core.Component {
 	return []core.Component{
 		&RunWorkflow{},
+		&GetJobLogs{},
+		&GetPipeline{},
+		&ListPipelines{},
 	}
 }
 

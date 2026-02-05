@@ -300,6 +300,106 @@ func (c *Client) DeleteNotification(id string) error {
 	return nil
 }
 
+// JobLogResponse represents the response from the Semaphore job logs API
+type JobLogResponse struct {
+	Events []JobLogEvent `json:"events"`
+}
+
+// JobLogEvent represents a single log event from Semaphore
+type JobLogEvent struct {
+	Event     string `json:"event"`
+	Timestamp int64  `json:"timestamp"`
+	Output    string `json:"output"`
+	Type      string `json:"type"`
+}
+
+// JobResponse represents the response from the Semaphore job API
+type JobResponse struct {
+	Metadata JobMetadata `json:"metadata"`
+	Status   JobStatus   `json:"status"`
+}
+
+// JobMetadata contains job metadata
+type JobMetadata struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	CreateTime string `json:"create_time"`
+	UpdateTime string `json:"update_time"`
+	StartTime  string `json:"start_time"`
+	FinishTime string `json:"finish_time"`
+}
+
+// JobStatus contains job status information
+type JobStatus struct {
+	Result string `json:"result"`
+	State  string `json:"state"`
+}
+
+// GetJob fetches job details by ID
+func (c *Client) GetJob(jobID string) (*JobResponse, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/jobs/%s", c.OrgURL, jobID)
+	responseBody, err := c.execRequest(http.MethodGet, URL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var job JobResponse
+	err = json.Unmarshal(responseBody, &job)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return &job, nil
+}
+
+// GetJobLogs fetches the log output for a Semaphore job by job ID
+func (c *Client) GetJobLogs(jobID string) (*JobLogResponse, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/jobs/%s/log", c.OrgURL, jobID)
+	responseBody, err := c.execRequest(http.MethodGet, URL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var logs JobLogResponse
+	err = json.Unmarshal(responseBody, &logs)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return &logs, nil
+}
+
+// ListPipelinesWithParams lists pipelines with custom query parameters and limit
+func (c *Client) ListPipelinesWithParams(params map[string]string, limit int) ([]any, error) {
+	queryString := ""
+	for k, v := range params {
+		if queryString != "" {
+			queryString += "&"
+		}
+		queryString += k + "=" + v
+	}
+
+	URL := fmt.Sprintf("%s/api/v1alpha/pipelines?%s", c.OrgURL, queryString)
+	response, err := c.execRequest(http.MethodGet, URL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var pipelines []any
+	err = json.Unmarshal(response, &pipelines)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	// Apply limit
+	if len(pipelines) > limit {
+		pipelines = pipelines[:limit]
+	}
+
+	return pipelines, nil
+}
+}
+
 type Secret struct {
 	APIVersion string         `json:"apiVersion"`
 	Kind       string         `json:"kind"`
