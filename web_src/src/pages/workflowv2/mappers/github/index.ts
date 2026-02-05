@@ -14,6 +14,7 @@ import { publishCommitStatusMapper } from "./publish_commit_status";
 import { createReleaseMapper } from "./create_release";
 import { updateReleaseMapper } from "./update_release";
 import { deleteReleaseMapper } from "./delete_release";
+import { createReviewMapper } from "./create_review";
 import { buildActionStateRegistry } from "../utils";
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
@@ -25,6 +26,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createRelease: buildActionStateRegistry("created"),
   updateRelease: buildActionStateRegistry("updated"),
   deleteRelease: buildActionStateRegistry("deleted"),
+  createReview: buildActionStateRegistry("submitted"),
 };
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -36,6 +38,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   createRelease: createReleaseMapper,
   updateRelease: updateReleaseMapper,
   deleteRelease: deleteReleaseMapper,
+  createReview: createReviewMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
