@@ -1,10 +1,12 @@
 import {
-  ComponentsComponent,
-  ComponentsNode,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
-import { ComponentBaseMapper, OutputPayload } from "../types";
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  OutputPayload,
+  SubtitleContext,
+} from "../types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
@@ -27,52 +29,47 @@ interface SendAndWaitMessageMetadata {
 }
 
 export const sendAndWaitMessageMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    _nodeQueueItems?: CanvasesCanvasNodeQueueItem[],
-    _additionalData?: unknown,
-  ): ComponentBaseProps {
-    const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition.name || node.component?.name || "unknown";
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+    const componentName = context.componentDefinition.name || "unknown";
 
     return {
-      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
+      title:
+        context.node.name ||
+        context.componentDefinition.label ||
+        context.componentDefinition.name ||
+        "Unnamed component",
       iconSrc: slackIcon,
       iconSlug: "slack",
-      iconColor: getColorClass(componentDefinition.color),
-      collapsedBackground: getBackgroundColorClass(componentDefinition.color),
-      collapsed: node.isCollapsed,
-      eventSections: lastExecution ? sendAndWaitMessageEventSections(nodes, lastExecution, componentName) : undefined,
+      iconColor: getColorClass(context.componentDefinition.color),
+      collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
+      collapsed: context.node.isCollapsed,
+      eventSections: lastExecution
+        ? sendAndWaitMessageEventSections(context.nodes, lastExecution, componentName)
+        : undefined,
       includeEmptyState: !lastExecution,
-      metadata: sendAndWaitMessageMetadataList(node),
-      specs: sendAndWaitMessageSpecs(node),
+      metadata: sendAndWaitMessageMetadataList(context.node),
+      specs: sendAndWaitMessageSpecs(context.node),
       eventStateMap: getStateMap(componentName),
     };
   },
 
-  getExecutionDetails(
-    execution: CanvasesCanvasNodeExecution,
-    _node: ComponentsNode,
-    _nodes?: ComponentsNode[],
-  ): Record<string, any> {
-    const outputs = execution.outputs as { received?: OutputPayload[]; timeout?: OutputPayload[] } | undefined;
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+    const outputs = context.execution.outputs as { received?: OutputPayload[]; timeout?: OutputPayload[] } | undefined;
 
     if (outputs?.received && outputs.received.length > 0) {
       const data = outputs.received[0].data as Record<string, unknown> | undefined;
       return {
         Status: "Received",
         Value: stringOrDash(data?.value),
-        "Received At": execution.updatedAt ? new Date(execution.updatedAt).toLocaleString() : "-",
+        "Received At": context.execution.updatedAt ? new Date(context.execution.updatedAt).toLocaleString() : "-",
       };
     }
 
     if (outputs?.timeout && outputs.timeout.length > 0) {
       return {
         Status: "Timed Out",
-        "Timed Out At": execution.updatedAt ? new Date(execution.updatedAt).toLocaleString() : "-",
+        "Timed Out At": context.execution.updatedAt ? new Date(context.execution.updatedAt).toLocaleString() : "-",
       };
     }
 
@@ -80,17 +77,13 @@ export const sendAndWaitMessageMapper: ComponentBaseMapper = {
       Status: "Waiting",
     };
   },
-  subtitle(
-    _node: ComponentsNode,
-    execution: CanvasesCanvasNodeExecution,
-    _additionalData?: unknown,
-  ): string | React.ReactNode {
-    if (!execution || !execution.createdAt) return "";
-    return formatTimeAgo(new Date(execution.createdAt));
+  subtitle(context: SubtitleContext): string {
+    if (!context.execution || !context.execution.createdAt) return "";
+    return formatTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
-function sendAndWaitMessageMetadataList(node: ComponentsNode): MetadataItem[] {
+function sendAndWaitMessageMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as SendAndWaitMessageMetadata | undefined;
   const configuration = node.configuration as SendAndWaitMessageConfiguration | undefined;
@@ -107,7 +100,7 @@ function sendAndWaitMessageMetadataList(node: ComponentsNode): MetadataItem[] {
   return metadata;
 }
 
-function sendAndWaitMessageSpecs(node: ComponentsNode): ComponentBaseSpec[] {
+function sendAndWaitMessageSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
   const configuration = node.configuration as SendAndWaitMessageConfiguration | undefined;
 
@@ -135,23 +128,21 @@ function sendAndWaitMessageSpecs(node: ComponentsNode): ComponentBaseSpec[] {
 }
 
 function sendAndWaitMessageEventSections(
-  nodes: ComponentsNode[],
-  execution: CanvasesCanvasNodeExecution,
+  nodes: NodeInfo[],
+  execution: ExecutionInfo,
   componentName: string,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  const rootEvent = execution.rootEvent!;
-  const triggerContext = (rootEvent as any).event ? rootEvent : { event: rootEvent };
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle(triggerContext as any);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [
     {
-      receivedAt: new Date(execution.createdAt!),
+      receivedAt: new Date(execution.createdAt),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
-      eventState: getState(componentName)(execution as any),
-      eventId: execution.rootEvent!.id!,
+      eventSubtitle: formatTimeAgo(new Date(execution.createdAt)),
+      eventState: getState(componentName)(execution),
+      eventId: execution.rootEvent?.id || "",
     },
   ];
 }
