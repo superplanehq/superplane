@@ -81,6 +81,11 @@ import {
   triggerRenderers as openaiTriggerRenderers,
   eventStateRegistry as openaiEventStateRegistry,
 } from "./openai/index";
+import {
+  componentMappers as dockerhubComponentMappers,
+  triggerRenderers as dockerhubTriggerRenderers,
+  eventStateRegistry as dockerhubEventStateRegistry,
+} from "./dockerhub";
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
@@ -118,6 +123,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   dash0: dash0ComponentMappers,
   daytona: daytonaComponentMappers,
   datadog: datadogComponentMappers,
+  dockerhub: dockerhubComponentMappers,
   slack: slackComponentMappers,
   smtp: smtpComponentMappers,
   rootly: rootlyComponentMappers,
@@ -134,6 +140,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   dash0: dash0TriggerRenderers,
   daytona: daytonaTriggerRenderers,
   datadog: datadogTriggerRenderers,
+  dockerhub: dockerhubTriggerRenderers,
   slack: slackTriggerRenderers,
   smtp: smtpTriggerRenderers,
   rootly: rootlyTriggerRenderers,
@@ -150,6 +157,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   dash0: dash0EventStateRegistry,
   daytona: daytonaEventStateRegistry,
   datadog: datadogEventStateRegistry,
+  dockerhub: dockerhubEventStateRegistry,
   slack: slackEventStateRegistry,
   smtp: smtpEventStateRegistry,
   discord: discordEventStateRegistry,
