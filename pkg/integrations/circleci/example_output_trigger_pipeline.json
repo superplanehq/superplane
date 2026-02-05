@@ -1,0 +1,18 @@
+{
+  "pipeline": {
+    "id": "1285fe1d-d3a6-44fc-8886-8979558254c4",
+    "number": 130,
+    "url": "https://app.circleci.com/pipelines/github/myorg/my-project/130"
+  },
+  "workflow": {
+    "id": "fda08377-fe7e-46b1-8992-3a7aaecac9c3",
+    "name": "build-test-deploy",
+    "status": "success",
+    "url": "https://app.circleci.com/pipelines/github/myorg/my-project/130/workflows/fda08377-fe7e-46b1-8992-3a7aaecac9c3"
+  },
+  "project": {
+    "id": "84996744-a854-4f5e-aea3-04e2851dc1d2",
+    "name": "my-project",
+    "slug": "github/myorg/my-project"
+  }
+}

@@ -1,0 +1,172 @@
+---
+title: "CircleCI"
+sidebar:
+  order: 15
+---
+
+Run and react to your CircleCI pipelines
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Workflow Completed" href="#on-workflow-completed" description="Listen to CircleCI workflow completion events" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Trigger Pipeline" href="#trigger-pipeline" description="Trigger a CircleCI pipeline and wait for completion" />
+</CardGrid>
+
+<a id="on-workflow-completed"></a>
+
+## On Workflow Completed
+
+The On Workflow Completed trigger starts a workflow execution when a CircleCI workflow completes.
+
+### Use Cases
+
+- **Pipeline orchestration**: Chain workflows together based on CircleCI workflow completion
+- **Status monitoring**: Monitor CI/CD workflow results
+- **Notification workflows**: Send notifications when workflows succeed or fail
+- **Post-processing**: Process artifacts or results after workflow completion
+
+### Configuration
+
+- **Project Slug**: The CircleCI project slug (e.g., `gh/org/repo` or `circleci/org-id/project-id`)
+
+### Event Data
+
+Each workflow completed event includes:
+- **workflow**: Workflow information including ID, name, status, and URL
+- **pipeline**: Pipeline information including ID and number
+- **project**: Project information including ID, name, and slug
+- **organization**: Organization information
+
+### Webhook Setup
+
+This trigger automatically sets up a CircleCI webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "id": "3888f21b-eaa7-38e3-8f3d-75a63bba8895",
+  "type": "workflow-completed",
+  "happened_at": "2021-09-01T22:49:34.317Z",
+  "webhook": {
+    "id": "cf8c4fdd-0587-4da1-b4ca-4846e9640af9",
+    "name": "SuperPlane Webhook"
+  },
+  "project": {
+    "id": "84996744-a854-4f5e-aea3-04e2851dc1d2",
+    "name": "my-project",
+    "slug": "github/myorg/my-project"
+  },
+  "organization": {
+    "id": "f22b6566-597d-46d5-ba74-99ef5bb3d85c",
+    "name": "myorg"
+  },
+  "workflow": {
+    "id": "fda08377-fe7e-46b1-8992-3a7aaecac9c3",
+    "name": "build-test-deploy",
+    "created_at": "2021-09-01T22:49:03.616Z",
+    "stopped_at": "2021-09-01T22:49:34.170Z",
+    "url": "https://app.circleci.com/pipelines/github/myorg/my-project/130/workflows/fda08377-fe7e-46b1-8992-3a7aaecac9c3",
+    "status": "success"
+  },
+  "pipeline": {
+    "id": "1285fe1d-d3a6-44fc-8886-8979558254c4",
+    "number": 130,
+    "created_at": "2021-09-01T22:49:03.544Z",
+    "trigger": {
+      "type": "webhook"
+    },
+    "vcs": {
+      "provider_name": "github",
+      "origin_repository_url": "https://github.com/myorg/my-project",
+      "target_repository_url": "https://github.com/myorg/my-project",
+      "revision": "1dc6aa69429bff4806ad6afe58d3d8f57e25973e",
+      "commit": {
+        "subject": "Description of change",
+        "body": "More details about the change",
+        "author": {
+          "name": "Author Name",
+          "email": "author.email@example.com"
+        },
+        "authored_at": "2021-09-01T22:48:53Z",
+        "committer": {
+          "name": "Committer Name",
+          "email": "committer.email@example.com"
+        },
+        "committed_at": "2021-09-01T22:48:53Z"
+      },
+      "branch": "main"
+    }
+  }
+}
+```
+
+<a id="trigger-pipeline"></a>
+
+## Trigger Pipeline
+
+The Trigger Pipeline component starts a CircleCI pipeline and waits for its workflows to complete.
+
+### Use Cases
+
+- **CI/CD orchestration**: Trigger builds and deployments from SuperPlane workflows
+- **Pipeline automation**: Run CircleCI pipelines as part of workflow automation
+- **Multi-stage deployments**: Coordinate complex deployment pipelines
+- **Workflow chaining**: Chain multiple CircleCI pipelines together
+
+### How It Works
+
+1. Triggers a CircleCI pipeline with the specified branch/tag and parameters
+2. Waits for the pipeline's workflows to complete (monitored via webhook and polling)
+3. Routes execution based on workflow result:
+   - **Success channel**: All workflows completed successfully
+   - **Failed channel**: Any workflow failed or was cancelled
+
+### Configuration
+
+- **Project Slug**: The CircleCI project slug (e.g., `gh/org/repo`)
+- **Branch**: Git branch to run the pipeline on (mutually exclusive with Tag)
+- **Tag**: Git tag to run the pipeline on (mutually exclusive with Branch)
+- **Parameters**: Optional pipeline parameters as key-value pairs (supports expressions)
+
+### Output Channels
+
+- **Success**: Emitted when all workflows complete successfully
+- **Failed**: Emitted when any workflow fails or is cancelled
+
+### Notes
+
+- The component automatically sets up webhook monitoring for workflow completion
+- Falls back to polling if webhook doesn't arrive
+- Can be cancelled, which will stop monitoring (but won't stop the CircleCI pipeline)
+
+### Example Output
+
+```json
+{
+  "pipeline": {
+    "id": "1285fe1d-d3a6-44fc-8886-8979558254c4",
+    "number": 130,
+    "url": "https://app.circleci.com/pipelines/github/myorg/my-project/130"
+  },
+  "workflow": {
+    "id": "fda08377-fe7e-46b1-8992-3a7aaecac9c3",
+    "name": "build-test-deploy",
+    "status": "success",
+    "url": "https://app.circleci.com/pipelines/github/myorg/my-project/130/workflows/fda08377-fe7e-46b1-8992-3a7aaecac9c3"
+  },
+  "project": {
+    "id": "84996744-a854-4f5e-aea3-04e2851dc1d2",
+    "name": "my-project",
+    "slug": "github/myorg/my-project"
+  }
+}
+```

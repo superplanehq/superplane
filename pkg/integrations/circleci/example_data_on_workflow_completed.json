@@ -1,0 +1,59 @@
+{
+  "data": {
+    "id": "3888f21b-eaa7-38e3-8f3d-75a63bba8895",
+    "type": "workflow-completed",
+    "happened_at": "2026-01-19T12:00:00.000Z",
+    "webhook": {
+      "id": "cf8c4fdd-0587-4da1-b4ca-4846e9640af9",
+      "name": "SuperPlane Webhook"
+    },
+    "project": {
+      "id": "84996744-a854-4f5e-aea3-04e2851dc1d2",
+      "name": "my-project",
+      "slug": "github/myorg/my-project"
+    },
+    "organization": {
+      "id": "f22b6566-597d-46d5-ba74-99ef5bb3d85c",
+      "name": "myorg"
+    },
+    "workflow": {
+      "id": "fda08377-fe7e-46b1-8992-3a7aaecac9c3",
+      "name": "build-test-deploy",
+      "created_at": "2026-01-19T11:55:00.000Z",
+      "stopped_at": "2026-01-19T12:00:00.000Z",
+      "url": "https://app.circleci.com/pipelines/github/myorg/my-project/130/workflows/fda08377-fe7e-46b1-8992-3a7aaecac9c3",
+      "status": "success"
+    },
+    "pipeline": {
+      "id": "1285fe1d-d3a6-44fc-8886-8979558254c4",
+      "number": 130,
+      "created_at": "2026-01-19T11:55:00.000Z",
+      "trigger": {
+        "type": "webhook"
+      },
+      "vcs": {
+        "provider_name": "github",
+        "origin_repository_url": "https://github.com/myorg/my-project",
+        "target_repository_url": "https://github.com/myorg/my-project",
+        "revision": "1dc6aa69429bff4806ad6afe58d3d8f57e25973e",
+        "commit": {
+          "subject": "Update README.md",
+          "body": "Added new documentation",
+          "author": {
+            "name": "Author Name",
+            "email": "author@example.com"
+          },
+          "authored_at": "2026-01-19T11:54:00Z",
+          "committer": {
+            "name": "Committer Name",
+            "email": "committer@example.com"
+          },
+          "committed_at": "2026-01-19T11:54:00Z"
+        },
+        "branch": "main"
+      }
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "circleci.workflow.completed"
+}
