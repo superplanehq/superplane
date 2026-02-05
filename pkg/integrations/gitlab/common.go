@@ -10,7 +10,7 @@ import (
 )
 
 type WebhookConfiguration struct {
-	EventType string `json:"eventType" mapstructure:"eventType"` 
+	EventType string `json:"eventType" mapstructure:"eventType"`
 	ProjectID string `json:"projectId" mapstructure:"projectId"`
 }
 

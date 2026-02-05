@@ -11,10 +11,7 @@ import (
 )
 
 type HooksClient struct {
-	baseURL    string
-	token      string
-	authType   string
-	httpClient core.HTTPContext
+	*Client
 }
 
 type Hook struct {
@@ -62,16 +59,13 @@ func NewHooksClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*
 	}
 
 	return &HooksClient{
-		baseURL:    baseURL,
-		token:      token,
-		authType:   authType,
-		httpClient: httpClient,
+		Client: &Client{
+			baseURL:    baseURL,
+			token:      token,
+			authType:   authType,
+			httpClient: httpClient,
+		},
 	}, nil
-}
-
-func (c *HooksClient) do(req *http.Request) (*http.Response, error) {
-	setAuthHeaders(req, c.authType, c.token)
-	return c.httpClient.Do(req)
 }
 
 func (c *HooksClient) CreateHook(projectID string, webhookURL string, secret string, events HookEvents) (*Hook, error) {
