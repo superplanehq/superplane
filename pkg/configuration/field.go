@@ -32,6 +32,7 @@ const (
 	FieldTypeIntegrationResource = "integration-resource"
 	FieldTypeAnyPredicateList    = "any-predicate-list"
 	FieldTypeGitRef              = "git-ref"
+	FieldTypeSecretKey           = "secret-key"
 )
 
 type Field struct {
