@@ -18,8 +18,20 @@ export const integrationKeys = {
   connected: (organizationId: string) => [...integrationKeys.all, "connected", organizationId] as const,
   integration: (organizationId: string, integrationId: string) =>
     [...integrationKeys.connected(organizationId), integrationId] as const,
-  resources: (organizationId: string, integrationId: string, resourceType: string) =>
-    [...integrationKeys.integration(organizationId, integrationId), "resources", resourceType] as const,
+  resources: (
+    organizationId: string,
+    integrationId: string,
+    resourceType: string,
+    parameters?: Record<string, string>,
+  ) =>
+    [
+      ...integrationKeys.integration(organizationId, integrationId),
+      "resources",
+      resourceType,
+      Object.entries(parameters ?? {})
+        .map(([k, v]) => `${k}=${v}`)
+        .join("&"),
+    ] as const,
 };
 
 // Hook to fetch available integrations (catalog).
@@ -80,14 +92,27 @@ export const useIntegration = (organizationId: string, integrationId: string) =>
   });
 };
 
-export const useIntegrationResources = (organizationId: string, integrationId: string, resourceType: string) => {
+export const useIntegrationResources = (
+  organizationId: string,
+  integrationId: string,
+  resourceType: string,
+  parameters?: Record<string, string>,
+) => {
   return useQuery({
-    queryKey: integrationKeys.resources(organizationId, integrationId, resourceType),
+    queryKey: integrationKeys.resources(organizationId, integrationId, resourceType, parameters),
     queryFn: async () => {
+      const query: Record<string, string> = {
+        type: resourceType,
+      };
+
+      for (const [k, v] of Object.entries(parameters ?? {})) {
+        query[k] = v;
+      }
+
       const response = await organizationsListIntegrationResources(
         withOrganizationHeader({
           path: { id: organizationId, integrationId },
-          query: { type: resourceType },
+          query,
         }),
       );
       return response.data?.resources || [];

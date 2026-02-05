@@ -1901,7 +1901,7 @@
             "type": "string"
           },
           {
-            "name": "type",
+            "name": "parameters",
             "in": "query",
             "required": false,
             "type": "string"
@@ -4029,6 +4029,28 @@
         }
       }
     },
+    "ConfigurationParameterRef": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "valueFrom": {
+          "$ref": "#/definitions/ConfigurationParameterValueFrom"
+        }
+      }
+    },
+    "ConfigurationParameterValueFrom": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string"
+        }
+      }
+    },
     "ConfigurationRequiredCondition": {
       "type": "object",
       "properties": {
@@ -4054,6 +4076,13 @@
         },
         "multi": {
           "type": "boolean"
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationParameterRef"
+          }
         }
       }
     },

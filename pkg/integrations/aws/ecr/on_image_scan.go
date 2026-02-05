@@ -78,9 +78,14 @@ func (p *OnImageScan) Configuration() []configuration.Field {
 		{
 			Name:     "region",
 			Label:    "Region",
-			Type:     configuration.FieldTypeString,
+			Type:     configuration.FieldTypeSelect,
 			Required: true,
 			Default:  "us-east-1",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: common.AllRegions,
+				},
+			},
 		},
 		{
 			Name:        "repository",
@@ -88,9 +93,23 @@ func (p *OnImageScan) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "Filter by ECR repository name",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "region",
+					Values: []string{"*"},
+				},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "ecr.repository",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "region",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "region",
+							},
+						},
+					},
 				},
 			},
 		},

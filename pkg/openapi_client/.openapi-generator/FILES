@@ -86,6 +86,8 @@ docs/ConfigurationListTypeOptions.md
 docs/ConfigurationMultiSelectTypeOptions.md
 docs/ConfigurationNumberTypeOptions.md
 docs/ConfigurationObjectTypeOptions.md
+docs/ConfigurationParameterRef.md
+docs/ConfigurationParameterValueFrom.md
 docs/ConfigurationRequiredCondition.md
 docs/ConfigurationResourceTypeOptions.md
 docs/ConfigurationSelectOption.md
@@ -263,6 +265,8 @@ model_configuration_list_type_options.go
 model_configuration_multi_select_type_options.go
 model_configuration_number_type_options.go
 model_configuration_object_type_options.go
+model_configuration_parameter_ref.go
+model_configuration_parameter_value_from.go
 model_configuration_required_condition.go
 model_configuration_resource_type_options.go
 model_configuration_select_option.go
