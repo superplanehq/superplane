@@ -28,6 +28,7 @@ import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 
 export interface BuildingBlock {
   name: string;
@@ -399,6 +400,7 @@ function CategorySection({
     rootly: rootlyIcon,
     semaphore: SemaphoreLogo,
     slack: slackIcon,
+    sendgrid: sendgridIcon,
     aws: {
       codeArtifact: awsIcon,
       lambda: awsLambdaIcon,
@@ -467,6 +469,7 @@ function CategorySection({
             rootly: rootlyIcon,
             semaphore: SemaphoreLogo,
             slack: slackIcon,
+            sendgrid: sendgridIcon,
             aws: {
               codeArtifact: awsCodeArtifactIcon,
               ecr: awsEcrIcon,
