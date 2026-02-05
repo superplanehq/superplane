@@ -1,6 +1,5 @@
-import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerRenderer } from "../types";
+import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
 import { BaseNodeMetadata, GitRef } from "./types";
@@ -16,17 +15,17 @@ interface GithubConfiguration {
  * Renderer for the "github.onBranchCreated" trigger
  */
 export const onBranchCreatedTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as GitRef;
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+    const eventData = context.event?.data as GitRef;
 
     return {
       title: eventData?.ref ? `Branch: ${eventData.ref}` : "Branch Created",
-      subtitle: buildGithubSubtitle(eventData?.ref || "", event.createdAt),
+      subtitle: buildGithubSubtitle(eventData?.ref || "", context.event?.createdAt),
     };
   },
 
-  getRootEventValues: (lastEvent: CanvasesCanvasEvent): Record<string, string> => {
-    const eventData = lastEvent.data?.data as GitRef;
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
+    const eventData = context.event?.data as GitRef;
 
     return {
       Branch: eventData?.ref || "",
@@ -35,26 +34,27 @@ export const onBranchCreatedTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
+  getTriggerProps: (context: TriggerRendererContext) => {
+    const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as BaseNodeMetadata;
     const configuration = node.configuration as unknown as GithubConfiguration;
 
     const props: TriggerProps = {
-      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
+      title: node.name || definition.label || "Unnamed trigger",
       iconSrc: githubIcon,
-      iconColor: getColorClass(trigger.color),
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      iconColor: getColorClass(definition.color),
+      collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: createGithubMetadataItems(metadata?.repository?.name, configuration?.branches),
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as GitRef;
+      const eventData = lastEvent.data as GitRef;
       props.lastEventData = {
         title: eventData?.ref ? `Branch: ${eventData.ref}` : "Branch Created",
         subtitle: buildGithubSubtitle(eventData?.ref || "", lastEvent.createdAt),
-        receivedAt: new Date(lastEvent.createdAt!),
+        receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
-        eventId: lastEvent.id!,
+        eventId: lastEvent.id,
       };
     }
 

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -13,6 +14,85 @@ const (
 	secretAccessKeySecret = "secretAccessKey"
 	sessionTokenSecret    = "sessionToken"
 )
+
+var AllRegions = []configuration.FieldOption{
+	{
+		Label: "us-east-1",
+		Value: "us-east-1",
+	},
+	{
+		Label: "us-east-2",
+		Value: "us-east-2",
+	},
+	{
+		Label: "us-west-1",
+		Value: "us-west-1",
+	},
+	{
+		Label: "us-west-2",
+		Value: "us-west-2",
+	},
+	{
+		Label: "eu-west-1",
+		Value: "eu-west-1",
+	},
+	{
+		Label: "eu-central-1",
+		Value: "eu-central-1",
+	},
+	{
+		Label: "ap-northeast-1",
+		Value: "ap-northeast-1",
+	},
+	{
+		Label: "ap-northeast-2",
+		Value: "ap-northeast-2",
+	},
+	{
+		Label: "ap-southeast-1",
+		Value: "ap-southeast-1",
+	},
+	{
+		Label: "ap-southeast-2",
+		Value: "ap-southeast-2",
+	},
+	{
+		Label: "ap-south-1",
+		Value: "ap-south-1",
+	},
+	{
+		Label: "ca-central-1",
+		Value: "ca-central-1",
+	},
+	{
+		Label: "cn-north-1",
+		Value: "cn-north-1",
+	},
+	{
+		Label: "cn-northwest-1",
+		Value: "cn-northwest-1",
+	},
+	{
+		Label: "eu-north-1",
+		Value: "eu-north-1",
+	},
+	{
+		Label: "eu-south-1",
+		Value: "eu-south-1",
+	},
+	{
+		Label: "eu-west-2",
+		Value: "eu-west-2",
+	},
+	{
+		Label: "eu-west-3",
+		Value: "eu-west-3",
+	},
+	{
+		Label: "sa-east-1",
+		Value: "sa-east-1",
+	},
+}
 
 type IntegrationMetadata struct {
 	Session     *SessionMetadata     `json:"session" mapstructure:"session"`

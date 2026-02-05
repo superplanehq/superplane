@@ -176,7 +176,7 @@ type Repository struct {
 	DomainName string `json:"domainName"`
 }
 
-func (c *Client) ListRepositories() ([]Repository, error) {
+func (c *Client) ListRepositories(domain string) ([]Repository, error) {
 	endpoint := fmt.Sprintf("https://codeartifact.%s.amazonaws.com/v1/repositories", c.region)
 	repositories := []Repository{}
 	nextToken := ""
@@ -185,6 +185,11 @@ func (c *Client) ListRepositories() ([]Repository, error) {
 		payload := map[string]any{
 			"maxResults": 100,
 		}
+
+		if domain != "" {
+			payload["domain"] = domain
+		}
+
 		if strings.TrimSpace(nextToken) != "" {
 			payload["nextToken"] = strings.TrimSpace(nextToken)
 		}
