@@ -138,9 +138,7 @@ func (t *OnEmailEvent) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		EventTypes: config.EventTypes,
-	})
+	return ctx.Integration.RequestWebhook(struct{}{})
 }
 
 func (t *OnEmailEvent) Actions() []core.Action {
@@ -196,10 +194,6 @@ func (t *OnEmailEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 
 func (t *OnEmailEvent) Cleanup(ctx core.TriggerContext) error {
 	return nil
-}
-
-type WebhookConfiguration struct {
-	EventTypes []string `json:"eventTypes"`
 }
 
 func parseWebhookEvents(body []byte) ([]map[string]any, error) {
