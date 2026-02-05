@@ -1,5 +1,6 @@
 import type { SuperplaneBlueprintsOutputChannel, SuperplaneComponentsOutputChannel } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -12,16 +13,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
+import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
+import discordIcon from "@/assets/icons/integrations/discord.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
+import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
-import smtpIcon from "@/assets/icons/integrations/smtp.svg";
+import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
+import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
@@ -52,6 +57,7 @@ export interface BuildingBlocksSidebarProps {
   blocks: BuildingBlockCategory[];
   canvasZoom?: number;
   disabled?: boolean;
+  disabledMessage?: string;
   onBlockClick?: (block: BuildingBlock) => void;
   onAddNote?: () => void;
 }
@@ -62,25 +68,66 @@ export function BuildingBlocksSidebar({
   blocks,
   canvasZoom = 1,
   disabled = false,
+  disabledMessage,
   onBlockClick,
   onAddNote,
 }: BuildingBlocksSidebarProps) {
+  const disabledTooltip = disabledMessage || "Finish configuring the selected component first";
+
   if (!isOpen) {
+    const addNoteButton = (
+      <Button
+        variant="outline"
+        onClick={() => {
+          if (disabled) return;
+          onAddNote?.();
+        }}
+        aria-label="Add Note"
+        data-testid="add-note-button"
+        disabled={disabled}
+      >
+        <StickyNote size={16} className="animate-pulse" />
+        Add Note
+      </Button>
+    );
+    const openSidebarButton = (
+      <Button
+        variant="outline"
+        onClick={() => {
+          if (disabled) return;
+          onToggle(true);
+        }}
+        aria-label="Open sidebar"
+        data-testid="open-sidebar-button"
+        disabled={disabled}
+      >
+        <Plus size={16} />
+        Components
+      </Button>
+    );
+
     return (
       <div className="absolute top-4 right-4 z-10 flex gap-3">
-        <Button variant="outline" onClick={onAddNote} aria-label="Add Note" data-testid="add-note-button">
-          <StickyNote size={16} className="animate-pulse" />
-          Add Note
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => onToggle(true)}
-          aria-label="Open sidebar"
-          data-testid="open-sidebar-button"
-        >
-          <Plus size={16} />
-          Components
-        </Button>
+        {disabled ? (
+          <Tooltip>
+            <TooltipTrigger asChild>{addNoteButton}</TooltipTrigger>
+            <TooltipContent side="left" sideOffset={10}>
+              <p>{disabledTooltip}</p>
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          addNoteButton
+        )}
+        {disabled ? (
+          <Tooltip>
+            <TooltipTrigger asChild>{openSidebarButton}</TooltipTrigger>
+            <TooltipContent side="left" sideOffset={10}>
+              <p>{disabledTooltip}</p>
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          openSidebarButton
+        )}
       </div>
     );
   }
@@ -216,12 +263,12 @@ export function BuildingBlocksSidebar({
       {/* Search and Filter */}
       <div className="flex items-center gap-2 px-5">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-          <input
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+          <Input
             ref={searchInputRef}
             type="text"
             placeholder="Filter components..."
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-800 focus:border-transparent"
+            className="pl-9"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -261,7 +308,7 @@ export function BuildingBlocksSidebar({
               <div className="absolute inset-0 bg-white/60 dark:bg-gray-900/60 z-30 cursor-not-allowed" />
             </TooltipTrigger>
             <TooltipContent side="left" sideOffset={10}>
-              <p>Finish configuring the selected component first</p>
+              <p>{disabledTooltip}</p>
             </TooltipContent>
           </Tooltip>
         )}
@@ -280,7 +327,7 @@ export function BuildingBlocksSidebar({
         {hoveredBlock && (
           <ComponentBase
             title={hoveredBlock.label || hoveredBlock.name || "New Component"}
-            iconSlug={hoveredBlock.icon}
+            iconSlug={hoveredBlock.name?.split(".")[0] === "smtp" ? "mail" : (hoveredBlock.icon ?? "zap")}
             iconColor="text-gray-800"
             collapsedBackground={getBackgroundColorClass("white")}
             includeEmptyState={true}
@@ -341,18 +388,21 @@ function CategorySection({
 
   // Determine category icon
   const appLogoMap: Record<string, string | Record<string, string>> = {
+    cloudflare: cloudflareIcon,
     dash0: dash0Icon,
     datadog: datadogIcon,
     daytona: daytonaIcon,
+    discord: discordIcon,
     github: githubIcon,
+    jira: jiraIcon,
     openai: openAiIcon,
     "open-ai": openAiIcon,
     pagerduty: pagerDutyIcon,
     rootly: rootlyIcon,
     semaphore: SemaphoreLogo,
     slack: slackIcon,
-    smtp: smtpIcon,
     aws: {
+      codeArtifact: awsIcon,
       lambda: awsLambdaIcon,
       ecr: awsEcrIcon,
     },
@@ -362,14 +412,16 @@ function CategorySection({
   const firstBlock = allBlocks[0];
   const integrationName = firstBlock?.integrationName || category.name.toLowerCase();
   const appLogo = appLogoMap[integrationName];
-  const categoryIconSrc = typeof appLogo === "string" ? appLogo : undefined;
+  const categoryIconSrc = typeof appLogo === "string" ? appLogo : integrationName === "aws" ? awsIcon : undefined;
 
-  // Determine icon for special categories
+  // Determine icon for special categories (Core, Bundles, SMTP use Lucide SVG; others use img when categoryIconSrc)
   let CategoryIcon: React.ComponentType<{ size?: number; className?: string }> | null = null;
   if (category.name === "Core") {
     CategoryIcon = resolveIcon("zap");
   } else if (category.name === "Bundles") {
     CategoryIcon = resolveIcon("package");
+  } else if (integrationName === "smtp") {
+    CategoryIcon = resolveIcon("mail");
   } else if (categoryIconSrc) {
     // Integration category - will use img tag
   } else {
@@ -399,13 +451,17 @@ function CategorySection({
 
       <ItemGroup>
         {allBlocks.map((block) => {
-          const iconSlug = block.type === "blueprint" ? "component" : block.icon || "zap";
+          const nameParts = block.name?.split(".") ?? [];
+          const iconSlug =
+            block.type === "blueprint" ? "component" : nameParts[0] === "smtp" ? "mail" : block.icon || "zap";
 
-          // Use SVG icons for application components/triggers
+          // Use SVG icons for application components/triggers (SMTP uses resolveIcon("mail"), same as core)
           const appLogoMap: Record<string, string | Record<string, string>> = {
+            cloudflare: cloudflareIcon,
             dash0: dash0Icon,
             daytona: daytonaIcon,
             datadog: datadogIcon,
+            discord: discordIcon,
             github: githubIcon,
             openai: openAiIcon,
             "open-ai": openAiIcon,
@@ -413,13 +469,12 @@ function CategorySection({
             rootly: rootlyIcon,
             semaphore: SemaphoreLogo,
             slack: slackIcon,
-            smtp: smtpIcon,
             aws: {
+              codeArtifact: awsCodeArtifactIcon,
               ecr: awsEcrIcon,
               lambda: awsLambdaIcon,
             },
           };
-          const nameParts = block.name?.split(".") ?? [];
           const appLogo = nameParts[0] ? appLogoMap[nameParts[0]] : undefined;
           const appIconSrc = typeof appLogo === "string" ? appLogo : nameParts[1] ? appLogo?.[nameParts[1]] : undefined;
           const IconComponent = resolveIcon(iconSlug);
@@ -495,7 +550,14 @@ function CategorySection({
               }}
               aria-disabled={!isLive}
               title={isLive ? undefined : "Coming soon"}
-              className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing hover:bg-sky-100`}
+              className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing ${(() => {
+                const subtype = block.componentSubtype || getComponentSubtype(block);
+                return subtype === "trigger"
+                  ? "hover:bg-sky-100 dark:hover:bg-sky-900/20"
+                  : subtype === "flow"
+                    ? "hover:bg-purple-100 dark:hover:bg-purple-900/20"
+                    : "hover:bg-green-100 dark:hover:bg-green-900/20";
+              })()}`}
               size="sm"
             >
               <ItemMedia>
@@ -507,24 +569,26 @@ function CategorySection({
               </ItemMedia>
 
               <ItemContent>
-                <div className="flex items-center gap-2">
-                  <ItemTitle className="text-sm font-normal">{block.label || block.name}</ItemTitle>
+                <div className="flex items-center gap-2 w-full min-w-0">
+                  <ItemTitle className="text-sm font-normal min-w-0 flex-1 truncate">
+                    {block.label || block.name}
+                  </ItemTitle>
                   {(() => {
                     const subtype = block.componentSubtype || getComponentSubtype(block);
                     const badgeClass =
                       subtype === "trigger"
-                        ? "px-1.5 py-0.5 text-[11px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 rounded whitespace-nowrap"
+                        ? "inline-block text-left px-1.5 py-0.5 text-[11px] font-medium text-sky-600 dark:text-sky-400 rounded whitespace-nowrap flex-shrink-0"
                         : subtype === "flow"
-                          ? "px-1.5 py-0.5 text-[11px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 rounded whitespace-nowrap"
-                          : "px-1.5 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400 rounded whitespace-nowrap";
+                          ? "inline-block text-left px-1.5 py-0.5 text-[11px] font-medium text-purple-600 dark:text-purple-400 rounded whitespace-nowrap flex-shrink-0"
+                          : "inline-block text-left px-1.5 py-0.5 text-[11px] font-medium text-green-600 dark:text-green-400 rounded whitespace-nowrap flex-shrink-0";
                     return (
-                      <span className={badgeClass}>
+                      <span className={`${badgeClass} ml-auto`}>
                         {subtype === "trigger" ? "Trigger" : subtype === "flow" ? "Flow" : "Action"}
                       </span>
                     );
                   })()}
                   {block.deprecated && (
-                    <span className="px-1.5 py-0.5 text-[11px] font-medium bg-gray-950/5 text-gray-500 rounded whitespace-nowrap">
+                    <span className="px-1.5 py-0.5 text-[11px] font-medium bg-gray-950/5 text-gray-500 rounded whitespace-nowrap flex-shrink-0">
                       Deprecated
                     </span>
                   )}

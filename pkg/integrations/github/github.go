@@ -99,6 +99,7 @@ func (g *GitHub) Components() []core.Component {
 		&RunWorkflow{},
 		&PublishCommitStatus{},
 		&CreateRelease{},
+		&GetRelease{},
 		&UpdateRelease{},
 		&DeleteRelease{},
 	}
@@ -627,10 +628,10 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 			"repository_hooks": "write",
 			"statuses":         "write",
 		},
-		"setup_url":    fmt.Sprintf(`%s/api/v1/integrations/%s/setup`, ctx.BaseURL, ctx.InstallationID),
-		"redirect_url": fmt.Sprintf(`%s/api/v1/integrations/%s/redirect`, ctx.BaseURL, ctx.InstallationID),
+		"setup_url":    fmt.Sprintf(`%s/api/v1/integrations/%s/setup`, ctx.BaseURL, ctx.Integration.ID().String()),
+		"redirect_url": fmt.Sprintf(`%s/api/v1/integrations/%s/redirect`, ctx.BaseURL, ctx.Integration.ID().String()),
 		"hook_attributes": map[string]any{
-			"url": fmt.Sprintf(`%s/api/v1/integrations/%s/webhook`, ctx.WebhooksBaseURL, ctx.InstallationID),
+			"url": fmt.Sprintf(`%s/api/v1/integrations/%s/webhook`, ctx.WebhooksBaseURL, ctx.Integration.ID().String()),
 		},
 	}
 

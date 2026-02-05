@@ -5,13 +5,12 @@ import {
   OrganizationsIntegration,
 } from "@/api-client";
 import { useCallback, useEffect, useMemo, useState, ReactNode } from "react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
+import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
-import { AlertTriangle } from "lucide-react";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { isFieldRequired, isFieldVisible, parseDefaultValues, validateFieldForSubmission } from "@/utils/components";
 import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
@@ -35,7 +34,14 @@ interface SettingsTabProps {
   integrationName?: string;
   integrationRef?: ComponentsIntegrationRef;
   integrations?: OrganizationsIntegration[];
+  integrationDefinition?: { name?: string; label?: string; icon?: string };
   autocompleteExampleObj?: Record<string, unknown> | null;
+  onOpenCreateIntegrationDialog?: () => void;
+  onOpenConfigureIntegrationDialog?: (integrationId: string) => void;
+  readOnly?: boolean;
+  canReadIntegrations?: boolean;
+  canCreateIntegrations?: boolean;
+  canUpdateIntegrations?: boolean;
 }
 
 export function SettingsTab({
@@ -52,8 +58,19 @@ export function SettingsTab({
   integrationName,
   integrationRef,
   integrations = [],
+  integrationDefinition,
   autocompleteExampleObj,
+  onOpenCreateIntegrationDialog,
+  onOpenConfigureIntegrationDialog,
+  readOnly = false,
+  canReadIntegrations,
+  canCreateIntegrations,
+  canUpdateIntegrations,
 }: SettingsTabProps) {
+  const isReadOnly = readOnly ?? false;
+  const allowIntegrations = canReadIntegrations ?? true;
+  const allowCreateIntegrations = canCreateIntegrations ?? true;
+  const allowUpdateIntegrations = canUpdateIntegrations ?? true;
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(configuration || {});
   const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
@@ -76,11 +93,16 @@ export function SettingsTab({
     return filtered;
   }, [configurationFields, defaultValues]);
 
-  // Filter integrations by integration type
-  const availableIntegrations = useMemo(() => {
+  // All installations of this integration type (ready, error, pending)
+  const integrationsOfType = useMemo(() => {
     if (!integrationName) return [];
-    return integrations.filter((i) => i.spec?.integrationName === integrationName && i.status?.state === "ready");
+    return integrations.filter((i) => i.spec?.integrationName === integrationName);
   }, [integrations, integrationName]);
+  const selectedIntegrationFull = useMemo(() => {
+    const id = selectedIntegration?.id ?? integrationRef?.id;
+    if (!id) return undefined;
+    return integrations.find((i) => i.metadata?.id === id);
+  }, [integrations, selectedIntegration?.id, integrationRef?.id]);
   const {
     validationErrors: realtimeValidationErrors,
     validateNow,
@@ -202,7 +224,7 @@ export function SettingsTab({
 
   // Auto-select the first installation if none is selected or selection is invalid
   useEffect(() => {
-    if (availableIntegrations.length === 0) {
+    if (integrationsOfType.length === 0) {
       if (selectedIntegration) {
         setSelectedIntegration(undefined);
       }
@@ -211,30 +233,35 @@ export function SettingsTab({
 
     const selectedId = selectedIntegration?.id;
     const hasSelected = selectedId
-      ? availableIntegrations.some((integration) => integration.metadata?.id === selectedId)
+      ? integrationsOfType.some((integration) => integration.metadata?.id === selectedId)
       : false;
     if (hasSelected) {
       return;
     }
 
-    const firstIntegration = availableIntegrations[0];
+    const firstIntegration = integrationsOfType[0];
     setSelectedIntegration({
       id: firstIntegration.metadata?.id,
       name: firstIntegration.metadata?.name,
     });
-  }, [availableIntegrations, selectedIntegration]);
+  }, [integrationsOfType, selectedIntegration]);
 
-  const shouldShowConfiguration = !integrationName || !!selectedIntegration?.id;
+  const isIntegrationReady =
+    !integrationName || !allowIntegrations || selectedIntegrationFull?.status?.state === "ready";
+  const shouldShowConfiguration = (!integrationName || !!selectedIntegration?.id) && isIntegrationReady;
 
   const handleSave = () => {
+    if (isReadOnly) {
+      return;
+    }
     validateNow();
     onSave(nodeConfiguration, currentNodeName, selectedIntegration);
   };
 
   return (
     <div className="p-4 overflow-y-auto pb-20" style={{ maxHeight: "80vh" }}>
-      <div className="space-y-6">
-        {/* Node identification section */}
+      <div className={`space-y-6 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`} aria-disabled={isReadOnly}>
+        {/* Node identification section — always visible */}
         <div className="flex flex-col gap-2">
           <Label className="min-w-[100px] text-left">
             Name
@@ -249,64 +276,136 @@ export function SettingsTab({
             placeholder="Enter a name for this node"
             autoFocus
             className="shadow-none"
+            disabled={isReadOnly}
           />
         </div>
 
-        {/* Integration section */}
+        {/* Integration section — one container, three states: Connect / error or incomplete / ready */}
         {integrationName && (
           <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-            {availableIntegrations.length === 0 ? (
-              // Warning when no integrations available
-              <Alert className="bg-orange-50 dark:bg-amber-950">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle className="text-amber-900 dark:text-amber-100">Integration Required</AlertTitle>
-                <AlertDescription className="text-amber-900 dark:text-amber-200">
-                  This component requires a {integrationName} integration.{" "}
-                  <a
-                    href={`/${domainId}/settings/integrations`}
-                    className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800 dark:hover:text-blue-300"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Create an {integrationName} integration
-                  </a>{" "}
-                  to configure this component.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              // Select when integrations are available
-              <div className="flex flex-col gap-2">
-                <Label className="min-w-[100px] text-left">
-                  Integration
-                  <span className="text-gray-800 ml-1">*</span>
-                  {showValidation && validationErrors.has("integration") && (
-                    <span className="text-red-500 text-xs ml-2">Required</span>
-                  )}
-                </Label>
-                <Select
-                  value={selectedIntegration?.id || ""}
-                  onValueChange={(value) => {
-                    const integration = availableIntegrations.find((i) => i.metadata?.id === value);
-                    if (integration) {
-                      setSelectedIntegration({
-                        id: integration.metadata?.id,
-                        name: integration.metadata?.name,
-                      });
-                    }
-                  }}
-                >
-                  <SelectTrigger className="w-full shadow-none">
-                    <SelectValue placeholder="Select an installation" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableIntegrations.map((integration) => (
-                      <SelectItem key={integration.metadata?.id} value={integration.metadata?.id || ""}>
-                        {integration.metadata?.name || "Unnamed integration"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {!allowIntegrations ? (
+              <div className="bg-gray-50 dark:bg-gray-900/30 border border-gray-200 dark:border-gray-700 rounded-md p-3 text-sm text-gray-600 dark:text-gray-300">
+                You don't have permission to view integrations.
               </div>
+            ) : integrationsOfType.length === 0 ? (
+              /* No integration: Connect XYZ — always use helper so "github" shows as "GitHub" */
+              <div className="bg-orange-100 dark:bg-orange-950/30 border border-orange-950/15 rounded-md bg-stripe-diagonal p-3 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2 min-w-0">
+                  <IntegrationIcon
+                    integrationName={integrationName}
+                    iconSlug={integrationDefinition?.icon}
+                    className="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400"
+                  />
+                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
+                    {getIntegrationTypeDisplayName(undefined, integrationName) || integrationName} Integration
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onOpenCreateIntegrationDialog}
+                  className="flex-shrink-0"
+                  disabled={isReadOnly || !allowCreateIntegrations}
+                >
+                  Connect
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col gap-2">
+                  <Label className="min-w-[100px] text-left">
+                    Integration
+                    <span className="text-gray-800 ml-1">*</span>
+                    {showValidation && validationErrors.has("integration") && (
+                      <span className="text-red-500 text-xs ml-2">Required</span>
+                    )}
+                  </Label>
+                  <Select
+                    value={selectedIntegration?.id || ""}
+                    onValueChange={(value) => {
+                      const integration = integrationsOfType.find((i) => i.metadata?.id === value);
+                      if (integration) {
+                        setSelectedIntegration({
+                          id: integration.metadata?.id,
+                          name: integration.metadata?.name,
+                        });
+                      }
+                    }}
+                    disabled={isReadOnly}
+                  >
+                    <SelectTrigger className="w-full shadow-none">
+                      <SelectValue placeholder="Select an installation" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {integrationsOfType.map((integration) => {
+                        const instanceName = integration.metadata?.name;
+                        const typeName = integration.spec?.integrationName;
+                        const displayName =
+                          instanceName?.toLowerCase() === typeName?.toLowerCase()
+                            ? getIntegrationTypeDisplayName(undefined, typeName) || instanceName
+                            : instanceName;
+                        return (
+                          <SelectItem key={integration.metadata?.id} value={integration.metadata?.id || ""}>
+                            {displayName || "Unnamed integration"}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {selectedIntegrationFull && (
+                  <div
+                    className={`mt-3 border border-gray-300 dark:border-gray-700 rounded-md bg-stripe-diagonal p-3 flex items-center justify-between gap-4 ${
+                      selectedIntegrationFull.status?.state === "ready"
+                        ? "bg-green-100 dark:bg-green-950/30"
+                        : selectedIntegrationFull.status?.state === "error"
+                          ? "bg-red-100 dark:bg-red-950/30"
+                          : "bg-orange-100 dark:bg-orange-950/30"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <IntegrationIcon
+                        integrationName={selectedIntegrationFull.spec?.integrationName}
+                        iconSlug={integrationDefinition?.icon}
+                        className="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400"
+                      />
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
+                          {getIntegrationTypeDisplayName(undefined, selectedIntegrationFull.spec?.integrationName) ||
+                            "Integration"}
+                        </h3>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                          selectedIntegrationFull.status?.state === "ready"
+                            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                            : selectedIntegrationFull.status?.state === "error"
+                              ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                              : "bg-orange-100 text-yellow-800 dark:text-yellow-900/30 dark:text-yellow-400"
+                        }`}
+                      >
+                        {selectedIntegrationFull.status?.state
+                          ? selectedIntegrationFull.status.state.charAt(0).toUpperCase() +
+                            selectedIntegrationFull.status.state.slice(1)
+                          : "Unknown"}
+                      </span>
+                      {selectedIntegrationFull.metadata?.id && onOpenConfigureIntegrationDialog && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-sm py-1.5"
+                          onClick={() => onOpenConfigureIntegrationDialog(selectedIntegrationFull.metadata!.id!)}
+                          disabled={isReadOnly || !allowUpdateIntegrations}
+                        >
+                          Configure...
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -369,7 +468,7 @@ export function SettingsTab({
       </div>
 
       <div className="flex gap-2 justify-end mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-        <Button data-testid="save-node-button" variant="default" onClick={handleSave}>
+        <Button data-testid="save-node-button" variant="default" onClick={handleSave} disabled={isReadOnly}>
           Save
         </Button>
       </div>

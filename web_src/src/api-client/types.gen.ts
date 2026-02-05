@@ -411,6 +411,16 @@ export type ConfigurationObjectTypeOptions = {
   schema?: Array<ConfigurationField>;
 };
 
+export type ConfigurationParameterRef = {
+  name?: string;
+  value?: string;
+  valueFrom?: ConfigurationParameterValueFrom;
+};
+
+export type ConfigurationParameterValueFrom = {
+  field?: string;
+};
+
 export type ConfigurationRequiredCondition = {
   field?: string;
   values?: Array<string>;
@@ -420,6 +430,7 @@ export type ConfigurationResourceTypeOptions = {
   type?: string;
   useNameAsValue?: boolean;
   multi?: boolean;
+  parameters?: Array<ConfigurationParameterRef>;
 };
 
 export type ConfigurationSelectOption = {
@@ -837,6 +848,10 @@ export type SecretsCreateSecretResponse = {
   secret?: SecretsSecret;
 };
 
+export type SecretsDeleteSecretKeyResponse = {
+  secret?: SecretsSecret;
+};
+
 export type SecretsDeleteSecretResponse = {
   [key: string]: unknown;
 };
@@ -867,10 +882,30 @@ export type SecretsSecretSpec = {
   local?: SecretLocal;
 };
 
+export type SecretsSetSecretKeyBody = {
+  value?: string;
+  domainType?: AuthorizationDomainType;
+  domainId?: string;
+};
+
+export type SecretsSetSecretKeyResponse = {
+  secret?: SecretsSecret;
+};
+
 export type SecretsUpdateSecretBody = {
   secret?: SecretsSecret;
   domainType?: AuthorizationDomainType;
   domainId?: string;
+};
+
+export type SecretsUpdateSecretNameBody = {
+  name?: string;
+  domainType?: AuthorizationDomainType;
+  domainId?: string;
+};
+
+export type SecretsUpdateSecretNameResponse = {
+  secret?: SecretsSecret;
 };
 
 export type SecretsUpdateSecretResponse = {
@@ -2361,7 +2396,7 @@ export type OrganizationsListIntegrationResourcesData = {
     integrationId: string;
   };
   query?: {
-    type?: string;
+    parameters?: string;
   };
   url: "/api/v1/organizations/{id}/integrations/{integrationId}/resources";
 };
@@ -2894,6 +2929,92 @@ export type SecretsUpdateSecretResponses = {
 };
 
 export type SecretsUpdateSecretResponse2 = SecretsUpdateSecretResponses[keyof SecretsUpdateSecretResponses];
+
+export type SecretsDeleteSecretKeyData = {
+  body?: never;
+  path: {
+    idOrName: string;
+    keyName: string;
+  };
+  query?: {
+    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
+    domainId?: string;
+  };
+  url: "/api/v1/secrets/{idOrName}/keys/{keyName}";
+};
+
+export type SecretsDeleteSecretKeyErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type SecretsDeleteSecretKeyError = SecretsDeleteSecretKeyErrors[keyof SecretsDeleteSecretKeyErrors];
+
+export type SecretsDeleteSecretKeyResponses = {
+  /**
+   * A successful response.
+   */
+  200: SecretsDeleteSecretKeyResponse;
+};
+
+export type SecretsDeleteSecretKeyResponse2 = SecretsDeleteSecretKeyResponses[keyof SecretsDeleteSecretKeyResponses];
+
+export type SecretsSetSecretKeyData = {
+  body: SecretsSetSecretKeyBody;
+  path: {
+    idOrName: string;
+    keyName: string;
+  };
+  query?: never;
+  url: "/api/v1/secrets/{idOrName}/keys/{keyName}";
+};
+
+export type SecretsSetSecretKeyErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type SecretsSetSecretKeyError = SecretsSetSecretKeyErrors[keyof SecretsSetSecretKeyErrors];
+
+export type SecretsSetSecretKeyResponses = {
+  /**
+   * A successful response.
+   */
+  200: SecretsSetSecretKeyResponse;
+};
+
+export type SecretsSetSecretKeyResponse2 = SecretsSetSecretKeyResponses[keyof SecretsSetSecretKeyResponses];
+
+export type SecretsUpdateSecretNameData = {
+  body: SecretsUpdateSecretNameBody;
+  path: {
+    idOrName: string;
+  };
+  query?: never;
+  url: "/api/v1/secrets/{idOrName}/name";
+};
+
+export type SecretsUpdateSecretNameErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type SecretsUpdateSecretNameError = SecretsUpdateSecretNameErrors[keyof SecretsUpdateSecretNameErrors];
+
+export type SecretsUpdateSecretNameResponses = {
+  /**
+   * A successful response.
+   */
+  200: SecretsUpdateSecretNameResponse;
+};
+
+export type SecretsUpdateSecretNameResponse2 = SecretsUpdateSecretNameResponses[keyof SecretsUpdateSecretNameResponses];
 
 export type TriggersListTriggersData = {
   body?: never;

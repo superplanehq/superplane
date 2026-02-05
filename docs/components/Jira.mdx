@@ -1,0 +1,56 @@
+---
+title: "Jira"
+sidebar:
+  order: 9
+---
+
+Manage and react to issues in Jira
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in Jira" />
+</CardGrid>
+
+<a id="create-issue"></a>
+
+## Create Issue
+
+The Create Issue component creates a new issue in Jira.
+
+### Use Cases
+
+- **Task creation**: Automatically create tasks from workflow events
+- **Bug tracking**: Create bugs from error detection systems
+- **Feature requests**: Generate feature request issues from external inputs
+
+### Configuration
+
+- **Project**: The Jira project to create the issue in
+- **Issue Type**: The type of issue (e.g. Task, Bug, Story)
+- **Summary**: The issue summary/title
+- **Description**: Optional description text
+
+### Output
+
+Returns the created issue including:
+- **id**: The issue ID
+- **key**: The issue key (e.g. PROJ-123)
+- **self**: API URL for the issue
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "10001",
+    "key": "PROJ-123",
+    "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.issue"
+}
+```
+

@@ -214,8 +214,8 @@ The wait component shows custom UI in the settings panel:
 
 ```typescript
 export const waitCustomFieldRenderer: CustomFieldRenderer = {
-  render: (_node: ComponentsNode, configuration: Record<string, unknown>) => {
-    const mode = configuration?.mode as string;
+  render: (node: NodeInfo) => {
+    const mode = node.configuration?.mode as string;
 
     let content: string;
     let title: string;
@@ -280,22 +280,14 @@ For components that need to fetch external data:
 
 ```typescript
 export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
-  buildAdditionalData(
-    _nodes: ComponentsNode[],
-    node: ComponentsNode,
-    _componentDefinition: ComponentsComponent,
-    lastExecutions: WorkflowsWorkflowNodeExecution[],
-    workflowId: string,
-    queryClient: QueryClient,
-    organizationId?: string,
-  ) {
-    const execution = lastExecutions[0];
+  buildAdditionalData(context: AdditionalDataBuilderContext) {
+    const execution = context.lastExecutions[0];
     const usersById: Record<string, { email?: string; name?: string }> = {};
     const rolesByName: Record<string, string> = {};
 
     // Fetch user data from cache
-    if (organizationId) {
-      const usersResp = queryClient.getQueryData(organizationKeys.users(organizationId));
+    if (context.organizationId) {
+      const usersResp = context.queryClient.getQueryData(organizationKeys.users(context.organizationId));
       if (Array.isArray(usersResp)) {
         usersResp.forEach((user) => {
           const id = user.metadata?.id;
@@ -313,17 +305,17 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
       interactive: record.state === "pending" && execution?.state === "STATE_STARTED",
       onApprove: async (artifacts?: Record<string, string>) => {
         await workflowsInvokeNodeExecutionAction({
-          path: { workflowId, executionId: execution.id, actionName: "approve" },
+          path: { workflowId: context.canvasId, executionId: execution.id, actionName: "approve" },
           body: { parameters: { index: record.index, comment: artifacts?.comment } },
         });
-        queryClient.invalidateQueries({ queryKey: workflowKeys.nodeExecution(workflowId, node.id!) });
+        context.queryClient.invalidateQueries({ queryKey: workflowKeys.nodeExecution(context.canvasId, context.node.id!) });
       },
       onReject: async (comment?: string) => {
         await workflowsInvokeNodeExecutionAction({
-          path: { workflowId, executionId: execution.id, actionName: "reject" },
+          path: { workflowId: context.canvasId, executionId: execution.id, actionName: "reject" },
           body: { parameters: { index: record.index, reason: comment } },
         });
-        queryClient.invalidateQueries({ queryKey: workflowKeys.nodeExecution(workflowId, node.id!) });
+        context.queryClient.invalidateQueries({ queryKey: workflowKeys.nodeExecution(context.canvasId, context.node.id!) });
       },
     }));
 
@@ -355,7 +347,15 @@ To create a new component with custom behaviors:
 Create `web_src/src/pages/workflowv2/mappers/mycomponent.ts`:
 
 ```typescript
-import { ComponentBaseMapper, EventStateRegistry, CustomFieldRenderer } from "./types";
+import {
+  ComponentBaseMapper,
+  ComponentBaseContext,
+  ExecutionDetailsContext,
+  EventStateRegistry,
+  NodeInfo,
+  SubtitleContext,
+  CustomFieldRenderer,
+} from "./types";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 
 // Custom state map (optional)
@@ -384,23 +384,26 @@ export const MY_COMPONENT_STATE_REGISTRY: EventStateRegistry = {
 
 // Base mapper (required)
 export const myComponentMapper: ComponentBaseMapper = {
-  props(nodes, node, componentDefinition, lastExecutions, nodeQueueItems, additionalData) {
+  props(context: ComponentBaseContext) {
     return {
-      iconSlug: componentDefinition.icon || "box",
+      iconSlug: context.componentDefinition.icon || "box",
       iconColor: "text-blue-600",
       headerColor: "bg-white",
-      title: node.name || "My Component",
+      title: context.node.name || "My Component",
       // ... other properties
     };
   },
-  subtitle(node, execution, additionalData) {
-    return execution.metadata?.customMessage || "Processing...";
+  subtitle(context: SubtitleContext) {
+    return context.execution.metadata?.customMessage || "Processing...";
+  },
+  getExecutionDetails(context: ExecutionDetailsContext) {
+    return context.execution.metadata || {};
   },
 };
 
 // Custom field renderer (optional)
 export const myComponentCustomFieldRenderer: CustomFieldRenderer = {
-  render: (node, configuration) => {
+  render: (node: NodeInfo) => {
     return (
       <div className="p-4">
         <p>Custom configuration UI for {node.name}</p>
@@ -519,11 +522,11 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
 
 ```typescript
 export const myComponentMapper: ComponentBaseMapper = {
-  props(nodes, node, componentDefinition, lastExecutions, nodeQueueItems, additionalData): ComponentBaseProps {
+  props(context: ComponentBaseContext): ComponentBaseProps {
     return {
       // ... existing props
       myCustomProp: "Custom value based on component logic",
-      myCustomBehavior: lastExecutions.length > 0,
+      myCustomBehavior: context.lastExecutions.length > 0,
       // ... rest of props
     };
   },
@@ -571,8 +574,8 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
 **Location:** `web_src/src/pages/workflowv2/mappers/approval.ts:120-138`
 ```typescript
 export const approvalMapper: ComponentBaseMapper = {
-  props(nodes, node, componentDefinition, lastExecutions): ComponentBaseProps {
-    const lastExecution = lastExecutions[0];
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const lastExecution = context.lastExecutions[0];
 
     return {
       // ... existing props

@@ -1,10 +1,12 @@
 import {
-  ComponentsComponent,
-  ComponentsNode,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
-import { ComponentBaseMapper, OutputPayload } from "../../types";
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  OutputPayload,
+  SubtitleContext,
+} from "../../types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
@@ -36,32 +38,26 @@ interface RunFunctionOutput {
 }
 
 export const runFunctionMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    _items?: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
-    const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition.name || node.component?.name || "unknown";
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+    const componentName = context.componentDefinition.name || "unknown";
 
     return {
-      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
+      title: context.node.name || context.componentDefinition.label || "Unnamed component",
       iconSrc: awsLambdaIcon,
-      iconColor: getColorClass(componentDefinition.color),
-      collapsedBackground: getBackgroundColorClass(componentDefinition.color),
-      collapsed: node.isCollapsed,
-      eventSections: lastExecution ? runFunctionEventSections(nodes, lastExecution, componentName) : undefined,
+      iconColor: getColorClass(context.componentDefinition.color),
+      collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
+      collapsed: context.node.isCollapsed,
+      eventSections: lastExecution ? runFunctionEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
-      metadata: runFunctionMetadataList(node),
-      specs: runFunctionSpecs(node),
+      metadata: runFunctionMetadataList(context.node),
+      specs: runFunctionSpecs(context.node),
       eventStateMap: getStateMap(componentName),
     };
   },
 
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const result = outputs?.default?.[0]?.data as RunFunctionOutput | undefined;
     if (!result) {
       return {};
@@ -83,15 +79,15 @@ export const runFunctionMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    if (!execution.createdAt) {
+  subtitle(context: SubtitleContext): string {
+    if (!context.execution.createdAt) {
       return "";
     }
-    return formatTimeAgo(new Date(execution.createdAt));
+    return formatTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
-function runFunctionMetadataList(node: ComponentsNode): MetadataItem[] {
+function runFunctionMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as RunFunctionMetadata | undefined;
   const configuration = node.configuration as RunFunctionConfiguration | undefined;
@@ -105,7 +101,7 @@ function runFunctionMetadataList(node: ComponentsNode): MetadataItem[] {
   return metadata;
 }
 
-function runFunctionSpecs(node: ComponentsNode): ComponentBaseSpec[] {
+function runFunctionSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
   const configuration = node.configuration as RunFunctionConfiguration | undefined;
 
@@ -122,14 +118,17 @@ function runFunctionSpecs(node: ComponentsNode): ComponentBaseSpec[] {
   return specs;
 }
 
-function runFunctionEventSections(
-  nodes: ComponentsNode[],
-  execution: CanvasesCanvasNodeExecution,
-  componentName: string,
-): EventSection[] {
+function runFunctionEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({
+    event: {
+      nodeId: rootTriggerNode?.id!,
+      id: execution.rootEvent?.id!,
+      createdAt: execution.rootEvent?.createdAt!,
+      data: execution.rootEvent?.data || {},
+    },
+  });
 
   return [
     {
