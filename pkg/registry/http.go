@@ -39,18 +39,6 @@ func NewHTTPContext(options HTTPOptions) (*HTTPContext, error) {
 	}
 
 	//
-	// If no private IP ranges or blocked hosts are provided,
-	// just return a simple HTTP client that doesn't perform any validation.
-	//
-	if len(httpCtx.privateIPRanges) == 0 && len(httpCtx.blockedHosts) == 0 {
-		httpCtx.client = &http.Client{
-			Timeout: 30 * time.Second,
-		}
-
-		return httpCtx, nil
-	}
-
-	//
 	// Creates a new HTTP dialer that validates IP addresses at connection time.
 	// This prevents DNS rebinding attacks by checking the resolved IP just before connecting.
 	//
@@ -111,7 +99,7 @@ func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
 
 	err := c.validateURL(request.URL)
 	if err != nil {
-		return nil, fmt.Errorf("SSRF protection: %w", err)
+		return nil, err
 	}
 
 	return c.client.Do(request)
