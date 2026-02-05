@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
-	"path"
 	"slices"
 	"strings"
 
@@ -39,8 +38,8 @@ var sendGridEventTypes = []configuration.FieldOption{
 type OnEmailEvent struct{}
 
 type OnEmailEventConfiguration struct {
-	EventTypes     []string `json:"eventTypes" mapstructure:"eventTypes"`
-	CategoryFilter string   `json:"categoryFilter" mapstructure:"categoryFilter"`
+	EventTypes     []string                  `json:"eventTypes" mapstructure:"eventTypes"`
+	CategoryFilter []configuration.Predicate `json:"categoryFilter" mapstructure:"categoryFilter"`
 }
 
 func (t *OnEmailEvent) Name() string {
@@ -67,7 +66,7 @@ func (t *OnEmailEvent) Documentation() string {
 ## Configuration
 
 - **Event Types**: Optional filter for specific SendGrid events (processed, delivered, bounce, open, click, etc.)
-- **Category Filter**: Optional category filter (supports ` + "`*`" + ` wildcards)
+- **Category Filter**: Optional list of predicates (` + "`equals`" + `, ` + "`notEquals`" + `, ` + "`matches`" + ` regex)
 
 ## Webhook Verification
 
@@ -117,12 +116,17 @@ func (t *OnEmailEvent) Configuration() []configuration.Field {
 			Description: "Only emit events for these SendGrid event types (leave empty for all)",
 		},
 		{
-			Name:        "categoryFilter",
-			Label:       "Category Filter",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Default:     "*",
-			Description: "Optional category filter (supports * wildcards)",
+			Name:     "categoryFilter",
+			Label:    "Category Filter",
+			Type:     configuration.FieldTypeAnyPredicateList,
+			Required: false,
+			Default:  []map[string]any{},
+			TypeOptions: &configuration.TypeOptions{
+				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
+					Operators: configuration.AllPredicateOperators,
+				},
+			},
+			Description: "Optional category filter (leave empty for all categories)",
 		},
 		{},
 	}
@@ -134,10 +138,7 @@ func (t *OnEmailEvent) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		EventTypes:     config.EventTypes,
-		CategoryFilter: config.CategoryFilter,
-	})
+	return ctx.Integration.RequestWebhook(struct{}{})
 }
 
 func (t *OnEmailEvent) Actions() []core.Action {
@@ -174,7 +175,7 @@ func (t *OnEmailEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 			continue
 		}
 
-		if !matchesCategoryFilter(config.CategoryFilter, event["category"]) {
+		if !matchesCategoryPredicates(config.CategoryFilter, event["category"]) {
 			continue
 		}
 
@@ -193,11 +194,6 @@ func (t *OnEmailEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 
 func (t *OnEmailEvent) Cleanup(ctx core.TriggerContext) error {
 	return nil
-}
-
-type WebhookConfiguration struct {
-	EventTypes     []string `json:"eventTypes"`
-	CategoryFilter string   `json:"categoryFilter"`
 }
 
 func parseWebhookEvents(body []byte) ([]map[string]any, error) {
@@ -230,12 +226,8 @@ func extractString(event map[string]any, key string) string {
 	return value
 }
 
-func matchesCategoryFilter(filter string, categoryValue any) bool {
-	filter = strings.TrimSpace(filter)
-	if filter == "" {
-		return true
-	}
-	if filter == "*" {
+func matchesCategoryPredicates(predicates []configuration.Predicate, categoryValue any) bool {
+	if len(predicates) == 0 {
 		return true
 	}
 
@@ -244,36 +236,13 @@ func matchesCategoryFilter(filter string, categoryValue any) bool {
 		return false
 	}
 
-	for _, filterValue := range splitFilters(filter) {
-		isWildcard := strings.ContainsAny(filterValue, "*?")
-		for _, category := range categories {
-			if isWildcard {
-				match, err := path.Match(strings.ToLower(filterValue), strings.ToLower(category))
-				if err == nil && match {
-					return true
-				}
-				continue
-			}
-
-			if strings.EqualFold(filterValue, category) {
-				return true
-			}
+	for _, category := range categories {
+		if configuration.MatchesAnyPredicate(predicates, category) {
+			return true
 		}
 	}
 
 	return false
-}
-
-func splitFilters(filter string) []string {
-	parts := strings.Split(filter, ",")
-	out := make([]string, 0, len(parts))
-	for _, part := range parts {
-		value := strings.TrimSpace(part)
-		if value != "" {
-			out = append(out, value)
-		}
-	}
-	return out
 }
 
 func normalizeCategories(value any) []string {

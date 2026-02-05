@@ -134,17 +134,6 @@ func (s *SendGrid) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (s *SendGrid) CompareWebhookConfig(a, b any) (bool, error) {
-	configA := WebhookConfiguration{}
-	configB := WebhookConfiguration{}
-
-	if err := mapstructure.Decode(a, &configA); err != nil {
-		return false, err
-	}
-
-	if err := mapstructure.Decode(b, &configB); err != nil {
-		return false, err
-	}
-
 	return true, nil
 }
 

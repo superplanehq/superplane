@@ -2,7 +2,6 @@ package contexts
 
 import (
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,7 +29,7 @@ func (e *ConfigurationBuildError) Unwrap() error {
 	return e.Err
 }
 
-func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models.CanvasNode, queueItem *models.CanvasNodeQueueItem, configFields []configuration.Field) (*core.ProcessQueueContext, error) {
+func BuildProcessQueueContext(httpCtx core.HTTPContext, tx *gorm.DB, node *models.CanvasNode, queueItem *models.CanvasNodeQueueItem, configFields []configuration.Field) (*core.ProcessQueueContext, error) {
 	event, err := models.FindCanvasEventInTransaction(tx, queueItem.EventID)
 	if err != nil {
 		return nil, err
@@ -121,7 +120,7 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 			WorkflowID:     execution.WorkflowID.String(),
 			NodeID:         execution.NodeID,
 			Configuration:  execution.Configuration.Data(),
-			HTTP:           NewHTTPContext(httpClient),
+			HTTP:           httpCtx,
 			Metadata:       NewExecutionMetadataContext(tx, &execution),
 			NodeMetadata:   NewNodeMetadataContext(tx, node),
 			ExecutionState: NewExecutionStateContext(tx, &execution),
@@ -217,7 +216,7 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 			WorkflowID:     execution.WorkflowID.String(),
 			NodeID:         execution.NodeID,
 			Configuration:  execution.Configuration.Data(),
-			HTTP:           NewHTTPContext(httpClient),
+			HTTP:           httpCtx,
 			Metadata:       NewExecutionMetadataContext(tx, execution),
 			NodeMetadata:   NewNodeMetadataContext(tx, node),
 			ExecutionState: NewExecutionStateContext(tx, execution),
