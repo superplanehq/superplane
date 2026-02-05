@@ -1,0 +1,36 @@
+{
+  "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "jobName": "Run tests",
+  "state": "finished",
+  "result": "failed",
+  "logs": "npm test\n\n> project@1.0.0 test\n> jest --coverage\n\nFAIL src/utils.test.js\n  ● Test suite failed to run\n\n    SyntaxError: Unexpected token\n\n      1 | import { someFunction } from './utils';\n      2 |\n    > 3 | describe('someFunction', () => {\n        ^\n\nTest Suites: 1 failed, 1 total\nTests:       0 total\nSnapshots:   0 total\nTime:        0.523 s",
+  "logLines": [
+    "npm test",
+    "",
+    "> project@1.0.0 test",
+    "> jest --coverage",
+    "",
+    "FAIL src/utils.test.js",
+    "  ● Test suite failed to run",
+    "",
+    "    SyntaxError: Unexpected token",
+    "",
+    "      1 | import { someFunction } from './utils';",
+    "      2 |",
+    "    > 3 | describe('someFunction', () => {",
+    "        ^",
+    "",
+    "Test Suites: 1 failed, 1 total",
+    "Tests:       0 total",
+    "Snapshots:   0 total",
+    "Time:        0.523 s"
+  ],
+  "metadata": {
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Run tests",
+    "create_time": "2024-01-15T10:30:00Z",
+    "update_time": "2024-01-15T10:35:00Z",
+    "start_time": "2024-01-15T10:30:05Z",
+    "finish_time": "2024-01-15T10:35:00Z"
+  }
+}
