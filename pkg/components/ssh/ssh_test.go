@@ -10,17 +10,28 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
+func authConfig(method string, privateKey, password any) map[string]any {
+	m := map[string]any{"authMethod": method}
+	if privateKey != nil {
+		m["privateKey"] = privateKey
+	}
+	if password != nil {
+		m["password"] = password
+	}
+	return m
+}
+
 func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 	c := &SSHCommand{}
+	authWithKey := authConfig(AuthMethodSSHKey, map[string]any{"secret": "my-secret", "key": "private_key"}, nil)
+	authWithPass := authConfig(AuthMethodPassword, nil, map[string]any{"secret": "my-secret", "key": "password"})
 
 	t.Run("missing host", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"username":   "root",
-				"authMethod": AuthMethodSSHKey,
-				"privateKeySecretRef": "my-secret",
-				"privateKeyKeyName":   "private_key",
-				"command":    "ls",
+				"username":      "root",
+				"authentication": authWithKey,
+				"command":      "ls",
 			},
 		})
 		require.Error(t, err)
@@ -30,11 +41,9 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 	t.Run("missing username", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"host":       "example.com",
-				"authMethod": AuthMethodSSHKey,
-				"privateKeySecretRef": "my-secret",
-				"privateKeyKeyName":   "private_key",
-				"command":    "ls",
+				"host":           "example.com",
+				"authentication": authWithKey,
+				"command":        "ls",
 			},
 		})
 		require.Error(t, err)
@@ -44,11 +53,10 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 	t.Run("missing command", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"host":       "example.com",
-				"username":   "root",
-				"authMethod": AuthMethodSSHKey,
-				"privateKeySecretRef": "my-secret",
-				"privateKeyKeyName":   "private_key",
+				"host":           "example.com",
+				"username":       "root",
+				"authentication": authWithKey,
+				"timeout":        60,
 			},
 		})
 		require.Error(t, err)
@@ -58,10 +66,11 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 	t.Run("ssh_key auth without secret ref", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"host":       "example.com",
-				"username":   "root",
-				"authMethod": AuthMethodSSHKey,
-				"command":    "ls",
+				"host":           "example.com",
+				"username":       "root",
+				"authentication": authConfig(AuthMethodSSHKey, nil, nil),
+				"command":        "ls",
+				"timeout":        60,
 			},
 		})
 		require.Error(t, err)
@@ -71,10 +80,11 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 	t.Run("password auth without secret ref", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"host":       "example.com",
-				"username":   "root",
-				"authMethod": AuthMethodPassword,
-				"command":    "ls",
+				"host":           "example.com",
+				"username":       "root",
+				"authentication": authConfig(AuthMethodPassword, nil, nil),
+				"command":        "ls",
+				"timeout":        60,
 			},
 		})
 		require.Error(t, err)
@@ -84,12 +94,11 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 	t.Run("valid ssh_key config", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"host":                "example.com",
-				"username":            "root",
-				"authMethod":          AuthMethodSSHKey,
-				"privateKeySecretRef": "my-secret",
-				"privateKeyKeyName":   "private_key",
-				"command":             "ls -la",
+				"host":           "example.com",
+				"username":       "root",
+				"authentication": authWithKey,
+				"command":        "ls -la",
+				"timeout":        60,
 			},
 		})
 		require.NoError(t, err)
@@ -98,12 +107,11 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 	t.Run("valid password config", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"host":               "example.com",
-				"username":           "root",
-				"authMethod":         AuthMethodPassword,
-				"passwordSecretRef":  "my-secret",
-				"passwordKeyName":    "password",
-				"command":            "whoami",
+				"host":           "example.com",
+				"username":       "root",
+				"authentication": authWithPass,
+				"command":        "whoami",
+				"timeout":        60,
 			},
 		})
 		require.NoError(t, err)
@@ -117,20 +125,18 @@ func TestSSHCommand_Execute_RequiresSecretsContext(t *testing.T) {
 
 	ctx := core.ExecutionContext{
 		Configuration: map[string]any{
-			"host":                "example.com",
-			"username":            "root",
-			"authMethod":          AuthMethodSSHKey,
-			"privateKeySecretRef": "secret",
-			"privateKeyKeyName":   "key",
-			"command":             "ls",
+			"host":           "example.com",
+			"username":       "root",
+			"authentication": authConfig(AuthMethodSSHKey, map[string]any{"secret": "secret", "key": "key"}, nil),
+			"command":        "ls",
+			"timeout":        60,
 		},
 		ExecutionState: stateCtx,
 		Metadata:       metadataCtx,
 		Secrets:        nil, // not set
 	}
 
-	_ = c.Execute(ctx)
-	assert.True(t, stateCtx.Finished)
-	assert.False(t, stateCtx.Passed)
-	assert.Contains(t, stateCtx.FailureMessage, "secrets")
+	err := c.Execute(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "secrets")
 }

@@ -11,16 +11,24 @@ const SECRET_KEY_DELIMITER = "::";
 const LABEL_SEPARATOR = " / ";
 const DOMAIN_TYPE_ORG: AuthorizationDomainType = "DOMAIN_TYPE_ORGANIZATION";
 
+export type SecretKeyRefValue = { secret: string; key: string } | undefined;
+
 interface SecretKeyFieldRendererProps {
-  value: string | undefined;
-  onChange: (value: string | undefined) => void;
+  value: SecretKeyRefValue;
+  onChange: (value: { secret: string; key: string } | undefined) => void;
   organizationId: string | undefined;
   placeholder?: string;
 }
 
+/** Value to option value "secret::key" for the dropdown. */
+function toOptionValue(value: SecretKeyRefValue): string {
+  if (value?.secret && value?.key) return `${value.secret}${SECRET_KEY_DELIMITER}${value.key}`;
+  return "";
+}
+
 /**
  * Single dropdown listing all secret/key variants as "secret-name / key-name".
- * Value is stored as "secretRef::keyName".
+ * Value is stored as { secret: string, key: string } (YAML-friendly).
  */
 export const SecretKeyFieldRenderer = ({
   value,
@@ -29,6 +37,7 @@ export const SecretKeyFieldRenderer = ({
   placeholder = "Select credential",
 }: SecretKeyFieldRendererProps) => {
   const domainId = organizationId ?? "";
+  const optionValue = toOptionValue(value);
   const { data: secrets = [], isLoading: secretsLoading, error: secretsError } = useSecrets(domainId, DOMAIN_TYPE_ORG);
 
   const secretRefs = React.useMemo(
@@ -126,10 +135,16 @@ export const SecretKeyFieldRenderer = ({
 
   return (
     <Select
-      value={value ?? ""}
+      value={optionValue}
       onValueChange={(val) => {
-        if (!val) onChange(undefined);
-        else onChange(val);
+        if (!val) {
+          onChange(undefined);
+          return;
+        }
+        const idx = val.indexOf(SECRET_KEY_DELIMITER);
+        if (idx >= 0) {
+          onChange({ secret: val.slice(0, idx), key: val.slice(idx + SECRET_KEY_DELIMITER.length) });
+        }
       }}
     >
       <SelectTrigger className="w-full">

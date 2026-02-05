@@ -380,7 +380,7 @@ export const ConfigurationFieldRenderer = ({
         }
         return (
           <SecretKeyFieldRenderer
-            value={value as string | undefined}
+            value={value as import("./SecretKeyFieldRenderer").SecretKeyRefValue}
             onChange={(v) => onChange(v)}
             organizationId={organizationId ?? domainId}
             placeholder={field.placeholder ?? "Select credential"}

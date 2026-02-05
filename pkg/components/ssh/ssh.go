@@ -3,7 +3,6 @@ package ssh
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,16 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
-
-// parseSecretKeyValue splits "secretRef::keyName" into (secretRef, keyName). Returns empty strings if invalid.
-func parseSecretKeyValue(v string) (secretRef, keyName string) {
-	v = strings.TrimSpace(v)
-	idx := strings.Index(v, secretKeyDelimiter)
-	if idx < 0 {
-		return "", ""
-	}
-	return strings.TrimSpace(v[:idx]), strings.TrimSpace(v[idx+len(secretKeyDelimiter):])
-}
 
 const (
 	channelSuccess = "success"
@@ -32,16 +21,24 @@ func init() {
 	registry.RegisterComponent("ssh", &SSHCommand{})
 }
 
-const secretKeyDelimiter = "::"
-
 type SSHCommand struct{}
+
+// SecretKeyRef is stored in YAML as: { secret: "name", key: "keyName" }.
+type SecretKeyRef struct {
+	Secret string `json:"secret" mapstructure:"secret"`
+	Key    string `json:"key" mapstructure:"key"`
+}
+
+func (r SecretKeyRef) IsSet() bool {
+	return r.Secret != "" && r.Key != ""
+}
 
 // AuthSpec is the authentication config group (SSH key or password, credential references).
 type AuthSpec struct {
-	Method     string `json:"authMethod" mapstructure:"authMethod"`
-	PrivateKey string `json:"privateKey" mapstructure:"privateKey"` // stores "secretRef::keyName" for SSH key
-	Passphrase string `json:"passphrase" mapstructure:"passphrase"`   // optional, "secretRef::keyName"
-	Password   string `json:"password" mapstructure:"password"`       // stores "secretRef::keyName" for password auth
+	Method     string      `json:"authMethod" mapstructure:"authMethod"`
+	PrivateKey SecretKeyRef `json:"privateKey" mapstructure:"privateKey"`
+	Passphrase SecretKeyRef `json:"passphrase" mapstructure:"passphrase"`
+	Password   SecretKeyRef `json:"password" mapstructure:"password"`
 }
 
 type Spec struct {
@@ -220,7 +217,11 @@ func (c *SSHCommand) Configuration() []configuration.Field {
 
 func (c *SSHCommand) Setup(ctx core.SetupContext) error {
 	var spec Spec
-	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+	config, ok := ctx.Configuration.(map[string]any)
+	if !ok || config == nil {
+		return fmt.Errorf("decode configuration: invalid configuration type")
+	}
+	if err := mapstructure.Decode(config, &spec); err != nil {
 		return fmt.Errorf("decode configuration: %w", err)
 	}
 
@@ -242,13 +243,11 @@ func (c *SSHCommand) Setup(ctx core.SetupContext) error {
 
 	switch spec.Authentication.Method {
 	case AuthMethodSSHKey:
-		ref, key := parseSecretKeyValue(spec.Authentication.PrivateKey)
-		if ref == "" || key == "" {
+		if !spec.Authentication.PrivateKey.IsSet() {
 			return errors.New("for SSH key auth, private key credential is required")
 		}
 	case AuthMethodPassword:
-		ref, key := parseSecretKeyValue(spec.Authentication.Password)
-		if ref == "" || key == "" {
+		if !spec.Authentication.Password.IsSet() {
 			return errors.New("for password auth, password credential is required")
 		}
 	default:
@@ -260,7 +259,11 @@ func (c *SSHCommand) Setup(ctx core.SetupContext) error {
 
 func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 	var spec Spec
-	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+	config, ok := ctx.Configuration.(map[string]any)
+	if !ok || config == nil {
+		return fmt.Errorf("decode configuration: invalid configuration type")
+	}
+	if err := mapstructure.Decode(config, &spec); err != nil {
 		return fmt.Errorf("decode configuration: %w", err)
 	}
 
@@ -280,11 +283,10 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 	var client *Client
 	switch spec.Authentication.Method {
 	case AuthMethodSSHKey:
-		secretRef, keyName := parseSecretKeyValue(spec.Authentication.PrivateKey)
-		if secretRef == "" || keyName == "" {
+		if !spec.Authentication.PrivateKey.IsSet() {
 			return fmt.Errorf("private key credential is required")
 		}
-		privateKey, err := ctx.Secrets.GetKey(secretRef, keyName)
+		privateKey, err := ctx.Secrets.GetKey(spec.Authentication.PrivateKey.Secret, spec.Authentication.PrivateKey.Key)
 		if err != nil {
 			if errors.Is(err, core.ErrSecretKeyNotFound) {
 				return fmt.Errorf("private key could not be resolved from the selected credential")
@@ -293,21 +295,17 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 		}
 
 		var passphrase []byte
-		if spec.Authentication.Passphrase != "" {
-			pref, pkey := parseSecretKeyValue(spec.Authentication.Passphrase)
-			if pref != "" && pkey != "" {
-				passphrase, _ = ctx.Secrets.GetKey(pref, pkey)
-			}
+		if spec.Authentication.Passphrase.IsSet() {
+			passphrase, _ = ctx.Secrets.GetKey(spec.Authentication.Passphrase.Secret, spec.Authentication.Passphrase.Key)
 		}
 
 		client = NewClientKey(spec.Host, port, spec.User, privateKey, passphrase)
 
 	case AuthMethodPassword:
-		secretRef, keyName := parseSecretKeyValue(spec.Authentication.Password)
-		if secretRef == "" || keyName == "" {
+		if !spec.Authentication.Password.IsSet() {
 			return fmt.Errorf("password credential is required")
 		}
-		password, err := ctx.Secrets.GetKey(secretRef, keyName)
+		password, err := ctx.Secrets.GetKey(spec.Authentication.Password.Secret, spec.Authentication.Password.Key)
 		if err != nil {
 			if errors.Is(err, core.ErrSecretKeyNotFound) {
 				return fmt.Errorf("password could not be resolved from the selected credential")
