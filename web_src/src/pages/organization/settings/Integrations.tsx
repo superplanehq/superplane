@@ -1,7 +1,6 @@
 import { AppWindow, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
 import {
   useAvailableIntegrations,
   useConnectedIntegrations,
@@ -10,24 +9,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PermissionTooltip } from "@/components/PermissionGate";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { ConfigurationFieldRenderer } from "../../../ui/configurationFieldRenderer";
 import type { IntegrationsIntegrationDefinition } from "../../../api-client/types.gen";
-import { resolveIcon } from "@/lib/utils";
 import { getApiErrorMessage } from "@/utils/errors";
+import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { Icon } from "@/components/Icon";
 import { showErrorToast } from "@/utils/toast";
-import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
-import discordIcon from "@/assets/icons/integrations/discord.svg";
-import githubIcon from "@/assets/icons/integrations/github.svg";
-import openAiIcon from "@/assets/icons/integrations/openai.svg";
-import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
-import slackIcon from "@/assets/icons/integrations/slack.svg";
-import smtpIcon from "@/assets/icons/integrations/smtp.svg";
-import awsIcon from "@/assets/icons/integrations/aws.svg";
-import jiraIcon from "@/assets/icons/integrations/jira.svg";
-import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
-import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
+import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 
 interface IntegrationsProps {
   organizationId: string;
@@ -35,10 +26,13 @@ interface IntegrationsProps {
 
 export function Integrations({ organizationId }: IntegrationsProps) {
   const navigate = useNavigate();
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationsIntegrationDefinition | null>(null);
   const [integrationName, setIntegrationName] = useState("");
   const [configuration, setConfiguration] = useState<Record<string, unknown>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const canCreateIntegrations = canAct("integrations", "create");
+  const canUpdateIntegrations = canAct("integrations", "update");
 
   const { data: availableIntegrations = [], isLoading: loadingAvailable } = useAvailableIntegrations();
   const { data: organizationIntegrations = [], isLoading: loadingInstalled } = useConnectedIntegrations(organizationId);
@@ -48,42 +42,15 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   const selectedInstructions = useMemo(() => {
     return selectedIntegration?.instructions?.trim();
   }, [selectedIntegration?.instructions]);
-  const appLogoMap: Record<string, string> = {
-    aws: awsIcon,
-    dash0: dash0Icon,
-    daytona: daytonaIcon,
-    discord: discordIcon,
-    github: githubIcon,
-    jira: jiraIcon,
-    openai: openAiIcon,
-    "open-ai": openAiIcon,
-    pagerduty: pagerDutyIcon,
-    rootly: rootlyIcon,
-    semaphore: SemaphoreLogo,
-    slack: slackIcon,
-    smtp: smtpIcon,
-  };
-
-  const renderAppIcon = (slug: string | undefined, appName: string | undefined, className: string) => {
-    const logo = appName ? appLogoMap[appName] : undefined;
-    if (logo) {
-      return (
-        <span className={className}>
-          <img src={logo} alt="" className="h-full w-full object-contain" />
-        </span>
-      );
-    }
-    const Icon = resolveIcon(slug);
-    return <Icon className={className} />;
-  };
-
   const handleConnectClick = (integration: IntegrationsIntegrationDefinition) => {
+    if (!canCreateIntegrations) return;
     setSelectedIntegration(integration);
     setIntegrationName(integration.name || "");
     setConfiguration({});
     setIsModalOpen(true);
   };
   const handleConnect = async () => {
+    if (!canCreateIntegrations) return;
     if (!selectedIntegration?.name) return;
 
     try {
@@ -137,7 +104,10 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                 const integrationDefinition = availableIntegrations.find(
                   (a) => a.name === integration.spec?.integrationName,
                 );
-                const integrationLabel = integrationDefinition?.label || integration.spec?.integrationName;
+                const integrationLabel =
+                  integrationDefinition?.label ||
+                  getIntegrationTypeDisplayName(undefined, integration.spec?.integrationName) ||
+                  integration.spec?.integrationName;
                 const integrationName = integrationDefinition?.name || integration.spec?.integrationName;
                 const statusLabel = integration.status?.state
                   ? integration.status.state.charAt(0).toUpperCase() + integration.status.state.slice(1)
@@ -150,15 +120,18 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                   >
                     <div className="flex items-start gap-3">
                       <div className="mt-0.5 flex h-4 w-4 items-center justify-center">
-                        {renderAppIcon(
-                          integrationDefinition?.icon,
-                          integrationName,
-                          "w-4 h-4 text-gray-500 dark:text-gray-400",
-                        )}
+                        <IntegrationIcon
+                          integrationName={integrationName}
+                          iconSlug={integrationDefinition?.icon}
+                          className="w-4 h-4 text-gray-500 dark:text-gray-400"
+                        />
                       </div>
                       <div>
                         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                          {integrationLabel || integration.metadata?.name || integration.spec?.integrationName}
+                          {integrationLabel ||
+                            integration.metadata?.name ||
+                            getIntegrationTypeDisplayName(undefined, integration.spec?.integrationName) ||
+                            integration.spec?.integrationName}
                         </h3>
                         {integrationDefinition?.description ? (
                           <p className="mt-1 text-sm text-gray-800 dark:text-gray-400">
@@ -179,17 +152,24 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                       >
                         {statusLabel}
                       </span>
-                      <Button
-                        variant="outline"
-                        onClick={() =>
-                          navigate(`/${organizationId}/settings/integrations/${integration.metadata?.id}`, {
-                            state: { tab: "configuration" },
-                          })
-                        }
-                        className="text-sm py-1.5 self-start"
+                      <PermissionTooltip
+                        allowed={canUpdateIntegrations || permissionsLoading}
+                        message="You don't have permission to update integrations."
                       >
-                        Configure...
-                      </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            if (!canUpdateIntegrations) return;
+                            navigate(`/${organizationId}/settings/integrations/${integration.metadata?.id}`, {
+                              state: { tab: "configuration" },
+                            });
+                          }}
+                          className="text-sm py-1.5 self-start"
+                          disabled={!canUpdateIntegrations}
+                        >
+                          Configure...
+                        </Button>
+                      </PermissionTooltip>
                     </div>
                   </div>
                 );
@@ -225,7 +205,11 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                     >
                       <div className="flex items-start gap-3">
                         <div className="mt-0.5 flex h-4 w-4 items-center justify-center">
-                          {renderAppIcon(app.icon, appName, "w-4 h-4 text-gray-500 dark:text-gray-400")}
+                          <IntegrationIcon
+                            integrationName={appName}
+                            iconSlug={app.icon}
+                            className="w-4 h-4 text-gray-500 dark:text-gray-400"
+                          />
                         </div>
                         <div>
                           <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
@@ -237,13 +221,19 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                         </div>
                       </div>
 
-                      <Button
-                        color="blue"
-                        onClick={() => handleConnectClick(app)}
-                        className="text-sm py-1.5 self-start"
+                      <PermissionTooltip
+                        allowed={canCreateIntegrations || permissionsLoading}
+                        message="You don't have permission to connect integrations."
                       >
-                        Connect
-                      </Button>
+                        <Button
+                          color="blue"
+                          onClick={() => handleConnectClick(app)}
+                          className="text-sm py-1.5 self-start"
+                          disabled={!canCreateIntegrations}
+                        >
+                          Connect
+                        </Button>
+                      </PermissionTooltip>
                     </div>
                   );
                 })}
@@ -263,11 +253,11 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
-                      {renderAppIcon(
-                        selectedIntegration.icon,
-                        integrationName,
-                        "w-6 h-6 text-gray-500 dark:text-gray-400",
-                      )}
+                      <IntegrationIcon
+                        integrationName={integrationName}
+                        iconSlug={selectedIntegration.icon}
+                        className="w-6 h-6 text-gray-500 dark:text-gray-400"
+                      />
                       <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">
                         Connect {selectedIntegration.label || selectedIntegration.name}
                       </h3>
@@ -282,11 +272,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                   </div>
 
                   <div className="space-y-4">
-                    {selectedInstructions && (
-                      <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-100 [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:space-y-1">
-                        <ReactMarkdown>{selectedInstructions}</ReactMarkdown>
-                      </div>
-                    )}
+                    {selectedInstructions && <IntegrationInstructions description={selectedInstructions} />}
                     {/* Integration Name Field */}
                     <div>
                       <Label className="text-gray-800 dark:text-gray-100 mb-2">
@@ -302,6 +288,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                         onChange={(e) => setIntegrationName(e.target.value)}
                         placeholder="e.g., my-app-integration"
                         required
+                        disabled={!canCreateIntegrations}
                       />
                     </div>
 
@@ -331,7 +318,9 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                     <Button
                       color="blue"
                       onClick={handleConnect}
-                      disabled={createIntegrationMutation.isPending || !integrationName?.trim()}
+                      disabled={
+                        createIntegrationMutation.isPending || !integrationName?.trim() || !canCreateIntegrations
+                      }
                       className="flex items-center gap-2"
                     >
                       {createIntegrationMutation.isPending ? (

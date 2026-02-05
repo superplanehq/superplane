@@ -44,6 +44,29 @@ func (s *Secret) UpdateData(data []byte) (*Secret, error) {
 	return s, nil
 }
 
+func (s *Secret) UpdateName(name string) (*Secret, error) {
+	now := time.Now()
+
+	err := database.Conn().
+		Model(s).
+		Clauses(clause.Returning{}).
+		Where("id = ?", s.ID).
+		Update("name", name).
+		Update("updated_at", &now).
+		Error
+
+	if err != nil {
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+			return nil, ErrNameAlreadyUsed
+		}
+		return nil, err
+	}
+
+	s.Name = name
+	s.UpdatedAt = &now
+	return s, nil
+}
+
 func (s *Secret) Delete() error {
 	return database.Conn().Delete(s).Error
 }

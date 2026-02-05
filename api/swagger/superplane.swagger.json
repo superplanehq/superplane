@@ -1901,7 +1901,7 @@
             "type": "string"
           },
           {
-            "name": "type",
+            "name": "parameters",
             "in": "query",
             "required": false,
             "type": "string"
@@ -2610,6 +2610,145 @@
             "required": true,
             "schema": {
               "$ref": "#/definitions/SecretsUpdateSecretBody"
+            }
+          }
+        ],
+        "tags": [
+          "Secret"
+        ]
+      }
+    },
+    "/api/v1/secrets/{idOrName}/keys/{keyName}": {
+      "delete": {
+        "summary": "Remove a key from a secret",
+        "description": "Removes one key from the secret. Secret must have at least one key remaining.",
+        "operationId": "Secrets_DeleteSecretKey",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SecretsDeleteSecretKeyResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "keyName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Secret"
+        ]
+      },
+      "put": {
+        "summary": "Set or overwrite a single key in a secret",
+        "description": "Sets the value for one key. Creates the key if missing, overwrites if present.",
+        "operationId": "Secrets_SetSecretKey",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SecretsSetSecretKeyResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "keyName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SecretsSetSecretKeyBody"
+            }
+          }
+        ],
+        "tags": [
+          "Secret"
+        ]
+      }
+    },
+    "/api/v1/secrets/{idOrName}/name": {
+      "patch": {
+        "summary": "Update secret name",
+        "description": "Updates only the name of the secret. Name must be unique within the domain.",
+        "operationId": "Secrets_UpdateSecretName",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SecretsUpdateSecretNameResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SecretsUpdateSecretNameBody"
             }
           }
         ],
@@ -3890,6 +4029,28 @@
         }
       }
     },
+    "ConfigurationParameterRef": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "valueFrom": {
+          "$ref": "#/definitions/ConfigurationParameterValueFrom"
+        }
+      }
+    },
+    "ConfigurationParameterValueFrom": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string"
+        }
+      }
+    },
     "ConfigurationRequiredCondition": {
       "type": "object",
       "properties": {
@@ -3915,6 +4076,13 @@
         },
         "multi": {
           "type": "boolean"
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationParameterRef"
+          }
         }
       }
     },
@@ -4841,6 +5009,14 @@
         }
       }
     },
+    "SecretsDeleteSecretKeyResponse": {
+      "type": "object",
+      "properties": {
+        "secret": {
+          "$ref": "#/definitions/SecretsSecret"
+        }
+      }
+    },
     "SecretsDeleteSecretResponse": {
       "type": "object"
     },
@@ -4907,6 +5083,28 @@
         }
       }
     },
+    "SecretsSetSecretKeyBody": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "string"
+        },
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        }
+      }
+    },
+    "SecretsSetSecretKeyResponse": {
+      "type": "object",
+      "properties": {
+        "secret": {
+          "$ref": "#/definitions/SecretsSecret"
+        }
+      }
+    },
     "SecretsUpdateSecretBody": {
       "type": "object",
       "properties": {
@@ -4918,6 +5116,28 @@
         },
         "domainId": {
           "type": "string"
+        }
+      }
+    },
+    "SecretsUpdateSecretNameBody": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        }
+      }
+    },
+    "SecretsUpdateSecretNameResponse": {
+      "type": "object",
+      "properties": {
+        "secret": {
+          "$ref": "#/definitions/SecretsSecret"
         }
       }
     },

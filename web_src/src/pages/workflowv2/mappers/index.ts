@@ -4,6 +4,8 @@ import {
   ComponentAdditionalDataBuilder,
   EventStateRegistry,
   CustomFieldRenderer,
+  TriggerRendererContext,
+  TriggerEventContext,
 } from "./types";
 import { ComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
 import { defaultTriggerRenderer } from "./default";
@@ -39,6 +41,11 @@ import {
   eventStateRegistry as daytonaEventStateRegistry,
 } from "./daytona/index";
 import {
+  componentMappers as cloudflareComponentMappers,
+  triggerRenderers as cloudflareTriggerRenderers,
+  eventStateRegistry as cloudflareEventStateRegistry,
+} from "./cloudflare/index";
+import {
   componentMappers as datadogComponentMappers,
   triggerRenderers as datadogTriggerRenderers,
   eventStateRegistry as datadogEventStateRegistry,
@@ -58,19 +65,29 @@ import {
   triggerRenderers as rootlyTriggerRenderers,
   eventStateRegistry as rootlyEventStateRegistry,
 } from "./rootly/index";
-import { componentMappers as awsComponentMappers, triggerRenderers as awsTriggerRenderers } from "./aws";
+import {
+  componentMappers as awsComponentMappers,
+  triggerRenderers as awsTriggerRenderers,
+  eventStateRegistry as awsEventStateRegistry,
+} from "./aws";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
 import {
   componentMappers as discordComponentMappers,
   triggerRenderers as discordTriggerRenderers,
   eventStateRegistry as discordEventStateRegistry,
 } from "./discord";
+import {
+  componentMappers as openaiComponentMappers,
+  triggerRenderers as openaiTriggerRenderers,
+  eventStateRegistry as openaiEventStateRegistry,
+} from "./openai/index";
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
 import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 import { startTriggerRenderer } from "./start";
+import { buildExecutionInfo, buildNodeInfo } from "../utils";
 
 /**
  * Registry mapping trigger names to their renderers.
@@ -94,6 +111,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
 };
 
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
+  cloudflare: cloudflareComponentMappers,
   semaphore: semaphoreComponentMappers,
   github: githubComponentMappers,
   pagerduty: pagerdutyComponentMappers,
@@ -105,9 +123,11 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   rootly: rootlyComponentMappers,
   aws: awsComponentMappers,
   discord: discordComponentMappers,
+  openai: openaiComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
+  cloudflare: cloudflareTriggerRenderers,
   semaphore: semaphoreTriggerRenderers,
   github: githubTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
@@ -119,9 +139,11 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   rootly: rootlyTriggerRenderers,
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
+  openai: openaiTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
+  cloudflare: cloudflareEventStateRegistry,
   semaphore: semaphoreEventStateRegistry,
   github: githubEventStateRegistry,
   pagerduty: pagerdutyEventStateRegistry,
@@ -132,6 +154,8 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   smtp: smtpEventStateRegistry,
   discord: discordEventStateRegistry,
   rootly: rootlyEventStateRegistry,
+  openai: openaiEventStateRegistry,
+  aws: awsEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
@@ -163,6 +187,10 @@ const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer
  * Falls back to the default renderer if no specific renderer is registered.
  */
 export function getTriggerRenderer(name: string): TriggerRenderer {
+  if (!name) {
+    return defaultTriggerRenderer;
+  }
+
   const parts = name?.split(".");
   if (parts?.length == 1) {
     return withCustomName(triggerRenderers[name] || defaultTriggerRenderer);
@@ -286,15 +314,19 @@ export function getExecutionDetails(
     }
   }
 
-  return mapper?.getExecutionDetails?.(execution, node, nodes);
+  return mapper?.getExecutionDetails?.({
+    execution: buildExecutionInfo(execution),
+    node: buildNodeInfo(node),
+    nodes: nodes?.map((n) => buildNodeInfo(n)) || [],
+  });
 }
 
 function withCustomName(renderer: TriggerRenderer): TriggerRenderer {
   return {
     ...renderer,
-    getTriggerProps: (node, trigger, lastEvent) => {
-      const props = renderer.getTriggerProps(node, trigger, lastEvent);
-      const customName = lastEvent?.customName?.trim();
+    getTriggerProps: (context: TriggerRendererContext) => {
+      const props = renderer.getTriggerProps(context);
+      const customName = context.lastEvent?.customName?.trim();
       if (customName && props.lastEventData) {
         return {
           ...props,
@@ -307,9 +339,9 @@ function withCustomName(renderer: TriggerRenderer): TriggerRenderer {
 
       return props;
     },
-    getTitleAndSubtitle: (event) => {
-      const { title, subtitle } = renderer.getTitleAndSubtitle(event);
-      const customName = event.customName?.trim();
+    getTitleAndSubtitle: (context: TriggerEventContext) => {
+      const { title, subtitle } = renderer.getTitleAndSubtitle(context);
+      const customName = context.event?.customName?.trim();
       if (customName) {
         return { title: customName, subtitle };
       }

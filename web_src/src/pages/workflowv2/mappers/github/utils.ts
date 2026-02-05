@@ -1,29 +1,7 @@
 import { MetadataItem } from "@/ui/metadataList";
 import { formatTimeAgo } from "@/utils/date";
 import { CanvasesCanvasNodeExecution } from "@/api-client";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { EventStateRegistry } from "../types";
-import { defaultStateFunction } from "../stateRegistry";
-
-export type PredicateType = "equals" | "notEquals" | "matches";
-
-export interface Predicate {
-  type: PredicateType;
-  value: string;
-}
-
-export function formatPredicate(predicate: Predicate): string {
-  switch (predicate.type) {
-    case "equals":
-      return `=${predicate.value}`;
-    case "notEquals":
-      return `!=${predicate.value}`;
-    case "matches":
-      return `~${predicate.value}`;
-    default:
-      return predicate.value;
-  }
-}
+import { Predicate, formatPredicate } from "../utils";
 
 export function createGithubMetadataItems(
   repositoryName: string | undefined,
@@ -61,17 +39,4 @@ export function buildGithubSubtitle(content: string | undefined, createdAt?: str
 export function buildGithubExecutionSubtitle(execution: CanvasesCanvasNodeExecution, content?: string): string {
   const timestamp = execution.updatedAt || execution.createdAt;
   return buildGithubSubtitle(content || "", timestamp);
-}
-
-export function buildActionStateRegistry(successState: string): EventStateRegistry {
-  return {
-    stateMap: {
-      ...DEFAULT_EVENT_STATE_MAP,
-      [successState]: DEFAULT_EVENT_STATE_MAP.success,
-    },
-    getState: (execution) => {
-      const state = defaultStateFunction(execution);
-      return state === "success" ? successState : state;
-    },
-  };
 }

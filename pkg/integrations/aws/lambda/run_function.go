@@ -30,7 +30,7 @@ func (c *RunFunction) Name() string {
 }
 
 func (c *RunFunction) Label() string {
-	return "Lambda - Run Function"
+	return "Lambda • Run Function"
 }
 
 func (c *RunFunction) Description() string {
@@ -71,6 +71,18 @@ func (c *RunFunction) OutputChannels(configuration any) []core.OutputChannel {
 func (c *RunFunction) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:     "region",
+			Label:    "Region",
+			Type:     configuration.FieldTypeSelect,
+			Required: true,
+			Default:  "us-east-1",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: common.AllRegions,
+				},
+			},
+		},
+		{
 			Name:        "functionArn",
 			Label:       "Lambda Function ARN",
 			Type:        configuration.FieldTypeIntegrationResource,
@@ -79,6 +91,20 @@ func (c *RunFunction) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "lambda.function",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "region",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "region",
+							},
+						},
+					},
+				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "region",
+					Values: []string{"*"},
 				},
 			},
 		},

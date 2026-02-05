@@ -107,13 +107,13 @@ func (w *IntegrationRequestWorker) syncIntegration(tx *gorm.DB, request *models.
 
 	integrationCtx := contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry)
 	syncErr := integration.Sync(core.SyncContext{
+		Logger:          logging.ForIntegration(*instance),
 		HTTP:            contexts.NewHTTPContext(w.registry.GetHTTPClient()),
 		Integration:     integrationCtx,
 		Configuration:   instance.Configuration.Data(),
 		BaseURL:         w.baseURL,
 		WebhooksBaseURL: w.webhooksBaseURL,
 		OrganizationID:  instance.OrganizationID.String(),
-		InstallationID:  instance.ID.String(),
 		OIDC:            w.oidcProvider,
 	})
 
@@ -146,16 +146,24 @@ func (w *IntegrationRequestWorker) invokeIntegrationAction(tx *gorm.DB, request 
 	logger := logging.ForIntegration(*integration)
 	integrationCtx := contexts.NewIntegrationContext(tx, nil, integration, w.encryptor, w.registry)
 	actionCtx := core.IntegrationActionContext{
-		Name:          spec.InvokeAction.ActionName,
-		Parameters:    spec.InvokeAction.Parameters,
-		Configuration: integration.Configuration.Data(),
-		Logger:        logger,
-		Integration:   integrationCtx,
+		WebhooksBaseURL: w.webhooksBaseURL,
+		Name:            spec.InvokeAction.ActionName,
+		Parameters:      spec.InvokeAction.Parameters,
+		Configuration:   integration.Configuration.Data(),
+		Logger:          logger,
+		Integration:     integrationCtx,
+		HTTP:            contexts.NewHTTPContext(w.registry.GetHTTPClient()),
 	}
 
 	err = integrationImpl.HandleAction(actionCtx)
 	if err != nil {
 		logger.Errorf("error handling action: %v", err)
+	}
+
+	err = tx.Save(integration).Error
+	if err != nil {
+		logger.Errorf("failed to save integration %s: %v", integration.ID, err)
+		return fmt.Errorf("failed to save integration: %w", err)
 	}
 
 	return request.Complete(tx)

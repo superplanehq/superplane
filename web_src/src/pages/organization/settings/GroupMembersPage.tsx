@@ -9,6 +9,8 @@ import { Icon } from "../../../components/Icon";
 import { Input } from "../../../components/Input/input";
 import { Table, TableBody, TableCell, TableRow } from "../../../components/Table/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { PermissionTooltip } from "@/components/PermissionGate";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import {
   useOrganizationGroup,
   useOrganizationGroupUsers,
@@ -28,6 +30,7 @@ export function GroupMembersPage() {
   const orgId = organizationId;
   const queryClient = useQueryClient();
   usePageTitle(["Groups", groupName || "Group"]);
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
   const addMembersSectionRef = useRef<AddMembersSectionRef>(null);
   const [isEditingGroupName, setIsEditingGroupName] = useState(false);
   const [editedGroupName, setEditedGroupName] = useState("");
@@ -48,6 +51,7 @@ export function GroupMembersPage() {
   // Mutations
   const updateGroupMutation = useUpdateGroup(orgId || "");
   const removeUserFromGroupMutation = useRemoveUserFromGroup(orgId || "");
+  const canUpdateGroups = canAct("groups", "update");
 
   const loading = loadingGroup || loadingMembers;
   const error = groupError || membersError;
@@ -57,6 +61,7 @@ export function GroupMembersPage() {
   };
 
   const handleEditGroupName = () => {
+    if (!canUpdateGroups) return;
     if (group) {
       setEditedGroupName(group.spec?.displayName || "");
       setIsEditingGroupName(true);
@@ -64,6 +69,7 @@ export function GroupMembersPage() {
   };
 
   const handleSaveGroupName = async () => {
+    if (!canUpdateGroups) return;
     if (!group || !editedGroupName.trim() || !groupName || !orgId) return;
 
     try {
@@ -87,6 +93,7 @@ export function GroupMembersPage() {
   };
 
   const handleRemoveMember = async (userId: string) => {
+    if (!canUpdateGroups) return;
     if (!groupName || !orgId) return;
 
     try {
@@ -188,30 +195,42 @@ export function GroupMembersPage() {
                 </div>
               </div>
             ) : (
-              <div
-                className="flex items-center gap-2 rounded-md px-2 py-1 transition group-hover:bg-white/50 border-1 border-transparent group-hover:border-gray-300 dark:group-hover:bg-white/10 cursor-text"
-                onClick={handleEditGroupName}
+              <PermissionTooltip
+                allowed={canUpdateGroups || permissionsLoading}
+                message="You don't have permission to update groups."
               >
-                <Heading level={2} className="text-2xl font-semibold text-gray-800 dark:text-white">
-                  {group?.spec?.displayName}
-                </Heading>
-                <span className="opacity-0 group-hover:opacity-100 text-xs font-medium text-gray-500 border-1 border-gray-300 rounded px-2 py-0.5">
-                  Edit
-                </span>
-              </div>
+                <div
+                  className="flex items-center gap-2 rounded-md px-2 py-1 transition group-hover:bg-white/50 border-1 border-transparent group-hover:border-gray-300 dark:group-hover:bg-white/10 cursor-text"
+                  onClick={handleEditGroupName}
+                >
+                  <Heading level={2} className="text-2xl font-semibold text-gray-800 dark:text-white">
+                    {group?.spec?.displayName}
+                  </Heading>
+                  <span className="opacity-0 group-hover:opacity-100 text-xs font-medium text-gray-500 border-1 border-gray-300 rounded px-2 py-0.5">
+                    Edit
+                  </span>
+                </div>
+              </PermissionTooltip>
             )}
           </div>
           <div />
         </div>
 
         {/* Add Members Section */}
-        <AddMembersSection
-          ref={addMembersSectionRef}
-          organizationId={orgId!}
-          groupName={groupName!}
-          showRoleSelection={false}
-          onMemberAdded={handleMemberAdded}
-        />
+        <PermissionTooltip
+          allowed={canUpdateGroups || permissionsLoading}
+          message="You don't have permission to update group members."
+          className="w-full"
+        >
+          <AddMembersSection
+            ref={addMembersSectionRef}
+            organizationId={orgId!}
+            groupName={groupName!}
+            showRoleSelection={false}
+            onMemberAdded={handleMemberAdded}
+            className="w-full"
+          />
+        </PermissionTooltip>
 
         {/* Group members table */}
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
@@ -240,21 +259,27 @@ export function GroupMembersPage() {
                     <TableCell>{member.metadata?.email}</TableCell>
                     <TableCell>
                       <div className="flex justify-end">
-                        <TooltipProvider delayDuration={200}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveMember(member.metadata!.id!)}
-                                className="p-1 rounded text-gray-800 hover:bg-gray-100 transition-colors"
-                                aria-label="Remove from Group"
-                              >
-                                <Icon name="x" size="sm" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">Remove from Group</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                        <PermissionTooltip
+                          allowed={canUpdateGroups || permissionsLoading}
+                          message="You don't have permission to update group members."
+                        >
+                          <TooltipProvider delayDuration={200}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveMember(member.metadata!.id!)}
+                                  className="p-1 rounded text-gray-800 hover:bg-gray-100 transition-colors"
+                                  aria-label="Remove from Group"
+                                  disabled={!canUpdateGroups}
+                                >
+                                  <Icon name="x" size="sm" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Remove from Group</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </PermissionTooltip>
                       </div>
                     </TableCell>
                   </TableRow>

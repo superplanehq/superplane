@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -59,12 +60,12 @@ func UpdateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 	)
 
 	syncErr := integration.Sync(core.SyncContext{
+		Logger:          logging.ForIntegration(*instance),
 		HTTP:            contexts.NewHTTPContext(registry.GetHTTPClient()),
 		Configuration:   instance.Configuration.Data(),
 		BaseURL:         baseURL,
 		WebhooksBaseURL: webhooksBaseURL,
 		OrganizationID:  orgID,
-		InstallationID:  instance.ID.String(),
 		Integration:     integrationCtx,
 		OIDC:            oidcProvider,
 	})
