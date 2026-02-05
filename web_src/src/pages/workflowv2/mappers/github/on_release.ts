@@ -1,6 +1,5 @@
-import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerRenderer } from "../types";
+import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { TriggerProps } from "@/ui/trigger";
 import { BaseNodeMetadata, Release } from "./types";
@@ -19,19 +18,19 @@ interface OnReleaseEventData {
  * Renderer for the "github.onRelease" trigger
  */
 export const onReleaseTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as OnReleaseEventData;
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+    const eventData = context.event?.data as OnReleaseEventData;
     const assetCount = eventData?.release?.assets?.length || 0;
     const releaseName = eventData?.release?.name || eventData?.release?.tag_name || "Release";
 
     return {
       title: `${releaseName} (${assetCount} asset${assetCount !== 1 ? "s" : ""})`,
-      subtitle: buildGithubSubtitle(eventData?.action || "", event.createdAt),
+      subtitle: buildGithubSubtitle(eventData?.action || "", context.event?.createdAt),
     };
   },
 
-  getRootEventValues: (lastEvent: CanvasesCanvasEvent): Record<string, string> => {
-    const eventData = lastEvent.data?.data as OnReleaseEventData;
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
+    const eventData = context.event?.data as OnReleaseEventData;
     const values: Record<string, string> = {
       Name: eventData?.release?.name || "",
       Tag: eventData?.release?.tag_name || "",
@@ -47,7 +46,8 @@ export const onReleaseTriggerRenderer: TriggerRenderer = {
     return values;
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
+  getTriggerProps: (context: TriggerRendererContext) => {
+    const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as BaseNodeMetadata;
     const configuration = node.configuration as unknown as OnReleaseConfiguration;
     const metadataItems = [];
@@ -67,15 +67,15 @@ export const onReleaseTriggerRenderer: TriggerRenderer = {
     }
 
     const props: TriggerProps = {
-      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
+      title: node.name || definition.label || "Unnamed trigger",
       iconSrc: githubIcon,
-      iconColor: getColorClass(trigger.color),
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      iconColor: getColorClass(definition.color),
+      collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: metadataItems,
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as OnReleaseEventData;
+      const eventData = lastEvent.data as OnReleaseEventData;
       const assetCount = eventData?.release?.assets?.length || 0;
       const releaseName = eventData?.release?.name || eventData?.release?.tag_name || "Release";
 

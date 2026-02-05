@@ -92,7 +92,8 @@ func (c *GetImage) Configuration() []configuration.Field {
 			},
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: "ecr.repository",
+					Type:           "ecr.repository",
+					UseNameAsValue: true,
 					Parameters: []configuration.ParameterRef{
 						{
 							Name: "region",

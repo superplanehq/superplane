@@ -74,7 +74,7 @@ This section gives a quick snapshot of what SuperPlane already supports and what
 
 **In progress / upcoming**
 
-→ 200+ new components (AWS, Grafana, Datadog, Azure, GitLab, Jira, and more)  
+→ 200+ new components (AWS, Grafana, DataDog, Azure, GitLab, Jira, and more)  
 → [Canvas version control](https://github.com/superplanehq/superplane/issues/1380)  
 → [SAML/SCIM](https://github.com/superplanehq/superplane/issues/1377) with [extended RBAC and permissions](https://github.com/superplanehq/superplane/issues/1378)  
 → [Artifact version tracking](https://github.com/superplanehq/superplane/issues/1382)  

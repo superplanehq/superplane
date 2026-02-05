@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/models"
 	workercontexts "github.com/superplanehq/superplane/pkg/workers/contexts"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support/contexts"
@@ -30,81 +31,137 @@ func TestApproval_OutputChannels(t *testing.T) {
 	assert.Equal(t, "At least one actor rejected (after everyone responded)", channels[1].Description)
 }
 
-// TODO: Add tests for role and group approval when RBAC is enabled
 func TestApproval_HandleAction_Approved_UsesCorrectChannel(t *testing.T) {
 	approval := &Approval{}
 
-	user := &core.User{ID: "test-user"}
-	metadata := &Metadata{
-		Result: StatePending,
-		Records: []Record{
-			{Index: 0, State: StatePending, Type: ItemTypeUser, User: user},
+	role := models.RoleOrgOwner
+	group := "release-approvers"
+
+	testCases := []struct {
+		name   string
+		record Record
+		auth   *contexts.AuthContext
+	}{
+		{
+			name:   "user",
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeUser, User: &core.User{ID: "test-user"}},
+			auth:   &contexts.AuthContext{User: &core.User{ID: "test-user"}},
+		},
+		{
+			name:   "role",
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeRole, Role: &role},
+			auth: &contexts.AuthContext{
+				User:  &core.User{ID: "test-user"},
+				Roles: map[string]struct{}{role: {}},
+			},
+		},
+		{
+			name:   "group",
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeGroup, Group: &group},
+			auth: &contexts.AuthContext{
+				User:   &core.User{ID: "test-user"},
+				Groups: map[string]struct{}{group: {}},
+			},
 		},
 	}
 
-	stateCtx := &contexts.ExecutionStateContext{}
-	metadataCtx := &contexts.MetadataContext{
-		Metadata: metadata,
-	}
-	authCtx := &contexts.AuthContext{
-		User: user,
-	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			metadata := &Metadata{
+				Result:  StatePending,
+				Records: []Record{testCase.record},
+			}
 
-	ctx := core.ActionContext{
-		Name: "approve",
-		Parameters: map[string]any{
-			"index": float64(0),
-		},
-		Metadata:       metadataCtx,
-		ExecutionState: stateCtx,
-		Auth:           authCtx,
+			stateCtx := &contexts.ExecutionStateContext{}
+			metadataCtx := &contexts.MetadataContext{
+				Metadata: metadata,
+			}
+
+			ctx := core.ActionContext{
+				Name: "approve",
+				Parameters: map[string]any{
+					"index": float64(0),
+				},
+				Metadata:       metadataCtx,
+				ExecutionState: stateCtx,
+				Auth:           testCase.auth,
+			}
+
+			err := approval.HandleAction(ctx)
+
+			assert.NoError(t, err)
+			assert.True(t, stateCtx.Passed)
+			assert.True(t, stateCtx.Finished)
+			assert.Equal(t, ChannelApproved, stateCtx.Channel)
+		})
 	}
-
-	err := approval.HandleAction(ctx)
-
-	assert.NoError(t, err)
-	assert.True(t, stateCtx.Passed)
-	assert.True(t, stateCtx.Finished)
-	assert.Equal(t, ChannelApproved, stateCtx.Channel)
 }
 
-// TODO: Add tests for role and group approval when RBAC is enabled
 func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
 	approval := &Approval{}
 
-	user := &core.User{ID: "test-user"}
-	metadata := &Metadata{
-		Result: StatePending,
-		Records: []Record{
-			{Index: 0, State: StatePending, Type: ItemTypeUser, User: user},
+	role := models.RoleOrgOwner
+	group := "release-approvers"
+
+	testCases := []struct {
+		name   string
+		record Record
+		auth   *contexts.AuthContext
+	}{
+		{
+			name:   "user",
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeUser, User: &core.User{ID: "test-user"}},
+			auth:   &contexts.AuthContext{User: &core.User{ID: "test-user"}},
+		},
+		{
+			name:   "role",
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeRole, Role: &role},
+			auth: &contexts.AuthContext{
+				User:  &core.User{ID: "test-user"},
+				Roles: map[string]struct{}{role: {}},
+			},
+		},
+		{
+			name:   "group",
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeGroup, Group: &group},
+			auth: &contexts.AuthContext{
+				User:   &core.User{ID: "test-user"},
+				Groups: map[string]struct{}{group: {}},
+			},
 		},
 	}
 
-	stateCtx := &contexts.ExecutionStateContext{}
-	metadataCtx := &contexts.MetadataContext{
-		Metadata: metadata,
-	}
-	authCtx := &contexts.AuthContext{
-		User: user,
-	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			metadata := &Metadata{
+				Result:  StatePending,
+				Records: []Record{testCase.record},
+			}
 
-	ctx := core.ActionContext{
-		Name: "reject",
-		Parameters: map[string]any{
-			"index":  float64(0),
-			"reason": "Not approved",
-		},
-		Metadata:       metadataCtx,
-		ExecutionState: stateCtx,
-		Auth:           authCtx,
+			stateCtx := &contexts.ExecutionStateContext{}
+			metadataCtx := &contexts.MetadataContext{
+				Metadata: metadata,
+			}
+
+			ctx := core.ActionContext{
+				Name: "reject",
+				Parameters: map[string]any{
+					"index":  float64(0),
+					"reason": "Not approved",
+				},
+				Metadata:       metadataCtx,
+				ExecutionState: stateCtx,
+				Auth:           testCase.auth,
+			}
+
+			err := approval.HandleAction(ctx)
+
+			assert.NoError(t, err)
+			assert.True(t, stateCtx.Passed)
+			assert.True(t, stateCtx.Finished)
+			assert.Equal(t, ChannelRejected, stateCtx.Channel)
+		})
 	}
-
-	err := approval.HandleAction(ctx)
-
-	assert.NoError(t, err)
-	assert.True(t, stateCtx.Passed)
-	assert.True(t, stateCtx.Finished)
-	assert.Equal(t, ChannelRejected, stateCtx.Channel)
 }
 
 func TestApproval_HandleAction_RejectImmediatelyFinishes(t *testing.T) {
@@ -149,43 +206,72 @@ func TestApproval_HandleAction_RejectImmediatelyFinishes(t *testing.T) {
 	assert.Equal(t, StateRejected, stored.Result)
 }
 
-// TODO: Add tests for role and group approval when RBAC is enabled
 func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
 	approval := &Approval{}
 
-	user1 := &core.User{ID: "test-user-1"}
-	user2 := &core.User{ID: "test-user-2"}
-	metadata := &Metadata{
-		Result: StatePending,
-		Records: []Record{
-			{Index: 0, State: StatePending, Type: ItemTypeUser, User: user1},
-			{Index: 1, State: StatePending, Type: ItemTypeUser, User: user2},
+	role := models.RoleOrgOwner
+	group := "release-approvers"
+
+	testCases := []struct {
+		name   string
+		record Record
+		auth   *contexts.AuthContext
+	}{
+		{
+			name:   "user",
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeUser, User: &core.User{ID: "test-user-1"}},
+			auth:   &contexts.AuthContext{User: &core.User{ID: "test-user-1"}},
+		},
+		{
+			name:   "role",
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeRole, Role: &role},
+			auth: &contexts.AuthContext{
+				User:  &core.User{ID: "test-user-1"},
+				Roles: map[string]struct{}{role: {}},
+			},
+		},
+		{
+			name:   "group",
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeGroup, Group: &group},
+			auth: &contexts.AuthContext{
+				User:   &core.User{ID: "test-user-1"},
+				Groups: map[string]struct{}{group: {}},
+			},
 		},
 	}
 
-	stateCtx := &contexts.ExecutionStateContext{}
-	metadataCtx := &contexts.MetadataContext{
-		Metadata: metadata,
-	}
-	authCtx := &contexts.AuthContext{
-		User: user1,
-	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			metadata := &Metadata{
+				Result: StatePending,
+				Records: []Record{
+					testCase.record,
+					{Index: 1, State: StatePending, Type: ItemTypeUser, User: &core.User{ID: "test-user-2"}},
+				},
+			}
 
-	ctx := core.ActionContext{
-		Name: "approve",
-		Parameters: map[string]any{
-			"index": float64(0),
-		},
-		Metadata:       metadataCtx,
-		ExecutionState: stateCtx,
-		Auth:           authCtx,
+			stateCtx := &contexts.ExecutionStateContext{}
+			metadataCtx := &contexts.MetadataContext{
+				Metadata: metadata,
+			}
+
+			ctx := core.ActionContext{
+				Name: "approve",
+				Parameters: map[string]any{
+					"index": float64(0),
+				},
+				Metadata:       metadataCtx,
+				ExecutionState: stateCtx,
+				Auth:           testCase.auth,
+			}
+
+			err := approval.HandleAction(ctx)
+
+			assert.NoError(t, err)
+			assert.False(t, stateCtx.Passed)
+			assert.False(t, stateCtx.Finished)
+		})
 	}
-
-	err := approval.HandleAction(ctx)
-
-	assert.NoError(t, err)
-	assert.False(t, stateCtx.Passed)
-	assert.False(t, stateCtx.Finished)
 }
 
 func TestApproval_HandleAction_ApproveOnceAcrossAllRequirements(t *testing.T) {
@@ -407,7 +493,6 @@ func TestMetadata_Completed(t *testing.T) {
 	})
 }
 
-// TODO: Add tests for role and group approval when RBAC is enabled
 func TestApproval_Execute(t *testing.T) {
 	approval := &Approval{}
 
@@ -496,6 +581,45 @@ func TestApproval_Execute(t *testing.T) {
 		err := approval.Execute(ctx)
 		require.NoError(t, err)
 		assert.True(t, notificationConsumer.HasReceivedMessage())
+	})
+
+	t.Run("with role and group items creates records", func(t *testing.T) {
+		stateCtx := &contexts.ExecutionStateContext{}
+		metadataCtx := &contexts.MetadataContext{}
+
+		role := models.RoleOrgOwner
+		group := "release-approvers"
+
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"items": []any{
+					map[string]any{
+						"type": "role",
+						"role": role,
+					},
+					map[string]any{
+						"type":  "group",
+						"group": group,
+					},
+				},
+			},
+			Metadata:       metadataCtx,
+			ExecutionState: stateCtx,
+			Auth:           &contexts.AuthContext{},
+		}
+
+		err := approval.Execute(ctx)
+
+		assert.NoError(t, err)
+		assert.False(t, stateCtx.Passed)
+		assert.False(t, stateCtx.Finished)
+
+		stored := metadataCtx.Metadata.(*Metadata)
+		require.Len(t, stored.Records, 2)
+		assert.Equal(t, ItemTypeRole, stored.Records[0].Type)
+		assert.Equal(t, role, *stored.Records[0].Role)
+		assert.Equal(t, ItemTypeGroup, stored.Records[1].Type)
+		assert.Equal(t, group, *stored.Records[1].Group)
 	})
 }
 

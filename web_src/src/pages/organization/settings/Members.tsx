@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { useAccount } from "@/contexts/AccountContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { Avatar } from "../../../components/Avatar/avatar";
 import { Badge } from "../../../components/Badge/badge";
 import { Icon } from "../../../components/Icon";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
 import { Text } from "../../../components/Text/text";
+import { PermissionTooltip } from "@/components/PermissionGate";
 import {
   useAssignRole,
   useOrganizationInviteLink,
@@ -16,11 +17,11 @@ import {
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { isRBACEnabled } from "@/lib/env";
 import { Switch } from "@/ui/switch";
 import { getApiErrorMessage } from "@/utils/errors";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { useMe } from "@/hooks/useMe";
 
 interface Member {
   id: string;
@@ -39,7 +40,8 @@ interface MembersProps {
 }
 
 export function Members({ organizationId }: MembersProps) {
-  const { account } = useAccount();
+  const { data: me } = useMe();
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Member | null;
     direction: "asc" | "desc";
@@ -53,18 +55,9 @@ export function Members({ organizationId }: MembersProps) {
     isLoading: loadingRoles,
     error: rolesError,
   } = useOrganizationRoles(organizationId);
-  const currentUserRoleNames = useMemo(() => {
-    if (!account?.email) {
-      return [];
-    }
-
-    const matchedUser = users.find((user) => user.metadata?.email?.toLowerCase() === account.email.toLowerCase());
-    return matchedUser?.status?.roleAssignments?.map((role) => role.roleName) ?? [];
-  }, [account?.email, users]);
-
-  const canManageInviteLink = currentUserRoleNames.some(
-    (roleName) => roleName === "org_owner" || roleName === "org_admin",
-  );
+  const canManageInviteLink = canAct("members", "create");
+  const canUpdateMembers = canAct("members", "update");
+  const canDeleteMembers = canAct("members", "delete");
 
   const {
     data: inviteLink,
@@ -98,7 +91,7 @@ export function Members({ organizationId }: MembersProps) {
   }, [inviteLink?.token]);
 
   const inviteLinkErrorMessage = inviteLinkError ? getApiErrorMessage(inviteLinkError) : null;
-  const showInviteLinkSection = canManageInviteLink && inviteLinkErrorMessage !== "Not found";
+  const showInviteLinkSection = inviteLinkErrorMessage !== "Not found";
   const inviteLinkEnabled = inviteLink?.enabled ?? false;
   const inviteLinkBusy = updateInviteLinkMutation.isPending || resetInviteLinkMutation.isPending;
 
@@ -168,6 +161,7 @@ export function Members({ organizationId }: MembersProps) {
   };
 
   const handleRoleChange = async (memberId: string, newRoleName: string) => {
+    if (!canUpdateMembers || me?.id === memberId) return;
     try {
       await assignRoleMutation.mutateAsync({
         userId: memberId,
@@ -179,6 +173,7 @@ export function Members({ organizationId }: MembersProps) {
   };
 
   const handleMemberRemove = async (member: Member) => {
+    if (!canDeleteMembers) return;
     if (member.type === "member" && ownerIds.has(member.id) && ownerIds.size <= 1) {
       setRemovalError("You must have at least one organization owner.");
       return;
@@ -233,69 +228,77 @@ export function Members({ organizationId }: MembersProps) {
       )}
 
       {showInviteLinkSection ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
-          <div className="flex items-start justify-between gap-6">
-            <div>
-              <Text className="text-left font-semibold text-gray-800 dark:text-white mb-1">
-                Invite link to add members
-              </Text>
-              <Text className="text-sm text-gray-500 dark:text-gray-400">
-                Only people with owner and admin roles can see this.
-                {inviteLinkEnabled && (
-                  <>
-                    {" "}
-                    You can also{" "}
-                    <button
-                      type="button"
-                      className="text-sky-600 hover:underline disabled:text-gray-400"
-                      onClick={handleInviteLinkReset}
-                      disabled={loadingInviteLink || inviteLinkBusy}
-                    >
-                      generate a new link
-                    </button>
-                    .
-                  </>
-                )}
-              </Text>
+        <PermissionTooltip
+          allowed={canManageInviteLink || permissionsLoading}
+          message="You don't have permission to invite members."
+          className="w-full"
+        >
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+            <div className="flex items-start justify-between gap-6">
+              <div>
+                <Text className="text-left font-semibold text-gray-800 dark:text-white mb-1">
+                  Invite link to add members
+                </Text>
+                <Text className="text-sm text-gray-500 dark:text-gray-400">
+                  {canManageInviteLink
+                    ? "Only people with required roles can see this."
+                    : "You don't have permission to manage invite links."}
+                  {inviteLinkEnabled && (
+                    <>
+                      {" "}
+                      You can also{" "}
+                      <button
+                        type="button"
+                        className="text-sky-600 hover:underline disabled:text-gray-400"
+                        onClick={handleInviteLinkReset}
+                        disabled={loadingInviteLink || inviteLinkBusy || !canManageInviteLink}
+                      >
+                        generate a new link
+                      </button>
+                      .
+                    </>
+                  )}
+                </Text>
+              </div>
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={inviteLinkEnabled}
+                  onCheckedChange={handleInviteLinkToggle}
+                  disabled={loadingInviteLink || inviteLinkBusy || !canManageInviteLink}
+                  aria-label="Toggle invite link"
+                />
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Switch
-                checked={inviteLinkEnabled}
-                onCheckedChange={handleInviteLinkToggle}
-                disabled={loadingInviteLink || inviteLinkBusy}
-                aria-label="Toggle invite link"
-              />
-            </div>
+
+            {inviteLinkErrorMessage && inviteLinkErrorMessage !== "Not found" && (
+              <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded mt-4">
+                <p className="text-sm">{inviteLinkErrorMessage}</p>
+              </div>
+            )}
+
+            {!inviteLinkEnabled && !loadingInviteLink && (
+              <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">Invite link is currently disabled.</div>
+            )}
+
+            {inviteLinkEnabled && inviteLinkUrl && (
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Input
+                  readOnly
+                  value={inviteLinkUrl}
+                  className="flex-1 bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300"
+                />
+                <Button
+                  variant="outline"
+                  onClick={handleCopyInviteLink}
+                  disabled={!inviteLinkUrl || loadingInviteLink || inviteLinkBusy || !canManageInviteLink}
+                >
+                  <Icon name="copy" />
+                  Copy link
+                </Button>
+              </div>
+            )}
           </div>
-
-          {inviteLinkErrorMessage && inviteLinkErrorMessage !== "Not found" && (
-            <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded mt-4">
-              <p className="text-sm">{inviteLinkErrorMessage}</p>
-            </div>
-          )}
-
-          {!inviteLinkEnabled && !loadingInviteLink && (
-            <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">Invite link is currently disabled.</div>
-          )}
-
-          {inviteLinkEnabled && inviteLinkUrl && (
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <Input
-                readOnly
-                value={inviteLinkUrl}
-                className="flex-1 bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-300"
-              />
-              <Button
-                variant="outline"
-                onClick={handleCopyInviteLink}
-                disabled={!inviteLinkUrl || loadingInviteLink || inviteLinkBusy}
-              >
-                <Icon name="copy" />
-                Copy link
-              </Button>
-            </div>
-          )}
-        </div>
+        </PermissionTooltip>
       ) : (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
           <Text className="text-left font-semibold text-gray-800 dark:text-white mb-1">Invite link to add members</Text>
@@ -345,17 +348,15 @@ export function Members({ organizationId }: MembersProps) {
                       <Icon name={getSortIcon("email")} size="sm" className="text-gray-400" />
                     </div>
                   </TableHeader>
-                  {isRBACEnabled() && (
-                    <TableHeader
-                      className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                      onClick={() => handleSort("role")}
-                    >
-                      <div className="flex items-center gap-2">
-                        Role
-                        <Icon name={getSortIcon("role")} size="sm" className="text-gray-400" />
-                      </div>
-                    </TableHeader>
-                  )}
+                  <TableHeader
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    onClick={() => handleSort("role")}
+                  >
+                    <div className="flex items-center gap-2">
+                      Role
+                      <Icon name={getSortIcon("role")} size="sm" className="text-gray-400" />
+                    </div>
+                  </TableHeader>
                   <TableHeader
                     className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
                     onClick={() => handleSort("status")}
@@ -380,37 +381,48 @@ export function Members({ organizationId }: MembersProps) {
                       </div>
                     </TableCell>
                     <TableCell>{member.email}</TableCell>
-                    {isRBACEnabled() && (
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button className="flex items-center gap-2 text-sm">
-                              {member.role}
-                              <Icon name="chevron-down" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            {organizationRoles.map((role) => (
-                              <DropdownMenuItem
-                                key={role.metadata?.name}
-                                onClick={() => handleRoleChange(member.id, role.metadata?.name || "")}
-                                disabled={loadingRoles}
-                                className="flex flex-col items-start gap-1"
-                              >
-                                <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                                  {role.spec?.displayName || role.metadata?.name}
-                                </span>
-                              </DropdownMenuItem>
-                            ))}
-                            {loadingRoles && (
-                              <DropdownMenuItem disabled>
-                                <span className="text-sm text-gray-500 dark:text-gray-400">Loading roles...</span>
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    )}
+                    <TableCell>
+                      {(() => {
+                        const isSelf = me?.id === member.id;
+                        const roleChangeAllowed = canUpdateMembers && !isSelf;
+                        const tooltipAllowed = roleChangeAllowed || (permissionsLoading && !isSelf);
+                        const tooltipMessage = isSelf
+                          ? "You can't change your own role."
+                          : "You don't have permission to update member roles.";
+
+                        return (
+                          <PermissionTooltip allowed={tooltipAllowed} message={tooltipMessage}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="flex items-center gap-2 text-sm" disabled={!roleChangeAllowed}>
+                                  {member.role}
+                                  <Icon name="chevron-down" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent>
+                                {organizationRoles.map((role) => (
+                                  <DropdownMenuItem
+                                    key={role.metadata?.name}
+                                    onClick={() => handleRoleChange(member.id, role.metadata?.name || "")}
+                                    disabled={loadingRoles || !roleChangeAllowed}
+                                    className="flex flex-col items-start gap-1"
+                                  >
+                                    <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                                      {role.spec?.displayName || role.metadata?.name}
+                                    </span>
+                                  </DropdownMenuItem>
+                                ))}
+                                {loadingRoles && (
+                                  <DropdownMenuItem disabled>
+                                    <span className="text-sm text-gray-500 dark:text-gray-400">Loading roles...</span>
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </PermissionTooltip>
+                        );
+                      })()}
+                    </TableCell>
                     <TableCell>
                       <Badge color="green">Active</Badge>
                     </TableCell>
@@ -431,22 +443,28 @@ export function Members({ organizationId }: MembersProps) {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         ) : (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className="flex items-center gap-2 text-sm">
-                                <Icon name="ellipsis-vertical" size="sm" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <DropdownMenuItem
-                                className="flex items-center gap-1"
-                                onClick={() => handleMemberRemove(member)}
-                              >
-                                <Icon name="x" size="sm" />
-                                Remove
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <PermissionTooltip
+                            allowed={canDeleteMembers || permissionsLoading}
+                            message="You don't have permission to remove members."
+                          >
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="flex items-center gap-2 text-sm" disabled={!canDeleteMembers}>
+                                  <Icon name="ellipsis-vertical" size="sm" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent>
+                                <DropdownMenuItem
+                                  className="flex items-center gap-1"
+                                  onClick={() => handleMemberRemove(member)}
+                                  disabled={!canDeleteMembers}
+                                >
+                                  <Icon name="x" size="sm" />
+                                  Remove
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </PermissionTooltip>
                         )}
                       </div>
                     </TableCell>

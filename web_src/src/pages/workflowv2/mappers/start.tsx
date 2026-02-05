@@ -1,6 +1,5 @@
-import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerRenderer, CustomFieldRenderer } from "./types";
+import { TriggerRenderer, CustomFieldRenderer, NodeInfo, TriggerRendererContext, TriggerEventContext } from "./types";
 import { TriggerProps } from "@/ui/trigger";
 import { flattenObject } from "@/lib/utils";
 import { formatTimeAgo } from "@/utils/date";
@@ -21,23 +20,23 @@ interface StartConfiguration {
  * Default renderer for the start trigger
  */
 export const startTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    return { title: `Event received at ${new Date(event.createdAt!).toLocaleString()}`, subtitle: "" };
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+    return { title: `Event received at ${new Date(context.event?.createdAt || "").toLocaleString()}`, subtitle: "" };
   },
 
-  getRootEventValues: (event: CanvasesCanvasEvent): Record<string, string> => {
-    return flattenObject(event.data || {});
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
+    return flattenObject(context.event?.data || {});
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
-    const configuration = (node.configuration || {}) as Record<string, unknown>;
-    const nodeId = node.id!;
+  getTriggerProps: (context: TriggerRendererContext) => {
+    const { node, definition, lastEvent } = context;
+    const nodeId = node.id;
 
     // Create customField as a function that will receive onRun when ComponentBase renders it
     // We'll create a wrapper that captures nodeId and allows passing initialData
     const customField = (onRunBase?: () => void) => {
       if (!onRunBase) {
-        return startCustomFieldRenderer.render(node, configuration, undefined);
+        return startCustomFieldRenderer.render(node);
       }
 
       // Create a wrapper onRun that can accept initialData
@@ -53,14 +52,14 @@ export const startTriggerRenderer: TriggerRenderer = {
         }, 100);
       };
 
-      return startCustomFieldRenderer.render(node, configuration, { onRun: onRunWithContext });
+      return startCustomFieldRenderer.render(node, { onRun: onRunWithContext });
     };
 
     const props: TriggerProps = {
-      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
-      iconSlug: trigger.icon || "play",
+      title: node.name || definition.label || "Unnamed trigger",
+      iconSlug: definition.icon || "play",
       iconColor: getColorClass("purple"),
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: [],
       customField: customField,
       customFieldPosition: "before",
@@ -69,10 +68,10 @@ export const startTriggerRenderer: TriggerRenderer = {
     if (lastEvent) {
       props.lastEventData = {
         title: "Event emitted by trigger",
-        subtitle: formatTimeAgo(new Date(lastEvent.createdAt!)),
+        subtitle: formatTimeAgo(new Date(lastEvent.createdAt)),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
-        eventId: lastEvent.id!,
+        eventId: lastEvent.id,
       };
     }
 
@@ -85,13 +84,9 @@ export const startTriggerRenderer: TriggerRenderer = {
  * This is only used internally by startTriggerRenderer, not registered in the global registry
  */
 const startCustomFieldRenderer: CustomFieldRenderer = {
-  render: (
-    _node: ComponentsNode,
-    configuration: Record<string, unknown>,
-    context?: { onRun?: (initialData?: string) => void },
-  ): React.ReactNode => {
-    const config = configuration as StartConfiguration;
-    const templates = config.templates || [];
+  render: (node: NodeInfo, context?: { onRun?: (initialData?: string) => void }): React.ReactNode => {
+    const config = node.configuration as StartConfiguration;
+    const templates = config?.templates || [];
 
     if (templates.length === 0) {
       return null;
