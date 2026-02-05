@@ -1,0 +1,32 @@
+{
+  "data": {
+    "id": 3001,
+    "tag_name": "v1.2.3",
+    "name": "Release 1.2.3",
+    "body": "## What's Changed\n\n- Feature A\n- Bug fix B",
+    "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
+    "draft": false,
+    "prerelease": false,
+    "created_at": "2026-01-15T10:00:00Z",
+    "published_at": "2026-01-16T12:00:00Z",
+    "author": {
+      "login": "octocat",
+      "id": 1,
+      "avatar_url": "https://github.com/images/error/octocat_happy.gif",
+      "html_url": "https://github.com/octocat"
+    },
+    "assets": [
+      {
+        "id": 1,
+        "name": "app-v1.2.3.zip",
+        "label": "Application Bundle",
+        "content_type": "application/zip",
+        "size": 1024000,
+        "download_count": 42,
+        "browser_download_url": "https://github.com/acme/widgets/releases/download/v1.2.3/app-v1.2.3.zip"
+      }
+    ]
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.release"
+}

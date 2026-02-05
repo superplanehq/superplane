@@ -847,10 +847,10 @@ func (a *AWS) provisionRule(credentials *aws.Credentials, logger *logrus.Entry, 
 	// Otherwise, update the detail types for the rule.
 	//
 	newDetailTypes := append(rule.DetailTypes, detailType)
-	return a.updateRule(credentials, logger, integration, http, metadata, &rule, newDetailTypes)
+	return a.updateRule(credentials, logger, http, metadata, &rule, newDetailTypes)
 }
 
-func (a *AWS) updateRule(credentials *aws.Credentials, logger *logrus.Entry, integration core.IntegrationContext, http core.HTTPContext, metadata *common.IntegrationMetadata, rule *common.EventBridgeRuleMetadata, detailTypes []string) error {
+func (a *AWS) updateRule(credentials *aws.Credentials, logger *logrus.Entry, http core.HTTPContext, metadata *common.IntegrationMetadata, rule *common.EventBridgeRuleMetadata, detailTypes []string) error {
 	client := eventbridge.NewClient(http, credentials, rule.Region)
 	pattern, err := json.Marshal(map[string]any{
 		"source":      []string{rule.Source},
