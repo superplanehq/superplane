@@ -150,6 +150,7 @@ type ListResourcesContext struct {
 	Logger      *logrus.Entry
 	HTTP        HTTPContext
 	Integration IntegrationContext
+	Parameters  map[string]string
 }
 
 type SetupWebhookContext struct {

@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func ListIntegrationResources(ctx context.Context, registry *registry.Registry, orgID, integrationID, resourceType string) (*pb.ListIntegrationResourcesResponse, error) {
+func ListIntegrationResources(ctx context.Context, registry *registry.Registry, orgID string, integrationID string, parameters map[string]string) (*pb.ListIntegrationResourcesResponse, error) {
 	org, err := uuid.Parse(orgID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
@@ -24,6 +24,11 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 	ID, err := uuid.Parse(integrationID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid installation ID")
+	}
+
+	resourceType := parameters["type"]
+	if resourceType == "" {
+		return nil, status.Error(codes.InvalidArgument, "resource type is required")
 	}
 
 	instance, err := models.FindIntegration(org, ID)
@@ -52,6 +57,7 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 		}),
 		HTTP:        contexts.NewHTTPContext(registry.GetHTTPClient()),
 		Integration: integrationCtx,
+		Parameters:  parameters,
 	}
 
 	resources, err := integration.ListResources(resourceType, listCtx)

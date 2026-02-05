@@ -294,6 +294,7 @@ export const ConfigurationFieldRenderer = ({
             field={field}
             value={value as string | string[] | undefined}
             onChange={onChange}
+            allValues={allValues}
             organizationId={organizationId}
             integrationId={integrationId}
             allowExpressions={allowExpressions}
