@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -101,28 +104,37 @@ func (c *Client) listProjects() ([]ProjectResponse, error) {
 }
 
 func (c *Client) execRequest(method, URL string, body io.Reader) ([]byte, error) {
+	responseBody, _, err := c.execRequestWithHeaders(method, URL, body)
+	if err != nil {
+		return nil, err
+	}
+
+	return responseBody, nil
+}
+
+func (c *Client) execRequestWithHeaders(method, URL string, body io.Reader) ([]byte, http.Header, error) {
 	req, err := http.NewRequest(method, URL, body)
 	if err != nil {
-		return nil, fmt.Errorf("error building request: %v", err)
+		return nil, nil, fmt.Errorf("error building request: %v", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Token "+c.APIToken)
 	res, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error executing request: %v", err)
+		return nil, nil, fmt.Errorf("error executing request: %v", err)
 	}
 
 	responseBody, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading body: %v", err)
+		return nil, nil, fmt.Errorf("error reading body: %v", err)
 	}
 
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusNoContent {
-		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+		return nil, nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
 	}
 
-	return responseBody, nil
+	return responseBody, res.Header, nil
 }
 
 type PipelineResponse struct {
@@ -153,20 +165,115 @@ func (c *Client) GetPipeline(id string) (*Pipeline, error) {
 	return pipelineResponse.Pipeline, nil
 }
 
+type ListPipelinesParams struct {
+	ProjectID     string `json:"project_id,omitempty"`
+	BranchName    string `json:"branch_name,omitempty"`
+	YMLFilePath   string `json:"yml_file_path,omitempty"`
+	CreatedAfter  string `json:"created_after,omitempty"`
+	CreatedBefore string `json:"created_before,omitempty"`
+	DoneAfter     string `json:"done_after,omitempty"`
+	DoneBefore    string `json:"done_before,omitempty"`
+	Limit         int    `json:"limit,omitempty"`
+}
+
 func (c *Client) ListPipelines(projectID string) ([]any, error) {
-	URL := fmt.Sprintf("%s/api/v1alpha/pipelines?project_id=%s", c.OrgURL, projectID)
-	response, err := c.execRequest(http.MethodGet, URL, nil)
-	if err != nil {
-		return nil, err
+	return c.ListPipelinesWithFilters(&ListPipelinesParams{
+		ProjectID: projectID,
+		Limit:     100,
+	})
+}
+
+func (c *Client) ListPipelinesWithFilters(params *ListPipelinesParams) ([]any, error) {
+	if params == nil {
+		return nil, fmt.Errorf("params is required")
 	}
 
-	var pipelines []any
-	err = json.Unmarshal(response, &pipelines)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	if params.ProjectID == "" {
+		return nil, fmt.Errorf("project_id is required")
+	}
+
+	const defaultLimit = 30
+	const maxLimit = 100
+
+	// Enforce total limit max of 100
+	limit := params.Limit
+	if limit <= 0 {
+		limit = defaultLimit
+	}
+	if limit > maxLimit {
+		limit = maxLimit
+	}
+
+	values := url.Values{}
+	values.Set("project_id", params.ProjectID)
+	values.Set("limit", strconv.Itoa(limit))
+	if params.BranchName != "" {
+		values.Set("branch_name", params.BranchName)
+	}
+	if params.YMLFilePath != "" {
+		values.Set("yml_file_path", params.YMLFilePath)
+	}
+	if params.CreatedAfter != "" {
+		values.Set("created_after", params.CreatedAfter)
+	}
+	if params.CreatedBefore != "" {
+		values.Set("created_before", params.CreatedBefore)
+	}
+	if params.DoneAfter != "" {
+		values.Set("done_after", params.DoneAfter)
+	}
+	if params.DoneBefore != "" {
+		values.Set("done_before", params.DoneBefore)
+	}
+
+	baseURL := fmt.Sprintf("%s/api/v1alpha/pipelines", c.OrgURL)
+	nextURL := fmt.Sprintf("%s?%s", baseURL, values.Encode())
+
+	pipelines := make([]any, 0, limit)
+	for nextURL != "" {
+		response, headers, err := c.execRequestWithHeaders(http.MethodGet, nextURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var page []any
+		if err := json.Unmarshal(response, &page); err != nil {
+			return nil, fmt.Errorf("error unmarshaling response: %v", err)
+		}
+
+		pipelines = append(pipelines, page...)
+		if len(pipelines) >= limit {
+			return pipelines[:limit], nil
+		}
+
+		nextURL = parseNextLink(headers.Get("Link"))
 	}
 
 	return pipelines, nil
+}
+
+func parseNextLink(linkHeader string) string {
+	if linkHeader == "" {
+		return ""
+	}
+
+	parts := strings.Split(linkHeader, ",")
+	for _, part := range parts {
+		segment := strings.TrimSpace(part)
+		if !strings.Contains(segment, "rel=\"next\"") && !strings.Contains(segment, "rel=next") {
+			continue
+		}
+
+		start := strings.Index(segment, "<")
+		end := strings.Index(segment, ">")
+		if start == -1 || end == -1 || end <= start+1 {
+			continue
+		}
+
+		return segment[start+1 : end]
+	}
+
+	return ""
 }
 
 type CreateWorkflowResponse struct {
