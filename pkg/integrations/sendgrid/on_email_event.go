@@ -71,7 +71,7 @@ func (t *OnEmailEvent) Documentation() string {
 
 ## Webhook Verification
 
-SuperPlane configures the SendGrid Event Webhook via API and enables Signed Event Webhook by default. If you already manage signing in SendGrid, paste the verification key in the SendGrid integration. Verification uses:
+SuperPlane configures the SendGrid Event Webhook via API and enables Signed Event Webhook by default. The verification key is stored automatically. Verification uses:
 - ` + "`X-Twilio-Email-Event-Webhook-Signature`" + ` header
 - ` + "`X-Twilio-Email-Event-Webhook-Timestamp`" + ` header
 - Raw request body (no transformations)
@@ -89,22 +89,6 @@ func (t *OnEmailEvent) Icon() string {
 
 func (t *OnEmailEvent) Color() string {
 	return "gray"
-}
-
-func (t *OnEmailEvent) ExampleData() map[string]any {
-	return map[string]any{
-		"data": map[string]any{
-			"event":         "delivered",
-			"email":         "recipient@example.com",
-			"timestamp":     1700000000,
-			"sg_event_id":   "ZGVmYXVsdC1ldmVudC1pZA",
-			"sg_message_id": "YWJjMTIzX2RlZmF1bHRfbXNnX2lk",
-			"category":      []string{"order-confirmation"},
-			"response":      "250 OK",
-		},
-		"timestamp": "2026-02-04T12:00:00Z",
-		"type":      EmailEventPayloadType,
-	}
 }
 
 func (t *OnEmailEvent) Configuration() []configuration.Field {

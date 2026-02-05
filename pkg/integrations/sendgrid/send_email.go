@@ -31,6 +31,7 @@ type SendEmailConfiguration struct {
 	FromName     string         `json:"fromName" mapstructure:"fromName"`
 	FromEmail    string         `json:"fromEmail" mapstructure:"fromEmail"`
 	ReplyTo      string         `json:"replyTo" mapstructure:"replyTo"`
+	Categories   string         `json:"categories" mapstructure:"categories"`
 	TemplateID   string         `json:"templateId" mapstructure:"templateId"`
 	TemplateData map[string]any `json:"templateData" mapstructure:"templateData"`
 }
@@ -100,20 +101,6 @@ func (c *SendEmail) Icon() string {
 
 func (c *SendEmail) Color() string {
 	return "gray"
-}
-
-func (c *SendEmail) ExampleOutput() map[string]any {
-	return map[string]any{
-		"data": map[string]any{
-			"messageId":  "YzQ2ODAtMTg5NC0xMWVmLTk0NGYtNTZlYjU5OGY4Y2Q3",
-			"status":     "202 Accepted",
-			"statusCode": 202,
-			"to":         []string{"recipient@example.com"},
-			"subject":    "Your receipt is ready",
-		},
-		"timestamp": "2026-02-04T12:00:00Z",
-		"type":      SendEmailPayloadType,
-	}
 }
 
 func (c *SendEmail) OutputChannels(configuration any) []core.OutputChannel {
@@ -238,6 +225,13 @@ func (c *SendEmail) Configuration() []configuration.Field {
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "mode", Values: []string{"template"}},
 			},
+		},
+		{
+			Name:        "categories",
+			Label:       "Categories",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "SendGrid categories (comma-separated)",
 		},
 	}
 }
@@ -402,6 +396,9 @@ func (c *SendEmail) Execute(ctx core.ExecutionContext) error {
 		Subject:    config.Subject,
 		TemplateID: config.TemplateID,
 	}
+	if categories := parseCSV(config.Categories); len(categories) > 0 {
+		request.Categories = categories
+	}
 
 	if config.ReplyTo != "" {
 		request.ReplyTo = &EmailAddress{Email: config.ReplyTo}
@@ -521,4 +518,26 @@ func parseEmailList(emails string) ([]string, error) {
 	}
 
 	return result, nil
+}
+
+func parseCSV(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		item := strings.TrimSpace(part)
+		if item == "" {
+			continue
+		}
+		result = append(result, item)
+	}
+
+	if len(result) == 0 {
+		return nil
+	}
+
+	return result
 }

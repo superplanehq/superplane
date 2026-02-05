@@ -26,46 +26,6 @@ func (t *testWebhookContext) GetMetadata() any              { return nil }
 func (t *testWebhookContext) GetConfiguration() any         { return t.configuration }
 func (t *testWebhookContext) SetSecret(secret []byte) error { t.secret = secret; return nil }
 
-func Test__SendGrid__SetupWebhook_UsesProvidedVerificationKey(t *testing.T) {
-	integration := &SendGrid{}
-	httpCtx := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{
-				StatusCode: http.StatusOK,
-				Status:     http.StatusText(http.StatusOK),
-				Body:       io.NopCloser(strings.NewReader(`{}`)),
-				Header:     http.Header{},
-				Request:    &http.Request{},
-			},
-		},
-	}
-
-	webhookCtx := &testWebhookContext{
-		url:           "https://example.com/webhook",
-		configuration: WebhookConfiguration{},
-	}
-
-	integrationCtx := &contexts.IntegrationContext{
-		Configuration: map[string]any{
-			"apiKey":          "sg-test",
-			"verificationKey": "public-key",
-		},
-		Secrets: map[string]core.IntegrationSecret{},
-	}
-
-	_, err := integration.SetupWebhook(core.SetupWebhookContext{
-		HTTP:        httpCtx,
-		Webhook:     webhookCtx,
-		Integration: integrationCtx,
-	})
-
-	require.NoError(t, err)
-	assert.Equal(t, "public-key", string(webhookCtx.secret))
-	secret, ok := integrationCtx.Secrets[webhookVerificationKeySecret]
-	require.True(t, ok)
-	assert.Equal(t, "public-key", string(secret.Value))
-}
-
 func Test__SendGrid__SetupWebhook_EnablesSignedWebhook(t *testing.T) {
 	integration := &SendGrid{}
 	httpCtx := &contexts.HTTPContext{

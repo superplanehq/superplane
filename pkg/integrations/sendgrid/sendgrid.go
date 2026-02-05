@@ -20,10 +20,9 @@ type SendGrid struct{}
 const webhookVerificationKeySecret = "sendgridWebhookVerificationKey"
 
 type Configuration struct {
-	APIKey          string `json:"apiKey"`
-	FromName        string `json:"fromName"`
-	FromEmail       string `json:"fromEmail"`
-	VerificationKey string `json:"verificationKey"`
+	APIKey    string `json:"apiKey"`
+	FromName  string `json:"fromName"`
+	FromEmail string `json:"fromEmail"`
 }
 
 type Metadata struct {
@@ -53,7 +52,6 @@ Configure the SendGrid integration in SuperPlane with:
 - **API Key**: SendGrid API key with Mail Send and Mail Settings Read scopes
 - **Default From Email**: Required sender email address for SendGrid actions
 - **Default From Name**: Optional sender name for SendGrid actions
-- **Verification Key**: Optional SendGrid Signed Event Webhook key for verifying incoming events
 
 ### Actions and Triggers
 
@@ -83,14 +81,6 @@ func (s *SendGrid) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Default sender name for SendGrid actions",
-		},
-		{
-			Name:        "verificationKey",
-			Label:       "Verification Key",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Sensitive:   true,
-			Description: "SendGrid Signed Event Webhook key for verifying incoming events",
 		},
 	}
 }
@@ -162,11 +152,6 @@ func (s *SendGrid) ListResources(resourceType string, ctx core.ListResourcesCont
 }
 
 func (s *SendGrid) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	config := WebhookConfiguration{}
-	if err := mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config); err != nil {
-		return nil, fmt.Errorf("failed to decode webhook configuration: %w", err)
-	}
-
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, err
@@ -192,14 +177,11 @@ func (s *SendGrid) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 		return nil, fmt.Errorf("failed to update SendGrid webhook settings: %w", err)
 	}
 
-	verificationKey := strings.TrimSpace(getIntegrationConfigValue(ctx.Integration, "verificationKey"))
-	if verificationKey == "" {
-		publicKey, err := client.EnableEventWebhookSignature()
-		if err != nil {
-			return nil, fmt.Errorf("failed to enable SendGrid signed webhook: %w", err)
-		}
-		verificationKey = strings.TrimSpace(publicKey)
+	publicKey, err := client.EnableEventWebhookSignature()
+	if err != nil {
+		return nil, fmt.Errorf("failed to enable SendGrid signed webhook: %w", err)
 	}
+	verificationKey := strings.TrimSpace(publicKey)
 
 	if verificationKey != "" {
 		if err := ctx.Integration.SetSecret(webhookVerificationKeySecret, []byte(verificationKey)); err != nil {
@@ -251,17 +233,4 @@ func (s *SendGrid) Actions() []core.Action {
 
 func (s *SendGrid) HandleAction(ctx core.IntegrationActionContext) error {
 	return nil
-}
-
-func getIntegrationConfigValue(ctx core.IntegrationContext, key string) string {
-	if ctx == nil {
-		return ""
-	}
-
-	value, err := ctx.GetConfig(key)
-	if err != nil {
-		return ""
-	}
-
-	return strings.TrimSpace(string(value))
 }

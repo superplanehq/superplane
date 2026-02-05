@@ -154,6 +154,7 @@ type MailSendRequest struct {
 	Subject          string            `json:"subject,omitempty"`
 	Content          []EmailContent    `json:"content,omitempty"`
 	TemplateID       string            `json:"template_id,omitempty"`
+	Categories       []string          `json:"categories,omitempty"`
 }
 
 type MailSendResult struct {
