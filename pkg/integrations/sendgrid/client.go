@@ -163,6 +163,28 @@ type MailSendResult struct {
 	Status     string `json:"status"`
 }
 
+type ContactInput struct {
+	Email        string         `json:"email"`
+	FirstName    string         `json:"first_name,omitempty"`
+	LastName     string         `json:"last_name,omitempty"`
+	CustomFields map[string]any `json:"custom_fields,omitempty"`
+}
+
+type UpsertContactsRequest struct {
+	Contacts []ContactInput `json:"contacts"`
+	ListIDs  []string       `json:"list_ids,omitempty"`
+}
+
+type UpsertContactsResponse struct {
+	JobID string `json:"job_id"`
+}
+
+type UpsertContactResult struct {
+	JobID      string `json:"jobId"`
+	StatusCode int    `json:"statusCode"`
+	Status     string `json:"status"`
+}
+
 func (c *Client) SendEmail(request MailSendRequest) (*MailSendResult, error) {
 	payload, err := json.Marshal(request)
 	if err != nil {
@@ -179,6 +201,34 @@ func (c *Client) SendEmail(request MailSendRequest) (*MailSendResult, error) {
 
 	return &MailSendResult{
 		MessageID:  res.Header.Get("X-Message-Id"),
+		StatusCode: res.StatusCode,
+		Status:     res.Status,
+	}, nil
+}
+
+func (c *Client) UpsertContact(request UpsertContactsRequest) (*UpsertContactResult, error) {
+	payload, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	res, responseBody, err := c.execRequestWithResponse(http.MethodPut, c.BaseURL+"/marketing/contacts", bytes.NewReader(payload))
+	if err != nil {
+		if apiErr, ok := err.(*APIError); ok {
+			return nil, apiErr
+		}
+		return nil, err
+	}
+
+	var response UpsertContactsResponse
+	if len(responseBody) > 0 {
+		if err := json.Unmarshal(responseBody, &response); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal response: %v", err)
+		}
+	}
+
+	return &UpsertContactResult{
+		JobID:      response.JobID,
 		StatusCode: res.StatusCode,
 		Status:     res.Status,
 	}, nil

@@ -12,18 +12,16 @@ import { MetadataItem } from "@/ui/metadataList";
 import { formatTimeAgo } from "@/utils/date";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 
-interface SendEmailConfiguration {
-  to?: string;
-  subject?: string;
-  body?: string;
+interface CreateOrUpdateContactConfiguration {
+  email?: string;
+  listIds?: string[];
 }
 
-interface SendEmailMetadata {
-  to?: string[];
-  subject?: string;
+interface CreateOrUpdateContactMetadata {
+  email?: string;
 }
 
-export const sendEmailMapper: ComponentBaseMapper = {
+export const createOrUpdateContactMapper: ComponentBaseMapper = {
   props(
     nodes: ComponentsNode[],
     node: ComponentsNode,
@@ -40,9 +38,9 @@ export const sendEmailMapper: ComponentBaseMapper = {
       iconColor: getColorClass(componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(componentDefinition.color),
       collapsed: node.isCollapsed,
-      eventSections: lastExecution ? sendEmailEventSections(nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? eventSections(nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
-      metadata: sendEmailMetadataList(node),
+      metadata: metadataList(node),
       eventStateMap: getStateMap(componentName),
     };
   },
@@ -63,11 +61,10 @@ export const sendEmailMapper: ComponentBaseMapper = {
     }
 
     return {
-      "Sent At": new Date(execution.updatedAt!).toLocaleString(),
+      "Updated At": new Date(execution.updatedAt!).toLocaleString(),
       Status: stringOrDash(result?.status),
-      "Message ID": stringOrDash(result?.messageId),
-      To: stringOrDash(result?.to),
-      Subject: stringOrDash(result?.subject),
+      "Job ID": stringOrDash(result?.jobId),
+      Email: stringOrDash(result?.email),
     };
   },
 
@@ -77,24 +74,24 @@ export const sendEmailMapper: ComponentBaseMapper = {
   },
 };
 
-function sendEmailMetadataList(node: ComponentsNode): MetadataItem[] {
+function metadataList(node: ComponentsNode): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const nodeMetadata = node.metadata as SendEmailMetadata | undefined;
-  const configuration = node.configuration as SendEmailConfiguration | undefined;
+  const nodeMetadata = node.metadata as CreateOrUpdateContactMetadata | undefined;
+  const configuration = node.configuration as CreateOrUpdateContactConfiguration | undefined;
 
-  const toLabel = "To: " + (nodeMetadata?.to?.join(", ") || configuration?.to);
-  if (toLabel) {
-    metadata.push({ icon: "mail", label: toLabel });
+  const email = nodeMetadata?.email || configuration?.email;
+  if (email) {
+    metadata.push({ icon: "mail", label: `Email: ${email}` });
   }
 
-  if (configuration?.subject) {
-    metadata.push({ icon: "message-square", label: "Subject: " + configuration.subject });
+  if (configuration?.listIds?.length) {
+    metadata.push({ icon: "tag", label: `Lists: ${configuration.listIds.join(", ")}` });
   }
 
   return metadata;
 }
 
-function sendEmailEventSections(
+function eventSections(
   nodes: ComponentsNode[],
   execution: CanvasesCanvasNodeExecution,
   componentName: string,
