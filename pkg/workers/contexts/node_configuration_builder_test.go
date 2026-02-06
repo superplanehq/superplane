@@ -1265,7 +1265,14 @@ func Test_NodeConfigurationBuilder_ExpressionsContainingSecrets(t *testing.T) {
 	})
 
 	t.Run("Build with runtime resolution - secrets expressions should be resolved", func(t *testing.T) {
-		builder = builder.WithRuntimeResolution(encryptor, r.Organization.ID)
+		loadSecret := func(name string) (map[string]string, error) {
+			provider, err := secrets.NewProvider(database.Conn(), encryptor, name, models.DomainTypeOrganization, r.Organization.ID)
+			if err != nil {
+				return nil, err
+			}
+			return provider.Load(context.Background())
+		}
+		builder = builder.WithSecretResolver(&RuntimeSecretResolver{Builder: builder, LoadSecret: loadSecret})
 
 		result, err := builder.Build(configuration)
 		require.NoError(t, err)
@@ -1278,7 +1285,14 @@ func Test_NodeConfigurationBuilder_ExpressionsContainingSecrets(t *testing.T) {
 
 
 	t.Run("Build with runtime resolution but missing secret - should return error", func(t *testing.T) {
-		builder = builder.WithRuntimeResolution(encryptor, r.Organization.ID)
+		loadSecret := func(name string) (map[string]string, error) {
+			provider, err := secrets.NewProvider(database.Conn(), encryptor, name, models.DomainTypeOrganization, r.Organization.ID)
+			if err != nil {
+				return nil, err
+			}
+			return provider.Load(context.Background())
+		}
+		builder = builder.WithSecretResolver(&RuntimeSecretResolver{Builder: builder, LoadSecret: loadSecret})
 
 		badConfig := map[string]any{
 			"missing": `{{ secrets("nonexistent").token }}`,

@@ -40,7 +40,8 @@ func BuildProcessQueueContext(httpClient *http.Client, tx *gorm.DB, node *models
 		WithNodeID(node.NodeID).
 		WithRootEvent(&queueItem.RootEventID).
 		WithPreviousExecution(event.ExecutionID).
-		WithInput(map[string]any{event.NodeID: event.Data.Data()})
+		WithInput(map[string]any{event.NodeID: event.Data.Data()}).
+		WithSecretResolver(NoOpSecretResolver{})
 	if len(configFields) > 0 {
 		configBuilder = configBuilder.WithConfigurationFields(configFields)
 	}

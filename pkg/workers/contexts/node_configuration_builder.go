@@ -1,7 +1,6 @@
 package contexts
 
 import (
-	"context"
 	"fmt"
 	"regexp"
 	"sort"
@@ -14,9 +13,7 @@ import (
 	"github.com/expr-lang/expr/parser"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/secrets"
 	"gorm.io/gorm"
 )
 
@@ -32,12 +29,7 @@ type NodeConfigurationBuilder struct {
 	input               any
 	parentBlueprintNode *models.CanvasNode
 	configurationFields []configuration.Field
-	runtimeResolution   *runtimeResolution
-}
-
-type runtimeResolution struct {
-	encryptor crypto.Encryptor
-	orgID     uuid.UUID
+	secretResolver      SecretResolver
 }
 
 func NewNodeConfigurationBuilder(tx *gorm.DB, workflowID uuid.UUID) *NodeConfigurationBuilder {
@@ -77,8 +69,8 @@ func (b *NodeConfigurationBuilder) WithConfigurationFields(fields []configuratio
 	return b
 }
 
-func (b *NodeConfigurationBuilder) WithRuntimeResolution(encryptor crypto.Encryptor, orgID uuid.UUID) *NodeConfigurationBuilder {
-	b.runtimeResolution = &runtimeResolution{encryptor: encryptor, orgID: orgID}
+func (b *NodeConfigurationBuilder) WithSecretResolver(r SecretResolver) *NodeConfigurationBuilder {
+	b.secretResolver = r
 	return b
 }
 
@@ -241,35 +233,35 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 		if len(matches) != 2 {
 			return match
 		}
-
 		inner := strings.TrimSpace(matches[1])
-		if expressionContainsSecrets(inner) {
-			if b.runtimeResolution != nil {
-				value, e := b.resolveExpression(inner)
-				if e != nil {
-					err = e
-					return ""
-				}
-				return fmt.Sprintf("%v", value)
-			}
-			return match
+		resolver := b.secretResolver
+		if resolver == nil {
+			resolver = NoOpSecretResolver{}
 		}
-		if b.runtimeResolution != nil {
-			return match
-		}
-
-		value, e := b.resolveExpression(matches[1])
+		value, action, e := resolver.Resolve(inner)
 		if e != nil {
 			err = e
 			return ""
 		}
-
-		repl := fmt.Sprintf("%v", value)
-		if b.runtimeResolution == nil &&
-			(stringContainsDeferredSecretExpression(repl) || strings.Contains(repl, "secrets(")) {
+		switch action {
+		case SecretResolveUseValue:
+			return fmt.Sprintf("%v", value)
+		case SecretResolveKeepOriginal:
+			return match
+		case SecretResolveNormal:
+			val, e := b.resolveExpression(matches[1])
+			if e != nil {
+				err = e
+				return ""
+			}
+			repl := fmt.Sprintf("%v", val)
+			if stringContainsDeferredSecretExpression(repl) || strings.Contains(repl, "secrets(") {
+				return match
+			}
+			return repl
+		default:
 			return match
 		}
-		return repl
 	})
 
 	if err != nil {
@@ -328,6 +320,58 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 	if err != nil {
 		return "", err
 	}
+
+	if b.parentBlueprintNode != nil {
+		env["config"] = b.parentBlueprintNode.Configuration.Data()
+	}
+
+	exprOptions := []expr.Option{
+		expr.Env(env),
+		expr.AsAny(),
+		expr.WithContext("ctx"),
+		expr.Timezone(time.UTC.String()),
+
+		expr.Function("root", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("root() takes no arguments")
+			}
+			return b.resolveRootPayload()
+		}),
+
+		expr.Function("previous", func(params ...any) (any, error) {
+			depth := 1
+			if len(params) > 1 {
+				return nil, fmt.Errorf("previous() accepts zero or one argument")
+			}
+			if len(params) == 1 {
+				parsedDepth, err := parseDepth(params[0])
+				if err != nil {
+					return nil, err
+				}
+				depth = parsedDepth
+			}
+			return b.resolvePreviousPayload(depth)
+		}),
+	}
+
+	vm, err := expr.Compile(expression, exprOptions...)
+	if err != nil {
+		return "", err
+	}
+
+	output, err := expr.Run(vm, env)
+	if err != nil {
+		return "", fmt.Errorf("expression evaluation failed: %w", err)
+	}
+
+	return output, nil
+}
+
+func (b *NodeConfigurationBuilder) evaluateWithSecrets(expression string, loadSecret func(name string) (map[string]string, error)) (any, error) {
+	env, err := b.BuildExpressionEnv(expression)
+	if err != nil {
+		return nil, err
+	}
 	if b.parentBlueprintNode != nil {
 		env["config"] = b.parentBlueprintNode.Configuration.Data()
 	}
@@ -357,17 +401,7 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 			}
 			return b.resolvePreviousPayload(depth)
 		}),
-	}
-	if b.runtimeResolution != nil {
-		rr := b.runtimeResolution
-		secretsFunc := func(name string) (map[string]string, error) {
-			provider, err := secrets.NewProvider(b.tx, rr.encryptor, name, models.DomainTypeOrganization, rr.orgID)
-			if err != nil {
-				return nil, fmt.Errorf("secret \"%s\" not found", name)
-			}
-			return provider.Load(context.Background())
-		}
-		exprOptions = append(exprOptions, expr.Function("secrets", func(params ...any) (any, error) {
+		expr.Function("secrets", func(params ...any) (any, error) {
 			if len(params) != 1 {
 				return nil, fmt.Errorf("secrets() takes exactly one argument (secret name)")
 			}
@@ -375,17 +409,17 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 			if !ok {
 				return nil, fmt.Errorf("secrets() argument must be a string")
 			}
-			return secretsFunc(name)
-		}))
+			return loadSecret(name)
+		}),
 	}
 
 	vm, err := expr.Compile(expression, exprOptions...)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	output, err := expr.Run(vm, env)
 	if err != nil {
-		return "", fmt.Errorf("expression evaluation failed: %w", err)
+		return nil, fmt.Errorf("expression evaluation failed: %w", err)
 	}
 	return output, nil
 }
