@@ -13,8 +13,11 @@ import (
 type OnIssue struct{}
 
 type OnIssueConfiguration struct {
-	Project string   `json:"project" mapstructure:"project"`
-	Actions []string `json:"actions" mapstructure:"actions"`
+	Project     string   `json:"project" mapstructure:"project"`
+	Actions     []string `json:"actions" mapstructure:"actions"`
+	Labels      []string `json:"labels" mapstructure:"labels"`
+	AssigneeIDs []string `json:"assignee_ids" mapstructure:"assigneeIds"`
+	State       string   `json:"state" mapstructure:"state"`
 }
 
 func (i *OnIssue) Name() string {
@@ -34,24 +37,21 @@ func (i *OnIssue) Documentation() string {
 
 ## Use Cases
 
-- **Issue automation**: Automate responses to new or updated issues
-- **Notification workflows**: Send notifications when issues are created or closed
-- **Task management**: Sync issues with external task management systems
-- **Label automation**: Automatically label or categorize issues
+- **Notify Slack** when an issue is created or assigned for triage
+- **Create a Jira issue** when a GitLab issue is created for traceability
+- **Update external dashboards** or close linked tickets when an issue is closed
 
 ## Configuration
 
-- **Project**: Select the GitLab project to monitor
-- **Actions**: Select which issue actions to listen for (open, close, reopen, update)
+- **Project** (required): GitLab project to monitor
+- **Actions** (optional): Filter by action (opened, updated, closed, reopened). Default: all.
+- **Labels** (optional): Only trigger for issues with specific labels
+- **Assignees** (optional): Only trigger when issue is assigned to specific users
+- **State** (optional): Only trigger for open or closed issues
 
-## Event Data
+## Outputs
 
-Each issue event includes:
-- **object_kind**: The type of event (issue)
-- **event_type**: The specific event type
-- **object_attributes**: Complete issue information including title, description, state, labels
-- **project**: Project information
-- **user**: User who triggered the event
+- **Default channel**: Emits issue payload including issue IID, title, state, labels, assignees, author, and action type
 
 ## Webhook Setup
 
@@ -109,10 +109,9 @@ func (i *OnIssue) Configuration() []configuration.Field {
 		},
 		{
 			Name:     "actions",
-			Label:    "Actions",
+			Label:    "Action Filter",
 			Type:     configuration.FieldTypeMultiSelect,
-			Required: true,
-			Default:  []string{"open"},
+			Required: false,
 			TypeOptions: &configuration.TypeOptions{
 				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: []configuration.FieldOption{
@@ -120,6 +119,47 @@ func (i *OnIssue) Configuration() []configuration.Field {
 						{Label: "Closed", Value: "close"},
 						{Label: "Reopened", Value: "reopen"},
 						{Label: "Updated", Value: "update"},
+					},
+				},
+			},
+		},
+		{
+			Name:     "labels",
+			Label:    "Label Filter",
+			Type:     configuration.FieldTypeList,
+			Required: false,
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Label",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeString,
+					},
+				},
+			},
+		},
+		{
+			Name:     "assigneeIds",
+			Label:    "Assignee Filter",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: false,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "member",
+					Multi:          true,
+					UseNameAsValue: false, // Use ID
+				},
+			},
+		},
+		{
+			Name:     "state",
+			Label:    "State Filter",
+			Type:     configuration.FieldTypeSelect,
+			Required: false,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Open", Value: "opened"},
+						{Label: "Closed", Value: "closed"},
 					},
 				},
 			},
@@ -179,6 +219,86 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 
 	if !whitelistedAction(data, config.Actions) {
 		return http.StatusOK, nil
+	}
+
+	// Filter by State
+	if config.State != "" {
+		attrs, ok := data["object_attributes"].(map[string]any)
+		if !ok {
+			return http.StatusBadRequest, fmt.Errorf("invalid object_attributes")
+		}
+		state, _ := attrs["state"].(string)
+		if state != config.State {
+			return http.StatusOK, nil
+		}
+	}
+
+	// Filter by Labels
+	if len(config.Labels) > 0 {
+		attrs, ok := data["object_attributes"].(map[string]any)
+		if !ok {
+			return http.StatusBadRequest, fmt.Errorf("invalid object_attributes")
+		}
+
+		// Using a helper to check labels would be cleaner, but let's try to parse here safely
+		eventLabels, ok := attrs["labels"].([]interface{})
+		if !ok {
+			// Try checking if it's nil or different format. If not found, and we require labels, skip.
+			return http.StatusOK, nil
+		}
+
+		found := false
+		for _, label := range eventLabels {
+			labelMap, ok := label.(map[string]interface{})
+			if ok {
+				title, _ := labelMap["title"].(string)
+				for _, requiredLabel := range config.Labels {
+					if title == requiredLabel {
+						found = true
+						break
+					}
+				}
+			}
+			if found {
+				break
+			}
+		}
+		if !found {
+			return http.StatusOK, nil
+		}
+	}
+
+	// Filter by Assignees
+	if len(config.AssigneeIDs) > 0 {
+
+		// Checking standard payload: often "assignees" key in the root object.
+		eventAssignees, ok := data["assignees"].([]interface{})
+		if !ok {
+			return http.StatusOK, nil
+		}
+
+		found := false
+		for _, assignee := range eventAssignees {
+			assigneeMap, ok := assignee.(map[string]interface{})
+			if ok {
+				// ID comes as float64 usually from JSON unmarshal
+				idFloat, _ := assigneeMap["id"].(float64)
+				idStr := fmt.Sprintf("%.0f", idFloat)
+
+				for _, requiredID := range config.AssigneeIDs {
+					if idStr == requiredID {
+						found = true
+						break
+					}
+				}
+			}
+			if found {
+				break
+			}
+		}
+		if !found {
+			return http.StatusOK, nil
+		}
 	}
 
 	if err := ctx.Events.Emit("gitlab.issue", data); err != nil {
