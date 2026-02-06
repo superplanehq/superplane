@@ -20,7 +20,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
@@ -282,7 +281,7 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 			WithRootEvent(&execution.RootEventID).
 			WithInput(map[string]any{inputEvent.NodeID: input}).
 			WithPreviousExecution(execution.PreviousExecutionID).
-			WithSecretResolver(&contexts.RuntimeSecretResolver{Builder: builder, LoadSecret: loadSecret})
+			WithSecretResolver(contexts.NewRuntimeSecretResolver(tx, w.encryptor, models.DomainTypeOrganization, workflow.OrganizationID))
 
 		resolved, err := builder.Build(config)
 		if err != nil {

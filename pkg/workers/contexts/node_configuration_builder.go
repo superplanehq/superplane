@@ -234,10 +234,6 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 			return match
 		}
 
-		if ShouldLeaveSecretUnresolved(&b.secretResolver, strings.TrimSpace(matches[1])) {
-			return match
-		}
-
 		value, e := b.resolveExpression(matches[1])
 		if e != nil {
 			err = e
@@ -250,6 +246,8 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO: Add check here
 
 	return result, nil
 }
@@ -344,11 +342,23 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 			if len(params) != 1 {
 				return nil, fmt.Errorf("secrets() takes exactly one argument (secret name)")
 			}
+
 			name, ok := params[0].(string)
 			if !ok {
 				return nil, fmt.Errorf("secrets() argument must be a string")
 			}
-			return b.resolveSecret(name)
+
+			value, err := b.secretResolver.Resolve(name)
+			if err != nil {
+				return nil, fmt.Errorf("error resolving secret %s: %w", name, err)
+			}
+
+			strValue, ok := value.(map[string]string)
+			if !ok {
+				return nil, fmt.Errorf("secret resolver returned value of type %T, expected map[string]string", value)
+			}
+
+			return strValue, nil
 		}),
 	}
 
@@ -908,23 +918,6 @@ func (b *NodeConfigurationBuilder) listLinearExecutionsInChain() ([]models.Canva
 	}
 
 	return executions, nil
-}
-
-func (b *NodeConfigurationBuilder) resolveSecret(name string) (map[string]string, error) {
-	if !b.secretResolver.CanResolveSecrets() {
-		return nil, fmt.Errorf("no secret resolver configured")
-	}
-	value, err := b.secretResolver.Resolve(name)
-	if err != nil {
-		return nil, fmt.Errorf("error resolving secret %s: %w", name, err)
-	}
-
-	strValue, ok := value.(map[string]string)
-	if !ok {
-		return nil, fmt.Errorf("secret resolver returned value of type %T, expected map[string]string", value)
-	}
-
-	return strValue, nil
 }
 
 func (b *NodeConfigurationBuilder) listUpstreamNodeIDs() ([]string, error) {
