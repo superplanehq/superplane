@@ -35,7 +35,6 @@ type NodeConfigurationBuilder struct {
 	runtimeResolution   *runtimeResolution
 }
 
-// runtimeResolution enables resolving deferred secret expressions when Build is called.
 type runtimeResolution struct {
 	encryptor crypto.Encryptor
 	orgID     uuid.UUID
@@ -78,8 +77,6 @@ func (b *NodeConfigurationBuilder) WithConfigurationFields(fields []configuratio
 	return b
 }
 
-// WithRuntimeResolution enables resolving deferred secret expressions (e.g. secrets())
-// when Build is called. Use when resolving execution config at node run time; do not persist the result.
 func (b *NodeConfigurationBuilder) WithRuntimeResolution(encryptor crypto.Encryptor, orgID uuid.UUID) *NodeConfigurationBuilder {
 	b.runtimeResolution = &runtimeResolution{encryptor: encryptor, orgID: orgID}
 	return b
@@ -232,26 +229,6 @@ func asAnyMap(value any) (map[string]any, bool) {
 	}
 }
 
-// stringContainsDeferredSecretExpression reports whether s contains at least one
-// {{ ... }} segment whose inner expression would be deferred at build time
-// (i.e. contains a secrets() call). Used by tests that assert runtime vs build-time behavior.
-func stringContainsDeferredSecretExpression(s string) bool {
-	if !expressionRegex.MatchString(s) {
-		return false
-	}
-	matches := expressionRegex.FindAllStringSubmatch(s, -1)
-	for _, m := range matches {
-		if len(m) != 2 {
-			continue
-		}
-		inner := strings.TrimSpace(m[1])
-		if expressionContainsSecrets(inner) {
-			return true
-		}
-	}
-	return false
-}
-
 func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, error) {
 	if !expressionRegex.MatchString(expression) {
 		return expression, nil
@@ -278,7 +255,6 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 			return match
 		}
 		if b.runtimeResolution != nil {
-			// At runtime we only resolve secret-containing segments; leave others as-is.
 			return match
 		}
 
@@ -289,11 +265,6 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 		}
 
 		repl := fmt.Sprintf("%v", value)
-		// If the result looks like or could form part of a secret expression, keep the original
-		// segment so that at runtime we only ever evaluate the original expression (not injected
-		// output). We check both a complete {{ secrets(...) }} and the substring "secrets("
-		// so that partial output (e.g. from a segment that didn't include the closing }})
-		// does not get combined with following text and resolved at runtime.
 		if b.runtimeResolution == nil &&
 			(stringContainsDeferredSecretExpression(repl) || strings.Contains(repl, "secrets(")) {
 			return match
@@ -352,11 +323,24 @@ func (b *NodeConfigurationBuilder) BuildExpressionEnv(expression string) (map[st
 	return env, nil
 }
 
-// buildExprOptions returns the standard expr options used for expression evaluation
-// everywhere (build-time and runtime). Callers that need secrets() must append
-// that function separately so it is the only difference for runtime config resolution.
-func (b *NodeConfigurationBuilder) buildExprOptions(env map[string]any) []expr.Option {
-	return []expr.Option{
+func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, error) {
+	referencedNodes, err := parseReferencedNodes(expression)
+	if err != nil {
+		return "", err
+	}
+
+	messageChain, err := b.buildMessageChain(referencedNodes)
+	if err != nil {
+		return "", err
+	}
+
+	env := map[string]any{"$": messageChain}
+
+	if b.parentBlueprintNode != nil {
+		env["config"] = b.parentBlueprintNode.Configuration.Data()
+	}
+
+	exprOptions := []expr.Option{
 		expr.Env(env),
 		expr.AsAny(),
 		expr.WithContext("ctx"),
@@ -382,31 +366,20 @@ func (b *NodeConfigurationBuilder) buildExprOptions(env map[string]any) []expr.O
 			return b.resolvePreviousPayload(depth)
 		}),
 	}
-}
 
-func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, error) {
-	env, err := b.BuildExpressionEnv(expression)
+	vm, err := expr.Compile(expression, exprOptions...)
 	if err != nil {
 		return "", err
 	}
-	if b.parentBlueprintNode != nil {
-		env["config"] = b.parentBlueprintNode.Configuration.Data()
-	}
 
-	vm, err := expr.Compile(expression, b.buildExprOptions(env)...)
-	if err != nil {
-		return "", err
-	}
 	output, err := expr.Run(vm, env)
 	if err != nil {
 		return "", fmt.Errorf("expression evaluation failed: %w", err)
 	}
+
 	return output, nil
 }
 
-// resolveExpressionWithSecrets evaluates an expression with the same env and options
-// as resolveExpression plus the secrets() function. Used when Build is called with
-// WithRuntimeResolution so deferred secret expressions are resolved at run time.
 func (b *NodeConfigurationBuilder) resolveExpressionWithSecrets(expression string) (any, error) {
 	env, err := b.BuildExpressionEnv(expression)
 	if err != nil {
@@ -425,8 +398,31 @@ func (b *NodeConfigurationBuilder) resolveExpressionWithSecrets(expression strin
 		return provider.Load(context.Background())
 	}
 
-	exprOptions := append(
-		b.buildExprOptions(env),
+	exprOptions := []expr.Option{
+		expr.Env(env),
+		expr.AsAny(),
+		expr.WithContext("ctx"),
+		expr.Timezone(time.UTC.String()),
+		expr.Function("root", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("root() takes no arguments")
+			}
+			return b.resolveRootPayload()
+		}),
+		expr.Function("previous", func(params ...any) (any, error) {
+			depth := 1
+			if len(params) > 1 {
+				return nil, fmt.Errorf("previous() accepts zero or one argument")
+			}
+			if len(params) == 1 {
+				parsedDepth, err := parseDepth(params[0])
+				if err != nil {
+					return nil, err
+				}
+				depth = parsedDepth
+			}
+			return b.resolvePreviousPayload(depth)
+		}),
 		expr.Function("secrets", func(params ...any) (any, error) {
 			if len(params) != 1 {
 				return nil, fmt.Errorf("secrets() takes exactly one argument (secret name)")
@@ -437,7 +433,7 @@ func (b *NodeConfigurationBuilder) resolveExpressionWithSecrets(expression strin
 			}
 			return secretsFunc(name)
 		}),
-	)
+	}
 
 	vm, err := expr.Compile(expression, exprOptions...)
 	if err != nil {

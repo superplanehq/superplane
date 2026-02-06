@@ -7,6 +7,23 @@ import (
 	"github.com/expr-lang/expr/parser"
 )
 
+func stringContainsDeferredSecretExpression(s string) bool {
+	if !expressionRegex.MatchString(s) {
+		return false
+	}
+	matches := expressionRegex.FindAllStringSubmatch(s, -1)
+	for _, m := range matches {
+		if len(m) != 2 {
+			continue
+		}
+		inner := strings.TrimSpace(m[1])
+		if expressionContainsSecrets(inner) {
+			return true
+		}
+	}
+	return false
+}
+
 // expressionContainsSecrets reports whether the expression contains a call to
 // secrets() and must be deferred to runtime resolution. 
 //
