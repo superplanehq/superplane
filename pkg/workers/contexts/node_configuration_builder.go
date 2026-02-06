@@ -288,7 +288,17 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 			return ""
 		}
 
-		return fmt.Sprintf("%v", value)
+		repl := fmt.Sprintf("%v", value)
+		// If the result looks like or could form part of a secret expression, keep the original
+		// segment so that at runtime we only ever evaluate the original expression (not injected
+		// output). We check both a complete {{ secrets(...) }} and the substring "secrets("
+		// so that partial output (e.g. from a segment that didn't include the closing }})
+		// does not get combined with following text and resolved at runtime.
+		if b.runtimeResolution == nil &&
+			(stringContainsDeferredSecretExpression(repl) || strings.Contains(repl, "secrets(")) {
+			return match
+		}
+		return repl
 	})
 
 	if err != nil {

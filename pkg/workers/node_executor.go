@@ -273,23 +273,6 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		return fmt.Errorf("failed to find workflow: %v", err)
 	}
 
-	config := execution.Configuration.Data()
-
-	if config != nil {
-		builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
-			WithNodeID(node.NodeID).
-			WithRootEvent(&execution.RootEventID).
-			WithInput(map[string]any{inputEvent.NodeID: input}).
-			WithPreviousExecution(execution.PreviousExecutionID).
-			WithRuntimeResolution(w.encryptor, workflow.OrganizationID)
-		resolved, err := builder.Build(config)
-		if err != nil {
-			logger.Errorf("failed to resolve configuration at runtime: %v", err)
-			return fmt.Errorf("failed to resolve configuration at runtime: %v", err)
-		}
-		config = resolved
-	}
-
 	ctx := core.ExecutionContext{
 		ID:             execution.ID,
 		WorkflowID:     execution.WorkflowID.String(),
@@ -297,7 +280,7 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		NodeID:         execution.NodeID,
 		SourceNodeID:   inputEvent.NodeID,
 		BaseURL:        w.baseURL,
-		Configuration:  config,
+		Configuration:  execution.Configuration.Data(),
 		Data:           input,
 		HTTP:           contexts.NewHTTPContext(w.registry.GetHTTPClient()),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
@@ -307,7 +290,6 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, nil, nil),
 		Notifications:  contexts.NewNotificationContext(tx, workflow.OrganizationID, execution.WorkflowID),
 	}
-
 	ctx.ExpressionEnv = func(expression string) (map[string]any, error) {
 		builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
 			WithNodeID(node.NodeID).

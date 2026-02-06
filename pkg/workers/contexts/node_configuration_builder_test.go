@@ -1288,6 +1288,23 @@ func Test_NodeConfigurationBuilder_ExpressionsContainingSecrets(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "secret \"nonexistent\" not found")
 	})
+
+	t.Run("Build without runtime resolution - expression that outputs secret-like string is kept as original", func(t *testing.T) {
+		// If an expression evaluates to a string that looks like {{ secrets(...) }}, we keep
+		// the original segment so at runtime we only ever evaluate the original expression.
+		builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+			WithInput(map[string]any{"node-1": map[string]any{"x": "y"}})
+
+		config := map[string]any{
+			"api_key": `{{ '{' + '{' + 'sec' + 'ret' + 's("api")' + '.token' }}' }}`,
+		}
+
+		result, err := builder.Build(config)
+		require.NoError(t, err)
+
+		// Original expression is preserved; at runtime the inner is a string literal, so it won't be resolved.
+		assert.Equal(t, `{{ '{' + '{' + 'sec' + 'ret' + 's("api")' + '.token' }}' }}`, result["api_key"])
+	})
 }
 
 func Test_NodeConfigurationBuilder_DisallowExpression_ListItems(t *testing.T) {
