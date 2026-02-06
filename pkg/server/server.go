@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -338,7 +339,14 @@ func Start() {
 		panic(fmt.Sprintf("failed to load OIDC keys: %v", err))
 	}
 
-	registry := registry.NewRegistry(encryptorInstance)
+	registry, err := registry.NewRegistry(encryptorInstance, registry.HTTPOptions{
+		BlockedHosts:    getBlockedHTTPHosts(),
+		PrivateIPRanges: getPrivateIPRanges(),
+	})
+
+	if err != nil {
+		panic(fmt.Sprintf("failed to create registry: %v", err))
+	}
 
 	templates.Setup(registry)
 
@@ -368,4 +376,56 @@ func getWebhookBaseURL(baseURL string) string {
 		webhookBaseURL = baseURL
 	}
 	return webhookBaseURL
+}
+
+/*
+ * Default blocked HTTP hosts include:
+ * - Cloud metadata endpoints
+ * - Kubernetes API
+ * - Localhost variations
+ */
+var defaultBlockedHTTPHosts = []string{
+	"metadata.google.internal",
+	"metadata.goog",
+	"metadata.azure.com",
+	"169.254.169.254",
+	"fd00:ec2::254",
+	"kubernetes.default",
+	"kubernetes.default.svc",
+	"kubernetes.default.svc.cluster.local",
+	"localhost",
+	"127.0.0.1",
+	"::1",
+	"0.0.0.0",
+	"::",
+}
+
+func getBlockedHTTPHosts() []string {
+	blockedHosts := os.Getenv("BLOCKED_HTTP_HOSTS")
+	if blockedHosts == "" {
+		return defaultBlockedHTTPHosts
+	}
+
+	return strings.Split(blockedHosts, ",")
+}
+
+var defaultBlockedPrivateIPRanges = []string{
+	"0.0.0.0/8",
+	"10.0.0.0/8",
+	"172.16.0.0/12",
+	"192.168.0.0/16",
+	"127.0.0.0/8",
+	"169.254.0.0/16",
+	"::1/128",
+	"fc00::/7",
+	"fe80::/10",
+}
+
+func getPrivateIPRanges() []string {
+	blockedPrivateIPRanges := os.Getenv("BLOCKED_PRIVATE_IP_RANGES")
+	if blockedPrivateIPRanges == "" {
+		return defaultBlockedPrivateIPRanges
+	}
+
+	return strings.Split(blockedPrivateIPRanges, ",")
 }
