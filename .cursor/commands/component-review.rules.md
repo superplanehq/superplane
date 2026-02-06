@@ -82,6 +82,13 @@ The output channels shown in the UI include at least one channel (or rely on def
   - `github.onPush`: we select the repository we want to listen to
   - `pagerduty.onIncident`: we select the service
 
+### Security
+
+- Components should always execute HTTP requests using the `HTTPContext` available to them, and never use `net/http` to do so
+- Components should never import `pkg/models` and interact with database directly, only through methods provided through core interfaces
+- HandleWebhook() implementations in components/triggers should always verify that the requests are authenticated using the secret in the webhook
+- HandleRequest() implementations in integrations should always verify that the requests are authenticated using the secret in the webhook
+
 ## Code Quality
 
 ### Unit testing
