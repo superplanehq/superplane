@@ -2,8 +2,8 @@ package claude
 
 import (
 	_ "embed"
-	"sync"
 	"github.com/superplanehq/superplane/pkg/utils"
+	"sync"
 )
 
 //go:embed example_output_create_message.json

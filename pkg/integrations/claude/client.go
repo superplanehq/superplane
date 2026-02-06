@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/superplanehq/superplane/pkg/core"
 	"io"
 	"net/http"
-	"github.com/superplanehq/superplane/pkg/core"
 )
 
 const defaultBaseURL = "https://api.anthropic.com/v1"
@@ -28,7 +28,7 @@ type CreateMessageRequest struct {
 	Messages    []Message `json:"messages"`
 	System      string    `json:"system,omitempty"`
 	MaxTokens   int       `json:"max_tokens,omitempty"`
-	Temperature *float64   `json:"temperature,omitempty"`
+	Temperature *float64  `json:"temperature,omitempty"`
 }
 
 type MessageContent struct {

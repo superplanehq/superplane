@@ -4,21 +4,25 @@ sidebar:
   order: 3
 ---
 
-Generate messages with Anthropic Claude
+Use Claude models in workflows
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Actions
 
 <CardGrid>
-  <LinkCard title="Create Message" href="#create-message" description="Generate a message using Claude" />
+  <LinkCard title="Create Message" href="#create-message" description="Generate a response using Anthropic's Claude models via the Messages API" />
 </CardGrid>
+
+## Instructions
+
+To get new Claude API key, go to [platform.claude.com](https://platform.claude.com).
 
 <a id="create-message"></a>
 
 ## Create Message
 
-The Create Message component sends prompts to Anthropic Claude and returns model-generated responses.
+The Create Message component uses Anthropic's Claude models to generate text responses.
 
 ### Use Cases
 
@@ -52,34 +56,35 @@ Returns a payload containing:
 
 ```json
 {
-    "type": "claude.message",
-    "data": {
-        "id": "msg_01X9JGt5...123456",
-        "model": "claude-3-5-sonnet-latest",
-        "text": "Here is the summary of the deployment logs you requested...",
-        "stopReason": "end_turn",
-        "usage": {
-            "input_tokens": 45,
-            "output_tokens": 120
-        },
-        "response": {
-            "id": "msg_01X9JGt5...123456",
-            "type": "message",
-            "role": "assistant",
-            "model": "claude-3-5-sonnet-latest",
-            "content": [
-                {
-                    "type": "text",
-                    "text": "Here is the summary of the deployment logs you requested..."
-                }
-            ],
-            "stop_reason": "end_turn",
-            "usage": {
-                "input_tokens": 45,
-                "output_tokens": 120
-            }
+  "data": {
+    "id": "msg_01X9JGt5...123456",
+    "model": "claude-3-5-sonnet-latest",
+    "response": {
+      "content": [
+        {
+          "text": "Here is the summary of the deployment logs you requested...",
+          "type": "text"
         }
+      ],
+      "id": "msg_01X9JGt5...123456",
+      "model": "claude-3-5-sonnet-latest",
+      "role": "assistant",
+      "stop_reason": "end_turn",
+      "type": "message",
+      "usage": {
+        "input_tokens": 45,
+        "output_tokens": 120
+      }
     },
-    "timestamp": "2026-02-06T12:00:00Z"
+    "stopReason": "end_turn",
+    "text": "Here is the summary of the deployment logs you requested...",
+    "usage": {
+      "input_tokens": 45,
+      "output_tokens": 120
+    }
+  },
+  "timestamp": "2026-02-06T12:00:00Z",
+  "type": "claude.message"
 }
 ```
+
