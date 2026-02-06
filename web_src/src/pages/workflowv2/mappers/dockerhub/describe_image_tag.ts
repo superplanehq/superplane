@@ -69,9 +69,15 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 }
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+  const rootEvent = execution.rootEvent;
+  let eventId: string | undefined = undefined;
+  let title = "";
+  if (rootEvent) {
+    eventId = rootEvent.id;
+    const rootTriggerNode = nodes.find((n) => n.id === rootEvent.nodeId);
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
+    title = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent }).title;
+  }
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : "";
 
@@ -81,7 +87,7 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
       eventTitle: title,
       eventSubtitle,
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent!.id!,
+      eventId,
     },
   ];
 }
