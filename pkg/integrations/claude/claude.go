@@ -2,6 +2,7 @@ package claude
 
 import (
 	"fmt"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -15,8 +16,7 @@ func init() {
 type Claude struct{}
 
 type Configuration struct {
-	APIKey           string `json:"apiKey"`
-	AnthropicVersion string `json:"anthropicVersion"`
+	APIKey string `json:"apiKey"`
 }
 
 func (i *Claude) Name() string {
@@ -44,15 +44,6 @@ func (i *Claude) Configuration() []configuration.Field {
 			Sensitive:   true,
 			Description: "Claude API key",
 			Required:    true,
-		},
-		{
-			Name:        "anthropicVersion",
-			Label:       "Version",
-			Type:        configuration.FieldTypeString,
-			Sensitive:   false,
-			Description: "Anthropic API version",
-			Required:    true,
-			Default:     "2023-06-01",
 		},
 	}
 }
@@ -83,10 +74,6 @@ func (i *Claude) Sync(ctx core.SyncContext) error {
 
 	if config.APIKey == "" {
 		return fmt.Errorf("apiKey is required")
-	}
-
-	if config.AnthropicVersion == "" {
-		return fmt.Errorf("anthropicVersion is required")
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)

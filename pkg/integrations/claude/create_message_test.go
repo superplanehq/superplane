@@ -3,11 +3,12 @@ package claude
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/superplanehq/superplane/pkg/configuration"
-	"github.com/superplanehq/superplane/pkg/core"
 	"io"
 	"net/http"
 	"testing"
+
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 )
 
 // --- Mocks ---
@@ -217,8 +218,7 @@ func TestCreateMessage_Execute(t *testing.T) {
 			mockHTTP := &mockHTTPContext{RoundTripFunc: tt.mockResponse}
 			mockInt := &mockIntegrationContext{
 				config: map[string][]byte{
-					"apiKey":           []byte("test-key"),
-					"anthropicVersion": []byte("2023-06-01"),
+					"apiKey": []byte("test-key"),
 				},
 			}
 

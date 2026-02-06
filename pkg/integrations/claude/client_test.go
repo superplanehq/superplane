@@ -90,7 +90,6 @@ func TestNewClient(t *testing.T) {
 			name: "Success",
 			setupMock: func(m *mockIntegrationContextForClient) {
 				m.config["apiKey"] = []byte("sk-123")
-				m.config["anthropicVersion"] = []byte("2023-06-01")
 			},
 			expectError: false,
 		},
@@ -103,15 +102,6 @@ func TestNewClient(t *testing.T) {
 			name: "Missing API Key",
 			setupMock: func(m *mockIntegrationContextForClient) {
 				// No API Key
-				m.config["anthropicVersion"] = []byte("2023-06-01")
-			},
-			expectError: true,
-		},
-		{
-			name: "Missing Version",
-			setupMock: func(m *mockIntegrationContextForClient) {
-				m.config["apiKey"] = []byte("sk-123")
-				// No Version
 			},
 			expectError: true,
 		},
@@ -149,9 +139,6 @@ func TestNewClient(t *testing.T) {
 				if client.APIKey != "sk-123" {
 					t.Errorf("expected API Key 'sk-123', got %s", client.APIKey)
 				}
-				if client.AnthropicVersion != "2023-06-01" {
-					t.Errorf("expected Version '2023-06-01', got %s", client.AnthropicVersion)
-				}
 			}
 		})
 	}
@@ -186,10 +173,9 @@ func TestClient_Verify(t *testing.T) {
 			}
 
 			client := &Client{
-				APIKey:           "test-key",
-				AnthropicVersion: "test-ver",
-				BaseURL:          defaultBaseURL,
-				http:             mockHTTP,
+				APIKey:  "test-key",
+				BaseURL: defaultBaseURL,
+				http:    mockHTTP,
 			}
 
 			err := client.Verify()
@@ -278,10 +264,9 @@ func TestClient_CreateMessage(t *testing.T) {
 	}
 
 	client := &Client{
-		APIKey:           "my-secret-key",
-		AnthropicVersion: "2023-06-01",
-		BaseURL:          defaultBaseURL,
-		http:             mockHTTP,
+		APIKey:  "my-secret-key",
+		BaseURL: defaultBaseURL,
+		http:    mockHTTP,
 	}
 
 	req := CreateMessageRequest{

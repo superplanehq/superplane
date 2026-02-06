@@ -4,18 +4,21 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/superplanehq/superplane/pkg/core"
 	"io"
 	"net/http"
+
+	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const defaultBaseURL = "https://api.anthropic.com/v1"
+const (
+	defaultBaseURL        = "https://api.anthropic.com/v1"
+	anthropicVersionValue = "2023-06-01"
+)
 
 type Client struct {
-	APIKey           string
-	AnthropicVersion string
-	BaseURL          string
-	http             core.HTTPContext
+	APIKey  string
+	BaseURL string
+	http    core.HTTPContext
 }
 
 type Message struct {
@@ -77,16 +80,10 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 		return nil, err
 	}
 
-	anthropicVersion, err := ctx.GetConfig("anthropicVersion")
-	if err != nil {
-		return nil, err
-	}
-
 	return &Client{
-		APIKey:           string(apiKey),
-		AnthropicVersion: string(anthropicVersion),
-		BaseURL:          defaultBaseURL,
-		http:             httpClient,
+		APIKey:  string(apiKey),
+		BaseURL: defaultBaseURL,
+		http:    httpClient,
 	}, nil
 }
 
@@ -135,7 +132,7 @@ func (c *Client) execRequest(method, URL string, body io.Reader) ([]byte, error)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-api-key", c.APIKey)
-	req.Header.Set("anthropic-version", c.AnthropicVersion)
+	req.Header.Set("anthropic-version", anthropicVersionValue)
 
 	res, err := c.http.Do(req)
 	if err != nil {

@@ -94,8 +94,7 @@ func TestClaude_Configuration(t *testing.T) {
 		Type     string
 		Required bool
 	}{
-		"apiKey":           {string(configuration.FieldTypeString), true},
-		"anthropicVersion": {string(configuration.FieldTypeString), true},
+		"apiKey": {string(configuration.FieldTypeString), true},
 	}
 
 	if len(configs) != len(expectedFields) {
@@ -131,8 +130,7 @@ func TestClaude_Sync(t *testing.T) {
 		{
 			name: "Success",
 			config: map[string]interface{}{
-				"apiKey":           "sk-ant-test",
-				"anthropicVersion": "2023-06-01",
+				"apiKey": "sk-ant-test",
 			},
 			mockResponses: func(req *http.Request) *http.Response {
 				if req.URL.Path == "/v1/models" {
@@ -149,24 +147,14 @@ func TestClaude_Sync(t *testing.T) {
 		{
 			name: "Missing API Key",
 			config: map[string]interface{}{
-				"apiKey":           "",
-				"anthropicVersion": "2023-06-01",
-			},
-			expectError: true,
-		},
-		{
-			name: "Missing Version",
-			config: map[string]interface{}{
-				"apiKey":           "sk-ant-test",
-				"anthropicVersion": "",
+				"apiKey": "",
 			},
 			expectError: true,
 		},
 		{
 			name: "Verify Fails (401)",
 			config: map[string]interface{}{
-				"apiKey":           "invalid",
-				"anthropicVersion": "2023-06-01",
+				"apiKey": "invalid",
 			},
 			mockResponses: func(req *http.Request) *http.Response {
 				return &http.Response{
@@ -188,9 +176,6 @@ func TestClaude_Sync(t *testing.T) {
 			// Populate mock integration config (used by NewClient)
 			if v, ok := tt.config["apiKey"].(string); ok {
 				mockInt.config["apiKey"] = []byte(v)
-			}
-			if v, ok := tt.config["anthropicVersion"].(string); ok {
-				mockInt.config["anthropicVersion"] = []byte(v)
 			}
 
 			ctx := core.SyncContext{
@@ -230,8 +215,7 @@ func TestClaude_ListResources(t *testing.T) {
 			name:         "List Models Success",
 			resourceType: "model",
 			config: map[string][]byte{
-				"apiKey":           []byte("test"),
-				"anthropicVersion": []byte("2023-06-01"),
+				"apiKey": []byte("test"),
 			},
 			mockResponses: func(req *http.Request) *http.Response {
 				return &http.Response{
@@ -255,8 +239,7 @@ func TestClaude_ListResources(t *testing.T) {
 			name:         "API Error",
 			resourceType: "model",
 			config: map[string][]byte{
-				"apiKey":           []byte("test"),
-				"anthropicVersion": []byte("2023-06-01"),
+				"apiKey": []byte("test"),
 			},
 			mockResponses: func(req *http.Request) *http.Response {
 				return &http.Response{
