@@ -46,6 +46,7 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 	if err != nil {
 		return nil, fmt.Errorf("error executing request: %v", err)
 	}
+	defer res.Body.Close()
 
 	responseBody, err := io.ReadAll(res.Body)
 	if err != nil {
