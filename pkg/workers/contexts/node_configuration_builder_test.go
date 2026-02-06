@@ -1265,14 +1265,7 @@ func Test_NodeConfigurationBuilder_ExpressionsContainingSecrets(t *testing.T) {
 	})
 
 	t.Run("Build with runtime resolution - secrets expressions should be resolved", func(t *testing.T) {
-		loadSecret := func(name string) (map[string]string, error) {
-			provider, err := secrets.NewProvider(database.Conn(), encryptor, name, models.DomainTypeOrganization, r.Organization.ID)
-			if err != nil {
-				return nil, err
-			}
-			return provider.Load(context.Background())
-		}
-		builder = builder.WithSecretResolver(&RuntimeSecretResolver{Builder: builder, LoadSecret: loadSecret})
+		builder = builder.WithSecretResolver(NewImmediateSecretResolver(database.Conn(), encryptor, models.DomainTypeOrganization, r.Organization.ID))
 
 		result, err := builder.Build(configuration)
 		require.NoError(t, err)
@@ -1285,14 +1278,7 @@ func Test_NodeConfigurationBuilder_ExpressionsContainingSecrets(t *testing.T) {
 
 
 	t.Run("Build with runtime resolution but missing secret - should return error", func(t *testing.T) {
-		loadSecret := func(name string) (map[string]string, error) {
-			provider, err := secrets.NewProvider(database.Conn(), encryptor, name, models.DomainTypeOrganization, r.Organization.ID)
-			if err != nil {
-				return nil, err
-			}
-			return provider.Load(context.Background())
-		}
-		builder = builder.WithSecretResolver(&RuntimeSecretResolver{Builder: builder, LoadSecret: loadSecret})
+		builder = builder.WithSecretResolver(NewImmediateSecretResolver(database.Conn(), encryptor, models.DomainTypeOrganization, r.Organization.ID))
 
 		badConfig := map[string]any{
 			"missing": `{{ secrets("nonexistent").token }}`,
@@ -1300,7 +1286,8 @@ func Test_NodeConfigurationBuilder_ExpressionsContainingSecrets(t *testing.T) {
 
 		_, err := builder.Build(badConfig)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "secret \"nonexistent\" not found")
+		assert.Contains(t, err.Error(), "nonexistent")
+		assert.Contains(t, err.Error(), "not found")
 	})
 
 	t.Run("Build without runtime resolution - expression that outputs secret-like string is kept as original", func(t *testing.T) {

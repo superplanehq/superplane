@@ -234,6 +234,11 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 			return match
 		}
 
+		innerExpr := strings.TrimSpace(matches[1])
+		if IsInjectingUnresolvedSecret(innerExpr) && !b.secretResolver.CanResolveSecrets() {
+			return match
+		}
+
 		value, e := b.resolveExpression(matches[1])
 		if e != nil {
 			err = e
@@ -961,6 +966,9 @@ func (b *NodeConfigurationBuilder) listLinearExecutionsInChain() ([]models.Canva
 }
 
 func (b *NodeConfigurationBuilder) resolveSecret(name string) (map[string]string, error) {
+	if !b.secretResolver.CanResolveSecrets() {
+		return nil, fmt.Errorf("no secret resolver configured")
+	}
 	value, err := b.secretResolver.Resolve(name)
 	if err != nil {
 		return nil, fmt.Errorf("error resolving secret %s: %w", name, err)
