@@ -351,6 +351,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 			integration,
 			encryptor,
 			registry,
+			"",
 		)
 	}
 
@@ -391,6 +392,7 @@ func setupComponent(tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.
 			integration,
 			encryptor,
 			registry,
+			"",
 		)
 	}
 

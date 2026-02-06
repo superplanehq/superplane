@@ -101,7 +101,7 @@ func InvokeNodeExecutionAction(
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
-		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, integration, encryptor, registry)
+		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, integration, encryptor, registry, "")
 	}
 
 	actionCtx.Logger = logger

@@ -59,6 +59,7 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 		newIntegration,
 		registry.Encryptor,
 		registry,
+		"",
 	)
 
 	syncErr := integration.Sync(core.SyncContext{

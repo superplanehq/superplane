@@ -314,7 +314,7 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		}
 
 		logger = logging.WithIntegration(logger, *instance)
-		ctx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry)
+		ctx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, w.baseURL)
 	}
 
 	ctx.Logger = logger

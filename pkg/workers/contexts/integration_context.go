@@ -24,15 +24,17 @@ type IntegrationContext struct {
 	integration *models.Integration
 	encryptor   crypto.Encryptor
 	registry    *registry.Registry
+	baseURL     string
 }
 
-func NewIntegrationContext(tx *gorm.DB, node *models.CanvasNode, integration *models.Integration, encryptor crypto.Encryptor, registry *registry.Registry) *IntegrationContext {
+func NewIntegrationContext(tx *gorm.DB, node *models.CanvasNode, integration *models.Integration, encryptor crypto.Encryptor, registry *registry.Registry, baseURL string) *IntegrationContext {
 	return &IntegrationContext{
 		tx:          tx,
 		node:        node,
 		integration: integration,
 		encryptor:   encryptor,
 		registry:    registry,
+		baseURL:     baseURL,
 	}
 }
 
@@ -68,6 +70,39 @@ func (c *IntegrationContext) RequestWebhook(configuration any) error {
 	}
 
 	return c.createWebhook(configuration)
+}
+
+func (c *IntegrationContext) GetWebhookURL() (string, error) {
+	webhook, err := c.getNodeWebhookIfReady()
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s/api/v1/webhooks/%s", c.baseURL, webhook.ID), nil
+}
+
+func (c *IntegrationContext) GetWebhookSecret() ([]byte, error) {
+	webhook, err := c.getNodeWebhookIfReady()
+	if err != nil {
+		return nil, err
+	}
+	return c.encryptor.Decrypt(context.Background(), webhook.Secret, []byte(webhook.ID.String()))
+}
+
+func (c *IntegrationContext) getNodeWebhookIfReady() (*models.Webhook, error) {
+	if c.baseURL == "" {
+		return nil, core.ErrWebhookNotReady
+	}
+	if c.node == nil || c.node.WebhookID == nil {
+		return nil, core.ErrWebhookNotReady
+	}
+	webhook, err := models.FindWebhookInTransaction(c.tx, *c.node.WebhookID)
+	if err != nil {
+		return nil, core.ErrWebhookNotReady
+	}
+	if webhook.State != models.WebhookStateReady {
+		return nil, core.ErrWebhookNotReady
+	}
+	return webhook, nil
 }
 
 func (c *IntegrationContext) replaceMismatchedWebhook(configuration any, impl core.Integration) error {

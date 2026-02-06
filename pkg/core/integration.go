@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -9,6 +10,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/oidc"
 )
+
+// ErrWebhookNotReady is returned when the node's webhook is not yet provisioned or not ready.
+var ErrWebhookNotReady = errors.New("webhook is not ready")
 
 type Integration interface {
 	/*
@@ -235,6 +239,13 @@ type IntegrationContext interface {
 	 * Called from the components/triggers Setup().
 	 */
 	RequestWebhook(configuration any) error
+
+	/*
+	 * Get the webhook URL and secret for the node's webhook (when the node has a webhook that is ready).
+	 * Used by components that need to pass webhook details to external APIs during execution.
+	 */
+	GetWebhookURL() (string, error)
+	GetWebhookSecret() ([]byte, error)
 
 	/*
 	 * Subscribe to integration events.

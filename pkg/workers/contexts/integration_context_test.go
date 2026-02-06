@@ -33,7 +33,7 @@ func Test__IntegrationContext_ScheduleResync(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx := NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry)
+	ctx := NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry, "")
 
 	t.Run("rejects short interval", func(t *testing.T) {
 		err = ctx.ScheduleResync(500 * time.Millisecond)
@@ -133,7 +133,7 @@ func Test__IntegrationContext_RequestWebhook_ReplacesWebhookOnConfigChange(t *te
 	node.WebhookID = &webhookID
 	require.NoError(t, database.Conn().Save(&node).Error)
 
-	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry)
+	ctx := NewIntegrationContext(database.Conn(), &node, integration, r.Encryptor, r.Registry, "")
 	require.NoError(t, ctx.RequestWebhook(newConfig))
 
 	require.NotNil(t, node.WebhookID)

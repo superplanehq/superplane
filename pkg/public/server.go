@@ -510,6 +510,7 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 			integrationInstance,
 			s.encryptor,
 			s.registry,
+			"",
 		),
 	})
 

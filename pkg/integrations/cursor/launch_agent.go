@@ -22,8 +22,6 @@ const agentStatusFinished = "FINISHED"
 const agentStatusError = "ERROR"
 const waitForWebhookAction = "waitForWebhook"
 
-var errWebhookNotReady = errors.New("cursor webhook is not ready yet")
-
 const webhookRetryInterval = 5 * time.Second
 
 type LaunchAgent struct{}
@@ -195,9 +193,9 @@ func (l *LaunchAgent) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	webhook, err := l.lookupWebhook(ctx.Integration)
+	webhook, err := l.webhookFromContext(ctx.Integration)
 	if err != nil {
-		if errors.Is(err, errWebhookNotReady) {
+		if errors.Is(err, core.ErrWebhookNotReady) {
 			return ctx.Requests.ScheduleActionCall(waitForWebhookAction, map[string]any{}, webhookRetryInterval)
 		}
 		return err
@@ -349,23 +347,24 @@ func buildLaunchAgentTarget(spec LaunchAgentSpec) *LaunchAgentTarget {
 	}
 }
 
-func (l *LaunchAgent) lookupWebhook(integration core.IntegrationContext) (*LaunchAgentWebhook, error) {
+func (l *LaunchAgent) webhookFromContext(integration core.IntegrationContext) (*LaunchAgentWebhook, error) {
 	if integration == nil {
 		return nil, fmt.Errorf("integration is required")
 	}
 
-	metadata := Metadata{}
-	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
-		return nil, fmt.Errorf("failed to decode integration metadata: %v", err)
+	url, err := integration.GetWebhookURL()
+	if err != nil {
+		return nil, err
 	}
 
-	if metadata.Webhook == nil || metadata.Webhook.URL == "" || metadata.Webhook.Secret == "" {
-		return nil, errWebhookNotReady
+	secret, err := integration.GetWebhookSecret()
+	if err != nil {
+		return nil, err
 	}
 
 	return &LaunchAgentWebhook{
-		URL:    metadata.Webhook.URL,
-		Secret: metadata.Webhook.Secret,
+		URL:    url,
+		Secret: string(secret),
 	}, nil
 }
 
@@ -392,9 +391,9 @@ func (l *LaunchAgent) retryLaunch(ctx core.ActionContext) error {
 		return nil
 	}
 
-	webhook, err := l.lookupWebhook(ctx.Integration)
+	webhook, err := l.webhookFromContext(ctx.Integration)
 	if err != nil {
-		if errors.Is(err, errWebhookNotReady) {
+		if errors.Is(err, core.ErrWebhookNotReady) {
 			return ctx.Requests.ScheduleActionCall(waitForWebhookAction, map[string]any{}, webhookRetryInterval)
 		}
 		return err

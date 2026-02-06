@@ -47,6 +47,7 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 		instance,
 		registry.Encryptor,
 		registry,
+		"",
 	)
 
 	listCtx := core.ListResourcesContext{

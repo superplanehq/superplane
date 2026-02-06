@@ -19,15 +19,6 @@ type Configuration struct {
 	APIKey string `json:"apiKey" mapstructure:"apiKey"`
 }
 
-type Metadata struct {
-	Webhook *WebhookMetadata `json:"webhook,omitempty" mapstructure:"webhook"`
-}
-
-type WebhookMetadata struct {
-	URL    string `json:"url" mapstructure:"url"`
-	Secret string `json:"secret" mapstructure:"secret"`
-}
-
 type WebhookConfiguration struct {
 	Event string `json:"event" mapstructure:"event"`
 }
@@ -126,22 +117,8 @@ func (c *Cursor) ListResources(resourceType string, ctx core.ListResourcesContex
 }
 
 func (c *Cursor) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	metadata := Metadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
-		return nil, err
-	}
-
-	secret, err := ctx.Webhook.GetSecret()
-	if err != nil {
-		return nil, fmt.Errorf("error getting webhook secret: %v", err)
-	}
-
-	metadata.Webhook = &WebhookMetadata{
-		URL:    ctx.Webhook.GetURL(),
-		Secret: string(secret),
-	}
-	ctx.Integration.SetMetadata(metadata)
-
+	// Cursor does not register with an external webhook endpoint; our webhook URL is the callback.
+	// Webhook URL and secret are provided to the Launch Agent component via IntegrationContext.GetWebhookURL/GetWebhookSecret at execution time.
 	return nil, nil
 }
 

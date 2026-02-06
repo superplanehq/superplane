@@ -57,6 +57,7 @@ func UpdateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 		instance,
 		registry.Encryptor,
 		registry,
+		"",
 	)
 
 	syncErr := integration.Sync(core.SyncContext{

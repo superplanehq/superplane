@@ -81,6 +81,10 @@ import {
   triggerRenderers as openaiTriggerRenderers,
   eventStateRegistry as openaiEventStateRegistry,
 } from "./openai/index";
+import {
+  componentMappers as cursorComponentMappers,
+  eventStateRegistry as cursorEventStateRegistry,
+} from "./cursor/index";
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
@@ -112,6 +116,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
 
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   cloudflare: cloudflareComponentMappers,
+  cursor: cursorComponentMappers,
   semaphore: semaphoreComponentMappers,
   github: githubComponentMappers,
   pagerduty: pagerdutyComponentMappers,
@@ -144,6 +149,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
   cloudflare: cloudflareEventStateRegistry,
+  cursor: cursorEventStateRegistry,
   semaphore: semaphoreEventStateRegistry,
   github: githubEventStateRegistry,
   pagerduty: pagerdutyEventStateRegistry,

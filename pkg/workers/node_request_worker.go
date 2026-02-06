@@ -27,12 +27,14 @@ type NodeRequestWorker struct {
 	semaphore *semaphore.Weighted
 	registry  *registry.Registry
 	encryptor crypto.Encryptor
+	baseURL   string
 }
 
-func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry) *NodeRequestWorker {
+func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string) *NodeRequestWorker {
 	return &NodeRequestWorker{
 		encryptor: encryptor,
 		registry:  registry,
+		baseURL:   baseURL,
 		semaphore: semaphore.NewWeighted(25),
 	}
 }
@@ -152,7 +154,7 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Can
 			return fmt.Errorf("failed to find integration: %v", err)
 		}
 
-		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry)
+		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, w.baseURL)
 	}
 
 	_, err = trigger.HandleAction(actionCtx)
@@ -222,7 +224,7 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 		}
 
 		logger = logging.WithIntegration(logger, *instance)
-		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry)
+		actionCtx.Integration = contexts.NewIntegrationContext(tx, node, instance, w.encryptor, w.registry, w.baseURL)
 	}
 
 	actionCtx.Logger = logger

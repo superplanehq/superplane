@@ -105,7 +105,7 @@ func (w *IntegrationRequestWorker) syncIntegration(tx *gorm.DB, request *models.
 		return fmt.Errorf("integration %s not found", instance.AppName)
 	}
 
-	integrationCtx := contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry)
+	integrationCtx := contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry, "")
 	syncErr := integration.Sync(core.SyncContext{
 		Logger:          logging.ForIntegration(*instance),
 		HTTP:            contexts.NewHTTPContext(w.registry.GetHTTPClient()),
@@ -144,7 +144,7 @@ func (w *IntegrationRequestWorker) invokeIntegrationAction(tx *gorm.DB, request 
 
 	spec := request.Spec.Data()
 	logger := logging.ForIntegration(*integration)
-	integrationCtx := contexts.NewIntegrationContext(tx, nil, integration, w.encryptor, w.registry)
+	integrationCtx := contexts.NewIntegrationContext(tx, nil, integration, w.encryptor, w.registry, "")
 	actionCtx := core.IntegrationActionContext{
 		WebhooksBaseURL: w.webhooksBaseURL,
 		Name:            spec.InvokeAction.ActionName,
