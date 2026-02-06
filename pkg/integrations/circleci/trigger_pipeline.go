@@ -513,7 +513,7 @@ func (t *TriggerPipeline) checkWorkflowsStatus(workflows []WorkflowInfo) (allDon
 	anyFailed = false
 
 	for _, w := range workflows {
-		if w.Status == "running" || w.Status == "on_hold" || w.Status == "not_run" {
+		if w.Status == "running" || w.Status == "on_hold" || w.Status == "not_run" || w.Status == "failing" {
 			allDone = false
 		}
 		if w.Status == WorkflowStatusFailed || w.Status == WorkflowStatusCanceled || w.Status == "error" || w.Status == "failing" || w.Status == "unauthorized" {
