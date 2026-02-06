@@ -7,5 +7,5 @@
     "status": "succeeded"
   },
   "timestamp": "2026-02-05T16:00:01.000000Z",
-  "type": "render.deployEnded"
+  "type": "render.deploy.ended"
 }
