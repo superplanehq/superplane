@@ -1,0 +1,31 @@
+{
+    "type": "claude.message",
+    "data": {
+        "id": "msg_01X9JGt5...123456",
+        "model": "claude-3-5-sonnet-latest",
+        "text": "Here is the summary of the deployment logs you requested...",
+        "stopReason": "end_turn",
+        "usage": {
+            "input_tokens": 45,
+            "output_tokens": 120
+        },
+        "response": {
+            "id": "msg_01X9JGt5...123456",
+            "type": "message",
+            "role": "assistant",
+            "model": "claude-3-5-sonnet-latest",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Here is the summary of the deployment logs you requested..."
+                }
+            ],
+            "stop_reason": "end_turn",
+            "usage": {
+                "input_tokens": 45,
+                "output_tokens": 120
+            }
+        }
+    },
+    "timestamp": "2026-02-06T12:00:00Z"
+}
