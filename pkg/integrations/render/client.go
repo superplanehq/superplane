@@ -1,0 +1,392 @@
+package render
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
+
+	"github.com/superplanehq/superplane/pkg/core"
+)
+
+const defaultRenderBaseURL = "https://api.render.com/v1"
+
+type Client struct {
+	APIKey  string
+	BaseURL string
+	http    core.HTTPContext
+}
+
+type APIError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("request failed with %d: %s", e.StatusCode, e.Body)
+}
+
+type Owner struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type ownerWithCursor struct {
+	Cursor string `json:"cursor"`
+	Owner  Owner  `json:"owner"`
+}
+
+type Service struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type serviceWithCursor struct {
+	Cursor  string  `json:"cursor"`
+	Service Service `json:"service"`
+}
+
+type Webhook struct {
+	ID          string   `json:"id"`
+	OwnerID     string   `json:"ownerId"`
+	Name        string   `json:"name"`
+	URL         string   `json:"url"`
+	Enabled     bool     `json:"enabled"`
+	EventFilter []string `json:"eventFilter"`
+	Secret      string   `json:"secret"`
+}
+
+type webhookWithCursor struct {
+	Cursor  string  `json:"cursor"`
+	Webhook Webhook `json:"webhook"`
+}
+
+type CreateWebhookRequest struct {
+	OwnerID     string   `json:"ownerId"`
+	Name        string   `json:"name"`
+	URL         string   `json:"url"`
+	Enabled     bool     `json:"enabled"`
+	EventFilter []string `json:"eventFilter"`
+}
+
+type deployRequest struct {
+	ClearCache string `json:"clearCache"`
+}
+
+func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("no integration context")
+	}
+
+	apiKey, err := ctx.GetConfig("apiKey")
+	if err != nil {
+		return nil, err
+	}
+
+	trimmedAPIKey := strings.TrimSpace(string(apiKey))
+	if trimmedAPIKey == "" {
+		return nil, fmt.Errorf("apiKey is required")
+	}
+
+	return &Client{
+		APIKey:  trimmedAPIKey,
+		BaseURL: defaultRenderBaseURL,
+		http:    httpClient,
+	}, nil
+}
+
+func (c *Client) Verify() error {
+	query := url.Values{}
+	query.Set("limit", "1")
+	_, _, err := c.execRequestWithResponse(http.MethodGet, "/services", query, nil)
+	return err
+}
+
+func (c *Client) ListOwners() ([]Owner, error) {
+	query := url.Values{}
+	query.Set("limit", "100")
+
+	_, body, err := c.execRequestWithResponse(http.MethodGet, "/owners", query, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseOwners(body)
+}
+
+func (c *Client) ListServices(ownerID string) ([]Service, error) {
+	query := url.Values{}
+	query.Set("limit", "100")
+	if strings.TrimSpace(ownerID) != "" {
+		query.Set("ownerId", strings.TrimSpace(ownerID))
+	}
+
+	_, body, err := c.execRequestWithResponse(http.MethodGet, "/services", query, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseServices(body)
+}
+
+func (c *Client) ListWebhooks(ownerID string) ([]Webhook, error) {
+	if strings.TrimSpace(ownerID) == "" {
+		return nil, fmt.Errorf("ownerId is required")
+	}
+
+	query := url.Values{}
+	query.Set("ownerId", strings.TrimSpace(ownerID))
+	query.Set("limit", "100")
+
+	_, body, err := c.execRequestWithResponse(http.MethodGet, "/webhooks", query, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseWebhooks(body)
+}
+
+func (c *Client) GetWebhook(webhookID string) (*Webhook, error) {
+	if strings.TrimSpace(webhookID) == "" {
+		return nil, fmt.Errorf("webhookID is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(http.MethodGet, "/webhooks/"+url.PathEscape(webhookID), nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseWebhook(body)
+}
+
+func (c *Client) CreateWebhook(request CreateWebhookRequest) (*Webhook, error) {
+	if strings.TrimSpace(request.OwnerID) == "" {
+		return nil, fmt.Errorf("ownerId is required")
+	}
+	if strings.TrimSpace(request.URL) == "" {
+		return nil, fmt.Errorf("url is required")
+	}
+	if strings.TrimSpace(request.Name) == "" {
+		return nil, fmt.Errorf("name is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(http.MethodPost, "/webhooks", nil, request)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseWebhook(body)
+}
+
+func (c *Client) DeleteWebhook(webhookID string) error {
+	if strings.TrimSpace(webhookID) == "" {
+		return fmt.Errorf("webhookID is required")
+	}
+
+	_, _, err := c.execRequestWithResponse(http.MethodDelete, "/webhooks/"+url.PathEscape(webhookID), nil, nil)
+	return err
+}
+
+func (c *Client) RetrieveEvent(eventID string) (map[string]any, error) {
+	if strings.TrimSpace(eventID) == "" {
+		return nil, fmt.Errorf("eventID is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(http.MethodGet, "/events/"+url.PathEscape(eventID), nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := map[string]any{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal event response: %w", err)
+	}
+
+	if eventValue, ok := payload["event"]; ok {
+		eventMap, ok := eventValue.(map[string]any)
+		if ok {
+			return eventMap, nil
+		}
+	}
+
+	return payload, nil
+}
+
+func (c *Client) TriggerDeploy(serviceID string, clearCache bool) (map[string]any, error) {
+	if strings.TrimSpace(serviceID) == "" {
+		return nil, fmt.Errorf("serviceID is required")
+	}
+
+	clearCacheValue := "do_not_clear"
+	if clearCache {
+		clearCacheValue = "clear"
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodPost,
+		"/services/"+url.PathEscape(serviceID)+"/deploys",
+		nil,
+		deployRequest{ClearCache: clearCacheValue},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := map[string]any{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal deploy response: %w", err)
+	}
+
+	if deployValue, ok := payload["deploy"]; ok {
+		deployMap, ok := deployValue.(map[string]any)
+		if ok {
+			return deployMap, nil
+		}
+	}
+
+	return payload, nil
+}
+
+func parseOwners(body []byte) ([]Owner, error) {
+	withCursor := []ownerWithCursor{}
+	if err := json.Unmarshal(body, &withCursor); err == nil {
+		owners := make([]Owner, 0, len(withCursor))
+		for _, item := range withCursor {
+			if strings.TrimSpace(item.Owner.ID) == "" {
+				continue
+			}
+			owners = append(owners, item.Owner)
+		}
+
+		if len(withCursor) > 0 {
+			return owners, nil
+		}
+	}
+
+	plainOwners := []Owner{}
+	if err := json.Unmarshal(body, &plainOwners); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal owners response: %w", err)
+	}
+
+	return plainOwners, nil
+}
+
+func parseServices(body []byte) ([]Service, error) {
+	withCursor := []serviceWithCursor{}
+	if err := json.Unmarshal(body, &withCursor); err == nil {
+		services := make([]Service, 0, len(withCursor))
+		for _, item := range withCursor {
+			if strings.TrimSpace(item.Service.ID) == "" {
+				continue
+			}
+			services = append(services, item.Service)
+		}
+
+		if len(withCursor) > 0 {
+			return services, nil
+		}
+	}
+
+	plainServices := []Service{}
+	if err := json.Unmarshal(body, &plainServices); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal services response: %w", err)
+	}
+
+	return plainServices, nil
+}
+
+func parseWebhooks(body []byte) ([]Webhook, error) {
+	withCursor := []webhookWithCursor{}
+	if err := json.Unmarshal(body, &withCursor); err == nil {
+		webhooks := make([]Webhook, 0, len(withCursor))
+		for _, item := range withCursor {
+			if strings.TrimSpace(item.Webhook.ID) == "" {
+				continue
+			}
+			webhooks = append(webhooks, item.Webhook)
+		}
+
+		if len(withCursor) > 0 {
+			return webhooks, nil
+		}
+	}
+
+	plainWebhooks := []Webhook{}
+	if err := json.Unmarshal(body, &plainWebhooks); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal webhooks response: %w", err)
+	}
+
+	return plainWebhooks, nil
+}
+
+func parseWebhook(body []byte) (*Webhook, error) {
+	webhook := Webhook{}
+	if err := json.Unmarshal(body, &webhook); err == nil && strings.TrimSpace(webhook.ID) != "" {
+		return &webhook, nil
+	}
+
+	wrapper := struct {
+		Webhook Webhook `json:"webhook"`
+	}{}
+	if err := json.Unmarshal(body, &wrapper); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal webhook response: %w", err)
+	}
+
+	if strings.TrimSpace(wrapper.Webhook.ID) == "" {
+		return nil, fmt.Errorf("webhook id is missing in response")
+	}
+
+	return &wrapper.Webhook, nil
+}
+
+func (c *Client) execRequestWithResponse(
+	method string,
+	path string,
+	query url.Values,
+	payload any,
+) (*http.Response, []byte, error) {
+	endpoint := c.BaseURL + path
+	if len(query) > 0 {
+		endpoint += "?" + query.Encode()
+	}
+
+	var body io.Reader
+	if payload != nil {
+		encodedBody, err := json.Marshal(payload)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to marshal request: %w", err)
+		}
+		body = bytes.NewReader(encodedBody)
+	}
+
+	req, err := http.NewRequest(method, endpoint, body)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to build request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.APIKey)
+	req.Header.Set("Accept", "application/json")
+	if payload != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer res.Body.Close()
+
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
+		return nil, nil, &APIError{StatusCode: res.StatusCode, Body: string(responseBody)}
+	}
+
+	return res, responseBody, nil
+}

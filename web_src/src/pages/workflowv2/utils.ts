@@ -1166,6 +1166,7 @@ export function buildEventInfo(event: CanvasesCanvasEvent): EventInfo | undefine
     createdAt: event.createdAt!,
     data: event.data?.data || {},
     nodeId: event.nodeId!,
+    type: (event.data?.type as string) || "",
   };
 }
 
