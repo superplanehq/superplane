@@ -72,8 +72,8 @@ The output channels shown in the UI include at least one channel (or rely on def
 
 ### Webhooks
 
-- If the webhook is not configured through the integration, use `ctx.Webhook.Setup()`. If the webhook is configured through the integration, use `ctx.Integration.RequestWebhook()` and implement a `core.WebhookHandler` with `Setup`, `Cleanup`, and `CompareConfig`, registered via `registry.RegisterIntegrationWithWebhookHandler`.
-- We should always aim to share webhooks between components if they use the same underlying event configuration. Use `CompareConfig` for that. For example, if we have two `github.onPush` triggers, one for main branch, and one for release branches, both of those triggers use the same webhook in GitHub.
+- If the webhook is not configured through the integration, use `ctx.Webhook.Setup()`. If the webhook is configured through the integration, `ctx.Integration.RequestWebhook()` and implement the integration's `SetupWebhook`, `CleanupWebhook`
+- We should always aim to share webhooks between components, if they use the same underlying event configuration. Use `CompareWebhookConfig` for that. For example, if we have two `github.onPush` triggers, one for main branch, and one for release branches, both of those triggers use the same webhook in GitHub.
 
 ### Triggers
 
@@ -81,13 +81,6 @@ The output channels shown in the UI include at least one channel (or rely on def
   - `semaphore.onPipelineDone`: we select the specific project we want to listen to
   - `github.onPush`: we select the repository we want to listen to
   - `pagerduty.onIncident`: we select the service
-
-### Security
-
-- Components should always execute HTTP requests using the `HTTPContext` available to them, and never use `net/http` to do so
-- Components should never import `pkg/models` and interact with database directly, only through methods provided through core interfaces
-- HandleWebhook() implementations in components/triggers should always verify that the requests are authenticated using the secret in the webhook
-- HandleRequest() implementations in integrations should always verify that the requests are authenticated using the secret in the webhook
 
 ## Code Quality
 
