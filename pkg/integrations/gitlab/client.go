@@ -56,8 +56,6 @@ func (c *Client) do(req *http.Request) (*http.Response, error) {
 	return c.httpClient.Do(req)
 }
 
-
-
 // T is the type of the resource item (e.g. Project, Milestone, User).
 func fetchResourcesPage[T any](c *Client, apiURL string) ([]T, string, error) {
 	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
@@ -125,12 +123,12 @@ func (c *Client) listProjects() ([]Project, error) {
 }
 
 type IssueRequest struct {
-	Title       string   `json:"title"`
-	Description string   `json:"description,omitempty"`
-	Labels      string   `json:"labels,omitempty"`
-	AssigneeIDs []int    `json:"assignee_ids,omitempty"`
-	MilestoneID *int     `json:"milestone_id,omitempty"`
-	DueDate     string   `json:"due_date,omitempty"`
+	Title       string `json:"title"`
+	Description string `json:"description,omitempty"`
+	Labels      string `json:"labels,omitempty"`
+	AssigneeIDs []int  `json:"assignee_ids,omitempty"`
+	MilestoneID *int   `json:"milestone_id,omitempty"`
+	DueDate     string `json:"due_date,omitempty"`
 }
 
 type Issue struct {
