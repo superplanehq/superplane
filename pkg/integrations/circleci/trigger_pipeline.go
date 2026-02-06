@@ -383,11 +383,12 @@ func (t *TriggerPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 		return http.StatusInternalServerError, fmt.Errorf("error creating client: %v", err)
 	}
 
+	var allDone, anyFailed bool
 	allWorkflows, err := client.GetPipelineWorkflows(metadata.Pipeline.ID)
 	if err != nil {
 		// If API call fails, check with what we have
 		executionCtx.Logger.Warnf("Failed to fetch workflows: %v", err)
-		allDone, anyFailed := t.checkWorkflowsStatus(metadata.Workflows)
+		allDone, anyFailed = t.checkWorkflowsStatus(metadata.Workflows)
 		if !allDone {
 			return http.StatusOK, nil
 		}
@@ -405,7 +406,7 @@ func (t *TriggerPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 		executionCtx.Metadata.Set(metadata)
 
 		// Check if all workflows are done
-		allDone, anyFailed := t.checkWorkflowsStatus(updatedWorkflows)
+		allDone, anyFailed = t.checkWorkflowsStatus(updatedWorkflows)
 		if !allDone {
 			// Not all workflows finished yet
 			return http.StatusOK, nil
