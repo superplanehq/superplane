@@ -34,7 +34,7 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     const issue = eventData?.object_attributes;
 
     return {
-      title: `#${issue?.iid} - ${issue?.title || "Issue"}`,
+      title: `#${issue?.iid ?? ""} - ${issue?.title || "Issue"}`,
       subtitle: buildGitlabSubtitle(issue?.action || "", context.event?.createdAt),
     };
   },
@@ -88,7 +88,7 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
       const issue = eventData?.object_attributes;
 
       props.lastEventData = {
-        title: `#${issue?.iid} - ${issue?.title || "Issue"}`,
+        title: `#${issue?.iid ?? ""} - ${issue?.title || "Issue"}`,
         subtitle: buildGitlabSubtitle(issue?.action || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
