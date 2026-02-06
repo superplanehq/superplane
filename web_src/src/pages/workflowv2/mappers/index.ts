@@ -86,6 +86,11 @@ import {
   triggerRenderers as openaiTriggerRenderers,
   eventStateRegistry as openaiEventStateRegistry,
 } from "./openai/index";
+import {
+  componentMappers as grafanaComponentMappers,
+  triggerRenderers as grafanaTriggerRenderers,
+  eventStateRegistry as grafanaEventStateRegistry,
+} from "./grafana/index";
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
@@ -132,6 +137,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   aws: awsComponentMappers,
   discord: discordComponentMappers,
   openai: openaiComponentMappers,
+  grafana: grafanaComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -149,6 +155,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
   openai: openaiTriggerRenderers,
+  grafana: grafanaTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -166,6 +173,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   rootly: rootlyEventStateRegistry,
   openai: openaiEventStateRegistry,
   aws: awsEventStateRegistry,
+  grafana: grafanaEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
