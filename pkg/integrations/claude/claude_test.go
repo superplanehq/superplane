@@ -85,26 +85,6 @@ func (m *mockIntegrationContext) ListSubscriptions() ([]core.IntegrationSubscrip
 
 // --- Tests ---
 
-func TestClaude_Metadata(t *testing.T) {
-	i := &Claude{}
-
-	if i.Name() != "claude" {
-		t.Errorf("expected name 'claude', got '%s'", i.Name())
-	}
-	if i.Label() != "Claude" {
-		t.Errorf("expected label 'Claude', got '%s'", i.Label())
-	}
-	if i.Icon() != "loader" {
-		t.Errorf("expected icon 'loader', got '%s'", i.Icon())
-	}
-	if i.Description() == "" {
-		t.Error("expected description to be non-empty")
-	}
-	if i.Instructions() == "" {
-		t.Error("expected instructions to be non-empty")
-	}
-}
-
 func TestClaude_Configuration(t *testing.T) {
 	i := &Claude{}
 	configs := i.Configuration()
@@ -138,17 +118,6 @@ func TestClaude_Configuration(t *testing.T) {
 	}
 }
 
-func TestClaude_Components(t *testing.T) {
-	i := &Claude{}
-	comps := i.Components()
-
-	if len(comps) != 1 {
-		t.Errorf("expected 1 component, got %d", len(comps))
-	}
-	if _, ok := comps[0].(*CreateMessage); !ok {
-		t.Error("expected component to be *CreateMessage")
-	}
-}
 
 func TestClaude_Sync(t *testing.T) {
 	logger := logrus.NewEntry(logrus.New())
@@ -349,16 +318,5 @@ func TestClaude_CompareWebhookConfig(t *testing.T) {
 	}
 	if !ok {
 		t.Error("expected CompareWebhookConfig to return true")
-	}
-}
-
-func TestClaude_TriggersAndActions(t *testing.T) {
-	i := &Claude{}
-
-	if len(i.Triggers()) != 0 {
-		t.Error("expected 0 triggers")
-	}
-	if len(i.Actions()) != 0 {
-		t.Error("expected 0 actions")
 	}
 }

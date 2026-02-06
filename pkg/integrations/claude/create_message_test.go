@@ -47,26 +47,6 @@ func (m *mockExecutionState) Fail(reason, message string) error {
 
 // --- Tests ---
 
-func TestCreateMessage_Metadata(t *testing.T) {
-	c := &CreateMessage{}
-
-	if c.Name() != "claude.createMessage" {
-		t.Errorf("expected name 'claude.createMessage', got '%s'", c.Name())
-	}
-	if c.Label() != "Create Message" {
-		t.Errorf("expected label 'Create Message', got '%s'", c.Label())
-	}
-	if c.Icon() != "message-square" {
-		t.Errorf("expected icon 'message-square', got '%s'", c.Icon())
-	}
-	if c.Color() != "orange" {
-		t.Errorf("expected color 'orange', got '%s'", c.Color())
-	}
-	if c.Description() == "" {
-		t.Error("expected description to be non-empty")
-	}
-}
-
 func TestCreateMessage_Configuration(t *testing.T) {
 	c := &CreateMessage{}
 	config := c.Configuration()

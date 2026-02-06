@@ -19,7 +19,7 @@ type CreateMessageSpec struct {
 	Prompt        string  `json:"prompt"`
 	SystemMessage string  `json:"systemMessage"`
 	MaxTokens     int     `json:"maxTokens"`
-	Temperature   float64 `json:"temperature"`
+	Temperature   *float64 `json:"temperature"`
 }
 
 type MessagePayload struct {
@@ -124,8 +124,8 @@ func (c *CreateMessage) Configuration() []configuration.Field {
 			Label:       "Max Tokens",
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
-			Default:	 "1024",
-			Description: "Maximum number of tokens to generate e.g. 1024",
+			Default:	 "4096",
+			Description: "Maximum number of tokens to generate e.g. Defaults to 4096.",
 		},
 		{
 			Name:        "temperature",
@@ -169,8 +169,12 @@ func (c *CreateMessage) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if spec.MaxTokens == 0 {
-		spec.MaxTokens = 1024
+		spec.MaxTokens = 4096
 	}
+
+	if spec.MaxTokens < 1 {
+        return fmt.Errorf("maxTokens must be at least 1")
+    }
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
@@ -186,14 +190,11 @@ func (c *CreateMessage) Execute(ctx core.ExecutionContext) error {
 				Content: spec.Prompt,
 			},
 		},
+		Temperature: spec.Temperature,
 	}
 
 	if spec.SystemMessage != "" {
 		req.System = spec.SystemMessage
-	}
-
-	if spec.Temperature > 0 {
-		req.Temperature = spec.Temperature
 	}
 
 	response, err := client.CreateMessage(req)
