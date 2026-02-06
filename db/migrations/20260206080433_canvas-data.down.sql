@@ -1,0 +1,5 @@
+BEGIN;
+
+DROP TABLE IF EXISTS canvas_data;
+
+COMMIT;

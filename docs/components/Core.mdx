@@ -21,10 +21,12 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Approval" href="#approval" description="Collect approvals on events" />
   <LinkCard title="Filter" href="#filter" description="Filter events based on their content" />
+  <LinkCard title="Get Canvas Data" href="#get-canvas-data" description="Read a value from the canvas data store, optionally a previous version" />
   <LinkCard title="HTTP Request" href="#http-request" description="Make HTTP requests" />
   <LinkCard title="If" href="#if" description="Route events based on expression" />
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
+  <LinkCard title="Set Canvas Data" href="#set-canvas-data" description="Store a value under a key on the canvas with history" />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
   <LinkCard title="Wait" href="#wait" description="Wait for a certain amount of time" />
 </CardGrid>
@@ -361,6 +363,67 @@ Configure timeout and retry behavior:
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "http.request.finished"
+}
+```
+
+<a id="get-canvas-data"></a>
+
+## Get Canvas Data
+
+The Get Canvas Data component reads a value for a key from the canvas data store. You can read the current (latest) value or a previous version.
+
+### Use Cases
+
+- **Rollback**: Get the previous version of a key (e.g. last deployed version) to roll back.
+- **Compare**: Read current and previous in separate nodes to detect changes.
+- **Ephemeral teardown**: Read a list of machine IDs stored by an earlier step.
+
+### Configuration
+
+- **Key**: Canvas-scoped key to read (e.g. `app/my-service/last_version`).
+- **Version**: Current (latest), Previous, or N steps back.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "key": "app/backend/last_version",
+    "found": true,
+    "value": "v1.2.3",
+    "created_at": "2026-02-06T12:00:00.000Z"
+  },
+  "type": "canvasdata.get.finished"
+}
+```
+
+<a id="set-canvas-data"></a>
+
+## Set Canvas Data
+
+The Set Canvas Data component writes a key-value pair to the canvas data store. Every write is versioned so you can later read the current or previous values.
+
+### Use Cases
+
+- **Last deployed version**: Save the version or SHA after a deploy step.
+- **Ephemeral resources**: Record machine IDs or resource names for later teardown.
+- **Canvas state**: Store small state (timestamps, flags) shared across workflow runs.
+
+### Configuration
+
+- **Key**: A string key (e.g. `app/backend/last_version`, `ephemeral/machines`). Use namespaced keys to avoid collisions.
+- **Value**: The value to store (expression supported; stored as string or JSON).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "key": "app/backend/last_version",
+    "value": "v1.2.3",
+    "created_at": "2026-02-06T12:00:00.000Z"
+  },
+  "type": "canvasdata.set.finished"
 }
 ```
 

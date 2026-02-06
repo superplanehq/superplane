@@ -27,6 +27,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/http"
 	_ "github.com/superplanehq/superplane/pkg/components/if"
 	_ "github.com/superplanehq/superplane/pkg/components/merge"
+	_ "github.com/superplanehq/superplane/pkg/components/canvasdata"
 	_ "github.com/superplanehq/superplane/pkg/components/noop"
 	_ "github.com/superplanehq/superplane/pkg/components/timegate"
 	_ "github.com/superplanehq/superplane/pkg/components/wait"
