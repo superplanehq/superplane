@@ -340,8 +340,9 @@ func Start() {
 	}
 
 	registry, err := registry.NewRegistry(encryptorInstance, registry.HTTPOptions{
-		BlockedHosts:    getBlockedHTTPHosts(),
-		PrivateIPRanges: getPrivateIPRanges(),
+		BlockedHosts:     getBlockedHTTPHosts(),
+		PrivateIPRanges:  getPrivateIPRanges(),
+		MaxResponseBytes: DefaultMaxHTTPResponseBytes,
 	})
 
 	if err != nil {
@@ -377,6 +378,13 @@ func getWebhookBaseURL(baseURL string) string {
 	}
 	return webhookBaseURL
 }
+
+/*
+ * 512KB is the default maximum response size for HTTP responses.
+ * This prevents component/trigger implementations from using too much memory,
+ * and also from emitting large events.
+ */
+var DefaultMaxHTTPResponseBytes int64 = 512 * 1024
 
 /*
  * Default blocked HTTP hosts include:
