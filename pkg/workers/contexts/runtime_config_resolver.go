@@ -13,20 +13,31 @@ import (
 	"gorm.io/gorm"
 )
 
-// ResolveRuntimeConfig walks config and re-evaluates any string value that looks
-// like an expression (contains {{ and }}), using the given builder's env plus
-// a secrets() function. Returns a new config map; the original is not modified.
-// Resolved config must not be persisted (secret values only in memory).
-func ResolveRuntimeConfig(
-	config map[string]any,
-	builder *NodeConfigurationBuilder,
-	tx *gorm.DB,
-	encryptor crypto.Encryptor,
-	orgID uuid.UUID,
-) (map[string]any, error) {
+type RuntimeConfigResolverParams struct {
+	tx *gorm.DB
+
+	config map[string]any
+	encryptor crypto.Encryptor
+
+	orgID uuid.UUID
+	nodeID uuid.UUID
+	workflowID uuid.UUID
+	rootEventID uuid.UUID
+	previousExecutionID *uuid.UUID
+	inputEvent models.Event
+}
+
+func ResolveRuntimeConfig(params RuntimeConfigResolverParams) (map[string]any, error) {
+	builder := NewNodeConfigurationBuilder(params.tx, params.WorkflowID).
+		WithNodeID(params.NodeID).
+		WithRootEvent(&params.RootEventID).
+		WithInput(map[string]any{params.inputEvent.NodeID: params.input}).
+		WithPreviousExecution(p.execution.PreviousExecutionID)
+
 	resolveString := func(s string) (any, error) {
 		return resolveStringAtRuntime(s, builder, tx, encryptor, orgID)
 	}
+
 	resolved, err := resolveRuntimeValue(config, resolveString)
 	if err != nil {
 		return nil, err

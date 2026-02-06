@@ -239,28 +239,6 @@ func (w *NodeExecutor) configurationFieldsForBlueprintNode(tx *gorm.DB, node mod
 	}
 }
 
-// runtimeConfigParams holds the context needed to resolve execution config at runtime.
-type runtimeConfigParams struct {
-	tx         *gorm.DB
-	execution  *models.CanvasNodeExecution
-	node       *models.CanvasNode
-	inputEvent *models.CanvasEvent
-	input      any
-	workflow   *models.Canvas
-}
-
-// resolveConfigAtRuntime resolves any deferred expressions (e.g. secrets()) in the
-// execution's stored configuration and returns the resolved config. The result
-// must not be persisted; it is only for passing to the component at runtime.
-func (w *NodeExecutor) resolveConfigAtRuntime(p *runtimeConfigParams) (map[string]any, error) {
-	builder := contexts.NewNodeConfigurationBuilder(p.tx, p.execution.WorkflowID).
-		WithNodeID(p.node.NodeID).
-		WithRootEvent(&p.execution.RootEventID).
-		WithInput(map[string]any{p.inputEvent.NodeID: p.input}).
-		WithPreviousExecution(p.execution.PreviousExecutionID)
-	return contexts.ResolveRuntimeConfig(p.execution.Configuration.Data(), builder, p.tx, w.encryptor, p.workflow.OrganizationID)
-}
-
 func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode) error {
 	logger := logging.WithExecution(
 		logging.WithNode(w.logger, *node),
@@ -296,8 +274,9 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 	}
 
 	config := execution.Configuration.Data()
+
 	if config != nil {
-		resolved, err := w.resolveConfigAtRuntime(&runtimeConfigParams{
+		resolved, err := contexts.ResolveRuntimeConfig(&context.RuntimeConfigParams{
 			tx:         tx,
 			execution:  execution,
 			node:       node,
@@ -305,10 +284,12 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 			input:      input,
 			workflow:   workflow,
 		})
+
 		if err != nil {
 			logger.Errorf("failed to resolve configuration at runtime: %v", err)
-			return execution.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, fmt.Sprintf("configuration resolution failed: %v", err))
+			return fmt.Errorf("failed to resolve configuration at runtime: %v", err)
 		}
+
 		config = resolved
 	}
 
@@ -329,6 +310,7 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, nil, nil),
 		Notifications:  contexts.NewNotificationContext(tx, workflow.OrganizationID, execution.WorkflowID),
 	}
+
 	ctx.ExpressionEnv = func(expression string) (map[string]any, error) {
 		builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
 			WithNodeID(node.NodeID).
