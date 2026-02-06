@@ -1,43 +1,71 @@
 package contexts
 
-// SecretResolveAction tells the builder what to do with a segment after calling SecretResolver.Resolve.
-type SecretResolveAction int
-
-const (
-	SecretResolveUseValue     SecretResolveAction = iota // replace segment with value
-	SecretResolveKeepOriginal                           // keep segment unchanged
-	SecretResolveNormal                                 // not a secret; resolve with resolveExpression
+import (
+	"strings"
 )
 
-// SecretResolver is given to NodeConfigurationBuilder. The builder calls Resolve for each
-// {{ ... }} segment; the resolver decides whether it's a secret expression and what to do.
-type SecretResolver interface {
-	Resolve(expression string) (value any, action SecretResolveAction, err error)
+type SecretResolutionMode int
+
+const (
+	ResolveSecretsImmediately SecretResolutionMode = iota	
+	DeferSecretResolution
 }
 
-// NoOpSecretResolver never resolves secrets. Secret expressions get KeepOriginal; others Normal.
-type NoOpSecretResolver struct{}
+type SecretResolver struct {
+	mode SecretResolutionMode
+	provider *secrets.Provider
+}
 
-func (NoOpSecretResolver) Resolve(expression string) (any, SecretResolveAction, error) {
-	if expressionContainsSecrets(expression) {
-		return nil, SecretResolveKeepOriginal, nil
+func NewDeferedSecretResolver(mode SecretResolutionMode) *SecretResolver {
+	return &SecretResolver{mode: DeferSecretResolution}
+}
+
+func NewImmediateSecretResolver(provider *secrets.Provider) *SecretResolver {
+	return &SecretResolver{
+		mode: ResolveSecretsImmediately,
+		provider: provider,
 	}
-	return nil, SecretResolveNormal, nil
 }
 
-// RuntimeSecretResolver evaluates secret expressions at runtime using the given LoadSecret.
-type RuntimeSecretResolver struct {
-	Builder    *NodeConfigurationBuilder
-	LoadSecret func(name string) (map[string]string, error)
-}
-
-func (r *RuntimeSecretResolver) Resolve(expression string) (any, SecretResolveAction, error) {
-	if !expressionContainsSecrets(expression) {
-		return nil, SecretResolveNormal, nil
+func (r *SecretResolver) ResolveSecret(secretName string) map[string]string {
+	if r.mode == DeferSecretResolution {
+		return "{{ secrets(" + secretName + ") }}"
 	}
-	value, err := r.Builder.evaluateWithSecrets(expression, r.LoadSecret)
+
+	secretValue, err := r.provider.GetSecret(secretName)
 	if err != nil {
-		return nil, 0, err
+		return fmt.Errorf("failed to resolve secret '%s'", secretName)
 	}
-	return value, SecretResolveUseValue, nil
+
+	return secretValue
+}
+
+func (r *SecretResolver) IsInjectingUnresolvedSecret(expression string) bool {
+	tree, err := parser.Parse(expression)
+	if err != nil {
+		return false
+	}
+
+	collector := &secretsCallCollector{}
+	ast.Walk(&tree.Node, collector)
+	return collector.found
+}
+
+type secretsCallCollector struct {
+	found bool
+}
+
+func (c *secretsCallCollector) Visit(node *ast.Node) {
+	if c.found {
+		return
+	}
+
+	call, ok := (*node).(*ast.CallNode)
+	if !ok {
+		return
+	}
+
+	if id, ok := call.Callee.(*ast.IdentifierNode); ok && id.Value == "secrets" {
+		c.found = true
+	}
 }

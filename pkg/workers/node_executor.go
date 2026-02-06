@@ -275,25 +275,21 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 	}
 
 	config := execution.Configuration.Data()
+
 	if config != nil {
 		builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
 			WithNodeID(node.NodeID).
 			WithRootEvent(&execution.RootEventID).
 			WithInput(map[string]any{inputEvent.NodeID: input}).
-			WithPreviousExecution(execution.PreviousExecutionID)
-		loadSecret := func(name string) (map[string]string, error) {
-			provider, err := secrets.NewProvider(tx, w.encryptor, name, models.DomainTypeOrganization, workflow.OrganizationID)
-			if err != nil {
-				return nil, err
-			}
-			return provider.Load(context.Background())
-		}
-		builder = builder.WithSecretResolver(&contexts.RuntimeSecretResolver{Builder: builder, LoadSecret: loadSecret})
+			WithPreviousExecution(execution.PreviousExecutionID).
+			WithSecretResolver(&contexts.RuntimeSecretResolver{Builder: builder, LoadSecret: loadSecret})
+
 		resolved, err := builder.Build(config)
 		if err != nil {
 			logger.Errorf("failed to resolve configuration at runtime: %v", err)
 			return fmt.Errorf("failed to resolve configuration at runtime: %v", err)
 		}
+
 		config = resolved
 	}
 

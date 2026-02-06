@@ -69,8 +69,8 @@ func (b *NodeConfigurationBuilder) WithConfigurationFields(fields []configuratio
 	return b
 }
 
-func (b *NodeConfigurationBuilder) WithSecretResolver(r SecretResolver) *NodeConfigurationBuilder {
-	b.secretResolver = r
+func (b *NodeConfigurationBuilder) WithSecretResolver(resolver SecretResolver) *NodeConfigurationBuilder {
+	b.secretResolver = resolver
 	return b
 }
 
@@ -233,35 +233,14 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 		if len(matches) != 2 {
 			return match
 		}
-		inner := strings.TrimSpace(matches[1])
-		resolver := b.secretResolver
-		if resolver == nil {
-			resolver = NoOpSecretResolver{}
-		}
-		value, action, e := resolver.Resolve(inner)
+
+		value, e := b.resolveExpression(matches[1])
 		if e != nil {
 			err = e
 			return ""
 		}
-		switch action {
-		case SecretResolveUseValue:
-			return fmt.Sprintf("%v", value)
-		case SecretResolveKeepOriginal:
-			return match
-		case SecretResolveNormal:
-			val, e := b.resolveExpression(matches[1])
-			if e != nil {
-				err = e
-				return ""
-			}
-			repl := fmt.Sprintf("%v", val)
-			if stringContainsDeferredSecretExpression(repl) || strings.Contains(repl, "secrets(") {
-				return match
-			}
-			return repl
-		default:
-			return match
-		}
+
+		return fmt.Sprintf("%v", value)
 	})
 
 	if err != nil {
@@ -351,6 +330,18 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 				depth = parsedDepth
 			}
 			return b.resolvePreviousPayload(depth)
+		}),
+
+		expr.Function("secrets", func(params ...any) (any, error) {
+			if len(params) != 1 {
+				return nil, fmt.Errorf("secrets() takes exactly one argument (secret name)")
+			}
+			name, ok := params[0].(string)
+			if !ok {
+				return nil, fmt.Errorf("secrets() argument must be a string")
+			}
+
+			return b.resolveSecret(name)
 		}),
 	}
 
@@ -967,6 +958,20 @@ func (b *NodeConfigurationBuilder) listLinearExecutionsInChain() ([]models.Canva
 	}
 
 	return executions, nil
+}
+
+func (b *NodeConfigurationBuilder) resolveSecret(name string) (map[string]string, error) {
+	value, err := b.secretResolver.Resolve(name)
+	if err != nil {
+		return nil, fmt.Errorf("error resolving secret %s: %w", name, err)
+	}
+
+	strValue, ok := value.(map[string]string)
+	if !ok {
+		return nil, fmt.Errorf("secret resolver returned value of type %T, expected map[string]string", value)
+	}
+
+	return strValue, nil
 }
 
 func (b *NodeConfigurationBuilder) listUpstreamNodeIDs() ([]string, error) {
