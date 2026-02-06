@@ -1,13 +1,17 @@
 package contexts
 
 import (
+	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
@@ -1221,6 +1225,166 @@ func Test_NodeConfigurationBuilder_ExpressionsContainingSecrets_LeftUnresolved(t
 	assert.Equal(t, `{{ secrets("my-secret").token }}`, result["api_key"])
 	assert.Equal(t, `prefix {{ secrets("other").key }} suffix`, result["mixed"])
 	assert.Equal(t, `{{ "Bearer " + secrets("api").token }}`, result["transformed"])
+}
+
+func Test_NodeConfigurationBuilder_WithRuntimeResolution_ResolvesSecretsExpression(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	encryptor := &crypto.NoOpEncryptor{}
+	secretName := "api-keys"
+	secretData := map[string]string{"token": "sk-test-123"}
+	raw, err := json.Marshal(secretData)
+	require.NoError(t, err)
+	encrypted, err := encryptor.Encrypt(context.Background(), raw, []byte(secretName))
+	require.NoError(t, err)
+
+	_, err = models.CreateSecret(secretName, secrets.ProviderLocal, r.User.String(), models.DomainTypeOrganization, r.Organization.ID, encrypted)
+	require.NoError(t, err)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent}},
+		[]models.Edge{},
+	)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithInput(map[string]any{"node-1": map[string]any{"x": "y"}})
+
+	configuration := map[string]any{
+		"api_key": `{{ secrets("api-keys").token }}`,
+	}
+
+	result, err := builder.WithRuntimeResolution(encryptor, r.Organization.ID).Build(configuration)
+	require.NoError(t, err)
+	assert.Equal(t, "sk-test-123", result["api_key"])
+}
+
+func Test_NodeConfigurationBuilder_WithRuntimeResolution_ResolvesSecretsTransformedWithFunction(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	encryptor := &crypto.NoOpEncryptor{}
+	secretName := "api-keys"
+	secretData := map[string]string{"token": "sk-test-123"}
+	raw, err := json.Marshal(secretData)
+	require.NoError(t, err)
+	encrypted, err := encryptor.Encrypt(context.Background(), raw, []byte(secretName))
+	require.NoError(t, err)
+
+	_, err = models.CreateSecret(secretName, secrets.ProviderLocal, r.User.String(), models.DomainTypeOrganization, r.Organization.ID, encrypted)
+	require.NoError(t, err)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent}},
+		[]models.Edge{},
+	)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithInput(map[string]any{"node-1": map[string]any{"x": "y"}})
+
+	configuration := map[string]any{
+		"authorization": `{{ "Bearer " + secrets("api-keys").token }}`,
+	}
+
+	result, err := builder.WithRuntimeResolution(encryptor, r.Organization.ID).Build(configuration)
+	require.NoError(t, err)
+	assert.Equal(t, "Bearer sk-test-123", result["authorization"])
+}
+
+func Test_NodeConfigurationBuilder_WithRuntimeResolution_NonSecretExpressionLeftUnchanged(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent}},
+		[]models.Edge{},
+	)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithInput(map[string]any{"node-1": map[string]any{"x": "y"}})
+
+	configuration := map[string]any{
+		"expr": `{{ root().x }}`,
+	}
+
+	result, err := builder.WithRuntimeResolution(&crypto.NoOpEncryptor{}, r.Organization.ID).Build(configuration)
+	require.NoError(t, err)
+	assert.Equal(t, `{{ root().x }}`, result["expr"])
+}
+
+func Test_NodeConfigurationBuilder_WithRuntimeResolution_SecretNotFound_ReturnsError(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent}},
+		[]models.Edge{},
+	)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithInput(map[string]any{})
+
+	configuration := map[string]any{
+		"api_key": `{{ secrets("nonexistent").key }}`,
+	}
+
+	_, err := builder.WithRuntimeResolution(&crypto.NoOpEncryptor{}, r.Organization.ID).Build(configuration)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "secret not found")
+}
+
+func Test_NodeConfigurationBuilder_WithRuntimeResolution_NestedConfigResolvesSecrets(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	encryptor := &crypto.NoOpEncryptor{}
+	secretData := map[string]string{"api_key": "nested-secret-value"}
+	raw, err := json.Marshal(secretData)
+	require.NoError(t, err)
+	encrypted, err := encryptor.Encrypt(context.Background(), raw, []byte("nested-secret"))
+	require.NoError(t, err)
+
+	_, err = models.CreateSecret("nested-secret", secrets.ProviderLocal, r.User.String(), models.DomainTypeOrganization, r.Organization.ID, encrypted)
+	require.NoError(t, err)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent}},
+		[]models.Edge{},
+	)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithInput(map[string]any{"node-1": map[string]any{}})
+
+	configuration := map[string]any{
+		"headers": map[string]any{
+			"Authorization": `{{ secrets("nested-secret").api_key }}`,
+		},
+		"items": []any{
+			`{{ secrets("nested-secret").api_key }}`,
+		},
+	}
+
+	result, err := builder.WithRuntimeResolution(encryptor, r.Organization.ID).Build(configuration)
+	require.NoError(t, err)
+	headers := result["headers"].(map[string]any)
+	assert.Equal(t, "nested-secret-value", headers["Authorization"])
+	items := result["items"].([]any)
+	assert.Equal(t, "nested-secret-value", items[0])
 }
 
 func Test_NodeConfigurationBuilder_DisallowExpression_ListItems(t *testing.T) {
