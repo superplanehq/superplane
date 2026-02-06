@@ -95,11 +95,6 @@ func (p *OnPipelineCompleted) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to parse metadata: %w", err)
 	}
 
-	// If metadata is set, trigger was already setup
-	if metadata.Project != nil {
-		return nil
-	}
-
 	config := OnPipelineCompletedConfiguration{}
 	err = mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
