@@ -4,26 +4,17 @@ import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import { TriggerProps } from "@/ui/trigger";
 import { GitLabNodeMetadata } from "./types";
 import { buildGitlabSubtitle } from "./utils";
+import { getDetailsForWebhookIssue, WebhookIssue } from "./issue_utils";
 
 interface OnIssueConfiguration {
   actions: string[];
   project: string;
 }
 
-interface GitLabIssue {
-  id: number;
-  iid: number;
-  title: string;
-  description?: string;
-  state: string;
-  action: string;
-  url: string;
-}
-
 interface OnIssueEventData {
   object_kind?: string;
   event_type?: string;
-  object_attributes?: GitLabIssue;
+  object_attributes?: WebhookIssue;
   user?: {
     id: number;
     name: string;
@@ -34,20 +25,6 @@ interface OnIssueEventData {
     name: string;
     path_with_namespace: string;
     web_url: string;
-  };
-}
-
-function getDetailsForIssue(issue: GitLabIssue | undefined): Record<string, string> {
-  if (!issue) {
-    return {};
-  }
-
-  return {
-    URL: issue.url || "",
-    Title: issue.title || "",
-    Action: issue.action || "",
-    State: issue.state || "",
-    IID: issue.iid?.toString() || "",
   };
 }
 
@@ -65,7 +42,7 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as OnIssueEventData;
     const issue = eventData?.object_attributes;
-    const values = getDetailsForIssue(issue);
+    const values = getDetailsForWebhookIssue(issue);
 
     if (eventData?.user?.username) {
       values["Author"] = eventData.user.username;

@@ -9,6 +9,7 @@ import {
 import { Issue } from "./types";
 import { baseProps } from "./base";
 import { buildGitlabExecutionSubtitle } from "./utils";
+import { getDetailsForApiIssue } from "./issue_utils";
 
 export const createIssueMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -37,43 +38,6 @@ export const createIssueMapper: ComponentBaseMapper = {
     }
 
     const issue = outputs.default[0].data as Issue;
-    return { ...getDetailsForIssue(issue), ...details };
+    return { ...getDetailsForApiIssue(issue), ...details };
   },
 };
-
-function getDetailsForIssue(issue: Issue): Record<string, string> {
-  const details: Record<string, string> = {};
-  Object.assign(details, {
-    "Created At": issue?.created_at ? new Date(issue.created_at).toLocaleString() : "-",
-    "Created By": issue?.author?.username || "-",
-  });
-
-  details["IID"] = issue?.iid.toString();
-  details["ID"] = issue?.id.toString();
-  details["State"] = issue?.state;
-  details["URL"] = issue?.web_url;
-  details["Title"] = issue?.title || "-";
-
-  if (issue.closed_by) {
-    details["Closed By"] = issue?.closed_by.username;
-    details["Closed At"] = issue?.closed_at ? new Date(issue.closed_at).toLocaleString() : "";
-  }
-
-  if (issue.labels && issue.labels.length > 0) {
-    details["Labels"] = issue.labels.join(", ");
-  }
-
-  if (issue.assignees && issue.assignees.length > 0) {
-    details["Assignees"] = issue.assignees.map((assignee) => assignee.username).join(", ");
-  }
-
-  if (issue.milestone) {
-    details["Milestone"] = issue.milestone.title;
-  }
-
-  if (issue.due_date) {
-    details["Due Date"] = issue.due_date;
-  }
-
-  return details;
-}

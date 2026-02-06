@@ -90,6 +90,20 @@ func (i *OnIssue) ExampleData() map[string]any {
 			"action":      "open",
 			"url":         "https://gitlab.com/group/my-project/-/issues/1",
 		},
+		"labels": []map[string]any{
+			{
+				"id":    206,
+				"title": "bug",
+				"color": "#dc3545",
+			},
+		},
+		"assignees": []map[string]any{
+			{
+				"id":       1,
+				"name":     "John Doe",
+				"username": "johndoe",
+			},
+		},
 	}
 }
 
@@ -234,19 +248,14 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	}
 
 	if len(config.Labels) > 0 {
-		attrs, ok := data["object_attributes"].(map[string]any)
-		if !ok {
-			return http.StatusBadRequest, fmt.Errorf("invalid object_attributes")
-		}
-
-		eventLabels, ok := attrs["labels"].([]interface{})
+		eventLabels, ok := data["labels"].([]any)
 		if !ok {
 			return http.StatusOK, nil
 		}
 
 		found := false
 		for _, label := range eventLabels {
-			labelMap, ok := label.(map[string]interface{})
+			labelMap, ok := label.(map[string]any)
 			if ok {
 				title, _ := labelMap["title"].(string)
 				for _, requiredLabel := range config.Labels {
@@ -268,14 +277,14 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	// Filter by Assignees
 	if len(config.AssigneeIDs) > 0 {
 
-		eventAssignees, ok := data["assignees"].([]interface{})
+		eventAssignees, ok := data["assignees"].([]any)
 		if !ok {
 			return http.StatusOK, nil
 		}
 
 		found := false
 		for _, assignee := range eventAssignees {
-			assigneeMap, ok := assignee.(map[string]interface{})
+			assigneeMap, ok := assignee.(map[string]any)
 			if ok {
 				// ID comes as float64 usually from JSON unmarshal
 				idFloat, _ := assigneeMap["id"].(float64)
