@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -12,21 +13,24 @@ import (
 )
 
 type HTTPContext struct {
-	client          *http.Client
-	dialer          *net.Dialer
-	blockedHosts    []string
-	privateIPRanges []*net.IPNet
+	client           *http.Client
+	dialer           *net.Dialer
+	blockedHosts     []string
+	privateIPRanges  []*net.IPNet
+	maxResponseBytes int64
 }
 
 type HTTPOptions struct {
-	BlockedHosts    []string
-	PrivateIPRanges []string
+	BlockedHosts     []string
+	PrivateIPRanges  []string
+	MaxResponseBytes int64
 }
 
 func NewHTTPContext(options HTTPOptions) (*HTTPContext, error) {
 	httpCtx := &HTTPContext{
-		blockedHosts:    options.BlockedHosts,
-		privateIPRanges: make([]*net.IPNet, 0),
+		blockedHosts:     options.BlockedHosts,
+		privateIPRanges:  make([]*net.IPNet, 0),
+		maxResponseBytes: options.MaxResponseBytes,
 	}
 
 	for _, cidr := range options.PrivateIPRanges {
@@ -94,7 +98,7 @@ func NewHTTPContext(options HTTPOptions) (*HTTPContext, error) {
 
 func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
 	if len(c.privateIPRanges) == 0 && len(c.blockedHosts) == 0 {
-		return c.client.Do(request)
+		return c.do(request)
 	}
 
 	err := c.validateURL(request.URL)
@@ -102,7 +106,68 @@ func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 
-	return c.client.Do(request)
+	return c.do(request)
+}
+
+func (c *HTTPContext) do(request *http.Request) (*http.Response, error) {
+	resp, err := c.client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+
+	if c.maxResponseBytes <= 0 {
+		return resp, nil
+	}
+
+	//
+	// Content-Length is not truly reliable,
+	// but it's a good first check to enforce the maximum response size.
+	//
+	if resp.ContentLength > c.maxResponseBytes {
+		_ = resp.Body.Close()
+		return nil, fmt.Errorf("response too large: %d bytes exceeds maximum size of %d bytes", resp.ContentLength, c.maxResponseBytes)
+	}
+
+	//
+	// We replace the body with a LimitedReadCloser that will return an error
+	// if the response body is larger than the maximum allowed size.
+	//
+	resp.Body = &LimitedReadCloser{
+		reader:          resp.Body,
+		remaining:       c.maxResponseBytes,
+		maxResponseSize: c.maxResponseBytes,
+	}
+
+	return resp, nil
+}
+
+type LimitedReadCloser struct {
+	reader          io.ReadCloser
+	remaining       int64
+	maxResponseSize int64
+}
+
+func (r *LimitedReadCloser) Read(p []byte) (int, error) {
+	if r.remaining <= 0 {
+		var buf [1]byte
+		n, err := r.reader.Read(buf[:])
+		if n > 0 {
+			return 0, fmt.Errorf("response too large: exceeds maximum size of %d bytes", r.maxResponseSize)
+		}
+		return 0, err
+	}
+
+	if int64(len(p)) > r.remaining {
+		p = p[:r.remaining]
+	}
+
+	n, err := r.reader.Read(p)
+	r.remaining -= int64(n)
+	return n, err
+}
+
+func (r *LimitedReadCloser) Close() error {
+	return r.reader.Close()
 }
 
 /*
