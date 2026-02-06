@@ -3,6 +3,7 @@ package gitlab
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -13,11 +14,13 @@ import (
 type CreateIssue struct{}
 
 type CreateIssueConfiguration struct {
-	Project   string   `mapstructure:"project"`
-	Title     string   `mapstructure:"title"`
-	Body      string   `mapstructure:"body"`
-	Assignees []string `mapstructure:"assignees"`
-	Labels    []string `mapstructure:"labels"`
+	Project     string   `mapstructure:"project"`
+	Title       string   `mapstructure:"title"`
+	Body        string   `mapstructure:"body"`
+	Assignees   []string `mapstructure:"assignees"`
+	Labels      []string `mapstructure:"labels"`
+	MilestoneID string   `mapstructure:"milestoneId"`
+	DueDate     string   `mapstructure:"dueDate"`
 }
 
 func (c *CreateIssue) Name() string {
@@ -105,6 +108,30 @@ func (c *CreateIssue) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:     "milestoneId",
+			Label:    "Milestone",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: false,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "milestone",
+					UseNameAsValue: false,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "project",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "project"},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:     "dueDate",
+			Label:    "Due Date",
+			Type:     configuration.FieldTypeDate,
+			Required: false,
+		},
 	}
 }
 
@@ -140,7 +167,6 @@ func (c *CreateIssue) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize GitLab client: %w", err)
 	}
 
-	// Convert assignees from []string to []int
 	var assigneeIDs []int
 	for _, idStr := range config.Assignees {
 		var id int
@@ -149,11 +175,21 @@ func (c *CreateIssue) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
+	var milestoneID *int
+	if config.MilestoneID != "" {
+		var id int
+		if _, err := fmt.Sscanf(config.MilestoneID, "%d", &id); err == nil {
+			milestoneID = &id
+		}
+	}
+
 	req := &IssueRequest{
 		Title:       config.Title,
 		Description: config.Body,
-		Labels:      config.Labels,
+		Labels:      strings.Join(config.Labels, ","),
 		AssigneeIDs: assigneeIDs,
+		MilestoneID: milestoneID,
+		DueDate:     config.DueDate,
 	}
 
 	issue, err := client.CreateIssue(context.Background(), config.Project, req)

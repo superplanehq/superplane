@@ -56,39 +56,10 @@ func (c *Client) do(req *http.Request) (*http.Response, error) {
 	return c.httpClient.Do(req)
 }
 
-type Project struct {
-	ID                int    `json:"id"`
-	PathWithNamespace string `json:"path_with_namespace"`
-	WebURL            string `json:"web_url"`
-}
 
-func (c *Client) listProjects() ([]Project, error) {
-	if c.groupID == "" {
-		return nil, fmt.Errorf("groupID is missing")
-	}
 
-	allProjects := []Project{}
-	page := 1
-
-	for {
-		projects, nextPage, err := c.fetchProjectsPage(page)
-		if err != nil {
-			return nil, err
-		}
-
-		allProjects = append(allProjects, projects...)
-
-		if nextPage == "" {
-			break
-		}
-		page++
-	}
-
-	return allProjects, nil
-}
-
-func (c *Client) fetchProjectsPage(page int) ([]Project, string, error) {
-	apiURL := fmt.Sprintf("%s/api/%s/groups/%s/projects?include_subgroups=true&per_page=100&page=%d", c.baseURL, apiVersion, url.PathEscape(c.groupID), page)
+// T is the type of the resource item (e.g. Project, Milestone, User).
+func fetchResourcesPage[T any](c *Client, apiURL string) ([]T, string, error) {
 	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
 	if err != nil {
 		return nil, "", err
@@ -102,24 +73,64 @@ func (c *Client) fetchProjectsPage(page int) ([]Project, string, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == http.StatusNotFound {
-			return nil, "", fmt.Errorf("group not found (404). Please verify that the Group ID '%s' is correct and you have access to it", c.groupID)
+			return nil, "", fmt.Errorf("resource not found: status 404")
 		}
-		return nil, "", fmt.Errorf("failed to list projects: status %d", resp.StatusCode)
+		return nil, "", fmt.Errorf("failed to list resources: status %d", resp.StatusCode)
 	}
 
-	var projects []Project
-	if err := json.NewDecoder(resp.Body).Decode(&projects); err != nil {
-		return nil, "", fmt.Errorf("failed to decode projects: %v", err)
+	var resources []T
+	if err := json.NewDecoder(resp.Body).Decode(&resources); err != nil {
+		return nil, "", fmt.Errorf("failed to decode resources: %v", err)
 	}
 
-	return projects, resp.Header.Get("X-Next-Page"), nil
+	return resources, resp.Header.Get("X-Next-Page"), nil
+}
+
+// urlBuilder is a function that returns the URL for a given page.
+func fetchAllResources[T any](c *Client, urlBuilder func(page int) string) ([]T, error) {
+	var allResources []T
+	page := 1
+
+	for {
+		resources, nextPage, err := fetchResourcesPage[T](c, urlBuilder(page))
+		if err != nil {
+			return nil, err
+		}
+
+		allResources = append(allResources, resources...)
+
+		if nextPage == "" {
+			break
+		}
+		page++
+	}
+
+	return allResources, nil
+}
+
+type Project struct {
+	ID                int    `json:"id"`
+	PathWithNamespace string `json:"path_with_namespace"`
+	WebURL            string `json:"web_url"`
+}
+
+func (c *Client) listProjects() ([]Project, error) {
+	if c.groupID == "" {
+		return nil, fmt.Errorf("groupID is missing")
+	}
+
+	return fetchAllResources[Project](c, func(page int) string {
+		return fmt.Sprintf("%s/api/%s/groups/%s/projects?include_subgroups=true&per_page=100&page=%d", c.baseURL, apiVersion, url.PathEscape(c.groupID), page)
+	})
 }
 
 type IssueRequest struct {
 	Title       string   `json:"title"`
 	Description string   `json:"description,omitempty"`
-	Labels      []string `json:"labels,omitempty"`
+	Labels      string   `json:"labels,omitempty"`
 	AssigneeIDs []int    `json:"assignee_ids,omitempty"`
+	MilestoneID *int     `json:"milestone_id,omitempty"`
+	DueDate     string   `json:"due_date,omitempty"`
 }
 
 type Issue struct {
@@ -178,6 +189,19 @@ func (c *Client) CreateIssue(ctx context.Context, projectID string, req *IssueRe
 	return &issue, nil
 }
 
+type Milestone struct {
+	ID    int    `json:"id"`
+	IID   int    `json:"iid"`
+	Title string `json:"title"`
+	State string `json:"state"`
+}
+
+func (c *Client) ListMilestones(projectID string) ([]Milestone, error) {
+	return fetchAllResources[Milestone](c, func(page int) string {
+		return fmt.Sprintf("%s/api/%s/projects/%s/milestones?per_page=100&page=%d&state=active", c.baseURL, apiVersion, url.PathEscape(projectID), page)
+	})
+}
+
 func (c *Client) getCurrentUser() (*User, error) {
 	apiURL := fmt.Sprintf("%s/api/%s/user", c.baseURL, apiVersion)
 	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
@@ -204,49 +228,9 @@ func (c *Client) getCurrentUser() (*User, error) {
 }
 
 func (c *Client) ListGroupMembers(groupID string) ([]User, error) {
-	allMembers := []User{}
-	page := 1
-
-	for {
-		members, nextPage, err := c.fetchGroupMembersPage(groupID, page)
-		if err != nil {
-			return nil, err
-		}
-
-		allMembers = append(allMembers, members...)
-
-		if nextPage == "" {
-			break
-		}
-		page++
-	}
-
-	return allMembers, nil
-}
-
-func (c *Client) fetchGroupMembersPage(groupID string, page int) ([]User, string, error) {
-	apiURL := fmt.Sprintf("%s/api/%s/groups/%s/members?per_page=100&page=%d", c.baseURL, apiVersion, url.PathEscape(groupID), page)
-	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
-	if err != nil {
-		return nil, "", err
-	}
-
-	resp, err := c.do(req)
-	if err != nil {
-		return nil, "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, "", fmt.Errorf("failed to list group members: status %d", resp.StatusCode)
-	}
-
-	var members []User
-	if err := json.NewDecoder(resp.Body).Decode(&members); err != nil {
-		return nil, "", fmt.Errorf("failed to decode members: %v", err)
-	}
-
-	return members, resp.Header.Get("X-Next-Page"), nil
+	return fetchAllResources[User](c, func(page int) string {
+		return fmt.Sprintf("%s/api/%s/groups/%s/members?per_page=100&page=%d", c.baseURL, apiVersion, url.PathEscape(groupID), page)
+	})
 }
 
 func (c *Client) FetchIntegrationData() (*User, []Project, error) {

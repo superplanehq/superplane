@@ -30,6 +30,33 @@ func (g *GitLab) ListResources(resourceType string, ctx core.ListResourcesContex
 		return resources, nil
 	}
 
+	if resourceType == "milestone" {
+		projectID := ctx.Parameters["project"]
+		if projectID == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %v", err)
+		}
+
+		milestones, err := client.ListMilestones(projectID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list milestones: %v", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(milestones))
+		for _, m := range milestones {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: m.Title,
+				ID:   fmt.Sprintf("%d", m.ID),
+			})
+		}
+		return resources, nil
+	}
+
 	if resourceType != "repository" {
 		return []core.IntegrationResource{}, nil
 	}

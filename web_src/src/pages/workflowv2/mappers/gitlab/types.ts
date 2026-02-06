@@ -14,6 +14,15 @@ export interface Issue {
   author: User;
   type: string;
   web_url: string;
+  milestone?: Milestone;
+  due_date?: string;
+}
+
+export interface Milestone {
+  id: number;
+  iid: number;
+  title: string;
+  state: string;
 }
 
 export interface User {

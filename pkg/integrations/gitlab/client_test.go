@@ -266,3 +266,90 @@ func Test__Client__ListGroupMembers(t *testing.T) {
 		assert.Equal(t, "user2", members[1].Username)
 	})
 }
+
+func Test__Client__ListMilestones(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `[
+					{"id": 1, "iid": 1, "title": "v1.0", "state": "active"},
+					{"id": 2, "iid": 2, "title": "v2.0", "state": "active"}
+				]`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		milestones, err := client.ListMilestones("456")
+		require.NoError(t, err)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/milestones?per_page=100&page=1&state=active", mockClient.Requests[0].URL.String())
+		assert.Equal(t, "token", mockClient.Requests[0].Header.Get("PRIVATE-TOKEN"))
+
+		require.Len(t, milestones, 2)
+		assert.Equal(t, 1, milestones[0].ID)
+		assert.Equal(t, "v1.0", milestones[0].Title)
+		assert.Equal(t, 2, milestones[1].ID)
+		assert.Equal(t, "v2.0", milestones[1].Title)
+	})
+
+	t.Run("pagination", func(t *testing.T) {
+		resp1 := GitlabMockResponse(http.StatusOK, `[{"id": 1, "iid": 1, "title": "v1.0", "state": "active"}]`)
+		resp1.Header.Set("X-Next-Page", "2")
+
+		resp2 := GitlabMockResponse(http.StatusOK, `[{"id": 2, "iid": 2, "title": "v2.0", "state": "active"}]`)
+
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				resp1,
+				resp2,
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		milestones, err := client.ListMilestones("456")
+		require.NoError(t, err)
+
+		require.Len(t, mockClient.Requests, 2)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/milestones?per_page=100&page=1&state=active", mockClient.Requests[0].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/milestones?per_page=100&page=2&state=active", mockClient.Requests[1].URL.String())
+
+		require.Len(t, milestones, 2)
+		assert.Equal(t, "v1.0", milestones[0].Title)
+		assert.Equal(t, "v2.0", milestones[1].Title)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"error": "not found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		_, err := client.ListMilestones("456")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "status 404")
+	})
+}

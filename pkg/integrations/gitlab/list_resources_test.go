@@ -87,4 +87,50 @@ func Test__GitLab__ListResources(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to decode metadata")
 	})
+
+	t.Run("returns list of milestones for project", func(t *testing.T) {
+		ctx := core.ListResourcesContext{
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseUrl":             "https://gitlab.com",
+					"groupId":             "123",
+					"authType":            AuthTypePersonalAccessToken,
+					"personalAccessToken": "token",
+				},
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					GitlabMockResponse(http.StatusOK, `[
+						{"id": 1, "iid": 1, "title": "v1.0", "state": "active"},
+						{"id": 2, "iid": 2, "title": "v2.0", "state": "active"}
+					]`),
+				},
+			},
+			Parameters: map[string]string{
+				"project": "456",
+			},
+		}
+
+		resources, err := g.ListResources("milestone", ctx)
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 2)
+		assert.Equal(t, "1", resources[0].ID)
+		assert.Equal(t, "v1.0", resources[0].Name)
+		assert.Equal(t, "milestone", resources[0].Type)
+		assert.Equal(t, "2", resources[1].ID)
+		assert.Equal(t, "v2.0", resources[1].Name)
+	})
+
+	t.Run("returns empty list for milestone without project", func(t *testing.T) {
+		ctx := core.ListResourcesContext{
+			Integration: &contexts.IntegrationContext{},
+			Parameters:  map[string]string{},
+		}
+
+		resources, err := g.ListResources("milestone", ctx)
+
+		require.NoError(t, err)
+		assert.Empty(t, resources)
+	})
 }

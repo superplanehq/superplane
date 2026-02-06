@@ -67,5 +67,13 @@ function getDetailsForIssue(issue: Issue): Record<string, string> {
     details["Assignees"] = issue.assignees.map((assignee) => assignee.username).join(", ");
   }
 
+  if (issue.milestone) {
+    details["Milestone"] = issue.milestone.title;
+  }
+
+  if (issue.due_date) {
+    details["Due Date"] = issue.due_date;
+  }
+
   return details;
 }
