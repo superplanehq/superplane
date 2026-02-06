@@ -72,7 +72,7 @@ func (c *IntegrationSubscriptionContext) sendMessageToComponent(message any) err
 	}
 
 	return integrationComponent.OnIntegrationMessage(core.IntegrationMessageContext{
-		HTTP:              NewHTTPContext(c.registry.GetHTTPClient()),
+		HTTP:              c.registry.HTTPContext(),
 		Configuration:     c.node.Configuration.Data(),
 		NodeMetadata:      NewNodeMetadataContext(c.tx, c.node),
 		Integration:       c.integrationCtx,
@@ -98,7 +98,7 @@ func (c *IntegrationSubscriptionContext) findExecutionByKV(key string, value str
 		WorkflowID:     execution.WorkflowID.String(),
 		NodeID:         execution.NodeID,
 		Configuration:  execution.Configuration.Data(),
-		HTTP:           NewHTTPContext(c.registry.GetHTTPClient()),
+		HTTP:           c.registry.HTTPContext(),
 		Metadata:       NewExecutionMetadataContext(c.tx, execution),
 		NodeMetadata:   NewNodeMetadataContext(c.tx, c.node),
 		ExecutionState: NewExecutionStateContext(c.tx, execution),
@@ -126,7 +126,7 @@ func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error
 	}
 
 	return integrationTrigger.OnIntegrationMessage(core.IntegrationMessageContext{
-		HTTP:              NewHTTPContext(c.registry.GetHTTPClient()),
+		HTTP:              c.registry.HTTPContext(),
 		Configuration:     c.node.Configuration.Data(),
 		NodeMetadata:      NewNodeMetadataContext(c.tx, c.node),
 		Integration:       c.integrationCtx,
