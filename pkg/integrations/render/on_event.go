@@ -89,9 +89,7 @@ Render webhooks are validated using the secret generated when SuperPlane creates
 
 ## Event Data
 
-The default output emits the full webhook payload, including fields like ` + "`type`" + `, ` + "`timestamp`" + `, ` + "`data.id`" + `, ` + "`data.serviceId`" + `, ` + "`data.serviceName`" + `, and ` + "`data.status`" + ` (when present).
-The emitted payload type is dynamic and based on the Render event type (for example: ` + "`build_ended`" + ` -> ` + "`render.buildEnded`" + `).
-`
+The default output emits the webhook payload data, including fields like ` + "`data.id`" + `, ` + "`data.serviceId`" + `, ` + "`data.serviceName`" + `, and ` + "`data.status`" + ` (when present).`
 }
 
 func (t *OnEvent) Icon() string {

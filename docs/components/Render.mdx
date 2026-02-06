@@ -59,7 +59,7 @@ Render webhooks are validated using the secret generated when SuperPlane creates
 
 ### Event Data
 
-The default output emits the full webhook payload, including fields like `type`, `timestamp`, `data.id`, `data.serviceId`, `data.serviceName`, and `data.status` (when present).
+The default output emits the webhook payload data, including fields like `data.id`, `data.serviceId`, `data.serviceName`, and `data.status` (when present).
 
 ### Example Data
 
@@ -73,7 +73,7 @@ The default output emits the full webhook payload, including fields like `type`,
     "status": "succeeded"
   },
   "timestamp": "2026-02-05T16:00:01.000000Z",
-  "type": "deploy_ended"
+  "type": "render.deployEnded"
 }
 ```
 
