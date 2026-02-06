@@ -119,7 +119,7 @@ func Test__Render_OnEvent__HandleWebhook(t *testing.T) {
 		require.NoError(t, webhookErr)
 		require.Equal(t, 1, eventCtx.Count())
 		assert.Equal(t, "render.deploy.ended", eventCtx.Payloads[0].Type)
-		assert.Equal(t, payload, eventCtx.Payloads[0].Data)
+		assert.Equal(t, payload["data"], eventCtx.Payloads[0].Data)
 	})
 
 	t.Run("service name filter does not match -> ignored", func(t *testing.T) {
@@ -160,7 +160,7 @@ func Test__Render_OnEvent__HandleWebhook(t *testing.T) {
 		require.NoError(t, webhookErr)
 		require.Equal(t, 1, eventCtx.Count())
 		assert.Equal(t, "render.deploy.ended", eventCtx.Payloads[0].Type)
-		assert.Equal(t, payload, eventCtx.Payloads[0].Data)
+		assert.Equal(t, payload["data"], eventCtx.Payloads[0].Data)
 	})
 
 	t.Run("multiple signatures header -> accepts matching v1 signature", func(t *testing.T) {
@@ -185,7 +185,7 @@ func Test__Render_OnEvent__HandleWebhook(t *testing.T) {
 		require.NoError(t, webhookErr)
 		require.Equal(t, 1, eventCtx.Count())
 		assert.Equal(t, "render.deploy.ended", eventCtx.Payloads[0].Type)
-		assert.Equal(t, payload, eventCtx.Payloads[0].Data)
+		assert.Equal(t, payload["data"], eventCtx.Payloads[0].Data)
 	})
 
 	t.Run("whsec secret format -> accepts decoded signing key", func(t *testing.T) {
@@ -206,7 +206,7 @@ func Test__Render_OnEvent__HandleWebhook(t *testing.T) {
 		require.NoError(t, webhookErr)
 		require.Equal(t, 1, eventCtx.Count())
 		assert.Equal(t, "render.deploy.ended", eventCtx.Payloads[0].Type)
-		assert.Equal(t, payload, eventCtx.Payloads[0].Data)
+		assert.Equal(t, payload["data"], eventCtx.Payloads[0].Data)
 	})
 }
 
