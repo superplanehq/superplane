@@ -61,12 +61,12 @@ func (m *mockIntegrationContext) Error(message string) {
 }
 
 // Stubs for other interface methods
-func (m *mockIntegrationContext) ID() uuid.UUID               { return uuid.New() }
-func (m *mockIntegrationContext) GetMetadata() any            { return nil }
-func (m *mockIntegrationContext) SetMetadata(any)             {}
+func (m *mockIntegrationContext) ID() uuid.UUID                       { return uuid.New() }
+func (m *mockIntegrationContext) GetMetadata() any                    { return nil }
+func (m *mockIntegrationContext) SetMetadata(any)                     {}
 func (m *mockIntegrationContext) NewBrowserAction(core.BrowserAction) {}
-func (m *mockIntegrationContext) RemoveBrowserAction()        {}
-func (m *mockIntegrationContext) SetSecret(string, []byte) error { return nil }
+func (m *mockIntegrationContext) RemoveBrowserAction()                {}
+func (m *mockIntegrationContext) SetSecret(string, []byte) error      { return nil }
 func (m *mockIntegrationContext) GetSecrets() ([]core.IntegrationSecret, error) {
 	return nil, nil
 }
@@ -117,7 +117,6 @@ func TestClaude_Configuration(t *testing.T) {
 		}
 	}
 }
-
 
 func TestClaude_Sync(t *testing.T) {
 	logger := logrus.NewEntry(logrus.New())

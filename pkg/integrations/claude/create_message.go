@@ -2,12 +2,12 @@ package claude
 
 import (
 	"fmt"
-	"net/http"
-	"strings"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"net/http"
+	"strings"
 )
 
 const MessagePayloadType = "claude.message"
@@ -15,10 +15,10 @@ const MessagePayloadType = "claude.message"
 type CreateMessage struct{}
 
 type CreateMessageSpec struct {
-	Model         string  `json:"model"`
-	Prompt        string  `json:"prompt"`
-	SystemMessage string  `json:"systemMessage"`
-	MaxTokens     int     `json:"maxTokens"`
+	Model         string   `json:"model"`
+	Prompt        string   `json:"prompt"`
+	SystemMessage string   `json:"systemMessage"`
+	MaxTokens     int      `json:"maxTokens"`
 	Temperature   *float64 `json:"temperature"`
 }
 
@@ -124,7 +124,7 @@ func (c *CreateMessage) Configuration() []configuration.Field {
 			Label:       "Max Tokens",
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
-			Default:	 "4096",
+			Default:     "4096",
 			Description: "Maximum number of tokens to generate e.g. Defaults to 4096.",
 		},
 		{
@@ -173,8 +173,8 @@ func (c *CreateMessage) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if spec.MaxTokens < 1 {
-        return fmt.Errorf("maxTokens must be at least 1")
-    }
+		return fmt.Errorf("maxTokens must be at least 1")
+	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {

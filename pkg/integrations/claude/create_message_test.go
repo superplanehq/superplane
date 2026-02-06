@@ -3,26 +3,26 @@ package claude
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"io"
 	"net/http"
 	"testing"
-	"github.com/superplanehq/superplane/pkg/configuration"
-	"github.com/superplanehq/superplane/pkg/core"
 )
 
 // --- Mocks ---
 
 // mockExecutionState implements core.ExecutionStateContext
 type mockExecutionState struct {
-	EmittedChannel     string
-	EmittedType        string
-	EmittedPayloads    []any
-	Finished           bool
-	Failed             bool
+	EmittedChannel      string
+	EmittedType         string
+	EmittedPayloads     []any
+	Finished            bool
+	Failed              bool
 	FailReason, FailMsg string
 }
 
-func (m *mockExecutionState) IsFinished() bool { return m.Finished }
+func (m *mockExecutionState) IsFinished() bool              { return m.Finished }
 func (m *mockExecutionState) SetKV(key, value string) error { return nil }
 
 func (m *mockExecutionState) Emit(channel, payloadType string, payloads []any) error {
@@ -142,11 +142,11 @@ func TestCreateMessage_Execute(t *testing.T) {
 	}`
 
 	tests := []struct {
-		name           string
-		config         map[string]interface{}
-		mockResponse   func(*http.Request) *http.Response
-		expectError    bool
-		expectEmission bool
+		name            string
+		config          map[string]interface{}
+		mockResponse    func(*http.Request) *http.Response
+		expectError     bool
+		expectEmission  bool
 		validatePayload func(*testing.T, MessagePayload)
 	}{
 		{

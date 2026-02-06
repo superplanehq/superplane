@@ -52,14 +52,14 @@ func (m *mockIntegrationContextForClient) GetConfig(name string) ([]byte, error)
 }
 
 // Stubs to satisfy the core.IntegrationContext interface
-func (m *mockIntegrationContextForClient) ID() uuid.UUID               { return uuid.New() }
-func (m *mockIntegrationContextForClient) GetMetadata() any            { return nil }
-func (m *mockIntegrationContextForClient) SetMetadata(any)             {}
-func (m *mockIntegrationContextForClient) Ready()                      {}
-func (m *mockIntegrationContextForClient) Error(message string)        {}
+func (m *mockIntegrationContextForClient) ID() uuid.UUID                       { return uuid.New() }
+func (m *mockIntegrationContextForClient) GetMetadata() any                    { return nil }
+func (m *mockIntegrationContextForClient) SetMetadata(any)                     {}
+func (m *mockIntegrationContextForClient) Ready()                              {}
+func (m *mockIntegrationContextForClient) Error(message string)                {}
 func (m *mockIntegrationContextForClient) NewBrowserAction(core.BrowserAction) {}
-func (m *mockIntegrationContextForClient) RemoveBrowserAction()        {}
-func (m *mockIntegrationContextForClient) SetSecret(string, []byte) error { return nil }
+func (m *mockIntegrationContextForClient) RemoveBrowserAction()                {}
+func (m *mockIntegrationContextForClient) SetSecret(string, []byte) error      { return nil }
 func (m *mockIntegrationContextForClient) GetSecrets() ([]core.IntegrationSecret, error) {
 	return nil, nil
 }
