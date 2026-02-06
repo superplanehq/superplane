@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"net/http"
 	"slices"
@@ -71,7 +72,7 @@ func verifyWebhookToken(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusInternalServerError, fmt.Errorf("error getting webhook secret: %v", err)
 	}
 
-	if token != string(secret) {
+	if subtle.ConstantTimeCompare([]byte(token), secret) != 1 {
 		return http.StatusForbidden, fmt.Errorf("invalid webhook token")
 	}
 
