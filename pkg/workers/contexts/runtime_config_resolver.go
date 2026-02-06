@@ -40,7 +40,7 @@ func ResolveRuntimeConfig(
 func resolveRuntimeValue(value any, resolveString func(string) (any, error)) (any, error) {
 	switch v := value.(type) {
 	case string:
-		if strings.Contains(v, "{{") && strings.Contains(v, "}}") {
+		if stringContainsDeferredSecretExpression(v) {
 			return resolveString(v)
 		}
 		return v, nil

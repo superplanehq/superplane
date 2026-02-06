@@ -49,6 +49,65 @@ func Test_ResolveRuntimeConfig_ResolvesSecretsExpression(t *testing.T) {
 	assert.Equal(t, "sk-test-123", resolved["api_key"])
 }
 
+func Test_ResolveRuntimeConfig_ResolvesSecretsTransformedWithFunction(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	encryptor := &crypto.NoOpEncryptor{}
+	secretName := "api-keys"
+	secretData := map[string]string{"token": "sk-test-123"}
+	raw, err := json.Marshal(secretData)
+	require.NoError(t, err)
+	encrypted, err := encryptor.Encrypt(context.Background(), raw, []byte(secretName))
+	require.NoError(t, err)
+
+	_, err = models.CreateSecret(secretName, secrets.ProviderLocal, r.User.String(), models.DomainTypeOrganization, r.Organization.ID, encrypted)
+	require.NoError(t, err)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent}},
+		[]models.Edge{},
+	)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithInput(map[string]any{"node-1": map[string]any{"x": "y"}})
+
+	config := map[string]any{
+		"authorization": `{{ "Bearer " + secrets("api-keys").token }}`,
+	}
+
+	resolved, err := ResolveRuntimeConfig(config, builder, database.Conn(), encryptor, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "Bearer sk-test-123", resolved["authorization"])
+}
+
+func Test_ResolveRuntimeConfig_ExpressionWithoutSecrets_LeftUnchanged(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{NodeID: "node-1", Name: "node-1", Type: models.NodeTypeComponent}},
+		[]models.Edge{},
+	)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).WithInput(map[string]any{"node-1": map[string]any{"x": "y"}})
+
+	// String has {{ }} but no secrets() — same check as build-time: do not re-evaluate at runtime.
+	config := map[string]any{
+		"expr": `{{ root().x }}`,
+	}
+
+	resolved, err := ResolveRuntimeConfig(config, builder, database.Conn(), &crypto.NoOpEncryptor{}, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, `{{ root().x }}`, resolved["expr"])
+}
+
 func Test_ResolveRuntimeConfig_NoExpressions_ReturnsCopy(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -105,4 +164,13 @@ func Test_expressionContainsSecrets(t *testing.T) {
 	assert.False(t, expressionContainsSecrets(`previous().value`))
 	// String literal containing "secrets(" is not a call, so AST returns false.
 	assert.False(t, expressionContainsSecrets(`"literal secrets( text"`))
+}
+
+func Test_stringContainsDeferredSecretExpression(t *testing.T) {
+	assert.True(t, stringContainsDeferredSecretExpression(`{{ secrets("api").token }}`))
+	assert.True(t, stringContainsDeferredSecretExpression(`Bearer {{ secrets("api").token }}`))
+	assert.True(t, stringContainsDeferredSecretExpression(`{{ "Bearer " + secrets("api").token }}`))
+	assert.False(t, stringContainsDeferredSecretExpression(`{{ root().x }}`))
+	assert.False(t, stringContainsDeferredSecretExpression(`plain text`))
+	assert.False(t, stringContainsDeferredSecretExpression(``))
 }

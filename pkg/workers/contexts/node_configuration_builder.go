@@ -215,36 +215,25 @@ func asAnyMap(value any) (map[string]any, bool) {
 	}
 }
 
-// expressionContainsSecrets reports whether the expression contains a call to
-// secrets() (and must be deferred to runtime resolution). It parses the
-// expression AST and looks for a CallNode with callee "secrets"; if parsing
-// fails, it falls back to a string check so malformed expressions are still
-// deferred and will fail at runtime.
-func expressionContainsSecrets(expression string) bool {
-	tree, err := parser.Parse(expression)
-	if err != nil {
-		return strings.Contains(expression, "secrets(")
+// stringContainsDeferredSecretExpression reports whether s contains at least one
+// {{ ... }} segment whose inner expression would be deferred at build time
+// (i.e. contains a secrets() call). Used at runtime to only re-evaluate strings
+// that were left unresolved.
+func stringContainsDeferredSecretExpression(s string) bool {
+	if !expressionRegex.MatchString(s) {
+		return false
 	}
-	collector := &secretsCallCollector{}
-	ast.Walk(&tree.Node, collector)
-	return collector.found
-}
-
-type secretsCallCollector struct {
-	found bool
-}
-
-func (c *secretsCallCollector) Visit(node *ast.Node) {
-	if c.found {
-		return
+	matches := expressionRegex.FindAllStringSubmatch(s, -1)
+	for _, m := range matches {
+		if len(m) != 2 {
+			continue
+		}
+		inner := strings.TrimSpace(m[1])
+		if expressionContainsSecrets(inner) {
+			return true
+		}
 	}
-	call, ok := (*node).(*ast.CallNode)
-	if !ok {
-		return
-	}
-	if id, ok := call.Callee.(*ast.IdentifierNode); ok && id.Value == "secrets" {
-		c.found = true
-	}
+	return false
 }
 
 func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, error) {

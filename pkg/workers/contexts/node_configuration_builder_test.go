@@ -1211,14 +1211,16 @@ func Test_NodeConfigurationBuilder_ExpressionsContainingSecrets_LeftUnresolved(t
 		WithInput(map[string]any{"node-1": map[string]any{"x": "y"}})
 
 	configuration := map[string]any{
-		"api_key": `{{ secrets("my-secret").token }}`,
-		"mixed":   `prefix {{ secrets("other").key }} suffix`,
+		"api_key":   `{{ secrets("my-secret").token }}`,
+		"mixed":     `prefix {{ secrets("other").key }} suffix`,
+		"transformed": `{{ "Bearer " + secrets("api").token }}`,
 	}
 
 	result, err := builder.Build(configuration)
 	require.NoError(t, err)
 	assert.Equal(t, `{{ secrets("my-secret").token }}`, result["api_key"])
 	assert.Equal(t, `prefix {{ secrets("other").key }} suffix`, result["mixed"])
+	assert.Equal(t, `{{ "Bearer " + secrets("api").token }}`, result["transformed"])
 }
 
 func Test_NodeConfigurationBuilder_DisallowExpression_ListItems(t *testing.T) {
