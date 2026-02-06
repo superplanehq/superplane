@@ -66,47 +66,6 @@ func (i *OnIssue) Color() string {
 	return "orange"
 }
 
-func (i *OnIssue) ExampleData() map[string]any {
-	return map[string]any{
-		"object_kind": "issue",
-		"event_type":  "issue",
-		"user": map[string]any{
-			"id":       1,
-			"name":     "John Doe",
-			"username": "johndoe",
-		},
-		"project": map[string]any{
-			"id":                  15,
-			"name":                "my-project",
-			"path_with_namespace": "group/my-project",
-			"web_url":             "https://gitlab.com/group/my-project",
-		},
-		"object_attributes": map[string]any{
-			"id":          301,
-			"iid":         1,
-			"title":       "Example Issue",
-			"description": "This is an example issue description",
-			"state":       "opened",
-			"action":      "open",
-			"url":         "https://gitlab.com/group/my-project/-/issues/1",
-		},
-		"labels": []map[string]any{
-			{
-				"id":    206,
-				"title": "bug",
-				"color": "#dc3545",
-			},
-		},
-		"assignees": []map[string]any{
-			{
-				"id":       1,
-				"name":     "John Doe",
-				"username": "johndoe",
-			},
-		},
-	}
-}
-
 func (i *OnIssue) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

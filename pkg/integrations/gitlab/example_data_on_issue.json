@@ -30,15 +30,30 @@
     "action": "open",
     "created_at": "2026-02-05T14:00:00Z",
     "updated_at": "2026-02-05T14:00:00Z",
-    "url": "https://gitlab.com/group/my-project/-/issues/1",
-    "labels": [
-      {
-        "id": 206,
-        "title": "bug",
-        "color": "#FF0000"
-      }
-    ]
+    "url": "https://gitlab.com/group/my-project/-/issues/1"
   },
+  "labels": [
+    {
+      "id": 206,
+      "title": "bug",
+      "color": "#dc3545",
+      "project_id": 15,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z",
+      "template": false,
+      "description": "Bug reports",
+      "type": "ProjectLabel",
+      "group_id": null
+    }
+  ],
+  "assignees": [
+    {
+      "id": 1,
+      "name": "John Doe",
+      "username": "johndoe",
+      "avatar_url": "https://www.gravatar.com/avatar/abc123"
+    }
+  ],
   "repository": {
     "name": "my-project",
     "url": "git@gitlab.com:group/my-project.git",
