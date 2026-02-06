@@ -242,33 +242,12 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 			return match
 		}
 
-		inner := strings.TrimSpace(matches[1])
-		if expressionContainsSecrets(inner) {
-			if b.runtimeResolution != nil {
-				value, e := b.resolveExpressionWithSecrets(inner)
-				if e != nil {
-					err = e
-					return ""
-				}
-				return fmt.Sprintf("%v", value)
-			}
-			return match
-		}
-		if b.runtimeResolution != nil {
-			return match
-		}
-
 		value, e := b.resolveExpression(matches[1])
 		if e != nil {
 			err = e
 			return ""
 		}
 
-		repl := fmt.Sprintf("%v", value)
-		if b.runtimeResolution == nil &&
-			(stringContainsDeferredSecretExpression(repl) || strings.Contains(repl, "secrets(")) {
-			return match
-		}
 		return repl
 	})
 
@@ -324,6 +303,12 @@ func (b *NodeConfigurationBuilder) BuildExpressionEnv(expression string) (map[st
 }
 
 func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, error) {
+	if b.runtimeResolution != nil && !expressionContainsSecrets(expression) {
+		// The expression was already completely resolved, return it directly without the 
+		// overhead of setting up the expression environment and running the expression engine
+		return expression, nil
+	}
+
 	referencedNodes, err := parseReferencedNodes(expression)
 	if err != nil {
 		return "", err
@@ -365,6 +350,18 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 			}
 			return b.resolvePreviousPayload(depth)
 		}),
+		expr.Function("secrets", func(params ...any) (any, error) {
+			if len(params) != 1 {
+				return nil, fmt.Errorf("secrets() takes exactly one argument (secret name)")
+			}
+
+			name, ok := params[0].(string)
+			if !ok {
+				return nil, fmt.Errorf("secrets() argument must be a string")
+			}
+
+			return secretsFunc(name)
+		}
 	}
 
 	vm, err := expr.Compile(expression, exprOptions...)
