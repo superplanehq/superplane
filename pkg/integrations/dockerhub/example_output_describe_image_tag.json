@@ -1,97 +1,26 @@
 {
   "type": "dockerhub.tags",
   "data": {
-    "count": 3,
-    "results": [
+    "name": "latest",
+    "full_size": 142857600,
+    "last_updated": "2026-02-01T10:30:00.000000Z",
+    "digest": "sha256:abc123def456789...",
+    "images": [
       {
-        "creator": 12345,
-        "id": 98765,
-        "last_updated": "2026-02-01T10:30:00.000000Z",
-        "last_updater": 12345,
-        "last_updater_username": "johndoe",
-        "name": "latest",
-        "repository": 54321,
-        "full_size": 142857600,
-        "v2": true,
-        "tag_status": "active",
-        "tag_last_pushed": "2026-02-01T10:30:00.000000Z",
-        "media_type": "application/vnd.docker.distribution.manifest.list.v2+json",
-        "content_type": "image",
-        "digest": "sha256:abc123def456789...",
-        "images": [
-          {
-            "architecture": "amd64",
-            "features": "",
-            "digest": "sha256:def456789abc123...",
-            "os": "linux",
-            "size": 71428800,
-            "status": "active",
-            "last_pushed": "2026-02-01T10:30:00.000000Z"
-          },
-          {
-            "architecture": "arm64",
-            "features": "",
-            "digest": "sha256:789abc123def456...",
-            "os": "linux",
-            "size": 68500000,
-            "status": "active",
-            "last_pushed": "2026-02-01T10:30:00.000000Z"
-          }
-        ]
+        "architecture": "amd64",
+        "os": "linux",
+        "size": 71428800,
+        "digest": "sha256:def456789abc123...",
+        "status": "active",
+        "last_pushed": "2026-02-01T10:30:00.000000Z"
       },
       {
-        "creator": 12345,
-        "id": 98764,
-        "last_updated": "2026-01-28T15:45:00.000000Z",
-        "last_updater": 12345,
-        "last_updater_username": "johndoe",
-        "name": "v1.2.3",
-        "repository": 54321,
-        "full_size": 140000000,
-        "v2": true,
-        "tag_status": "active",
-        "tag_last_pushed": "2026-01-28T15:45:00.000000Z",
-        "media_type": "application/vnd.docker.distribution.manifest.list.v2+json",
-        "content_type": "image",
-        "digest": "sha256:xyz789abc123def...",
-        "images": [
-          {
-            "architecture": "amd64",
-            "features": "",
-            "digest": "sha256:123def456789abc...",
-            "os": "linux",
-            "size": 70000000,
-            "status": "active",
-            "last_pushed": "2026-01-28T15:45:00.000000Z"
-          }
-        ]
-      },
-      {
-        "creator": 12345,
-        "id": 98763,
-        "last_updated": "2026-01-20T09:15:00.000000Z",
-        "last_updater": 12345,
-        "last_updater_username": "johndoe",
-        "name": "v1.2.2",
-        "repository": 54321,
-        "full_size": 138000000,
-        "v2": true,
-        "tag_status": "active",
-        "tag_last_pushed": "2026-01-20T09:15:00.000000Z",
-        "media_type": "application/vnd.docker.distribution.manifest.list.v2+json",
-        "content_type": "image",
-        "digest": "sha256:old789abc123def...",
-        "images": [
-          {
-            "architecture": "amd64",
-            "features": "",
-            "digest": "sha256:old123def456789...",
-            "os": "linux",
-            "size": 69000000,
-            "status": "active",
-            "last_pushed": "2026-01-20T09:15:00.000000Z"
-          }
-        ]
+        "architecture": "arm64",
+        "os": "linux",
+        "size": 68500000,
+        "digest": "sha256:789abc123def456...",
+        "status": "active",
+        "last_pushed": "2026-02-01T10:30:00.000000Z"
       }
     ]
   },
