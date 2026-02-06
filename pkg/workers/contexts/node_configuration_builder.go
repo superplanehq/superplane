@@ -410,7 +410,7 @@ func (b *NodeConfigurationBuilder) resolveExpressionWithSecrets(expression strin
 	secretsFunc := func(name string) (map[string]string, error) {
 		provider, err := secrets.NewProvider(b.tx, rr.encryptor, name, models.DomainTypeOrganization, rr.orgID)
 		if err != nil {
-			return nil, fmt.Errorf("secret not found: %s", name)
+			return nil, fmt.Errorf("secret \"%s\" not found", name)
 		}
 		return provider.Load(context.Background())
 	}
