@@ -103,4 +103,6 @@ func Test_expressionContainsSecrets(t *testing.T) {
 	assert.False(t, expressionContainsSecrets(`$.trigger.body`))
 	assert.False(t, expressionContainsSecrets(`root().x`))
 	assert.False(t, expressionContainsSecrets(`previous().value`))
+	// String literal containing "secrets(" is not a call, so AST returns false.
+	assert.False(t, expressionContainsSecrets(`"literal secrets( text"`))
 }

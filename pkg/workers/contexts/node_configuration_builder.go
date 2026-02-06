@@ -215,10 +215,36 @@ func asAnyMap(value any) (map[string]any, bool) {
 	}
 }
 
-// expressionContainsSecrets reports whether the expression references secrets()
-// (and must be deferred to runtime resolution).
+// expressionContainsSecrets reports whether the expression contains a call to
+// secrets() (and must be deferred to runtime resolution). It parses the
+// expression AST and looks for a CallNode with callee "secrets"; if parsing
+// fails, it falls back to a string check so malformed expressions are still
+// deferred and will fail at runtime.
 func expressionContainsSecrets(expression string) bool {
-	return strings.Contains(expression, "secrets(")
+	tree, err := parser.Parse(expression)
+	if err != nil {
+		return strings.Contains(expression, "secrets(")
+	}
+	collector := &secretsCallCollector{}
+	ast.Walk(&tree.Node, collector)
+	return collector.found
+}
+
+type secretsCallCollector struct {
+	found bool
+}
+
+func (c *secretsCallCollector) Visit(node *ast.Node) {
+	if c.found {
+		return
+	}
+	call, ok := (*node).(*ast.CallNode)
+	if !ok {
+		return
+	}
+	if id, ok := call.Callee.(*ast.IdentifierNode); ok && id.Value == "secrets" {
+		c.found = true
+	}
 }
 
 func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, error) {
@@ -299,24 +325,11 @@ func (b *NodeConfigurationBuilder) BuildExpressionEnv(expression string) (map[st
 	return env, nil
 }
 
-func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, error) {
-	referencedNodes, err := parseReferencedNodes(expression)
-	if err != nil {
-		return "", err
-	}
-
-	messageChain, err := b.buildMessageChain(referencedNodes)
-	if err != nil {
-		return "", err
-	}
-
-	env := map[string]any{"$": messageChain}
-
-	if b.parentBlueprintNode != nil {
-		env["config"] = b.parentBlueprintNode.Configuration.Data()
-	}
-
-	exprOptions := []expr.Option{
+// buildExprOptions returns the standard expr options used for expression evaluation
+// everywhere (build-time and runtime). Callers that need secrets() must append
+// that function separately so it is the only difference for runtime config resolution.
+func (b *NodeConfigurationBuilder) buildExprOptions(env map[string]any) []expr.Option {
+	return []expr.Option{
 		expr.Env(env),
 		expr.AsAny(),
 		expr.WithContext("ctx"),
@@ -325,7 +338,6 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 			if len(params) != 0 {
 				return nil, fmt.Errorf("root() takes no arguments")
 			}
-
 			return b.resolveRootPayload()
 		}),
 		expr.Function("previous", func(params ...any) (any, error) {
@@ -340,21 +352,28 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 				}
 				depth = parsedDepth
 			}
-
 			return b.resolvePreviousPayload(depth)
 		}),
 	}
+}
 
-	vm, err := expr.Compile(expression, exprOptions...)
+func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, error) {
+	env, err := b.BuildExpressionEnv(expression)
 	if err != nil {
 		return "", err
 	}
+	if b.parentBlueprintNode != nil {
+		env["config"] = b.parentBlueprintNode.Configuration.Data()
+	}
 
+	vm, err := expr.Compile(expression, b.buildExprOptions(env)...)
+	if err != nil {
+		return "", err
+	}
 	output, err := expr.Run(vm, env)
 	if err != nil {
 		return "", fmt.Errorf("expression evaluation failed: %w", err)
 	}
-
 	return output, nil
 }
 

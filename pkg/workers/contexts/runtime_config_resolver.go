@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/expr-lang/expr"
 	"github.com/google/uuid"
@@ -113,6 +112,9 @@ func resolveStringAtRuntime(
 	return result, nil
 }
 
+// runExpressionAtRuntime evaluates a single expression with the same env and
+// options as build-time (builder.buildExprOptions) plus the secrets() function
+// so deferred secret expressions can be resolved. Secret values must never be persisted.
 func runExpressionAtRuntime(
 	expression string,
 	builder *NodeConfigurationBuilder,
@@ -133,31 +135,8 @@ func runExpressionAtRuntime(
 		return provider.Load(context.Background())
 	}
 
-	exprOptions := []expr.Option{
-		expr.Env(env),
-		expr.AsAny(),
-		expr.WithContext("ctx"),
-		expr.Timezone(time.UTC.String()),
-		expr.Function("root", func(params ...any) (any, error) {
-			if len(params) != 0 {
-				return nil, fmt.Errorf("root() takes no arguments")
-			}
-			return builder.resolveRootPayload()
-		}),
-		expr.Function("previous", func(params ...any) (any, error) {
-			depth := 1
-			if len(params) > 1 {
-				return nil, fmt.Errorf("previous() accepts zero or one argument")
-			}
-			if len(params) == 1 {
-				parsedDepth, err := parseDepth(params[0])
-				if err != nil {
-					return nil, err
-				}
-				depth = parsedDepth
-			}
-			return builder.resolvePreviousPayload(depth)
-		}),
+	exprOptions := append(
+		builder.buildExprOptions(env),
 		expr.Function("secrets", func(params ...any) (any, error) {
 			if len(params) != 1 {
 				return nil, fmt.Errorf("secrets() takes exactly one argument (secret name)")
@@ -168,17 +147,15 @@ func runExpressionAtRuntime(
 			}
 			return secretsFunc(name)
 		}),
-	}
+	)
 
 	vm, err := expr.Compile(expression, exprOptions...)
 	if err != nil {
 		return nil, err
 	}
-
 	output, err := expr.Run(vm, env)
 	if err != nil {
 		return nil, fmt.Errorf("expression evaluation failed: %w", err)
 	}
-
 	return output, nil
 }
