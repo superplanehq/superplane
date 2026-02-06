@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -241,6 +242,53 @@ func Test__HTTPContext__Do__RedirectToBlockedHost(t *testing.T) {
 	assert.Contains(t, err.Error(), "redirect blocked")
 	assert.Contains(t, err.Error(), "access to example.com is not allowed")
 	assert.Equal(t, int32(1), hits.Load())
+}
+
+func Test__HTTPContext__Do__ResponseTooLarge_ContentLength(t *testing.T) {
+	ctx, err := NewHTTPContext(HTTPOptions{
+		MaxResponseBytes: 5,
+	})
+	require.NoError(t, err)
+
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", "6")
+		_, _ = w.Write([]byte("123456"))
+	}))
+	t.Cleanup(testServer.Close)
+
+	req, err := http.NewRequest(http.MethodGet, testServer.URL, nil)
+	require.NoError(t, err)
+
+	_, err = ctx.Do(req)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "response too large")
+}
+
+func Test__HTTPContext__Do__ResponseTooLarge_Streaming(t *testing.T) {
+	ctx, err := NewHTTPContext(HTTPOptions{
+		MaxResponseBytes: 5,
+	})
+	require.NoError(t, err)
+
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+		_, _ = w.Write([]byte("123456"))
+	}))
+	t.Cleanup(testServer.Close)
+
+	req, err := http.NewRequest(http.MethodGet, testServer.URL, nil)
+	require.NoError(t, err)
+
+	resp, err := ctx.Do(req)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = resp.Body.Close() })
+
+	body, err := io.ReadAll(resp.Body)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "response too large")
+	assert.Len(t, body, 5)
 }
 
 func Test__HTTPContext__ValidateIP__DefaultConfiguration(t *testing.T) {
