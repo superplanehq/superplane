@@ -22,9 +22,12 @@ func Test__OnIssue__Configuration(t *testing.T) {
 	trigger := &OnIssue{}
 	config := trigger.Configuration()
 
-	assert.Len(t, config, 2)
+	assert.Len(t, config, 5)
 	assert.Equal(t, "project", config[0].Name)
 	assert.Equal(t, "actions", config[1].Name)
+	assert.Equal(t, "labels", config[2].Name)
+	assert.Equal(t, "assigneeIds", config[3].Name)
+	assert.Equal(t, "state", config[4].Name)
 }
 
 func Test__OnIssue__HandleWebhook__MissingEventHeader(t *testing.T) {

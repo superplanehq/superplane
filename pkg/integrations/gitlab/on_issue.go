@@ -202,7 +202,6 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusBadRequest, fmt.Errorf("missing X-Gitlab-Event header")
 	}
 
-	// GitLab sends "Issue Hook" for issue events
 	if eventType != "Issue Hook" {
 		return http.StatusOK, nil
 	}
@@ -233,17 +232,14 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		}
 	}
 
-	// Filter by Labels
 	if len(config.Labels) > 0 {
 		attrs, ok := data["object_attributes"].(map[string]any)
 		if !ok {
 			return http.StatusBadRequest, fmt.Errorf("invalid object_attributes")
 		}
 
-		// Using a helper to check labels would be cleaner, but let's try to parse here safely
 		eventLabels, ok := attrs["labels"].([]interface{})
 		if !ok {
-			// Try checking if it's nil or different format. If not found, and we require labels, skip.
 			return http.StatusOK, nil
 		}
 
@@ -271,7 +267,6 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	// Filter by Assignees
 	if len(config.AssigneeIDs) > 0 {
 
-		// Checking standard payload: often "assignees" key in the root object.
 		eventAssignees, ok := data["assignees"].([]interface{})
 		if !ok {
 			return http.StatusOK, nil

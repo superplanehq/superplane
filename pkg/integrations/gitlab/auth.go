@@ -128,7 +128,11 @@ type TokenResponse struct {
 
 func (t *TokenResponse) GetExpiration() time.Duration {
 	if t.ExpiresIn > 0 {
-		return time.Duration(t.ExpiresIn/2) * time.Second
+		seconds := t.ExpiresIn / 2
+		if seconds < 1 {
+			seconds = 1
+		}
+		return time.Duration(seconds) * time.Second
 	}
 	return time.Hour
 }
