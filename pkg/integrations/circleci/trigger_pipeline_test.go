@@ -77,8 +77,6 @@ func Test__TriggerPipeline__checkWorkflowsStatus(t *testing.T) {
 }
 
 func Test__TriggerPipeline__buildParameters(t *testing.T) {
-	tp := &TriggerPipeline{}
-
 	t.Run("builds parameters with superplane metadata", func(t *testing.T) {
 		params := []Parameter{
 			{Name: "env", Value: "production"},
