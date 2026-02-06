@@ -230,7 +230,21 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
     );
   }
 
-  const objValue = (value as Record<string, unknown>) ?? {};
+  // Merge schema defaults so visibility/required for nested fields see e.g. authMethod
+  const schemaDefaults = React.useMemo(() => {
+    const acc: Record<string, unknown> = {};
+    schema?.forEach((f) => {
+      if (f.name != null && f.defaultValue !== undefined && f.defaultValue !== null) {
+        acc[f.name] = f.defaultValue;
+      }
+    });
+    return acc;
+  }, [schema]);
+
+  const objValue = React.useMemo(
+    () => ({ ...schemaDefaults, ...((value as Record<string, unknown>) ?? {}) }),
+    [schemaDefaults, value],
+  );
 
   return (
     <div className="border border-gray-300 dark:border-gray-700 rounded-md p-4 space-y-4">

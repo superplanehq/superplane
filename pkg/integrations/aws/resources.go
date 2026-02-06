@@ -13,7 +13,6 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return lambda.ListFunctions(ctx, resourceType)
 
 	case "ecr.repository":
-		ctx.Logger.Infof("listing ECR repositories")
 		return ecr.ListRepositories(ctx, resourceType)
 
 	case "codeartifact.repository":

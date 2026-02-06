@@ -29,6 +29,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitHub repository" />
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
+  <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitHub repository" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
@@ -1117,6 +1118,73 @@ Returns the complete issue object including:
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.issue"
+}
+```
+
+<a id="get-release"></a>
+
+## Get Release
+
+The Get Release component retrieves release information from a GitHub repository.
+
+### Use Cases
+
+- **Release Monitoring**: Get details about a specific release
+- **Deployment Pipelines**: Fetch release assets and metadata for deployment
+- **Version Tracking**: Monitor release status and changelog
+- **CI/CD Integration**: Retrieve release information for build processes
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Release Strategy**: How to find the release (by tag name, by ID, or latest)
+- **Tag Name**: Git tag name of the release (if using tag strategy)
+- **Release ID**: Numeric release ID (if using ID strategy)
+
+### Output
+
+Returns release information including:
+- Release ID, name, and tag name
+- Release body/description
+- Draft and prerelease status
+- Created and published timestamps
+- Author information
+- Asset URLs
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assets": [
+      {
+        "browser_download_url": "https://github.com/acme/widgets/releases/download/v1.2.3/app-v1.2.3.zip",
+        "content_type": "application/zip",
+        "download_count": 42,
+        "id": 1,
+        "label": "Application Bundle",
+        "name": "app-v1.2.3.zip",
+        "size": 1024000
+      }
+    ],
+    "author": {
+      "avatar_url": "https://github.com/images/error/octocat_happy.gif",
+      "html_url": "https://github.com/octocat",
+      "id": 1,
+      "login": "octocat"
+    },
+    "body": "## What's Changed\n\n- Feature A\n- Bug fix B",
+    "created_at": "2026-01-15T10:00:00Z",
+    "draft": false,
+    "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
+    "id": 3001,
+    "name": "Release 1.2.3",
+    "prerelease": false,
+    "published_at": "2026-01-16T12:00:00Z",
+    "tag_name": "v1.2.3"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.release"
 }
 ```
 

@@ -83,7 +83,7 @@ func InvokeNodeTriggerAction(
 		Name:          actionName,
 		Parameters:    parameters,
 		Configuration: node.Configuration.Data(),
-		HTTP:          contexts.NewHTTPContext(registry.GetHTTPClient()),
+		HTTP:          registry.HTTPContext(),
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),

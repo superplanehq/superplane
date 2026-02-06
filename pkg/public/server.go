@@ -23,6 +23,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -167,6 +168,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 
 	grpcGatewayMux := runtime.NewServeMux(
 		runtime.WithIncomingHeaderMatcher(headersMatcher),
+		runtime.SetQueryParameterParser(&grpc.QueryParser{}),
 	)
 
 	opts := []grpcLib.DialOption{grpcLib.WithTransportCredentials(insecure.NewCredentials())}
@@ -407,7 +409,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	//
 	publicRoute.
 		HandleFunc(s.BasePath+"/webhooks/{webhookID}", s.HandleWebhook).
-		Headers("Content-Type", "application/json").
+		HeadersRegexp("Content-Type", `^application/json(?:;\s*charset=utf-8)?$`).
 		Methods("POST")
 
 	//
@@ -501,7 +503,7 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		BaseURL:         s.BaseURL,
 		WebhooksBaseURL: s.WebhooksBaseURL,
 		OrganizationID:  integrationInstance.OrganizationID.String(),
-		HTTP:            contexts.NewHTTPContext(s.registry.GetHTTPClient()),
+		HTTP:            s.registry.HTTPContext(),
 		Integration: contexts.NewIntegrationContext(
 			database.Conn(),
 			nil,
@@ -826,7 +828,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 				NodeID:         execution.NodeID,
 				BaseURL:        s.BaseURL,
 				Configuration:  execution.Configuration.Data(),
-				HTTP:           contexts.NewHTTPContext(s.registry.GetHTTPClient()),
+				HTTP:           s.registry.HTTPContext(),
 				Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 				NodeMetadata:   contexts.NewNodeMetadataContext(tx, &node),
 				ExecutionState: contexts.NewExecutionStateContext(tx, execution),

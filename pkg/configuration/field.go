@@ -32,6 +32,7 @@ const (
 	FieldTypeIntegrationResource = "integration-resource"
 	FieldTypeAnyPredicateList    = "any-predicate-list"
 	FieldTypeGitRef              = "git-ref"
+	FieldTypeSecretKey           = "secret-key"
 )
 
 type Field struct {
@@ -118,7 +119,27 @@ type TypeOptions struct {
 type ResourceTypeOptions struct {
 	Type           string `json:"type"`
 	UseNameAsValue bool   `json:"use_name_as_value,omitempty"`
-	Multi          bool   `json:"multi,omitempty"` // If true, render as multi-select instead of single select
+
+	//
+	// If true, render as multi-select instead of single select
+	//
+	Multi bool `json:"multi,omitempty"`
+
+	//
+	// Additional parameters to be sent as query parameters to the /resources endpoint.
+	// They can be static or come from values of other fields.
+	//
+	Parameters []ParameterRef `json:"parameters,omitempty"`
+}
+
+type ParameterRef struct {
+	Name      string              `json:"name"`
+	Value     *string             `json:"value"`
+	ValueFrom *ParameterValueFrom `json:"value_from"`
+}
+
+type ParameterValueFrom struct {
+	Field string `json:"field"`
 }
 
 /*
