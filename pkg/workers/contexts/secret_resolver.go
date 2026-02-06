@@ -79,6 +79,11 @@ func (r *SecretResolver) CanResolveSecrets() bool {
 	return r.mode == ResolveSecretsImmediately && r.tx != nil && r.encryptor != nil
 }
 
+// ShouldLeaveSecretUnresolved reports whether an expression containing secrets() should be left as-is (not evaluated).
+func ShouldLeaveSecretUnresolved(resolver *SecretResolver, innerExpr string) bool {
+	return IsInjectingUnresolvedSecret(innerExpr) && (resolver == nil || !resolver.CanResolveSecrets())
+}
+
 // IsInjectingUnresolvedSecret reports whether the expression contains a call to secrets(...).
 func IsInjectingUnresolvedSecret(expression string) bool {
 	tree, err := parser.Parse(expression)
