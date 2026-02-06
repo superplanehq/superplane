@@ -7,9 +7,9 @@ import (
 type SecretResolutionMode int
 
 const (
-	ResolveSecretsImmediately SecretResolutionMode = iota	
+	ResolveSecretsImmediately SecretResolutionMode = iota
 	DeferSecretResolution
-}
+)
 
 type SecretResolver struct {
 	mode SecretResolutionMode
