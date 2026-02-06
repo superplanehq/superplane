@@ -111,7 +111,8 @@ func (i *OnIssue) Configuration() []configuration.Field {
 			Name:     "actions",
 			Label:    "Action Filter",
 			Type:     configuration.FieldTypeMultiSelect,
-			Required: false,
+			Required: true,
+			Default:  []string{"open"},
 			TypeOptions: &configuration.TypeOptions{
 				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: []configuration.FieldOption{
@@ -216,7 +217,7 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	if !whitelistedAction(data, config.Actions) {
+	if len(config.Actions) > 0 && !whitelistedAction(data, config.Actions) {
 		return http.StatusOK, nil
 	}
 
