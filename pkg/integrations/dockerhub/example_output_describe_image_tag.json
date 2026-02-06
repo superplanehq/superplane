@@ -1,0 +1,28 @@
+{
+  "type": "dockerhub.tags",
+  "data": {
+    "name": "latest",
+    "full_size": 142857600,
+    "last_updated": "2026-02-01T10:30:00.000000Z",
+    "digest": "sha256:abc123def456789...",
+    "images": [
+      {
+        "architecture": "amd64",
+        "os": "linux",
+        "size": 71428800,
+        "digest": "sha256:def456789abc123...",
+        "status": "active",
+        "last_pushed": "2026-02-01T10:30:00.000000Z"
+      },
+      {
+        "architecture": "arm64",
+        "os": "linux",
+        "size": 68500000,
+        "digest": "sha256:789abc123def456...",
+        "status": "active",
+        "last_pushed": "2026-02-01T10:30:00.000000Z"
+      }
+    ]
+  },
+  "timestamp": "2026-02-01T12:00:00Z"
+}
