@@ -16,6 +16,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -44,8 +45,13 @@ func Test__OnEmailEvent__HandleWebhook_Filters(t *testing.T) {
 			"Content-Type": []string{"application/json"},
 		},
 		Configuration: map[string]any{
-			"eventTypes":     []string{"delivered"},
-			"categoryFilter": "order-*",
+			"eventTypes": []string{"delivered"},
+			"categoryFilter": []map[string]any{
+				{
+					"type":  configuration.PredicateTypeMatches,
+					"value": "order-.*",
+				},
+			},
 		},
 	})
 
