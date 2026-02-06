@@ -215,11 +215,9 @@ func (t *TriggerPipeline) Setup(ctx core.SetupContext) error {
 	}
 
 	// Request webhook for this project
-	ctx.Integration.RequestWebhook(WebhookConfiguration{
+	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		ProjectSlug: config.ProjectSlug,
 	})
-
-	return nil
 }
 
 func (t *TriggerPipeline) Execute(ctx core.ExecutionContext) error {
@@ -256,7 +254,7 @@ func (t *TriggerPipeline) Execute(ctx core.ExecutionContext) error {
 	ctx.Logger.Infof("Pipeline triggered - id=%s, number=%d", response.ID, response.Number)
 
 	// Store pipeline info in metadata
-	ctx.Metadata.Set(TriggerPipelineExecutionMetadata{
+	err = ctx.Metadata.Set(TriggerPipelineExecutionMetadata{
 		Pipeline: &PipelineInfo{
 			ID:        response.ID,
 			Number:    response.Number,
@@ -264,6 +262,9 @@ func (t *TriggerPipeline) Execute(ctx core.ExecutionContext) error {
 		},
 		Workflows: []WorkflowInfo{},
 	})
+	if err != nil {
+		return fmt.Errorf("error setting metadata: %v", err)
+	}
 
 	// Associate pipeline ID with this execution for webhook handling
 	err = ctx.ExecutionState.SetKV("pipeline", response.ID)
@@ -375,12 +376,40 @@ func (t *TriggerPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 		return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
 	}
 
-	// Check if all workflows are done
-	allDone, anyFailed := t.checkWorkflowsStatus(metadata.Workflows)
+	// Fetch ALL workflows from API to check completion status
+	// (webhook only tells us about one workflow at a time)
+	client, err := NewClient(executionCtx.HTTP, executionCtx.Integration)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error creating client: %v", err)
+	}
 
-	if !allDone {
-		// Not all workflows finished yet
-		return http.StatusOK, nil
+	allWorkflows, err := client.GetPipelineWorkflows(metadata.Pipeline.ID)
+	if err != nil {
+		// If API call fails, check with what we have
+		executionCtx.Logger.Warnf("Failed to fetch workflows: %v", err)
+		allDone, anyFailed := t.checkWorkflowsStatus(metadata.Workflows)
+		if !allDone {
+			return http.StatusOK, nil
+		}
+	} else {
+		// Update metadata with complete workflow list
+		updatedWorkflows := []WorkflowInfo{}
+		for _, w := range allWorkflows {
+			updatedWorkflows = append(updatedWorkflows, WorkflowInfo{
+				ID:     w.ID,
+				Name:   w.Name,
+				Status: w.Status,
+			})
+		}
+		metadata.Workflows = updatedWorkflows
+		executionCtx.Metadata.Set(metadata)
+
+		// Check if all workflows are done
+		allDone, anyFailed := t.checkWorkflowsStatus(updatedWorkflows)
+		if !allDone {
+			// Not all workflows finished yet
+			return http.StatusOK, nil
+		}
 	}
 
 	// All workflows done, emit result
