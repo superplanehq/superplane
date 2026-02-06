@@ -276,20 +276,17 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 	config := execution.Configuration.Data()
 
 	if config != nil {
-		resolved, err := contexts.ResolveRuntimeConfig(&context.RuntimeConfigParams{
-			tx:         tx,
-			execution:  execution,
-			node:       node,
-			inputEvent: inputEvent,
-			input:      input,
-			workflow:   workflow,
-		})
-
+		builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
+			WithNodeID(node.NodeID).
+			WithRootEvent(&execution.RootEventID).
+			WithInput(map[string]any{inputEvent.NodeID: input}).
+			WithPreviousExecution(execution.PreviousExecutionID).
+			WithRuntimeResolution(w.encryptor, workflow.OrganizationID)
+		resolved, err := builder.Build(config)
 		if err != nil {
 			logger.Errorf("failed to resolve configuration at runtime: %v", err)
 			return fmt.Errorf("failed to resolve configuration at runtime: %v", err)
 		}
-
 		config = resolved
 	}
 

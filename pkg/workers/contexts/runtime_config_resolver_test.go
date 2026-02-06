@@ -44,7 +44,7 @@ func Test_ResolveRuntimeConfig_ResolvesSecretsExpression(t *testing.T) {
 		"api_key": `{{ secrets("api-keys").token }}`,
 	}
 
-	resolved, err := ResolveRuntimeConfig(config, builder, database.Conn(), encryptor, r.Organization.ID)
+	resolved, err := builder.WithRuntimeResolution(encryptor, r.Organization.ID).Build(config)
 	require.NoError(t, err)
 	assert.Equal(t, "sk-test-123", resolved["api_key"])
 }
@@ -79,7 +79,7 @@ func Test_ResolveRuntimeConfig_ResolvesSecretsTransformedWithFunction(t *testing
 		"authorization": `{{ "Bearer " + secrets("api-keys").token }}`,
 	}
 
-	resolved, err := ResolveRuntimeConfig(config, builder, database.Conn(), encryptor, r.Organization.ID)
+	resolved, err := builder.WithRuntimeResolution(encryptor, r.Organization.ID).Build(config)
 	require.NoError(t, err)
 	assert.Equal(t, "Bearer sk-test-123", resolved["authorization"])
 }
@@ -103,7 +103,7 @@ func Test_ResolveRuntimeConfig_ExpressionWithoutSecrets_LeftUnchanged(t *testing
 		"expr": `{{ root().x }}`,
 	}
 
-	resolved, err := ResolveRuntimeConfig(config, builder, database.Conn(), &crypto.NoOpEncryptor{}, r.Organization.ID)
+	resolved, err := builder.WithRuntimeResolution(&crypto.NoOpEncryptor{}, r.Organization.ID).Build(config)
 	require.NoError(t, err)
 	assert.Equal(t, `{{ root().x }}`, resolved["expr"])
 }
@@ -127,7 +127,7 @@ func Test_ResolveRuntimeConfig_NoExpressions_ReturnsCopy(t *testing.T) {
 		"nested": map[string]any{"a": "b"},
 	}
 
-	resolved, err := ResolveRuntimeConfig(config, builder, database.Conn(), &crypto.NoOpEncryptor{}, r.Organization.ID)
+	resolved, err := builder.Build(config)
 	require.NoError(t, err)
 	assert.Equal(t, "value", resolved["plain"])
 	assert.Equal(t, map[string]any{"a": "b"}, resolved["nested"])
@@ -151,7 +151,7 @@ func Test_ResolveRuntimeConfig_SecretNotFound_ReturnsError(t *testing.T) {
 		"api_key": `{{ secrets("nonexistent").key }}`,
 	}
 
-	_, err := ResolveRuntimeConfig(config, builder, database.Conn(), &crypto.NoOpEncryptor{}, r.Organization.ID)
+	_, err := builder.WithRuntimeResolution(&crypto.NoOpEncryptor{}, r.Organization.ID).Build(config)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "secret not found")
 }

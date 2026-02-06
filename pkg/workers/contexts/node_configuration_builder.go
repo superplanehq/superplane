@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"sort"
@@ -13,7 +14,9 @@ import (
 	"github.com/expr-lang/expr/parser"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/secrets"
 	"gorm.io/gorm"
 )
 
@@ -29,6 +32,13 @@ type NodeConfigurationBuilder struct {
 	input               any
 	parentBlueprintNode *models.CanvasNode
 	configurationFields []configuration.Field
+	runtimeResolution   *runtimeResolution
+}
+
+// runtimeResolution enables resolving deferred secret expressions when Build is called.
+type runtimeResolution struct {
+	encryptor crypto.Encryptor
+	orgID     uuid.UUID
 }
 
 func NewNodeConfigurationBuilder(tx *gorm.DB, workflowID uuid.UUID) *NodeConfigurationBuilder {
@@ -65,6 +75,13 @@ func (b *NodeConfigurationBuilder) WithInput(input any) *NodeConfigurationBuilde
 
 func (b *NodeConfigurationBuilder) WithConfigurationFields(fields []configuration.Field) *NodeConfigurationBuilder {
 	b.configurationFields = fields
+	return b
+}
+
+// WithRuntimeResolution enables resolving deferred secret expressions (e.g. secrets())
+// when Build is called. Use when resolving execution config at node run time; do not persist the result.
+func (b *NodeConfigurationBuilder) WithRuntimeResolution(encryptor crypto.Encryptor, orgID uuid.UUID) *NodeConfigurationBuilder {
+	b.runtimeResolution = &runtimeResolution{encryptor: encryptor, orgID: orgID}
 	return b
 }
 
@@ -215,6 +232,26 @@ func asAnyMap(value any) (map[string]any, bool) {
 	}
 }
 
+// stringContainsDeferredSecretExpression reports whether s contains at least one
+// {{ ... }} segment whose inner expression would be deferred at build time
+// (i.e. contains a secrets() call). Used by tests that assert runtime vs build-time behavior.
+func stringContainsDeferredSecretExpression(s string) bool {
+	if !expressionRegex.MatchString(s) {
+		return false
+	}
+	matches := expressionRegex.FindAllStringSubmatch(s, -1)
+	for _, m := range matches {
+		if len(m) != 2 {
+			continue
+		}
+		inner := strings.TrimSpace(m[1])
+		if expressionContainsSecrets(inner) {
+			return true
+		}
+	}
+	return false
+}
+
 func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, error) {
 	if !expressionRegex.MatchString(expression) {
 		return expression, nil
@@ -230,6 +267,18 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 
 		inner := strings.TrimSpace(matches[1])
 		if expressionContainsSecrets(inner) {
+			if b.runtimeResolution != nil {
+				value, e := b.resolveExpressionWithSecrets(inner)
+				if e != nil {
+					err = e
+					return ""
+				}
+				return fmt.Sprintf("%v", value)
+			}
+			return match
+		}
+		if b.runtimeResolution != nil {
+			// At runtime we only resolve secret-containing segments; leave others as-is.
 			return match
 		}
 
@@ -341,6 +390,52 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 	output, err := expr.Run(vm, env)
 	if err != nil {
 		return "", fmt.Errorf("expression evaluation failed: %w", err)
+	}
+	return output, nil
+}
+
+// resolveExpressionWithSecrets evaluates an expression with the same env and options
+// as resolveExpression plus the secrets() function. Used when Build is called with
+// WithRuntimeResolution so deferred secret expressions are resolved at run time.
+func (b *NodeConfigurationBuilder) resolveExpressionWithSecrets(expression string) (any, error) {
+	env, err := b.BuildExpressionEnv(expression)
+	if err != nil {
+		return nil, err
+	}
+	if b.parentBlueprintNode != nil {
+		env["config"] = b.parentBlueprintNode.Configuration.Data()
+	}
+
+	rr := b.runtimeResolution
+	secretsFunc := func(name string) (map[string]string, error) {
+		provider, err := secrets.NewProvider(b.tx, rr.encryptor, name, models.DomainTypeOrganization, rr.orgID)
+		if err != nil {
+			return nil, fmt.Errorf("secret not found: %s", name)
+		}
+		return provider.Load(context.Background())
+	}
+
+	exprOptions := append(
+		b.buildExprOptions(env),
+		expr.Function("secrets", func(params ...any) (any, error) {
+			if len(params) != 1 {
+				return nil, fmt.Errorf("secrets() takes exactly one argument (secret name)")
+			}
+			name, ok := params[0].(string)
+			if !ok {
+				return nil, fmt.Errorf("secrets() argument must be a string")
+			}
+			return secretsFunc(name)
+		}),
+	)
+
+	vm, err := expr.Compile(expression, exprOptions...)
+	if err != nil {
+		return nil, err
+	}
+	output, err := expr.Run(vm, env)
+	if err != nil {
+		return nil, fmt.Errorf("expression evaluation failed: %w", err)
 	}
 	return output, nil
 }
