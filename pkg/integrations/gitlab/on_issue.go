@@ -84,8 +84,7 @@ func (i *OnIssue) Configuration() []configuration.Field {
 			Name:     "actions",
 			Label:    "Action Filter",
 			Type:     configuration.FieldTypeMultiSelect,
-			Required: true,
-			Default:  []string{"open"},
+			Required: false,
 			TypeOptions: &configuration.TypeOptions{
 				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: []configuration.FieldOption{
