@@ -115,6 +115,7 @@ func Test__SendAndWaitMessage__OnIntegrationMessage(t *testing.T) {
 
 		err := component.OnIntegrationMessage(core.IntegrationMessageContext{
 			Message: map[string]any{
+				"type": "block_actions",
 				"actions": []any{
 					map[string]any{
 						"value": "sp_exec:" + execID.String() + ":approve",

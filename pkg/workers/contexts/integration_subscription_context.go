@@ -72,13 +72,14 @@ func (c *IntegrationSubscriptionContext) sendMessageToComponent(message any) err
 	}
 
 	return integrationComponent.OnIntegrationMessage(core.IntegrationMessageContext{
-		HTTP:          c.registry.HTTPContext(),
-		Configuration: c.node.Configuration.Data(),
-		NodeMetadata:  NewNodeMetadataContext(c.tx, c.node),
-		Integration:   c.integrationCtx,
-		Events:        NewEventContext(c.tx, c.node),
-		Message:       message,
-		Logger:        logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
+		HTTP:              c.registry.HTTPContext(),
+		Configuration:     c.node.Configuration.Data(),
+		NodeMetadata:      NewNodeMetadataContext(c.tx, c.node),
+		Integration:       c.integrationCtx,
+		Events:            NewEventContext(c.tx, c.node),
+		Message:           message,
+		Logger:            logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
+		FindExecutionByKV: c.findExecutionByKV,
 	})
 }
 
@@ -97,7 +98,7 @@ func (c *IntegrationSubscriptionContext) findExecutionByKV(key string, value str
 		WorkflowID:     execution.WorkflowID.String(),
 		NodeID:         execution.NodeID,
 		Configuration:  execution.Configuration.Data(),
-		HTTP:           NewHTTPContext(c.registry.GetHTTPClient()),
+		HTTP:           c.registry.HTTPContext(),
 		Metadata:       NewExecutionMetadataContext(c.tx, execution),
 		NodeMetadata:   NewNodeMetadataContext(c.tx, c.node),
 		ExecutionState: NewExecutionStateContext(c.tx, execution),
@@ -125,12 +126,13 @@ func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error
 	}
 
 	return integrationTrigger.OnIntegrationMessage(core.IntegrationMessageContext{
-		HTTP:          c.registry.HTTPContext(),
-		Configuration: c.node.Configuration.Data(),
-		NodeMetadata:  NewNodeMetadataContext(c.tx, c.node),
-		Integration:   c.integrationCtx,
-		Message:       message,
-		Events:        NewEventContext(c.tx, c.node),
-		Logger:        logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
+		HTTP:              c.registry.HTTPContext(),
+		Configuration:     c.node.Configuration.Data(),
+		NodeMetadata:      NewNodeMetadataContext(c.tx, c.node),
+		Integration:       c.integrationCtx,
+		Message:           message,
+		Events:            NewEventContext(c.tx, c.node),
+		Logger:            logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
+		FindExecutionByKV: c.findExecutionByKV,
 	})
 }
