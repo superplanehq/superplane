@@ -1,0 +1,12 @@
+{
+  "type": "sentry.issue",
+  "data": {
+    "id": "1234567890",
+    "shortId": "PYTHON-Y",
+    "title": "Error: example exception",
+    "status": "resolved",
+    "project": {"id": "112313123123134", "name": "python", "slug": "python"},
+    "permalink": "https://example-org.sentry.io/issues/1234567890/"
+  },
+  "timestamp": "2026-02-07T12:00:00Z"
+}
