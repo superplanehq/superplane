@@ -155,19 +155,6 @@ type ListResourcesContext struct {
 	Parameters  map[string]string
 }
 
-type SetupWebhookContext struct {
-	HTTP        HTTPContext
-	Webhook     WebhookContext
-	Logger      *logrus.Entry
-	Integration IntegrationContext
-}
-
-type CleanupWebhookContext struct {
-	HTTP        HTTPContext
-	Webhook     WebhookContext
-	Integration IntegrationContext
-}
-
 type WebhookOptions struct {
 	ID            string
 	URL           string

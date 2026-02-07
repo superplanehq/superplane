@@ -40,16 +40,6 @@ func (p *panickingIntegration) ListResources(resourceType string, ctx core.ListR
 func (p *panickingIntegration) HandleRequest(ctx core.HTTPRequestContext) {
 	panic("handle request panic")
 }
-func (p *panickingIntegration) CompareWebhookConfig(a, b any) (bool, error) {
-	panic("compare webhook config panic")
-}
-func (p *panickingIntegration) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	panic("setup webhook panic")
-}
-func (p *panickingIntegration) CleanupWebhook(ctx core.CleanupWebhookContext) error {
-	panic("cleanup webhook panic")
-}
-
 func TestPanicableIntegration_Sync_CatchesPanic(t *testing.T) {
 	integration := &panickingIntegration{}
 	panicable := NewPanicableIntegration(integration)
