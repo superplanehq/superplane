@@ -88,6 +88,7 @@ func (c *Client) UpdateIssue(org, issueID string, req UpdateIssueRequest) (map[s
 		return nil, fmt.Errorf("organization and issue id are required")
 	}
 	path := fmt.Sprintf("/api/0/organizations/%s/issues/%s/", org, issueID)
+	// Sentry API: https://docs.sentry.io/api/events/update-an-issue/
 	body, err := c.do(http.MethodPut, path, req)
 	if err != nil {
 		return nil, err
