@@ -170,7 +170,7 @@ func (c *SendAndWaitMessage) Execute(ctx core.ExecutionContext) error {
 				"type": "plain_text",
 				"text": b.Name,
 			},
-			"action_id": fmt.Sprintf("button_%d", i),
+			"action_id": fmt.Sprintf("slack.sendAndWaitMessage.button_%d", i),
 			"value":     fmt.Sprintf("sp_exec:%s:%s", ctx.ID.String(), b.Value),
 		})
 	}
@@ -242,11 +242,17 @@ func (c *SendAndWaitMessage) OnIntegrationMessage(ctx core.IntegrationMessageCon
 		return nil
 	}
 
+	// We only care about block_actions (button clicks)
+	if payload["type"] != "block_actions" {
+		return nil
+	}
+
 	actions, ok := payload["actions"].([]any)
 	if !ok || len(actions) == 0 {
 		return nil
 	}
 
+	var lastErr error
 	for _, actionAny := range actions {
 		action, ok := actionAny.(map[string]any)
 		if !ok {
@@ -267,18 +273,33 @@ func (c *SendAndWaitMessage) OnIntegrationMessage(ctx core.IntegrationMessageCon
 		buttonValue := parts[2]
 
 		executionCtx, err := ctx.FindExecutionByKV("execution_id", execID)
-		if err != nil || executionCtx == nil {
+		if err != nil {
+			ctx.Logger.Warnf("Failed to find execution by KV (possibly stale): %v", err)
+			continue
+		}
+
+		if executionCtx == nil {
+			// This interaction might be for a different node, ignore it
 			continue
 		}
 
 		if executionCtx.ExecutionState.IsFinished() {
+			ctx.Logger.Debugf("Execution %s is already finished, ignoring button click", execID)
 			continue
 		}
 
-		return executionCtx.ExecutionState.Emit("received", "slack.button.clicked", []any{map[string]any{"value": buttonValue}})
+		err = executionCtx.ExecutionState.Emit("received", "slack.button.clicked", []any{map[string]any{"value": buttonValue}})
+		if err != nil {
+			ctx.Logger.Errorf("Failed to emit received event for execution %s: %v", execID, err)
+			lastErr = err
+			continue
+		}
+
+		// Successfully processed a button click for this node
+		return nil
 	}
 
-	return nil
+	return lastErr
 }
 
 func (c *SendAndWaitMessage) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
