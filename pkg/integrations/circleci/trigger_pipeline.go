@@ -20,7 +20,7 @@ const FailedOutputChannel = "failed"
 const WorkflowStatusSuccess = "success"
 const WorkflowStatusFailed = "failed"
 const WorkflowStatusCanceled = "canceled"
-const PollInterval = 10 * time.Second
+const PollInterval = 5 * time.Minute
 
 type TriggerPipeline struct{}
 
@@ -140,15 +140,15 @@ func (t *TriggerPipeline) Configuration() []configuration.Field {
 		{
 			Name:        "branch",
 			Label:       "Branch",
-			Type:        configuration.FieldTypeString,
-			Description: "Git branch to run pipeline on",
+			Type:        configuration.FieldTypeGitRef,
+			Description: "Git branch to run pipeline on (mutually exclusive with tag)",
 			Placeholder: "main",
 		},
 		{
 			Name:        "tag",
 			Label:       "Tag",
-			Type:        configuration.FieldTypeString,
-			Description: "Git tag to run pipeline on",
+			Type:        configuration.FieldTypeGitRef,
+			Description: "Git tag to run pipeline on (mutually exclusive with branch)",
 		},
 		{
 			Name:  "parameters",
@@ -201,9 +201,18 @@ func (t *TriggerPipeline) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	// If this is the same project, nothing to do
 	if metadata.ProjectSlug == config.ProjectSlug {
 		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	_, err = client.GetProject(config.ProjectSlug)
+	if err != nil {
+		return fmt.Errorf("project not found or inaccessible: %w", err)
 	}
 
 	err = ctx.Metadata.Set(TriggerPipelineNodeMetadata{
@@ -227,12 +236,15 @@ func (t *TriggerPipeline) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	if spec.Branch != "" && spec.Tag != "" {
+		return fmt.Errorf("branch and tag are mutually exclusive - specify only one")
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}
 
-	// Build pipeline parameters
 	params := TriggerPipelineParams{
 		Parameters: t.buildParameters(ctx, spec.Parameters),
 	}
@@ -303,14 +315,13 @@ func (t *TriggerPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 		return http.StatusForbidden, fmt.Errorf("invalid signature")
 	}
 
-	var payload map[string]any
-	err = json.Unmarshal(ctx.Body, &payload)
+	var webhookPayload map[string]any
+	err = json.Unmarshal(ctx.Body, &webhookPayload)
 	if err != nil {
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	// Get pipeline data from payload
-	pipelineData, ok := payload["pipeline"].(map[string]any)
+	pipelineData, ok := webhookPayload["pipeline"].(map[string]any)
 	if !ok {
 		return http.StatusBadRequest, fmt.Errorf("pipeline data missing from webhook payload")
 	}
@@ -320,15 +331,12 @@ func (t *TriggerPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 		return http.StatusBadRequest, fmt.Errorf("pipeline id missing from webhook payload")
 	}
 
-	// Find the execution associated with this pipeline
 	executionCtx, err := ctx.FindExecutionByKV("pipeline", pipelineID)
 	if err != nil {
-		// Not a pipeline we triggered, ignore
 		return http.StatusOK, nil
 	}
 
-	// Get workflow data
-	workflowData, ok := payload["workflow"].(map[string]any)
+	workflowData, ok := webhookPayload["workflow"].(map[string]any)
 	if !ok {
 		return http.StatusBadRequest, fmt.Errorf("workflow data missing from webhook payload")
 	}
@@ -341,19 +349,16 @@ func (t *TriggerPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 		return http.StatusBadRequest, fmt.Errorf("workflow data incomplete")
 	}
 
-	// Update execution metadata with workflow info
 	metadata := TriggerPipelineExecutionMetadata{}
 	err = mapstructure.Decode(executionCtx.Metadata.Get(), &metadata)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error decoding metadata: %v", err)
 	}
 
-	// Check if execution already finished
 	if executionCtx.ExecutionState.IsFinished() {
 		return http.StatusOK, nil
 	}
 
-	// Update or add workflow status
 	found := false
 	for i, w := range metadata.Workflows {
 		if w.ID == workflowID {
@@ -376,8 +381,6 @@ func (t *TriggerPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 		return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
 	}
 
-	// Fetch ALL workflows from API to check completion status
-	// (webhook only tells us about one workflow at a time)
 	client, err := NewClient(executionCtx.HTTP, executionCtx.Integration)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error creating client: %v", err)
@@ -386,14 +389,12 @@ func (t *TriggerPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 	var allDone, anyFailed bool
 	allWorkflows, err := client.GetPipelineWorkflows(metadata.Pipeline.ID)
 	if err != nil {
-		// If API call fails, check with what we have
 		executionCtx.Logger.Warnf("Failed to fetch workflows: %v", err)
 		allDone, anyFailed = t.checkWorkflowsStatus(metadata.Workflows)
 		if !allDone {
 			return http.StatusOK, nil
 		}
 	} else {
-		// Update metadata with complete workflow list
 		updatedWorkflows := []WorkflowInfo{}
 		for _, w := range allWorkflows {
 			updatedWorkflows = append(updatedWorkflows, WorkflowInfo{
@@ -405,15 +406,17 @@ func (t *TriggerPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 		metadata.Workflows = updatedWorkflows
 		executionCtx.Metadata.Set(metadata)
 
-		// Check if all workflows are done
 		allDone, anyFailed = t.checkWorkflowsStatus(updatedWorkflows)
 		if !allDone {
-			// Not all workflows finished yet
 			return http.StatusOK, nil
 		}
 	}
 
-	// All workflows done, emit result
+	payload := map[string]any{
+		"pipeline":  metadata.Pipeline,
+		"workflows": metadata.Workflows,
+	}
+
 	if anyFailed {
 		err = executionCtx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{payload})
 	} else {
@@ -461,13 +464,11 @@ func (t *TriggerPipeline) poll(ctx core.ActionContext) error {
 		return err
 	}
 
-	// Get workflows for the pipeline
 	workflows, err := client.GetPipelineWorkflows(metadata.Pipeline.ID)
 	if err != nil {
 		return err
 	}
 
-	// Update metadata with workflow statuses
 	updatedWorkflows := []WorkflowInfo{}
 	for _, w := range workflows {
 		updatedWorkflows = append(updatedWorkflows, WorkflowInfo{
@@ -483,15 +484,12 @@ func (t *TriggerPipeline) poll(ctx core.ActionContext) error {
 		return err
 	}
 
-	// Check if all workflows are done
 	allDone, anyFailed := t.checkWorkflowsStatus(updatedWorkflows)
 
 	if !allDone {
-		// Schedule next poll
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 	}
 
-	// All workflows done, emit result
 	payload := map[string]any{
 		"pipeline":  metadata.Pipeline,
 		"workflows": metadata.Workflows,

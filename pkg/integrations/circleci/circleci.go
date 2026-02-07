@@ -137,11 +137,10 @@ func (c *CircleCI) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 		return nil, fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	// Create a unique webhook name using hash of webhook ID
 	hash := sha256.New()
 	hash.Write([]byte(ctx.Webhook.GetID()))
 	suffix := fmt.Sprintf("%x", hash.Sum(nil))
-	name := fmt.Sprintf("superplane-webhook-%x", suffix[:16])
+	name := fmt.Sprintf("superplane-webhook-%s", suffix[:16])
 
 	webhookSecret, err := ctx.Webhook.GetSecret()
 	if err != nil {
