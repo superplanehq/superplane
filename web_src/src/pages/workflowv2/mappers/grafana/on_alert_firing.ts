@@ -99,7 +99,7 @@ function getAlertName(eventData?: OnAlertFiringEventData): string | undefined {
 function buildSubtitle(status: string, createdAt?: string): string {
   const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
   if (status && timeAgo) {
-    return `${status} Â· ${timeAgo}`;
+    return `${status} - ${timeAgo}`;
   }
 
   return status || timeAgo;
