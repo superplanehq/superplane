@@ -236,6 +236,11 @@ func (c *CreateReview) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	// Validate that body is provided for events that require it
+	if (config.Event == "REQUEST_CHANGES" || config.Event == "COMMENT") && config.Body == "" {
+		return fmt.Errorf("body is required when event is REQUEST_CHANGES or COMMENT")
+	}
+
 	var appMetadata Metadata
 	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
 		return fmt.Errorf("failed to decode application metadata: %w", err)
