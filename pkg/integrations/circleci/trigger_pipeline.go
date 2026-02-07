@@ -230,6 +230,7 @@ func (t *TriggerPipeline) Setup(ctx core.SetupContext) error {
 	// Request webhook for this project
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		ProjectSlug: config.ProjectSlug,
+		Events:      []string{"workflow-completed"},
 	})
 }
 
@@ -297,6 +298,21 @@ func (t *TriggerPipeline) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (t *TriggerPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	// CircleCI event type is provided in payload under "type"
+	var envelope struct {
+		Type string          `json:"type"`
+		Raw  json.RawMessage `json:"-"`
+	}
+
+	// Quick unmarshal for the type field without committing to full shape
+	if err := json.Unmarshal(ctx.Body, &envelope); err != nil {
+		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
+	}
+
+	if envelope.Type != "workflow-completed" {
+		return http.StatusOK, nil // ignore unsupported event types
+	}
+
 	// Verify webhook signature
 	// CircleCI sends signature as "v1=<hex>" format
 	signatureHeader := ctx.Headers.Get("circleci-signature")
