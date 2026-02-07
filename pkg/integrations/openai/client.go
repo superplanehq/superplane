@@ -28,9 +28,14 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 		return nil, err
 	}
 
+	baseURL := defaultBaseURL
+	if customURL, err := ctx.GetConfig("baseURL"); err == nil && len(customURL) > 0 {
+		baseURL = string(customURL)
+	}
+
 	return &Client{
 		APIKey:  string(apiKey),
-		BaseURL: defaultBaseURL,
+		BaseURL: baseURL,
 		http:    httpClient,
 	}, nil
 }
