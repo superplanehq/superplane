@@ -1,0 +1,8 @@
+{
+  "data": {
+    "name": "John",
+    "email": "john@example.com"
+  },
+  "timestamp": "2026-02-07T12:00:00.000000000Z",
+  "type": "mapper.executed"
+}
