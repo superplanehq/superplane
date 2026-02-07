@@ -10,8 +10,6 @@ import (
 //go:embed example_output_create_issue.json
 var exampleOutputCreateIssueBytes []byte
 
-//go:embed example_output_create_issue_comment.json
-var exampleOutputCreateIssueCommentBytes []byte
 
 //go:embed example_output_get_issue.json
 var exampleOutputGetIssueBytes []byte
@@ -70,8 +68,6 @@ var exampleDataOnWorkflowRunBytes []byte
 var exampleOutputCreateIssueOnce sync.Once
 var exampleOutputCreateIssue map[string]any
 
-var exampleOutputCreateIssueCommentOnce sync.Once
-var exampleOutputCreateIssueComment map[string]any
 
 var exampleOutputGetIssueOnce sync.Once
 var exampleOutputGetIssue map[string]any
