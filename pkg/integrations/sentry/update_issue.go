@@ -145,8 +145,14 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 	}
 
 	req := UpdateIssueRequest{
-		Status:     spec.Status,
 		AssignedTo: spec.AssignedTo,
+	}
+	switch spec.Status {
+	case "resolvedInNextRelease":
+		req.Status = "resolved"
+		req.StatusDetails = map[string]any{"inNextRelease": true}
+	case "resolved", "unresolved", "ignored":
+		req.Status = spec.Status
 	}
 	issue, err := client.UpdateIssue(spec.Organization, spec.IssueID, req)
 	if err != nil {
