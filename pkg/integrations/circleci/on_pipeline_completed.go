@@ -146,6 +146,7 @@ func (p *OnPipelineCompleted) Setup(ctx core.TriggerContext) error {
 	// Request webhook setup
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		ProjectSlug: config.ProjectSlug,
+		Events:      []string{"workflow-completed"},
 	})
 }
 
