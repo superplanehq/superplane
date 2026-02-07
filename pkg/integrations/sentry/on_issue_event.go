@@ -19,8 +19,8 @@ type OnIssueEventConfiguration struct {
 }
 
 type WebhookConfiguration struct {
-	WebhookSecret string   `json:"webhookSecret"`
 	Events        []string `json:"events"`
+	WebhookSecret string   `json:"webhookSecret,omitempty"` // Transient: only used to pass secret to SetupWebhook
 }
 
 type sentryIssueWebhookPayload struct {
@@ -117,13 +117,15 @@ func (t *OnIssueEvent) Setup(ctx core.TriggerContext) error {
 	if len(config.Events) == 0 {
 		return fmt.Errorf("at least one event must be selected")
 	}
+	// Extract webhook secret from config (sensitive field)
 	var webhookSecret string
 	if m, ok := ctx.Configuration.(map[string]any); ok {
 		webhookSecret, _ = m["webhookSecret"].(string)
 	}
+	// Pass secret transiently to RequestWebhook; SetupWebhook will encrypt it via SetSecret
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		WebhookSecret: webhookSecret,
 		Events:        config.Events,
+		WebhookSecret: webhookSecret, // Transient: stored encrypted by SetupWebhook
 	})
 }
 
