@@ -8,7 +8,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-
 func Test__OnIssue__HandleWebhook__MissingEventHeader(t *testing.T) {
 	trigger := &OnIssue{}
 
