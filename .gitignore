@@ -1,4 +1,5 @@
 junit-report.xml
+test_output.txt
 pkg/web/assets/dist
 tmp
 build/
