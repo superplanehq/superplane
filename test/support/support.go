@@ -44,7 +44,6 @@ type ResourceRegistry struct {
 	Encryptor    crypto.Encryptor
 	AuthService  *authorization.AuthService
 	Registry     *registry.Registry
-	BaseURL      string
 }
 
 func (r *ResourceRegistry) Close() {}
@@ -77,7 +76,6 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 		Encryptor:   encryptor,
 		Registry:    registry,
 		AuthService: AuthService(t),
-		BaseURL:     "http://localhost:8000",
 	}
 
 	//
