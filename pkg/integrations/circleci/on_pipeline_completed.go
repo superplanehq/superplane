@@ -116,11 +116,21 @@ func (p *OnPipelineCompleted) Setup(ctx core.TriggerContext) error {
 		return nil
 	}
 
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	project, err := client.GetProject(config.ProjectSlug)
+	if err != nil {
+		return fmt.Errorf("project not found or inaccessible: %w", err)
+	}
+
 	// Save project metadata
 	err = ctx.Metadata.Set(OnPipelineCompletedMetadata{
 		Project: &Project{
-			Slug: config.ProjectSlug,
-			Name: config.ProjectSlug,
+			Slug: project.Slug,
+			Name: project.Name,
 		},
 	})
 
