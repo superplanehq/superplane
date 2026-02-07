@@ -404,7 +404,10 @@ func (t *TriggerPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 			})
 		}
 		metadata.Workflows = updatedWorkflows
-		executionCtx.Metadata.Set(metadata)
+		err = executionCtx.Metadata.Set(metadata)
+		if err != nil {
+			return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
+		}
 
 		allDone, anyFailed = t.checkWorkflowsStatus(updatedWorkflows)
 		if !allDone {
