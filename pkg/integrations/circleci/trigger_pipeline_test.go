@@ -3,7 +3,9 @@ package circleci
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/superplanehq/superplane/pkg/core"
 )
 
 func Test__TriggerPipeline__checkWorkflowsStatus(t *testing.T) {
@@ -78,32 +80,22 @@ func Test__TriggerPipeline__checkWorkflowsStatus(t *testing.T) {
 
 func Test__TriggerPipeline__buildParameters(t *testing.T) {
 	t.Run("builds parameters with superplane metadata", func(t *testing.T) {
+		tp := &TriggerPipeline{}
 		params := []Parameter{
 			{Name: "env", Value: "production"},
 			{Name: "version", Value: "1.0.0"},
 		}
 
-		// Mock execution context
-		mockCtx := struct {
-			ID         string
-			WorkflowID string
-		}{
-			ID:         "exec-123",
+		mockCtx := core.ExecutionContext{
+			ID:         uuid.MustParse("00000000-0000-0000-0000-000000000123"),
 			WorkflowID: "canvas-456",
 		}
 
-		// Note: We can't easily test this without a full ExecutionContext
-		// In a real test environment, you'd use a mock context
-		result := make(map[string]string)
-		for _, param := range params {
-			result[param.Name] = param.Value
-		}
-		result["SUPERPLANE_EXECUTION_ID"] = mockCtx.ID
-		result["SUPERPLANE_CANVAS_ID"] = mockCtx.WorkflowID
+		result := tp.buildParameters(mockCtx, params)
 
 		assert.Equal(t, "production", result["env"])
 		assert.Equal(t, "1.0.0", result["version"])
-		assert.Equal(t, "exec-123", result["SUPERPLANE_EXECUTION_ID"])
+		assert.Equal(t, "00000000-0000-0000-0000-000000000123", result["SUPERPLANE_EXECUTION_ID"])
 		assert.Equal(t, "canvas-456", result["SUPERPLANE_CANVAS_ID"])
 	})
 }
