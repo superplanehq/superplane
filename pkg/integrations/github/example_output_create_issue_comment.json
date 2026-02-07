@@ -1,0 +1,14 @@
+{
+  "data": {
+    "id": 1234567890,
+    "body": "Deployment completed successfully! ✅",
+    "html_url": "https://github.com/acme/widgets/issues/42#issuecomment-1234567890",
+    "created_at": "2026-01-16T18:30:00Z",
+    "user": {
+      "login": "superplane-bot",
+      "id": 12345678
+    }
+  },
+  "timestamp": "2026-01-16T18:30:00.123456789Z",
+  "type": "github.issueComment"
+}
