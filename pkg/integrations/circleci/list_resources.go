@@ -5,7 +5,29 @@ import (
 )
 
 func (c *CircleCI) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	// CircleCI doesn't have a concept of listable resources like projects
-	// Users need to manually enter their project slug
-	return []core.IntegrationResource{}, nil
+	if resourceType != "project" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	projects, err := client.ListProjects()
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(projects))
+	for _, project := range projects {
+		// CircleCI projects use slug as identifier (e.g., "gh/org/repo")
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: project.RepoName,
+			ID:   project.Slug,
+		})
+	}
+
+	return resources, nil
 }
