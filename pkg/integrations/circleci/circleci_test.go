@@ -135,6 +135,110 @@ func Test__CircleCI__CompareWebhookConfig(t *testing.T) {
 			expectEqual: false,
 			expectError: true,
 		},
+		{
+			name: "same events - should match",
+			configA: WebhookConfiguration{
+				ProjectSlug: "gh/username/repo",
+				Events:      []string{"workflow-completed"},
+			},
+			configB: WebhookConfiguration{
+				ProjectSlug: "gh/username/repo",
+				Events:      []string{"workflow-completed"},
+			},
+			expectEqual: true,
+			expectError: false,
+		},
+		{
+			name: "configA has superset of events - should match (webhook reuse)",
+			configA: WebhookConfiguration{
+				ProjectSlug: "gh/username/repo",
+				Events:      []string{"workflow-completed", "job-completed"},
+			},
+			configB: WebhookConfiguration{
+				ProjectSlug: "gh/username/repo",
+				Events:      []string{"workflow-completed"},
+			},
+			expectEqual: true,
+			expectError: false,
+		},
+		{
+			name: "configA has subset of events - should NOT match",
+			configA: WebhookConfiguration{
+				ProjectSlug: "gh/username/repo",
+				Events:      []string{"workflow-completed"},
+			},
+			configB: WebhookConfiguration{
+				ProjectSlug: "gh/username/repo",
+				Events:      []string{"workflow-completed", "job-completed"},
+			},
+			expectEqual: false,
+			expectError: false,
+		},
+		{
+			name: "different events - should NOT match",
+			configA: WebhookConfiguration{
+				ProjectSlug: "gh/username/repo",
+				Events:      []string{"workflow-completed"},
+			},
+			configB: WebhookConfiguration{
+				ProjectSlug: "gh/username/repo",
+				Events:      []string{"job-completed"},
+			},
+			expectEqual: false,
+			expectError: false,
+		},
+		{
+			name: "empty events in configB - should match (no events needed)",
+			configA: WebhookConfiguration{
+				ProjectSlug: "gh/username/repo",
+				Events:      []string{"workflow-completed"},
+			},
+			configB: WebhookConfiguration{
+				ProjectSlug: "gh/username/repo",
+				Events:      []string{},
+			},
+			expectEqual: true,
+			expectError: false,
+		},
+		{
+			name: "empty events in configA - should match (normalized to default)",
+			configA: WebhookConfiguration{
+				ProjectSlug: "gh/username/repo",
+				Events:      []string{},
+			},
+			configB: WebhookConfiguration{
+				ProjectSlug: "gh/username/repo",
+				Events:      []string{"workflow-completed"},
+			},
+			expectEqual: true,
+			expectError: false,
+		},
+		{
+			name: "invalid event type in configA - should error",
+			configA: WebhookConfiguration{
+				ProjectSlug: "gh/username/repo",
+				Events:      []string{"invalid-event"},
+			},
+			configB: WebhookConfiguration{
+				ProjectSlug: "gh/username/repo",
+				Events:      []string{"workflow-completed"},
+			},
+			expectEqual: false,
+			expectError: true,
+		},
+		{
+			name: "duplicate events - should dedupe and match",
+			configA: WebhookConfiguration{
+				ProjectSlug: "gh/username/repo",
+				Events:      []string{"workflow-completed", "workflow-completed", "job-completed"},
+			},
+			configB: WebhookConfiguration{
+				ProjectSlug: "gh/username/repo",
+				Events:      []string{"workflow-completed", "job-completed"},
+			},
+			expectEqual: true,
+			expectError: false,
+		},
 	}
 
 	for _, tc := range testCases {
