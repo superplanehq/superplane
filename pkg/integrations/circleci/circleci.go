@@ -3,6 +3,7 @@ package circleci
 import (
 	"crypto/sha256"
 	"fmt"
+	"slices"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -95,7 +96,38 @@ func (c *CircleCI) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 type WebhookConfiguration struct {
-	ProjectSlug string `json:"projectSlug"`
+	ProjectSlug string   `json:"projectSlug"`
+	Events      []string `json:"events"`
+}
+
+var (
+	defaultEvents = []string{"workflow-completed"}
+	allowedEvents = map[string]struct{}{
+		"workflow-completed": {},
+		"job-completed":      {},
+	}
+)
+
+func normalizeEvents(events []string) ([]string, error) {
+	if len(events) == 0 {
+		return defaultEvents, nil
+	}
+
+	unique := make([]string, 0, len(events))
+	seen := map[string]struct{}{}
+
+	for _, event := range events {
+		if _, ok := allowedEvents[event]; !ok {
+			return nil, fmt.Errorf("unsupported CircleCI event type: %s", event)
+		}
+		if _, exists := seen[event]; exists {
+			continue
+		}
+		seen[event] = struct{}{}
+		unique = append(unique, event)
+	}
+
+	return unique, nil
 }
 
 func (c *CircleCI) CompareWebhookConfig(a, b any) (bool, error) {
@@ -109,7 +141,30 @@ func (c *CircleCI) CompareWebhookConfig(a, b any) (bool, error) {
 		return false, err
 	}
 
-	return configA.ProjectSlug == configB.ProjectSlug, nil
+	normalizedA, err := normalizeEvents(configA.Events)
+	if err != nil {
+		return false, err
+	}
+
+	normalizedB, err := normalizeEvents(configB.Events)
+	if err != nil {
+		return false, err
+	}
+
+	// Project slug must match
+	if configA.ProjectSlug != configB.ProjectSlug {
+		return false, nil
+	}
+
+	// Check if A contains all events from B (A is superset of B)
+	// This allows webhook sharing when existing webhook has more events than needed
+	for _, eventB := range normalizedB {
+		if !slices.Contains(normalizedA, eventB) {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 func (c *CircleCI) Actions() []core.Action {
@@ -137,6 +192,11 @@ func (c *CircleCI) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 		return nil, fmt.Errorf("error decoding configuration: %v", err)
 	}
 
+	normalizedEvents, err := normalizeEvents(configuration.Events)
+	if err != nil {
+		return nil, fmt.Errorf("invalid webhook events: %w", err)
+	}
+
 	hash := sha256.New()
 	hash.Write([]byte(ctx.Webhook.GetID()))
 	suffix := fmt.Sprintf("%x", hash.Sum(nil))
@@ -153,7 +213,7 @@ func (c *CircleCI) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 		ctx.Webhook.GetURL(),
 		string(webhookSecret),
 		configuration.ProjectSlug,
-		[]string{"workflow-completed"},
+		normalizedEvents,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating CircleCI webhook: %v", err)
