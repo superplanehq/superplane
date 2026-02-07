@@ -24,19 +24,6 @@ import CircleCILogo from "@/assets/icons/integrations/circleci.svg";
 import { formatTimeAgo } from "@/utils/date";
 import { CanvasesCanvasNodeExecution } from "@/api-client";
 
-interface ExecutionMetadata {
-  pipeline?: {
-    id: string;
-    number: number;
-    createdAt: string;
-  };
-  workflows?: Array<{
-    id: string;
-    name: string;
-    status: string;
-  }>;
-}
-
 export const TRIGGER_PIPELINE_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   running: {
