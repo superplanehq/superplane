@@ -111,7 +111,10 @@ func (s *Sentry) CompareWebhookConfig(a, b any) (bool, error) {
 	if err := mapstructure.Decode(b, &cfgB); err != nil {
 		return false, err
 	}
-	// Only compare Events; secret is stored encrypted via SetSecret, not in config
+
+	if cfgA.WebhookSecret != "" || cfgB.WebhookSecret != "" {
+		return false, nil
+	}
 	if len(cfgA.Events) != len(cfgB.Events) {
 		return false, nil
 	}
