@@ -289,3 +289,49 @@ func (c *Client) DeleteWebhook(webhookID string) error {
 
 	return nil
 }
+
+// ListProjectResponse represents project information from API v1.1
+type ListProjectResponse struct {
+	VCSURL   string `json:"vcs_url"`
+	Followed bool   `json:"followed"`
+	Username string `json:"username"`
+	RepoName string `json:"reponame"`
+	// Construct slug from VCS type + username + reponame
+	Slug string
+}
+
+// ListProjects fetches all followed projects using API v1.1
+// Note: Uses v1.1 API since v2 doesn't have a list projects endpoint
+func (c *Client) ListProjects() ([]ListProjectResponse, error) {
+	// Use v1.1 API for listing projects (v2 doesn't support this)
+	url := "https://circleci.com/api/v1.1/projects"
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var projects []ListProjectResponse
+	err = json.Unmarshal(responseBody, &projects)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	// Build slug from vcs_url
+	// Example: "https://github.com/org/repo" -> "gh/org/repo"
+	for i := range projects {
+		if projects[i].VCSURL != "" {
+			// Extract VCS type and construct slug
+			vcsType := "gh" // Default to github
+			if len(projects[i].VCSURL) > len("https://bitbucket.org/") &&
+				projects[i].VCSURL[:len("https://bitbucket.org/")] == "https://bitbucket.org/" {
+				vcsType = "bb"
+			} else if len(projects[i].VCSURL) > len("https://gitlab.com/") &&
+				projects[i].VCSURL[:len("https://gitlab.com/")] == "https://gitlab.com/" {
+				vcsType = "gl"
+			}
+			projects[i].Slug = fmt.Sprintf("%s/%s/%s", vcsType, projects[i].Username, projects[i].RepoName)
+		}
+	}
+
+	return projects, nil
+}
