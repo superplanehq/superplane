@@ -27,6 +27,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitHub repository" />
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitHub repository" />
+  <LinkCard title="Create Review" href="#create-review" description="Create a review on a GitHub pull request" />
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitHub repository" />
@@ -1027,6 +1028,64 @@ Returns the created release object with all release information including tag, a
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.release"
+}
+```
+
+<a id="create-review"></a>
+
+## Create Review
+
+The Create Review component creates a review on a GitHub pull request.
+
+### Use Cases
+
+- **Automated code review**: Post automated review comments on pull requests
+- **CI/CD feedback**: Approve or request changes based on CI results
+- **Quality gates**: Programmatically review PRs based on code analysis
+- **Bot reviews**: Add bot-generated feedback with inline comments
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the pull request
+- **Pull Request Number**: The number of the pull request to review
+- **Event**: The review action (APPROVE, REQUEST_CHANGES, COMMENT, or PENDING)
+- **Body**: The review summary/comment (supports markdown)
+- **Commit ID**: Optional specific commit SHA to review (defaults to latest)
+- **Comments**: Optional list of inline review comments with file path, line number, and body
+
+### Review Events
+
+- **APPROVE**: Approve the pull request
+- **REQUEST_CHANGES**: Request changes before the PR can be merged
+- **COMMENT**: Leave a neutral review comment
+- **PENDING**: Create a pending review (can be submitted later)
+
+### Output
+
+Returns the created review object with details including:
+- Review ID
+- State
+- URL
+- Submitted timestamp
+- Review body
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": 1234567890,
+    "node_id": "PRR_kwDOABC123DEF456",
+    "html_url": "https://github.com/acme/widgets/pull/123#pullrequestreview-1234567890",
+    "body": "LGTM! Great work on this feature.",
+    "state": "APPROVED",
+    "commit_id": "abc123def456789",
+    "submitted_at": "2026-02-07T12:00:00Z",
+    "user": "superplane-bot",
+    "author_association": "COLLABORATOR"
+  },
+  "timestamp": "2026-02-07T12:00:00.000000000Z",
+  "type": "github.pullRequestReview"
 }
 ```
 
