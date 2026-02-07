@@ -41,8 +41,8 @@ func main() {
 		exitWithError(err)
 	}
 
-	for i, integration := range integrations {
-		if err := writeIntegrationDocs(integration, i+2); err != nil {
+	for _, integration := range integrations {
+		if err := writeIntegrationDocs(integration); err != nil {
 			exitWithError(err)
 		}
 	}
@@ -54,14 +54,14 @@ func createOutputDirectory() {
 	}
 }
 
-func writeIntegrationDocs(integration core.Integration, order int) error {
+func writeIntegrationDocs(integration core.Integration) error {
 	components := integration.Components()
 	triggers := integration.Triggers()
 
 	sort.Slice(components, func(i, j int) bool { return components[i].Name() < components[j].Name() })
 	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
 
-	return writeIntegrationIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.mdx", integrationFilename(integration))), integration, components, triggers, order)
+	return writeIntegrationIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.mdx", integrationFilename(integration))), integration, components, triggers)
 }
 
 func writeCoreComponentsDoc(components []core.Component, triggers []core.Trigger) error {
@@ -73,7 +73,8 @@ func writeCoreComponentsDoc(components []core.Component, triggers []core.Trigger
 	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
 
 	var buf bytes.Buffer
-	writeFrontMatter(&buf, "Core", 1)
+	coreOrder := 1
+	writeFrontMatter(&buf, "Core", &coreOrder)
 	writeOverviewSection(&buf, "Built-in SuperPlane components.")
 	writeCardGridTriggers(&buf, triggers)
 	writeCardGridComponents(&buf, components)
@@ -88,10 +89,9 @@ func writeIntegrationIndex(
 	integration core.Integration,
 	components []core.Component,
 	triggers []core.Trigger,
-	order int,
 ) error {
 	var buf bytes.Buffer
-	writeFrontMatter(&buf, integration.Label(), order)
+	writeFrontMatter(&buf, integration.Label(), nil)
 
 	writeOverviewSection(&buf, integration.Description())
 	writeCardGridTriggers(&buf, triggers)
@@ -109,11 +109,13 @@ func writeIntegrationIndex(
 	return writeFile(path, buf.Bytes())
 }
 
-func writeFrontMatter(buf *bytes.Buffer, title string, order int) {
+func writeFrontMatter(buf *bytes.Buffer, title string, order *int) {
 	buf.WriteString("---\n")
 	buf.WriteString(fmt.Sprintf("title: \"%s\"\n", escapeQuotes(title)))
-	buf.WriteString("sidebar:\n")
-	buf.WriteString(fmt.Sprintf("  order: %d\n", order))
+	if order != nil {
+		buf.WriteString("sidebar:\n")
+		buf.WriteString(fmt.Sprintf("  order: %d\n", *order))
+	}
 	buf.WriteString("---\n\n")
 }
 
@@ -203,62 +205,8 @@ func writeParagraph(buf *bytes.Buffer, text string) {
 	if trimmed == "" {
 		return
 	}
-	buf.WriteString(escapeMDXText(trimmed))
+	buf.WriteString(trimmed)
 	buf.WriteString("\n\n")
-}
-
-// escapeMDXText escapes angle brackets outside code to avoid MDX parsing errors.
-func escapeMDXText(text string) string {
-	lines := strings.Split(text, "\n")
-	escaped := make([]string, 0, len(lines))
-	inFence := false
-
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "```") {
-			inFence = !inFence
-			escaped = append(escaped, line)
-			continue
-		}
-
-		if inFence {
-			escaped = append(escaped, line)
-			continue
-		}
-
-		escaped = append(escaped, escapeInlineCode(line))
-	}
-
-	return strings.Join(escaped, "\n")
-}
-
-func escapeInlineCode(line string) string {
-	if !strings.Contains(line, "`") {
-		return escapeAngleBrackets(line)
-	}
-
-	parts := strings.Split(line, "`")
-	var buf strings.Builder
-
-	for i, part := range parts {
-		if i%2 == 0 {
-			buf.WriteString(escapeAngleBrackets(part))
-		} else {
-			buf.WriteString(part)
-		}
-
-		if i < len(parts)-1 {
-			buf.WriteString("`")
-		}
-	}
-
-	return buf.String()
-}
-
-func escapeAngleBrackets(value string) string {
-	value = strings.ReplaceAll(value, "<", "&lt;")
-	value = strings.ReplaceAll(value, ">", "&gt;")
-	return value
 }
 
 // adjustHeadingLevels increments all markdown heading levels by 1
@@ -296,7 +244,8 @@ func adjustHeadingLevels(text string) string {
 }
 
 func writeOverviewSection(buf *bytes.Buffer, description string) {
-	writeParagraph(buf, description)
+	buf.WriteString(description)
+	buf.WriteString("\n\n")
 }
 
 func writeExampleSection(title string, data map[string]any, buf *bytes.Buffer) {
