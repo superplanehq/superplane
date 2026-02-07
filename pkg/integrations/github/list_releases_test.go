@@ -38,6 +38,22 @@ func Test__ListReleases__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "repository world is not accessible to app installation")
 	})
 
+	t.Run("perPage over limit returns error", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Metadata: Metadata{
+				Repositories: []Repository{helloRepo},
+			},
+		}
+
+		err := component.Setup(core.SetupContext{
+			Integration:   integrationCtx,
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"repository": "hello", "perPage": "900"},
+		})
+
+		require.ErrorContains(t, err, "perPage must not exceed 100")
+	})
+
 	t.Run("metadata is set successfully", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Metadata: Metadata{
@@ -105,7 +121,7 @@ func Test__ListReleases__Execute__Validation(t *testing.T) {
 			{
 				name:          "too large",
 				perPageValue:  "500",
-				expectedError: "perPage must be <= 100",
+				expectedError: "perPage must not exceed 100",
 			},
 		}
 

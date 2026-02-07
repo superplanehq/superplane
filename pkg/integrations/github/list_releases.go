@@ -2,6 +2,7 @@ package github
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -92,11 +93,20 @@ func (c *ListReleases) Configuration() []configuration.Field {
 }
 
 func (c *ListReleases) Setup(ctx core.SetupContext) error {
-	return ensureRepoInMetadata(
+	if err := ensureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
 		ctx.Configuration,
-	)
+	); err != nil {
+		return err
+	}
+
+	var config ListReleasesConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	return validateListReleasesPagination(config)
 }
 
 func (c *ListReleases) Execute(ctx core.ExecutionContext) error {
@@ -105,32 +115,8 @@ func (c *ListReleases) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	// Validate perPage
-	if config.PerPage != nil && *config.PerPage != "" {
-		perPageValue, err := strconv.Atoi(*config.PerPage)
-		if err != nil {
-			return fmt.Errorf("invalid perPage value '%s': must be a valid number", *config.PerPage)
-		}
-
-		if perPageValue <= 0 {
-			return fmt.Errorf("perPage must be greater than 0")
-		}
-
-		if perPageValue > 100 {
-			return fmt.Errorf("perPage must be <= 100")
-		}
-	}
-
-	// Validate page
-	if config.Page != nil && *config.Page != "" {
-		pageValue, err := strconv.Atoi(*config.Page)
-		if err != nil {
-			return fmt.Errorf("invalid page value '%s': must be a valid number", *config.Page)
-		}
-
-		if pageValue <= 0 {
-			return fmt.Errorf("page must be greater than 0")
-		}
+	if err := validateListReleasesPagination(config); err != nil {
+		return err
 	}
 
 	var nodeMetadata NodeMetadata
@@ -174,6 +160,16 @@ func (c *ListReleases) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to list releases: %w", err)
 	}
 
+	payloadBytes, err := json.Marshal(releases)
+	if err != nil {
+		return fmt.Errorf("failed to marshal releases payload: %w", err)
+	}
+
+	const maxPayloadBytes = 1024 * 1024
+	if len(payloadBytes) > maxPayloadBytes {
+		return fmt.Errorf("payload size exceeds 1MB limit")
+	}
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"github.releases.list",
@@ -202,5 +198,35 @@ func (c *ListReleases) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (c *ListReleases) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func validateListReleasesPagination(config ListReleasesConfiguration) error {
+	if config.PerPage != nil && *config.PerPage != "" {
+		perPageValue, err := strconv.Atoi(*config.PerPage)
+		if err != nil {
+			return fmt.Errorf("invalid perPage value '%s': must be a valid number", *config.PerPage)
+		}
+
+		if perPageValue <= 0 {
+			return fmt.Errorf("perPage must be greater than 0")
+		}
+
+		if perPageValue > 100 {
+			return fmt.Errorf("perPage must not exceed 100")
+		}
+	}
+
+	if config.Page != nil && *config.Page != "" {
+		pageValue, err := strconv.Atoi(*config.Page)
+		if err != nil {
+			return fmt.Errorf("invalid page value '%s': must be a valid number", *config.Page)
+		}
+
+		if pageValue <= 0 {
+			return fmt.Errorf("page must be greater than 0")
+		}
+	}
+
 	return nil
 }
