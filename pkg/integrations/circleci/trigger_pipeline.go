@@ -130,12 +130,16 @@ func (t *TriggerPipeline) OutputChannels(configuration any) []core.OutputChannel
 func (t *TriggerPipeline) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "projectSlug",
-			Label:       "Project Slug",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "CircleCI project slug (e.g., gh/username/repo)",
-			Placeholder: "gh/username/repo",
+			Name:     "projectSlug",
+			Label:    "Project",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "project",
+					UseNameAsValue: false,
+				},
+			},
 		},
 		{
 			Name:        "branch",
