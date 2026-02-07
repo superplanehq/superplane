@@ -111,9 +111,7 @@ func (s *Sentry) CompareWebhookConfig(a, b any) (bool, error) {
 	if err := mapstructure.Decode(b, &cfgB); err != nil {
 		return false, err
 	}
-	if cfgA.WebhookSecret != cfgB.WebhookSecret {
-		return false, nil
-	}
+	// Only compare Events; secret is stored encrypted via SetSecret, not in config
 	if len(cfgA.Events) != len(cfgB.Events) {
 		return false, nil
 	}
@@ -131,11 +129,16 @@ func (s *Sentry) CompareWebhookConfig(a, b any) (bool, error) {
 
 func (s *Sentry) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 	var cfg WebhookConfiguration
-	_ = mapstructure.Decode(ctx.Webhook.GetConfiguration(), &cfg)
-	if cfg.WebhookSecret != "" {
-		_ = ctx.Webhook.SetSecret([]byte(cfg.WebhookSecret))
+	if err := mapstructure.Decode(ctx.Webhook.GetConfiguration(), &cfg); err != nil {
+		return nil, fmt.Errorf("decode webhook config: %w", err)
 	}
-	return nil, nil
+	if cfg.WebhookSecret != "" {
+		if err := ctx.Webhook.SetSecret([]byte(cfg.WebhookSecret)); err != nil {
+			return nil, fmt.Errorf("store webhook secret: %w", err)
+		}
+	}
+	// Return config without the secret (only Events)
+	return WebhookConfiguration{Events: cfg.Events}, nil
 }
 
 func (s *Sentry) CleanupWebhook(ctx core.CleanupWebhookContext) error {
