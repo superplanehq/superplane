@@ -6,18 +6,18 @@ sidebar:
 
 Trigger workflows from Sentry issue events and update issues from workflows
 
-import { CardGrid, LinkCard } from "@astrojs/starlight/components";
-
 ## Triggers
 
 <CardGrid>
   <LinkCard title="On Issue Event" href="#on-issue-event" description="Start a workflow when Sentry sends issue events (created, resolved, assigned, etc.)" />
 </CardGrid>
 
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
 ## Actions
 
 <CardGrid>
-  <LinkCard title="Update Issue" href="#update-issue" description="Update a Sentry issue (resolve, assign, ignore)" />
+  <LinkCard title="Update Issue" href="#update-issue" description="Update a Sentry issue (resolve, assign, ignore, etc.)" />
 </CardGrid>
 
 ## Instructions
@@ -26,7 +26,7 @@ Connect Sentry to SuperPlane using an Internal Integration token.
 
 1. In Sentry: **Organization Settings** → **Developer Settings** → **New Internal Integration**
 2. Name it (e.g. "SuperPlane"), then create an **Auth Token** with scopes: `org:read`, `project:read`, `event:write`
-3. Paste the token in the integration configuration. For the **On Issue Event** trigger, add the trigger's webhook URL in your Sentry integration (Webhooks) and subscribe to Issue events. Copy the integration's Client Secret into the Webhook secret field.
+3. Paste the token below. For the **On Issue Event** trigger, configure the webhook in your Sentry integration to point to the trigger's webhook URL and subscribe to Issue events. Use the same integration's Client Secret as the webhook secret in SuperPlane when prompted.
 
 <a id="on-issue-event"></a>
 
@@ -43,13 +43,48 @@ The On Issue Event trigger runs when Sentry sends webhook events for issues.
 ### Configuration
 
 - **Events**: Choose which issue actions to listen for (created, resolved, assigned, archived, unresolved)
-- **Webhook secret**: Client Secret from your Sentry Internal Integration (used to verify webhook signatures)
+- **Webhook secret**: Paste the Client Secret from your Sentry Internal Integration (used to verify webhook signatures)
 
 ### Setup
 
-1. In Sentry: add the webhook URL (shown for this trigger in SuperPlane) in your Internal Integration → Webhooks
-2. Subscribe to Issue events
-3. Copy the integration's Client Secret into the Webhook secret field in SuperPlane
+1. In Sentry: add a webhook URL in your Internal Integration (Developer Settings → your integration → Webhooks). Use the webhook URL shown for this trigger in SuperPlane.
+2. Subscribe to **Issue** events (e.g. issue.created, issue.resolved).
+3. Copy the integration's **Client Secret** into the Webhook secret field below.
+
+### Example Data
+
+```json
+{
+  "action": "created",
+  "actor": {
+    "id": "example-app",
+    "name": "Example App",
+    "type": "application"
+  },
+  "installation": {
+    "uuid": "24b397fc-a86e-43ef-9297-949e21b82480"
+  },
+  "issue": {
+    "culprit": "raven.scripts.runner in main",
+    "firstSeen": "2025-11-10T20:56:00.679000+00:00",
+    "id": "1234567890",
+    "lastSeen": "2025-11-10T20:56:00.738000+00:00",
+    "level": "error",
+    "metadata": {
+      "title": "Error: example exception"
+    },
+    "permalink": "https://example-org.sentry.io/issues/1234567890/",
+    "project": {
+      "id": "112313123123134",
+      "name": "python",
+      "slug": "python"
+    },
+    "shortId": "PYTHON-Y",
+    "status": "unresolved",
+    "title": "Error: example exception"
+  }
+}
+```
 
 <a id="update-issue"></a>
 
@@ -65,7 +100,7 @@ The Update Issue component updates an existing Sentry issue.
 
 ### Configuration
 
-- **Organization**: Sentry organization slug
+- **Organization**: Sentry organization slug (e.g. from trigger payload or your org name)
 - **Issue ID**: The issue ID to update (e.g. from trigger: `$['On Issue Event'].issue.id`)
 - **Status**: resolved, resolvedInNextRelease, unresolved, or ignored
 - **Assigned To**: Actor id or username to assign the issue to
@@ -73,3 +108,25 @@ The Update Issue component updates an existing Sentry issue.
 ### Output
 
 Returns the updated issue object from Sentry.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "1234567890",
+    "permalink": "https://example-org.sentry.io/issues/1234567890/",
+    "project": {
+      "id": "112313123123134",
+      "name": "python",
+      "slug": "python"
+    },
+    "shortId": "PYTHON-Y",
+    "status": "resolved",
+    "title": "Error: example exception"
+  },
+  "timestamp": "2026-02-07T12:00:00Z",
+  "type": "sentry.issue"
+}
+```
+
