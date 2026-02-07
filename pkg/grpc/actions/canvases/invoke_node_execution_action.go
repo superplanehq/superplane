@@ -26,7 +26,6 @@ func InvokeNodeExecutionAction(
 	authService authorization.Authorization,
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
-	baseURL string,
 	orgID uuid.UUID,
 	canvasID uuid.UUID,
 	executionID uuid.UUID,

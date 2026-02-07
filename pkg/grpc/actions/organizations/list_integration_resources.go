@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func ListIntegrationResources(ctx context.Context, registry *registry.Registry, baseURL string, orgID string, integrationID string, parameters map[string]string) (*pb.ListIntegrationResourcesResponse, error) {
+func ListIntegrationResources(ctx context.Context, registry *registry.Registry, orgID string, integrationID string, parameters map[string]string) (*pb.ListIntegrationResourcesResponse, error) {
 	org, err := uuid.Parse(orgID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")

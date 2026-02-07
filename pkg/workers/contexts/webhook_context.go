@@ -6,7 +6,6 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -49,11 +48,6 @@ func (c *WebhookContext) GetMetadata() any {
 
 func (c *WebhookContext) GetConfiguration() any {
 	return c.webhook.Configuration.Data()
-}
-
-func (c *WebhookContext) UpdateConfiguration(configuration any) error {
-	c.webhook.Configuration = datatypes.NewJSONType(configuration)
-	return c.tx.Save(c.webhook).Error
 }
 
 func (c *WebhookContext) SetSecret(secret []byte) error {

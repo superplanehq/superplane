@@ -110,13 +110,6 @@ type WebhookHandlerContext struct {
 	Webhook     WebhookContext
 }
 
-type OnWebhookRequestContext struct {
-	Configuration any
-	ListWebhooks  func() ([]WebhookContext, error)
-	CreateWebhook func(configuration any) error
-	DeleteWebhook func(id string) error
-}
-
 type IntegrationComponent interface {
 
 	/*
@@ -305,6 +298,5 @@ type WebhookContext interface {
 	GetSecret() ([]byte, error)
 	GetMetadata() any
 	GetConfiguration() any
-	UpdateConfiguration(configuration any) error
 	SetSecret([]byte) error
 }
