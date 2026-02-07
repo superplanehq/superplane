@@ -46,9 +46,7 @@ export const TRIGGER_PIPELINE_STATE_MAP: EventStateMap = {
   },
 };
 
-export const triggerPipelineStateFunction: StateFunction = (
-  execution: CanvasesCanvasNodeExecution,
-): EventState => {
+export const triggerPipelineStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
   if (!execution) return "neutral";
 
   if (
@@ -67,9 +65,7 @@ export const triggerPipelineStateFunction: StateFunction = (
     return "running";
   }
 
-  const outputs = execution.outputs as
-    | { success?: OutputPayload[]; failed?: OutputPayload[] }
-    | undefined;
+  const outputs = execution.outputs as { success?: OutputPayload[]; failed?: OutputPayload[] } | undefined;
 
   if (outputs?.failed && outputs.failed.length > 0) {
     return "failed";
