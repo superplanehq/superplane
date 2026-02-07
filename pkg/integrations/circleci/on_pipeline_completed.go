@@ -129,6 +129,7 @@ func (p *OnPipelineCompleted) Setup(ctx core.TriggerContext) error {
 	// Save project metadata
 	err = ctx.Metadata.Set(OnPipelineCompletedMetadata{
 		Project: &Project{
+			ID:   project.ID,
 			Slug: project.Slug,
 			Name: project.Name,
 		},
