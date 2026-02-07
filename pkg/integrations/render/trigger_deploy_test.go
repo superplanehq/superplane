@@ -16,17 +16,17 @@ import (
 func Test__Render_TriggerDeploy__Setup(t *testing.T) {
 	component := &TriggerDeploy{}
 
-	t.Run("missing serviceId -> error", func(t *testing.T) {
+	t.Run("missing service -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{},
 		})
 
-		require.ErrorContains(t, err, "serviceId is required")
+		require.ErrorContains(t, err, "service is required")
 	})
 
 	t.Run("valid configuration -> success", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{"serviceId": "srv-cukouhrtq21c73e9scng"},
+			Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},
 		})
 
 		require.NoError(t, err)
@@ -56,7 +56,7 @@ func Test__Render_TriggerDeploy__Execute(t *testing.T) {
 			},
 			ExecutionState: executionState,
 			Configuration: map[string]any{
-				"serviceId":  "srv-cukouhrtq21c73e9scng",
+				"service":    "srv-cukouhrtq21c73e9scng",
 				"clearCache": true,
 			},
 		})
@@ -79,7 +79,7 @@ func Test__Render_TriggerDeploy__Execute(t *testing.T) {
 		assert.Equal(t, "clear", payload["clearCache"])
 	})
 
-	t.Run("missing serviceId -> error", func(t *testing.T) {
+	t.Run("missing service -> error", func(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{"apiKey": "rnd_test"},
@@ -88,7 +88,7 @@ func Test__Render_TriggerDeploy__Execute(t *testing.T) {
 			Configuration:  map[string]any{},
 		})
 
-		require.ErrorContains(t, err, "serviceId is required")
+		require.ErrorContains(t, err, "service is required")
 	})
 
 	t.Run("render API error -> returns error", func(t *testing.T) {
@@ -108,7 +108,7 @@ func Test__Render_TriggerDeploy__Execute(t *testing.T) {
 			},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 			Configuration: map[string]any{
-				"serviceId": "srv-missing",
+				"service": "srv-missing",
 			},
 		})
 

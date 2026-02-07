@@ -66,15 +66,16 @@ func Test__Render__Sync(t *testing.T) {
 
 		metadata, ok := integrationCtx.Metadata.(Metadata)
 		require.True(t, ok)
-		assert.Equal(t, "usr-123", metadata.OwnerID)
-		assert.Equal(t, "professional", metadata.WorkspacePlan)
+		require.NotNil(t, metadata.Workspace)
+		assert.Equal(t, "usr-123", metadata.Workspace.ID)
+		assert.Equal(t, "professional", metadata.Workspace.Plan)
 
 		require.Len(t, httpCtx.Requests, 2)
 		assert.Contains(t, httpCtx.Requests[0].URL.String(), "/v1/services")
 		assert.Contains(t, httpCtx.Requests[1].URL.String(), "/v1/owners")
 	})
 
-	t.Run("ownerId not available -> error", func(t *testing.T) {
+	t.Run("workspace not available -> error", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -91,7 +92,7 @@ func Test__Render__Sync(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiKey":        "rnd_test",
-				"ownerId":       "tea-999",
+				"workspace":     "tea-999",
 				"workspacePlan": "professional",
 			},
 		}
@@ -136,8 +137,48 @@ func Test__Render__Sync(t *testing.T) {
 
 		metadata, ok := integrationCtx.Metadata.(Metadata)
 		require.True(t, ok)
-		assert.Equal(t, "usr-123", metadata.OwnerID)
-		assert.Equal(t, "organization", metadata.WorkspacePlan)
+		require.NotNil(t, metadata.Workspace)
+		assert.Equal(t, "usr-123", metadata.Workspace.ID)
+		assert.Equal(t, "organization", metadata.Workspace.Plan)
+	})
+
+	t.Run("workspace can be selected by name", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`[{"cursor":"x","service":{"id":"srv-1","name":"backend"}}]`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`[{"cursor":"x","owner":{"id":"usr-123","name":"Personal"}},{"cursor":"y","owner":{"id":"tea-456","name":"Acme Team"}}]`,
+					)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey":        "rnd_test",
+				"workspace":     "Acme Team",
+				"workspacePlan": "organization",
+			},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			Configuration: integrationCtx.Configuration,
+			HTTP:          httpCtx,
+			Integration:   integrationCtx,
+		})
+
+		require.NoError(t, err)
+
+		metadata, ok := integrationCtx.Metadata.(Metadata)
+		require.True(t, ok)
+		require.NotNil(t, metadata.Workspace)
+		assert.Equal(t, "tea-456", metadata.Workspace.ID)
+		assert.Equal(t, "organization", metadata.Workspace.Plan)
 	})
 }
 
@@ -156,7 +197,11 @@ func Test__Render__ListResources(t *testing.T) {
 
 	integrationCtx := &contexts.IntegrationContext{
 		Configuration: map[string]any{"apiKey": "rnd_test"},
-		Metadata:      Metadata{OwnerID: "usr-123"},
+		Metadata: Metadata{
+			Workspace: &WorkspaceMetadata{
+				ID: "usr-123",
+			},
+		},
 	}
 
 	resources, err := integration.ListResources("service", core.ListResourcesContext{
@@ -202,7 +247,11 @@ func Test__Render__SetupWebhook(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{"apiKey": "rnd_test"},
-			Metadata:      Metadata{OwnerID: "usr-123"},
+			Metadata: Metadata{
+				Workspace: &WorkspaceMetadata{
+					ID: "usr-123",
+				},
+			},
 		}
 
 		metadata, err := integration.SetupWebhook(core.SetupWebhookContext{
@@ -235,7 +284,7 @@ func Test__Render__SetupWebhook(t *testing.T) {
 		assert.Equal(t, "usr-123", payload["ownerId"])
 		assert.Equal(t, "https://hooks.superplane.dev/render", payload["url"])
 		assert.Equal(t, true, payload["enabled"])
-		assert.ElementsMatch(t, renderWebhookEventFilter(WebhookConfiguration{
+		assert.ElementsMatch(t, webhookEventFilter(WebhookConfiguration{
 			Strategy: renderWebhookStrategyIntegration,
 		}), payload["eventFilter"])
 	})
@@ -272,7 +321,11 @@ func Test__Render__SetupWebhook(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{"apiKey": "rnd_test"},
-			Metadata:      Metadata{OwnerID: "usr-123"},
+			Metadata: Metadata{
+				Workspace: &WorkspaceMetadata{
+					ID: "usr-123",
+				},
+			},
 		}
 
 		metadata, err := integration.SetupWebhook(core.SetupWebhookContext{
@@ -306,7 +359,7 @@ func Test__Render__SetupWebhook(t *testing.T) {
 		assert.Equal(t, "SuperPlane", updatePayload["name"])
 		assert.Equal(t, "https://hooks.superplane.dev/render", updatePayload["url"])
 		assert.Equal(t, true, updatePayload["enabled"])
-		assert.ElementsMatch(t, renderWebhookEventFilter(WebhookConfiguration{
+		assert.ElementsMatch(t, webhookEventFilter(WebhookConfiguration{
 			Strategy: renderWebhookStrategyIntegration,
 		}), updatePayload["eventFilter"])
 
@@ -342,8 +395,10 @@ func Test__Render__SetupWebhook(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{"apiKey": "rnd_test"},
 			Metadata: Metadata{
-				OwnerID:       "usr-123",
-				WorkspacePlan: "organization",
+				Workspace: &WorkspaceMetadata{
+					ID:   "usr-123",
+					Plan: "organization",
+				},
 			},
 		}
 
@@ -370,7 +425,7 @@ func Test__Render__SetupWebhook(t *testing.T) {
 		payload := map[string]any{}
 		require.NoError(t, json.Unmarshal(body, &payload))
 		assert.Equal(t, "SuperPlane Build", payload["name"])
-		assert.ElementsMatch(t, renderWebhookEventFilter(WebhookConfiguration{
+		assert.ElementsMatch(t, webhookEventFilter(WebhookConfiguration{
 			Strategy:     renderWebhookStrategyResourceType,
 			ResourceType: renderWebhookResourceTypeBuild,
 		}), payload["eventFilter"])

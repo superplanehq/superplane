@@ -24,7 +24,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Instructions
 
 1. **API Key:** Create it in [Render Account Settings -> API Keys](https://dashboard.render.com/u/settings#api-keys).
-2. **Workspace ID (optional):** Use your Render workspace ID (`usr-...` or `tea-...`). Leave empty to use the first workspace available to the API key.
+2. **Workspace (optional):** Use your Render workspace ID (`usr-...` or `tea-...`) or workspace name. Leave empty to use the first workspace available to the API key.
 3. **Workspace Plan:** Select **Professional** or **Organization / Enterprise** (used to choose webhook strategy).
 4. **Auth:** SuperPlane sends requests to [Render API v1](https://api.render.com/v1/) using `Authorization: Bearer <API_KEY>`.
 5. **Webhooks:** SuperPlane configures Render webhooks automatically via the [Render Webhooks API](https://render.com/docs/webhooks). No manual setup is required.
@@ -54,6 +54,7 @@ Render webhooks are validated using the secret generated when SuperPlane creates
 - `webhook-id`
 - `webhook-timestamp`
 - `webhook-signature` (`v1,<base64-signature>`)
+- `webhook-timestamp` must be recent (5-minute replay window)
 
 ### Event Data
 
@@ -68,10 +69,10 @@ The default output emits payload data fields like `id`, `serviceId`, `serviceNam
     "id": "evj-cukouhrtq21c73e9scng",
     "serviceId": "srv-cukouhrtq21c73e9scng",
     "serviceName": "backend-api",
-    "status": "succeeded"
+    "status": "failed"
   },
   "timestamp": "2026-02-05T16:00:01.000000Z",
-  "type": "render.deploy.ended"
+  "type": "render.build.ended"
 }
 ```
 
@@ -98,6 +99,7 @@ Render webhooks are validated using the secret generated when SuperPlane creates
 - `webhook-id`
 - `webhook-timestamp`
 - `webhook-signature` (`v1,<base64-signature>`)
+- `webhook-timestamp` must be recent (5-minute replay window)
 
 ### Event Data
 
@@ -158,4 +160,3 @@ The default output emits the deploy object returned by Render (e.g. `id`, `statu
   "type": "render.deploy.triggered"
 }
 ```
-

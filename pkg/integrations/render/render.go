@@ -19,13 +19,17 @@ type Render struct{}
 
 type Configuration struct {
 	APIKey        string `json:"apiKey" mapstructure:"apiKey"`
-	OwnerID       string `json:"ownerId" mapstructure:"ownerId"`
+	Workspace     string `json:"workspace" mapstructure:"workspace"`
 	WorkspacePlan string `json:"workspacePlan" mapstructure:"workspacePlan"`
 }
 
 type Metadata struct {
-	OwnerID       string `json:"ownerId" mapstructure:"ownerId"`
-	WorkspacePlan string `json:"workspacePlan" mapstructure:"workspacePlan"`
+	Workspace *WorkspaceMetadata `json:"workspace,omitempty" mapstructure:"workspace"`
+}
+
+type WorkspaceMetadata struct {
+	ID   string `json:"id" mapstructure:"id"`
+	Plan string `json:"plan" mapstructure:"plan"`
 }
 
 type WebhookMetadata struct {
@@ -52,7 +56,7 @@ func (r *Render) Description() string {
 func (r *Render) Instructions() string {
 	return `
 1. **API Key:** Create it in [Render Account Settings -> API Keys](https://dashboard.render.com/u/settings#api-keys).
-2. **Workspace ID (optional):** Use your Render workspace ID (` + "`usr-...`" + ` or ` + "`tea-...`" + `). Leave empty to use the first workspace available to the API key.
+2. **Workspace (optional):** Use your Render workspace ID (` + "`usr-...`" + ` or ` + "`tea-...`" + `) or workspace name. Leave empty to use the first workspace available to the API key.
 3. **Workspace Plan:** Select **Professional** or **Organization / Enterprise** (used to choose webhook strategy).
 4. **Auth:** SuperPlane sends requests to [Render API v1](https://api.render.com/v1/) using ` + "`Authorization: Bearer <API_KEY>`" + `.
 5. **Webhooks:** SuperPlane configures Render webhooks automatically via the [Render Webhooks API](https://render.com/docs/webhooks). No manual setup is required.
@@ -72,11 +76,11 @@ func (r *Render) Configuration() []configuration.Field {
 			Description: "Render API key",
 		},
 		{
-			Name:        "ownerId",
-			Label:       "Workspace ID",
+			Name:        "workspace",
+			Label:       "Workspace",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Optional Render workspace ID (usr-... or tea-...). Use this if your API key has access to multiple workspaces.",
+			Description: "Optional Render workspace ID/name. Use this if your API key has access to multiple workspaces.",
 		},
 		{
 			Name:     "workspacePlan",
@@ -134,16 +138,13 @@ func (r *Render) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to verify Render credentials: %w", err)
 	}
 
-	owner, err := resolveOwner(client, strings.TrimSpace(config.OwnerID))
+	owner, err := resolveOwner(client, config.workspace())
 	if err != nil {
 		return fmt.Errorf("failed to resolve workspace: %w", err)
 	}
 
 	workspacePlan := normalizeWorkspacePlan(config.WorkspacePlan)
-	ctx.Integration.SetMetadata(Metadata{
-		OwnerID:       owner.ID,
-		WorkspacePlan: workspacePlan,
-	})
+	ctx.Integration.SetMetadata(buildMetadata(owner.ID, workspacePlan))
 	ctx.Integration.Ready()
 	return nil
 }
@@ -200,10 +201,10 @@ func (r *Render) MergeWebhookConfig(current, requested any) (any, bool, error) {
 	)
 
 	if len(mergedConfiguration.EventTypes) == 0 {
-		mergedConfiguration.EventTypes = renderDefaultEventTypesForWebhook(currentConfiguration)
+		mergedConfiguration.EventTypes = defaultEventTypesForWebhook(currentConfiguration)
 	}
 
-	return mergedConfiguration, !renderWebhookConfigurationsEqual(currentConfiguration, mergedConfiguration), nil
+	return mergedConfiguration, !webhookConfigurationsEqual(currentConfiguration, mergedConfiguration), nil
 }
 
 func (r *Render) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -216,7 +217,7 @@ func (r *Render) ListResources(resourceType string, ctx core.ListResourcesContex
 		return nil, err
 	}
 
-	ownerID, err := r.ownerID(client, ctx.Integration)
+	ownerID, err := ownerIDForIntegration(client, ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
@@ -253,12 +254,12 @@ func (r *Render) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 		return nil, err
 	}
 
-	ownerID, err := r.ownerID(client, ctx.Integration)
+	ownerID, err := ownerIDForIntegration(client, ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
 
-	webhookURL := strings.TrimSpace(ctx.Webhook.GetURL())
+	webhookURL := ctx.Webhook.GetURL()
 	if webhookURL == "" {
 		return nil, fmt.Errorf("webhook URL is required")
 	}
@@ -268,76 +269,42 @@ func (r *Render) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 		return nil, fmt.Errorf("failed to decode webhook configuration: %w", err)
 	}
 
-	webhookName := renderWebhookName(webhookConfiguration)
-	eventFilter := renderWebhookEventFilter(webhookConfiguration)
-	webhooks, err := client.ListWebhooks(ownerID)
+	selectedWebhookName := webhookName(webhookConfiguration)
+	eventFilter := webhookEventFilter(webhookConfiguration)
+	selectedWebhook, err := r.findExistingWebhook(
+		client,
+		ownerID,
+		webhookURL,
+		webhookConfiguration,
+		selectedWebhookName,
+		eventFilter,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list Render webhooks: %w", err)
-	}
-
-	candidateWebhooks := make([]Webhook, 0, len(webhooks))
-	for _, webhook := range webhooks {
-		if strings.TrimSpace(webhook.URL) == webhookURL {
-			candidateWebhooks = append(candidateWebhooks, webhook)
-		}
-	}
-
-	selectedWebhook := (*Webhook)(nil)
-	if webhookConfiguration.Strategy == renderWebhookStrategyIntegration {
-		selectedWebhook = pickExistingRenderWebhook(candidateWebhooks, webhookName)
-	} else {
-		selectedWebhook = pickExistingRenderWebhookByName(candidateWebhooks, webhookName)
-		if selectedWebhook == nil {
-			selectedWebhook = pickExistingRenderWebhookByEventFilter(candidateWebhooks, eventFilter)
-		}
+		return nil, err
 	}
 
 	if selectedWebhook != nil {
-		retrievedWebhook, retrieveErr := client.GetWebhook(selectedWebhook.ID)
-		if retrieveErr != nil {
-			return nil, fmt.Errorf("failed to retrieve existing Render webhook: %w", retrieveErr)
+		secret, err := r.updateWebhookIfNeeded(
+			client,
+			*selectedWebhook,
+			selectedWebhookName,
+			webhookURL,
+			eventFilter,
+		)
+		if err != nil {
+			return nil, err
 		}
 
-		existingEventFilter := normalizeWebhookEventTypes(retrievedWebhook.EventFilter)
-		if len(existingEventFilter) == 0 {
-			existingEventFilter = normalizeWebhookEventTypes(selectedWebhook.EventFilter)
-		}
-
-		existingName := strings.TrimSpace(retrievedWebhook.Name)
-		if existingName == "" {
-			existingName = strings.TrimSpace(selectedWebhook.Name)
-		}
-
-		mergedEventFilter := normalizeWebhookEventTypes(append(existingEventFilter, eventFilter...))
-		if len(mergedEventFilter) == 0 {
-			mergedEventFilter = eventFilter
-		}
-
-		if existingName != webhookName || !slices.Equal(existingEventFilter, mergedEventFilter) || !retrievedWebhook.Enabled {
-			_, updateErr := client.UpdateWebhook(selectedWebhook.ID, UpdateWebhookRequest{
-				Name:        webhookName,
-				URL:         webhookURL,
-				Enabled:     true,
-				EventFilter: mergedEventFilter,
-			})
-			if updateErr != nil {
-				return nil, fmt.Errorf("failed to update existing Render webhook: %w", updateErr)
-			}
-		}
-
-		secret := strings.TrimSpace(retrievedWebhook.Secret)
-		if secret == "" {
-			secret = strings.TrimSpace(selectedWebhook.Secret)
-		}
 		if err := setWebhookSecret(ctx, secret); err != nil {
 			return nil, err
 		}
+
 		return WebhookMetadata{WebhookID: selectedWebhook.ID, OwnerID: ownerID}, nil
 	}
 
 	createdWebhook, err := client.CreateWebhook(CreateWebhookRequest{
 		OwnerID:     ownerID,
-		Name:        webhookName,
+		Name:        selectedWebhookName,
 		URL:         webhookURL,
 		Enabled:     true,
 		EventFilter: eventFilter,
@@ -345,10 +312,88 @@ func (r *Render) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Render webhook: %w", err)
 	}
-	if err := setWebhookSecret(ctx, strings.TrimSpace(createdWebhook.Secret)); err != nil {
+	if err := setWebhookSecret(ctx, createdWebhook.Secret); err != nil {
 		return nil, err
 	}
 	return WebhookMetadata{WebhookID: createdWebhook.ID, OwnerID: ownerID}, nil
+}
+
+func (r *Render) findExistingWebhook(
+	client *Client,
+	ownerID string,
+	webhookURL string,
+	webhookConfiguration WebhookConfiguration,
+	selectedWebhookName string,
+	eventFilter []string,
+) (*Webhook, error) {
+	webhooks, err := client.ListWebhooks(ownerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list Render webhooks: %w", err)
+	}
+
+	candidateWebhooks := make([]Webhook, 0, len(webhooks))
+	for _, webhook := range webhooks {
+		if webhook.URL == webhookURL {
+			candidateWebhooks = append(candidateWebhooks, webhook)
+		}
+	}
+
+	if webhookConfiguration.Strategy == renderWebhookStrategyIntegration {
+		return pickExistingRenderWebhook(candidateWebhooks, selectedWebhookName), nil
+	}
+
+	webhook := pickExistingRenderWebhookByName(candidateWebhooks, selectedWebhookName)
+	if webhook != nil {
+		return webhook, nil
+	}
+
+	return pickExistingRenderWebhookByEventFilter(candidateWebhooks, eventFilter), nil
+}
+
+func (r *Render) updateWebhookIfNeeded(
+	client *Client,
+	selectedWebhook Webhook,
+	selectedWebhookName string,
+	webhookURL string,
+	eventFilter []string,
+) (string, error) {
+	retrievedWebhook, err := client.GetWebhook(selectedWebhook.ID)
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve existing Render webhook: %w", err)
+	}
+
+	existingEventFilter := normalizeWebhookEventTypes(retrievedWebhook.EventFilter)
+	if len(existingEventFilter) == 0 {
+		existingEventFilter = normalizeWebhookEventTypes(selectedWebhook.EventFilter)
+	}
+
+	existingName := retrievedWebhook.Name
+	if existingName == "" {
+		existingName = selectedWebhook.Name
+	}
+
+	mergedEventFilter := normalizeWebhookEventTypes(append(existingEventFilter, eventFilter...))
+	if len(mergedEventFilter) == 0 {
+		mergedEventFilter = eventFilter
+	}
+
+	if existingName != selectedWebhookName || !slices.Equal(existingEventFilter, mergedEventFilter) || !retrievedWebhook.Enabled {
+		_, err = client.UpdateWebhook(selectedWebhook.ID, UpdateWebhookRequest{
+			Name:        selectedWebhookName,
+			URL:         webhookURL,
+			Enabled:     true,
+			EventFilter: mergedEventFilter,
+		})
+		if err != nil {
+			return "", fmt.Errorf("failed to update existing Render webhook: %w", err)
+		}
+	}
+
+	if retrievedWebhook.Secret != "" {
+		return retrievedWebhook.Secret, nil
+	}
+
+	return selectedWebhook.Secret, nil
 }
 
 func setWebhookSecret(ctx core.SetupWebhookContext, secret string) error {
@@ -367,7 +412,7 @@ func (r *Render) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 		return fmt.Errorf("failed to decode webhook metadata: %w", err)
 	}
 
-	if strings.TrimSpace(metadata.WebhookID) == "" {
+	if metadata.WebhookID == "" {
 		return nil
 	}
 
@@ -397,48 +442,24 @@ func (r *Render) HandleAction(ctx core.IntegrationActionContext) error {
 	return nil
 }
 
-func (r *Render) ownerID(client *Client, integration core.IntegrationContext) (string, error) {
+func ownerIDForIntegration(client *Client, integration core.IntegrationContext) (string, error) {
 	metadata := Metadata{}
-	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err == nil {
-		if strings.TrimSpace(metadata.OwnerID) != "" {
-			if strings.TrimSpace(metadata.WorkspacePlan) == "" {
-				workspacePlan := renderWorkspacePlanProfessional
-				workspacePlanValue, workspacePlanErr := integration.GetConfig("workspacePlan")
-				if workspacePlanErr == nil {
-					workspacePlan = normalizeWorkspacePlan(string(workspacePlanValue))
-				}
-
-				integration.SetMetadata(Metadata{
-					OwnerID:       strings.TrimSpace(metadata.OwnerID),
-					WorkspacePlan: workspacePlan,
-				})
-			}
-
-			return strings.TrimSpace(metadata.OwnerID), nil
-		}
+	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err == nil && metadata.Workspace != nil && metadata.Workspace.ID != "" {
+		return metadata.Workspace.ID, nil
 	}
 
-	ownerIDConfig := ""
-	ownerIDConfigValue, err := integration.GetConfig("ownerId")
-	if err == nil {
-		ownerIDConfig = strings.TrimSpace(string(ownerIDConfigValue))
+	workspace := ""
+	workspaceValue, workspaceErr := integration.GetConfig("workspace")
+	if workspaceErr == nil {
+		workspace = strings.TrimSpace(string(workspaceValue))
 	}
 
-	owner, err := resolveOwner(client, ownerIDConfig)
+	owner, err := resolveOwner(client, workspace)
 	if err != nil {
 		return "", err
 	}
 
-	workspacePlan, workspacePlanErr := integration.GetConfig("workspacePlan")
-	configuredWorkspacePlan := renderWorkspacePlanProfessional
-	if workspacePlanErr == nil {
-		configuredWorkspacePlan = normalizeWorkspacePlan(string(workspacePlan))
-	}
-
-	integration.SetMetadata(Metadata{
-		OwnerID:       owner.ID,
-		WorkspacePlan: configuredWorkspacePlan,
-	})
+	integration.SetMetadata(buildMetadata(owner.ID, workspacePlanFromConfig(integration)))
 	return owner.ID, nil
 }
 
@@ -452,19 +473,56 @@ func resolveOwner(client *Client, ownerID string) (Owner, error) {
 		return Owner{}, fmt.Errorf("no workspaces found for this API key")
 	}
 
-	trimmedOwnerID := strings.TrimSpace(ownerID)
-	if trimmedOwnerID == "" {
+	trimmedWorkspace := strings.TrimSpace(ownerID)
+	if trimmedWorkspace == "" {
 		return owners[0], nil
 	}
 
 	selectedOwner := slices.IndexFunc(owners, func(owner Owner) bool {
-		return strings.TrimSpace(owner.ID) == trimmedOwnerID
+		return strings.TrimSpace(owner.ID) == trimmedWorkspace
 	})
 	if selectedOwner < 0 {
-		return Owner{}, fmt.Errorf("workspace %s is not accessible with this API key", trimmedOwnerID)
+		selectedOwner = slices.IndexFunc(owners, func(owner Owner) bool {
+			return strings.EqualFold(strings.TrimSpace(owner.Name), trimmedWorkspace)
+		})
+	}
+
+	if selectedOwner < 0 {
+		return Owner{}, fmt.Errorf("workspace %s is not accessible with this API key", trimmedWorkspace)
 	}
 
 	return owners[selectedOwner], nil
+}
+
+func (c Configuration) workspace() string {
+	return strings.TrimSpace(c.Workspace)
+}
+
+func (m Metadata) workspacePlan() string {
+	if m.Workspace == nil {
+		return renderWorkspacePlanProfessional
+	}
+
+	return normalizeWorkspacePlan(m.Workspace.Plan)
+}
+
+func buildMetadata(workspaceID, workspacePlan string) Metadata {
+	return Metadata{
+		Workspace: &WorkspaceMetadata{
+			ID:   workspaceID,
+			Plan: normalizeWorkspacePlan(workspacePlan),
+		},
+	}
+}
+
+func workspacePlanFromConfig(integration core.IntegrationContext) string {
+	configuredWorkspacePlan := renderWorkspacePlanProfessional
+	workspacePlanValue, workspacePlanErr := integration.GetConfig("workspacePlan")
+	if workspacePlanErr == nil {
+		configuredWorkspacePlan = normalizeWorkspacePlan(string(workspacePlanValue))
+	}
+
+	return configuredWorkspacePlan
 }
 
 func normalizeWorkspacePlan(workspacePlan string) string {

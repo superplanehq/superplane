@@ -13,7 +13,7 @@ interface RenderEventData {
 
 interface OnEventConfiguration {
   eventTypes?: string[];
-  serviceId?: string;
+  service?: string;
 }
 
 /** Labels for event types as received in payloads (dot-case, e.g. render.deploy.ended). */
@@ -50,7 +50,7 @@ function formatEventLabel(event?: string): string {
 
 export const renderTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const event = context.event as RenderEventData | undefined;
+    const event = context.event?.data as RenderEventData | undefined;
     const title = buildTitle(event, context.event?.type as string);
 
     return {
@@ -110,10 +110,11 @@ function buildMetadata(configuration: OnEventConfiguration | undefined): Trigger
     });
   }
 
-  if (configuration?.serviceId) {
+  const service = configuration?.service;
+  if (service) {
     metadata.push({
       icon: "server",
-      label: `Service: ${configuration.serviceId}`,
+      label: `Service: ${service}`,
     });
   }
 

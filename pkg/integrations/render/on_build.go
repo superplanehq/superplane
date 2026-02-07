@@ -77,8 +77,12 @@ func (t *OnBuild) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if config.ServiceID == "" {
-		return fmt.Errorf("serviceId is required")
+	if config.Service == "" {
+		return fmt.Errorf("service is required")
+	}
+
+	if err := ensureServiceInMetadata(ctx, config); err != nil {
+		return err
 	}
 
 	requestedEventTypes := filterAllowedEventTypes(config.EventTypes, buildAllowedEventTypes)
@@ -87,7 +91,7 @@ func (t *OnBuild) Setup(ctx core.TriggerContext) error {
 	}
 
 	return ctx.Integration.RequestWebhook(
-		renderWebhookConfigurationForResource(ctx.Integration, renderWebhookResourceTypeBuild, requestedEventTypes),
+		webhookConfigurationForResource(ctx.Integration, renderWebhookResourceTypeBuild, requestedEventTypes),
 	)
 }
 

@@ -16,7 +16,7 @@ import renderIcon from "@/assets/icons/integrations/render.svg";
 import { formatTimestamp, stringOrDash } from "./common";
 
 interface TriggerDeployConfiguration {
-  serviceId?: string;
+  service?: string;
   clearCache?: boolean;
 }
 
@@ -75,8 +75,8 @@ function triggerDeployMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as TriggerDeployConfiguration | undefined;
 
-  if (configuration?.serviceId) {
-    metadata.push({ icon: "server", label: `Service: ${configuration.serviceId}` });
+  if (configuration?.service) {
+    metadata.push({ icon: "server", label: `Service: ${configuration.service}` });
   }
 
   if (configuration?.clearCache) {

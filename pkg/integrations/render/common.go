@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -17,8 +19,17 @@ import (
 )
 
 type OnResourceEventConfiguration struct {
-	ServiceID  string   `json:"serviceId" mapstructure:"serviceId"`
+	Service    string   `json:"service" mapstructure:"service"`
 	EventTypes []string `json:"eventTypes" mapstructure:"eventTypes"`
+}
+
+type ServiceMetadata struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type OnResourceEventMetadata struct {
+	Service *ServiceMetadata `json:"service"`
 }
 
 type WebhookConfiguration struct {
@@ -37,9 +48,11 @@ const (
 
 	renderWebhookResourceTypeDeploy = "deploy"
 	renderWebhookResourceTypeBuild  = "build"
+
+	webhookTimestampMaxSkew = 5 * time.Minute
 )
 
-func renderWebhookConfigurationForResource(
+func webhookConfigurationForResource(
 	integration core.IntegrationContext,
 	resourceType string,
 	eventTypes []string,
@@ -52,8 +65,8 @@ func renderWebhookConfigurationForResource(
 		}
 	}
 
-	workspacePlan := strings.ToLower(strings.TrimSpace(metadata.WorkspacePlan))
-	if workspacePlan != renderWorkspacePlanOrganization && workspacePlan != renderWorkspacePlanEnterpriseAlias {
+	workspacePlan := metadata.workspacePlan()
+	if workspacePlan != renderWorkspacePlanOrganization {
 		return WebhookConfiguration{
 			Strategy:   renderWebhookStrategyIntegration,
 			EventTypes: normalizeWebhookEventTypes(eventTypes),
@@ -125,7 +138,7 @@ func normalizeWebhookConfiguration(configuration WebhookConfiguration) WebhookCo
 	}
 }
 
-func renderWebhookName(configuration WebhookConfiguration) string {
+func webhookName(configuration WebhookConfiguration) string {
 	configuration = normalizeWebhookConfiguration(configuration)
 	if configuration.Strategy == renderWebhookStrategyResourceType &&
 		configuration.ResourceType == renderWebhookResourceTypeDeploy {
@@ -140,15 +153,15 @@ func renderWebhookName(configuration WebhookConfiguration) string {
 	return "SuperPlane"
 }
 
-func renderWebhookEventFilter(configuration WebhookConfiguration) []string {
+func webhookEventFilter(configuration WebhookConfiguration) []string {
 	configuration = normalizeWebhookConfiguration(configuration)
-	allowedEventTypes := renderAllowedEventTypesForWebhook(configuration)
+	allowedEventTypes := allowedEventTypesForWebhook(configuration)
 	requestedEventTypes := filterAllowedEventTypes(configuration.EventTypes, allowedEventTypes)
 	if len(requestedEventTypes) > 0 {
 		return requestedEventTypes
 	}
 
-	defaultEventTypes := renderDefaultEventTypesForWebhook(configuration)
+	defaultEventTypes := defaultEventTypesForWebhook(configuration)
 	if len(defaultEventTypes) > 0 {
 		return defaultEventTypes
 	}
@@ -163,7 +176,7 @@ func combineDeployAndBuildEventTypes(deploy, build []string) []string {
 	return normalizeWebhookEventTypes(out)
 }
 
-func renderAllowedEventTypesForWebhook(configuration WebhookConfiguration) []string {
+func allowedEventTypesForWebhook(configuration WebhookConfiguration) []string {
 	if configuration.Strategy == renderWebhookStrategyResourceType {
 		switch configuration.ResourceType {
 		case renderWebhookResourceTypeDeploy:
@@ -175,7 +188,7 @@ func renderAllowedEventTypesForWebhook(configuration WebhookConfiguration) []str
 	return combineDeployAndBuildEventTypes(deployAllowedEventTypes, buildAllowedEventTypes)
 }
 
-func renderDefaultEventTypesForWebhook(configuration WebhookConfiguration) []string {
+func defaultEventTypesForWebhook(configuration WebhookConfiguration) []string {
 	if configuration.Strategy == renderWebhookStrategyResourceType {
 		switch configuration.ResourceType {
 		case renderWebhookResourceTypeDeploy:
@@ -187,7 +200,7 @@ func renderDefaultEventTypesForWebhook(configuration WebhookConfiguration) []str
 	return combineDeployAndBuildEventTypes(deployDefaultEventTypes, buildDefaultEventTypes)
 }
 
-func renderWebhookConfigurationsEqual(a, b WebhookConfiguration) bool {
+func webhookConfigurationsEqual(a, b WebhookConfiguration) bool {
 	normalizedA := normalizeWebhookConfiguration(a)
 	normalizedB := normalizeWebhookConfiguration(b)
 
@@ -202,7 +215,7 @@ func onResourceEventConfigurationFields(
 ) []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:     "serviceId",
+			Name:     "service",
 			Label:    "Service",
 			Type:     configuration.FieldTypeIntegrationResource,
 			Required: true,
@@ -235,9 +248,82 @@ func decodeOnResourceEventConfiguration(configuration any) (OnResourceEventConfi
 		return config, err
 	}
 
-	config.ServiceID = strings.TrimSpace(config.ServiceID)
+	config.Service = strings.TrimSpace(config.Service)
 	config.EventTypes = normalizeWebhookEventTypes(config.EventTypes)
 	return config, nil
+}
+
+func ensureServiceInMetadata(ctx core.TriggerContext, config OnResourceEventConfiguration) error {
+	serviceValue := strings.TrimSpace(config.Service)
+	if serviceValue == "" {
+		return fmt.Errorf("service is required")
+	}
+
+	nodeMetadata := OnResourceEventMetadata{}
+	if ctx.Metadata != nil {
+		if err := mapstructure.Decode(ctx.Metadata.Get(), &nodeMetadata); err != nil {
+			return fmt.Errorf("failed to decode node metadata: %w", err)
+		}
+
+		if nodeMetadata.Service != nil &&
+			(nodeMetadata.Service.ID == serviceValue || nodeMetadata.Service.Name == serviceValue) {
+			return nil
+		}
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	ownerID, err := ownerIDForIntegration(client, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	services, err := client.ListServices(ownerID)
+	if err != nil {
+		return fmt.Errorf("failed to list Render services: %w", err)
+	}
+
+	service := findService(services, serviceValue)
+	if service == nil {
+		return fmt.Errorf("service %s is not accessible with this API key", serviceValue)
+	}
+
+	if ctx.Metadata == nil {
+		return nil
+	}
+
+	return ctx.Metadata.Set(OnResourceEventMetadata{
+		Service: &ServiceMetadata{
+			ID:   service.ID,
+			Name: service.Name,
+		},
+	})
+}
+
+func findService(services []Service, value string) *Service {
+	trimmedValue := strings.TrimSpace(value)
+	if trimmedValue == "" {
+		return nil
+	}
+
+	idIndex := slices.IndexFunc(services, func(service Service) bool {
+		return strings.TrimSpace(service.ID) == trimmedValue
+	})
+	if idIndex >= 0 {
+		return &services[idIndex]
+	}
+
+	nameIndex := slices.IndexFunc(services, func(service Service) bool {
+		return strings.EqualFold(strings.TrimSpace(service.Name), trimmedValue)
+	})
+	if nameIndex < 0 {
+		return nil
+	}
+
+	return &services[nameIndex]
 }
 
 func handleOnResourceEventWebhook(
@@ -246,7 +332,7 @@ func handleOnResourceEventWebhook(
 	allowedEventTypes []string,
 	defaultEventTypes []string,
 ) (int, error) {
-	if err := verifyRenderWebhookSignature(ctx); err != nil {
+	if err := verifyWebhookSignature(ctx); err != nil {
 		return http.StatusForbidden, err
 	}
 
@@ -266,7 +352,7 @@ func handleOnResourceEventWebhook(
 
 	data := readMap(payload["data"])
 	serviceID := readString(data["serviceId"])
-	if config.ServiceID == "" || serviceID == "" || config.ServiceID != serviceID {
+	if config.Service == "" || serviceID == "" || config.Service != serviceID {
 		return http.StatusOK, nil
 	}
 
@@ -279,7 +365,7 @@ func handleOnResourceEventWebhook(
 		return http.StatusOK, nil
 	}
 
-	if err := ctx.Events.Emit(renderPayloadType(eventType), data); err != nil {
+	if err := ctx.Events.Emit(payloadType(eventType), data); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %w", err)
 	}
 
@@ -322,7 +408,7 @@ func normalizeWebhookEventTypes(eventTypes []string) []string {
 	return normalizedEventTypes
 }
 
-func verifyRenderWebhookSignature(ctx core.WebhookRequestContext) error {
+func verifyWebhookSignature(ctx core.WebhookRequestContext) error {
 	if ctx.Webhook == nil {
 		return fmt.Errorf("missing webhook context")
 	}
@@ -344,12 +430,21 @@ func verifyRenderWebhookSignature(ctx core.WebhookRequestContext) error {
 		return fmt.Errorf("missing signature headers")
 	}
 
-	signatures, err := parseRenderWebhookSignatures(signatureHeader)
+	timestamp, err := parseWebhookTimestamp(webhookTimestamp)
+	if err != nil {
+		return fmt.Errorf("invalid webhook timestamp")
+	}
+
+	if absDuration(time.Now().UTC().Sub(timestamp)) > webhookTimestampMaxSkew {
+		return fmt.Errorf("webhook timestamp expired")
+	}
+
+	signatures, err := parseWebhookSignatures(signatureHeader)
 	if err != nil {
 		return err
 	}
 
-	signingKeys := renderSigningKeys(secret)
+	signingKeys := signingKeys(secret)
 	payloadPrefix := webhookID + "." + webhookTimestamp + "."
 	secretText := []byte(strings.TrimSpace(string(secret)))
 
@@ -357,7 +452,7 @@ func verifyRenderWebhookSignature(ctx core.WebhookRequestContext) error {
 		h := hmac.New(sha256.New, key)
 		h.Write([]byte(payloadPrefix))
 		h.Write(ctx.Body)
-		if matchesAnyRenderSignature(signatures, h.Sum(nil)) {
+		if matchesAnySignature(signatures, h.Sum(nil)) {
 			return nil
 		}
 
@@ -368,7 +463,7 @@ func verifyRenderWebhookSignature(ctx core.WebhookRequestContext) error {
 		h.Write(ctx.Body)
 		h.Write([]byte("."))
 		h.Write(secretText)
-		if matchesAnyRenderSignature(signatures, h.Sum(nil)) {
+		if matchesAnySignature(signatures, h.Sum(nil)) {
 			return nil
 		}
 	}
@@ -376,7 +471,7 @@ func verifyRenderWebhookSignature(ctx core.WebhookRequestContext) error {
 	return fmt.Errorf("invalid signature")
 }
 
-func parseRenderWebhookSignatures(headerValue string) ([][]byte, error) {
+func parseWebhookSignatures(headerValue string) ([][]byte, error) {
 	trimmed := strings.TrimSpace(headerValue)
 	if trimmed == "" {
 		return nil, fmt.Errorf("invalid signature header")
@@ -408,7 +503,7 @@ func parseRenderWebhookSignatures(headerValue string) ([][]byte, error) {
 				continue
 			}
 
-			decoded, decodeErr := decodeRenderBase64(signature)
+			decoded, decodeErr := decodeBase64(signature)
 			if decodeErr != nil {
 				continue
 			}
@@ -430,7 +525,7 @@ func parseRenderWebhookSignatures(headerValue string) ([][]byte, error) {
 	return signatures, nil
 }
 
-func decodeRenderBase64(value string) ([]byte, error) {
+func decodeBase64(value string) ([]byte, error) {
 	decoders := []*base64.Encoding{
 		base64.StdEncoding,
 		base64.RawStdEncoding,
@@ -448,7 +543,7 @@ func decodeRenderBase64(value string) ([]byte, error) {
 	return nil, fmt.Errorf("failed to decode base64 value")
 }
 
-func renderSigningKeys(secret []byte) [][]byte {
+func signingKeys(secret []byte) [][]byte {
 	trimmedSecret := strings.TrimSpace(string(secret))
 	if trimmedSecret == "" {
 		return [][]byte{secret}
@@ -465,7 +560,7 @@ func renderSigningKeys(secret []byte) [][]byte {
 		return keys
 	}
 
-	decodedSecret, err := decodeRenderBase64(encodedSecret)
+	decodedSecret, err := decodeBase64(encodedSecret)
 	if err != nil || len(decodedSecret) == 0 {
 		return keys
 	}
@@ -480,13 +575,13 @@ func renderSigningKeys(secret []byte) [][]byte {
 	return append(keys, decodedSecret)
 }
 
-func matchesAnyRenderSignature(signatures [][]byte, expected []byte) bool {
+func matchesAnySignature(signatures [][]byte, expected []byte) bool {
 	return slices.ContainsFunc(signatures, func(signature []byte) bool {
 		return hmac.Equal(signature, expected)
 	})
 }
 
-func renderPayloadType(eventType string) string {
+func payloadType(eventType string) string {
 	trimmedEventType := strings.TrimSpace(eventType)
 	if trimmedEventType == "" {
 		return "render.event"
@@ -508,6 +603,33 @@ func renderPayloadType(eventType string) string {
 	}
 
 	return "render." + strings.Join(dotCaseParts, ".")
+}
+
+func parseWebhookTimestamp(value string) (time.Time, error) {
+	trimmedValue := strings.TrimSpace(value)
+	if trimmedValue == "" {
+		return time.Time{}, fmt.Errorf("missing timestamp")
+	}
+
+	seconds, err := strconv.ParseInt(trimmedValue, 10, 64)
+	if err == nil {
+		return time.Unix(seconds, 0).UTC(), nil
+	}
+
+	timestamp, err := time.Parse(time.RFC3339Nano, trimmedValue)
+	if err == nil {
+		return timestamp.UTC(), nil
+	}
+
+	return time.Time{}, fmt.Errorf("invalid timestamp")
+}
+
+func absDuration(value time.Duration) time.Duration {
+	if value < 0 {
+		return -value
+	}
+
+	return value
 }
 
 func readString(value any) string {

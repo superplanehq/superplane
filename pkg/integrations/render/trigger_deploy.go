@@ -16,7 +16,7 @@ const TriggerDeployPayloadType = "render.deploy.triggered"
 type TriggerDeploy struct{}
 
 type TriggerDeployConfiguration struct {
-	ServiceID  string `json:"serviceId" mapstructure:"serviceId"`
+	Service    string `json:"service" mapstructure:"service"`
 	ClearCache bool   `json:"clearCache" mapstructure:"clearCache"`
 }
 
@@ -70,7 +70,7 @@ func (c *TriggerDeploy) OutputChannels(configuration any) []core.OutputChannel {
 func (c *TriggerDeploy) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:     "serviceId",
+			Name:     "service",
 			Label:    "Service",
 			Type:     configuration.FieldTypeIntegrationResource,
 			Required: true,
@@ -98,8 +98,8 @@ func (c *TriggerDeploy) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if strings.TrimSpace(configuration.ServiceID) == "" {
-		return fmt.Errorf("serviceId is required")
+	if strings.TrimSpace(configuration.Service) == "" {
+		return fmt.Errorf("service is required")
 	}
 
 	return nil
@@ -115,8 +115,8 @@ func (c *TriggerDeploy) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if strings.TrimSpace(configuration.ServiceID) == "" {
-		return fmt.Errorf("serviceId is required")
+	if strings.TrimSpace(configuration.Service) == "" {
+		return fmt.Errorf("service is required")
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -124,7 +124,7 @@ func (c *TriggerDeploy) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	deploy, err := client.TriggerDeploy(configuration.ServiceID, configuration.ClearCache)
+	deploy, err := client.TriggerDeploy(configuration.Service, configuration.ClearCache)
 	if err != nil {
 		return err
 	}
