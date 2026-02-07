@@ -55,8 +55,6 @@ func (r *Render) Instructions() string {
 2. **Workspace ID (optional):** Use your Render workspace ID (` + "`usr-...`" + ` or ` + "`tea-...`" + `). Leave empty to use the first workspace available to the API key.
 3. **Workspace Plan:** Select **Professional** or **Organization / Enterprise** (used to choose webhook strategy).
 4. **Auth:** SuperPlane sends requests to [Render API v1](https://api.render.com/v1/) using ` + "`Authorization: Bearer <API_KEY>`" + `.
-
-
 5. **Webhooks:** SuperPlane configures Render webhooks automatically via the [Render Webhooks API](https://render.com/docs/webhooks). No manual setup is required.
 6. **Troubleshooting:** Check [Render Dashboard -> Integrations -> Webhooks](https://dashboard.render.com/) and the [Render webhook docs](https://render.com/docs/webhooks).
 
@@ -331,15 +329,9 @@ func (r *Render) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 		if secret == "" {
 			secret = strings.TrimSpace(selectedWebhook.Secret)
 		}
-
-		if secret == "" {
-			return nil, fmt.Errorf("render webhook secret is empty")
+		if err := setWebhookSecret(ctx, secret); err != nil {
+			return nil, err
 		}
-
-		if err := ctx.Webhook.SetSecret([]byte(secret)); err != nil {
-			return nil, fmt.Errorf("failed to store webhook secret: %w", err)
-		}
-
 		return WebhookMetadata{WebhookID: selectedWebhook.ID, OwnerID: ownerID}, nil
 	}
 
@@ -353,17 +345,20 @@ func (r *Render) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Render webhook: %w", err)
 	}
-
-	secret := strings.TrimSpace(createdWebhook.Secret)
-	if secret == "" {
-		return nil, fmt.Errorf("render webhook secret is empty")
+	if err := setWebhookSecret(ctx, strings.TrimSpace(createdWebhook.Secret)); err != nil {
+		return nil, err
 	}
-
-	if err := ctx.Webhook.SetSecret([]byte(secret)); err != nil {
-		return nil, fmt.Errorf("failed to store webhook secret: %w", err)
-	}
-
 	return WebhookMetadata{WebhookID: createdWebhook.ID, OwnerID: ownerID}, nil
+}
+
+func setWebhookSecret(ctx core.SetupWebhookContext, secret string) error {
+	if strings.TrimSpace(secret) == "" {
+		return fmt.Errorf("render webhook secret is empty")
+	}
+	if err := ctx.Webhook.SetSecret([]byte(secret)); err != nil {
+		return fmt.Errorf("failed to store webhook secret: %w", err)
+	}
+	return nil
 }
 
 func (r *Render) CleanupWebhook(ctx core.CleanupWebhookContext) error {

@@ -13,6 +13,7 @@ import { getState, getStateMap, getTriggerRenderer } from "..";
 import { MetadataItem } from "@/ui/metadataList";
 import { formatTimeAgo } from "@/utils/date";
 import renderIcon from "@/assets/icons/integrations/render.svg";
+import { formatTimestamp, stringOrDash } from "./common";
 
 interface TriggerDeployConfiguration {
   serviceId?: string;
@@ -103,26 +104,4 @@ function triggerDeployEventSections(
       eventId: execution.rootEvent!.id!,
     },
   ];
-}
-
-function stringOrDash(value?: unknown): string {
-  if (value === undefined || value === null || value === "") {
-    return "-";
-  }
-
-  return String(value);
-}
-
-function formatTimestamp(value?: string, fallback?: string): string {
-  const timestamp = value || fallback;
-  if (!timestamp) {
-    return "-";
-  }
-
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) {
-    return "-";
-  }
-
-  return date.toLocaleString();
 }

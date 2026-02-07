@@ -215,31 +215,6 @@ func (c *Client) DeleteWebhook(webhookID string) error {
 	return err
 }
 
-func (c *Client) RetrieveEvent(eventID string) (map[string]any, error) {
-	if strings.TrimSpace(eventID) == "" {
-		return nil, fmt.Errorf("eventID is required")
-	}
-
-	_, body, err := c.execRequestWithResponse(http.MethodGet, "/events/"+url.PathEscape(eventID), nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	payload := map[string]any{}
-	if err := json.Unmarshal(body, &payload); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event response: %w", err)
-	}
-
-	if eventValue, ok := payload["event"]; ok {
-		eventMap, ok := eventValue.(map[string]any)
-		if ok {
-			return eventMap, nil
-		}
-	}
-
-	return payload, nil
-}
-
 func (c *Client) TriggerDeploy(serviceID string, clearCache bool) (map[string]any, error) {
 	if strings.TrimSpace(serviceID) == "" {
 		return nil, fmt.Errorf("serviceID is required")

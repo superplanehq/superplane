@@ -16,7 +16,8 @@ interface OnEventConfiguration {
   serviceId?: string;
 }
 
-const eventLabels: Record<string, string> = {
+/** Labels for event types as received in payloads (dot-case, e.g. render.deploy.ended). */
+const eventLabelsByType: Record<string, string> = {
   "render.deploy.ended": "Deploy Ended",
   "render.deploy.started": "Deploy Started",
   "render.build.ended": "Build Ended",
@@ -27,12 +28,24 @@ const eventLabels: Record<string, string> = {
   "render.pre.deploy.started": "Pre-Deploy Started",
 };
 
+/** Labels for event types as stored in configuration (snake_case, e.g. deploy_ended). */
+const eventLabelsByConfig: Record<string, string> = {
+  deploy_ended: "Deploy Ended",
+  deploy_started: "Deploy Started",
+  build_ended: "Build Ended",
+  build_started: "Build Started",
+  image_pull_failed: "Image Pull Failed",
+  pipeline_minutes_exhausted: "Pipeline Minutes Exhausted",
+  pre_deploy_ended: "Pre-Deploy Ended",
+  pre_deploy_started: "Pre-Deploy Started",
+};
+
 function formatEventLabel(event?: string): string {
   if (!event) {
     return "Render Event";
   }
 
-  return eventLabels[event] || event;
+  return eventLabelsByType[event] || eventLabelsByConfig[event] || event;
 }
 
 export const renderTriggerRenderer: TriggerRenderer = {
@@ -49,7 +62,7 @@ export const renderTriggerRenderer: TriggerRenderer = {
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const event = context.event?.data as RenderEventData | undefined;
     return {
-      "Received At": toLocaleStringOrDash(context.event?.createdAt),
+      "Received At": formatTimestamp(context.event?.createdAt),
       Event: stringOrDash(context.event?.type),
       "Event ID": stringOrDash(event?.id),
       "Service ID": stringOrDash(event?.serviceId),
@@ -90,7 +103,7 @@ function buildMetadata(configuration: OnEventConfiguration | undefined): Trigger
   const metadata: TriggerProps["metadata"] = [];
 
   if (configuration?.eventTypes && configuration.eventTypes.length > 0) {
-    const eventTypes = configuration.eventTypes.map((event) => formatEventLabel(event));
+    const eventTypes = configuration.eventTypes.map((event: string) => formatEventLabel(event));
     metadata.push({
       icon: "funnel",
       label: eventTypes.length > 3 ? `Events: ${eventTypes.length} selected` : `Events: ${eventTypes.join(", ")}`,
@@ -117,24 +130,23 @@ function buildSubtitle(createdAt?: string): string {
   return createdAt ? formatTimeAgo(new Date(createdAt)) : "";
 }
 
-function stringOrDash(value?: string): string {
-  if (!value) {
+/** Shared: value or "-" for display. */
+export function stringOrDash(value?: unknown): string {
+  if (value === undefined || value === null || value === "") {
     return "-";
   }
-
-  return value;
+  return String(value);
 }
 
-function toLocaleStringOrDash(value?: string, fallback?: string): string {
+/** Shared: format timestamp for display, or "-" if missing/invalid. */
+export function formatTimestamp(value?: string, fallback?: string): string {
   const timestamp = value || fallback;
   if (!timestamp) {
     return "-";
   }
-
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) {
     return "-";
   }
-
   return date.toLocaleString();
 }

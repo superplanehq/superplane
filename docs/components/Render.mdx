@@ -9,8 +9,8 @@ Deploy and manage Render services, and react to Render deploy/build events
 ## Triggers
 
 <CardGrid>
-  <LinkCard title="On Deploy" href="#on-deploy" description="Listen to Render deploy-related webhook events for one service" />
-  <LinkCard title="On Build" href="#on-build" description="Listen to Render build webhook events for one service" />
+  <LinkCard title="On Build" href="#on-build" description="Listen to Render build events for a service" />
+  <LinkCard title="On Deploy" href="#on-deploy" description="Listen to Render deploy events for a service" />
 </CardGrid>
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
@@ -25,29 +25,28 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 1. **API Key:** Create it in [Render Account Settings -> API Keys](https://dashboard.render.com/u/settings#api-keys).
 2. **Workspace ID (optional):** Use your Render workspace ID (`usr-...` or `tea-...`). Leave empty to use the first workspace available to the API key.
-3. **Workspace Plan:** Select **Professional** or **Organization / Enterprise**. SuperPlane uses this to choose webhook strategy.
+3. **Workspace Plan:** Select **Professional** or **Organization / Enterprise** (used to choose webhook strategy).
 4. **Auth:** SuperPlane sends requests to [Render API v1](https://api.render.com/v1/) using `Authorization: Bearer <API_KEY>`.
 5. **Webhooks:** SuperPlane configures Render webhooks automatically via the [Render Webhooks API](https://render.com/docs/webhooks). No manual setup is required.
 6. **Troubleshooting:** Check [Render Dashboard -> Integrations -> Webhooks](https://dashboard.render.com/) and the [Render webhook docs](https://render.com/docs/webhooks).
 
 Note: **Plan requirement:** Render webhooks require a Professional plan or higher.
 
-<a id="on-deploy"></a>
+<a id="on-build"></a>
 
-## On Deploy
+## On Build
 
-The On Deploy trigger emits deploy-related events from Render for one selected service.
+The On Build trigger emits build-related Render events for one selected service.
 
 ### Use Cases
 
-- **Deploy notifications**: Notify Slack or PagerDuty when deploys succeed or fail
-- **Post-deploy automation**: Trigger smoke tests after successful deploy completion events
-- **Release orchestration**: Trigger downstream workflows when deploy stages change
+- **Build failure alerts**: Notify your team when builds fail
+- **Build success hooks**: Trigger follow-up automation after successful builds
 
 ### Configuration
 
 - **Service**: Required Render service.
-- **Event Types**: Optional deploy event types to listen for. Defaults to `deploy_ended`.
+- **Event Types**: Build event states to listen for. Defaults to `build_ended`.
 
 ### Webhook Verification
 
@@ -65,6 +64,7 @@ The default output emits payload data fields like `id`, `serviceId`, `serviceNam
 ```json
 {
   "data": {
+    "createdAt": "2026-02-05T16:00:00.000000Z",
     "id": "evj-cukouhrtq21c73e9scng",
     "serviceId": "srv-cukouhrtq21c73e9scng",
     "serviceName": "backend-api",
@@ -75,21 +75,22 @@ The default output emits payload data fields like `id`, `serviceId`, `serviceNam
 }
 ```
 
-<a id="on-build"></a>
+<a id="on-deploy"></a>
 
-## On Build
+## On Deploy
 
-The On Build trigger emits build-related events from Render for one selected service.
+The On Deploy trigger emits deploy-related Render events for one selected service.
 
 ### Use Cases
 
-- **Build failure alerts**: Notify your team when builds fail
-- **Build success hooks**: Trigger follow-up automation after successful builds
+- **Deploy notifications**: Notify Slack or PagerDuty when deploys succeed/fail
+- **Post-deploy automation**: Trigger smoke tests after successful deploy completion events
+- **Release orchestration**: Trigger downstream workflows when deploy stages change
 
 ### Configuration
 
 - **Service**: Required Render service.
-- **Event Types**: Optional build event types to listen for. Defaults to `build_ended`.
+- **Event Types**: Deploy event states to listen for. Defaults to `deploy_ended`.
 
 ### Webhook Verification
 
@@ -107,13 +108,14 @@ The default output emits payload data fields like `id`, `serviceId`, `serviceNam
 ```json
 {
   "data": {
+    "createdAt": "2026-02-05T16:00:00.000000Z",
     "id": "evj-cukouhrtq21c73e9scng",
     "serviceId": "srv-cukouhrtq21c73e9scng",
     "serviceName": "backend-api",
-    "status": "failed"
+    "status": "succeeded"
   },
   "timestamp": "2026-02-05T16:00:01.000000Z",
-  "type": "render.build.ended"
+  "type": "render.deploy.ended"
 }
 ```
 
@@ -156,3 +158,4 @@ The default output emits the deploy object returned by Render (e.g. `id`, `statu
   "type": "render.deploy.triggered"
 }
 ```
+

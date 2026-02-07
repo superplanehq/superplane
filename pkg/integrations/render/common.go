@@ -156,6 +156,13 @@ func renderWebhookEventFilter(configuration WebhookConfiguration) []string {
 	return allowedEventTypes
 }
 
+func combineDeployAndBuildEventTypes(deploy, build []string) []string {
+	out := make([]string, 0, len(deploy)+len(build))
+	out = append(out, deploy...)
+	out = append(out, build...)
+	return normalizeWebhookEventTypes(out)
+}
+
 func renderAllowedEventTypesForWebhook(configuration WebhookConfiguration) []string {
 	if configuration.Strategy == renderWebhookStrategyResourceType {
 		switch configuration.ResourceType {
@@ -165,12 +172,7 @@ func renderAllowedEventTypesForWebhook(configuration WebhookConfiguration) []str
 			return buildAllowedEventTypes
 		}
 	}
-
-	eventTypes := make([]string, 0, len(deployAllowedEventTypes)+len(buildAllowedEventTypes))
-	eventTypes = append(eventTypes, deployAllowedEventTypes...)
-	eventTypes = append(eventTypes, buildAllowedEventTypes...)
-
-	return normalizeWebhookEventTypes(eventTypes)
+	return combineDeployAndBuildEventTypes(deployAllowedEventTypes, buildAllowedEventTypes)
 }
 
 func renderDefaultEventTypesForWebhook(configuration WebhookConfiguration) []string {
@@ -182,11 +184,7 @@ func renderDefaultEventTypesForWebhook(configuration WebhookConfiguration) []str
 			return normalizeWebhookEventTypes(buildDefaultEventTypes)
 		}
 	}
-
-	eventTypes := make([]string, 0, len(deployDefaultEventTypes)+len(buildDefaultEventTypes))
-	eventTypes = append(eventTypes, deployDefaultEventTypes...)
-	eventTypes = append(eventTypes, buildDefaultEventTypes...)
-	return normalizeWebhookEventTypes(eventTypes)
+	return combineDeployAndBuildEventTypes(deployDefaultEventTypes, buildDefaultEventTypes)
 }
 
 func renderWebhookConfigurationsEqual(a, b WebhookConfiguration) bool {
