@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -90,22 +91,23 @@ func (w *WebhookProvisioner) processIntegrationWebhook(tx *gorm.DB, webhook *mod
 		return w.handleWebhookError(tx, webhook, err)
 	}
 
-	integration, err := w.registry.GetIntegration(instance.AppName)
+	handler, err := w.registry.GetWebhookHandler(instance.AppName)
 	if err != nil {
 		return w.handleWebhookError(tx, webhook, err)
 	}
 
-	webhookMetadata, err := integration.SetupWebhook(core.SetupWebhookContext{
+	metadata, err := handler.Setup(core.WebhookHandlerContext{
 		HTTP:        w.registry.HTTPContext(),
-		Webhook:     contexts.NewWebhookContext(tx, webhook, w.encryptor, w.baseURL),
 		Integration: contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry),
+		Webhook:     contexts.NewWebhookContext(tx, webhook, w.encryptor, w.baseURL),
+		Logger:      logging.ForIntegration(*instance),
 	})
 
 	if err != nil {
 		return w.handleWebhookError(tx, webhook, err)
 	}
 
-	return webhook.ReadyWithMetadata(tx, webhookMetadata)
+	return webhook.ReadyWithMetadata(tx, metadata)
 }
 
 func (w *WebhookProvisioner) handleWebhookError(tx *gorm.DB, webhook *models.Webhook, originalErr error) error {

@@ -27,13 +27,15 @@ type NodeRequestWorker struct {
 	semaphore *semaphore.Weighted
 	registry  *registry.Registry
 	encryptor crypto.Encryptor
+	baseURL   string
 }
 
-func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry) *NodeRequestWorker {
+func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string) *NodeRequestWorker {
 	return &NodeRequestWorker{
 		encryptor: encryptor,
 		registry:  registry,
 		semaphore: semaphore.NewWeighted(25),
+		baseURL:   baseURL,
 	}
 }
 

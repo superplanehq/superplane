@@ -75,36 +75,3 @@ func TestPanicableIntegration_HandleRequest_CatchesPanic(t *testing.T) {
 
 	assert.Equal(t, 500, recorder.Code)
 }
-
-func TestPanicableIntegration_CompareWebhookConfig_CatchesPanic(t *testing.T) {
-	integration := &panickingIntegration{}
-	panicable := NewPanicableIntegration(integration)
-
-	result, err := panicable.CompareWebhookConfig(nil, nil)
-
-	assert.False(t, result)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "integration panicking-integration panicked in CompareWebhookConfig()")
-	assert.Contains(t, err.Error(), "compare webhook config panic")
-}
-
-func TestPanicableIntegration_SetupWebhook_CatchesPanic(t *testing.T) {
-	integration := &panickingIntegration{}
-	panicable := NewPanicableIntegration(integration)
-
-	metadata, err := panicable.SetupWebhook(core.SetupWebhookContext{})
-	require.Error(t, err)
-	assert.Nil(t, metadata)
-	assert.Contains(t, err.Error(), "integration panicking-integration panicked in SetupWebhook()")
-	assert.Contains(t, err.Error(), "setup webhook panic")
-}
-
-func TestPanicableIntegration_CleanupWebhook_CatchesPanic(t *testing.T) {
-	integration := &panickingIntegration{}
-	panicable := NewPanicableIntegration(integration)
-
-	err := panicable.CleanupWebhook(core.CleanupWebhookContext{})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "integration panicking-integration panicked in CleanupWebhook()")
-	assert.Contains(t, err.Error(), "cleanup webhook panic")
-}

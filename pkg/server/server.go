@@ -83,7 +83,7 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 	if os.Getenv("START_NODE_REQUEST_WORKER") == "yes" {
 		log.Println("Starting Node Request Worker")
 
-		w := workers.NewNodeRequestWorker(encryptor, registry)
+		w := workers.NewNodeRequestWorker(encryptor, registry, baseURL)
 		go w.Start(context.Background())
 	}
 

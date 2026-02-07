@@ -133,6 +133,7 @@ func (s *CanvasService) InvokeNodeExecutionAction(ctx context.Context, req *pb.I
 		s.authService,
 		s.encryptor,
 		s.registry,
+		s.webhookBaseURL,
 		uuid.MustParse(organizationID),
 		canvasID,
 		executionID,
@@ -211,7 +212,7 @@ func (s *CanvasService) CancelExecution(ctx context.Context, req *pb.CancelExecu
 
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 
-	return canvases.CancelExecution(ctx, s.authService, s.encryptor, organizationID, s.registry, canvasID, executionID)
+	return canvases.CancelExecution(ctx, s.authService, s.encryptor, s.webhookBaseURL, organizationID, s.registry, canvasID, executionID)
 }
 
 func (s *CanvasService) ResolveExecutionErrors(ctx context.Context, req *pb.ResolveExecutionErrorsRequest) (*pb.ResolveExecutionErrorsResponse, error) {

@@ -81,25 +81,40 @@ type Integration interface {
 	 * HTTP request handler
 	 */
 	HandleRequest(ctx HTTPRequestContext)
+}
 
-	/*
-	 * Used to compare webhook configurations.
-	 * If the configuration is the same,
-	 * the system will reuse the existing webhook.
-	 */
-	CompareWebhookConfig(a, b any) (bool, error)
+type WebhookHandler interface {
 
 	/*
 	 * Set up webhooks through the integration, in the external system.
 	 * This is called by the webhook provisioner, for pending webhook records.
 	 */
-	SetupWebhook(ctx SetupWebhookContext) (any, error)
+	Setup(ctx WebhookHandlerContext) (any, error)
 
 	/*
 	 * Delete webhooks through the integration, in the external system.
 	 * This is called by the webhook cleanup worker, for webhook records that were deleted.
 	 */
-	CleanupWebhook(ctx CleanupWebhookContext) error
+	Cleanup(ctx WebhookHandlerContext) error
+
+	/*
+	 * Compare two webhook configurations to see if they are the same.
+	 */
+	CompareConfig(a, b any) (bool, error)
+}
+
+type WebhookHandlerContext struct {
+	Logger      *logrus.Entry
+	HTTP        HTTPContext
+	Integration IntegrationContext
+	Webhook     WebhookContext
+}
+
+type OnWebhookRequestContext struct {
+	Configuration any
+	ListWebhooks  func() ([]WebhookContext, error)
+	CreateWebhook func(configuration any) error
+	DeleteWebhook func(id string) error
 }
 
 type IntegrationComponent interface {
@@ -290,5 +305,6 @@ type WebhookContext interface {
 	GetSecret() ([]byte, error)
 	GetMetadata() any
 	GetConfiguration() any
+	UpdateConfiguration(configuration any) error
 	SetSecret([]byte) error
 }

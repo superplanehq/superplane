@@ -19,11 +19,15 @@ type testWebhookContext struct {
 	secret        []byte
 }
 
-func (t *testWebhookContext) GetID() string                 { return "wh_123" }
-func (t *testWebhookContext) GetURL() string                { return t.url }
-func (t *testWebhookContext) GetSecret() ([]byte, error)    { return t.secret, nil }
-func (t *testWebhookContext) GetMetadata() any              { return nil }
-func (t *testWebhookContext) GetConfiguration() any         { return t.configuration }
+func (t *testWebhookContext) GetID() string              { return "wh_123" }
+func (t *testWebhookContext) GetURL() string             { return t.url }
+func (t *testWebhookContext) GetSecret() ([]byte, error) { return t.secret, nil }
+func (t *testWebhookContext) GetMetadata() any           { return nil }
+func (t *testWebhookContext) GetConfiguration() any      { return t.configuration }
+func (t *testWebhookContext) UpdateConfiguration(configuration any) error {
+	t.configuration = configuration
+	return nil
+}
 func (t *testWebhookContext) SetSecret(secret []byte) error { t.secret = secret; return nil }
 
 func Test__SendGrid__SetupWebhook_EnablesSignedWebhook(t *testing.T) {
@@ -47,14 +51,14 @@ func Test__SendGrid__SetupWebhook_EnablesSignedWebhook(t *testing.T) {
 		},
 	}
 
-	webhookCtx := &testWebhookContext{
-		url:           "https://example.com/webhook",
-		configuration: struct{}{},
-	}
-
 	integrationCtx := &contexts.IntegrationContext{
 		Configuration: map[string]any{"apiKey": "sg-test"},
 		Secrets:       map[string]core.IntegrationSecret{},
+	}
+
+	webhookCtx := &testWebhookContext{
+		url:           "https://example.com/webhook",
+		configuration: struct{}{},
 	}
 
 	_, err := integration.SetupWebhook(core.SetupWebhookContext{
