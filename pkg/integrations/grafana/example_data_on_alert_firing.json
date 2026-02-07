@@ -1,0 +1,21 @@
+{
+  "status": "firing",
+  "title": "High error rate",
+  "ruleUid": "alert_rule_uid",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "HighErrorRate",
+        "service": "api"
+      },
+      "annotations": {
+        "summary": "Error rate above threshold"
+      }
+    }
+  ],
+  "commonLabels": {
+    "alertname": "HighErrorRate"
+  },
+  "externalURL": "http://grafana.local"
+}

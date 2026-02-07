@@ -109,9 +109,7 @@ func (g *Grafana) Sync(ctx core.SyncContext) error {
 	}
 
 	metadata.BaseURL = strings.TrimSuffix(strings.TrimSpace(string(baseURL)), "/")
-	if err := ctx.Integration.SetMetadata(metadata); err != nil {
-		return fmt.Errorf("failed to set metadata: %v", err)
-	}
+	ctx.Integration.SetMetadata(metadata)
 
 	ctx.Integration.Ready()
 	return nil
