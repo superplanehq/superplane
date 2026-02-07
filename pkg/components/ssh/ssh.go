@@ -74,7 +74,7 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 
 - **Host**, **Port** (default 22), **Username**: Connection details.
 - **Command**: The command to run (supports expressions).
-- **Working directory**: Optional; runs "cd &lt;dir&gt; && &lt;command&gt;".
+- **Working directory**: Optional; runs `cd <dir> && <command>`.
 - **Timeout (seconds)**: How long the command may run (default 60).
 
 ## Output

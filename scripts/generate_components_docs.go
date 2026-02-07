@@ -203,8 +203,62 @@ func writeParagraph(buf *bytes.Buffer, text string) {
 	if trimmed == "" {
 		return
 	}
-	buf.WriteString(trimmed)
+	buf.WriteString(escapeMDXText(trimmed))
 	buf.WriteString("\n\n")
+}
+
+// escapeMDXText escapes angle brackets outside code to avoid MDX parsing errors.
+func escapeMDXText(text string) string {
+	lines := strings.Split(text, "\n")
+	escaped := make([]string, 0, len(lines))
+	inFence := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "```") {
+			inFence = !inFence
+			escaped = append(escaped, line)
+			continue
+		}
+
+		if inFence {
+			escaped = append(escaped, line)
+			continue
+		}
+
+		escaped = append(escaped, escapeInlineCode(line))
+	}
+
+	return strings.Join(escaped, "\n")
+}
+
+func escapeInlineCode(line string) string {
+	if !strings.Contains(line, "`") {
+		return escapeAngleBrackets(line)
+	}
+
+	parts := strings.Split(line, "`")
+	var buf strings.Builder
+
+	for i, part := range parts {
+		if i%2 == 0 {
+			buf.WriteString(escapeAngleBrackets(part))
+		} else {
+			buf.WriteString(part)
+		}
+
+		if i < len(parts)-1 {
+			buf.WriteString("`")
+		}
+	}
+
+	return buf.String()
+}
+
+func escapeAngleBrackets(value string) string {
+	value = strings.ReplaceAll(value, "<", "&lt;")
+	value = strings.ReplaceAll(value, ">", "&gt;")
+	return value
 }
 
 // adjustHeadingLevels increments all markdown heading levels by 1
@@ -242,8 +296,7 @@ func adjustHeadingLevels(text string) string {
 }
 
 func writeOverviewSection(buf *bytes.Buffer, description string) {
-	buf.WriteString(description)
-	buf.WriteString("\n\n")
+	writeParagraph(buf, description)
 }
 
 func writeExampleSection(title string, data map[string]any, buf *bytes.Buffer) {
