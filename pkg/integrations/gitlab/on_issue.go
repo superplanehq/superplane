@@ -44,7 +44,7 @@ func (i *OnIssue) Documentation() string {
 ## Configuration
 
 - **Project** (required): GitLab project to monitor
-- **Actions** (optional): Filter by action (opened, updated, closed, reopened). Default: all.
+- **Actions** (required): Select which issue actions to listen for (opened, closed, reopened, etc.). Default: opened.
 - **Labels** (optional): Only trigger for issues with specific labels
 - **Assignees** (optional): Only trigger when issue is assigned to specific users
 - **State** (optional): Only trigger for open or closed issues
@@ -82,9 +82,10 @@ func (i *OnIssue) Configuration() []configuration.Field {
 		},
 		{
 			Name:     "actions",
-			Label:    "Action Filter",
+			Label:    "Actions",
 			Type:     configuration.FieldTypeMultiSelect,
-			Required: false,
+			Required: true,
+			Default:  []string{"open"},
 			TypeOptions: &configuration.TypeOptions{
 				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: []configuration.FieldOption{
@@ -244,7 +245,6 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		for _, assignee := range eventAssignees {
 			assigneeMap, ok := assignee.(map[string]any)
 			if ok {
-				// ID comes as float64 usually from JSON unmarshal
 				idFloat, _ := assigneeMap["id"].(float64)
 				idStr := fmt.Sprintf("%.0f", idFloat)
 

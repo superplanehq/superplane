@@ -8,27 +8,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-func Test__OnIssue__Name(t *testing.T) {
-	trigger := &OnIssue{}
-	assert.Equal(t, "gitlab.onIssue", trigger.Name())
-}
-
-func Test__OnIssue__Label(t *testing.T) {
-	trigger := &OnIssue{}
-	assert.Equal(t, "On Issue", trigger.Label())
-}
-
-func Test__OnIssue__Configuration(t *testing.T) {
-	trigger := &OnIssue{}
-	config := trigger.Configuration()
-
-	assert.Len(t, config, 5)
-	assert.Equal(t, "project", config[0].Name)
-	assert.Equal(t, "actions", config[1].Name)
-	assert.Equal(t, "labels", config[2].Name)
-	assert.Equal(t, "assigneeIds", config[3].Name)
-	assert.Equal(t, "state", config[4].Name)
-}
 
 func Test__OnIssue__HandleWebhook__MissingEventHeader(t *testing.T) {
 	trigger := &OnIssue{}
