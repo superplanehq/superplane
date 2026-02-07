@@ -43,7 +43,7 @@ func (c *ListReleases) Documentation() string {
 
 ## Output
 
-Returns the complete release objects including:
+Returns a list of releases and their details including:
 - Release id, tag, and name
 - Body and published/created timestamps
 - Author information
