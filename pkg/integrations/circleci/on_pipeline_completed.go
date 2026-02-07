@@ -37,18 +37,24 @@ func (p *OnPipelineCompleted) Label() string {
 }
 
 func (p *OnPipelineCompleted) Description() string {
-	return "Listen to CircleCI pipeline completion events"
+	return "Listen to CircleCI workflow completion events within a pipeline"
 }
 
 func (p *OnPipelineCompleted) Documentation() string {
-	return `The On Pipeline Completed trigger starts a workflow execution when a CircleCI workflow completes.
+	return `Triggers when a CircleCI workflow completes within a pipeline. Note that a single pipeline can contain multiple workflows.
+
+## Terminology
+
+- **Pipeline**: A CircleCI pipeline is triggered by a commit or API call and can contain multiple workflows
+- **Workflow**: A set of jobs that run as part of a pipeline (defined in .circleci/config.yml)
+- This trigger fires for each workflow completion, not when the entire pipeline finishes
 
 ## Use Cases
 
-- **Pipeline orchestration**: Chain workflows together based on pipeline completion
-- **Status monitoring**: Monitor CI/CD pipeline results
-- **Notification workflows**: Send notifications when workflows succeed or fail
-- **Post-processing**: Process artifacts or results after pipeline completion
+- **Workflow chaining**: Start SuperPlane workflows when CircleCI workflows complete
+- **Status monitoring**: Monitor CI/CD workflow results
+- **Notifications**: Send alerts when workflows succeed or fail
+- **Post-processing**: Process artifacts after workflow completion
 
 ## Configuration
 
@@ -58,13 +64,13 @@ func (p *OnPipelineCompleted) Documentation() string {
 
 Each workflow completion event includes:
 - **workflow**: Workflow information including ID, name, status, and URL
-- **pipeline**: Pipeline information including ID, number, and trigger details
+- **pipeline**: Parent pipeline information including ID, number, and trigger details
 - **project**: Project information
 - **organization**: Organization information
 
 ## Webhook Setup
 
-This trigger automatically sets up a CircleCI webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.`
+This trigger automatically sets up a CircleCI webhook when configured. The webhook is managed by SuperPlane and cleaned up when the trigger is removed.`
 }
 
 func (p *OnPipelineCompleted) Icon() string {
