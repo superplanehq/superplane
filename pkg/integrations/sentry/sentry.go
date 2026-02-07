@@ -104,6 +104,28 @@ func (s *Sentry) Sync(ctx core.SyncContext) error {
 func (s *Sentry) HandleRequest(ctx core.HTTPRequestContext) {}
 
 func (s *Sentry) CompareWebhookConfig(a, b any) (bool, error) {
+	var cfgA, cfgB WebhookConfiguration
+	if err := mapstructure.Decode(a, &cfgA); err != nil {
+		return false, err
+	}
+	if err := mapstructure.Decode(b, &cfgB); err != nil {
+		return false, err
+	}
+	if cfgA.WebhookSecret != cfgB.WebhookSecret {
+		return false, nil
+	}
+	if len(cfgA.Events) != len(cfgB.Events) {
+		return false, nil
+	}
+	seen := make(map[string]bool)
+	for _, e := range cfgA.Events {
+		seen[e] = true
+	}
+	for _, e := range cfgB.Events {
+		if !seen[e] {
+			return false, nil
+		}
+	}
 	return true, nil
 }
 
