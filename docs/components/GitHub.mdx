@@ -34,6 +34,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
   <LinkCard title="Update Release" href="#update-release" description="Update an existing release in a GitHub repository" />
+  <LinkCard title="List Releases" href="#list-releases" description="List releases from a GitHub repository" />
 </CardGrid>
 
 <a id="on-branch-created"></a>
@@ -1185,6 +1186,68 @@ Returns release information including:
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.release"
+}
+```
+
+<a id="list-releases"></a>
+
+## List Releases
+
+The List Releases component returns releases from a GitHub repository with optional pagination.
+
+### Use Cases
+
+- **Release auditing**: Review recent releases for compliance or visibility
+- **Deployment inputs**: Feed release metadata into deployment workflows
+- **Changelog automation**: Aggregate release notes across versions
+- **Reporting**: Build release dashboards or summaries
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Per Page**: Number of releases per page (max 100)
+- **Page**: Page number for pagination
+
+### Output
+
+Returns a list of releases and their details including:
+- Release id, tag, and name
+- Body and published/created timestamps
+- Author information
+- Assets, tarball URL, and zipball URL
+- Other metadata fields
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "id": 3001,
+      "tag_name": "v1.2.3",
+      "name": "Release 1.2.3",
+      "body": "## What's Changed\n\n- Feature A\n- Bug fix B",
+      "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
+      "draft": false,
+      "prerelease": false,
+      "created_at": "2026-01-15T10:00:00Z",
+      "published_at": "2026-01-16T12:00:00Z",
+      "author": {
+        "login": "octocat",
+        "html_url": "https://github.com/octocat"
+      },
+      "assets": [
+        {
+          "name": "app-v1.2.3.zip",
+          "size": 1024000,
+          "download_count": 42,
+          "browser_download_url": "https://github.com/acme/widgets/releases/download/v1.2.3/app-v1.2.3.zip"
+        }
+      ]
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.releases.list"
 }
 ```
 
