@@ -15,6 +15,8 @@ import { createReleaseMapper } from "./create_release";
 import { updateReleaseMapper } from "./update_release";
 import { deleteReleaseMapper } from "./delete_release";
 import { getReleaseMapper } from "./get_release";
+import { listReleasesMapper } from "./list_releases";
+import { createReviewMapper } from "./create_review";
 import { buildActionStateRegistry } from "../utils";
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
@@ -27,6 +29,8 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   updateRelease: buildActionStateRegistry("updated"),
   deleteRelease: buildActionStateRegistry("deleted"),
   getRelease: buildActionStateRegistry("retrieved"),
+  listReleases: buildActionStateRegistry("retrieved"),
+  createReview: buildActionStateRegistry("created"),
 };
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -39,6 +43,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   updateRelease: updateReleaseMapper,
   deleteRelease: deleteReleaseMapper,
   getRelease: getReleaseMapper,
+  listReleases: listReleasesMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
