@@ -274,8 +274,7 @@ func (c *SendAndWaitMessage) OnIntegrationMessage(ctx core.IntegrationMessageCon
 
 		executionCtx, err := ctx.FindExecutionByKV("execution_id", execID)
 		if err != nil {
-			ctx.Logger.Errorf("Failed to find execution by KV: %v", err)
-			lastErr = err
+			ctx.Logger.Warnf("Failed to find execution by KV (possibly stale): %v", err)
 			continue
 		}
 
