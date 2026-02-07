@@ -50,7 +50,8 @@ func Test__Render__Sync(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiKey": "rnd_test",
+				"apiKey":        "rnd_test",
+				"workspacePlan": "professional",
 			},
 		}
 
@@ -66,6 +67,7 @@ func Test__Render__Sync(t *testing.T) {
 		metadata, ok := integrationCtx.Metadata.(Metadata)
 		require.True(t, ok)
 		assert.Equal(t, "usr-123", metadata.OwnerID)
+		assert.Equal(t, "professional", metadata.WorkspacePlan)
 
 		require.Len(t, httpCtx.Requests, 2)
 		assert.Contains(t, httpCtx.Requests[0].URL.String(), "/v1/services")
@@ -88,8 +90,9 @@ func Test__Render__Sync(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiKey":  "rnd_test",
-				"ownerId": "tea-999",
+				"apiKey":        "rnd_test",
+				"ownerId":       "tea-999",
+				"workspacePlan": "professional",
 			},
 		}
 
@@ -100,6 +103,41 @@ func Test__Render__Sync(t *testing.T) {
 		})
 
 		require.ErrorContains(t, err, "is not accessible")
+	})
+
+	t.Run("organization plan -> metadata uses organization strategy", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`[{"cursor":"x","service":{"id":"srv-1","name":"backend"}}]`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`[{"cursor":"x","owner":{"id":"usr-123","name":"Pedro"}}]`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey":        "rnd_test",
+				"workspacePlan": "organization",
+			},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			Configuration: integrationCtx.Configuration,
+			HTTP:          httpCtx,
+			Integration:   integrationCtx,
+		})
+
+		require.NoError(t, err)
+
+		metadata, ok := integrationCtx.Metadata.(Metadata)
+		require.True(t, ok)
+		assert.Equal(t, "usr-123", metadata.OwnerID)
+		assert.Equal(t, "organization", metadata.WorkspacePlan)
 	})
 }
 
@@ -197,9 +235,12 @@ func Test__Render__SetupWebhook(t *testing.T) {
 		assert.Equal(t, "usr-123", payload["ownerId"])
 		assert.Equal(t, "https://hooks.superplane.dev/render", payload["url"])
 		assert.Equal(t, true, payload["enabled"])
+		assert.ElementsMatch(t, renderWebhookEventFilter(WebhookConfiguration{
+			Strategy: renderWebhookStrategyIntegration,
+		}), payload["eventFilter"])
 	})
 
-	t.Run("reuse existing webhook with same URL", func(t *testing.T) {
+	t.Run("reuse existing webhook with same URL and update event filter", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -212,6 +253,12 @@ func Test__Render__SetupWebhook(t *testing.T) {
 					StatusCode: http.StatusOK,
 					Body: io.NopCloser(strings.NewReader(
 						`{"id":"whk-existing","ownerId":"usr-123","name":"SuperPlane","url":"https://hooks.superplane.dev/render","enabled":true,"eventFilter":[],"secret":"whsec-existing"}`,
+					)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"id":"whk-existing","ownerId":"usr-123","name":"SuperPlane","url":"https://hooks.superplane.dev/render","enabled":true,"eventFilter":["build_ended","build_started","deploy_ended","deploy_started","image_pull_failed","pipeline_minutes_exhausted","pre_deploy_ended","pre_deploy_started"],"secret":"whsec-existing"}`,
 					)),
 				},
 			},
@@ -242,12 +289,91 @@ func Test__Render__SetupWebhook(t *testing.T) {
 		assert.Equal(t, "whk-existing", storedMetadata.WebhookID)
 		assert.Equal(t, "usr-123", storedMetadata.OwnerID)
 
-		require.Len(t, httpCtx.Requests, 2)
+		require.Len(t, httpCtx.Requests, 3)
 		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
 		assert.Contains(t, httpCtx.Requests[0].URL.String(), "/v1/webhooks")
 		assert.Contains(t, httpCtx.Requests[0].URL.String(), "ownerId=usr-123")
 		assert.Equal(t, http.MethodGet, httpCtx.Requests[1].Method)
 		assert.Contains(t, httpCtx.Requests[1].URL.String(), "/v1/webhooks/whk-existing")
+		assert.Equal(t, http.MethodPatch, httpCtx.Requests[2].Method)
+		assert.Contains(t, httpCtx.Requests[2].URL.String(), "/v1/webhooks/whk-existing")
+
+		updateBody, readErr := io.ReadAll(httpCtx.Requests[2].Body)
+		require.NoError(t, readErr)
+
+		updatePayload := map[string]any{}
+		require.NoError(t, json.Unmarshal(updateBody, &updatePayload))
+		assert.Equal(t, "SuperPlane", updatePayload["name"])
+		assert.Equal(t, "https://hooks.superplane.dev/render", updatePayload["url"])
+		assert.Equal(t, true, updatePayload["enabled"])
+		assert.ElementsMatch(t, renderWebhookEventFilter(WebhookConfiguration{
+			Strategy: renderWebhookStrategyIntegration,
+		}), updatePayload["eventFilter"])
+
+	})
+
+	t.Run("organization strategy creates resource-specific webhook when URL already exists with different filter", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`[{"cursor":"x","webhook":{"id":"whk-existing","ownerId":"usr-123","name":"SuperPlane Deploy","url":"https://hooks.superplane.dev/render","enabled":true,"eventFilter":["deploy_ended"],"secret":"whsec-existing"}}]`,
+					)),
+				},
+				{
+					StatusCode: http.StatusCreated,
+					Body: io.NopCloser(strings.NewReader(
+						`{"id":"whk-build","ownerId":"usr-123","name":"SuperPlane Build","url":"https://hooks.superplane.dev/render","enabled":true,"eventFilter":["build_ended","build_started"],"secret":"whsec-build"}`,
+					)),
+				},
+			},
+		}
+
+		webhookCtx := &integrationWebhookContext{
+			id:  "wh_record_2",
+			url: "https://hooks.superplane.dev/render",
+			configuration: WebhookConfiguration{
+				Strategy:     renderWebhookStrategyResourceType,
+				ResourceType: renderWebhookResourceTypeBuild,
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "rnd_test"},
+			Metadata: Metadata{
+				OwnerID:       "usr-123",
+				WorkspacePlan: "organization",
+			},
+		}
+
+		metadata, err := integration.SetupWebhook(core.SetupWebhookContext{
+			HTTP:        httpCtx,
+			Webhook:     webhookCtx,
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "whsec-build", string(webhookCtx.secret))
+
+		storedMetadata, ok := metadata.(WebhookMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "whk-build", storedMetadata.WebhookID)
+
+		require.Len(t, httpCtx.Requests, 2)
+		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[1].Method)
+
+		body, readErr := io.ReadAll(httpCtx.Requests[1].Body)
+		require.NoError(t, readErr)
+
+		payload := map[string]any{}
+		require.NoError(t, json.Unmarshal(body, &payload))
+		assert.Equal(t, "SuperPlane Build", payload["name"])
+		assert.ElementsMatch(t, renderWebhookEventFilter(WebhookConfiguration{
+			Strategy:     renderWebhookStrategyResourceType,
+			ResourceType: renderWebhookResourceTypeBuild,
+		}), payload["eventFilter"])
 	})
 }
 
@@ -283,4 +409,50 @@ func Test__Render__CompareWebhookConfig(t *testing.T) {
 	equal, err := integration.CompareWebhookConfig(struct{}{}, map[string]any{"eventTypes": []string{"deploy_ended"}})
 	require.NoError(t, err)
 	assert.True(t, equal)
+
+	equal, err = integration.CompareWebhookConfig(
+		WebhookConfiguration{
+			Strategy:     renderWebhookStrategyResourceType,
+			ResourceType: renderWebhookResourceTypeDeploy,
+		},
+		WebhookConfiguration{
+			Strategy:     renderWebhookStrategyResourceType,
+			ResourceType: renderWebhookResourceTypeBuild,
+		},
+	)
+	require.NoError(t, err)
+	assert.False(t, equal)
+
+	equal, err = integration.CompareWebhookConfig(
+		WebhookConfiguration{
+			Strategy:   renderWebhookStrategyIntegration,
+			EventTypes: []string{"deploy_ended"},
+		},
+		WebhookConfiguration{
+			Strategy:   renderWebhookStrategyIntegration,
+			EventTypes: []string{"build_ended"},
+		},
+	)
+	require.NoError(t, err)
+	assert.True(t, equal)
+}
+
+func Test__Render__MergeWebhookConfig(t *testing.T) {
+	integration := &Render{}
+	merged, changed, err := integration.MergeWebhookConfig(
+		WebhookConfiguration{
+			Strategy:   renderWebhookStrategyIntegration,
+			EventTypes: []string{"deploy_ended"},
+		},
+		WebhookConfiguration{
+			Strategy:   renderWebhookStrategyIntegration,
+			EventTypes: []string{"build_ended"},
+		},
+	)
+	require.NoError(t, err)
+	require.True(t, changed)
+	assert.Equal(t, WebhookConfiguration{
+		Strategy:   renderWebhookStrategyIntegration,
+		EventTypes: []string{"build_ended", "deploy_ended"},
+	}, merged)
 }

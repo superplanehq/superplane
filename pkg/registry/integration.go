@@ -159,3 +159,21 @@ func (s *PanicableIntegration) CleanupWebhook(ctx core.CleanupWebhookContext) (e
 	}()
 	return s.underlying.CleanupWebhook(ctx)
 }
+
+func (s *PanicableIntegration) MergeWebhookConfig(current, requested any) (merged any, changed bool, err error) {
+	merger, ok := s.underlying.(core.WebhookConfigMerger)
+	if !ok {
+		return current, false, nil
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			merged = current
+			changed = false
+			err = fmt.Errorf("integration %s panicked in MergeWebhookConfig(): %v",
+				s.underlying.Name(), r)
+		}
+	}()
+
+	return merger.MergeWebhookConfig(current, requested)
+}

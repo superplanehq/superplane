@@ -43,6 +43,9 @@ func (p *panickingIntegration) HandleRequest(ctx core.HTTPRequestContext) {
 func (p *panickingIntegration) CompareWebhookConfig(a, b any) (bool, error) {
 	panic("compare webhook config panic")
 }
+func (p *panickingIntegration) MergeWebhookConfig(current, requested any) (any, bool, error) {
+	panic("merge webhook config panic")
+}
 func (p *panickingIntegration) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 	panic("setup webhook panic")
 }
@@ -97,6 +100,21 @@ func TestPanicableIntegration_SetupWebhook_CatchesPanic(t *testing.T) {
 	assert.Nil(t, metadata)
 	assert.Contains(t, err.Error(), "integration panicking-integration panicked in SetupWebhook()")
 	assert.Contains(t, err.Error(), "setup webhook panic")
+}
+
+func TestPanicableIntegration_MergeWebhookConfig_CatchesPanic(t *testing.T) {
+	integration := &panickingIntegration{}
+	panicable := NewPanicableIntegration(integration)
+
+	merger, ok := panicable.(core.WebhookConfigMerger)
+	require.True(t, ok)
+
+	merged, changed, err := merger.MergeWebhookConfig(map[string]any{"a": "b"}, nil)
+	require.Error(t, err)
+	assert.False(t, changed)
+	assert.Equal(t, map[string]any{"a": "b"}, merged)
+	assert.Contains(t, err.Error(), "integration panicking-integration panicked in MergeWebhookConfig()")
+	assert.Contains(t, err.Error(), "merge webhook config panic")
 }
 
 func TestPanicableIntegration_CleanupWebhook_CatchesPanic(t *testing.T) {

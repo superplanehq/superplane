@@ -72,6 +72,13 @@ type CreateWebhookRequest struct {
 	EventFilter []string `json:"eventFilter"`
 }
 
+type UpdateWebhookRequest struct {
+	Name        string   `json:"name,omitempty"`
+	URL         string   `json:"url,omitempty"`
+	Enabled     bool     `json:"enabled"`
+	EventFilter []string `json:"eventFilter,omitempty"`
+}
+
 type deployRequest struct {
 	ClearCache string `json:"clearCache"`
 }
@@ -174,6 +181,24 @@ func (c *Client) CreateWebhook(request CreateWebhookRequest) (*Webhook, error) {
 	}
 
 	_, body, err := c.execRequestWithResponse(http.MethodPost, "/webhooks", nil, request)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseWebhook(body)
+}
+
+func (c *Client) UpdateWebhook(webhookID string, request UpdateWebhookRequest) (*Webhook, error) {
+	if strings.TrimSpace(webhookID) == "" {
+		return nil, fmt.Errorf("webhookID is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodPatch,
+		"/webhooks/"+url.PathEscape(webhookID),
+		nil,
+		request,
+	)
 	if err != nil {
 		return nil, err
 	}

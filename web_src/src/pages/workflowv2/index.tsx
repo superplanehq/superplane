@@ -3075,7 +3075,7 @@ function prepareTriggerNode(
   const lastEvent = nodeEventsMap[node.id!]?.[0];
   const triggerProps = renderer.getTriggerProps({
     node: buildNodeInfo(node),
-    definition: buildComponentDefinition(triggerMetadata!),
+    definition: buildComponentDefinition(triggerMetadata),
     lastEvent: buildEventInfo(lastEvent),
   });
 

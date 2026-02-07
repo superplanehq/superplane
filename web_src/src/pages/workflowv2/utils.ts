@@ -1148,13 +1148,13 @@ export function buildExecutionInfo(execution: CanvasesCanvasNodeExecution): Exec
   };
 }
 
-export function buildComponentDefinition(component: ComponentsComponent): ComponentDefinition {
+export function buildComponentDefinition(component?: Partial<ComponentsComponent>): ComponentDefinition {
   return {
-    name: component.name!,
-    label: component.label!,
-    description: component.description!,
-    icon: component.icon!,
-    color: component.color!,
+    name: component?.name || "unknown",
+    label: component?.label || "Unknown",
+    description: component?.description || "",
+    icon: component?.icon || "bolt",
+    color: component?.color || "gray",
   };
 }
 

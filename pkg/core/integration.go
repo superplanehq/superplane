@@ -102,6 +102,14 @@ type Integration interface {
 	CleanupWebhook(ctx CleanupWebhookContext) error
 }
 
+/*
+ * Optional interface for integrations that need to mutate/merge webhook
+ * configuration when an existing webhook is reused.
+ */
+type WebhookConfigMerger interface {
+	MergeWebhookConfig(current, requested any) (merged any, changed bool, err error)
+}
+
 type IntegrationComponent interface {
 
 	/*

@@ -19,7 +19,11 @@ var exampleDataOnEvent map[string]any
 var exampleOutputTriggerDeployOnce sync.Once
 var exampleOutputTriggerDeploy map[string]any
 
-func (t *OnEvent) ExampleData() map[string]any {
+func (t *OnDeploy) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnEventOnce, exampleDataOnEventBytes, &exampleDataOnEvent)
+}
+
+func (t *OnBuild) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnEventOnce, exampleDataOnEventBytes, &exampleDataOnEvent)
 }
 

@@ -4,12 +4,13 @@ sidebar:
   order: 12
 ---
 
-Deploy and manage Render services, and react to Render deploy/service events
+Deploy and manage Render services, and react to Render deploy/build events
 
 ## Triggers
 
 <CardGrid>
-  <LinkCard title="On Event" href="#on-event" description="Listen to Render deploy and service webhook events" />
+  <LinkCard title="On Deploy" href="#on-deploy" description="Listen to Render deploy-related webhook events for one service" />
+  <LinkCard title="On Build" href="#on-build" description="Listen to Render build webhook events for one service" />
 </CardGrid>
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
@@ -24,31 +25,29 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 1. **API Key:** Create it in [Render Account Settings -> API Keys](https://dashboard.render.com/u/settings#api-keys).
 2. **Workspace ID (optional):** Use your Render workspace ID (`usr-...` or `tea-...`). Leave empty to use the first workspace available to the API key.
-3. **Auth:** SuperPlane sends requests to [Render API v1](https://api.render.com/v1/) using `Authorization: Bearer <API_KEY>`.
-
-
-4. **Webhooks:** SuperPlane configures Render webhooks automatically via the [Render Webhooks API](https://render.com/docs/webhooks). No manual setup is required.
-5. **Troubleshooting:** Check [Render Dashboard -> Integrations -> Webhooks](https://dashboard.render.com/) and the [Render webhook docs](https://render.com/docs/webhooks).
+3. **Workspace Plan:** Select **Professional** or **Organization / Enterprise**. SuperPlane uses this to choose webhook strategy.
+4. **Auth:** SuperPlane sends requests to [Render API v1](https://api.render.com/v1/) using `Authorization: Bearer <API_KEY>`.
+5. **Webhooks:** SuperPlane configures Render webhooks automatically via the [Render Webhooks API](https://render.com/docs/webhooks). No manual setup is required.
+6. **Troubleshooting:** Check [Render Dashboard -> Integrations -> Webhooks](https://dashboard.render.com/) and the [Render webhook docs](https://render.com/docs/webhooks).
 
 Note: **Plan requirement:** Render webhooks require a Professional plan or higher.
 
-<a id="on-event"></a>
+<a id="on-deploy"></a>
 
-## On Event
+## On Deploy
 
-The On Event trigger emits an event when Render sends a webhook notification.
+The On Deploy trigger emits deploy-related events from Render for one selected service.
 
 ### Use Cases
 
-- **Deploy notifications**: Notify Slack or PagerDuty when deploys succeed/fail or services become unavailable
+- **Deploy notifications**: Notify Slack or PagerDuty when deploys succeed or fail
 - **Post-deploy automation**: Trigger smoke tests after successful deploy completion events
-- **Operational follow-up**: Run cleanup or notifications for cron/job completion and service suspension events
+- **Release orchestration**: Trigger downstream workflows when deploy stages change
 
 ### Configuration
 
-- **Event Types**: Optional set of event types to listen for. Leave empty to accept all webhook events.
-- **Service ID Filter**: Optional predicate filter for `data.serviceId`.
-- **Service Name Filter**: Optional predicate filter for `data.serviceName`.
+- **Service**: Required Render service.
+- **Event Types**: Optional deploy event types to listen for. Defaults to `deploy_ended`.
 
 ### Webhook Verification
 
@@ -59,14 +58,13 @@ Render webhooks are validated using the secret generated when SuperPlane creates
 
 ### Event Data
 
-The default output emits the webhook payload data, including fields like `data.id`, `data.serviceId`, `data.serviceName`, and `data.status` (when present).
+The default output emits payload data fields like `id`, `serviceId`, `serviceName`, and `status` (when present).
 
 ### Example Data
 
 ```json
 {
   "data": {
-    "createdAt": "2026-02-05T16:00:00.000000Z",
     "id": "evj-cukouhrtq21c73e9scng",
     "serviceId": "srv-cukouhrtq21c73e9scng",
     "serviceName": "backend-api",
@@ -74,6 +72,48 @@ The default output emits the webhook payload data, including fields like `data.i
   },
   "timestamp": "2026-02-05T16:00:01.000000Z",
   "type": "render.deploy.ended"
+}
+```
+
+<a id="on-build"></a>
+
+## On Build
+
+The On Build trigger emits build-related events from Render for one selected service.
+
+### Use Cases
+
+- **Build failure alerts**: Notify your team when builds fail
+- **Build success hooks**: Trigger follow-up automation after successful builds
+
+### Configuration
+
+- **Service**: Required Render service.
+- **Event Types**: Optional build event types to listen for. Defaults to `build_ended`.
+
+### Webhook Verification
+
+Render webhooks are validated using the secret generated when SuperPlane creates the webhook via the Render API. Verification checks:
+- `webhook-id`
+- `webhook-timestamp`
+- `webhook-signature` (`v1,<base64-signature>`)
+
+### Event Data
+
+The default output emits payload data fields like `id`, `serviceId`, `serviceName`, and `status` (when present).
+
+### Example Data
+
+```json
+{
+  "data": {
+    "id": "evj-cukouhrtq21c73e9scng",
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "serviceName": "backend-api",
+    "status": "failed"
+  },
+  "timestamp": "2026-02-05T16:00:01.000000Z",
+  "type": "render.build.ended"
 }
 ```
 
@@ -116,4 +156,3 @@ The default output emits the deploy object returned by Render (e.g. `id`, `statu
   "type": "render.deploy.triggered"
 }
 ```
-
