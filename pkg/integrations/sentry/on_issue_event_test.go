@@ -12,6 +12,38 @@ import (
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
 )
 
+func Test__OnIssueEvent__Setup(t *testing.T) {
+	trigger := &OnIssueEvent{}
+	integration := &contexts.IntegrationContext{}
+
+	t.Run("missing events -> error", func(t *testing.T) {
+		ctx := core.TriggerContext{
+			Configuration: map[string]any{"webhookSecret": "sec"},
+			Integration:   integration,
+		}
+		err := trigger.Setup(ctx)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "at least one event")
+	})
+
+	t.Run("valid config -> requests webhook", func(t *testing.T) {
+		ctx := core.TriggerContext{
+			Configuration: map[string]any{
+				"events":        []string{"created", "resolved"},
+				"webhookSecret": "my-secret",
+			},
+			Integration: integration,
+		}
+		err := trigger.Setup(ctx)
+		assert.NoError(t, err)
+		assert.Len(t, integration.WebhookRequests, 1)
+		cfg, ok := integration.WebhookRequests[0].(WebhookConfiguration)
+		assert.True(t, ok)
+		assert.Equal(t, []string{"created", "resolved"}, cfg.Events)
+		assert.Equal(t, "my-secret", cfg.WebhookSecret)
+	})
+}
+
 func Test__OnIssueEvent__HandleWebhook(t *testing.T) {
 	trigger := &OnIssueEvent{}
 
