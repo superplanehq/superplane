@@ -1,0 +1,11 @@
+{
+  "id": 1234567890,
+  "node_id": "PRR_kwDOABC123DEF456",
+  "html_url": "https://github.com/superplanehq/superplane/pull/123#pullrequestreview-1234567890",
+  "body": "LGTM! Great work on this feature.",
+  "state": "APPROVED",
+  "commit_id": "abc123def456789",
+  "submitted_at": "2026-02-07T12:00:00Z",
+  "user": "superplane-bot",
+  "author_association": "COLLABORATOR"
+}
