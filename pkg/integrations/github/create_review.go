@@ -201,13 +201,16 @@ func (c *CreateReview) Execute(ctx core.ExecutionContext) error {
 
 	draftComments := make([]*github.DraftReviewComment, 0, len(config.Comments))
 	for i, comment := range config.Comments {
-		if strings.TrimSpace(comment.Path) == "" {
+		path := strings.TrimSpace(comment.Path)
+		if path == "" {
 			return fmt.Errorf("comments[%d].path is required", i)
 		}
-		if strings.TrimSpace(comment.Line) == "" {
+
+		lineStr := strings.TrimSpace(comment.Line)
+		if lineStr == "" {
 			return fmt.Errorf("comments[%d].line is required", i)
 		}
-		line, err := strconv.Atoi(comment.Line)
+		line, err := strconv.Atoi(lineStr)
 		if err != nil {
 			return fmt.Errorf("comments[%d].line is not a number: %v", i, err)
 		}
@@ -219,7 +222,7 @@ func (c *CreateReview) Execute(ctx core.ExecutionContext) error {
 		}
 
 		draftComments = append(draftComments, &github.DraftReviewComment{
-			Path: github.String(comment.Path),
+			Path: github.String(path),
 			Line: github.Int(line),
 			Side: github.String("RIGHT"),
 			Body: github.String(comment.Body),
