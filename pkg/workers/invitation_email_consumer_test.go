@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -20,6 +21,8 @@ func Test__InvitationEmailConsumer(t *testing.T) {
 	baseURL := "https://app.superplane.com"
 
 	consumer := NewInvitationEmailConsumer(amqpURL, testEmailService, baseURL)
+	// Use a unique queue per test run to avoid competing with the app's own consumers.
+	consumer.ServiceName = InvitationEmailServiceName + "." + uuid.NewString()
 
 	go consumer.Start()
 	defer consumer.Stop()
