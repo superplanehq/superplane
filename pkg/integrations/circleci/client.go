@@ -37,9 +37,9 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 
 func (c *Client) execRequest(method, requestURL string, body io.Reader) ([]byte, error) {
 	headers := map[string]string{
-		"Content-Type":  "application/json",
-		"Accept":        "application/json",
-		"Circle-Token":  c.APIToken,
+		"Content-Type": "application/json",
+		"Accept":       "application/json",
+		"Circle-Token": c.APIToken,
 	}
 	return core.DoRequest(c.http, method, requestURL, body, headers)
 }

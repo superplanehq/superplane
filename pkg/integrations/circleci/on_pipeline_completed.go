@@ -41,13 +41,7 @@ func (p *OnPipelineCompleted) Description() string {
 }
 
 func (p *OnPipelineCompleted) Documentation() string {
-	return `Triggers when a CircleCI workflow completes within a pipeline. Note that a single pipeline can contain multiple workflows.
-
-## Terminology
-
-- **Pipeline**: A CircleCI pipeline is triggered by a commit or API call and can contain multiple workflows
-- **Workflow**: A set of jobs that run as part of a pipeline (defined in .circleci/config.yml)
-- This trigger fires for each workflow completion, not when the entire pipeline finishes
+	return `Triggers when all CircleCI workflow completes within a pipeline.
 
 ## Use Cases
 
