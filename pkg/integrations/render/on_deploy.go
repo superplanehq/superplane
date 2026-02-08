@@ -100,7 +100,7 @@ func (t *OnDeploy) Setup(ctx core.TriggerContext) error {
 	}
 
 	return ctx.Integration.RequestWebhook(
-		webhookConfigurationForResource(ctx.Integration, renderWebhookResourceTypeDeploy, requestedEventTypes),
+		webhookConfigurationForResource(ctx.Integration, webhookResourceTypeDeploy, requestedEventTypes),
 	)
 }
 

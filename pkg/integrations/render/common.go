@@ -39,15 +39,15 @@ type WebhookConfiguration struct {
 }
 
 const (
-	renderWorkspacePlanProfessional    = "professional"
-	renderWorkspacePlanOrganization    = "organization"
-	renderWorkspacePlanEnterpriseAlias = "enterprise"
+	workspacePlanProfessional    = "professional"
+	workspacePlanOrganization    = "organization"
+	workspacePlanEnterpriseAlias = "enterprise"
 
-	renderWebhookStrategyIntegration  = "integration"
-	renderWebhookStrategyResourceType = "resource_type"
+	webhookStrategyIntegration  = "integration"
+	webhookStrategyResourceType = "resource_type"
 
-	renderWebhookResourceTypeDeploy = "deploy"
-	renderWebhookResourceTypeBuild  = "build"
+	webhookResourceTypeDeploy = "deploy"
+	webhookResourceTypeBuild  = "build"
 
 	webhookTimestampMaxSkew = 5 * time.Minute
 )
@@ -60,30 +60,30 @@ func webhookConfigurationForResource(
 	metadata := Metadata{}
 	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
 		return WebhookConfiguration{
-			Strategy:   renderWebhookStrategyIntegration,
+			Strategy:   webhookStrategyIntegration,
 			EventTypes: normalizeWebhookEventTypes(eventTypes),
 		}
 	}
 
 	workspacePlan := metadata.workspacePlan()
-	if workspacePlan != renderWorkspacePlanOrganization {
+	if workspacePlan != workspacePlanOrganization {
 		return WebhookConfiguration{
-			Strategy:   renderWebhookStrategyIntegration,
+			Strategy:   webhookStrategyIntegration,
 			EventTypes: normalizeWebhookEventTypes(eventTypes),
 		}
 	}
 
 	normalizedResourceType := strings.ToLower(strings.TrimSpace(resourceType))
 	switch normalizedResourceType {
-	case renderWebhookResourceTypeDeploy, renderWebhookResourceTypeBuild:
+	case webhookResourceTypeDeploy, webhookResourceTypeBuild:
 		return WebhookConfiguration{
-			Strategy:     renderWebhookStrategyResourceType,
+			Strategy:     webhookStrategyResourceType,
 			ResourceType: normalizedResourceType,
 			EventTypes:   normalizeWebhookEventTypes(eventTypes),
 		}
 	default:
 		return WebhookConfiguration{
-			Strategy:   renderWebhookStrategyIntegration,
+			Strategy:   webhookStrategyIntegration,
 			EventTypes: normalizeWebhookEventTypes(eventTypes),
 		}
 	}
@@ -91,7 +91,7 @@ func webhookConfigurationForResource(
 
 func decodeWebhookConfiguration(configuration any) (WebhookConfiguration, error) {
 	webhookConfiguration := WebhookConfiguration{
-		Strategy: renderWebhookStrategyIntegration,
+		Strategy: webhookStrategyIntegration,
 	}
 
 	if configuration == nil {
@@ -114,25 +114,25 @@ func normalizeWebhookConfiguration(configuration WebhookConfiguration) WebhookCo
 
 	if normalizedConfiguration.Strategy == "" {
 		if normalizedConfiguration.ResourceType == "" {
-			normalizedConfiguration.Strategy = renderWebhookStrategyIntegration
+			normalizedConfiguration.Strategy = webhookStrategyIntegration
 		} else {
-			normalizedConfiguration.Strategy = renderWebhookStrategyResourceType
+			normalizedConfiguration.Strategy = webhookStrategyResourceType
 		}
 	}
 
-	if normalizedConfiguration.Strategy != renderWebhookStrategyResourceType {
+	if normalizedConfiguration.Strategy != webhookStrategyResourceType {
 		return WebhookConfiguration{
-			Strategy:   renderWebhookStrategyIntegration,
+			Strategy:   webhookStrategyIntegration,
 			EventTypes: normalizedConfiguration.EventTypes,
 		}
 	}
 
 	switch normalizedConfiguration.ResourceType {
-	case renderWebhookResourceTypeDeploy, renderWebhookResourceTypeBuild:
+	case webhookResourceTypeDeploy, webhookResourceTypeBuild:
 		return normalizedConfiguration
 	default:
 		return WebhookConfiguration{
-			Strategy:   renderWebhookStrategyIntegration,
+			Strategy:   webhookStrategyIntegration,
 			EventTypes: normalizedConfiguration.EventTypes,
 		}
 	}
@@ -140,13 +140,13 @@ func normalizeWebhookConfiguration(configuration WebhookConfiguration) WebhookCo
 
 func webhookName(configuration WebhookConfiguration) string {
 	configuration = normalizeWebhookConfiguration(configuration)
-	if configuration.Strategy == renderWebhookStrategyResourceType &&
-		configuration.ResourceType == renderWebhookResourceTypeDeploy {
+	if configuration.Strategy == webhookStrategyResourceType &&
+		configuration.ResourceType == webhookResourceTypeDeploy {
 		return "SuperPlane Deploy"
 	}
 
-	if configuration.Strategy == renderWebhookStrategyResourceType &&
-		configuration.ResourceType == renderWebhookResourceTypeBuild {
+	if configuration.Strategy == webhookStrategyResourceType &&
+		configuration.ResourceType == webhookResourceTypeBuild {
 		return "SuperPlane Build"
 	}
 
@@ -177,11 +177,11 @@ func combineDeployAndBuildEventTypes(deploy, build []string) []string {
 }
 
 func allowedEventTypesForWebhook(configuration WebhookConfiguration) []string {
-	if configuration.Strategy == renderWebhookStrategyResourceType {
+	if configuration.Strategy == webhookStrategyResourceType {
 		switch configuration.ResourceType {
-		case renderWebhookResourceTypeDeploy:
+		case webhookResourceTypeDeploy:
 			return deployAllowedEventTypes
-		case renderWebhookResourceTypeBuild:
+		case webhookResourceTypeBuild:
 			return buildAllowedEventTypes
 		}
 	}
@@ -189,11 +189,11 @@ func allowedEventTypesForWebhook(configuration WebhookConfiguration) []string {
 }
 
 func defaultEventTypesForWebhook(configuration WebhookConfiguration) []string {
-	if configuration.Strategy == renderWebhookStrategyResourceType {
+	if configuration.Strategy == webhookStrategyResourceType {
 		switch configuration.ResourceType {
-		case renderWebhookResourceTypeDeploy:
+		case webhookResourceTypeDeploy:
 			return normalizeWebhookEventTypes(deployDefaultEventTypes)
-		case renderWebhookResourceTypeBuild:
+		case webhookResourceTypeBuild:
 			return normalizeWebhookEventTypes(buildDefaultEventTypes)
 		}
 	}

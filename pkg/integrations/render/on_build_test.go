@@ -51,7 +51,7 @@ func Test__Render_OnBuild__Setup(t *testing.T) {
 	webhookConfiguration, ok := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
 	require.True(t, ok)
 	assert.Equal(t, WebhookConfiguration{
-		Strategy:   renderWebhookStrategyIntegration,
+		Strategy:   webhookStrategyIntegration,
 		EventTypes: []string{"build_ended"},
 	}, webhookConfiguration)
 }
@@ -93,8 +93,8 @@ func Test__Render_OnBuild__Setup__OrganizationWorkspace(t *testing.T) {
 	webhookConfiguration, ok := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
 	require.True(t, ok)
 	assert.Equal(t, WebhookConfiguration{
-		Strategy:     renderWebhookStrategyResourceType,
-		ResourceType: renderWebhookResourceTypeBuild,
+		Strategy:     webhookStrategyResourceType,
+		ResourceType: webhookResourceTypeBuild,
 		EventTypes:   []string{"build_ended"},
 	}, webhookConfiguration)
 }

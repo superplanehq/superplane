@@ -285,7 +285,7 @@ func Test__Render__SetupWebhook(t *testing.T) {
 		assert.Equal(t, "https://hooks.superplane.dev/render", payload["url"])
 		assert.Equal(t, true, payload["enabled"])
 		assert.ElementsMatch(t, webhookEventFilter(WebhookConfiguration{
-			Strategy: renderWebhookStrategyIntegration,
+			Strategy: webhookStrategyIntegration,
 		}), payload["eventFilter"])
 	})
 
@@ -360,7 +360,7 @@ func Test__Render__SetupWebhook(t *testing.T) {
 		assert.Equal(t, "https://hooks.superplane.dev/render", updatePayload["url"])
 		assert.Equal(t, true, updatePayload["enabled"])
 		assert.ElementsMatch(t, webhookEventFilter(WebhookConfiguration{
-			Strategy: renderWebhookStrategyIntegration,
+			Strategy: webhookStrategyIntegration,
 		}), updatePayload["eventFilter"])
 
 	})
@@ -387,8 +387,8 @@ func Test__Render__SetupWebhook(t *testing.T) {
 			id:  "wh_record_2",
 			url: "https://hooks.superplane.dev/render",
 			configuration: WebhookConfiguration{
-				Strategy:     renderWebhookStrategyResourceType,
-				ResourceType: renderWebhookResourceTypeBuild,
+				Strategy:     webhookStrategyResourceType,
+				ResourceType: webhookResourceTypeBuild,
 			},
 		}
 
@@ -426,8 +426,8 @@ func Test__Render__SetupWebhook(t *testing.T) {
 		require.NoError(t, json.Unmarshal(body, &payload))
 		assert.Equal(t, "SuperPlane Build", payload["name"])
 		assert.ElementsMatch(t, webhookEventFilter(WebhookConfiguration{
-			Strategy:     renderWebhookStrategyResourceType,
-			ResourceType: renderWebhookResourceTypeBuild,
+			Strategy:     webhookStrategyResourceType,
+			ResourceType: webhookResourceTypeBuild,
 		}), payload["eventFilter"])
 	})
 }
@@ -467,12 +467,12 @@ func Test__Render__CompareWebhookConfig(t *testing.T) {
 
 	equal, err = integration.CompareWebhookConfig(
 		WebhookConfiguration{
-			Strategy:     renderWebhookStrategyResourceType,
-			ResourceType: renderWebhookResourceTypeDeploy,
+			Strategy:     webhookStrategyResourceType,
+			ResourceType: webhookResourceTypeDeploy,
 		},
 		WebhookConfiguration{
-			Strategy:     renderWebhookStrategyResourceType,
-			ResourceType: renderWebhookResourceTypeBuild,
+			Strategy:     webhookStrategyResourceType,
+			ResourceType: webhookResourceTypeBuild,
 		},
 	)
 	require.NoError(t, err)
@@ -480,11 +480,11 @@ func Test__Render__CompareWebhookConfig(t *testing.T) {
 
 	equal, err = integration.CompareWebhookConfig(
 		WebhookConfiguration{
-			Strategy:   renderWebhookStrategyIntegration,
+			Strategy:   webhookStrategyIntegration,
 			EventTypes: []string{"deploy_ended"},
 		},
 		WebhookConfiguration{
-			Strategy:   renderWebhookStrategyIntegration,
+			Strategy:   webhookStrategyIntegration,
 			EventTypes: []string{"build_ended"},
 		},
 	)
@@ -496,18 +496,18 @@ func Test__Render__MergeWebhookConfig(t *testing.T) {
 	integration := &Render{}
 	merged, changed, err := integration.MergeWebhookConfig(
 		WebhookConfiguration{
-			Strategy:   renderWebhookStrategyIntegration,
+			Strategy:   webhookStrategyIntegration,
 			EventTypes: []string{"deploy_ended"},
 		},
 		WebhookConfiguration{
-			Strategy:   renderWebhookStrategyIntegration,
+			Strategy:   webhookStrategyIntegration,
 			EventTypes: []string{"build_ended"},
 		},
 	)
 	require.NoError(t, err)
 	require.True(t, changed)
 	assert.Equal(t, WebhookConfiguration{
-		Strategy:   renderWebhookStrategyIntegration,
+		Strategy:   webhookStrategyIntegration,
 		EventTypes: []string{"build_ended", "deploy_ended"},
 	}, merged)
 }

@@ -87,14 +87,14 @@ func (r *Render) Configuration() []configuration.Field {
 			Label:    "Workspace Plan",
 			Type:     configuration.FieldTypeSelect,
 			Required: true,
-			Default:  renderWorkspacePlanProfessional,
+			Default:  workspacePlanProfessional,
 			Description: "Render workspace plan used for webhook strategy. " +
 				"Use Organization / Enterprise when available.",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
-						{Label: "Professional", Value: renderWorkspacePlanProfessional},
-						{Label: "Organization / Enterprise", Value: renderWorkspacePlanOrganization},
+						{Label: "Professional", Value: workspacePlanProfessional},
+						{Label: "Organization / Enterprise", Value: workspacePlanOrganization},
 					},
 				},
 			},
@@ -168,7 +168,7 @@ func (r *Render) CompareWebhookConfig(a, b any) (bool, error) {
 		return false, nil
 	}
 
-	if configA.Strategy == renderWebhookStrategyResourceType {
+	if configA.Strategy == webhookStrategyResourceType {
 		return configA.ResourceType == configB.ResourceType, nil
 	}
 
@@ -190,7 +190,7 @@ func (r *Render) MergeWebhookConfig(current, requested any) (any, bool, error) {
 		return currentConfiguration, false, nil
 	}
 
-	if currentConfiguration.Strategy == renderWebhookStrategyResourceType &&
+	if currentConfiguration.Strategy == webhookStrategyResourceType &&
 		currentConfiguration.ResourceType != requestedConfiguration.ResourceType {
 		return currentConfiguration, false, nil
 	}
@@ -338,7 +338,7 @@ func (r *Render) findExistingWebhook(
 		}
 	}
 
-	if webhookConfiguration.Strategy == renderWebhookStrategyIntegration {
+	if webhookConfiguration.Strategy == webhookStrategyIntegration {
 		return pickExistingRenderWebhook(candidateWebhooks, selectedWebhookName), nil
 	}
 
@@ -500,7 +500,7 @@ func (c Configuration) workspace() string {
 
 func (m Metadata) workspacePlan() string {
 	if m.Workspace == nil {
-		return renderWorkspacePlanProfessional
+		return workspacePlanProfessional
 	}
 
 	return normalizeWorkspacePlan(m.Workspace.Plan)
@@ -516,7 +516,7 @@ func buildMetadata(workspaceID, workspacePlan string) Metadata {
 }
 
 func workspacePlanFromConfig(integration core.IntegrationContext) string {
-	configuredWorkspacePlan := renderWorkspacePlanProfessional
+	configuredWorkspacePlan := workspacePlanProfessional
 	workspacePlanValue, workspacePlanErr := integration.GetConfig("workspacePlan")
 	if workspacePlanErr == nil {
 		configuredWorkspacePlan = normalizeWorkspacePlan(string(workspacePlanValue))
@@ -527,10 +527,10 @@ func workspacePlanFromConfig(integration core.IntegrationContext) string {
 
 func normalizeWorkspacePlan(workspacePlan string) string {
 	switch strings.ToLower(strings.TrimSpace(workspacePlan)) {
-	case renderWorkspacePlanOrganization, renderWorkspacePlanEnterpriseAlias:
-		return renderWorkspacePlanOrganization
+	case workspacePlanOrganization, workspacePlanEnterpriseAlias:
+		return workspacePlanOrganization
 	default:
-		return renderWorkspacePlanProfessional
+		return workspacePlanProfessional
 	}
 }
 
