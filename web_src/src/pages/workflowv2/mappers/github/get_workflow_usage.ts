@@ -42,7 +42,9 @@ export const getWorkflowUsageMapper: ComponentBaseMapper = {
       return details;
     }
 
-    details["Retrieved At"] = context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-";
+    details["Retrieved At"] = context.execution.createdAt
+      ? new Date(context.execution.createdAt).toLocaleString()
+      : "-";
     details["Product"] = stringOrDash(out.product);
 
     if (out.year) details["Year"] = String(out.year);
@@ -68,4 +70,3 @@ export const getWorkflowUsageMapper: ComponentBaseMapper = {
     return details;
   },
 };
-
