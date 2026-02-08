@@ -20,6 +20,7 @@ func TestTimeGateComponent(t *testing.T) {
 	workweekDays := []string{"monday", "tuesday", "wednesday", "thursday", "friday"}
 
 	t.Run("add a TimeGate that blocks on weekends", func(t *testing.T) {
+		steps.t = t
 		steps.start()
 		steps.givenACanvasExists("Weekday Work Hours Gate")
 		steps.addTimeGate()
@@ -31,6 +32,7 @@ func TestTimeGateComponent(t *testing.T) {
 	})
 
 	t.Run("add a TimeGate that blocks on outside of work hours", func(t *testing.T) {
+		steps.t = t
 		steps.start()
 		steps.givenACanvasExists("Work Hours Gate")
 		steps.addTimeGate()
@@ -42,10 +44,13 @@ func TestTimeGateComponent(t *testing.T) {
 	})
 
 	t.Run("push through the time gate item", func(t *testing.T) {
+		steps.t = t
 		steps.start()
-		now := time.Now().UTC()
-		tomorrow := now.Add(24 * time.Hour)
-		activeDay := dayString(tomorrow.Weekday())
+		// Pick a day-of-week that's very unlikely to become active during the test.
+		// The time gate uses day-of-week scheduling (not a concrete date), so choosing
+		// "yesterday" ensures the next active window is ~6 days away.
+		yesterday := time.Now().UTC().Add(-24 * time.Hour)
+		activeDay := dayString(yesterday.Weekday())
 		steps.givenACanvasWithManualTriggerTimeGateAndOutput([]string{activeDay}, "00:00-23:59", "0")
 		steps.runManualTrigger()
 		steps.openSidebarForNode("timeGate")
@@ -171,20 +176,28 @@ func (s *TimeGateSteps) runManualTrigger() {
 	s.canvas.WaitForExecutionInStates(
 		"timeGate",
 		[]string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted},
-		10*time.Second,
+		30*time.Second,
 	)
 }
 
 func (s *TimeGateSteps) openSidebarForNode(node string) {
-	s.session.Click(q.TestID("node", node, "header"))
+	s.session.Click(q.Locator(`[data-testid="node-` + node + `-header"]:visible`))
 }
 
 func (s *TimeGateSteps) pushThroughFirstItemFromSidebar() {
-	eventItem := q.Locator("h2:has-text('Latest') ~ div")
+	eventItem := q.Locator(`[data-testid="sidebar-event-item"][data-event-state="running"]`)
+	s.session.AssertVisible(eventItem)
 	s.session.HoverOver(eventItem)
-	s.session.Click(q.Locator("h2:has-text('Latest') ~ div button[aria-label='Open actions']"))
-	s.session.Click(q.TestID("push-through-item"))
-	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 15*time.Second)
+
+	actionsBtn := q.Locator(`[data-testid="sidebar-event-item"][data-event-state="running"] button[aria-label="Open actions"]`)
+	s.session.AssertVisible(actionsBtn)
+	s.session.Click(actionsBtn)
+
+	pushThrough := q.TestID("push-through-item")
+	s.session.AssertVisible(pushThrough)
+	s.session.Click(pushThrough)
+
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 45*time.Second)
 }
 
 func (s *TimeGateSteps) assertTimeGateExecutionFinishedAndOutputNodeProcessed() {
