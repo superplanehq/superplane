@@ -91,6 +91,12 @@ import {
   triggerRenderers as openaiTriggerRenderers,
   eventStateRegistry as openaiEventStateRegistry,
 } from "./openai/index";
+import {
+  componentMappers as claudeComponentMappers,
+  triggerRenderers as claudeTriggerRenderers,
+  eventStateRegistry as claudeEventStateRegistry,
+} from "./claude/index";
+
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
@@ -138,6 +144,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   aws: awsComponentMappers,
   discord: discordComponentMappers,
   openai: openaiComponentMappers,
+  claude: claudeComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -156,6 +163,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
   openai: openaiTriggerRenderers,
+  claude: claudeTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -173,6 +181,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   discord: discordEventStateRegistry,
   rootly: rootlyEventStateRegistry,
   openai: openaiEventStateRegistry,
+  claude: claudeEventStateRegistry,
   aws: awsEventStateRegistry,
 };
 

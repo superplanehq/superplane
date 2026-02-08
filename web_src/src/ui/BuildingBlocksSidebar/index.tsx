@@ -21,6 +21,7 @@ import discordIcon from "@/assets/icons/integrations/discord.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
+import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import awsIcon from "@/assets/icons/integrations/aws.svg";
@@ -399,6 +400,7 @@ function CategorySection({
     jira: jiraIcon,
     openai: openAiIcon,
     "open-ai": openAiIcon,
+    claude: claudeIcon,
     pagerduty: pagerDutyIcon,
     rootly: rootlyIcon,
     semaphore: SemaphoreLogo,
@@ -469,6 +471,7 @@ function CategorySection({
             github: githubIcon,
             openai: openAiIcon,
             "open-ai": openAiIcon,
+            claude: claudeIcon,
             pagerduty: pagerDutyIcon,
             rootly: rootlyIcon,
             semaphore: SemaphoreLogo,
