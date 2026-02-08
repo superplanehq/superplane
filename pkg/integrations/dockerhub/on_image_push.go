@@ -1,0 +1,238 @@
+package dockerhub
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strings"
+
+	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
+)
+
+const ImagePushEventType = "dockerhub.image.push"
+
+type OnImagePush struct{}
+
+type OnImagePushConfiguration struct {
+	Namespace  string                    `json:"namespace" mapstructure:"namespace"`
+	Repository string                    `json:"repository" mapstructure:"repository"`
+	Tags       []configuration.Predicate `json:"tags" mapstructure:"tags"`
+}
+
+type OnImagePushMetadata struct {
+	Namespace  string      `json:"namespace" mapstructure:"namespace"`
+	Repository *Repository `json:"repository" mapstructure:"repository"`
+}
+
+type ImagePushPayload struct {
+	CallbackURL string              `json:"callback_url"`
+	PushData    ImagePushData       `json:"push_data"`
+	Repository  ImagePushRepository `json:"repository"`
+}
+
+type ImagePushData struct {
+	Tag      string `json:"tag"`
+	PushedAt int64  `json:"pushed_at"`
+	Pusher   string `json:"pusher"`
+}
+
+type ImagePushRepository struct {
+	RepoName   string `json:"repo_name"`
+	Name       string `json:"name"`
+	Namespace  string `json:"namespace"`
+	RepoURL    string `json:"repo_url"`
+	IsPrivate  bool   `json:"is_private"`
+	Status     string `json:"status"`
+	StarCount  int    `json:"star_count"`
+	PullCount  int    `json:"pull_count"`
+	Owner      string `json:"owner"`
+	Repository string `json:"repository"`
+}
+
+func (p *OnImagePush) Name() string {
+	return "dockerhub.onImagePush"
+}
+
+func (p *OnImagePush) Label() string {
+	return "Docker Hub • On Image Push"
+}
+
+func (p *OnImagePush) Description() string {
+	return "Listen to Docker Hub image push events"
+}
+
+func (p *OnImagePush) Documentation() string {
+	return `The On Image Push trigger starts a workflow execution when an image tag is pushed to Docker Hub.
+
+## Use Cases
+
+- **Build pipelines**: Trigger builds and deployments on container pushes
+- **Release workflows**: Promote artifacts when a new tag is published
+- **Security automation**: Kick off scans or alerts for newly pushed images
+
+## Configuration
+
+- **Namespace**: Docker Hub username or organization that owns the repository (defaults to the integration username)
+- **Repository**: Docker Hub repository name
+- **Tags**: Optional filters for image tags (for example: ` + "`latest`" + ` or ` + "`^v[0-9]+`" + `)
+
+## Webhook Setup
+
+This trigger automatically creates a Docker Hub webhook for the selected repository. The webhook is managed by SuperPlane and cleaned up when the trigger is removed.`
+}
+
+func (p *OnImagePush) Icon() string {
+	return "docker"
+}
+
+func (p *OnImagePush) Color() string {
+	return "gray"
+}
+
+func (p *OnImagePush) ExampleData() map[string]any {
+	return onImagePushExampleData()
+}
+
+func (p *OnImagePush) Configuration() []configuration.Field {
+	return []configuration.Field{
+		{
+			Name:        "namespace",
+			Label:       "Namespace",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Placeholder: "my-organization",
+			Description: "Docker Hub username or organization",
+		},
+		{
+			Name:     "repository",
+			Label:    "Repository",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "dockerhub.repository",
+					UseNameAsValue: true,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "namespace",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "namespace",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:     "tags",
+			Label:    "Tags",
+			Type:     configuration.FieldTypeAnyPredicateList,
+			Required: false,
+			TypeOptions: &configuration.TypeOptions{
+				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
+					Operators: configuration.AllPredicateOperators,
+				},
+			},
+		},
+	}
+}
+
+func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
+	metadata := OnImagePushMetadata{}
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	config := OnImagePushConfiguration{}
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	repository := strings.TrimSpace(config.Repository)
+	if repository == "" {
+		return fmt.Errorf("repository is required")
+	}
+
+	namespace, err := resolveNamespace(config.Namespace, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	if metadata.Repository != nil && metadata.Repository.Name == repository && metadata.Namespace == namespace {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create Docker Hub client: %w", err)
+	}
+
+	repoInfo, err := client.GetRepository(namespace, repository)
+	if err != nil {
+		return fmt.Errorf("failed to validate repository: %w", err)
+	}
+
+	if err := ctx.Metadata.Set(OnImagePushMetadata{
+		Namespace:  namespace,
+		Repository: repoInfo,
+	}); err != nil {
+		return fmt.Errorf("failed to store metadata: %w", err)
+	}
+
+	return ctx.Integration.RequestWebhook(WebhookConfiguration{
+		Namespace:  namespace,
+		Repository: repository,
+	})
+}
+
+func (p *OnImagePush) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (p *OnImagePush) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	return nil, nil
+}
+
+func (p *OnImagePush) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	config := OnImagePushConfiguration{}
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	payload := ImagePushPayload{}
+	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
+		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %w", err)
+	}
+
+	repositoryName := repositoryNameFromEvent(payload.Repository.RepoName, payload.Repository.Name)
+	if repositoryName == "" {
+		return http.StatusBadRequest, fmt.Errorf("missing repository name in event payload")
+	}
+
+	if strings.TrimSpace(config.Repository) != "" && repositoryName != strings.TrimSpace(config.Repository) {
+		return http.StatusOK, nil
+	}
+
+	if len(config.Tags) > 0 {
+		tag := strings.TrimSpace(payload.PushData.Tag)
+		if tag == "" {
+			return http.StatusOK, nil
+		}
+
+		if !configuration.MatchesAnyPredicate(config.Tags, tag) {
+			return http.StatusOK, nil
+		}
+	}
+
+	if err := ctx.Events.Emit(ImagePushEventType, payload); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %w", err)
+	}
+
+	return http.StatusOK, nil
+}
+
+func (p *OnImagePush) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}
