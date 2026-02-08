@@ -173,7 +173,7 @@ func (c *ListReleases) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if len(events) == 0 {
-		return nil
+		return ctx.ExecutionState.Pass()
 	}
 
 	return ctx.ExecutionState.Emit(
