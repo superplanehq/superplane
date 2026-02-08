@@ -63,15 +63,15 @@ func (t *TriggerPipeline) Name() string {
 }
 
 func (t *TriggerPipeline) Label() string {
-	return "Trigger Pipeline"
+	return "Run Pipeline"
 }
 
 func (t *TriggerPipeline) Description() string {
-	return "Trigger a CircleCI pipeline and wait for completion"
+	return "Run a CircleCI pipeline and wait for completion"
 }
 
 func (t *TriggerPipeline) Documentation() string {
-	return `The Trigger Pipeline component starts a CircleCI pipeline and waits for it to complete.
+	return `The Run Pipeline component starts a CircleCI pipeline and waits for it to complete.
 
 ## Use Cases
 

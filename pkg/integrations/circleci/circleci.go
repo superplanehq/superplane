@@ -138,6 +138,10 @@ func (c *CircleCI) HandleAction(ctx core.IntegrationActionContext) error {
 	return nil
 }
 
+func (c *CircleCI) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	return []core.IntegrationResource{}, nil
+}
+
 type WebhookMetadata struct {
 	WebhookID string `json:"webhookId"`
 	Name      string `json:"name"`
