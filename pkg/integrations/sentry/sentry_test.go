@@ -138,4 +138,3 @@ func Test__Sentry__CompareWebhookConfig(t *testing.T) {
 		assert.True(t, equal, "event order should not matter")
 	})
 }
-
