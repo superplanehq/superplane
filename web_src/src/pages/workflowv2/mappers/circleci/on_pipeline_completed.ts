@@ -6,6 +6,7 @@ import { formatTimeAgo } from "@/utils/date";
 
 interface OnPipelineCompletedMetadata {
   project?: {
+    name: string;
     slug: string;
   };
 }
@@ -64,11 +65,12 @@ export const onPipelineCompletedTriggerRenderer: TriggerRenderer = {
     const configuration = node.configuration as any;
     const metadataItems = [];
 
-    const projectSlug = metadata?.project?.slug || configuration?.projectSlug;
-    if (projectSlug) {
+    const projectLabel =
+      metadata?.project?.name || metadata?.project?.slug || configuration?.projectSlug;
+    if (projectLabel) {
       metadataItems.push({
         icon: "folder",
-        label: projectSlug,
+        label: projectLabel,
       });
     }
 
