@@ -2,88 +2,15 @@ package claude
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"net/http"
 	"testing"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
-
-// --- Mocks ---
-
-// mockHTTPContext implements core.HTTPContext for testing
-type mockHTTPContext struct {
-	RoundTripFunc func(req *http.Request) *http.Response
-}
-
-func (m *mockHTTPContext) Do(req *http.Request) (*http.Response, error) {
-	if m.RoundTripFunc != nil {
-		return m.RoundTripFunc(req), nil
-	}
-	return &http.Response{
-		StatusCode: http.StatusOK,
-		Body:       io.NopCloser(bytes.NewBufferString(`{}`)),
-	}, nil
-}
-
-// mockIntegrationContext implements core.IntegrationContext for testing
-type mockIntegrationContext struct {
-	config map[string][]byte
-	ready  bool
-	errMsg string
-}
-
-func newMockIntegrationContext() *mockIntegrationContext {
-	return &mockIntegrationContext{
-		config: make(map[string][]byte),
-	}
-}
-
-func (m *mockIntegrationContext) GetConfig(name string) ([]byte, error) {
-	val, ok := m.config[name]
-	if !ok {
-		return nil, fmt.Errorf("config not found: %s", name)
-	}
-	return val, nil
-}
-
-func (m *mockIntegrationContext) Ready() {
-	m.ready = true
-}
-
-func (m *mockIntegrationContext) Error(message string) {
-	m.errMsg = message
-}
-
-// Stubs for other interface methods
-func (m *mockIntegrationContext) ID() uuid.UUID                       { return uuid.New() }
-func (m *mockIntegrationContext) GetMetadata() any                    { return nil }
-func (m *mockIntegrationContext) SetMetadata(any)                     {}
-func (m *mockIntegrationContext) NewBrowserAction(core.BrowserAction) {}
-func (m *mockIntegrationContext) RemoveBrowserAction()                {}
-func (m *mockIntegrationContext) SetSecret(string, []byte) error      { return nil }
-func (m *mockIntegrationContext) GetSecrets() ([]core.IntegrationSecret, error) {
-	return nil, nil
-}
-func (m *mockIntegrationContext) RequestWebhook(any) error { return nil }
-func (m *mockIntegrationContext) Subscribe(any) (*uuid.UUID, error) {
-	u := uuid.New()
-	return &u, nil
-}
-func (m *mockIntegrationContext) ScheduleResync(time.Duration) error { return nil }
-func (m *mockIntegrationContext) ScheduleActionCall(string, any, time.Duration) error {
-	return nil
-}
-func (m *mockIntegrationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
-	return nil, nil
-}
-
-// --- Tests ---
 
 func TestClaude_Configuration(t *testing.T) {
 	i := &Claude{}
@@ -170,19 +97,25 @@ func TestClaude_Sync(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			i := &Claude{}
-			mockInt := newMockIntegrationContext()
-			mockHTTP := &mockHTTPContext{RoundTripFunc: tt.mockResponses}
-
-			// Populate mock integration config (used by NewClient)
-			if v, ok := tt.config["apiKey"].(string); ok {
-				mockInt.config["apiKey"] = []byte(v)
+			integrationCtx := &contexts.IntegrationContext{
+				Configuration: map[string]any{},
 			}
+			if v, ok := tt.config["apiKey"].(string); ok {
+				integrationCtx.Configuration["apiKey"] = v
+			}
+
+			var responses []*http.Response
+			if tt.mockResponses != nil {
+				req, _ := http.NewRequest(http.MethodGet, "https://api.anthropic.com/v1/models", nil)
+				responses = []*http.Response{tt.mockResponses(req)}
+			}
+			httpCtx := &contexts.HTTPContext{Responses: responses}
 
 			ctx := core.SyncContext{
 				Logger:        logger,
-				Configuration: tt.config, // Used by mapstructure decode
-				HTTP:          mockHTTP,
-				Integration:   mockInt,
+				Configuration: tt.config,
+				HTTP:          httpCtx,
+				Integration:   integrationCtx,
 			}
 
 			err := i.Sync(ctx)
@@ -193,7 +126,7 @@ func TestClaude_Sync(t *testing.T) {
 			if !tt.expectError && err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if tt.expectReady && !mockInt.ready {
+			if tt.expectReady && integrationCtx.State != "ready" {
 				t.Error("expected integration to be marked ready")
 			}
 		})
@@ -254,14 +187,23 @@ func TestClaude_ListResources(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			i := &Claude{}
-			mockInt := newMockIntegrationContext()
-			mockInt.config = tt.config
-			mockHTTP := &mockHTTPContext{RoundTripFunc: tt.mockResponses}
+			configAny := make(map[string]any)
+			for k, v := range tt.config {
+				configAny[k] = string(v)
+			}
+			integrationCtx := &contexts.IntegrationContext{Configuration: configAny}
+
+			var responses []*http.Response
+			if tt.mockResponses != nil {
+				req, _ := http.NewRequest(http.MethodGet, "https://api.anthropic.com/v1/models", nil)
+				responses = []*http.Response{tt.mockResponses(req)}
+			}
+			httpCtx := &contexts.HTTPContext{Responses: responses}
 
 			ctx := core.ListResourcesContext{
 				Logger:      logger,
-				HTTP:        mockHTTP,
-				Integration: mockInt,
+				HTTP:        httpCtx,
+				Integration: integrationCtx,
 			}
 
 			resources, err := i.ListResources(tt.resourceType, ctx)
