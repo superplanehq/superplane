@@ -7,10 +7,10 @@ Manage resources and execute AWS commands in workflows
 ## Triggers
 
 <CardGrid>
-  <LinkCard title="CloudWatch • On Alarm" href="#cloud-watch-•-on-alarm" description="Listen to AWS CloudWatch alarm state change events" />
   <LinkCard title="CodeArtifact • On Package Version" href="#code-artifact-•-on-package-version" description="Listen to AWS CodeArtifact package version events" />
   <LinkCard title="ECR • On Image Push" href="#ecr-•-on-image-push" description="Listen to AWS ECR image push events" />
   <LinkCard title="ECR • On Image Scan" href="#ecr-•-on-image-scan" description="Listen to AWS ECR image scan events" />
+  <LinkCard title="SNS • On Topic Message" href="#sns-•-on-topic-message" description="Listen to AWS SNS topic notification events" />
 </CardGrid>
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
@@ -18,81 +18,23 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
-  <LinkCard title="CodeArtifact • Copy Package Versions" href="#code-artifact-•-copy-package-versions" description="Copy package versions from one repository to another in the same domain" />
-  <LinkCard title="CodeArtifact • Create Repository" href="#code-artifact-•-create-repository" description="Create an AWS CodeArtifact repository in a domain" />
-  <LinkCard title="CodeArtifact • Delete Package Versions" href="#code-artifact-•-delete-package-versions" description="Permanently delete one or more package versions from a repository" />
-  <LinkCard title="CodeArtifact • Delete Repository" href="#code-artifact-•-delete-repository" description="Delete an AWS CodeArtifact repository from a domain" />
-  <LinkCard title="CodeArtifact • Dispose Package Versions" href="#code-artifact-•-dispose-package-versions" description="Delete assets and set package version status to Disposed (record remains)" />
   <LinkCard title="CodeArtifact • Get Package Version" href="#code-artifact-•-get-package-version" description="Describe an AWS CodeArtifact package version" />
-  <LinkCard title="CodeArtifact • Update Package Versions Status" href="#code-artifact-•-update-package-versions-status" description="Update the status of one or more package versions (Archived, Published, Unlisted)" />
   <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
   <LinkCard title="ECR • Scan Image" href="#ecr-•-scan-image" description="Scan an ECR image for vulnerabilities" />
   <LinkCard title="Lambda • Run Function" href="#lambda-•-run-function" description="Invoke a Lambda function, optionally creating it from inline JavaScript" />
+  <LinkCard title="SNS • Create Topic" href="#sns-•-create-topic" description="Create an AWS SNS topic" />
+  <LinkCard title="SNS • Delete Topic" href="#sns-•-delete-topic" description="Delete an AWS SNS topic" />
+  <LinkCard title="SNS • Get Subscription" href="#sns-•-get-subscription" description="Get an AWS SNS subscription by ARN" />
+  <LinkCard title="SNS • Get Topic" href="#sns-•-get-topic" description="Get an AWS SNS topic by ARN" />
+  <LinkCard title="SNS • Publish Message" href="#sns-•-publish-message" description="Publish a message to an AWS SNS topic" />
+  <LinkCard title="SNS • Subscribe" href="#sns-•-subscribe" description="Create an AWS SNS subscription" />
+  <LinkCard title="SNS • Unsubscribe" href="#sns-•-unsubscribe" description="Delete an AWS SNS subscription" />
 </CardGrid>
 
 ## Instructions
 
 Initially, you can leave the **"IAM Role ARN"** field empty, as you will be guided through the identity provider and IAM role creation process.
-
-<a id="cloud-watch-•-on-alarm"></a>
-
-## CloudWatch • On Alarm
-
-The On Alarm trigger starts a workflow execution when a CloudWatch alarm transitions to the ALARM state.
-
-### Use Cases
-
-- **Incident response**: Notify responders and open incidents when alarms fire
-- **Auto-remediation**: Execute rollback or recovery workflows immediately
-- **Audit and reporting**: Track alarm transitions over time
-
-### Configuration
-
-- **Region**: AWS region where alarms are evaluated
-- **Alarms**: Optional alarm name filters (supports equals, not-equals, and regex matches)
-- **State**: Only trigger for alarms in the specified state (OK, ALARM, or INSUFFICIENT_DATA)
-
-### Event Data
-
-Each alarm event includes:
-- **detail.alarmName**: CloudWatch alarm name
-- **detail.state.value**: Current alarm state
-- **detail.previousState.value**: Previous alarm state
-
-### Example Data
-
-```json
-{
-  "data": {
-    "account": "123456789012",
-    "detail": {
-      "alarmName": "HighCPUUtilization",
-      "previousState": {
-        "reason": "Threshold Crossed: 1 datapoint [35.0 (20/11/24 20:29:00)] was not greater than or equal to the threshold (90.0).",
-        "timestamp": "2024-11-20T20:30:33.000+0000",
-        "value": "OK"
-      },
-      "state": {
-        "reason": "Threshold Crossed: 1 datapoint [95.0 (20/11/24 20:34:00)] was greater than or equal to the threshold (90.0).",
-        "timestamp": "2024-11-20T20:35:33.000+0000",
-        "value": "ALARM"
-      }
-    },
-    "detail-type": "CloudWatch Alarm State Change",
-    "id": "2f1ecf5c-8bc9-4b7d-9e76-8df420e8e1a7",
-    "region": "us-east-1",
-    "resources": [
-      "arn:aws:cloudwatch:us-east-1:123456789012:alarm:HighCPUUtilization"
-    ],
-    "source": "aws.cloudwatch",
-    "time": "2024-11-20T20:35:33Z",
-    "version": "0"
-  },
-  "timestamp": "2026-02-10T12:00:00Z",
-  "type": "aws.cloudwatch.alarm"
-}
-```
 
 <a id="code-artifact-•-on-package-version"></a>
 
@@ -262,143 +204,62 @@ Each image scan event includes:
 }
 ```
 
-<a id="code-artifact-•-copy-package-versions"></a>
+<a id="sns-•-on-topic-message"></a>
 
-## CodeArtifact • Copy Package Versions
+## SNS • On Topic Message
 
-The Copy Package Versions component copies one or more package versions from a source repository to a destination repository in the same domain.
+The On Topic Message trigger starts a workflow execution when a message is published to an AWS SNS topic.
 
 ### Use Cases
 
-- **Promotion**: Copy approved versions from staging to production
-- **Replication**: Mirror packages across repositories
-- **Migration**: Move versions between repos in the same domain
+- **Event-driven automation**: React to messages published by external systems
+- **Notification processing**: Handle SNS payloads in workflow steps
+- **Routing and enrichment**: Trigger downstream workflows based on topic activity
 
-### Example Output
+### Example Data
 
 ```json
 {
-  "failedVersions": {},
-  "successfulVersions": {
-    "1.0.0": {
-      "revision": "REVISION1",
-      "status": "Published"
+  "data": {
+    "account": "123456789012",
+    "detail": {
+      "message": "{\"orderId\":\"ord_123\",\"status\":\"created\"}",
+      "subject": "order.created",
+      "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
     },
-    "1.0.1": {
-      "revision": "REVISION2",
-      "status": "Published"
-    }
-  }
+    "detail-type": "SNS Topic Notification",
+    "id": "5f0bc5d7-9ad1-4d2c-b68b-41f26032e41e",
+    "region": "us-east-1",
+    "resources": [
+      "arn:aws:sns:us-east-1:123456789012:orders-events"
+    ],
+    "source": "aws.sns",
+    "time": "2026-01-10T10:00:00Z",
+    "version": "0"
+  },
+  "timestamp": "2026-01-10T10:00:02.000000000Z",
+  "type": "aws.sns.topic.message"
 }
 ```
 
-<a id="code-artifact-•-create-repository"></a>
+### Required IAM Permissions for SNS
 
-## CodeArtifact • Create Repository
+The following IAM permissions are required for SNS components:
 
-The Create Repository component creates a new repository in an AWS CodeArtifact domain.
+| Component | Required Permissions |
+|-----------|---------------------|
+| On Topic Message | `events:PutRule`, `events:PutTargets`, `events:DeleteRule`, `events:RemoveTargets` |
+| Get Topic | `sns:GetTopicAttributes` |
+| Get Subscription | `sns:GetSubscriptionAttributes` |
+| Create Topic | `sns:CreateTopic`, `sns:GetTopicAttributes` |
+| Delete Topic | `sns:DeleteTopic` |
+| Publish Message | `sns:Publish` |
+| Subscribe | `sns:Subscribe`, `sns:GetSubscriptionAttributes` |
+| Unsubscribe | `sns:Unsubscribe` |
 
-### Use Cases
-
-- **Automated setup**: Create repositories as part of onboarding or pipeline setup
-- **Environment replication**: Mirror repository structure across domains
-- **Workflow provisioning**: Create a destination repository before copying packages
-
-### Example Output
-
-```json
-{
-  "repository": {
-    "administratorAccount": "123456789012",
-    "arn": "arn:aws:codeartifact:us-east-1:123456789012:repository/example-domain/my-repo",
-    "createdTime": 1706961600,
-    "description": "Example repository created by workflow",
-    "domainName": "example-domain",
-    "domainOwner": "123456789012",
-    "name": "my-repo"
-  }
-}
-```
-
-<a id="code-artifact-•-delete-package-versions"></a>
-
-## CodeArtifact • Delete Package Versions
-
-The Delete Package Versions component permanently removes package versions and their assets. Deleted versions cannot be restored. To remove from view but keep the option to restore later, use Update Package Versions Status to set status to Archived instead.
-
-### Use Cases
-
-- **Cleanup**: Remove obsolete or invalid versions
-- **Compliance**: Permanently remove versions that must not be retained
-- **Storage**: Free space by deleting unused versions
-
-### Example Output
-
-```json
-{
-  "failedVersions": {},
-  "successfulVersions": {
-    "1.0.0": {
-      "revision": "REVISION1",
-      "status": "Deleted"
-    }
-  }
-}
-```
-
-<a id="code-artifact-•-delete-repository"></a>
-
-## CodeArtifact • Delete Repository
-
-The Delete Repository component deletes a repository from an AWS CodeArtifact domain.
-
-### Use Cases
-
-- **Cleanup**: Remove repositories after migration or deprecation
-- **Environment teardown**: Delete temporary repositories created by workflows
-- **Lifecycle management**: Enforce retention by deleting old repositories
-
-### Example Output
-
-```json
-{
-  "repository": {
-    "administratorAccount": "123456789012",
-    "arn": "arn:aws:codeartifact:us-east-1:123456789012:repository/example-domain/my-repo",
-    "createdTime": 1706961600,
-    "description": "Deleted repository",
-    "domainName": "example-domain",
-    "domainOwner": "123456789012",
-    "name": "my-repo"
-  }
-}
-```
-
-<a id="code-artifact-•-dispose-package-versions"></a>
-
-## CodeArtifact • Dispose Package Versions
-
-The Dispose Package Versions component deletes the assets of package versions and sets their status to Disposed. The version record remains so you can still see it in ListPackageVersions with status Disposed; assets cannot be restored.
-
-### Use Cases
-
-- **Retention**: Keep version metadata for audit while removing binary assets
-- **Storage**: Free asset storage while preserving version history
-- **Lifecycle**: Mark versions as disposed after a retention period
-
-### Example Output
-
-```json
-{
-  "failedVersions": {},
-  "successfulVersions": {
-    "1.0.0": {
-      "revision": "REVISION1",
-      "status": "Disposed"
-    }
-  }
-}
-```
+For resource listing in the UI:
+- `sns:ListTopics` - Required for topic selection dropdowns
+- `sns:ListSubscriptions` - Required for subscription selection dropdowns
 
 <a id="code-artifact-•-get-package-version"></a>
 
@@ -454,36 +315,6 @@ The Get Package Version component retrieves metadata for a specific package vers
   },
   "timestamp": "2026-02-03T12:00:00Z",
   "type": "aws.codeartifact.package.version"
-}
-```
-
-<a id="code-artifact-•-update-package-versions-status"></a>
-
-## CodeArtifact • Update Package Versions Status
-
-The Update Package Versions Status component sets the status of package versions to Archived, Published, or Unlisted.
-
-### Use Cases
-
-- **Lifecycle management**: Archive old versions or publish after validation
-- **Visibility**: Unlist versions without deleting them
-- **Compliance**: Align version status with release policies
-
-### Example Output
-
-```json
-{
-  "failedVersions": {},
-  "successfulVersions": {
-    "1.0.0": {
-      "revision": "REVISION1",
-      "status": "Archived"
-    },
-    "1.0.1": {
-      "revision": "REVISION2",
-      "status": "Archived"
-    }
-  }
 }
 ```
 
@@ -698,6 +529,220 @@ The Run Lambda component invokes a Lambda function.
     "memorySize": "128 MB"
   },
   "requestId": "9f8d2b5e-1c7a-4d62-8f1a-0f8b8e4f3a12"
+}
+```
+
+<a id="sns-•-create-topic"></a>
+
+## SNS • Create Topic
+
+The Create Topic component creates an AWS SNS topic and returns its metadata.
+
+### Use Cases
+
+- **Provisioning workflows**: Create topics as part of environment setup
+- **Automation bootstrap**: Prepare topics before publishing messages
+- **Self-service operations**: Provision messaging resources on demand
+
+### Example Output
+
+```json
+{
+  "data": {
+    "attributes": {
+      "DisplayName": "Orders Events",
+      "Owner": "123456789012",
+      "TopicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
+    },
+    "contentBasedDeduplication": false,
+    "displayName": "Orders Events",
+    "fifoTopic": false,
+    "name": "orders-events",
+    "owner": "123456789012",
+    "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
+  },
+  "timestamp": "2026-01-10T10:00:02.000000000Z",
+  "type": "aws.sns.topic"
+}
+```
+
+<a id="sns-•-delete-topic"></a>
+
+## SNS • Delete Topic
+
+The Delete Topic component deletes an AWS SNS topic.
+
+### Use Cases
+
+- **Cleanup workflows**: Remove temporary topics after execution
+- **Lifecycle management**: Decommission unused messaging resources
+- **Rollback automation**: Remove topics created in failed provisioning runs
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
+  },
+  "timestamp": "2026-01-10T10:00:02.000000000Z",
+  "type": "aws.sns.topic.deleted"
+}
+```
+
+<a id="sns-•-get-subscription"></a>
+
+## SNS • Get Subscription
+
+The Get Subscription component retrieves metadata and attributes for an AWS SNS subscription.
+
+### Use Cases
+
+- **Subscription audits**: Inspect endpoint and delivery configuration
+- **Workflow enrichment**: Load subscription metadata before downstream actions
+- **Validation**: Confirm subscription existence and protocol
+
+### Example Output
+
+```json
+{
+  "data": {
+    "attributes": {
+      "Endpoint": "https://example.com/sns/events",
+      "Protocol": "https",
+      "RawMessageDelivery": "true",
+      "TopicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
+    },
+    "endpoint": "https://example.com/sns/events",
+    "owner": "123456789012",
+    "pendingConfirmation": false,
+    "protocol": "https",
+    "rawMessageDelivery": true,
+    "subscriptionArn": "arn:aws:sns:us-east-1:123456789012:orders-events:7f8a3d50-f160-4d2d-8f8a-fb95d7f86a51",
+    "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
+  },
+  "timestamp": "2026-01-10T10:00:02.000000000Z",
+  "type": "aws.sns.subscription"
+}
+```
+
+<a id="sns-•-get-topic"></a>
+
+## SNS • Get Topic
+
+The Get Topic component retrieves metadata and attributes for an AWS SNS topic.
+
+### Use Cases
+
+- **Configuration audits**: Verify topic settings and attributes
+- **Workflow enrichment**: Load topic metadata before downstream actions
+- **Validation**: Confirm topic existence and ownership
+
+### Example Output
+
+```json
+{
+  "data": {
+    "attributes": {
+      "DisplayName": "Orders Events",
+      "Owner": "123456789012",
+      "TopicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
+    },
+    "contentBasedDeduplication": false,
+    "displayName": "Orders Events",
+    "fifoTopic": false,
+    "name": "orders-events",
+    "owner": "123456789012",
+    "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
+  },
+  "timestamp": "2026-01-10T10:00:02.000000000Z",
+  "type": "aws.sns.topic"
+}
+```
+
+<a id="sns-•-publish-message"></a>
+
+## SNS • Publish Message
+
+The Publish Message component sends a message to an AWS SNS topic.
+
+### Use Cases
+
+- **Event fan-out**: Broadcast workflow results to multiple subscribers
+- **Notifications**: Send operational updates to users and systems
+- **Automation**: Trigger downstream subscribers through SNS delivery
+
+### Example Output
+
+```json
+{
+  "data": {
+    "messageId": "a730a53a-a86d-5fcb-9ad1-ff72b8d0f104",
+    "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
+  },
+  "timestamp": "2026-01-10T10:00:02.000000000Z",
+  "type": "aws.sns.message.published"
+}
+```
+
+<a id="sns-•-subscribe"></a>
+
+## SNS • Subscribe
+
+The Subscribe component creates a new AWS SNS subscription for a topic.
+
+### Use Cases
+
+- **Dynamic delivery setup**: Register temporary workflow endpoints
+- **Provisioning workflows**: Configure subscribers during environment setup
+- **Automation bootstrap**: Attach systems to topics on demand
+
+### Example Output
+
+```json
+{
+  "data": {
+    "attributes": {
+      "Endpoint": "https://example.com/sns/events",
+      "Protocol": "https",
+      "RawMessageDelivery": "true",
+      "TopicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
+    },
+    "endpoint": "https://example.com/sns/events",
+    "pendingConfirmation": false,
+    "protocol": "https",
+    "rawMessageDelivery": true,
+    "subscriptionArn": "arn:aws:sns:us-east-1:123456789012:orders-events:7f8a3d50-f160-4d2d-8f8a-fb95d7f86a51",
+    "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
+  },
+  "timestamp": "2026-01-10T10:00:02.000000000Z",
+  "type": "aws.sns.subscription"
+}
+```
+
+<a id="sns-•-unsubscribe"></a>
+
+## SNS • Unsubscribe
+
+The Unsubscribe component removes an AWS SNS subscription.
+
+### Use Cases
+
+- **Cleanup workflows**: Remove temporary subscriptions after execution
+- **Lifecycle management**: Detach deprecated subscribers
+- **Rollback automation**: Revert dynamic subscription changes
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "subscriptionArn": "arn:aws:sns:us-east-1:123456789012:orders-events:7f8a3d50-f160-4d2d-8f8a-fb95d7f86a51"
+  },
+  "timestamp": "2026-01-10T10:00:02.000000000Z",
+  "type": "aws.sns.subscription.unsubscribed"
 }
 ```
 

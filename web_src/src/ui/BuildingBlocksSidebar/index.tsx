@@ -423,6 +423,7 @@ function CategorySection({
       cloudwatch: awsCloudwatchIcon,
       lambda: awsLambdaIcon,
       ecr: awsEcrIcon,
+      sns: awsIcon,
     },
   };
 
@@ -500,6 +501,7 @@ function CategorySection({
               cloudwatch: awsCloudwatchIcon,
               ecr: awsEcrIcon,
               lambda: awsLambdaIcon,
+              sns: awsIcon,
             },
           };
           const appLogo = nameParts[0] ? appLogoMap[nameParts[0]] : undefined;
