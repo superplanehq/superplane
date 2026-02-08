@@ -242,25 +242,6 @@ The On Topic Message trigger starts a workflow execution when a message is publi
 }
 ```
 
-### Required IAM Permissions for SNS
-
-The following IAM permissions are required for SNS components:
-
-| Component | Required Permissions |
-|-----------|---------------------|
-| On Topic Message | `events:PutRule`, `events:PutTargets`, `events:DeleteRule`, `events:RemoveTargets` |
-| Get Topic | `sns:GetTopicAttributes` |
-| Get Subscription | `sns:GetSubscriptionAttributes` |
-| Create Topic | `sns:CreateTopic`, `sns:GetTopicAttributes` |
-| Delete Topic | `sns:DeleteTopic` |
-| Publish Message | `sns:Publish` |
-| Subscribe | `sns:Subscribe`, `sns:GetSubscriptionAttributes` |
-| Unsubscribe | `sns:Unsubscribe` |
-
-For resource listing in the UI:
-- `sns:ListTopics` - Required for topic selection dropdowns
-- `sns:ListSubscriptions` - Required for subscription selection dropdowns
-
 <a id="code-artifact-•-get-package-version"></a>
 
 ## CodeArtifact • Get Package Version
@@ -745,4 +726,3 @@ The Unsubscribe component removes an AWS SNS subscription.
   "type": "aws.sns.subscription.unsubscribed"
 }
 ```
-
