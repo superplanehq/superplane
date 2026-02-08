@@ -72,7 +72,7 @@
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^3.0.6",
-    "react-router-dom": "^7.6.0",
+    "react-router-dom": "^7.13.0",
     "react-use-websocket": "^4.0.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
@@ -85,7 +85,7 @@
   "devDependencies": {
     "@chromatic-com/storybook": "^4.1.1",
     "@eslint/js": "^9.25.0",
-    "@hey-api/openapi-ts": "^0.67.4",
+    "@hey-api/openapi-ts": "^0.92.3",
     "@storybook/addon-a11y": "^9.1.7",
     "@storybook/addon-docs": "^9.1.7",
     "@storybook/addon-onboarding": "^9.1.7",
