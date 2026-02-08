@@ -3,11 +3,11 @@ import { baseMapper } from "./base";
 import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
-  createMessage: baseMapper,
+  textPrompt: baseMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {};
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
-  createMessage: buildActionStateRegistry("completed"),
+  textPrompt: buildActionStateRegistry("completed"),
 };
