@@ -28,6 +28,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitHub repository" />
+  <LinkCard title="List Releases" href="#list-releases" description="List releases from a GitHub repository" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
@@ -1183,6 +1184,72 @@ Returns release information including:
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.release"
+}
+```
+
+<a id="list-releases"></a>
+
+## List Releases
+
+The List Releases component retrieves releases from a GitHub repository.
+
+### Use Cases
+
+- **Release monitoring**: List all releases and their metadata
+- **Deployment pipelines**: Discover available versions for deployment
+- **Release dashboards**: Build dashboards showing release history
+- **CI/CD integration**: Iterate over releases for automated actions
+
+### Configuration
+
+- **Repository**: Select the GitHub repository (required)
+- **Per Page**: Number of releases per page, max 100 (optional, defaults to 30)
+- **Page**: Page number for pagination (optional, defaults to 1)
+
+### Output
+
+Returns a list of releases, each containing:
+- Release ID, tag name, and name
+- Release body/description
+- Published date
+- Asset information (download URLs, sizes)
+- Source archive URLs (tarball, zipball)
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "assets": [
+        {
+          "browser_download_url": "https://github.com/acme/widgets/releases/download/v1.2.4/app-v1.2.4.zip",
+          "download_count": 12,
+          "name": "app-v1.2.4.zip",
+          "size": 2048000
+        }
+      ],
+      "body": "## What's Changed\n\n- Feature C\n- Bug fix D",
+      "id": 3002,
+      "name": "Release 1.2.4",
+      "published_at": "2026-01-20T12:00:00Z",
+      "tag_name": "v1.2.4",
+      "tarball_url": "https://api.github.com/repos/acme/widgets/tarball/v1.2.4",
+      "zipball_url": "https://api.github.com/repos/acme/widgets/zipball/v1.2.4"
+    },
+    {
+      "assets": [],
+      "body": "## What's Changed\n\n- Feature A\n- Bug fix B",
+      "id": 3001,
+      "name": "Release 1.2.3",
+      "published_at": "2026-01-16T12:00:00Z",
+      "tag_name": "v1.2.3",
+      "tarball_url": "https://api.github.com/repos/acme/widgets/tarball/v1.2.3",
+      "zipball_url": "https://api.github.com/repos/acme/widgets/zipball/v1.2.3"
+    }
+  ],
+  "timestamp": "2026-01-20T12:34:56Z",
+  "type": "github.releases"
 }
 ```
 

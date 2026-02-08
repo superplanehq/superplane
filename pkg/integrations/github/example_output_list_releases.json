@@ -1,0 +1,33 @@
+{
+  "data": [
+    {
+      "id": 3002,
+      "tag_name": "v1.2.4",
+      "name": "Release 1.2.4",
+      "body": "## What's Changed\n\n- Feature C\n- Bug fix D",
+      "published_at": "2026-01-20T12:00:00Z",
+      "tarball_url": "https://api.github.com/repos/acme/widgets/tarball/v1.2.4",
+      "zipball_url": "https://api.github.com/repos/acme/widgets/zipball/v1.2.4",
+      "assets": [
+        {
+          "name": "app-v1.2.4.zip",
+          "size": 2048000,
+          "download_count": 12,
+          "browser_download_url": "https://github.com/acme/widgets/releases/download/v1.2.4/app-v1.2.4.zip"
+        }
+      ]
+    },
+    {
+      "id": 3001,
+      "tag_name": "v1.2.3",
+      "name": "Release 1.2.3",
+      "body": "## What's Changed\n\n- Feature A\n- Bug fix B",
+      "published_at": "2026-01-16T12:00:00Z",
+      "tarball_url": "https://api.github.com/repos/acme/widgets/tarball/v1.2.3",
+      "zipball_url": "https://api.github.com/repos/acme/widgets/zipball/v1.2.3",
+      "assets": []
+    }
+  ],
+  "timestamp": "2026-01-20T12:34:56Z",
+  "type": "github.releases"
+}
