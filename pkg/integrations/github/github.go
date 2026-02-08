@@ -20,6 +20,9 @@ const (
 	GitHubAppPEM           = "pem"
 	GitHubAppClientSecret  = "clientSecret"
 	GitHubAppWebhookSecret = "webhookSecret"
+	// GitHubAccessToken is an optional user access token (PAT / OAuth token) used for
+	// endpoints that are not accessible via GitHub App installation tokens (e.g. billing).
+	GitHubAccessToken = "accessToken"
 
 	appBootstrapDescription = `
 To complete the GitHub app setup:

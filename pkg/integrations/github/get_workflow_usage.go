@@ -54,14 +54,13 @@ func (c *GetWorkflowUsage) Description() string {
 }
 
 func (c *GetWorkflowUsage) Documentation() string {
-	return `The Get Workflow Usage component retrieves **billable** GitHub Actions usage for the integration installation's organization using GitHub's billing usage API.
+	return `The Get Workflow Usage component retrieves **billable** GitHub Actions usage for an organization using GitHub's billing usage API.
 
-## Important: GitHub App Permissions
+## Important: Authentication
 
-This API requires the GitHub App to have **Organization permission: Administration (read)**. SuperPlane now requests this permission in the GitHub App manifest.
+GitHub's organization billing endpoints are **not accessible** using GitHub App installation tokens. If you see a 403 with ` + "`Resource not accessible by integration`" + `, you must provide a **user access token**.
 
-- **Existing installations**: Organization owners will be prompted by GitHub to approve the new permission. Until approved, this action will return **403**.
-- **New installations**: The permission will be requested during installation.
+To enable this component, set a GitHub integration secret named ` + "`accessToken`" + ` containing a GitHub **PAT** (or OAuth token) that has permission to read the organization's billing/usage.
 
 ## Notes
 
@@ -242,6 +241,13 @@ func (c *GetWorkflowUsage) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
+	var tokenClient *github.Client
+	if token, ok, err := findSecretOptional(ctx.Integration, GitHubAccessToken); err != nil {
+		return fmt.Errorf("failed to read optional GitHub access token secret: %w", err)
+	} else if ok {
+		tokenClient = NewTokenClient(token)
+	}
+
 	repos := make([]string, 0, len(config.Repositories))
 	for _, r := range config.Repositories {
 		r = strings.TrimSpace(r)
@@ -296,17 +302,17 @@ func (c *GetWorkflowUsage) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if len(repos) == 0 {
-		summary, err := fetchBillingUsageSummary(client, appMetadata.Owner, "", year, month, day, product, sku)
+		summary, err := fetchBillingUsageSummaryWithFallback(client, tokenClient, appMetadata.Owner, "", year, month, day, product, sku)
 		if err != nil {
-			return err
+			return wrapBillingUsageSummaryError(err, tokenClient != nil)
 		}
 		consume(summary)
 	} else {
 		for _, repo := range repos {
 			repoFull := fmt.Sprintf("%s/%s", strings.TrimSpace(appMetadata.Owner), repo)
-			summary, err := fetchBillingUsageSummary(client, appMetadata.Owner, repoFull, year, month, day, product, sku)
+			summary, err := fetchBillingUsageSummaryWithFallback(client, tokenClient, appMetadata.Owner, repoFull, year, month, day, product, sku)
 			if err != nil {
-				return err
+				return wrapBillingUsageSummaryError(err, tokenClient != nil)
 			}
 			consume(summary)
 		}
@@ -413,6 +419,29 @@ func parseOptionalYMD(year, month, day *string) (*int, *int, *int, error) {
 	return y, m, d, nil
 }
 
+func fetchBillingUsageSummaryWithFallback(
+	appClient *github.Client,
+	tokenClient *github.Client,
+	organization string,
+	repository string,
+	year, month, day *int,
+	product string,
+	sku string,
+) (*billingUsageSummaryResponse, error) {
+	summary, err := fetchBillingUsageSummary(appClient, organization, repository, year, month, day, product, sku)
+	if err == nil {
+		return summary, nil
+	}
+
+	// Billing endpoints can return 403 "Resource not accessible by integration" for
+	// GitHub App installation tokens. Retry with a user token if configured.
+	if tokenClient != nil && isResourceNotAccessibleByIntegration(err) {
+		return fetchBillingUsageSummary(tokenClient, organization, repository, year, month, day, product, sku)
+	}
+
+	return nil, err
+}
+
 func fetchBillingUsageSummary(
 	client *github.Client,
 	organization string,
@@ -455,16 +484,47 @@ func fetchBillingUsageSummary(
 	var out billingUsageSummaryResponse
 	_, err = client.Do(context.Background(), req, &out)
 	if err != nil {
-		if ghErr, ok := err.(*github.ErrorResponse); ok && ghErr.Response != nil {
-			switch ghErr.Response.StatusCode {
-			case 403:
-				return nil, fmt.Errorf("permission denied (403): GitHub App requires Organization permission: Administration (read); org owners may need to approve the updated permission for existing installations: %w", err)
-			default:
-				// keep original error context
-			}
-		}
 		return nil, err
 	}
 
 	return &out, nil
+}
+
+func isForbidden(err error) bool {
+	var ghErr *github.ErrorResponse
+	if errors.As(err, &ghErr) && ghErr.Response != nil && ghErr.Response.StatusCode == 403 {
+		return true
+	}
+	return false
+}
+
+func isResourceNotAccessibleByIntegration(err error) bool {
+	var ghErr *github.ErrorResponse
+	if !errors.As(err, &ghErr) || ghErr == nil || ghErr.Response == nil {
+		return false
+	}
+	if ghErr.Response.StatusCode != 403 {
+		return false
+	}
+	return strings.Contains(strings.ToLower(ghErr.Message), "resource not accessible by integration")
+}
+
+func wrapBillingUsageSummaryError(err error, hasToken bool) error {
+	if isResourceNotAccessibleByIntegration(err) {
+		if !hasToken {
+			return fmt.Errorf(
+				"GitHub billing usage endpoints are not accessible via GitHub App installation tokens. Configure a GitHub integration secret named %q with a PAT/OAuth token that can read org billing usage: %w",
+				GitHubAccessToken,
+				err,
+			)
+		}
+
+		return fmt.Errorf("permission denied (403): GitHub token does not have access to organization billing usage: %w", err)
+	}
+
+	if isForbidden(err) {
+		return fmt.Errorf("permission denied (403): %w", err)
+	}
+
+	return err
 }
