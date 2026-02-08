@@ -536,8 +536,8 @@ func (m Metadata) workspacePlan() string {
 func buildMetadata(workspaceID, workspacePlan string) Metadata {
 	return Metadata{
 		Workspace: &WorkspaceMetadata{
-			ID:   workspaceID,
-			Plan: workspacePlan,
+			ID:   strings.TrimSpace(workspaceID),
+			Plan: strings.TrimSpace(workspacePlan),
 		},
 	}
 }
