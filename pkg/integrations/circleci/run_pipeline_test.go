@@ -8,8 +8,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-func Test__TriggerPipeline__checkWorkflowsStatus(t *testing.T) {
-	tp := &TriggerPipeline{}
+func Test__RunPipeline__checkWorkflowsStatus(t *testing.T) {
+	tp := &RunPipeline{}
 
 	t.Run("empty workflows list", func(t *testing.T) {
 		allDone, anyFailed := tp.checkWorkflowsStatus([]WorkflowInfo{})
@@ -78,9 +78,9 @@ func Test__TriggerPipeline__checkWorkflowsStatus(t *testing.T) {
 	})
 }
 
-func Test__TriggerPipeline__buildParameters(t *testing.T) {
+func Test__RunPipeline__buildParameters(t *testing.T) {
 	t.Run("builds parameters with superplane metadata", func(t *testing.T) {
-		tp := &TriggerPipeline{}
+		tp := &RunPipeline{}
 		params := []Parameter{
 			{Name: "env", Value: "production"},
 			{Name: "version", Value: "1.0.0"},

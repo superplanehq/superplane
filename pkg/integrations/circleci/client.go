@@ -186,23 +186,23 @@ func (c *Client) GetPipeline(pipelineID string) (*PipelineResponse, error) {
 	return &pipeline, nil
 }
 
-// TriggerPipelineParams represents parameters for triggering a pipeline
-type TriggerPipelineParams struct {
+// RunPipelineParams represents parameters for running a pipeline
+type RunPipelineParams struct {
 	Branch     string            `json:"branch,omitempty"`
 	Tag        string            `json:"tag,omitempty"`
 	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
-// TriggerPipelineResponse represents the response from triggering a pipeline
-type TriggerPipelineResponse struct {
+// RunPipelineResponse represents the response from running a pipeline
+type RunPipelineResponse struct {
 	ID        string `json:"id"`
 	Number    int    `json:"number"`
 	State     string `json:"state"`
 	CreatedAt string `json:"created_at"`
 }
 
-// TriggerPipeline triggers a new pipeline for a project
-func (c *Client) TriggerPipeline(projectSlug string, params TriggerPipelineParams) (*TriggerPipelineResponse, error) {
+// RunPipeline runs a new pipeline for a project
+func (c *Client) RunPipeline(projectSlug string, params RunPipelineParams) (*RunPipelineResponse, error) {
 	projectSlug = normalizeProjectSlug(projectSlug)
 	path := fmt.Sprintf("%s/project/%s/pipeline", baseURL, projectSlug)
 
@@ -216,7 +216,7 @@ func (c *Client) TriggerPipeline(projectSlug string, params TriggerPipelineParam
 		return nil, err
 	}
 
-	var response TriggerPipelineResponse
+	var response RunPipelineResponse
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
@@ -225,18 +225,18 @@ func (c *Client) TriggerPipeline(projectSlug string, params TriggerPipelineParam
 	return &response, nil
 }
 
-// TriggerPipelineRunParams is the body for the pipeline/run API (GitHub App and Bitbucket DC).
-type TriggerPipelineRunParams struct {
+// RunPipelineRunParams is the body for the pipeline/run API (GitHub App and Bitbucket DC).
+type RunPipelineRunParams struct {
 	DefinitionID string            `json:"definition_id"`
 	Config       map[string]string `json:"config"`   // e.g. {"branch": "main"} or {"tag": "v1.0"}
 	Checkout     map[string]string `json:"checkout"` // same as config
 	Parameters   map[string]string `json:"parameters,omitempty"`
 }
 
-// TriggerPipelineRun triggers a pipeline via the pipeline/run endpoint.
+// RunPipelineRun runs a pipeline via the pipeline/run endpoint.
 // Use this for projects connected via GitHub App or Bitbucket Data Center.
 // See https://circleci.com/docs/triggers-overview/#run-a-pipeline-using-the-api
-func (c *Client) TriggerPipelineRun(projectSlug string, params TriggerPipelineRunParams) (*TriggerPipelineResponse, error) {
+func (c *Client) RunPipelineRun(projectSlug string, params RunPipelineRunParams) (*RunPipelineResponse, error) {
 	projectSlug = normalizeProjectSlug(projectSlug)
 	path := fmt.Sprintf("%s/project/%s/pipeline/run", baseURL, projectSlug)
 
@@ -250,7 +250,7 @@ func (c *Client) TriggerPipelineRun(projectSlug string, params TriggerPipelineRu
 		return nil, err
 	}
 
-	var response TriggerPipelineResponse
+	var response RunPipelineResponse
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)

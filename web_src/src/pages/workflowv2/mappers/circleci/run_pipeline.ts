@@ -24,7 +24,7 @@ import CircleCILogo from "@/assets/icons/integrations/circleci.svg";
 import { formatTimeAgo } from "@/utils/date";
 import { CanvasesCanvasNodeExecution } from "@/api-client";
 
-export const TRIGGER_PIPELINE_STATE_MAP: EventStateMap = {
+export const RUN_PIPELINE_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   running: {
     icon: "loader-circle",
@@ -46,7 +46,7 @@ export const TRIGGER_PIPELINE_STATE_MAP: EventStateMap = {
   },
 };
 
-export const triggerPipelineStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
+export const runPipelineStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
   if (!execution) return "neutral";
 
   if (
@@ -78,12 +78,12 @@ export const triggerPipelineStateFunction: StateFunction = (execution: CanvasesC
   return "neutral";
 };
 
-export const TRIGGER_PIPELINE_STATE_REGISTRY: EventStateRegistry = {
-  stateMap: TRIGGER_PIPELINE_STATE_MAP,
-  getState: triggerPipelineStateFunction,
+export const RUN_PIPELINE_STATE_REGISTRY: EventStateRegistry = {
+  stateMap: RUN_PIPELINE_STATE_MAP,
+  getState: runPipelineStateFunction,
 };
 
-export const triggerPipelineMapper: ComponentBaseMapper = {
+export const runPipelineMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
 
@@ -98,11 +98,11 @@ export const triggerPipelineMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition?.color || "gray"),
       collapsed: context.node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
-      eventSections: lastExecution ? triggerPipelineEventSections(context.nodes, lastExecution) : undefined,
+      eventSections: lastExecution ? runPipelineEventSections(context.nodes, lastExecution) : undefined,
       includeEmptyState: !lastExecution,
-      metadata: triggerPipelineMetadataList(context.node),
-      specs: triggerPipelineSpecs(context.node),
-      eventStateMap: TRIGGER_PIPELINE_STATE_MAP,
+      metadata: runPipelineMetadataList(context.node),
+      specs: runPipelineSpecs(context.node),
+      eventStateMap: RUN_PIPELINE_STATE_MAP,
     };
   },
   subtitle(context: SubtitleContext): string {
@@ -169,7 +169,7 @@ export const triggerPipelineMapper: ComponentBaseMapper = {
   },
 };
 
-function triggerPipelineMetadataList(node: NodeInfo): MetadataItem[] {
+function runPipelineMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as any;
   const nodeMetadata = node.metadata as { projectName?: string } | undefined;
@@ -188,7 +188,7 @@ function triggerPipelineMetadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function triggerPipelineSpecs(node: NodeInfo): ComponentBaseSpec[] {
+function runPipelineSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
   const configuration = node.configuration as any;
 
@@ -218,7 +218,7 @@ function triggerPipelineSpecs(node: NodeInfo): ComponentBaseSpec[] {
   return specs;
 }
 
-function triggerPipelineEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] | undefined {
+function runPipelineEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] | undefined {
   if (!execution) {
     return undefined;
   }
@@ -228,7 +228,7 @@ function triggerPipelineEventSections(nodes: NodeInfo[], execution: ExecutionInf
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-  const executionState = triggerPipelineStateFunction(execution);
+  const executionState = runPipelineStateFunction(execution);
   const subtitleTimestamp =
     executionState === "running" ? execution.createdAt : execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : undefined;

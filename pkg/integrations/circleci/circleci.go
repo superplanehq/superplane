@@ -244,7 +244,7 @@ func (h *CircleCIWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 
 func (c *CircleCI) Components() []core.Component {
 	return []core.Component{
-		&TriggerPipeline{},
+		&RunPipeline{},
 	}
 }
 
