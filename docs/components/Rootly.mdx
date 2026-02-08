@@ -16,6 +16,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in Rootly" />
+  <LinkCard title="Update Incident" href="#update-incident" description="Update an existing Rootly incident" />
 </CardGrid>
 
 <a id="on-incident"></a>
@@ -113,6 +114,56 @@ Returns the created incident object including:
     }
   },
   "timestamp": "2026-01-19T12:00:00Z",
+  "type": "rootly.incident"
+}
+```
+
+<a id="update-incident"></a>
+
+## Update Incident
+
+The Update Incident component modifies an existing incident in Rootly.
+
+### Use Cases
+
+- **Status updates**: Transition incidents through statuses (in_triage → started → mitigated → resolved → closed)
+- **Severity changes**: Escalate or de-escalate incident severity
+- **Enrichment**: Add or update title and summary as investigation progresses
+- **External sync**: Update Rootly incidents based on signals from Sentry, PagerDuty, Jira, or ServiceNow
+
+### Configuration
+
+- **Incident ID**: The Rootly incident UUID to update (required). Accepts expressions from trigger events or previous component outputs.
+- **Title**: New incident title (optional)
+- **Summary**: New incident summary/description (optional)
+- **Status**: New status — one of: in_triage, started, detected, acknowledged, mitigated, resolved, closed, cancelled (optional)
+- **Severity**: Severity slug from Rootly (optional). Select from available severities.
+
+### Output
+
+Returns the updated incident object containing:
+- id, sequential_id, title, slug
+- status, summary, severity
+- Timestamps (started_at, detected_at, acknowledged_at, mitigated_at, resolved_at, closed_at)
+- URL to the incident in Rootly
+
+### Example Output
+
+```json
+{
+  "data": {
+    "incident": {
+      "id": "abc123-def456",
+      "mitigated_at": "2026-01-19T12:30:00Z",
+      "severity": "sev2",
+      "started_at": "2026-01-19T12:00:00Z",
+      "status": "mitigated",
+      "summary": "Issue mitigated. Monitoring impact.",
+      "title": "Database connection issues (updated)",
+      "url": "https://app.rootly.com/incidents/abc123-def456"
+    }
+  },
+  "timestamp": "2026-01-19T12:31:00Z",
   "type": "rootly.incident"
 }
 ```
