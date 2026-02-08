@@ -112,9 +112,8 @@ func (s *Sentry) CompareWebhookConfig(a, b any) (bool, error) {
 		return false, err
 	}
 
-	if cfgA.WebhookSecret != "" || cfgB.WebhookSecret != "" {
-		return false, nil
-	}
+	// Ignore WebhookSecret field - it's transient and stripped before storage (line 144)
+	// Only compare Events to determine if webhooks can be shared
 	if len(cfgA.Events) != len(cfgB.Events) {
 		return false, nil
 	}
