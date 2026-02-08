@@ -5,7 +5,7 @@ import {
   ExecutionDetailsContext,
   OutputPayload,
   SubtitleContext,
-} from "../types";  
+} from "../types";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
 import { Comment } from "./types";

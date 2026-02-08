@@ -116,7 +116,7 @@ func (c *CreateIssueComment) Execute(ctx core.ExecutionContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	
+
 	var appMetadata Metadata
 	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
 		return fmt.Errorf("failed to decode integration metadata: %w", err)
