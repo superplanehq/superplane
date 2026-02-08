@@ -54,7 +54,6 @@ Render webhooks are validated using the secret generated when SuperPlane creates
 - `webhook-id`
 - `webhook-timestamp`
 - `webhook-signature` (`v1,<base64-signature>`)
-- `webhook-timestamp` must be recent (5-minute replay window)
 
 ### Event Data
 
@@ -99,7 +98,6 @@ Render webhooks are validated using the secret generated when SuperPlane creates
 - `webhook-id`
 - `webhook-timestamp`
 - `webhook-signature` (`v1,<base64-signature>`)
-- `webhook-timestamp` must be recent (5-minute replay window)
 
 ### Event Data
 
@@ -160,3 +158,4 @@ The default output emits the deploy object returned by Render (e.g. `id`, `statu
   "type": "render.deploy.triggered"
 }
 ```
+
