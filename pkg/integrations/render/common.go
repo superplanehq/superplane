@@ -259,15 +259,13 @@ func ensureServiceInMetadata(ctx core.TriggerContext, config OnResourceEventConf
 	}
 
 	nodeMetadata := OnResourceEventMetadata{}
-	if ctx.Metadata != nil {
-		if err := mapstructure.Decode(ctx.Metadata.Get(), &nodeMetadata); err != nil {
-			return fmt.Errorf("failed to decode node metadata: %w", err)
-		}
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &nodeMetadata); err != nil {
+		return fmt.Errorf("failed to decode node metadata: %w", err)
+	}
 
-		if nodeMetadata.Service != nil &&
-			(nodeMetadata.Service.ID == serviceValue || nodeMetadata.Service.Name == serviceValue) {
-			return nil
-		}
+	if nodeMetadata.Service != nil &&
+		(nodeMetadata.Service.ID == serviceValue || nodeMetadata.Service.Name == serviceValue) {
+		return nil
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -288,10 +286,6 @@ func ensureServiceInMetadata(ctx core.TriggerContext, config OnResourceEventConf
 	service := findService(services, serviceValue)
 	if service == nil {
 		return fmt.Errorf("service %s is not accessible with this API key", serviceValue)
-	}
-
-	if ctx.Metadata == nil {
-		return nil
 	}
 
 	return ctx.Metadata.Set(OnResourceEventMetadata{

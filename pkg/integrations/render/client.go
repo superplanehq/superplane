@@ -251,6 +251,39 @@ func (c *Client) TriggerDeploy(serviceID string, clearCache bool) (map[string]an
 	return payload, nil
 }
 
+func (c *Client) GetDeploy(serviceID string, deployID string) (map[string]any, error) {
+	if serviceID == "" {
+		return nil, fmt.Errorf("serviceID is required")
+	}
+	if deployID == "" {
+		return nil, fmt.Errorf("deployID is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodGet,
+		"/services/"+url.PathEscape(serviceID)+"/deploys/"+url.PathEscape(deployID),
+		nil,
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := map[string]any{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal deploy response: %w", err)
+	}
+
+	if deployValue, ok := payload["deploy"]; ok {
+		deployMap, ok := deployValue.(map[string]any)
+		if ok {
+			return deployMap, nil
+		}
+	}
+
+	return payload, nil
+}
+
 func parseWorkspaces(body []byte) ([]Workspace, error) {
 	withCursor := []workspaceWithCursor{}
 	if err := json.Unmarshal(body, &withCursor); err == nil && len(withCursor) > 0 {

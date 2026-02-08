@@ -1,10 +1,11 @@
 {
   "data": {
-    "createdAt": "2026-02-05T16:10:00.000000Z",
-    "finishedAt": null,
     "id": "dep-cukouhrtq21c73e9scng",
-    "status": "build_in_progress"
+    "status": "succeeded",
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "createdAt": "2026-02-05T16:10:00.000000Z",
+    "finishedAt": "2026-02-05T16:15:00.000000Z"
   },
-  "timestamp": "2026-02-05T16:10:00.000000Z",
-  "type": "render.deploy.triggered"
+  "timestamp": "2026-02-05T16:15:00.000000Z",
+  "type": "render.deploy.finished"
 }
