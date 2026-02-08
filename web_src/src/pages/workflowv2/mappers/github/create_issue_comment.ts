@@ -1,0 +1,44 @@
+import { ComponentBaseProps } from "@/ui/componentBase";
+import {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  OutputPayload,
+  SubtitleContext,
+} from "../types";
+import { baseProps } from "./base";
+import { buildGithubExecutionSubtitle } from "./utils";
+import { Comment } from "./types";
+
+export const createIssueCommentMapper: ComponentBaseMapper = {
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+  },
+
+  subtitle(context: SubtitleContext): string {
+    return buildGithubExecutionSubtitle(context.execution);
+  },
+
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+    const details: Record<string, string> = {};
+
+    if (!outputs || !outputs.default || outputs.default.length === 0) {
+      return details;
+    }
+
+    const comment = outputs.default[0].data as Comment;
+    details["Created At"] = comment?.created_at ? new Date(comment.created_at).toLocaleString() : "-";
+    details["Created By"] = comment?.user?.login || "-";
+
+    details["Comment URL"] = comment?.html_url || "";
+    details["Comment ID"] = comment?.id?.toString() || "";
+
+    if (comment?.body) {
+      details["Body"] = comment.body;
+    }
+
+    return details;
+  },
+};
+
