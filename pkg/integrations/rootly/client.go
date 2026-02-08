@@ -427,3 +427,80 @@ func (c *Client) DeleteWebhookEndpoint(id string) error {
 	_, err := c.execRequest(http.MethodDelete, url, nil)
 	return err
 }
+
+// TimelineEvent represents a Rootly incident timeline event
+type TimelineEvent struct {
+	ID         string `json:"id"`
+	Body       string `json:"body"`
+	Visibility string `json:"visibility"`
+	OccurredAt string `json:"occurred_at"`
+	CreatedAt  string `json:"created_at"`
+}
+
+type TimelineEventData struct {
+	ID         string                  `json:"id"`
+	Type       string                  `json:"type"`
+	Attributes TimelineEventAttributes `json:"attributes"`
+}
+
+type TimelineEventAttributes struct {
+	Body       string `json:"body"`
+	Visibility string `json:"visibility"`
+	OccurredAt string `json:"occurred_at"`
+	CreatedAt  string `json:"created_at"`
+}
+
+type TimelineEventResponse struct {
+	Data TimelineEventData `json:"data"`
+}
+
+type CreateTimelineEventRequest struct {
+	Data CreateTimelineEventData `json:"data"`
+}
+
+type CreateTimelineEventData struct {
+	Type       string                        `json:"type"`
+	Attributes CreateTimelineEventAttributes `json:"attributes"`
+}
+
+type CreateTimelineEventAttributes struct {
+	Body       string `json:"body"`
+	Visibility string `json:"visibility,omitempty"`
+}
+
+func (c *Client) CreateTimelineEvent(incidentID, body, visibility string) (*TimelineEvent, error) {
+	request := CreateTimelineEventRequest{
+		Data: CreateTimelineEventData{
+			Type: "incident_events",
+			Attributes: CreateTimelineEventAttributes{
+				Body:       body,
+				Visibility: visibility,
+			},
+		},
+	}
+
+	requestBody, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/incidents/%s/events", c.BaseURL, incidentID)
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(requestBody))
+	if err != nil {
+		return nil, err
+	}
+
+	var response TimelineEventResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &TimelineEvent{
+		ID:         response.Data.ID,
+		Body:       response.Data.Attributes.Body,
+		Visibility: response.Data.Attributes.Visibility,
+		OccurredAt: response.Data.Attributes.OccurredAt,
+		CreatedAt:  response.Data.Attributes.CreatedAt,
+	}, nil
+}
