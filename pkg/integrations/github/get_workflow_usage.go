@@ -312,11 +312,6 @@ func (c *GetWorkflowUsage) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
-	// If the API returns no items, emit nothing (consistent with other list-like components).
-	if totalMinutes == 0 && len(minutesBySKU) == 0 {
-		return nil
-	}
-
 	out := map[string]any{
 		"minutes_used":           totalMinutes,
 		"minutes_used_breakdown": minutesBySKU,
