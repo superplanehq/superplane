@@ -39,11 +39,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function updateIssueEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function updateIssueEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
@@ -68,18 +64,13 @@ export const updateIssueMapper: ComponentBaseMapper = {
 
     return {
       title:
-        context.node.name ||
-        context.componentDefinition.label ||
-        context.componentDefinition.name ||
-        "Update Issue",
+        context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Update Issue",
       iconSrc: sentryIcon,
       iconSlug: "alert-triangle",
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution
-        ? updateIssueEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? updateIssueEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: metadataList(context.node),
       eventStateMap: getStateMap(componentName),
