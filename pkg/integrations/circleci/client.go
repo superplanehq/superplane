@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
@@ -36,12 +37,26 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 }
 
 func (c *Client) execRequest(method, requestURL string, body io.Reader) ([]byte, error) {
-	headers := map[string]string{
-		"Content-Type": "application/json",
-		"Accept":       "application/json",
-		"Circle-Token": c.APIToken,
+	req, err := http.NewRequest(method, requestURL, body)
+	if err != nil {
+		return nil, fmt.Errorf("building request: %w", err)
 	}
-	return core.DoRequest(c.http, method, requestURL, body, headers)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Circle-Token", c.APIToken)
+	res, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("executing request: %w", err)
+	}
+	defer res.Body.Close()
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading body: %w", err)
+	}
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return nil, fmt.Errorf("request got %d: %s", res.StatusCode, string(responseBody))
+	}
+	return responseBody, nil
 }
 
 // UserResponse represents the current user information from GET /me.
