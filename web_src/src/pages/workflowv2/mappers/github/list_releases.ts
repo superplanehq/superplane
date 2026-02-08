@@ -24,7 +24,9 @@ export const listReleasesMapper: ComponentBaseMapper = {
     const details: Record<string, string> = {};
 
     const list = outputs?.default || [];
-    details["Retrieved At"] = context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-";
+    details["Retrieved At"] = context.execution.createdAt
+      ? new Date(context.execution.createdAt).toLocaleString()
+      : "-";
     details["Releases"] = list.length.toString();
 
     if (list.length > 0) {
@@ -39,4 +41,3 @@ export const listReleasesMapper: ComponentBaseMapper = {
     return details;
   },
 };
-

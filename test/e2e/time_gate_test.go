@@ -181,7 +181,12 @@ func (s *TimeGateSteps) runManualTrigger() {
 }
 
 func (s *TimeGateSteps) openSidebarForNode(node string) {
-	s.session.Click(q.Locator(`[data-testid="node-` + node + `-header"]:visible`))
+	// The node header test id is derived from the node's title and can appear in
+	// multiple places in the DOM. Prefer the visible element to avoid hidden
+	// duplicates (e.g. in sidebar/settings templates).
+	nodeSlug := strings.ToLower(node)
+	nodeSlug = strings.ReplaceAll(nodeSlug, " ", "-")
+	s.session.Click(q.Locator(`[data-testid="node-` + nodeSlug + `-header"]:visible`))
 }
 
 func (s *TimeGateSteps) pushThroughFirstItemFromSidebar() {
