@@ -81,6 +81,7 @@ When the process completes, you can access the SuperPlane at [http://localhost:8
 
 ### Adding new integrations to SuperPlane
 
+- **[Opening PRs for integrations](docs/contributing/integration-prs.md)** — Checklist for opening and submitting integration PRs (title, description, video, frontend/backend/docs, CI, DCO)
 - **[Integrations](docs/contributing/integrations.md)** — Instructions for adding new third-party integrations to SuperPlane
 - **[Component Implementation](docs/contributing/component-implementations.md)** — Step-by-step instructions for creating new components or triggers
 - **[Component Customization](docs/contributing/component-customization.md)** — Guide for customizing existing components or building behaviors

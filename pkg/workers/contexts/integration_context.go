@@ -41,12 +41,12 @@ func (c *IntegrationContext) ID() uuid.UUID {
 }
 
 func (c *IntegrationContext) RequestWebhook(configuration any) error {
-	impl, err := c.registry.GetIntegration(c.integration.AppName)
+	handler, err := c.registry.GetWebhookHandler(c.integration.AppName)
 	if err != nil {
 		return err
 	}
 
-	if err := c.replaceMismatchedWebhook(configuration, impl); err != nil {
+	if err := c.replaceMismatchedWebhook(configuration, handler); err != nil {
 		return err
 	}
 
@@ -56,13 +56,13 @@ func (c *IntegrationContext) RequestWebhook(configuration any) error {
 	}
 
 	for _, hook := range webhooks {
-		ok, err := impl.CompareWebhookConfig(hook.Configuration.Data(), configuration)
+		ok, err := handler.CompareConfig(hook.Configuration.Data(), configuration)
 		if err != nil {
 			return err
 		}
 
 		if ok {
-			if err := c.mergeWebhookConfiguration(impl, &hook, configuration); err != nil {
+			if err := c.mergeWebhookConfiguration(handler, &hook, configuration); err != nil {
 				return err
 			}
 
@@ -74,7 +74,7 @@ func (c *IntegrationContext) RequestWebhook(configuration any) error {
 	return c.createWebhook(configuration)
 }
 
-func (c *IntegrationContext) replaceMismatchedWebhook(configuration any, impl core.Integration) error {
+func (c *IntegrationContext) replaceMismatchedWebhook(configuration any, handler core.WebhookHandler) error {
 	if c.node == nil || c.node.WebhookID == nil {
 		return nil
 	}
@@ -84,7 +84,7 @@ func (c *IntegrationContext) replaceMismatchedWebhook(configuration any, impl co
 		return err
 	}
 
-	matches, err := impl.CompareWebhookConfig(webhook.Configuration.Data(), configuration)
+	matches, err := handler.CompareConfig(webhook.Configuration.Data(), configuration)
 	if err != nil {
 		return err
 	}
@@ -134,16 +134,11 @@ func (c *IntegrationContext) createWebhook(configuration any) error {
 }
 
 func (c *IntegrationContext) mergeWebhookConfiguration(
-	impl core.Integration,
+	handler core.WebhookHandler,
 	webhook *models.Webhook,
 	configuration any,
 ) error {
-	merger, ok := impl.(core.WebhookConfigMerger)
-	if !ok {
-		return nil
-	}
-
-	mergedConfiguration, changed, err := merger.MergeWebhookConfig(webhook.Configuration.Data(), configuration)
+	mergedConfiguration, changed, err := handler.Merge(webhook.Configuration.Data(), configuration)
 	if err != nil {
 		return err
 	}

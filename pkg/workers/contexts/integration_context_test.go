@@ -81,8 +81,9 @@ func Test__IntegrationContext_RequestWebhook_ReplacesWebhookOnConfigChange(t *te
 	r := support.Setup(t)
 	defer r.Close()
 
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
-		OnCompareWebhookConfig: func(a, b any) (bool, error) {
+	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = support.NewDummyWebhookHandler(support.DummyWebhookHandlerOptions{
+		CompareConfigFunc: func(a, b any) (bool, error) {
 			return reflect.DeepEqual(a, b), nil
 		},
 	})
@@ -154,11 +155,12 @@ func Test__IntegrationContext_RequestWebhook_MergesExistingWebhookConfig(t *test
 	r := support.Setup(t)
 	defer r.Close()
 
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
-		OnCompareWebhookConfig: func(a, b any) (bool, error) {
+	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = support.NewDummyWebhookHandler(support.DummyWebhookHandlerOptions{
+		CompareConfigFunc: func(a, b any) (bool, error) {
 			return true, nil
 		},
-		OnMergeWebhookConfig: func(current, requested any) (any, bool, error) {
+		MergeFunc: func(current, requested any) (any, bool, error) {
 			currentMap := current.(map[string]any)
 			requestedMap := requested.(map[string]any)
 

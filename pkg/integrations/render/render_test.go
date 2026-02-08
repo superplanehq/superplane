@@ -221,7 +221,7 @@ func Test__Render__ListResources(t *testing.T) {
 }
 
 func Test__Render__SetupWebhook(t *testing.T) {
-	integration := &Render{}
+	handler := &RenderWebhookHandler{}
 
 	t.Run("create webhook and store secret", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
@@ -254,7 +254,7 @@ func Test__Render__SetupWebhook(t *testing.T) {
 			},
 		}
 
-		metadata, err := integration.SetupWebhook(core.SetupWebhookContext{
+		metadata, err := handler.Setup(core.WebhookHandlerContext{
 			HTTP:        httpCtx,
 			Webhook:     webhookCtx,
 			Integration: integrationCtx,
@@ -328,7 +328,7 @@ func Test__Render__SetupWebhook(t *testing.T) {
 			},
 		}
 
-		metadata, err := integration.SetupWebhook(core.SetupWebhookContext{
+		metadata, err := handler.Setup(core.WebhookHandlerContext{
 			HTTP:        httpCtx,
 			Webhook:     webhookCtx,
 			Integration: integrationCtx,
@@ -402,7 +402,7 @@ func Test__Render__SetupWebhook(t *testing.T) {
 			},
 		}
 
-		metadata, err := integration.SetupWebhook(core.SetupWebhookContext{
+		metadata, err := handler.Setup(core.WebhookHandlerContext{
 			HTTP:        httpCtx,
 			Webhook:     webhookCtx,
 			Integration: integrationCtx,
@@ -433,7 +433,7 @@ func Test__Render__SetupWebhook(t *testing.T) {
 }
 
 func Test__Render__CleanupWebhook(t *testing.T) {
-	integration := &Render{}
+	handler := &RenderWebhookHandler{}
 	httpCtx := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{
@@ -443,7 +443,7 @@ func Test__Render__CleanupWebhook(t *testing.T) {
 		},
 	}
 
-	err := integration.CleanupWebhook(core.CleanupWebhookContext{
+	err := handler.Cleanup(core.WebhookHandlerContext{
 		HTTP: httpCtx,
 		Webhook: &integrationWebhookContext{
 			metadata: WebhookMetadata{WebhookID: "whk-1", WorkspaceID: "usr-123"},
@@ -460,12 +460,12 @@ func Test__Render__CleanupWebhook(t *testing.T) {
 }
 
 func Test__Render__CompareWebhookConfig(t *testing.T) {
-	integration := &Render{}
-	equal, err := integration.CompareWebhookConfig(struct{}{}, map[string]any{"eventTypes": []string{"deploy_ended"}})
+	handler := &RenderWebhookHandler{}
+	equal, err := handler.CompareConfig(struct{}{}, map[string]any{"eventTypes": []string{"deploy_ended"}})
 	require.NoError(t, err)
 	assert.True(t, equal)
 
-	equal, err = integration.CompareWebhookConfig(
+	equal, err = handler.CompareConfig(
 		WebhookConfiguration{
 			Strategy:     webhookStrategyResourceType,
 			ResourceType: webhookResourceTypeDeploy,
@@ -478,7 +478,7 @@ func Test__Render__CompareWebhookConfig(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, equal)
 
-	equal, err = integration.CompareWebhookConfig(
+	equal, err = handler.CompareConfig(
 		WebhookConfiguration{
 			Strategy:   webhookStrategyIntegration,
 			EventTypes: []string{"deploy_ended"},
@@ -493,8 +493,8 @@ func Test__Render__CompareWebhookConfig(t *testing.T) {
 }
 
 func Test__Render__MergeWebhookConfig(t *testing.T) {
-	integration := &Render{}
-	merged, changed, err := integration.MergeWebhookConfig(
+	handler := &RenderWebhookHandler{}
+	merged, changed, err := handler.Merge(
 		WebhookConfiguration{
 			Strategy:   webhookStrategyIntegration,
 			EventTypes: []string{"deploy_ended"},
