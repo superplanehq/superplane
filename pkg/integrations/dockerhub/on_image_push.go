@@ -24,6 +24,7 @@ type OnImagePushConfiguration struct {
 type OnImagePushMetadata struct {
 	Namespace  string      `json:"namespace" mapstructure:"namespace"`
 	Repository *Repository `json:"repository" mapstructure:"repository"`
+	WebhookURL string      `json:"webhookUrl" mapstructure:"webhookUrl"`
 }
 
 type ImagePushPayload struct {
@@ -80,7 +81,7 @@ func (p *OnImagePush) Documentation() string {
 
 ## Webhook Setup
 
-This trigger automatically creates a Docker Hub webhook for the selected repository. The webhook is managed by SuperPlane and cleaned up when the trigger is removed.`
+This trigger generates a webhook URL in SuperPlane. Add that URL as a Docker Hub webhook for the selected repository so Docker Hub can deliver push events.`
 }
 
 func (p *OnImagePush) Icon() string {
@@ -160,7 +161,10 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 		return err
 	}
 
-	if metadata.Repository != nil && metadata.Repository.Name == repository && metadata.Namespace == namespace {
+	if metadata.Repository != nil &&
+		metadata.Repository.Name == repository &&
+		metadata.Namespace == namespace &&
+		metadata.WebhookURL != "" {
 		return nil
 	}
 
@@ -174,17 +178,23 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to validate repository: %w", err)
 	}
 
+	webhookURL := metadata.WebhookURL
+	if webhookURL == "" {
+		webhookURL, err = ctx.Webhook.Setup()
+		if err != nil {
+			return fmt.Errorf("failed to setup webhook: %w", err)
+		}
+	}
+
 	if err := ctx.Metadata.Set(OnImagePushMetadata{
 		Namespace:  namespace,
 		Repository: repoInfo,
+		WebhookURL: webhookURL,
 	}); err != nil {
 		return fmt.Errorf("failed to store metadata: %w", err)
 	}
 
-	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		Namespace:  namespace,
-		Repository: repository,
-	})
+	return nil
 }
 
 func (p *OnImagePush) Actions() []core.Action {

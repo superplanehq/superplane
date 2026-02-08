@@ -23,7 +23,7 @@ To connect Docker Hub to SuperPlane:
 `
 
 func init() {
-	registry.RegisterIntegrationWithWebhookHandler("dockerhub", &DockerHub{}, &DockerHubWebhookHandler{})
+	registry.RegisterIntegration("dockerhub", &DockerHub{})
 }
 
 type DockerHub struct{}

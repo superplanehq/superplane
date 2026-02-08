@@ -103,6 +103,7 @@ import {
 } from "./claude/index";
 import {
   componentMappers as dockerhubComponentMappers,
+  customFieldRenderers as dockerhubCustomFieldRenderers,
   triggerRenderers as dockerhubTriggerRenderers,
   eventStateRegistry as dockerhubEventStateRegistry,
 } from "./dockerhub";
@@ -224,6 +225,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
+  dockerhub: dockerhubCustomFieldRenderers,
 };
 
 /**

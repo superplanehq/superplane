@@ -52,6 +52,7 @@ func Test__OnImagePush__Setup(t *testing.T) {
 			HTTP:        httpCtx,
 			Integration: integrationCtx,
 			Metadata:    metadata,
+			Webhook:     &contexts.WebhookContext{},
 			Configuration: map[string]any{
 				"repository": "demo",
 			},
@@ -62,11 +63,7 @@ func Test__OnImagePush__Setup(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "superplane", stored.Namespace)
 		assert.Equal(t, "demo", stored.Repository.Name)
-		require.Len(t, integrationCtx.WebhookRequests, 1)
-
-		webhookConfig := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
-		assert.Equal(t, "superplane", webhookConfig.Namespace)
-		assert.Equal(t, "demo", webhookConfig.Repository)
+		assert.NotEmpty(t, stored.WebhookURL)
 	})
 }
 

@@ -15,6 +15,7 @@ export interface DockerHubRepository {
 export interface DockerHubRepositoryMetadata {
   namespace?: string;
   repository?: DockerHubRepository;
+  webhookUrl?: string;
 }
 
 export interface DockerHubRepositoryConfiguration {
