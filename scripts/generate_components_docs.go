@@ -41,8 +41,8 @@ func main() {
 		exitWithError(err)
 	}
 
-	for i, integration := range integrations {
-		if err := writeIntegrationDocs(integration, i+2); err != nil {
+	for _, integration := range integrations {
+		if err := writeIntegrationDocs(integration); err != nil {
 			exitWithError(err)
 		}
 	}
@@ -54,14 +54,14 @@ func createOutputDirectory() {
 	}
 }
 
-func writeIntegrationDocs(integration core.Integration, order int) error {
+func writeIntegrationDocs(integration core.Integration) error {
 	components := integration.Components()
 	triggers := integration.Triggers()
 
 	sort.Slice(components, func(i, j int) bool { return components[i].Name() < components[j].Name() })
 	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
 
-	return writeIntegrationIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.mdx", integrationFilename(integration))), integration, components, triggers, order)
+	return writeIntegrationIndex(filepath.Join(docsRoot, fmt.Sprintf("%s.mdx", integrationFilename(integration))), integration, components, triggers)
 }
 
 func writeCoreComponentsDoc(components []core.Component, triggers []core.Trigger) error {
@@ -73,7 +73,8 @@ func writeCoreComponentsDoc(components []core.Component, triggers []core.Trigger
 	sort.Slice(triggers, func(i, j int) bool { return triggers[i].Name() < triggers[j].Name() })
 
 	var buf bytes.Buffer
-	writeFrontMatter(&buf, "Core", 1)
+	coreOrder := 1
+	writeFrontMatter(&buf, "Core", &coreOrder)
 	writeOverviewSection(&buf, "Built-in SuperPlane components.")
 	writeCardGridTriggers(&buf, triggers)
 	writeCardGridComponents(&buf, components)
@@ -88,10 +89,9 @@ func writeIntegrationIndex(
 	integration core.Integration,
 	components []core.Component,
 	triggers []core.Trigger,
-	order int,
 ) error {
 	var buf bytes.Buffer
-	writeFrontMatter(&buf, integration.Label(), order)
+	writeFrontMatter(&buf, integration.Label(), nil)
 
 	writeOverviewSection(&buf, integration.Description())
 	writeCardGridTriggers(&buf, triggers)
@@ -109,11 +109,13 @@ func writeIntegrationIndex(
 	return writeFile(path, buf.Bytes())
 }
 
-func writeFrontMatter(buf *bytes.Buffer, title string, order int) {
+func writeFrontMatter(buf *bytes.Buffer, title string, order *int) {
 	buf.WriteString("---\n")
 	buf.WriteString(fmt.Sprintf("title: \"%s\"\n", escapeQuotes(title)))
-	buf.WriteString("sidebar:\n")
-	buf.WriteString(fmt.Sprintf("  order: %d\n", order))
+	if order != nil {
+		buf.WriteString("sidebar:\n")
+		buf.WriteString(fmt.Sprintf("  order: %d\n", *order))
+	}
 	buf.WriteString("---\n\n")
 }
 
