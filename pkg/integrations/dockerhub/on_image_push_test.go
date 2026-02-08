@@ -26,13 +26,9 @@ func Test__OnImagePush__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "repository is required")
 	})
 
-	t.Run("valid configuration -> stores metadata and requests webhook", func(t *testing.T) {
+	t.Run("valid configuration -> stores metadata and generates webhook URL", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"access_token":"token"}`)),
-				},
 				{
 					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`{"name":"demo","namespace":"superplane"}`)),
@@ -42,9 +38,8 @@ func Test__OnImagePush__Setup(t *testing.T) {
 
 		metadata := &contexts.MetadataContext{}
 		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"username":    "superplane",
-				"accessToken": "pat",
+			Secrets: map[string]core.IntegrationSecret{
+				accessTokenSecretName: {Name: accessTokenSecretName, Value: []byte("token")},
 			},
 		}
 

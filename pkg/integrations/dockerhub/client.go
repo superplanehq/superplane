@@ -1,34 +1,24 @@
 package dockerhub
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 const (
-	defaultBaseURL    = "https://hub.docker.com"
-	defaultPageSize   = 100
-	tokenTTLLeeway    = 9 * time.Minute
-	authTokenEndpoint = "/v2/auth/token"
+	defaultBaseURL  = "https://hub.docker.com"
+	defaultPageSize = 100
 )
 
 type Client struct {
-	Identifier string
-	Secret     string
-	BaseURL    string
-	http       core.HTTPContext
-
-	token       string
-	tokenExpiry time.Time
-	tokenMu     sync.Mutex
+	AccessToken string
+	BaseURL      string
+	http         core.HTTPContext
 }
 
 type APIError struct {
@@ -45,110 +35,24 @@ func NewClient(httpClient core.HTTPContext, integration core.IntegrationContext)
 		return nil, fmt.Errorf("no integration context")
 	}
 
-	username, err := integration.GetConfig("username")
+	accessToken, err := findSecret(integration, accessTokenSecretName)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("access token not configured: %w", err)
 	}
 
-	accessToken, err := integration.GetConfig("accessToken")
-	if err != nil {
-		return nil, err
-	}
-
-	identifier := strings.TrimSpace(string(username))
-	if identifier == "" {
-		return nil, fmt.Errorf("username is required")
-	}
-
-	secret := strings.TrimSpace(string(accessToken))
-	if secret == "" {
-		return nil, fmt.Errorf("accessToken is required")
+	token := strings.TrimSpace(accessToken)
+	if token == "" {
+		return nil, fmt.Errorf("access token is required")
 	}
 
 	return &Client{
-		Identifier: identifier,
-		Secret:     secret,
-		BaseURL:    defaultBaseURL,
-		http:       httpClient,
+		AccessToken: token,
+		BaseURL:      defaultBaseURL,
+		http:         httpClient,
 	}, nil
 }
 
-type accessTokenRequest struct {
-	Identifier string `json:"identifier"`
-	Secret     string `json:"secret"`
-}
-
-type accessTokenResponse struct {
-	AccessToken string `json:"access_token"`
-}
-
-func (c *Client) ensureAccessToken() (string, error) {
-	c.tokenMu.Lock()
-	defer c.tokenMu.Unlock()
-
-	if c.token != "" && time.Now().Before(c.tokenExpiry) {
-		return c.token, nil
-	}
-
-	token, err := c.createAccessToken()
-	if err != nil {
-		return "", err
-	}
-
-	c.token = token
-	c.tokenExpiry = time.Now().Add(tokenTTLLeeway)
-	return token, nil
-}
-
-func (c *Client) createAccessToken() (string, error) {
-	payload, err := json.Marshal(accessTokenRequest{
-		Identifier: c.Identifier,
-		Secret:     c.Secret,
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal access token request: %w", err)
-	}
-
-	req, err := http.NewRequest(http.MethodPost, c.BaseURL+authTokenEndpoint, bytes.NewReader(payload))
-	if err != nil {
-		return "", fmt.Errorf("failed to create access token request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	res, err := c.http.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("access token request failed: %w", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read access token response: %w", err)
-	}
-
-	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
-		return "", &APIError{StatusCode: res.StatusCode, Body: string(body)}
-	}
-
-	var response accessTokenResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return "", fmt.Errorf("failed to parse access token response: %w", err)
-	}
-
-	if response.AccessToken == "" {
-		return "", fmt.Errorf("access token response was empty")
-	}
-
-	return response.AccessToken, nil
-}
-
 func (c *Client) doRequest(method, URL string, body io.Reader) (*http.Response, []byte, error) {
-	token, err := c.ensureAccessToken()
-	if err != nil {
-		return nil, nil, err
-	}
-
 	finalURL := URL
 	if !strings.HasPrefix(URL, "http") {
 		finalURL = c.BaseURL + URL
@@ -160,7 +64,7 @@ func (c *Client) doRequest(method, URL string, body io.Reader) (*http.Response, 
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", "Bearer "+c.AccessToken)
 
 	res, err := c.http.Do(req)
 	if err != nil {

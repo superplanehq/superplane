@@ -42,3 +42,18 @@ func repositoryNameFromEvent(repoName, name string) string {
 
 	return parts[len(parts)-1]
 }
+
+func findSecret(ctx core.IntegrationContext, secretName string) (string, error) {
+	secrets, err := ctx.GetSecrets()
+	if err != nil {
+		return "", err
+	}
+
+	for _, secret := range secrets {
+		if secret.Name == secretName {
+			return string(secret.Value), nil
+		}
+	}
+
+	return "", fmt.Errorf("secret %s not found", secretName)
+}

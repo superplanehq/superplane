@@ -2,7 +2,6 @@ package dockerhub
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -19,7 +18,6 @@ To connect Docker Hub to SuperPlane:
 
 **Scopes**:
 - **Read**: Required to list repositories and read tags
-- **Write**: Required to create webhooks for triggers
 `
 
 func init() {
@@ -95,13 +93,8 @@ func (d *DockerHub) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	username := strings.TrimSpace(config.Username)
-	if username == "" {
-		return fmt.Errorf("username is required")
-	}
-
-	if strings.TrimSpace(config.AccessToken) == "" {
-		return fmt.Errorf("accessToken is required")
+	if err := refreshAccessToken(ctx.HTTP, ctx.Integration, config); err != nil {
+		return fmt.Errorf("failed to refresh access token: %w", err)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -109,8 +102,12 @@ func (d *DockerHub) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to create Docker Hub client: %w", err)
 	}
 
-	if err := client.ValidateCredentials(username); err != nil {
+	if err := client.ValidateCredentials(config.Username); err != nil {
 		return fmt.Errorf("failed to validate Docker Hub credentials: %w", err)
+	}
+
+	if err := ctx.Integration.ScheduleActionCall("refreshAccessToken", map[string]any{}, accessTokenRefreshInterval); err != nil {
+		return fmt.Errorf("failed to schedule token refresh: %w", err)
 	}
 
 	ctx.Integration.Ready()
@@ -126,9 +123,29 @@ func (d *DockerHub) ListResources(resourceType string, ctx core.ListResourcesCon
 }
 
 func (d *DockerHub) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		{
+			Name:        "refreshAccessToken",
+			Description: "Refresh Docker Hub access token",
+		},
+	}
 }
 
 func (d *DockerHub) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
+	switch ctx.Name {
+	case "refreshAccessToken":
+		config := Configuration{}
+		if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+			return fmt.Errorf("failed to decode configuration: %w", err)
+		}
+
+		if err := refreshAccessToken(ctx.HTTP, ctx.Integration, config); err != nil {
+			return fmt.Errorf("failed to refresh access token: %w", err)
+		}
+
+		return ctx.Integration.ScheduleActionCall("refreshAccessToken", map[string]any{}, accessTokenRefreshInterval)
+
+	default:
+		return fmt.Errorf("unknown action: %s", ctx.Name)
+	}
 }

@@ -50,10 +50,6 @@ func Test__GetImageTag__Setup(t *testing.T) {
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"access_token":"token"}`)),
-				},
-				{
-					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`{"name":"demo","namespace":"superplane"}`)),
 				},
 			},
@@ -62,9 +58,8 @@ func Test__GetImageTag__Setup(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{
 			Integration: &contexts.IntegrationContext{
-				Configuration: map[string]any{
-					"username":    "superplane",
-					"accessToken": "pat",
+				Secrets: map[string]core.IntegrationSecret{
+					accessTokenSecretName: {Name: accessTokenSecretName, Value: []byte("token")},
 				},
 			},
 			HTTP:     httpCtx,
@@ -91,10 +86,6 @@ func Test__GetImageTag__Execute(t *testing.T) {
 		Responses: []*http.Response{
 			{
 				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader(`{"access_token":"token"}`)),
-			},
-			{
-				StatusCode: http.StatusOK,
 				Body:       io.NopCloser(strings.NewReader(`{"id":1,"name":"latest"}`)),
 			},
 		},
@@ -104,9 +95,8 @@ func Test__GetImageTag__Execute(t *testing.T) {
 
 	err := component.Execute(core.ExecutionContext{
 		Integration: &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"username":    "superplane",
-				"accessToken": "pat",
+			Secrets: map[string]core.IntegrationSecret{
+				accessTokenSecretName: {Name: accessTokenSecretName, Value: []byte("token")},
 			},
 		},
 		HTTP:           httpCtx,
