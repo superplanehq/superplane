@@ -22,14 +22,14 @@ const WorkflowStatusFailed = "failed"
 const WorkflowStatusCanceled = "canceled"
 const PollInterval = 5 * time.Minute
 
-type TriggerPipeline struct{}
+type RunPipeline struct{}
 
-type TriggerPipelineNodeMetadata struct {
+type RunPipelineNodeMetadata struct {
 	ProjectSlug string `json:"projectSlug" mapstructure:"projectSlug"`
 	ProjectName string `json:"projectName" mapstructure:"projectName"`
 }
 
-type TriggerPipelineExecutionMetadata struct {
+type RunPipelineExecutionMetadata struct {
 	Pipeline  *PipelineInfo  `json:"pipeline" mapstructure:"pipeline"`
 	Workflows []WorkflowInfo `json:"workflows" mapstructure:"workflows"`
 }
@@ -46,7 +46,7 @@ type WorkflowInfo struct {
 	Status string `json:"status"`
 }
 
-type TriggerPipelineSpec struct {
+type RunPipelineSpec struct {
 	ProjectSlug          string      `json:"projectSlug"`
 	Location             string      `json:"location"`
 	PipelineDefinitionID string      `json:"pipelineDefinitionId"` // Find in CircleCI: Project Settings → Project Setup
@@ -58,19 +58,19 @@ type Parameter struct {
 	Value string `json:"value"`
 }
 
-func (t *TriggerPipeline) Name() string {
-	return "circleci.triggerPipeline"
+func (t *RunPipeline) Name() string {
+	return "circleci.runPipeline"
 }
 
-func (t *TriggerPipeline) Label() string {
+func (t *RunPipeline) Label() string {
 	return "Run Pipeline"
 }
 
-func (t *TriggerPipeline) Description() string {
+func (t *RunPipeline) Description() string {
 	return "Run a CircleCI pipeline and wait for completion"
 }
 
-func (t *TriggerPipeline) Documentation() string {
+func (t *RunPipeline) Documentation() string {
 	return `The Run Pipeline component starts a CircleCI pipeline and waits for it to complete.
 
 ## Use Cases
@@ -102,15 +102,15 @@ func (t *TriggerPipeline) Documentation() string {
 `
 }
 
-func (t *TriggerPipeline) Icon() string {
+func (t *RunPipeline) Icon() string {
 	return "workflow"
 }
 
-func (t *TriggerPipeline) Color() string {
+func (t *RunPipeline) Color() string {
 	return "gray"
 }
 
-func (t *TriggerPipeline) OutputChannels(configuration any) []core.OutputChannel {
+func (t *RunPipeline) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{
 		{
 			Name:  SuccessOutputChannel,
@@ -123,7 +123,7 @@ func (t *TriggerPipeline) OutputChannels(configuration any) []core.OutputChannel
 	}
 }
 
-func (t *TriggerPipeline) Configuration() []configuration.Field {
+func (t *RunPipeline) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "projectSlug",
@@ -173,12 +173,12 @@ func (t *TriggerPipeline) Configuration() []configuration.Field {
 	}
 }
 
-func (t *TriggerPipeline) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+func (t *RunPipeline) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (t *TriggerPipeline) Setup(ctx core.SetupContext) error {
-	config := TriggerPipelineSpec{}
+func (t *RunPipeline) Setup(ctx core.SetupContext) error {
+	config := RunPipelineSpec{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
@@ -188,7 +188,7 @@ func (t *TriggerPipeline) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("projectSlug is required")
 	}
 
-	metadata := TriggerPipelineNodeMetadata{}
+	metadata := RunPipelineNodeMetadata{}
 	err = mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)
@@ -208,7 +208,7 @@ func (t *TriggerPipeline) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("project not found or inaccessible: %w", err)
 	}
 
-	err = ctx.Metadata.Set(TriggerPipelineNodeMetadata{
+	err = ctx.Metadata.Set(RunPipelineNodeMetadata{
 		ProjectSlug: config.ProjectSlug,
 		ProjectName: project.Name,
 	})
@@ -224,8 +224,8 @@ func (t *TriggerPipeline) Setup(ctx core.SetupContext) error {
 	})
 }
 
-func (t *TriggerPipeline) Execute(ctx core.ExecutionContext) error {
-	spec := TriggerPipelineSpec{}
+func (t *RunPipeline) Execute(ctx core.ExecutionContext) error {
+	spec := RunPipelineSpec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
 		return err
@@ -236,7 +236,7 @@ func (t *TriggerPipeline) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	params := TriggerPipelineParams{
+	params := RunPipelineParams{
 		Parameters: t.buildParameters(ctx, spec.Parameters),
 	}
 	var branch, tag string
@@ -260,10 +260,10 @@ func (t *TriggerPipeline) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
-	var response *TriggerPipelineResponse
+	var response *RunPipelineResponse
 	if spec.PipelineDefinitionID != "" {
 		// Use pipeline/run API (required for GitHub App and Bitbucket Data Center)
-		runParams := TriggerPipelineRunParams{
+		runParams := RunPipelineRunParams{
 			DefinitionID: strings.TrimSpace(spec.PipelineDefinitionID),
 			Parameters:   t.buildParameters(ctx, spec.Parameters),
 		}
@@ -277,9 +277,9 @@ func (t *TriggerPipeline) Execute(ctx core.ExecutionContext) error {
 			runParams.Config = map[string]string{"branch": branch}
 			runParams.Checkout = map[string]string{"branch": branch}
 		}
-		response, err = client.TriggerPipelineRun(spec.ProjectSlug, runParams)
+		response, err = client.RunPipelineRun(spec.ProjectSlug, runParams)
 	} else {
-		response, err = client.TriggerPipeline(spec.ProjectSlug, params)
+		response, err = client.RunPipeline(spec.ProjectSlug, params)
 	}
 	if err != nil {
 		if strings.Contains(err.Error(), "400") &&
@@ -290,7 +290,7 @@ func (t *TriggerPipeline) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Store pipeline info in metadata
-	err = ctx.Metadata.Set(TriggerPipelineExecutionMetadata{
+	err = ctx.Metadata.Set(RunPipelineExecutionMetadata{
 		Pipeline: &PipelineInfo{
 			ID:        response.ID,
 			Number:    response.Number,
@@ -312,11 +312,11 @@ func (t *TriggerPipeline) Execute(ctx core.ExecutionContext) error {
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 }
 
-func (t *TriggerPipeline) Cancel(ctx core.ExecutionContext) error {
+func (t *RunPipeline) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (t *TriggerPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (t *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	// Verify webhook signature first before any processing
 	// CircleCI sends signature as "v1=<hex>" format
 	signatureHeader := ctx.Headers.Get("circleci-signature")
@@ -375,7 +375,7 @@ func (t *TriggerPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 		return http.StatusBadRequest, fmt.Errorf("workflow data incomplete")
 	}
 
-	metadata := TriggerPipelineExecutionMetadata{}
+	metadata := RunPipelineExecutionMetadata{}
 	err = mapstructure.Decode(executionCtx.Metadata.Get(), &metadata)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error decoding metadata: %v", err)
@@ -458,7 +458,7 @@ func (t *TriggerPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 	return http.StatusOK, nil
 }
 
-func (t *TriggerPipeline) Actions() []core.Action {
+func (t *RunPipeline) Actions() []core.Action {
 	return []core.Action{
 		{
 			Name:           "poll",
@@ -467,7 +467,7 @@ func (t *TriggerPipeline) Actions() []core.Action {
 	}
 }
 
-func (t *TriggerPipeline) HandleAction(ctx core.ActionContext) error {
+func (t *RunPipeline) HandleAction(ctx core.ActionContext) error {
 	switch ctx.Name {
 	case "poll":
 		return t.poll(ctx)
@@ -476,12 +476,12 @@ func (t *TriggerPipeline) HandleAction(ctx core.ActionContext) error {
 	return fmt.Errorf("unknown action: %s", ctx.Name)
 }
 
-func (t *TriggerPipeline) poll(ctx core.ActionContext) error {
+func (t *RunPipeline) poll(ctx core.ActionContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
 
-	metadata := TriggerPipelineExecutionMetadata{}
+	metadata := RunPipelineExecutionMetadata{}
 	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
 		return err
@@ -530,7 +530,7 @@ func (t *TriggerPipeline) poll(ctx core.ActionContext) error {
 	return ctx.ExecutionState.Emit(SuccessOutputChannel, PayloadType, []any{payload})
 }
 
-func (t *TriggerPipeline) checkWorkflowsStatus(workflows []WorkflowInfo) (allDone bool, anyFailed bool) {
+func (t *RunPipeline) checkWorkflowsStatus(workflows []WorkflowInfo) (allDone bool, anyFailed bool) {
 	if len(workflows) == 0 {
 		return false, false
 	}
@@ -550,7 +550,7 @@ func (t *TriggerPipeline) checkWorkflowsStatus(workflows []WorkflowInfo) (allDon
 	return allDone, anyFailed
 }
 
-func (t *TriggerPipeline) buildParameters(ctx core.ExecutionContext, params []Parameter) map[string]string {
+func (t *RunPipeline) buildParameters(ctx core.ExecutionContext, params []Parameter) map[string]string {
 	parameters := make(map[string]string)
 	for _, param := range params {
 		parameters[param.Name] = param.Value
@@ -562,6 +562,6 @@ func (t *TriggerPipeline) buildParameters(ctx core.ExecutionContext, params []Pa
 	return parameters
 }
 
-func (t *TriggerPipeline) Cleanup(ctx core.SetupContext) error {
+func (t *RunPipeline) Cleanup(ctx core.SetupContext) error {
 	return nil
 }

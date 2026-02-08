@@ -1,9 +1,9 @@
 import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { onPipelineCompletedTriggerRenderer } from "./on_pipeline_completed";
-import { TRIGGER_PIPELINE_STATE_REGISTRY, triggerPipelineMapper } from "./trigger_pipeline";
+import { RUN_PIPELINE_STATE_REGISTRY, runPipelineMapper } from "./run_pipeline";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
-  triggerPipeline: triggerPipelineMapper,
+  runPipeline: runPipelineMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -11,5 +11,5 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
-  triggerPipeline: TRIGGER_PIPELINE_STATE_REGISTRY,
+  runPipeline: RUN_PIPELINE_STATE_REGISTRY,
 };
