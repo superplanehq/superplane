@@ -144,6 +144,10 @@ func (g *GetPipeline) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("api_error", fmt.Sprintf("failed to get pipeline: %v", err))
 	}
 
+	if pipeline == nil {
+		return ctx.ExecutionState.Fail("not_found", fmt.Sprintf("pipeline %s not found", spec.PipelineID))
+	}
+
 	payload := map[string]any{
 		"name":   pipeline.PipelineName,
 		"ppl_id": pipeline.PipelineID,
