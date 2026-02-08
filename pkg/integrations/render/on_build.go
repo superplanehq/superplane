@@ -77,10 +77,6 @@ func (t *OnBuild) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if config.Service == "" {
-		return fmt.Errorf("service is required")
-	}
-
 	if err := ensureServiceInMetadata(ctx, config); err != nil {
 		return err
 	}
