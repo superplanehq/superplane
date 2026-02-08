@@ -1,0 +1,12 @@
+{
+  "id": 1234567890,
+  "html_url": "https://github.com/octocat/Hello-World/issues/42#issuecomment-1234567890",
+  "body": "Deployment succeeded. ✅\\n\\nSee run logs: https://example.com/logs/123",
+  "user": {
+    "login": "octocat",
+    "html_url": "https://github.com/octocat"
+  },
+  "created_at": "2026-02-08T00:00:00Z",
+  "updated_at": "2026-02-08T00:00:00Z"
+}
+
