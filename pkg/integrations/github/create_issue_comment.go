@@ -2,7 +2,9 @@ package github
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/google/go-github/v74/github"
@@ -16,7 +18,7 @@ type CreateIssueComment struct{}
 
 type CreateIssueCommentConfiguration struct {
 	Repository  string `json:"repository" mapstructure:"repository"`
-	IssueNumber int    `json:"issueNumber" mapstructure:"issueNumber"`
+	IssueNumber string `json:"issueNumber" mapstructure:"issueNumber"`
 	Body        string `json:"body" mapstructure:"body"`
 }
 
@@ -86,8 +88,8 @@ func (c *CreateIssueComment) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "issueNumber",
-			Label:       "Issue/PR Number (shared sequence)",
-			Type:        configuration.FieldTypeNumber,
+			Label:       "Issue/PR Number",
+			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Placeholder: "e.g., 42 or {{event.data.issue.number}}",
 			Description: "Issue or pull request number",
@@ -104,6 +106,19 @@ func (c *CreateIssueComment) Configuration() []configuration.Field {
 }
 
 func (c *CreateIssueComment) Setup(ctx core.SetupContext) error {
+	var config CreateIssueCommentConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	if config.IssueNumber == "" {
+		return errors.New("issue number is required")
+	}
+
+	if config.Body == "" {
+		return errors.New("body is required")
+	}
+
 	return ensureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
@@ -117,6 +132,22 @@ func (c *CreateIssueComment) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	if strings.TrimSpace(config.IssueNumber) == "" {
+		return fmt.Errorf("issue number is required")
+	}
+
+	if strings.TrimSpace(config.Body) == "" {
+		return fmt.Errorf("comment body is required")
+	}
+
+	issueNumber, err := strconv.Atoi(config.IssueNumber)
+	if err != nil {
+		return fmt.Errorf("issue number is not a number: %v", err)
+	}
+	if issueNumber <= 0 {
+		return fmt.Errorf("issue number is required")
+	}
+
 	var appMetadata Metadata
 	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
 		return fmt.Errorf("failed to decode integration metadata: %w", err)
@@ -125,14 +156,6 @@ func (c *CreateIssueComment) Execute(ctx core.ExecutionContext) error {
 	client, err := NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
-	}
-
-	if config.IssueNumber <= 0 {
-		return fmt.Errorf("issue number is required")
-	}
-
-	if strings.TrimSpace(config.Body) == "" {
-		return fmt.Errorf("comment body is required")
 	}
 
 	commentRequest := &github.IssueComment{}
@@ -145,7 +168,7 @@ func (c *CreateIssueComment) Execute(ctx core.ExecutionContext) error {
 		context.Background(),
 		appMetadata.Owner,
 		config.Repository,
-		config.IssueNumber,
+		issueNumber,
 		commentRequest,
 	)
 
