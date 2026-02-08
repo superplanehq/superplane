@@ -4399,10 +4399,10 @@
     "IntegrationNodeRef": {
       "type": "object",
       "properties": {
-        "workflowId": {
+        "canvasId": {
           "type": "string"
         },
-        "workflowName": {
+        "canvasName": {
           "type": "string"
         },
         "nodeId": {
