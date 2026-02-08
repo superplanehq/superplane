@@ -113,19 +113,19 @@ func ListUnscopedIntegrationWebhooks(tx *gorm.DB, integrationID uuid.UUID) ([]We
 	return webhooks, nil
 }
 
-type WorkflowNodeReference struct {
-	WorkflowID   uuid.UUID
-	WorkflowName string
-	NodeID       string
-	NodeName     string
+type CanvasNodeReference struct {
+	CanvasID   uuid.UUID
+	CanvasName string
+	NodeID     string
+	NodeName   string
 }
 
-func ListIntegrationNodeReferences(integrationID uuid.UUID) ([]WorkflowNodeReference, error) {
-	var nodeReferences []WorkflowNodeReference
+func ListIntegrationNodeReferences(integrationID uuid.UUID) ([]CanvasNodeReference, error) {
+	var nodeReferences []CanvasNodeReference
 	err := database.Conn().
 		Table("workflow_nodes AS wn").
 		Joins("JOIN workflows AS w ON w.id = wn.workflow_id").
-		Select("w.id as workflow_id, w.name as workflow_name, wn.node_id as node_id, wn.name as node_name").
+		Select("w.id as canvas_id, w.name as canvas_name, wn.node_id as node_id, wn.name as node_name").
 		Where("wn.app_installation_id = ?", integrationID).
 		Where("wn.deleted_at IS NULL").
 		Find(&nodeReferences).
