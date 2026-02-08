@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -20,6 +21,8 @@ func Test__NotificationEmailConsumer(t *testing.T) {
 	amqpURL := "amqp://guest:guest@rabbitmq:5672"
 
 	consumer := NewNotificationEmailConsumer(amqpURL, testEmailService, r.AuthService)
+	// Use a unique queue per test run to avoid competing with the app's own consumers.
+	consumer.ServiceName = NotificationEmailServiceName + "." + uuid.NewString()
 
 	go consumer.Start()
 	defer consumer.Stop()
