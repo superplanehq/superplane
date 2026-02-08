@@ -69,4 +69,3 @@ func Test__OnWorkflowCompleted__HandleWebhook(t *testing.T) {
 		assert.Equal(t, "circleci.workflow.completed", events.Payloads[0].Type)
 	})
 }
-

@@ -25,9 +25,11 @@ type OnWorkflowCompletedMetadata struct {
 	Project *Project `json:"project" mapstructure:"project"`
 }
 
-func (t *OnWorkflowCompleted) Name() string        { return "circleci.onWorkflowCompleted" }
-func (t *OnWorkflowCompleted) Label() string       { return "On Workflow Completed" }
-func (t *OnWorkflowCompleted) Description() string { return "Start a workflow when a CircleCI workflow completes" }
+func (t *OnWorkflowCompleted) Name() string  { return "circleci.onWorkflowCompleted" }
+func (t *OnWorkflowCompleted) Label() string { return "On Workflow Completed" }
+func (t *OnWorkflowCompleted) Description() string {
+	return "Start a workflow when a CircleCI workflow completes"
+}
 
 func (t *OnWorkflowCompleted) Documentation() string {
 	return `The On Workflow Completed trigger starts a workflow execution when a CircleCI workflow completes.
@@ -154,4 +156,3 @@ func (t *OnWorkflowCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int
 }
 
 func (t *OnWorkflowCompleted) Cleanup(ctx core.TriggerContext) error { return nil }
-

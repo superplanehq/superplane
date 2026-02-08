@@ -162,9 +162,9 @@ func (c *CircleCI) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 
 	name := fmt.Sprintf("superplane-%s", ctx.Webhook.GetID())
 	wh, err := client.CreateWebhook(CreateWebhookRequest{
-		Name:         name,
-		URL:          ctx.Webhook.GetURL(),
-		VerifyTLS:    true,
+		Name:          name,
+		URL:           ctx.Webhook.GetURL(),
+		VerifyTLS:     true,
 		SigningSecret: string(secret),
 		Scope: WebhookScope{
 			ID:   cfg.ProjectID,

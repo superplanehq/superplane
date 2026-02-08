@@ -202,5 +202,5 @@ func (t *TriggerPipeline) Actions() []core.Action { return []core.Action{} }
 func (t *TriggerPipeline) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
-func (t *TriggerPipeline) Cancel(ctx core.ExecutionContext) error  { return nil }
-func (t *TriggerPipeline) Cleanup(ctx core.SetupContext) error     { return nil }
+func (t *TriggerPipeline) Cancel(ctx core.ExecutionContext) error { return nil }
+func (t *TriggerPipeline) Cleanup(ctx core.SetupContext) error    { return nil }

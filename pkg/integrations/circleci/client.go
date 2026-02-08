@@ -169,11 +169,11 @@ type WebhookScope struct {
 }
 
 type CreateWebhookRequest struct {
-	Name          string      `json:"name"`
-	Events        []string    `json:"events"`
-	URL           string      `json:"url"`
-	VerifyTLS     bool        `json:"verify-tls"`
-	SigningSecret string      `json:"signing-secret"`
+	Name          string       `json:"name"`
+	Events        []string     `json:"events"`
+	URL           string       `json:"url"`
+	VerifyTLS     bool         `json:"verify-tls"`
+	SigningSecret string       `json:"signing-secret"`
 	Scope         WebhookScope `json:"scope"`
 }
 
@@ -199,4 +199,3 @@ func (c *Client) DeleteWebhook(webhookID string) error {
 	_, err := c.exec(http.MethodDelete, "/webhook/"+webhookID, nil, http.StatusOK)
 	return err
 }
-
