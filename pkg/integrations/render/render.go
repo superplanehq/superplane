@@ -37,6 +37,13 @@ type WebhookMetadata struct {
 	OwnerID   string `json:"ownerId" mapstructure:"ownerId"`
 }
 
+type webhookSetupRequest struct {
+	URL           string
+	Configuration WebhookConfiguration
+	Name          string
+	EventFilter   []string
+}
+
 func (r *Render) Name() string {
 	return "render"
 }
@@ -259,63 +266,110 @@ func (r *Render) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 		return nil, err
 	}
 
-	webhookURL := ctx.Webhook.GetURL()
-	if webhookURL == "" {
-		return nil, fmt.Errorf("webhook URL is required")
-	}
-
-	webhookConfiguration, err := decodeWebhookConfiguration(ctx.Webhook.GetConfiguration())
+	request, err := buildWebhookSetupRequest(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode webhook configuration: %w", err)
+		return nil, err
 	}
 
-	selectedWebhookName := webhookName(webhookConfiguration)
-	eventFilter := webhookEventFilter(webhookConfiguration)
 	selectedWebhook, err := r.findExistingWebhook(
 		client,
 		ownerID,
-		webhookURL,
-		webhookConfiguration,
-		selectedWebhookName,
-		eventFilter,
+		request.URL,
+		request.Configuration,
+		request.Name,
+		request.EventFilter,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	if selectedWebhook != nil {
-		secret, err := r.updateWebhookIfNeeded(
-			client,
-			*selectedWebhook,
-			selectedWebhookName,
-			webhookURL,
-			eventFilter,
-		)
-		if err != nil {
-			return nil, err
+	if selectedWebhook == nil {
+		metadata, createErr := r.createWebhook(ctx, client, ownerID, request)
+		if createErr != nil {
+			return nil, createErr
 		}
-
-		if err := setWebhookSecret(ctx, secret); err != nil {
-			return nil, err
-		}
-
-		return WebhookMetadata{WebhookID: selectedWebhook.ID, OwnerID: ownerID}, nil
+		return metadata, nil
 	}
 
+	metadata, reuseErr := r.reuseWebhook(ctx, client, ownerID, *selectedWebhook, request)
+	if reuseErr != nil {
+		return nil, reuseErr
+	}
+
+	return metadata, nil
+}
+
+func buildWebhookSetupRequest(ctx core.SetupWebhookContext) (webhookSetupRequest, error) {
+	webhookURL := ctx.Webhook.GetURL()
+	if webhookURL == "" {
+		return webhookSetupRequest{}, fmt.Errorf("webhook URL is required")
+	}
+
+	webhookConfiguration, err := decodeWebhookConfiguration(ctx.Webhook.GetConfiguration())
+	if err != nil {
+		return webhookSetupRequest{}, fmt.Errorf("failed to decode webhook configuration: %w", err)
+	}
+
+	return webhookSetupRequest{
+		URL:           webhookURL,
+		Configuration: webhookConfiguration,
+		Name:          webhookName(webhookConfiguration),
+		EventFilter:   webhookEventFilter(webhookConfiguration),
+	}, nil
+}
+
+func (r *Render) reuseWebhook(
+	ctx core.SetupWebhookContext,
+	client *Client,
+	ownerID string,
+	selectedWebhook Webhook,
+	request webhookSetupRequest,
+) (WebhookMetadata, error) {
+	secret, err := r.updateWebhookIfNeeded(
+		client,
+		selectedWebhook,
+		request.Name,
+		request.URL,
+		request.EventFilter,
+	)
+	if err != nil {
+		return WebhookMetadata{}, err
+	}
+
+	return finalizeWebhookSetup(ctx, selectedWebhook.ID, ownerID, secret)
+}
+
+func (r *Render) createWebhook(
+	ctx core.SetupWebhookContext,
+	client *Client,
+	ownerID string,
+	request webhookSetupRequest,
+) (WebhookMetadata, error) {
 	createdWebhook, err := client.CreateWebhook(CreateWebhookRequest{
 		OwnerID:     ownerID,
-		Name:        selectedWebhookName,
-		URL:         webhookURL,
+		Name:        request.Name,
+		URL:         request.URL,
 		Enabled:     true,
-		EventFilter: eventFilter,
+		EventFilter: request.EventFilter,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Render webhook: %w", err)
+		return WebhookMetadata{}, fmt.Errorf("failed to create Render webhook: %w", err)
 	}
-	if err := setWebhookSecret(ctx, createdWebhook.Secret); err != nil {
-		return nil, err
+
+	return finalizeWebhookSetup(ctx, createdWebhook.ID, ownerID, createdWebhook.Secret)
+}
+
+func finalizeWebhookSetup(
+	ctx core.SetupWebhookContext,
+	webhookID string,
+	ownerID string,
+	secret string,
+) (WebhookMetadata, error) {
+	if err := setWebhookSecret(ctx, secret); err != nil {
+		return WebhookMetadata{}, err
 	}
-	return WebhookMetadata{WebhookID: createdWebhook.ID, OwnerID: ownerID}, nil
+
+	return WebhookMetadata{WebhookID: webhookID, OwnerID: ownerID}, nil
 }
 
 func (r *Render) findExistingWebhook(
@@ -331,12 +385,7 @@ func (r *Render) findExistingWebhook(
 		return nil, fmt.Errorf("failed to list Render webhooks: %w", err)
 	}
 
-	candidateWebhooks := make([]Webhook, 0, len(webhooks))
-	for _, webhook := range webhooks {
-		if webhook.URL == webhookURL {
-			candidateWebhooks = append(candidateWebhooks, webhook)
-		}
-	}
+	candidateWebhooks := filterWebhooksByURL(webhooks, webhookURL)
 
 	if webhookConfiguration.Strategy == webhookStrategyIntegration {
 		return pickExistingRenderWebhook(candidateWebhooks, selectedWebhookName), nil
@@ -361,23 +410,14 @@ func (r *Render) updateWebhookIfNeeded(
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve existing Render webhook: %w", err)
 	}
-
-	existingEventFilter := normalizeWebhookEventTypes(retrievedWebhook.EventFilter)
-	if len(existingEventFilter) == 0 {
-		existingEventFilter = normalizeWebhookEventTypes(selectedWebhook.EventFilter)
+	if retrievedWebhook == nil {
+		return "", fmt.Errorf("failed to retrieve existing Render webhook: empty response")
 	}
 
-	existingName := retrievedWebhook.Name
-	if existingName == "" {
-		existingName = selectedWebhook.Name
-	}
-
-	mergedEventFilter := normalizeWebhookEventTypes(append(existingEventFilter, eventFilter...))
-	if len(mergedEventFilter) == 0 {
-		mergedEventFilter = eventFilter
-	}
-
-	if existingName != selectedWebhookName || !slices.Equal(existingEventFilter, mergedEventFilter) || !retrievedWebhook.Enabled {
+	existingEventFilter := existingWebhookEventFilter(*retrievedWebhook, selectedWebhook)
+	existingName := existingWebhookName(*retrievedWebhook, selectedWebhook)
+	mergedEventFilter := mergeWebhookEventFilters(existingEventFilter, eventFilter)
+	if shouldUpdateWebhook(retrievedWebhook.Enabled, existingName, selectedWebhookName, existingEventFilter, mergedEventFilter) {
 		_, err = client.UpdateWebhook(selectedWebhook.ID, UpdateWebhookRequest{
 			Name:        selectedWebhookName,
 			URL:         webhookURL,
@@ -389,11 +429,7 @@ func (r *Render) updateWebhookIfNeeded(
 		}
 	}
 
-	if retrievedWebhook.Secret != "" {
-		return retrievedWebhook.Secret, nil
-	}
-
-	return selectedWebhook.Secret, nil
+	return webhookSecret(*retrievedWebhook, selectedWebhook), nil
 }
 
 func setWebhookSecret(ctx core.SetupWebhookContext, secret string) error {
@@ -570,4 +606,60 @@ func pickExistingRenderWebhookByEventFilter(webhooks []Webhook, eventFilter []st
 	}
 
 	return nil
+}
+
+func filterWebhooksByURL(webhooks []Webhook, webhookURL string) []Webhook {
+	filteredWebhooks := make([]Webhook, 0, len(webhooks))
+	for _, webhook := range webhooks {
+		if webhook.URL == webhookURL {
+			filteredWebhooks = append(filteredWebhooks, webhook)
+		}
+	}
+
+	return filteredWebhooks
+}
+
+func existingWebhookEventFilter(retrievedWebhook, selectedWebhook Webhook) []string {
+	existingEventFilter := normalizeWebhookEventTypes(retrievedWebhook.EventFilter)
+	if len(existingEventFilter) != 0 {
+		return existingEventFilter
+	}
+
+	return normalizeWebhookEventTypes(selectedWebhook.EventFilter)
+}
+
+func existingWebhookName(retrievedWebhook, selectedWebhook Webhook) string {
+	existingName := retrievedWebhook.Name
+	if existingName != "" {
+		return existingName
+	}
+
+	return selectedWebhook.Name
+}
+
+func mergeWebhookEventFilters(existingEventFilter, requestEventFilter []string) []string {
+	mergedEventFilter := normalizeWebhookEventTypes(append(existingEventFilter, requestEventFilter...))
+	if len(mergedEventFilter) != 0 {
+		return mergedEventFilter
+	}
+
+	return requestEventFilter
+}
+
+func shouldUpdateWebhook(
+	enabled bool,
+	existingName string,
+	selectedWebhookName string,
+	existingEventFilter []string,
+	mergedEventFilter []string,
+) bool {
+	return existingName != selectedWebhookName || !slices.Equal(existingEventFilter, mergedEventFilter) || !enabled
+}
+
+func webhookSecret(retrievedWebhook, selectedWebhook Webhook) string {
+	if retrievedWebhook.Secret != "" {
+		return retrievedWebhook.Secret
+	}
+
+	return selectedWebhook.Secret
 }
