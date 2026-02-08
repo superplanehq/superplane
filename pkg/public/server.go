@@ -822,7 +822,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 				return nil, err
 			}
 
-			return &core.ExecutionContext{
+			execCtx := &core.ExecutionContext{
 				ID:             execution.ID,
 				WorkflowID:     execution.WorkflowID.String(),
 				NodeID:         execution.NodeID,
@@ -835,7 +835,14 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 				Requests:       contexts.NewExecutionRequestContext(tx, execution),
 				Logger:         logging.ForExecution(execution, nil),
 				Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
-			}, nil
+			}
+			if node.AppInstallationID != nil {
+				instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
+				if err == nil {
+					execCtx.Integration = contexts.NewIntegrationContext(tx, &node, instance, s.encryptor, s.registry)
+				}
+			}
+			return execCtx, nil
 		},
 	})
 }
