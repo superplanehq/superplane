@@ -1010,15 +1010,19 @@ Emits the created comment object (id, body, user, created_at, html_url).
 
 ```json
 {
-  "body": "Deployment succeeded. ✅\\n\\nSee run logs: https://example.com/logs/123",
-  "created_at": "2026-02-08T00:00:00Z",
-  "html_url": "https://github.com/octocat/Hello-World/issues/42#issuecomment-1234567890",
-  "id": 1234567890,
-  "updated_at": "2026-02-08T00:00:00Z",
-  "user": {
-    "html_url": "https://github.com/octocat",
-    "login": "octocat"
-  }
+  "data": {
+    "body": "Deployment succeeded. ✅\n\nSee run logs: https://example.com/logs/123",
+    "created_at": "2026-02-08T00:00:00Z",
+    "html_url": "https://github.com/octocat/Hello-World/issues/42#issuecomment-1234567890",
+    "id": 1234567890,
+    "updated_at": "2026-02-08T00:00:00Z",
+    "user": {
+      "html_url": "https://github.com/octocat",
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-02-08T00:00:00Z",
+  "type": "github.issueComment"
 }
 ```
 
