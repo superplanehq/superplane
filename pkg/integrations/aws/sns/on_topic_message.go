@@ -84,12 +84,12 @@ func (t *OnTopicMessage) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("%s: invalid topic ARN: %w", scope, err)
 	}
 
-	if _, err := validateTopic(ctx.HTTP, ctx.Integration, region, topicArn); err != nil {
-		return fmt.Errorf("%s: failed to validate topic %q: %w", scope, topicArn, err)
+	if metadata.Region == region && metadata.TopicArn == topicArn {
+		return nil
 	}
 
-	if metadata.SubscriptionID != "" && metadata.Region == region && metadata.TopicArn == topicArn {
-		return nil
+	if _, err := validateTopic(ctx.HTTP, ctx.Integration, region, topicArn); err != nil {
+		return fmt.Errorf("%s: failed to validate topic %q: %w", scope, topicArn, err)
 	}
 
 	var integrationMetadata common.IntegrationMetadata
