@@ -1,0 +1,26 @@
+{
+  "data": {
+    "id": 4001,
+    "tag_name": "v2.0.0",
+    "name": "Release 2.0.0",
+    "body": "## What's Changed\n\n- Major refactor\n- Performance improvements",
+    "html_url": "https://github.com/acme/widgets/releases/tag/v2.0.0",
+    "draft": false,
+    "prerelease": false,
+    "created_at": "2026-01-20T10:00:00Z",
+    "published_at": "2026-01-21T12:00:00Z",
+    "assets": [
+      {
+        "id": 2,
+        "name": "widgets-v2.0.0.zip",
+        "content_type": "application/zip",
+        "size": 2048000,
+        "download_count": 17,
+        "browser_download_url": "https://github.com/acme/widgets/releases/download/v2.0.0/widgets-v2.0.0.zip"
+      }
+    ]
+  },
+  "timestamp": "2026-01-21T17:56:16.680755501Z",
+  "type": "github.release"
+}
+
