@@ -26,7 +26,7 @@ func (t *testWebhookContext) GetMetadata() any              { return nil }
 func (t *testWebhookContext) GetConfiguration() any         { return t.configuration }
 func (t *testWebhookContext) SetSecret(secret []byte) error { t.secret = secret; return nil }
 
-func Test__SendGrid__SetupWebhook_EnablesSignedWebhook(t *testing.T) {
+func Test__SendGrid__Setup_EnablesSignedWebhook(t *testing.T) {
 	handler := &SendGridWebhookHandler{}
 	httpCtx := &contexts.HTTPContext{
 		Responses: []*http.Response{

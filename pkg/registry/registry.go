@@ -103,11 +103,11 @@ func (r *Registry) Init() {
 	}
 
 	for name, integration := range registeredIntegrations {
-		r.Integrations[name] = integration
+		r.Integrations[name] = NewPanicableIntegration(integration)
 	}
 
 	for name, webhookHandler := range registeredWebhookHandlers {
-		r.WebhookHandlers[name] = webhookHandler
+		r.WebhookHandlers[name] = NewPanicableWebhookHandler(webhookHandler)
 	}
 
 	//
