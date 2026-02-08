@@ -438,21 +438,6 @@ func decodeWebhookMetadata(value any) (WebhookMetadata, error) {
 		return WebhookMetadata{}, err
 	}
 
-	if metadata.WorkspaceID != "" {
-		return metadata, nil
-	}
-
-	legacyMetadata := map[string]any{}
-	if err := mapstructure.Decode(value, &legacyMetadata); err != nil {
-		return metadata, nil
-	}
-
-	legacyWorkspaceID, ok := legacyMetadata["ownerId"].(string)
-	if !ok {
-		return metadata, nil
-	}
-
-	metadata.WorkspaceID = strings.TrimSpace(legacyWorkspaceID)
 	return metadata, nil
 }
 
