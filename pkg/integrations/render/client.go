@@ -253,18 +253,8 @@ func (c *Client) TriggerDeploy(serviceID string, clearCache bool) (map[string]an
 
 func parseWorkspaces(body []byte) ([]Workspace, error) {
 	withCursor := []workspaceWithCursor{}
-	if err := json.Unmarshal(body, &withCursor); err == nil {
-		workspaces := make([]Workspace, 0, len(withCursor))
-		for _, item := range withCursor {
-			if item.Workspace.ID == "" {
-				continue
-			}
-			workspaces = append(workspaces, item.Workspace)
-		}
-
-		if len(withCursor) > 0 {
-			return workspaces, nil
-		}
+	if err := json.Unmarshal(body, &withCursor); err == nil && len(withCursor) > 0 {
+		return parseWorkspacesWithCursor(withCursor), nil
 	}
 
 	plainWorkspaces := []Workspace{}
@@ -277,18 +267,8 @@ func parseWorkspaces(body []byte) ([]Workspace, error) {
 
 func parseServices(body []byte) ([]Service, error) {
 	withCursor := []serviceWithCursor{}
-	if err := json.Unmarshal(body, &withCursor); err == nil {
-		services := make([]Service, 0, len(withCursor))
-		for _, item := range withCursor {
-			if item.Service.ID == "" {
-				continue
-			}
-			services = append(services, item.Service)
-		}
-
-		if len(withCursor) > 0 {
-			return services, nil
-		}
+	if err := json.Unmarshal(body, &withCursor); err == nil && len(withCursor) > 0 {
+		return parseServicesWithCursor(withCursor), nil
 	}
 
 	plainServices := []Service{}
@@ -301,18 +281,8 @@ func parseServices(body []byte) ([]Service, error) {
 
 func parseWebhooks(body []byte) ([]Webhook, error) {
 	withCursor := []webhookWithCursor{}
-	if err := json.Unmarshal(body, &withCursor); err == nil {
-		webhooks := make([]Webhook, 0, len(withCursor))
-		for _, item := range withCursor {
-			if item.Webhook.ID == "" {
-				continue
-			}
-			webhooks = append(webhooks, item.Webhook)
-		}
-
-		if len(withCursor) > 0 {
-			return webhooks, nil
-		}
+	if err := json.Unmarshal(body, &withCursor); err == nil && len(withCursor) > 0 {
+		return parseWebhooksWithCursor(withCursor), nil
 	}
 
 	plainWebhooks := []Webhook{}
@@ -341,6 +311,45 @@ func parseWebhook(body []byte) (*Webhook, error) {
 	}
 
 	return &wrapper.Webhook, nil
+}
+
+func parseWorkspacesWithCursor(withCursor []workspaceWithCursor) []Workspace {
+	workspaces := make([]Workspace, 0, len(withCursor))
+	for _, item := range withCursor {
+		if item.Workspace.ID == "" {
+			continue
+		}
+
+		workspaces = append(workspaces, item.Workspace)
+	}
+
+	return workspaces
+}
+
+func parseServicesWithCursor(withCursor []serviceWithCursor) []Service {
+	services := make([]Service, 0, len(withCursor))
+	for _, item := range withCursor {
+		if item.Service.ID == "" {
+			continue
+		}
+
+		services = append(services, item.Service)
+	}
+
+	return services
+}
+
+func parseWebhooksWithCursor(withCursor []webhookWithCursor) []Webhook {
+	webhooks := make([]Webhook, 0, len(withCursor))
+	for _, item := range withCursor {
+		if item.Webhook.ID == "" {
+			continue
+		}
+
+		webhooks = append(webhooks, item.Webhook)
+	}
+
+	return webhooks
 }
 
 func (c *Client) execRequestWithResponse(
