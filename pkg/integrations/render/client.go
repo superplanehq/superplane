@@ -140,12 +140,12 @@ func (c *Client) ListServices(ownerID string) ([]Service, error) {
 }
 
 func (c *Client) ListWebhooks(ownerID string) ([]Webhook, error) {
-	if strings.TrimSpace(ownerID) == "" {
+	if ownerID == "" {
 		return nil, fmt.Errorf("ownerId is required")
 	}
 
 	query := url.Values{}
-	query.Set("ownerId", strings.TrimSpace(ownerID))
+	query.Set("ownerId", ownerID)
 	query.Set("limit", "100")
 
 	_, body, err := c.execRequestWithResponse(http.MethodGet, "/webhooks", query, nil)
@@ -157,7 +157,7 @@ func (c *Client) ListWebhooks(ownerID string) ([]Webhook, error) {
 }
 
 func (c *Client) GetWebhook(webhookID string) (*Webhook, error) {
-	if strings.TrimSpace(webhookID) == "" {
+	if webhookID == "" {
 		return nil, fmt.Errorf("webhookID is required")
 	}
 
@@ -170,13 +170,13 @@ func (c *Client) GetWebhook(webhookID string) (*Webhook, error) {
 }
 
 func (c *Client) CreateWebhook(request CreateWebhookRequest) (*Webhook, error) {
-	if strings.TrimSpace(request.OwnerID) == "" {
+	if request.OwnerID == "" {
 		return nil, fmt.Errorf("ownerId is required")
 	}
-	if strings.TrimSpace(request.URL) == "" {
+	if request.URL == "" {
 		return nil, fmt.Errorf("url is required")
 	}
-	if strings.TrimSpace(request.Name) == "" {
+	if request.Name == "" {
 		return nil, fmt.Errorf("name is required")
 	}
 
@@ -189,7 +189,7 @@ func (c *Client) CreateWebhook(request CreateWebhookRequest) (*Webhook, error) {
 }
 
 func (c *Client) UpdateWebhook(webhookID string, request UpdateWebhookRequest) (*Webhook, error) {
-	if strings.TrimSpace(webhookID) == "" {
+	if webhookID == "" {
 		return nil, fmt.Errorf("webhookID is required")
 	}
 
@@ -207,7 +207,7 @@ func (c *Client) UpdateWebhook(webhookID string, request UpdateWebhookRequest) (
 }
 
 func (c *Client) DeleteWebhook(webhookID string) error {
-	if strings.TrimSpace(webhookID) == "" {
+	if webhookID == "" {
 		return fmt.Errorf("webhookID is required")
 	}
 
@@ -216,7 +216,7 @@ func (c *Client) DeleteWebhook(webhookID string) error {
 }
 
 func (c *Client) TriggerDeploy(serviceID string, clearCache bool) (map[string]any, error) {
-	if strings.TrimSpace(serviceID) == "" {
+	if serviceID == "" {
 		return nil, fmt.Errorf("serviceID is required")
 	}
 
@@ -255,7 +255,7 @@ func parseOwners(body []byte) ([]Owner, error) {
 	if err := json.Unmarshal(body, &withCursor); err == nil {
 		owners := make([]Owner, 0, len(withCursor))
 		for _, item := range withCursor {
-			if strings.TrimSpace(item.Owner.ID) == "" {
+			if item.Owner.ID == "" {
 				continue
 			}
 			owners = append(owners, item.Owner)
@@ -279,7 +279,7 @@ func parseServices(body []byte) ([]Service, error) {
 	if err := json.Unmarshal(body, &withCursor); err == nil {
 		services := make([]Service, 0, len(withCursor))
 		for _, item := range withCursor {
-			if strings.TrimSpace(item.Service.ID) == "" {
+			if item.Service.ID == "" {
 				continue
 			}
 			services = append(services, item.Service)
@@ -303,7 +303,7 @@ func parseWebhooks(body []byte) ([]Webhook, error) {
 	if err := json.Unmarshal(body, &withCursor); err == nil {
 		webhooks := make([]Webhook, 0, len(withCursor))
 		for _, item := range withCursor {
-			if strings.TrimSpace(item.Webhook.ID) == "" {
+			if item.Webhook.ID == "" {
 				continue
 			}
 			webhooks = append(webhooks, item.Webhook)
@@ -324,7 +324,7 @@ func parseWebhooks(body []byte) ([]Webhook, error) {
 
 func parseWebhook(body []byte) (*Webhook, error) {
 	webhook := Webhook{}
-	if err := json.Unmarshal(body, &webhook); err == nil && strings.TrimSpace(webhook.ID) != "" {
+	if err := json.Unmarshal(body, &webhook); err == nil && webhook.ID != "" {
 		return &webhook, nil
 	}
 
@@ -335,7 +335,7 @@ func parseWebhook(body []byte) (*Webhook, error) {
 		return nil, fmt.Errorf("failed to unmarshal webhook response: %w", err)
 	}
 
-	if strings.TrimSpace(wrapper.Webhook.ID) == "" {
+	if wrapper.Webhook.ID == "" {
 		return nil, fmt.Errorf("webhook id is missing in response")
 	}
 

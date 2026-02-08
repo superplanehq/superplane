@@ -132,7 +132,7 @@ func (r *Render) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if strings.TrimSpace(config.APIKey) == "" {
+	if config.APIKey == "" {
 		return fmt.Errorf("apiKey is required")
 	}
 
@@ -145,13 +145,12 @@ func (r *Render) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to verify Render credentials: %w", err)
 	}
 
-	owner, err := resolveOwner(client, config.workspace())
+	owner, err := resolveOwner(client, config.Workspace)
 	if err != nil {
 		return fmt.Errorf("failed to resolve workspace: %w", err)
 	}
 
-	workspacePlan := normalizeWorkspacePlan(config.WorkspacePlan)
-	ctx.Integration.SetMetadata(buildMetadata(owner.ID, workspacePlan))
+	ctx.Integration.SetMetadata(buildMetadata(owner.ID, config.WorkspacePlan))
 	ctx.Integration.Ready()
 	return nil
 }
@@ -236,20 +235,11 @@ func (r *Render) ListResources(resourceType string, ctx core.ListResourcesContex
 
 	resources := make([]core.IntegrationResource, 0, len(services))
 	for _, service := range services {
-		if strings.TrimSpace(service.ID) == "" {
+		if service.ID == "" || service.Name == "" {
 			continue
 		}
 
-		name := strings.TrimSpace(service.Name)
-		if name == "" {
-			name = service.ID
-		}
-
-		resources = append(resources, core.IntegrationResource{
-			Type: resourceType,
-			Name: name,
-			ID:   service.ID,
-		})
+		resources = append(resources, core.IntegrationResource{Type: resourceType, Name: service.Name, ID: service.ID})
 	}
 
 	return resources, nil
@@ -433,7 +423,7 @@ func (r *Render) updateWebhookIfNeeded(
 }
 
 func setWebhookSecret(ctx core.SetupWebhookContext, secret string) error {
-	if strings.TrimSpace(secret) == "" {
+	if secret == "" {
 		return fmt.Errorf("render webhook secret is empty")
 	}
 	if err := ctx.Webhook.SetSecret([]byte(secret)); err != nil {
@@ -487,7 +477,7 @@ func ownerIDForIntegration(client *Client, integration core.IntegrationContext) 
 	workspace := ""
 	workspaceValue, workspaceErr := integration.GetConfig("workspace")
 	if workspaceErr == nil {
-		workspace = strings.TrimSpace(string(workspaceValue))
+		workspace = string(workspaceValue)
 	}
 
 	owner, err := resolveOwner(client, workspace)
@@ -495,7 +485,13 @@ func ownerIDForIntegration(client *Client, integration core.IntegrationContext) 
 		return "", err
 	}
 
-	integration.SetMetadata(buildMetadata(owner.ID, workspacePlanFromConfig(integration)))
+	workspacePlan := workspacePlanProfessional
+	workspacePlanValue, workspacePlanErr := integration.GetConfig("workspacePlan")
+	if workspacePlanErr == nil {
+		workspacePlan = string(workspacePlanValue)
+	}
+
+	integration.SetMetadata(buildMetadata(owner.ID, workspacePlan))
 	return owner.ID, nil
 }
 
@@ -509,29 +505,24 @@ func resolveOwner(client *Client, ownerID string) (Owner, error) {
 		return Owner{}, fmt.Errorf("no workspaces found for this API key")
 	}
 
-	trimmedWorkspace := strings.TrimSpace(ownerID)
-	if trimmedWorkspace == "" {
+	if ownerID == "" {
 		return owners[0], nil
 	}
 
 	selectedOwner := slices.IndexFunc(owners, func(owner Owner) bool {
-		return strings.TrimSpace(owner.ID) == trimmedWorkspace
+		return owner.ID == ownerID
 	})
 	if selectedOwner < 0 {
 		selectedOwner = slices.IndexFunc(owners, func(owner Owner) bool {
-			return strings.EqualFold(strings.TrimSpace(owner.Name), trimmedWorkspace)
+			return strings.EqualFold(owner.Name, ownerID)
 		})
 	}
 
 	if selectedOwner < 0 {
-		return Owner{}, fmt.Errorf("workspace %s is not accessible with this API key", trimmedWorkspace)
+		return Owner{}, fmt.Errorf("owner %s is not accessible with this API key", ownerID)
 	}
 
 	return owners[selectedOwner], nil
-}
-
-func (c Configuration) workspace() string {
-	return strings.TrimSpace(c.Workspace)
 }
 
 func (m Metadata) workspacePlan() string {
@@ -539,34 +530,15 @@ func (m Metadata) workspacePlan() string {
 		return workspacePlanProfessional
 	}
 
-	return normalizeWorkspacePlan(m.Workspace.Plan)
+	return m.Workspace.Plan
 }
 
 func buildMetadata(workspaceID, workspacePlan string) Metadata {
 	return Metadata{
 		Workspace: &WorkspaceMetadata{
 			ID:   workspaceID,
-			Plan: normalizeWorkspacePlan(workspacePlan),
+			Plan: workspacePlan,
 		},
-	}
-}
-
-func workspacePlanFromConfig(integration core.IntegrationContext) string {
-	configuredWorkspacePlan := workspacePlanProfessional
-	workspacePlanValue, workspacePlanErr := integration.GetConfig("workspacePlan")
-	if workspacePlanErr == nil {
-		configuredWorkspacePlan = normalizeWorkspacePlan(string(workspacePlanValue))
-	}
-
-	return configuredWorkspacePlan
-}
-
-func normalizeWorkspacePlan(workspacePlan string) string {
-	switch strings.ToLower(strings.TrimSpace(workspacePlan)) {
-	case workspacePlanOrganization, workspacePlanEnterpriseAlias:
-		return workspacePlanOrganization
-	default:
-		return workspacePlanProfessional
 	}
 }
 
@@ -584,13 +556,12 @@ func pickExistingRenderWebhook(webhooks []Webhook, webhookName string) *Webhook 
 }
 
 func pickExistingRenderWebhookByName(webhooks []Webhook, webhookName string) *Webhook {
-	normalizedWebhookName := strings.TrimSpace(webhookName)
-	if normalizedWebhookName == "" {
+	if webhookName == "" {
 		return nil
 	}
 
 	for i := range webhooks {
-		if strings.TrimSpace(webhooks[i].Name) == normalizedWebhookName {
+		if webhooks[i].Name == webhookName {
 			return &webhooks[i]
 		}
 	}
