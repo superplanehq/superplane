@@ -47,10 +47,10 @@ type WorkflowInfo struct {
 }
 
 type TriggerPipelineSpec struct {
-	ProjectSlug         string `json:"projectSlug"`
-	Location            string `json:"location"`
-	PipelineDefinitionID string `json:"pipelineDefinitionId"` // Find in CircleCI: Project Settings → Project Setup
-	Parameters          []Parameter `json:"parameters"`
+	ProjectSlug          string      `json:"projectSlug"`
+	Location             string      `json:"location"`
+	PipelineDefinitionID string      `json:"pipelineDefinitionId"` // Find in CircleCI: Project Settings → Project Setup
+	Parameters           []Parameter `json:"parameters"`
 }
 
 type Parameter struct {
@@ -99,12 +99,7 @@ func (t *TriggerPipeline) Documentation() string {
 
 - **Success**: Emitted when all workflows complete successfully
 - **Failed**: Emitted when any workflow fails or is cancelled
-
-## Notes
-
-- The component automatically sets up webhook monitoring for workflow completion
-- Falls back to polling if webhook doesn't arrive
-- SUPERPLANE_EXECUTION_ID and SUPERPLANE_CANVAS_ID are automatically injected; declare them in your CircleCI pipeline config (parameters) if you use this component`
+`
 }
 
 func (t *TriggerPipeline) Icon() string {
@@ -138,9 +133,9 @@ func (t *TriggerPipeline) Configuration() []configuration.Field {
 			Description: "CircleCI project slug (e.g. gh/org/repo). Find in CircleCI project settings.",
 		},
 		{
-			Name:     "location",
-			Label:    "Location",
-			Type:     configuration.FieldTypeGitRef,
+			Name:  "location",
+			Label: "Location",
+			Type:  configuration.FieldTypeGitRef,
 		},
 		{
 			Name:        "pipelineDefinitionId",

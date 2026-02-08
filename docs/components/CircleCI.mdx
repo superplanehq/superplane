@@ -114,6 +114,7 @@ The Trigger Pipeline component starts a CircleCI pipeline and waits for it to co
 
 - **Project Slug**: CircleCI project slug (e.g., gh/username/repo)
 - **Location**: Branch or tag to run the pipeline
+- **Pipeline definition ID**: Find in CircleCI: Project Settings → Project Setup.
 - **Parameters**: Optional pipeline parameters as key-value pairs (supports expressions)
 
 ### Output Channels
@@ -125,7 +126,7 @@ The Trigger Pipeline component starts a CircleCI pipeline and waits for it to co
 
 - The component automatically sets up webhook monitoring for workflow completion
 - Falls back to polling if webhook doesn't arrive
-- SuperPlane execution ID and canvas ID are automatically injected as pipeline parameters
+- SUPERPLANE_EXECUTION_ID and SUPERPLANE_CANVAS_ID are automatically injected; declare them in your CircleCI pipeline config (parameters) if you use this component
 
 ### Example Output
 

@@ -65,8 +65,7 @@ export const onPipelineCompletedTriggerRenderer: TriggerRenderer = {
     const configuration = node.configuration as any;
     const metadataItems = [];
 
-    const projectLabel =
-      metadata?.project?.name || metadata?.project?.slug || configuration?.projectSlug;
+    const projectLabel = metadata?.project?.name || metadata?.project?.slug || configuration?.projectSlug;
     if (projectLabel) {
       metadataItems.push({
         icon: "folder",
