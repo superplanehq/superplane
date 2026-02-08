@@ -74,8 +74,8 @@ func Test__CircleCI__Sync(t *testing.T) {
 	})
 }
 
-func Test__CircleCI__CompareWebhookConfig(t *testing.T) {
-	c := &CircleCI{}
+func Test__CircleCIWebhookHandler__CompareConfig(t *testing.T) {
+	h := &CircleCIWebhookHandler{}
 
 	testCases := []struct {
 		name        string
@@ -243,7 +243,7 @@ func Test__CircleCI__CompareWebhookConfig(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			equal, err := c.CompareWebhookConfig(tc.configA, tc.configB)
+			equal, err := h.CompareConfig(tc.configA, tc.configB)
 
 			if tc.expectError {
 				assert.Error(t, err)

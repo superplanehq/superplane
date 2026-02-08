@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegration("circleci", &CircleCI{})
+	registry.RegisterIntegrationWithWebhookHandler("circleci", &CircleCI{}, &CircleCIWebhookHandler{})
 }
 
 type CircleCI struct{}
@@ -130,7 +130,22 @@ func normalizeEvents(events []string) ([]string, error) {
 	return unique, nil
 }
 
-func (c *CircleCI) CompareWebhookConfig(a, b any) (bool, error) {
+func (c *CircleCI) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (c *CircleCI) HandleAction(ctx core.IntegrationActionContext) error {
+	return nil
+}
+
+type WebhookMetadata struct {
+	WebhookID string `json:"webhookId"`
+	Name      string `json:"name"`
+}
+
+type CircleCIWebhookHandler struct{}
+
+func (h *CircleCIWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	configA := WebhookConfiguration{}
 	if err := mapstructure.Decode(a, &configA); err != nil {
 		return false, err
@@ -151,13 +166,10 @@ func (c *CircleCI) CompareWebhookConfig(a, b any) (bool, error) {
 		return false, err
 	}
 
-	// Project slug must match
 	if configA.ProjectSlug != configB.ProjectSlug {
 		return false, nil
 	}
 
-	// Check if A contains all events from B (A is superset of B)
-	// This allows webhook sharing when existing webhook has more events than needed
 	for _, eventB := range normalizedB {
 		if !slices.Contains(normalizedA, eventB) {
 			return false, nil
@@ -167,20 +179,7 @@ func (c *CircleCI) CompareWebhookConfig(a, b any) (bool, error) {
 	return true, nil
 }
 
-func (c *CircleCI) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CircleCI) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
-type WebhookMetadata struct {
-	WebhookID string `json:"webhookId"`
-	Name      string `json:"name"`
-}
-
-func (c *CircleCI) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
+func (h *CircleCIWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, err
@@ -207,7 +206,6 @@ func (c *CircleCI) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 		return nil, fmt.Errorf("error getting webhook secret: %v", err)
 	}
 
-	// Create CircleCI webhook
 	webhook, err := client.CreateWebhook(
 		name,
 		ctx.Webhook.GetURL(),
@@ -225,7 +223,7 @@ func (c *CircleCI) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 	}, nil
 }
 
-func (c *CircleCI) CleanupWebhook(ctx core.CleanupWebhookContext) error {
+func (h *CircleCIWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 	metadata := WebhookMetadata{}
 	err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &metadata)
 	if err != nil {
