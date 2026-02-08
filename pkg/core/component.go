@@ -2,6 +2,8 @@ package core
 
 import (
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -164,6 +166,32 @@ type ExecutionContext struct {
  */
 type HTTPContext interface {
 	Do(*http.Request) (*http.Response, error)
+}
+
+// DoRequest performs an HTTP request via the given HTTPContext so integrations
+// do not need to use net/http directly. Method is "GET", "POST", etc. Headers
+// are optional. On status >= 400, returns an error that includes the response body.
+func DoRequest(ctx HTTPContext, method, url string, body io.Reader, headers map[string]string) ([]byte, error) {
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return nil, fmt.Errorf("building request: %w", err)
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	res, err := ctx.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("executing request: %w", err)
+	}
+	defer res.Body.Close()
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading body: %w", err)
+	}
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return nil, fmt.Errorf("request got %d: %s", res.StatusCode, string(responseBody))
+	}
+	return responseBody, nil
 }
 
 /*
