@@ -26,6 +26,7 @@ type TriggerPipeline struct{}
 
 type TriggerPipelineNodeMetadata struct {
 	ProjectSlug string `json:"projectSlug" mapstructure:"projectSlug"`
+	ProjectName string `json:"projectName" mapstructure:"projectName"`
 }
 
 type TriggerPipelineExecutionMetadata struct {
@@ -48,7 +49,7 @@ type WorkflowInfo struct {
 type TriggerPipelineSpec struct {
 	ProjectSlug         string `json:"projectSlug"`
 	Location            string `json:"location"`
-	PipelineDefinitionID string `json:"pipelineDefinitionId"` // Required for GitHub App projects; from Project Settings → Pipelines → Definition ID
+	PipelineDefinitionID string `json:"pipelineDefinitionId"` // Find in CircleCI: Project Settings → Project Setup
 	Parameters          []Parameter `json:"parameters"`
 }
 
@@ -91,7 +92,7 @@ func (t *TriggerPipeline) Documentation() string {
 
 - **Project Slug**: CircleCI project slug (e.g., gh/username/repo)
 - **Location**: Branch or tag to run the pipeline
-- **Pipeline definition ID**: Required for projects connected via GitHub App. Find in CircleCI: Project Settings → Pipelines → Definition ID.
+- **Pipeline definition ID**: Find in CircleCI: Project Settings → Project Setup.
 - **Parameters**: Optional pipeline parameters as key-value pairs (supports expressions)
 
 ## Output Channels
@@ -134,7 +135,7 @@ func (t *TriggerPipeline) Configuration() []configuration.Field {
 			Label:       "Project slug",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "CircleCI project slug (e.g. gh/org/repo). Find in CircleCI project settings or URL.",
+			Description: "CircleCI project slug (e.g. gh/org/repo). Find in CircleCI project settings.",
 		},
 		{
 			Name:     "location",
@@ -145,7 +146,7 @@ func (t *TriggerPipeline) Configuration() []configuration.Field {
 			Name:        "pipelineDefinitionId",
 			Label:       "Pipeline definition ID",
 			Type:        configuration.FieldTypeString,
-			Description: "Required for GitHub App projects. Find in CircleCI: Project Settings → Pipelines → Definition ID.",
+			Description: "Find in CircleCI: Project Settings → Project Setup.",
 		},
 		{
 			Name:  "parameters",
@@ -207,13 +208,14 @@ func (t *TriggerPipeline) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	_, err = client.GetProject(config.ProjectSlug)
+	project, err := client.GetProject(config.ProjectSlug)
 	if err != nil {
 		return fmt.Errorf("project not found or inaccessible: %w", err)
 	}
 
 	err = ctx.Metadata.Set(TriggerPipelineNodeMetadata{
 		ProjectSlug: config.ProjectSlug,
+		ProjectName: project.Name,
 	})
 
 	if err != nil {
@@ -287,7 +289,7 @@ func (t *TriggerPipeline) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		if strings.Contains(err.Error(), "400") &&
 			(strings.Contains(err.Error(), "GitHub App") || strings.Contains(err.Error(), "not yet supported")) {
-			return fmt.Errorf("this project is connected via GitHub App: add the Pipeline Definition ID in the component configuration (CircleCI Project Settings → Pipelines → Definition ID). See https://circleci.com/docs/triggers-overview/#run-a-pipeline-using-the-api")
+			return fmt.Errorf("GitHub App project: add Pipeline Definition ID (CircleCI Project Settings → Project Setup). See https://circleci.com/docs/triggers-overview/#run-a-pipeline-using-the-api")
 		}
 		return fmt.Errorf("error triggering pipeline: %v", err)
 	}

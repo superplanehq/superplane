@@ -88,7 +88,7 @@ func (p *OnPipelineCompleted) Configuration() []configuration.Field {
 			Label:       "Project slug",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "CircleCI project slug (e.g. gh/org/repo). Find in CircleCI project settings or URL.",
+			Description: "CircleCI project slug (e.g. gh/org/repo). Find in CircleCI project settings.",
 		},
 	}
 }

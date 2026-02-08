@@ -172,9 +172,11 @@ export const triggerPipelineMapper: ComponentBaseMapper = {
 function triggerPipelineMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as any;
+  const nodeMetadata = node.metadata as { projectName?: string } | undefined;
 
-  if (configuration?.projectSlug) {
-    metadata.push({ icon: "folder", label: configuration.projectSlug });
+  const projectLabel = nodeMetadata?.projectName || configuration?.projectSlug;
+  if (projectLabel) {
+    metadata.push({ icon: "folder", label: projectLabel });
   }
 
   if (configuration?.branch) {
