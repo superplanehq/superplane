@@ -1,0 +1,13 @@
+{
+  "data": {
+    "id": 5001,
+    "body": "Deployment finished successfully. Runbook: https://example.com/runbook",
+    "html_url": "https://github.com/acme/widgets/issues/42#issuecomment-5001",
+    "created_at": "2026-01-16T17:55:10Z",
+    "user": {
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.issueComment"
+}
