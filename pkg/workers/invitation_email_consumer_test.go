@@ -23,6 +23,7 @@ func Test__InvitationEmailConsumer(t *testing.T) {
 	consumer := NewInvitationEmailConsumer(amqpURL, testEmailService, baseURL)
 	// Use a unique queue per test run to avoid competing with the app's own consumers.
 	consumer.ServiceName = InvitationEmailServiceName + "." + uuid.NewString()
+	queueName := consumer.ServiceName + "." + messages.InvitationCreatedRoutingKey
 
 	go consumer.Start()
 	defer consumer.Stop()
@@ -31,6 +32,7 @@ func Test__InvitationEmailConsumer(t *testing.T) {
 
 	t.Run("should send email for pending invitation", func(t *testing.T) {
 		testEmailService.Reset()
+		purgeRabbitQueueEventually(t, amqpURL, queueName)
 
 		invitation, err := models.CreateInvitation(
 			r.Organization.ID,
@@ -60,6 +62,7 @@ func Test__InvitationEmailConsumer(t *testing.T) {
 
 	t.Run("should not send email for accepted invitation", func(t *testing.T) {
 		testEmailService.Reset()
+		purgeRabbitQueueEventually(t, amqpURL, queueName)
 
 		invitation, err := models.CreateInvitation(
 			r.Organization.ID,

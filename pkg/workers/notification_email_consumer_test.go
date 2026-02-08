@@ -23,6 +23,7 @@ func Test__NotificationEmailConsumer(t *testing.T) {
 	consumer := NewNotificationEmailConsumer(amqpURL, testEmailService, r.AuthService)
 	// Use a unique queue per test run to avoid competing with the app's own consumers.
 	consumer.ServiceName = NotificationEmailServiceName + "." + uuid.NewString()
+	queueName := consumer.ServiceName + "." + messages.NotificationEmailRequestedRoutingKey
 
 	go consumer.Start()
 	defer consumer.Stop()
@@ -31,6 +32,7 @@ func Test__NotificationEmailConsumer(t *testing.T) {
 
 	t.Run("should send notification email with deduped recipients", func(t *testing.T) {
 		testEmailService.Reset()
+		purgeRabbitQueueEventually(t, amqpURL, queueName)
 
 		groupName := "engineering"
 		err := r.AuthService.CreateGroup(
