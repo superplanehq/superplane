@@ -9,44 +9,8 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
-
-// --- Mocks ---
-
-// mockExecutionState implements core.ExecutionStateContext
-type mockExecutionState struct {
-	EmittedChannel      string
-	EmittedType         string
-	EmittedPayloads     []any
-	Finished            bool
-	Failed              bool
-	FailReason, FailMsg string
-}
-
-func (m *mockExecutionState) IsFinished() bool              { return m.Finished }
-func (m *mockExecutionState) SetKV(key, value string) error { return nil }
-
-func (m *mockExecutionState) Emit(channel, payloadType string, payloads []any) error {
-	m.EmittedChannel = channel
-	m.EmittedType = payloadType
-	m.EmittedPayloads = payloads
-	return nil
-}
-
-func (m *mockExecutionState) Pass() error {
-	m.Finished = true
-	return nil
-}
-
-func (m *mockExecutionState) Fail(reason, message string) error {
-	m.Finished = true
-	m.Failed = true
-	m.FailReason = reason
-	m.FailMsg = message
-	return nil
-}
-
-// --- Tests ---
 
 func TestTextPrompt_Configuration(t *testing.T) {
 	c := &TextPrompt{}
@@ -145,7 +109,8 @@ func TestTextPrompt_Execute(t *testing.T) {
 	tests := []struct {
 		name            string
 		config          map[string]interface{}
-		mockResponse    func(*http.Request) *http.Response
+		responseStatus  int
+		responseBody    string
 		expectError     bool
 		expectEmission  bool
 		validatePayload func(*testing.T, MessagePayload)
@@ -159,21 +124,8 @@ func TestTextPrompt_Execute(t *testing.T) {
 				"systemMessage": "You are a bot",
 				"temperature":   0.7,
 			},
-			mockResponse: func(req *http.Request) *http.Response {
-				// Verify request body
-				body, _ := io.ReadAll(req.Body)
-				var sent CreateMessageRequest
-				json.Unmarshal(body, &sent)
-
-				if sent.Model != "claude-3-test" || sent.MaxTokens != 500 || sent.System != "You are a bot" {
-					return &http.Response{StatusCode: 400, Body: io.NopCloser(bytes.NewBufferString("bad request body"))}
-				}
-
-				return &http.Response{
-					StatusCode: 200,
-					Body:       io.NopCloser(bytes.NewBufferString(validResponseJSON)),
-				}
-			},
+			responseStatus: 200,
+			responseBody:   validResponseJSON,
 			expectError:    false,
 			expectEmission: true,
 			validatePayload: func(t *testing.T, p MessagePayload) {
@@ -201,32 +153,35 @@ func TestTextPrompt_Execute(t *testing.T) {
 				"model":  "claude-3-test",
 				"prompt": "fail me",
 			},
-			mockResponse: func(req *http.Request) *http.Response {
-				return &http.Response{
-					StatusCode: 500,
-					Body:       io.NopCloser(bytes.NewBufferString(`{"error": {"message": "internal error"}}`)),
-				}
-			},
-			expectError: true,
+			responseStatus: 500,
+			responseBody:   `{"error": {"message": "internal error"}}`,
+			expectError:    true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Setup Mocks
-			mockState := &mockExecutionState{}
-			mockHTTP := &mockHTTPContext{RoundTripFunc: tt.mockResponse}
-			mockInt := &mockIntegrationContext{
-				config: map[string][]byte{
-					"apiKey": []byte("test-key"),
-				},
+			execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+			integrationCtx := &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiKey": "test-key"},
 			}
+
+			var responses []*http.Response
+			if tt.responseStatus != 0 {
+				responses = []*http.Response{
+					{
+						StatusCode: tt.responseStatus,
+						Body:       io.NopCloser(bytes.NewBufferString(tt.responseBody)),
+					},
+				}
+			}
+			httpCtx := &contexts.HTTPContext{Responses: responses}
 
 			ctx := core.ExecutionContext{
 				Configuration:  tt.config,
-				ExecutionState: mockState,
-				HTTP:           mockHTTP,
-				Integration:    mockInt,
+				ExecutionState: execState,
+				HTTP:           httpCtx,
+				Integration:    integrationCtx,
 			}
 
 			err := c.Execute(ctx)
@@ -244,19 +199,32 @@ func TestTextPrompt_Execute(t *testing.T) {
 			}
 
 			if tt.expectEmission {
-				if mockState.EmittedType != MessagePayloadType {
-					t.Errorf("expected emitted type %s, got %s", MessagePayloadType, mockState.EmittedType)
+				if execState.Type != MessagePayloadType {
+					t.Errorf("expected emitted type %s, got %s", MessagePayloadType, execState.Type)
 				}
-				if len(mockState.EmittedPayloads) != 1 {
-					t.Errorf("expected 1 payload, got %d", len(mockState.EmittedPayloads))
+				if len(execState.Payloads) != 1 {
+					t.Errorf("expected 1 payload, got %d", len(execState.Payloads))
 				} else if tt.validatePayload != nil {
-					// Convert payload back to struct for validation
-					// In real execution this is passed as any, here we cast it
-					payload, ok := mockState.EmittedPayloads[0].(MessagePayload)
+					wrapped, ok := execState.Payloads[0].(map[string]any)
 					if !ok {
-						t.Error("emitted payload is not MessagePayload")
-					} else {
-						tt.validatePayload(t, payload)
+						t.Error("emitted payload wrapper is not map[string]any")
+						return
+					}
+					data, ok := wrapped["data"].(MessagePayload)
+					if !ok {
+						t.Error("emitted payload data is not MessagePayload")
+						return
+					}
+					tt.validatePayload(t, data)
+				}
+				// Verify request body was sent correctly (e.g. Success case)
+				if len(httpCtx.Requests) == 1 && tt.validatePayload != nil {
+					bodyBytes, _ := io.ReadAll(httpCtx.Requests[0].Body)
+					var sent CreateMessageRequest
+					if err := json.Unmarshal(bodyBytes, &sent); err != nil {
+						t.Errorf("failed to unmarshal sent body: %v", err)
+					} else if sent.Model != "claude-3-test" || sent.MaxTokens != 500 || sent.System != "You are a bot" {
+						t.Errorf("request body mismatch: model=%s max_tokens=%d system=%s", sent.Model, sent.MaxTokens, sent.System)
 					}
 				}
 			}
