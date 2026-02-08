@@ -24,7 +24,8 @@ type Configuration struct {
 }
 
 type Metadata struct {
-	Services []Service `json:"services"`
+	Services   []Service  `json:"services"`
+	Severities []Severity `json:"severities"`
 }
 
 func (r *Rootly) Name() string {
@@ -63,6 +64,7 @@ func (r *Rootly) Configuration() []configuration.Field {
 func (r *Rootly) Components() []core.Component {
 	return []core.Component{
 		&CreateIncident{},
+		&UpdateIncident{},
 	}
 }
 
@@ -97,7 +99,12 @@ func (r *Rootly) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("error listing services: %v", err)
 	}
 
-	ctx.Integration.SetMetadata(Metadata{Services: services})
+	severities, err := client.ListSeverities()
+	if err != nil {
+		return fmt.Errorf("error listing severities: %v", err)
+	}
+
+	ctx.Integration.SetMetadata(Metadata{Services: services, Severities: severities})
 	ctx.Integration.Ready()
 	return nil
 }
