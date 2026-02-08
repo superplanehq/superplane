@@ -10,40 +10,7 @@ import {
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
 import { MetadataItem } from "@/ui/metadataList";
-
-interface ReleaseItem {
-  url?: string;
-  assets_url?: string;
-  upload_url?: string;
-  html_url?: string;
-  id?: number;
-  author?: {
-    login?: string;
-    html_url?: string;
-  };
-  node_id?: string;
-  tag_name?: string;
-  name?: string;
-  draft?: boolean;
-  immutable?: boolean;
-  prerelease?: boolean;
-  created_at?: string;
-  updated_at?: string;
-  published_at?: string;
-  assets?: Array<{
-    name?: string;
-    size?: number;
-    download_count?: number;
-    browser_download_url?: string;
-  }>;
-  tarball_url?: string;
-  zipball_url?: string;
-  body?: string;
-  reactions: {
-    url?: string;
-    total_count?: string;
-  };
-}
+import { Release } from "./types";
 
 interface ListReleasesConfiguration {
   repository?: string;
@@ -90,7 +57,7 @@ export const listReleasesMapper: ComponentBaseMapper = {
     const details: Record<string, string> = {};
 
     if (outputs && outputs.default && outputs.default.length > 0) {
-      const list = outputs.default[0].data as ReleaseItem[] | undefined;
+      const list = outputs.default[0].data as Release[] | undefined;
       details["Retrieved At"] = context.execution.createdAt
         ? new Date(context.execution.createdAt).toLocaleString()
         : "-";
