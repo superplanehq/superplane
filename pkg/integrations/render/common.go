@@ -39,9 +39,8 @@ type WebhookConfiguration struct {
 }
 
 const (
-	workspacePlanProfessional    = "professional"
-	workspacePlanOrganization    = "organization"
-	workspacePlanEnterpriseAlias = "enterprise"
+	workspacePlanProfessional = "professional"
+	workspacePlanOrganization = "organization"
 
 	webhookStrategyIntegration  = "integration"
 	webhookStrategyResourceType = "resource_type"
