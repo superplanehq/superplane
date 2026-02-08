@@ -24,6 +24,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitHub repository" />
+  <LinkCard title="Create Issue Comment" href="#create-issue-comment" description="Add a comment to a GitHub issue or pull request" />
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitHub repository" />
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
@@ -980,6 +981,51 @@ Returns the created issue object with details including:
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.issue"
+}
+```
+
+<a id="create-issue-comment"></a>
+
+## Create Issue Comment
+
+The Create Issue Comment component adds a comment to a GitHub issue or pull request.
+
+### Use Cases
+
+- **Deployment updates**: Post deployment status or remediation notes
+- **Incident response**: Add runbook links, error details, or status updates
+- **Cross-tool syncing**: Sync Slack or PagerDuty notes into GitHub
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Issue Number**: Issue or PR number to comment on (supports expressions)
+- **Body**: Comment text (markdown supported, supports expressions)
+
+### Output
+
+Returns the created comment with details including:
+- Comment ID
+- Body
+- Author
+- Created timestamp
+- Comment URL
+
+### Example Output
+
+```json
+{
+  "data": {
+    "body": "Deployment finished successfully. Runbook: https://example.com/runbook",
+    "created_at": "2026-01-16T17:55:10Z",
+    "html_url": "https://github.com/acme/widgets/issues/42#issuecomment-5001",
+    "id": 5001,
+    "user": {
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.issueComment"
 }
 ```
 
