@@ -407,37 +407,33 @@ func (t *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
 	}
 
-	client, err := NewClient(executionCtx.HTTP, executionCtx.Integration)
-	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error creating client: %v", err)
-	}
-
 	var allDone, anyFailed bool
-	allWorkflows, err := client.GetPipelineWorkflows(metadata.Pipeline.ID)
-	if err != nil {
+	if executionCtx.Integration != nil {
+		client, err := NewClient(executionCtx.HTTP, executionCtx.Integration)
+		if err == nil {
+			allWorkflows, err := client.GetPipelineWorkflows(metadata.Pipeline.ID)
+			if err == nil {
+				updatedWorkflows := make([]WorkflowInfo, 0, len(allWorkflows))
+				for _, w := range allWorkflows {
+					updatedWorkflows = append(updatedWorkflows, WorkflowInfo{
+						ID:     w.ID,
+						Name:   w.Name,
+						Status: w.Status,
+					})
+				}
+				metadata.Workflows = updatedWorkflows
+				_ = executionCtx.Metadata.Set(metadata)
+				allDone, anyFailed = t.checkWorkflowsStatus(updatedWorkflows)
+			}
+		}
+	}
+	// When Integration is nil (e.g. webhook context from server doesn't set it), or API call failed,
+	// use only the workflow data we have from webhook events (same as Semaphore Run Workflow).
+	if !allDone {
 		allDone, anyFailed = t.checkWorkflowsStatus(metadata.Workflows)
-		if !allDone {
-			return http.StatusOK, nil
-		}
-	} else {
-		updatedWorkflows := []WorkflowInfo{}
-		for _, w := range allWorkflows {
-			updatedWorkflows = append(updatedWorkflows, WorkflowInfo{
-				ID:     w.ID,
-				Name:   w.Name,
-				Status: w.Status,
-			})
-		}
-		metadata.Workflows = updatedWorkflows
-		err = executionCtx.Metadata.Set(metadata)
-		if err != nil {
-			return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
-		}
-
-		allDone, anyFailed = t.checkWorkflowsStatus(updatedWorkflows)
-		if !allDone {
-			return http.StatusOK, nil
-		}
+	}
+	if !allDone {
+		return http.StatusOK, nil
 	}
 
 	payload := map[string]any{
