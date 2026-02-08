@@ -84,16 +84,11 @@ func (p *OnPipelineCompleted) Color() string {
 func (p *OnPipelineCompleted) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:     "projectSlug",
-			Label:    "Project",
-			Type:     configuration.FieldTypeIntegrationResource,
-			Required: true,
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type:           "project",
-					UseNameAsValue: false,
-				},
-			},
+			Name:        "projectSlug",
+			Label:       "Project slug",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Description: "CircleCI project slug (e.g. gh/org/repo). Find in CircleCI project settings or URL.",
 		},
 	}
 }

@@ -46,10 +46,10 @@ type WorkflowInfo struct {
 }
 
 type TriggerPipelineSpec struct {
-	ProjectSlug string      `json:"projectSlug"`
-	Branch      string      `json:"branch"`
-	Tag         string      `json:"tag"`
-	Parameters  []Parameter `json:"parameters"`
+	ProjectSlug         string `json:"projectSlug"`
+	Location            string `json:"location"`
+	PipelineDefinitionID string `json:"pipelineDefinitionId"` // Required for GitHub App projects; from Project Settings → Pipelines → Definition ID
+	Parameters          []Parameter `json:"parameters"`
 }
 
 type Parameter struct {
@@ -81,7 +81,7 @@ func (t *TriggerPipeline) Documentation() string {
 
 ## How It Works
 
-1. Triggers a CircleCI pipeline with the specified branch or tag and parameters
+1. Triggers a CircleCI pipeline with the specified location (branch or tag) and parameters
 2. Waits for all workflows in the pipeline to complete (monitored via webhook and polling)
 3. Routes execution based on workflow results:
    - **Success channel**: All workflows completed successfully
@@ -90,8 +90,8 @@ func (t *TriggerPipeline) Documentation() string {
 ## Configuration
 
 - **Project Slug**: CircleCI project slug (e.g., gh/username/repo)
-- **Branch**: Git branch to run the pipeline on (optional)
-- **Tag**: Git tag to run the pipeline on (optional)
+- **Location**: Branch or tag to run the pipeline
+- **Pipeline definition ID**: Required for projects connected via GitHub App. Find in CircleCI: Project Settings → Pipelines → Definition ID.
 - **Parameters**: Optional pipeline parameters as key-value pairs (supports expressions)
 
 ## Output Channels
@@ -103,7 +103,7 @@ func (t *TriggerPipeline) Documentation() string {
 
 - The component automatically sets up webhook monitoring for workflow completion
 - Falls back to polling if webhook doesn't arrive
-- SuperPlane execution ID and canvas ID are automatically injected as pipeline parameters`
+- SUPERPLANE_EXECUTION_ID and SUPERPLANE_CANVAS_ID are automatically injected; declare them in your CircleCI pipeline config (parameters) if you use this component`
 }
 
 func (t *TriggerPipeline) Icon() string {
@@ -130,29 +130,22 @@ func (t *TriggerPipeline) OutputChannels(configuration any) []core.OutputChannel
 func (t *TriggerPipeline) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:     "projectSlug",
-			Label:    "Project",
-			Type:     configuration.FieldTypeIntegrationResource,
-			Required: true,
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type:           "project",
-					UseNameAsValue: false,
-				},
-			},
+			Name:        "projectSlug",
+			Label:       "Project slug",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Description: "CircleCI project slug (e.g. gh/org/repo). Find in CircleCI project settings or URL.",
 		},
 		{
-			Name:        "branch",
-			Label:       "Branch",
-			Type:        configuration.FieldTypeGitRef,
-			Description: "Git branch to run pipeline on (mutually exclusive with tag)",
-			Placeholder: "main",
+			Name:     "location",
+			Label:    "Location",
+			Type:     configuration.FieldTypeGitRef,
 		},
 		{
-			Name:        "tag",
-			Label:       "Tag",
-			Type:        configuration.FieldTypeGitRef,
-			Description: "Git tag to run pipeline on (mutually exclusive with branch)",
+			Name:        "pipelineDefinitionId",
+			Label:       "Pipeline definition ID",
+			Type:        configuration.FieldTypeString,
+			Description: "Required for GitHub App projects. Find in CircleCI: Project Settings → Pipelines → Definition ID.",
 		},
 		{
 			Name:  "parameters",
@@ -241,10 +234,6 @@ func (t *TriggerPipeline) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	if spec.Branch != "" && spec.Tag != "" {
-		return fmt.Errorf("branch and tag are mutually exclusive - specify only one")
-	}
-
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
@@ -253,22 +242,55 @@ func (t *TriggerPipeline) Execute(ctx core.ExecutionContext) error {
 	params := TriggerPipelineParams{
 		Parameters: t.buildParameters(ctx, spec.Parameters),
 	}
-
-	if spec.Branch != "" {
-		params.Branch = spec.Branch
+	var branch, tag string
+	if spec.Location != "" {
+		switch {
+		case strings.HasPrefix(spec.Location, "refs/tags/"):
+			tag = strings.TrimPrefix(spec.Location, "refs/tags/")
+			params.Tag = tag
+		case strings.HasPrefix(spec.Location, "ref/tags/"):
+			tag = strings.TrimPrefix(spec.Location, "ref/tags/")
+			params.Tag = tag
+		case strings.HasPrefix(spec.Location, "refs/heads/"):
+			branch = strings.TrimPrefix(spec.Location, "refs/heads/")
+			params.Branch = branch
+		case strings.HasPrefix(spec.Location, "ref/heads/"):
+			branch = strings.TrimPrefix(spec.Location, "ref/heads/")
+			params.Branch = branch
+		default:
+			branch = strings.TrimSpace(spec.Location)
+			params.Branch = branch
+		}
 	}
 
-	if spec.Tag != "" {
-		params.Tag = spec.Tag
+	var response *TriggerPipelineResponse
+	if spec.PipelineDefinitionID != "" {
+		// Use pipeline/run API (required for GitHub App and Bitbucket Data Center)
+		runParams := TriggerPipelineRunParams{
+			DefinitionID: strings.TrimSpace(spec.PipelineDefinitionID),
+			Parameters:   t.buildParameters(ctx, spec.Parameters),
+		}
+		if tag != "" {
+			runParams.Config = map[string]string{"tag": tag}
+			runParams.Checkout = map[string]string{"tag": tag}
+		} else {
+			if branch == "" {
+				branch = "main"
+			}
+			runParams.Config = map[string]string{"branch": branch}
+			runParams.Checkout = map[string]string{"branch": branch}
+		}
+		response, err = client.TriggerPipelineRun(spec.ProjectSlug, runParams)
+	} else {
+		response, err = client.TriggerPipeline(spec.ProjectSlug, params)
 	}
-
-	// Trigger the pipeline
-	response, err := client.TriggerPipeline(spec.ProjectSlug, params)
 	if err != nil {
+		if strings.Contains(err.Error(), "400") &&
+			(strings.Contains(err.Error(), "GitHub App") || strings.Contains(err.Error(), "not yet supported")) {
+			return fmt.Errorf("this project is connected via GitHub App: add the Pipeline Definition ID in the component configuration (CircleCI Project Settings → Pipelines → Definition ID). See https://circleci.com/docs/triggers-overview/#run-a-pipeline-using-the-api")
+		}
 		return fmt.Errorf("error triggering pipeline: %v", err)
 	}
-
-	ctx.Logger.Infof("Pipeline triggered - id=%s, number=%d", response.ID, response.Number)
 
 	// Store pipeline info in metadata
 	err = ctx.Metadata.Set(TriggerPipelineExecutionMetadata{
@@ -320,31 +342,19 @@ func (t *TriggerPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 		return http.StatusForbidden, fmt.Errorf("invalid signature")
 	}
 
-	// After signature verification, check event type
-	var envelope struct {
-		Type string          `json:"type"`
-		Raw  json.RawMessage `json:"-"`
-	}
-
-	if err := json.Unmarshal(ctx.Body, &envelope); err != nil {
+	// Parse webhook payload (same as OnPipelineCompleted)
+	data := map[string]any{}
+	if err := json.Unmarshal(ctx.Body, &data); err != nil {
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
-
-	if envelope.Type != "workflow-completed" {
-		return http.StatusOK, nil // ignore unsupported event types
+	if eventType, _ := data["type"].(string); eventType != "workflow-completed" {
+		return http.StatusOK, nil
 	}
 
-	var webhookPayload map[string]any
-	err = json.Unmarshal(ctx.Body, &webhookPayload)
-	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
-	}
-
-	pipelineData, ok := webhookPayload["pipeline"].(map[string]any)
+	pipelineData, ok := data["pipeline"].(map[string]any)
 	if !ok {
 		return http.StatusBadRequest, fmt.Errorf("pipeline data missing from webhook payload")
 	}
-
 	pipelineID, _ := pipelineData["id"].(string)
 	if pipelineID == "" {
 		return http.StatusBadRequest, fmt.Errorf("pipeline id missing from webhook payload")
@@ -355,7 +365,7 @@ func (t *TriggerPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 		return http.StatusOK, nil
 	}
 
-	workflowData, ok := webhookPayload["workflow"].(map[string]any)
+	workflowData, ok := data["workflow"].(map[string]any)
 	if !ok {
 		return http.StatusBadRequest, fmt.Errorf("workflow data missing from webhook payload")
 	}
@@ -408,7 +418,6 @@ func (t *TriggerPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 	var allDone, anyFailed bool
 	allWorkflows, err := client.GetPipelineWorkflows(metadata.Pipeline.ID)
 	if err != nil {
-		executionCtx.Logger.Warnf("Failed to fetch workflows: %v", err)
 		allDone, anyFailed = t.checkWorkflowsStatus(metadata.Workflows)
 		if !allDone {
 			return http.StatusOK, nil

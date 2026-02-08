@@ -104,7 +104,7 @@ The Trigger Pipeline component starts a CircleCI pipeline and waits for it to co
 
 ### How It Works
 
-1. Triggers a CircleCI pipeline with the specified branch or tag and parameters
+1. Triggers a CircleCI pipeline with the specified location (branch or tag) and parameters
 2. Waits for all workflows in the pipeline to complete (monitored via webhook and polling)
 3. Routes execution based on workflow results:
    - **Success channel**: All workflows completed successfully
@@ -113,8 +113,7 @@ The Trigger Pipeline component starts a CircleCI pipeline and waits for it to co
 ### Configuration
 
 - **Project Slug**: CircleCI project slug (e.g., gh/username/repo)
-- **Branch**: Git branch to run the pipeline on (optional)
-- **Tag**: Git tag to run the pipeline on (optional)
+- **Location**: Branch or tag to run the pipeline
 - **Parameters**: Optional pipeline parameters as key-value pairs (supports expressions)
 
 ### Output Channels
