@@ -8,9 +8,9 @@ import {
   NodeInfo,
 } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
-import { formatTimeAgo } from "@/utils/time";
-import { getBackgroundColorClass } from "@/ui/utils";
-import SemaphoreLogo from "@/assets/semaphore-logo.svg";
+import { formatTimeAgo } from "@/utils/date";
+import { getBackgroundColorClass } from "@/utils/colors";
+import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 interface PipelineItem {
   ppl_id?: string;
