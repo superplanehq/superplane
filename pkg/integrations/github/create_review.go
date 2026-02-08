@@ -245,10 +245,12 @@ func (c *CreateReview) Execute(ctx core.ExecutionContext) error {
 	if config.Body != nil && strings.TrimSpace(*config.Body) != "" {
 		req.Body = config.Body
 	}
-	if config.CommitID != nil && strings.TrimSpace(*config.CommitID) != "" {
-		req.CommitID = config.CommitID
-	}
 	if len(draftComments) > 0 {
+		if config.CommitID == nil || strings.TrimSpace(*config.CommitID) == "" {
+			return errors.New("commitId is required when comments are provided")
+		}
+
+		req.CommitID = config.CommitID
 		req.Comments = draftComments
 	}
 
