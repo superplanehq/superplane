@@ -48,8 +48,8 @@ func (m *mockExecutionState) Fail(reason, message string) error {
 
 // --- Tests ---
 
-func TestCreateMessage_Configuration(t *testing.T) {
-	c := &CreateMessage{}
+func TestTextPrompt_Configuration(t *testing.T) {
+	c := &TextPrompt{}
 	config := c.Configuration()
 
 	expectedFields := map[string]struct {
@@ -78,8 +78,8 @@ func TestCreateMessage_Configuration(t *testing.T) {
 	}
 }
 
-func TestCreateMessage_Setup(t *testing.T) {
-	c := &CreateMessage{}
+func TestTextPrompt_Setup(t *testing.T) {
+	c := &TextPrompt{}
 
 	tests := []struct {
 		name        string
@@ -126,8 +126,8 @@ func TestCreateMessage_Setup(t *testing.T) {
 	}
 }
 
-func TestCreateMessage_Execute(t *testing.T) {
-	c := &CreateMessage{}
+func TestTextPrompt_Execute(t *testing.T) {
+	c := &TextPrompt{}
 
 	// Helper to create a valid response JSON
 	validResponseJSON := `{

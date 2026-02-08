@@ -2,19 +2,20 @@ package claude
 
 import (
 	"fmt"
+	"net/http"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"net/http"
-	"strings"
 )
 
 const MessagePayloadType = "claude.message"
 
-type CreateMessage struct{}
+type TextPrompt struct{}
 
-type CreateMessageSpec struct {
+type TextPromptSpec struct {
 	Model         string   `json:"model"`
 	Prompt        string   `json:"prompt"`
 	SystemMessage string   `json:"systemMessage"`
@@ -31,20 +32,20 @@ type MessagePayload struct {
 	Response   *CreateMessageResponse `json:"response"`
 }
 
-func (c *CreateMessage) Name() string {
-	return "claude.createMessage"
+func (c *TextPrompt) Name() string {
+	return "claude.textPrompt"
 }
 
-func (c *CreateMessage) Label() string {
-	return "Create Message"
+func (c *TextPrompt) Label() string {
+	return "Text Prompt"
 }
 
-func (c *CreateMessage) Description() string {
+func (c *TextPrompt) Description() string {
 	return "Generate a response using Anthropic's Claude models via the Messages API"
 }
 
-func (c *CreateMessage) Documentation() string {
-	return `The Create Message component uses Anthropic's Claude models to generate text responses.
+func (c *TextPrompt) Documentation() string {
+	return `The Text Prompt component uses Anthropic's Claude models to generate text responses.
 
 ## Use Cases
 
@@ -76,19 +77,19 @@ Returns a payload containing:
 `
 }
 
-func (c *CreateMessage) Icon() string {
+func (c *TextPrompt) Icon() string {
 	return "message-square"
 }
 
-func (c *CreateMessage) Color() string {
+func (c *TextPrompt) Color() string {
 	return "orange"
 }
 
-func (c *CreateMessage) OutputChannels(configuration any) []core.OutputChannel {
+func (c *TextPrompt) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-func (c *CreateMessage) Configuration() []configuration.Field {
+func (c *TextPrompt) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "model",
@@ -138,8 +139,8 @@ func (c *CreateMessage) Configuration() []configuration.Field {
 	}
 }
 
-func (c *CreateMessage) Setup(ctx core.SetupContext) error {
-	spec := CreateMessageSpec{}
+func (c *TextPrompt) Setup(ctx core.SetupContext) error {
+	spec := TextPromptSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
@@ -155,8 +156,8 @@ func (c *CreateMessage) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (c *CreateMessage) Execute(ctx core.ExecutionContext) error {
-	spec := CreateMessageSpec{}
+func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
+	spec := TextPromptSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
@@ -220,27 +221,27 @@ func (c *CreateMessage) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *CreateMessage) Cancel(ctx core.ExecutionContext) error {
+func (c *TextPrompt) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *CreateMessage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+func (c *TextPrompt) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (c *CreateMessage) Actions() []core.Action {
+func (c *TextPrompt) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (c *CreateMessage) HandleAction(ctx core.ActionContext) error {
+func (c *TextPrompt) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (c *CreateMessage) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (c *TextPrompt) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
 
-func (c *CreateMessage) Cleanup(ctx core.SetupContext) error {
+func (c *TextPrompt) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
