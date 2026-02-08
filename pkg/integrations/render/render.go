@@ -33,8 +33,8 @@ type WorkspaceMetadata struct {
 }
 
 type WebhookMetadata struct {
-	WebhookID string `json:"webhookId" mapstructure:"webhookId"`
-	OwnerID   string `json:"ownerId" mapstructure:"ownerId"`
+	WebhookID   string `json:"webhookId" mapstructure:"webhookId"`
+	WorkspaceID string `json:"workspaceId" mapstructure:"workspaceId"`
 }
 
 type webhookSetupRequest struct {
@@ -145,12 +145,12 @@ func (r *Render) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to verify Render credentials: %w", err)
 	}
 
-	owner, err := resolveOwner(client, config.Workspace)
+	workspace, err := resolveWorkspace(client, config.Workspace)
 	if err != nil {
 		return fmt.Errorf("failed to resolve workspace: %w", err)
 	}
 
-	ctx.Integration.SetMetadata(buildMetadata(owner.ID, config.WorkspacePlan))
+	ctx.Integration.SetMetadata(buildMetadata(workspace.ID, config.WorkspacePlan))
 	ctx.Integration.Ready()
 	return nil
 }
@@ -223,12 +223,12 @@ func (r *Render) ListResources(resourceType string, ctx core.ListResourcesContex
 		return nil, err
 	}
 
-	ownerID, err := ownerIDForIntegration(client, ctx.Integration)
+	workspaceID, err := workspaceIDForIntegration(client, ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
 
-	services, err := client.ListServices(ownerID)
+	services, err := client.ListServices(workspaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +251,7 @@ func (r *Render) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 		return nil, err
 	}
 
-	ownerID, err := ownerIDForIntegration(client, ctx.Integration)
+	workspaceID, err := workspaceIDForIntegration(client, ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +263,7 @@ func (r *Render) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 
 	selectedWebhook, err := r.findExistingWebhook(
 		client,
-		ownerID,
+		workspaceID,
 		request.URL,
 		request.Configuration,
 		request.Name,
@@ -274,14 +274,14 @@ func (r *Render) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 	}
 
 	if selectedWebhook == nil {
-		metadata, createErr := r.createWebhook(ctx, client, ownerID, request)
+		metadata, createErr := r.createWebhook(ctx, client, workspaceID, request)
 		if createErr != nil {
 			return nil, createErr
 		}
 		return metadata, nil
 	}
 
-	metadata, reuseErr := r.reuseWebhook(ctx, client, ownerID, *selectedWebhook, request)
+	metadata, reuseErr := r.reuseWebhook(ctx, client, workspaceID, *selectedWebhook, request)
 	if reuseErr != nil {
 		return nil, reuseErr
 	}
@@ -311,7 +311,7 @@ func buildWebhookSetupRequest(ctx core.SetupWebhookContext) (webhookSetupRequest
 func (r *Render) reuseWebhook(
 	ctx core.SetupWebhookContext,
 	client *Client,
-	ownerID string,
+	workspaceID string,
 	selectedWebhook Webhook,
 	request webhookSetupRequest,
 ) (WebhookMetadata, error) {
@@ -326,17 +326,17 @@ func (r *Render) reuseWebhook(
 		return WebhookMetadata{}, err
 	}
 
-	return finalizeWebhookSetup(ctx, selectedWebhook.ID, ownerID, secret)
+	return finalizeWebhookSetup(ctx, selectedWebhook.ID, workspaceID, secret)
 }
 
 func (r *Render) createWebhook(
 	ctx core.SetupWebhookContext,
 	client *Client,
-	ownerID string,
+	workspaceID string,
 	request webhookSetupRequest,
 ) (WebhookMetadata, error) {
 	createdWebhook, err := client.CreateWebhook(CreateWebhookRequest{
-		OwnerID:     ownerID,
+		WorkspaceID: workspaceID,
 		Name:        request.Name,
 		URL:         request.URL,
 		Enabled:     true,
@@ -346,31 +346,31 @@ func (r *Render) createWebhook(
 		return WebhookMetadata{}, fmt.Errorf("failed to create Render webhook: %w", err)
 	}
 
-	return finalizeWebhookSetup(ctx, createdWebhook.ID, ownerID, createdWebhook.Secret)
+	return finalizeWebhookSetup(ctx, createdWebhook.ID, workspaceID, createdWebhook.Secret)
 }
 
 func finalizeWebhookSetup(
 	ctx core.SetupWebhookContext,
 	webhookID string,
-	ownerID string,
+	workspaceID string,
 	secret string,
 ) (WebhookMetadata, error) {
 	if err := setWebhookSecret(ctx, secret); err != nil {
 		return WebhookMetadata{}, err
 	}
 
-	return WebhookMetadata{WebhookID: webhookID, OwnerID: ownerID}, nil
+	return WebhookMetadata{WebhookID: webhookID, WorkspaceID: workspaceID}, nil
 }
 
 func (r *Render) findExistingWebhook(
 	client *Client,
-	ownerID string,
+	workspaceID string,
 	webhookURL string,
 	webhookConfiguration WebhookConfiguration,
 	selectedWebhookName string,
 	eventFilter []string,
 ) (*Webhook, error) {
-	webhooks, err := client.ListWebhooks(ownerID)
+	webhooks, err := client.ListWebhooks(workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list Render webhooks: %w", err)
 	}
@@ -432,9 +432,33 @@ func setWebhookSecret(ctx core.SetupWebhookContext, secret string) error {
 	return nil
 }
 
-func (r *Render) CleanupWebhook(ctx core.CleanupWebhookContext) error {
+func decodeWebhookMetadata(value any) (WebhookMetadata, error) {
 	metadata := WebhookMetadata{}
-	if err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &metadata); err != nil {
+	if err := mapstructure.Decode(value, &metadata); err != nil {
+		return WebhookMetadata{}, err
+	}
+
+	if metadata.WorkspaceID != "" {
+		return metadata, nil
+	}
+
+	legacyMetadata := map[string]any{}
+	if err := mapstructure.Decode(value, &legacyMetadata); err != nil {
+		return metadata, nil
+	}
+
+	legacyWorkspaceID, ok := legacyMetadata["ownerId"].(string)
+	if !ok {
+		return metadata, nil
+	}
+
+	metadata.WorkspaceID = strings.TrimSpace(legacyWorkspaceID)
+	return metadata, nil
+}
+
+func (r *Render) CleanupWebhook(ctx core.CleanupWebhookContext) error {
+	metadata, err := decodeWebhookMetadata(ctx.Webhook.GetMetadata())
+	if err != nil {
 		return fmt.Errorf("failed to decode webhook metadata: %w", err)
 	}
 
@@ -468,7 +492,7 @@ func (r *Render) HandleAction(ctx core.IntegrationActionContext) error {
 	return nil
 }
 
-func ownerIDForIntegration(client *Client, integration core.IntegrationContext) (string, error) {
+func workspaceIDForIntegration(client *Client, integration core.IntegrationContext) (string, error) {
 	metadata := Metadata{}
 	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err == nil && metadata.Workspace != nil && metadata.Workspace.ID != "" {
 		return metadata.Workspace.ID, nil
@@ -480,7 +504,7 @@ func ownerIDForIntegration(client *Client, integration core.IntegrationContext) 
 		workspace = string(workspaceValue)
 	}
 
-	owner, err := resolveOwner(client, workspace)
+	selectedWorkspace, err := resolveWorkspace(client, workspace)
 	if err != nil {
 		return "", err
 	}
@@ -491,38 +515,38 @@ func ownerIDForIntegration(client *Client, integration core.IntegrationContext) 
 		workspacePlan = string(workspacePlanValue)
 	}
 
-	integration.SetMetadata(buildMetadata(owner.ID, workspacePlan))
-	return owner.ID, nil
+	integration.SetMetadata(buildMetadata(selectedWorkspace.ID, workspacePlan))
+	return selectedWorkspace.ID, nil
 }
 
-func resolveOwner(client *Client, ownerID string) (Owner, error) {
-	owners, err := client.ListOwners()
+func resolveWorkspace(client *Client, workspace string) (Workspace, error) {
+	workspaces, err := client.ListWorkspaces()
 	if err != nil {
-		return Owner{}, err
+		return Workspace{}, err
 	}
 
-	if len(owners) == 0 {
-		return Owner{}, fmt.Errorf("no workspaces found for this API key")
+	if len(workspaces) == 0 {
+		return Workspace{}, fmt.Errorf("no workspaces found for this API key")
 	}
 
-	if ownerID == "" {
-		return owners[0], nil
+	if workspace == "" {
+		return workspaces[0], nil
 	}
 
-	selectedOwner := slices.IndexFunc(owners, func(owner Owner) bool {
-		return owner.ID == ownerID
+	selectedWorkspace := slices.IndexFunc(workspaces, func(item Workspace) bool {
+		return item.ID == workspace
 	})
-	if selectedOwner < 0 {
-		selectedOwner = slices.IndexFunc(owners, func(owner Owner) bool {
-			return strings.EqualFold(owner.Name, ownerID)
+	if selectedWorkspace < 0 {
+		selectedWorkspace = slices.IndexFunc(workspaces, func(item Workspace) bool {
+			return strings.EqualFold(item.Name, workspace)
 		})
 	}
 
-	if selectedOwner < 0 {
-		return Owner{}, fmt.Errorf("owner %s is not accessible with this API key", ownerID)
+	if selectedWorkspace < 0 {
+		return Workspace{}, fmt.Errorf("workspace %s is not accessible with this API key", workspace)
 	}
 
-	return owners[selectedOwner], nil
+	return workspaces[selectedWorkspace], nil
 }
 
 func (m Metadata) workspacePlan() string {

@@ -29,14 +29,15 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("request failed with %d: %s", e.StatusCode, e.Body)
 }
 
-type Owner struct {
+type Workspace struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
-type ownerWithCursor struct {
+type workspaceWithCursor struct {
 	Cursor string `json:"cursor"`
-	Owner  Owner  `json:"owner"`
+	// Render docs call this a workspace, but the API response uses the legacy "owner" key.
+	Workspace Workspace `json:"owner"`
 }
 
 type Service struct {
@@ -51,7 +52,7 @@ type serviceWithCursor struct {
 
 type Webhook struct {
 	ID          string   `json:"id"`
-	OwnerID     string   `json:"ownerId"`
+	WorkspaceID string   `json:"ownerId"`
 	Name        string   `json:"name"`
 	URL         string   `json:"url"`
 	Enabled     bool     `json:"enabled"`
@@ -65,7 +66,7 @@ type webhookWithCursor struct {
 }
 
 type CreateWebhookRequest struct {
-	OwnerID     string   `json:"ownerId"`
+	WorkspaceID string   `json:"ownerId"`
 	Name        string   `json:"name"`
 	URL         string   `json:"url"`
 	Enabled     bool     `json:"enabled"`
@@ -112,7 +113,7 @@ func (c *Client) Verify() error {
 	return err
 }
 
-func (c *Client) ListOwners() ([]Owner, error) {
+func (c *Client) ListWorkspaces() ([]Workspace, error) {
 	query := url.Values{}
 	query.Set("limit", "100")
 
@@ -121,14 +122,14 @@ func (c *Client) ListOwners() ([]Owner, error) {
 		return nil, err
 	}
 
-	return parseOwners(body)
+	return parseWorkspaces(body)
 }
 
-func (c *Client) ListServices(ownerID string) ([]Service, error) {
+func (c *Client) ListServices(workspaceID string) ([]Service, error) {
 	query := url.Values{}
 	query.Set("limit", "100")
-	if strings.TrimSpace(ownerID) != "" {
-		query.Set("ownerId", strings.TrimSpace(ownerID))
+	if strings.TrimSpace(workspaceID) != "" {
+		query.Set("ownerId", strings.TrimSpace(workspaceID))
 	}
 
 	_, body, err := c.execRequestWithResponse(http.MethodGet, "/services", query, nil)
@@ -139,13 +140,13 @@ func (c *Client) ListServices(ownerID string) ([]Service, error) {
 	return parseServices(body)
 }
 
-func (c *Client) ListWebhooks(ownerID string) ([]Webhook, error) {
-	if ownerID == "" {
-		return nil, fmt.Errorf("ownerId is required")
+func (c *Client) ListWebhooks(workspaceID string) ([]Webhook, error) {
+	if workspaceID == "" {
+		return nil, fmt.Errorf("workspaceID is required")
 	}
 
 	query := url.Values{}
-	query.Set("ownerId", ownerID)
+	query.Set("ownerId", workspaceID)
 	query.Set("limit", "100")
 
 	_, body, err := c.execRequestWithResponse(http.MethodGet, "/webhooks", query, nil)
@@ -170,8 +171,8 @@ func (c *Client) GetWebhook(webhookID string) (*Webhook, error) {
 }
 
 func (c *Client) CreateWebhook(request CreateWebhookRequest) (*Webhook, error) {
-	if request.OwnerID == "" {
-		return nil, fmt.Errorf("ownerId is required")
+	if request.WorkspaceID == "" {
+		return nil, fmt.Errorf("workspaceID is required")
 	}
 	if request.URL == "" {
 		return nil, fmt.Errorf("url is required")
@@ -250,28 +251,28 @@ func (c *Client) TriggerDeploy(serviceID string, clearCache bool) (map[string]an
 	return payload, nil
 }
 
-func parseOwners(body []byte) ([]Owner, error) {
-	withCursor := []ownerWithCursor{}
+func parseWorkspaces(body []byte) ([]Workspace, error) {
+	withCursor := []workspaceWithCursor{}
 	if err := json.Unmarshal(body, &withCursor); err == nil {
-		owners := make([]Owner, 0, len(withCursor))
+		workspaces := make([]Workspace, 0, len(withCursor))
 		for _, item := range withCursor {
-			if item.Owner.ID == "" {
+			if item.Workspace.ID == "" {
 				continue
 			}
-			owners = append(owners, item.Owner)
+			workspaces = append(workspaces, item.Workspace)
 		}
 
 		if len(withCursor) > 0 {
-			return owners, nil
+			return workspaces, nil
 		}
 	}
 
-	plainOwners := []Owner{}
-	if err := json.Unmarshal(body, &plainOwners); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal owners response: %w", err)
+	plainWorkspaces := []Workspace{}
+	if err := json.Unmarshal(body, &plainWorkspaces); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal workspaces response: %w", err)
 	}
 
-	return plainOwners, nil
+	return plainWorkspaces, nil
 }
 
 func parseServices(body []byte) ([]Service, error) {

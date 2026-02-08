@@ -266,7 +266,7 @@ func Test__Render__SetupWebhook(t *testing.T) {
 		storedMetadata, ok := metadata.(WebhookMetadata)
 		require.True(t, ok)
 		assert.Equal(t, "whk-1", storedMetadata.WebhookID)
-		assert.Equal(t, "usr-123", storedMetadata.OwnerID)
+		assert.Equal(t, "usr-123", storedMetadata.WorkspaceID)
 
 		require.Len(t, httpCtx.Requests, 2)
 		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
@@ -340,7 +340,7 @@ func Test__Render__SetupWebhook(t *testing.T) {
 		storedMetadata, ok := metadata.(WebhookMetadata)
 		require.True(t, ok)
 		assert.Equal(t, "whk-existing", storedMetadata.WebhookID)
-		assert.Equal(t, "usr-123", storedMetadata.OwnerID)
+		assert.Equal(t, "usr-123", storedMetadata.WorkspaceID)
 
 		require.Len(t, httpCtx.Requests, 3)
 		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
@@ -446,7 +446,7 @@ func Test__Render__CleanupWebhook(t *testing.T) {
 	err := integration.CleanupWebhook(core.CleanupWebhookContext{
 		HTTP: httpCtx,
 		Webhook: &integrationWebhookContext{
-			metadata: WebhookMetadata{WebhookID: "whk-1", OwnerID: "usr-123"},
+			metadata: WebhookMetadata{WebhookID: "whk-1", WorkspaceID: "usr-123"},
 		},
 		Integration: &contexts.IntegrationContext{
 			Configuration: map[string]any{"apiKey": "rnd_test"},

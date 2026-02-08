@@ -276,12 +276,12 @@ func ensureServiceInMetadata(ctx core.TriggerContext, config OnResourceEventConf
 		return err
 	}
 
-	ownerID, err := ownerIDForIntegration(client, ctx.Integration)
+	workspaceID, err := workspaceIDForIntegration(client, ctx.Integration)
 	if err != nil {
 		return err
 	}
 
-	services, err := client.ListServices(ownerID)
+	services, err := client.ListServices(workspaceID)
 	if err != nil {
 		return fmt.Errorf("failed to list Render services: %w", err)
 	}
