@@ -3,6 +3,21 @@
 How to open a pull request for a new or updated integration. For general PR
 workflow (fork, branch, push), see [Pull Requests](pull-requests.md).
 
+## Table of contents
+
+- [Title](#title)
+- [Description](#description)
+  - [Start with link to the issue](#start-with-link-to-the-issue)
+  - [Describe the implementation](#describe-the-implementation)
+  - [Include a video demo](#include-a-video-demo)
+- [Backend Implementation](#backend-implementation)
+- [Frontend Implementation](#frontend-implementation)
+- [Docs](#docs)
+- [Tests](#tests)
+- [CI and BugBot](#ci-and-bugbot)
+- [BugBot](#bugbot)
+- [DCO](#dco)
+
 ## Title 
 
 Use the semantic format: `feat: Add <Integration>` or `feat: Add <Integration> <Trigger/Action>`. 
