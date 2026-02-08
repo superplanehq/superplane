@@ -16,7 +16,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
-  <LinkCard title="Trigger Deploy" href="#trigger-deploy" description="Trigger a deploy for a Render service" />
+  <LinkCard title="Deploy" href="#deploy" description="Trigger a deploy for a Render service and wait for it to complete" />
 </CardGrid>
 
 ## Instructions
@@ -117,11 +117,11 @@ The default output emits payload data fields like `id`, `serviceId`, `serviceNam
 }
 ```
 
-<a id="trigger-deploy"></a>
+<a id="deploy"></a>
 
-## Trigger Deploy
+## Deploy
 
-The Trigger Deploy component starts a new deploy for a Render service via the Render API.
+The Deploy component starts a new deploy for a Render service and waits for it to complete.
 
 ### Use Cases
 
@@ -129,17 +129,28 @@ The Trigger Deploy component starts a new deploy for a Render service via the Re
 - **Scheduled redeploys**: Redeploy staging services on schedules or external content changes
 - **Chained deploys**: Deploy service B when service A finishes successfully
 
+### How It Works
+
+1. Triggers a new deploy for the selected Render service via the Render API
+2. Waits for the deploy to complete (via deploy_ended webhook and optional polling fallback)
+3. Routes execution based on deploy outcome:
+   - **Success channel**: Deploy completed successfully
+   - **Failed channel**: Deploy failed or was cancelled
+
 ### Configuration
 
 - **Service**: Render service to deploy
 - **Clear Cache**: Clear build cache before deploying
 
-### Output
+### Output Channels
 
-The default output emits the deploy object returned by Render (e.g. `id`, `status`, `createdAt`, `finishedAt` when available).
+- **Success**: Emitted when the deploy completes successfully
+- **Failed**: Emitted when the deploy fails or is cancelled
 
 ### Notes
 
+- Uses the existing integration webhook for deploy_ended events (same as On Deploy trigger)
+- Falls back to polling if the webhook does not arrive
 - Requires a Render API key configured on the integration
 
 ### Example Output
@@ -148,12 +159,13 @@ The default output emits the deploy object returned by Render (e.g. `id`, `statu
 {
   "data": {
     "createdAt": "2026-02-05T16:10:00.000000Z",
-    "finishedAt": null,
+    "finishedAt": "2026-02-05T16:15:00.000000Z",
     "id": "dep-cukouhrtq21c73e9scng",
-    "status": "build_in_progress"
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "status": "succeeded"
   },
-  "timestamp": "2026-02-05T16:10:00.000000Z",
-  "type": "render.deploy.triggered"
+  "timestamp": "2026-02-05T16:15:00.000000Z",
+  "type": "render.deploy.finished"
 }
 ```
 

@@ -14,15 +14,15 @@ import (
 )
 
 const (
-	TriggerDeployPayloadType     = "render.deploy.finished"
-	DeploySucceededOutputChannel = "succeeded"
-	DeployFailedOutputChannel    = "failed"
-	DeployPollInterval           = 5 * time.Minute // fallback when deploy_ended webhook doesn't arrive
+	DeployPayloadType          = "render.deploy.finished"
+	DeploySuccessOutputChannel = "success"
+	DeployFailedOutputChannel  = "failed"
+	DeployPollInterval         = 5 * time.Minute // fallback when deploy_ended webhook doesn't arrive
 )
 
-type TriggerDeploy struct{}
+type Deploy struct{}
 
-type TriggerDeployExecutionMetadata struct {
+type DeployExecutionMetadata struct {
 	Deploy *DeployMetadata `json:"deploy" mapstructure:"deploy"`
 }
 
@@ -34,25 +34,25 @@ type DeployMetadata struct {
 	FinishedAt string `json:"finishedAt"`
 }
 
-type TriggerDeployConfiguration struct {
+type DeployConfiguration struct {
 	Service    string `json:"service" mapstructure:"service"`
 	ClearCache bool   `json:"clearCache" mapstructure:"clearCache"`
 }
 
-func (c *TriggerDeploy) Name() string {
-	return "render.triggerDeploy"
+func (c *Deploy) Name() string {
+	return "render.deploy"
 }
 
-func (c *TriggerDeploy) Label() string {
-	return "Trigger Deploy"
+func (c *Deploy) Label() string {
+	return "Deploy"
 }
 
-func (c *TriggerDeploy) Description() string {
+func (c *Deploy) Description() string {
 	return "Trigger a deploy for a Render service and wait for it to complete"
 }
 
-func (c *TriggerDeploy) Documentation() string {
-	return `The Trigger Deploy component starts a new deploy for a Render service and waits for it to complete.
+func (c *Deploy) Documentation() string {
+	return `The Deploy component starts a new deploy for a Render service and waits for it to complete.
 
 ## Use Cases
 
@@ -65,7 +65,7 @@ func (c *TriggerDeploy) Documentation() string {
 1. Triggers a new deploy for the selected Render service via the Render API
 2. Waits for the deploy to complete (via deploy_ended webhook and optional polling fallback)
 3. Routes execution based on deploy outcome:
-   - **Succeeded channel**: Deploy completed successfully
+   - **Success channel**: Deploy completed successfully
    - **Failed channel**: Deploy failed or was cancelled
 
 ## Configuration
@@ -75,7 +75,7 @@ func (c *TriggerDeploy) Documentation() string {
 
 ## Output Channels
 
-- **Succeeded**: Emitted when the deploy completes successfully
+- **Success**: Emitted when the deploy completes successfully
 - **Failed**: Emitted when the deploy fails or is cancelled
 
 ## Notes
@@ -85,22 +85,22 @@ func (c *TriggerDeploy) Documentation() string {
 - Requires a Render API key configured on the integration`
 }
 
-func (c *TriggerDeploy) Icon() string {
+func (c *Deploy) Icon() string {
 	return "rocket"
 }
 
-func (c *TriggerDeploy) Color() string {
+func (c *Deploy) Color() string {
 	return "gray"
 }
 
-func (c *TriggerDeploy) OutputChannels(configuration any) []core.OutputChannel {
+func (c *Deploy) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{
-		{Name: DeploySucceededOutputChannel, Label: "Succeeded"},
+		{Name: DeploySuccessOutputChannel, Label: "Success"},
 		{Name: DeployFailedOutputChannel, Label: "Failed"},
 	}
 }
 
-func (c *TriggerDeploy) Configuration() []configuration.Field {
+func (c *Deploy) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:     "service",
@@ -125,8 +125,8 @@ func (c *TriggerDeploy) Configuration() []configuration.Field {
 	}
 }
 
-func (c *TriggerDeploy) Setup(ctx core.SetupContext) error {
-	spec := TriggerDeployConfiguration{}
+func (c *Deploy) Setup(ctx core.SetupContext) error {
+	spec := DeployConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
@@ -145,12 +145,12 @@ func (c *TriggerDeploy) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (c *TriggerDeploy) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+func (c *Deploy) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (c *TriggerDeploy) Execute(ctx core.ExecutionContext) error {
-	spec := TriggerDeployConfiguration{}
+func (c *Deploy) Execute(ctx core.ExecutionContext) error {
+	spec := DeployConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
@@ -178,7 +178,7 @@ func (c *TriggerDeploy) Execute(ctx core.ExecutionContext) error {
 	createdAt := readString(deploy["createdAt"])
 	finishedAt := readString(deploy["finishedAt"])
 
-	err = ctx.Metadata.Set(TriggerDeployExecutionMetadata{
+	err = ctx.Metadata.Set(DeployExecutionMetadata{
 		Deploy: &DeployMetadata{
 			ID:         deployID,
 			Status:     status,
@@ -195,13 +195,15 @@ func (c *TriggerDeploy) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	ctx.Logger.Infof("Triggered deploy %s for service %s", deployID, spec.Service)
+	if ctx.Logger != nil {
+		ctx.Logger.Infof("Triggered deploy %s for service %s", deployID, spec.Service)
+	}
 
 	// Wait for deploy_ended webhook; poll as fallback
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, DeployPollInterval)
 }
 
-func (c *TriggerDeploy) Actions() []core.Action {
+func (c *Deploy) Actions() []core.Action {
 	return []core.Action{
 		{
 			Name:           "poll",
@@ -210,7 +212,7 @@ func (c *TriggerDeploy) Actions() []core.Action {
 	}
 }
 
-func (c *TriggerDeploy) HandleAction(ctx core.ActionContext) error {
+func (c *Deploy) HandleAction(ctx core.ActionContext) error {
 	switch ctx.Name {
 	case "poll":
 		return c.poll(ctx)
@@ -218,17 +220,17 @@ func (c *TriggerDeploy) HandleAction(ctx core.ActionContext) error {
 	return fmt.Errorf("unknown action: %s", ctx.Name)
 }
 
-func (c *TriggerDeploy) poll(ctx core.ActionContext) error {
+func (c *Deploy) poll(ctx core.ActionContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
 
-	spec := TriggerDeployConfiguration{}
+	spec := DeployConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return err
 	}
 
-	metadata := TriggerDeployExecutionMetadata{}
+	metadata := DeployExecutionMetadata{}
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
@@ -265,7 +267,7 @@ func (c *TriggerDeploy) poll(ctx core.ActionContext) error {
 	return c.emitDeployResult(ctx, deploy)
 }
 
-func (c *TriggerDeploy) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+func (c *Deploy) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	if err := verifyWebhookSignature(ctx); err != nil {
 		return http.StatusForbidden, err
 	}
@@ -294,7 +296,7 @@ func (c *TriggerDeploy) HandleWebhook(ctx core.WebhookRequestContext) (int, erro
 		return http.StatusOK, nil
 	}
 
-	metadata := TriggerDeployExecutionMetadata{}
+	metadata := DeployExecutionMetadata{}
 	if err := mapstructure.Decode(executionCtx.Metadata.Get(), &metadata); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error decoding metadata: %w", err)
 	}
@@ -327,19 +329,19 @@ func (c *TriggerDeploy) HandleWebhook(ctx core.WebhookRequestContext) (int, erro
 	return http.StatusOK, nil
 }
 
-func (c *TriggerDeploy) emitDeployResult(ctx core.ActionContext, deploy map[string]any) error {
+func (c *Deploy) emitDeployResult(ctx core.ActionContext, deploy map[string]any) error {
 	if isDeploySucceeded(readString(deploy["status"])) {
-		return ctx.ExecutionState.Emit(DeploySucceededOutputChannel, TriggerDeployPayloadType, []any{deploy})
+		return ctx.ExecutionState.Emit(DeploySuccessOutputChannel, DeployPayloadType, []any{deploy})
 	}
-	return ctx.ExecutionState.Emit(DeployFailedOutputChannel, TriggerDeployPayloadType, []any{deploy})
+	return ctx.ExecutionState.Emit(DeployFailedOutputChannel, DeployPayloadType, []any{deploy})
 }
 
-func (c *TriggerDeploy) emitDeployResultFromWebhook(ctx *core.ExecutionContext, data map[string]any) error {
+func (c *Deploy) emitDeployResultFromWebhook(ctx *core.ExecutionContext, data map[string]any) error {
 	status := readString(data["status"])
 	if isDeploySucceeded(status) {
-		return ctx.ExecutionState.Emit(DeploySucceededOutputChannel, TriggerDeployPayloadType, []any{data})
+		return ctx.ExecutionState.Emit(DeploySuccessOutputChannel, DeployPayloadType, []any{data})
 	}
-	return ctx.ExecutionState.Emit(DeployFailedOutputChannel, TriggerDeployPayloadType, []any{data})
+	return ctx.ExecutionState.Emit(DeployFailedOutputChannel, DeployPayloadType, []any{data})
 }
 
 func normalizeDeployWebhookEventType(t string) string {
@@ -359,10 +361,10 @@ func isDeploySucceeded(status string) bool {
 	return strings.TrimSpace(strings.ToLower(status)) == "succeeded"
 }
 
-func (c *TriggerDeploy) Cancel(ctx core.ExecutionContext) error {
+func (c *Deploy) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *TriggerDeploy) Cleanup(ctx core.SetupContext) error {
+func (c *Deploy) Cleanup(ctx core.SetupContext) error {
 	return nil
 }

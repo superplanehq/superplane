@@ -99,7 +99,7 @@ func (r *Render) Configuration() []configuration.Field {
 
 func (r *Render) Components() []core.Component {
 	return []core.Component{
-		&TriggerDeploy{},
+		&Deploy{},
 	}
 }
 

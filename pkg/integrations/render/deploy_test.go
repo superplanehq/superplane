@@ -13,8 +13,8 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__Render_TriggerDeploy__Setup(t *testing.T) {
-	component := &TriggerDeploy{}
+func Test__Render_Deploy__Setup(t *testing.T) {
+	component := &Deploy{}
 
 	t.Run("missing service -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
@@ -36,8 +36,8 @@ func Test__Render_TriggerDeploy__Setup(t *testing.T) {
 	})
 }
 
-func Test__Render_TriggerDeploy__Execute(t *testing.T) {
-	component := &TriggerDeploy{}
+func Test__Render_Deploy__Execute(t *testing.T) {
+	component := &Deploy{}
 
 	t.Run("valid input with clear cache -> triggers deploy and schedules poll", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{

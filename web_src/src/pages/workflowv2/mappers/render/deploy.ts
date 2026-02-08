@@ -15,12 +15,12 @@ import { formatTimeAgo } from "@/utils/date";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import { formatTimestamp, stringOrDash } from "./common";
 
-interface TriggerDeployConfiguration {
+interface DeployConfiguration {
   service?: string;
   clearCache?: boolean;
 }
 
-interface TriggerDeployOutput {
+interface DeployOutput {
   id?: string;
   status?: string;
   createdAt?: string;
@@ -28,7 +28,7 @@ interface TriggerDeployOutput {
   commitId?: string;
 }
 
-export const triggerDeployMapper: ComponentBaseMapper = {
+export const deployMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition.name || context.node.componentName || "unknown";
@@ -43,18 +43,18 @@ export const triggerDeployMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution
-        ? triggerDeployEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? deployEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
-      metadata: triggerDeployMetadataList(context.node),
+      metadata: deployMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
     };
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as TriggerDeployOutput | undefined;
+    const outputs = context.execution.outputs as { success?: OutputPayload[]; failed?: OutputPayload[] } | undefined;
+    const result =
+      (outputs?.success?.[0]?.data as DeployOutput | undefined) ??
+      (outputs?.failed?.[0]?.data as DeployOutput | undefined);
 
     return {
       "Triggered At": formatTimestamp(result?.createdAt, context.execution.createdAt),
@@ -71,9 +71,9 @@ export const triggerDeployMapper: ComponentBaseMapper = {
   },
 };
 
-function triggerDeployMetadataList(node: NodeInfo): MetadataItem[] {
+function deployMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as TriggerDeployConfiguration | undefined;
+  const configuration = node.configuration as DeployConfiguration | undefined;
 
   if (configuration?.service) {
     metadata.push({ icon: "server", label: `Service: ${configuration.service}` });
@@ -86,11 +86,7 @@ function triggerDeployMetadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function triggerDeployEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function deployEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
