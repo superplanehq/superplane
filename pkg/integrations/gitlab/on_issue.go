@@ -47,7 +47,6 @@ func (i *OnIssue) Documentation() string {
 - **Actions** (required): Select which issue actions to listen for (opened, closed, reopened, etc.). Default: opened.
 - **Labels** (optional): Only trigger for issues with specific labels
 - **Assignees** (optional): Only trigger when issue is assigned to specific users
-- **State** (optional): Only trigger for open or closed issues
 
 ## Outputs
 
@@ -124,20 +123,6 @@ func (i *OnIssue) Configuration() []configuration.Field {
 				},
 			},
 		},
-		{
-			Name:     "state",
-			Label:    "State Filter",
-			Type:     configuration.FieldTypeSelect,
-			Required: false,
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Open", Value: "opened"},
-						{Label: "Closed", Value: "closed"},
-					},
-				},
-			},
-		},
 	}
 }
 
@@ -194,16 +179,13 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusOK, nil
 	}
 
-	// Filter by State
-	if config.State != "" {
-		attrs, ok := data["object_attributes"].(map[string]any)
-		if !ok {
-			return http.StatusBadRequest, fmt.Errorf("invalid object_attributes")
-		}
-		state, _ := attrs["state"].(string)
-		if state != config.State {
-			return http.StatusOK, nil
-		}
+	attrs, ok := data["object_attributes"].(map[string]any)
+	if !ok {
+		return http.StatusBadRequest, fmt.Errorf("invalid object_attributes")
+	}
+	state, _ := attrs["state"].(string)
+	if state != "opened" {
+		return http.StatusOK, nil
 	}
 
 	if len(config.Labels) > 0 {
