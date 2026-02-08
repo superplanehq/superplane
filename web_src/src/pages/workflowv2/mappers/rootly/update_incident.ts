@@ -1,17 +1,20 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
+import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import { getBackgroundColorClass } from "@/utils/colors";
+import { formatTimeAgo } from "@/utils/date";
+import { getState, getStateMap, getTriggerRenderer } from "..";
 import {
-  ComponentBaseMapper,
   ComponentBaseContext,
-  SubtitleContext,
+  ComponentBaseMapper,
   ExecutionDetailsContext,
-  OutputPayload,
+  ExecutionInfo,
   NodeInfo,
+  OutputPayload,
+  SubtitleContext,
 } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
-import { formatTimeAgo } from "@/utils/time";
-import { getBackgroundColorClass } from "@/ui/utils";
-import { baseEventSections, getDetailsForIncident, getStateMap, Incident } from "./base";
-import rootlyIcon from "@/assets/rootly-icon.svg";
+import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
+import { getDetailsForIncident } from "./base";
+import { Incident } from "./types";
 
 interface UpdateIncidentConfiguration {
   incidentId?: string;
@@ -19,21 +22,6 @@ interface UpdateIncidentConfiguration {
   summary?: string;
   status?: string;
   severity?: string;
-}
-
-function getUpdateIncidentMetadataList(node: NodeInfo): MetadataItem[] {
-  const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as UpdateIncidentConfiguration | undefined;
-
-  if (configuration?.status) {
-    metadata.push({ icon: "activity", label: "→ " + configuration.status });
-  }
-
-  if (configuration?.severity) {
-    metadata.push({ icon: "funnel", label: "Severity: " + configuration.severity });
-  }
-
-  return metadata;
 }
 
 export const updateIncidentMapper: ComponentBaseMapper = {
@@ -45,11 +33,13 @@ export const updateIncidentMapper: ComponentBaseMapper = {
       iconSrc: rootlyIcon,
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      title: context.node.name || context.componentDefinition.label || "Unnamed component",
-      eventSections: lastExecution
-        ? baseEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
-      metadata: getUpdateIncidentMetadataList(context.node),
+      title:
+        context.node.name ||
+        context.componentDefinition.label ||
+        context.componentDefinition.name ||
+        "Unnamed component",
+      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
+      metadata: metadataList(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -62,15 +52,7 @@ export const updateIncidentMapper: ComponentBaseMapper = {
     }
 
     const incident = outputs.default[0].data as Incident;
-    const details = getDetailsForIncident(incident);
-
-    // Add update-specific details
-    const config = context.execution.configuration as UpdateIncidentConfiguration | undefined;
-    if (config?.status) {
-      details["Updated Status"] = config.status;
-    }
-
-    return details;
+    return getDetailsForIncident(incident);
   },
 
   subtitle(context: SubtitleContext): string {
@@ -78,3 +60,48 @@ export const updateIncidentMapper: ComponentBaseMapper = {
     return formatTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function metadataList(node: NodeInfo): MetadataItem[] {
+  const metadata: MetadataItem[] = [];
+  const configuration = node.configuration as UpdateIncidentConfiguration | undefined;
+
+  if (configuration?.incidentId) {
+    metadata.push({ icon: "alert-triangle", label: `Incident: ${configuration.incidentId}` });
+  }
+
+  const updates: string[] = [];
+  if (configuration?.status) {
+    updates.push(`Status: ${configuration.status}`);
+  }
+  if (configuration?.severity) {
+    updates.push(`Severity: ${configuration.severity}`);
+  }
+  if (configuration?.title) {
+    updates.push("Title");
+  }
+  if (configuration?.summary) {
+    updates.push("Summary");
+  }
+
+  if (updates.length > 0) {
+    metadata.push({ icon: "funnel", label: `Updating: ${updates.join(", ")}` });
+  }
+
+  return metadata;
+}
+
+function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
+
+  return [
+    {
+      receivedAt: new Date(execution.createdAt!),
+      eventTitle: title,
+      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventState: getState(componentName)(execution),
+      eventId: execution.rootEvent!.id!,
+    },
+  ];
+}
