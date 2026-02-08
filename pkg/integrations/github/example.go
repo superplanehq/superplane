@@ -25,6 +25,9 @@ var exampleOutputCreateReleaseBytes []byte
 //go:embed example_output_get_release.json
 var exampleOutputGetReleaseBytes []byte
 
+//go:embed example_output_list_releases.json
+var exampleOutputListReleasesBytes []byte
+
 //go:embed example_output_update_release.json
 var exampleOutputUpdateReleaseBytes []byte
 
@@ -78,6 +81,9 @@ var exampleOutputCreateRelease map[string]any
 
 var exampleOutputGetReleaseOnce sync.Once
 var exampleOutputGetRelease map[string]any
+
+var exampleOutputListReleasesOnce sync.Once
+var exampleOutputListReleases map[string]any
 
 var exampleOutputUpdateReleaseOnce sync.Once
 var exampleOutputUpdateRelease map[string]any
@@ -141,6 +147,14 @@ func (c *CreateRelease) ExampleOutput() map[string]any {
 
 func (c *GetRelease) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetReleaseOnce, exampleOutputGetReleaseBytes, &exampleOutputGetRelease)
+}
+
+func (c *ListReleases) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputListReleasesOnce,
+		exampleOutputListReleasesBytes,
+		&exampleOutputListReleases,
+	)
 }
 
 func (c *UpdateRelease) ExampleOutput() map[string]any {
