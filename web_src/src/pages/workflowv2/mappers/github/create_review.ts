@@ -52,4 +52,3 @@ export const createReviewMapper: ComponentBaseMapper = {
     return details;
   },
 };
-
