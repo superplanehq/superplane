@@ -17,7 +17,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="CodeArtifact • Copy Package Versions" href="#code-artifact-•-copy-package-versions" description="Copy package versions from one repository to another in the same domain" />
+  <LinkCard title="CodeArtifact • Create Repository" href="#code-artifact-•-create-repository" description="Create an AWS CodeArtifact repository in a domain" />
+  <LinkCard title="CodeArtifact • Delete Package Versions" href="#code-artifact-•-delete-package-versions" description="Permanently delete one or more package versions from a repository" />
+  <LinkCard title="CodeArtifact • Delete Repository" href="#code-artifact-•-delete-repository" description="Delete an AWS CodeArtifact repository from a domain" />
+  <LinkCard title="CodeArtifact • Dispose Package Versions" href="#code-artifact-•-dispose-package-versions" description="Delete assets and set package version status to Disposed" />
   <LinkCard title="CodeArtifact • Get Package Version" href="#code-artifact-•-get-package-version" description="Describe an AWS CodeArtifact package version" />
+  <LinkCard title="CodeArtifact • Update Package Versions Status" href="#code-artifact-•-update-package-versions-status" description="Set package version status to Archived, Published, or Unlisted" />
   <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
   <LinkCard title="ECR • Scan Image" href="#ecr-•-scan-image" description="Scan an ECR image for vulnerabilities" />
@@ -27,6 +33,32 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Instructions
 
 Initially, you can leave the **"IAM Role ARN"** field empty, as you will be guided through the identity provider and IAM role creation process.
+
+### IAM permissions for CodeArtifact
+
+If you use **CodeArtifact** components (Create Repository, Delete Repository, Get Package Version, etc.), the IAM role must allow CodeArtifact API calls. Otherwise the Domain/Repository dropdowns will show "Failed to load resources" and workflow runs will fail with 403.
+
+**Minimal policy for listing domains and repositories** (for the configuration dropdowns):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "codeartifact:ListDomains",
+        "codeartifact:ListRepositories"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+**For Create/Delete Repository**: `codeartifact:CreateRepository`, `codeartifact:DeleteRepository`, `codeartifact:DescribeRepository`. **For Update Package Versions Status**: `codeartifact:UpdatePackageVersionsStatus`. **For Copy Package Versions**: `codeartifact:CopyPackageVersions`. **For Delete Package Versions**: `codeartifact:DeletePackageVersions`. **For Dispose Package Versions**: `codeartifact:DisposePackageVersions`.
+
+Attach this (or a combined policy) to the same IAM role you use for the SuperPlane AWS integration. You can use the AWS managed policy **AWSCodeArtifactFullAccess** for full CodeArtifact access, or create a custom policy with only the actions you need.
 
 <a id="code-artifact-•-on-package-version"></a>
 
@@ -82,6 +114,155 @@ The On Package Version trigger starts a workflow execution when a package versio
   "type": "aws.codeartifact.package.version"
 }
 ```
+
+<a id="code-artifact-•-create-repository"></a>
+
+## CodeArtifact • Create Repository
+
+The Create Repository component creates a new repository in an AWS CodeArtifact domain.
+
+### Use Cases
+
+- **Automated setup**: Create repositories as part of onboarding or pipeline setup
+- **Environment replication**: Mirror repository structure across domains
+- **Workflow provisioning**: Create a destination repository before copying packages
+
+### Configuration
+
+- **Region**: AWS region for CodeArtifact (e.g. us-east-1)
+- **Domain**: CodeArtifact domain (from integration resource)
+- **Repository name**: Name of the new repository (2–100 characters)
+- **Description**: Optional description for the repository
+
+### Example Output
+
+The component emits the created repository details, including ARN, name, domain, and creation time.
+
+<a id="code-artifact-•-delete-repository"></a>
+
+## CodeArtifact • Delete Repository
+
+The Delete Repository component deletes a repository from an AWS CodeArtifact domain.
+
+### Use Cases
+
+- **Cleanup**: Remove repositories after migration or deprecation
+- **Environment teardown**: Delete temporary repositories created by workflows
+- **Lifecycle management**: Enforce retention by deleting old repositories
+
+### Configuration
+
+- **Region**: AWS region for CodeArtifact
+- **Domain**: CodeArtifact domain (from integration resource)
+- **Repository**: Repository to delete (from integration resource)
+
+### Example Output
+
+The component emits the deleted repository details (same shape as create), including ARN, name, and domain.
+
+<a id="code-artifact-•-update-package-versions-status"></a>
+
+## CodeArtifact • Update Package Versions Status
+
+The Update Package Versions Status component sets the status of one or more package versions to **Archived**, **Published**, or **Unlisted**.
+
+### Use Cases
+
+- **Lifecycle management**: Archive old versions or publish after validation
+- **Visibility**: Unlist versions without deleting them
+- **Compliance**: Align version status with release policies
+
+### Configuration
+
+- **Region**, **Domain**, **Repository**: CodeArtifact target (from integration resources)
+- **Format**, **Package**: Package format (e.g. npm, pypi) and package name
+- **Versions**: Comma- or newline-separated list of version strings
+- **Target status**: Archived | Published | Unlisted
+- **Expected status** (optional): Update only if current status matches
+- **Namespace** (optional): For Maven/npm/Swift/generic
+
+### Example Output
+
+The component emits `successfulVersions` and `failedVersions` maps (version → revision/status or error).
+
+<a id="code-artifact-•-copy-package-versions"></a>
+
+## CodeArtifact • Copy Package Versions
+
+The Copy Package Versions component copies one or more package versions from a source repository to a destination repository in the same domain.
+
+### Use Cases
+
+- **Promotion**: Copy approved versions from staging to production
+- **Replication**: Mirror packages across repositories
+- **Migration**: Move versions between repos in the same domain
+
+### Configuration
+
+- **Region**, **Domain**: CodeArtifact domain (from integration resources)
+- **Source repository**, **Destination repository**: From integration resources
+- **Format**, **Package**: Package format and package name
+- **Versions**: Comma- or newline-separated list of version strings
+- **Allow overwrite**: Overwrite existing versions in the destination
+- **Include from upstream**: Include versions from upstream repositories
+- **Namespace** (optional): For Maven/npm/Swift/generic
+
+### Example Output
+
+The component emits `successfulVersions` and `failedVersions` maps (version → revision/status or error).
+
+<a id="code-artifact-•-delete-package-versions"></a>
+
+## CodeArtifact • Delete Package Versions
+
+The Delete Package Versions component permanently removes one or more package versions and their assets. Deleted versions cannot be restored. To hide versions but keep the option to restore, use **Update Package Versions Status** to set status to **Archived**.
+
+### Use Cases
+
+- **Cleanup**: Remove obsolete or invalid versions
+- **Compliance**: Permanently remove versions that must not be retained
+- **Storage**: Free space by deleting unused versions
+
+### Configuration
+
+- **Region**, **Domain**, **Repository**: CodeArtifact target (from integration resources)
+- **Format**, **Package**: Package format and package name
+- **Versions**: Comma- or newline-separated list of version strings
+- **Expected status** (optional): Delete only if current status matches
+- **Namespace** (optional): For Maven/npm/Swift/generic
+
+### Example Output
+
+Emits `successfulVersions` and `failedVersions` (status will be `Deleted` for successful versions).
+
+<a id="code-artifact-•-dispose-package-versions"></a>
+
+## CodeArtifact • Dispose Package Versions
+
+The Dispose Package Versions component deletes the assets of package versions and sets their status to **Disposed**. The version record remains (visible in ListPackageVersions with status Disposed); assets cannot be restored.
+
+### Use Cases
+
+- **Retention**: Keep version metadata for audit while removing binary assets
+- **Storage**: Free asset storage while preserving version history
+- **Lifecycle**: Mark versions as disposed after a retention period
+
+### Configuration
+
+- **Region**, **Domain**, **Repository**: CodeArtifact target (from integration resources)
+- **Format**, **Package**: Package format and package name
+- **Versions**: Comma- or newline-separated list of version strings
+- **Expected status** (optional): Dispose only if current status matches
+- **Namespace** (optional): For Maven/npm/Swift/generic
+
+### Example Output
+
+Emits `successfulVersions` and `failedVersions` (status will be `Disposed` for successful versions).
+
+### Testing CodeArtifact components
+
+- **Integration per node:** Each action node (Create Repository, Copy Package Versions, etc.) must have the **AWS integration** selected in the node’s Integration dropdown; otherwise runs fail with "AWS integration context is missing". Save the workflow after selecting it.
+- **Manual testing:** Use the **Manual Run** trigger and one action per workflow (e.g. Manual Run → Create Repository). Downstream nodes do not run automatically; test each component in its own workflow.
 
 <a id="ecr-•-on-image-push"></a>
 
