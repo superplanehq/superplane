@@ -15,6 +15,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="List Pipelines" href="#list-pipelines" description="List pipelines for a Semaphore project or workflow" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run Semaphore workflow" />
 </CardGrid>
 
@@ -124,6 +125,86 @@ This trigger automatically sets up a Semaphore webhook when configured. The webh
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "semaphore.pipeline.done"
+}
+```
+
+<a id="list-pipelines"></a>
+
+## List Pipelines
+
+The List Pipelines component retrieves pipelines from a Semaphore project or workflow with comprehensive filtering capabilities.
+
+### Use Cases
+
+- **Pipeline monitoring**: List all pipelines and filter by branch, status, or date range
+- **CI/CD dashboards**: Build dashboards showing pipeline history and results
+- **Branch analysis**: Filter pipelines by branch to track deployment activity
+- **Time-range queries**: Find pipelines created or completed within specific time windows
+
+### Configuration
+
+- **Project ID**: The Semaphore project identifier (required if Workflow ID is not provided)
+- **Workflow ID**: The workflow identifier (required if Project ID is not provided)
+- **Branch Name**: Filter by branch name (optional)
+- **YAML File Path**: Filter by pipeline definition file (optional, e.g., .semaphore/semaphore.yml)
+- **Created After**: Unix timestamp or ISO date — only return pipelines created after this time (optional)
+- **Created Before**: Unix timestamp or ISO date — only return pipelines created before this time (optional)
+- **Done After**: Unix timestamp or ISO date — only return pipelines completed after this time (optional)
+- **Done Before**: Unix timestamp or ISO date — only return pipelines completed before this time (optional)
+- **Result Limit**: Maximum number of pipelines to return, 1-200 (optional, defaults to 100)
+
+### Output
+
+Returns a list of pipelines, each containing:
+- Pipeline ID (ppl_id), name, and YAML file path
+- Workflow ID (wf_id)
+- State (e.g., QUEUING, RUNNING, DONE) and result (e.g., PASSED, FAILED, STOPPED)
+- Branch name and commit SHA
+- Creation and completion timestamps
+- Error description (if any)
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "branch_name": "main",
+      "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "created_at": {
+        "seconds": 1769090400
+      },
+      "done_at": {
+        "seconds": 1769090700
+      },
+      "error_description": "",
+      "name": "Deploy",
+      "ppl_id": "11111111-1111-1111-1111-111111111111",
+      "result": "PASSED",
+      "state": "DONE",
+      "wf_id": "22222222-2222-2222-2222-222222222222",
+      "yml_file_path": ".semaphore/semaphore.yml"
+    },
+    {
+      "branch_name": "feature/something",
+      "commit_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "created_at": {
+        "seconds": 1769094000
+      },
+      "done_at": {
+        "seconds": 0
+      },
+      "error_description": "",
+      "name": "Test",
+      "ppl_id": "33333333-3333-3333-3333-333333333333",
+      "result": "",
+      "state": "RUNNING",
+      "wf_id": "22222222-2222-2222-2222-222222222222",
+      "yml_file_path": ".semaphore/semaphore.yml"
+    }
+  ],
+  "timestamp": "2026-01-22T16:00:00Z",
+  "type": "semaphore.pipelines"
 }
 ```
 
