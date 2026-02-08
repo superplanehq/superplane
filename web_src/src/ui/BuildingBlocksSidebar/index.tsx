@@ -409,6 +409,7 @@ function CategorySection({
       codeArtifact: awsIcon,
       lambda: awsLambdaIcon,
       ecr: awsEcrIcon,
+      sns: awsIcon,
     },
   };
 
@@ -479,6 +480,7 @@ function CategorySection({
               codeArtifact: awsCodeArtifactIcon,
               ecr: awsEcrIcon,
               lambda: awsLambdaIcon,
+              sns: awsIcon,
             },
           };
           const appLogo = nameParts[0] ? appLogoMap[nameParts[0]] : undefined;
