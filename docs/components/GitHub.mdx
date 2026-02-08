@@ -24,6 +24,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitHub repository" />
+  <LinkCard title="Create Issue Comment" href="#create-issue-comment" description="Add a comment to a GitHub issue or pull request" />
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitHub repository" />
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
@@ -980,6 +981,44 @@ Returns the created issue object with details including:
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.issue"
+}
+```
+
+<a id="create-issue-comment"></a>
+
+## Create Issue Comment
+
+The Create Issue Comment component adds a comment to an existing GitHub issue or pull request.
+
+### Use Cases
+
+- **Status updates**: Post deployment status or remediation notes to an issue
+- **Automation**: Sync notes from Slack/PagerDuty into GitHub as comments
+- **Runbooks**: Attach runbook links and diagnostics to a ticket
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the issue/PR
+- **Issue Number**: Issue or PR number (supports expressions)
+- **Body**: Comment body (Markdown supported; supports expressions)
+
+### Output
+
+Emits the created comment object (id, body, user, created_at, html_url).
+
+### Example Output
+
+```json
+{
+  "body": "Deployment succeeded. ✅\\n\\nSee run logs: https://example.com/logs/123",
+  "created_at": "2026-02-08T00:00:00Z",
+  "html_url": "https://github.com/octocat/Hello-World/issues/42#issuecomment-1234567890",
+  "id": 1234567890,
+  "updated_at": "2026-02-08T00:00:00Z",
+  "user": {
+    "html_url": "https://github.com/octocat",
+    "login": "octocat"
+  }
 }
 ```
 
