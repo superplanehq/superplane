@@ -577,8 +577,8 @@ export type GroupsUpdateGroupResponse = {
 };
 
 export type IntegrationNodeRef = {
-  workflowId?: string;
-  workflowName?: string;
+  canvasId?: string;
+  canvasName?: string;
   nodeId?: string;
   nodeName?: string;
 };

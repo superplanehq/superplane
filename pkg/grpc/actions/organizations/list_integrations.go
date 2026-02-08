@@ -17,7 +17,7 @@ func ListIntegrations(ctx context.Context, registry *registry.Registry, orgID st
 
 	protos := []*pb.Integration{}
 	for _, integration := range integrations {
-		proto, err := serializeIntegration(registry, &integration, []models.WorkflowNodeReference{})
+		proto, err := serializeIntegration(registry, &integration, []models.CanvasNodeReference{})
 		if err != nil {
 			return nil, err
 		}
