@@ -143,6 +143,14 @@ func (i *MyIntegration) HandleRequest(ctx core.HTTPRequestContext) {
 
 3. **Register the integration** in the `init()` function (shown above)
 
+If the integration manages webhooks, register a `core.WebhookHandler` along with the integration:
+
+```go
+func init() {
+	registry.RegisterIntegrationWithWebhookHandler("myintegration", &MyIntegration{}, &MyIntegrationWebhookHandler{})
+}
+```
+
 ## Adding Triggers
 
 Triggers listen to external events and start workflow executions. Here's how to add a new trigger:
@@ -335,7 +343,7 @@ func (a *MyApp) Triggers() []core.Trigger {
 
 ### 3. Implement Webhook Setup (if needed)
 
-If your triggers or components require webhooks, implement the webhook setup methods in your main integration file:
+If your triggers or components require webhooks, implement a `core.WebhookHandler` and register it with the integration:
 
 ```go
 type WebhookConfiguration struct {
@@ -343,9 +351,11 @@ type WebhookConfiguration struct {
 	Resource  string `json:"resource"`
 }
 
-// CompareWebhookConfig defines when two webhook configurations are equal.
+type MyIntegrationWebhookHandler struct{}
+
+// CompareConfig defines when two webhook configurations are equal.
 // This is used to determine if an existing webhook can be reused.
-func (i *MyIntegration) CompareWebhookConfig(a, b any) (bool, error) {
+func (h *MyIntegrationWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	configA := WebhookConfiguration{}
 	if err := mapstructure.Decode(a, &configA); err != nil {
 		return false, err
@@ -361,17 +371,17 @@ func (i *MyIntegration) CompareWebhookConfig(a, b any) (bool, error) {
 	return configA.Resource == configB.Resource && configA.EventType == configB.EventType, nil
 }
 
-// SetupWebhook creates a webhook in the external service.
+// Setup creates a webhook in the external service.
 // This is called by the webhook provisioner for pending webhook records.
-func (i *MyIntegration) SetupWebhook(ctx core.IntegrationContext, options core.WebhookOptions) (any, error) {
+func (h *MyIntegrationWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	// Create webhook in the external service
 	// Return metadata about the created webhook (e.g., webhook ID)
 	return nil, nil
 }
 
-// CleanupWebhook deletes a webhook from the external service.
+// Cleanup deletes a webhook from the external service.
 // This is called by the webhook cleanup worker for deleted webhook records.
-func (i *MyIntegration) CleanupWebhook(ctx core.IntegrationContext, options core.WebhookOptions) error {
+func (h *MyIntegrationWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 	// Delete webhook from the external service using the metadata
 	return nil
 }
@@ -382,7 +392,7 @@ func (i *MyIntegration) CleanupWebhook(ctx core.IntegrationContext, options core
 The webhook management logic is centralized in `Integration.RequestWebhook()`. When a trigger or component requests a webhook:
 
 1. The context lists all existing webhooks for the integration
-2. For each existing webhook, it calls your integration's `CompareWebhookConfig()` to check if configurations match
+2. For each existing webhook, it calls your webhook handler's `CompareConfig()` to check if configurations match
 3. If a match is found, the node is associated with the existing webhook
 4. If no match is found, a new webhook is created
 

@@ -290,15 +290,3 @@ func TestClaude_ListResources(t *testing.T) {
 		})
 	}
 }
-
-func TestClaude_CompareWebhookConfig(t *testing.T) {
-	i := &Claude{}
-	// Should always return true, nil based on implementation
-	ok, err := i.CompareWebhookConfig(nil, nil)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if !ok {
-		t.Error("expected CompareWebhookConfig to return true")
-	}
-}

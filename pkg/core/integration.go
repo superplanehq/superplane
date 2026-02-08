@@ -81,25 +81,33 @@ type Integration interface {
 	 * HTTP request handler
 	 */
 	HandleRequest(ctx HTTPRequestContext)
+}
 
-	/*
-	 * Used to compare webhook configurations.
-	 * If the configuration is the same,
-	 * the system will reuse the existing webhook.
-	 */
-	CompareWebhookConfig(a, b any) (bool, error)
+type WebhookHandler interface {
 
 	/*
 	 * Set up webhooks through the integration, in the external system.
 	 * This is called by the webhook provisioner, for pending webhook records.
 	 */
-	SetupWebhook(ctx SetupWebhookContext) (any, error)
+	Setup(ctx WebhookHandlerContext) (any, error)
 
 	/*
 	 * Delete webhooks through the integration, in the external system.
 	 * This is called by the webhook cleanup worker, for webhook records that were deleted.
 	 */
-	CleanupWebhook(ctx CleanupWebhookContext) error
+	Cleanup(ctx WebhookHandlerContext) error
+
+	/*
+	 * Compare two webhook configurations to see if they are the same.
+	 */
+	CompareConfig(a, b any) (bool, error)
+}
+
+type WebhookHandlerContext struct {
+	Logger      *logrus.Entry
+	HTTP        HTTPContext
+	Integration IntegrationContext
+	Webhook     WebhookContext
 }
 
 type IntegrationComponent interface {
@@ -145,19 +153,6 @@ type ListResourcesContext struct {
 	HTTP        HTTPContext
 	Integration IntegrationContext
 	Parameters  map[string]string
-}
-
-type SetupWebhookContext struct {
-	HTTP        HTTPContext
-	Webhook     WebhookContext
-	Logger      *logrus.Entry
-	Integration IntegrationContext
-}
-
-type CleanupWebhookContext struct {
-	HTTP        HTTPContext
-	Webhook     WebhookContext
-	Integration IntegrationContext
 }
 
 type WebhookOptions struct {

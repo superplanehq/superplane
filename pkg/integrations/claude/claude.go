@@ -92,10 +92,6 @@ func (i *Claude) Sync(ctx core.SyncContext) error {
 func (i *Claude) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
-func (i *Claude) CompareWebhookConfig(a, b any) (bool, error) {
-	return true, nil
-}
-
 func (i *Claude) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	if resourceType != "model" {
 		return []core.IntegrationResource{}, nil
@@ -125,14 +121,6 @@ func (i *Claude) ListResources(resourceType string, ctx core.ListResourcesContex
 	}
 
 	return resources, nil
-}
-
-func (i *Claude) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	return nil, nil
-}
-
-func (i *Claude) CleanupWebhook(ctx core.CleanupWebhookContext) error {
-	return nil
 }
 
 func (i *Claude) Actions() []core.Action {

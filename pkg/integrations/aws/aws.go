@@ -708,10 +708,6 @@ func (a *AWS) subscriptionApplies(subscription core.IntegrationSubscriptionConte
 	return true
 }
 
-func (a *AWS) CompareWebhookConfig(aConfig, bConfig any) (bool, error) {
-	return false, nil
-}
-
 func (a *AWS) Actions() []core.Action {
 	return []core.Action{
 		{
@@ -935,18 +931,5 @@ func (a *AWS) createRule(
 
 	logger.Infof("Created EventBridge rule %s: %v", ruleArn, detailTypes)
 
-	return nil
-}
-
-/*
- * No additional webhook endpoints are used for AWS triggers.
- * Events from AWS are received through the API destinations configured
- * in the integration itself, using the integration HTTP URL.
- */
-func (a *AWS) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	return nil, nil
-}
-
-func (a *AWS) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 	return nil
 }

@@ -93,10 +93,6 @@ func (o *OpenAI) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (o *OpenAI) CompareWebhookConfig(a, b any) (bool, error) {
-	return true, nil
-}
-
 func (o *OpenAI) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	if resourceType != "model" {
 		return []core.IntegrationResource{}, nil
@@ -126,14 +122,6 @@ func (o *OpenAI) ListResources(resourceType string, ctx core.ListResourcesContex
 	}
 
 	return resources, nil
-}
-
-func (o *OpenAI) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	return nil, nil
-}
-
-func (o *OpenAI) CleanupWebhook(ctx core.CleanupWebhookContext) error {
-	return nil
 }
 
 func (o *OpenAI) Actions() []core.Action {

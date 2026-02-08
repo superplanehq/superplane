@@ -26,8 +26,8 @@ func (t *testWebhookContext) GetMetadata() any              { return nil }
 func (t *testWebhookContext) GetConfiguration() any         { return t.configuration }
 func (t *testWebhookContext) SetSecret(secret []byte) error { t.secret = secret; return nil }
 
-func Test__SendGrid__SetupWebhook_EnablesSignedWebhook(t *testing.T) {
-	integration := &SendGrid{}
+func Test__SendGrid__Setup_EnablesSignedWebhook(t *testing.T) {
+	handler := &SendGridWebhookHandler{}
 	httpCtx := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{
@@ -47,17 +47,17 @@ func Test__SendGrid__SetupWebhook_EnablesSignedWebhook(t *testing.T) {
 		},
 	}
 
-	webhookCtx := &testWebhookContext{
-		url:           "https://example.com/webhook",
-		configuration: struct{}{},
-	}
-
 	integrationCtx := &contexts.IntegrationContext{
 		Configuration: map[string]any{"apiKey": "sg-test"},
 		Secrets:       map[string]core.IntegrationSecret{},
 	}
 
-	_, err := integration.SetupWebhook(core.SetupWebhookContext{
+	webhookCtx := &testWebhookContext{
+		url:           "https://example.com/webhook",
+		configuration: struct{}{},
+	}
+
+	_, err := handler.Setup(core.WebhookHandlerContext{
 		HTTP:        httpCtx,
 		Webhook:     webhookCtx,
 		Integration: integrationCtx,
@@ -71,7 +71,7 @@ func Test__SendGrid__SetupWebhook_EnablesSignedWebhook(t *testing.T) {
 }
 
 func Test__SendGrid__CleanupWebhook_DisablesWebhook(t *testing.T) {
-	integration := &SendGrid{}
+	handler := &SendGridWebhookHandler{}
 	httpCtx := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{
@@ -96,7 +96,7 @@ func Test__SendGrid__CleanupWebhook_DisablesWebhook(t *testing.T) {
 		configuration: struct{}{},
 	}
 
-	err := integration.CleanupWebhook(core.CleanupWebhookContext{
+	err := handler.Cleanup(core.WebhookHandlerContext{
 		HTTP:    httpCtx,
 		Webhook: webhookCtx,
 		Integration: &contexts.IntegrationContext{
@@ -126,7 +126,7 @@ func Test__SendGrid__CleanupWebhook_DisablesWebhook(t *testing.T) {
 }
 
 func Test__SendGrid__CleanupWebhook_SkipsNonHTTPS(t *testing.T) {
-	integration := &SendGrid{}
+	handler := &SendGridWebhookHandler{}
 	httpCtx := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{
@@ -144,7 +144,7 @@ func Test__SendGrid__CleanupWebhook_SkipsNonHTTPS(t *testing.T) {
 		configuration: struct{}{},
 	}
 
-	err := integration.CleanupWebhook(core.CleanupWebhookContext{
+	err := handler.Cleanup(core.WebhookHandlerContext{
 		HTTP:    httpCtx,
 		Webhook: webhookCtx,
 		Integration: &contexts.IntegrationContext{
