@@ -1,27 +1,9 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import { Incident } from "./types";
-import { getDetailsForIncident } from "./base";
-
-// Map event values to display labels (matching backend configuration)
-const eventLabels: Record<string, string> = {
-  "incident.created": "Created",
-  "incident.updated": "Updated",
-  "incident.mitigated": "Mitigated",
-  "incident.resolved": "Resolved",
-  "incident.cancelled": "Cancelled",
-  "incident.deleted": "Deleted",
-};
-
-function formatEventLabel(event: string): string {
-  return (
-    eventLabels[event] ||
-    event.replace("incident.", "").charAt(0).toUpperCase() + event.replace("incident.", "").slice(1)
-  );
-}
+import { getDetailsForIncident, formatEventLabel, buildSubtitle } from "./base";
 
 interface OnEventEventData {
   event?: string;
@@ -135,12 +117,3 @@ export const onEventTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
-
-function buildSubtitle(content: string, createdAt?: string): string {
-  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
-  if (content && timeAgo) {
-    return `${content} · ${timeAgo}`;
-  }
-
-  return content || timeAgo;
-}
