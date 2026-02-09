@@ -64,8 +64,6 @@ func Test__OnIssue__HandleWebhook__InvalidToken(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid webhook token")
 }
 
-
-
 func Test__OnIssue__HandleWebhook__StateNotOpened(t *testing.T) {
 	trigger := &OnIssue{}
 

@@ -7,9 +7,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-type WebhookHandler struct {
-}
-
 type GitLabWebhookHandler struct{}
 
 func (h *GitLabWebhookHandler) CompareConfig(a, b any) (bool, error) {
