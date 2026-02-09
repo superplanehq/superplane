@@ -178,6 +178,100 @@ func Test__GetIncident__Execute(t *testing.T) {
 		assert.Len(t, groups, 0)
 	})
 
+	t.Run("null-data relationships do not overwrite attribute values", func(t *testing.T) {
+		// The Rootly API returns many relationships beyond the four we request
+		// via ?include=. Relationships like severity, user, and started_by may
+		// have "data": null linkage even though their values are already
+		// embedded in attributes. This test verifies those attribute values
+		// are preserved.
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"data": {
+							"id": "inc-with-extra-rels",
+							"type": "incidents",
+							"attributes": {
+								"title": "Incident with extra relationships",
+								"status": "started",
+								"severity": {"id": "sev-001", "name": "sev1"},
+								"user": {"id": "user-001", "full_name": "Jane Smith"},
+								"started_by": {"id": "user-002", "full_name": "John Doe"}
+							},
+							"relationships": {
+								"services": {
+									"data": []
+								},
+								"groups": {
+									"data": []
+								},
+								"events": {
+									"data": []
+								},
+								"action_items": {
+									"data": null
+								},
+								"severity": {
+									"data": null
+								},
+								"user": {
+									"data": null
+								},
+								"started_by": {
+									"data": null
+								}
+							}
+						}
+					}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-api-key",
+			},
+		}
+
+		execCtx := &contexts.ExecutionStateContext{
+			KVs: map[string]string{},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"incidentId": "inc-with-extra-rels",
+			},
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
+			ExecutionState: execCtx,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, execCtx.Finished)
+		assert.True(t, execCtx.Passed)
+		require.Len(t, execCtx.Payloads, 1)
+
+		payload := execCtx.Payloads[0].(map[string]any)
+		data := payload["data"].(map[string]any)
+
+		// These attribute values must NOT be overwritten by the null-data relationships
+		severityMap, ok := data["severity"].(map[string]any)
+		require.True(t, ok, "severity should remain a map from attributes, not nil")
+		assert.Equal(t, "sev-001", severityMap["id"])
+
+		userMap, ok := data["user"].(map[string]any)
+		require.True(t, ok, "user should remain a map from attributes, not nil")
+		assert.Equal(t, "user-001", userMap["id"])
+
+		startedByMap, ok := data["started_by"].(map[string]any)
+		require.True(t, ok, "started_by should remain a map from attributes, not nil")
+		assert.Equal(t, "user-002", startedByMap["id"])
+
+		// The explicitly requested null relationship should still be nil
+		assert.Nil(t, data["action_items"])
+	})
+
 	t.Run("API error returns error", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
