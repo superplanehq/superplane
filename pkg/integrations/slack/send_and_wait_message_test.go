@@ -107,7 +107,7 @@ func Test__SendAndWaitMessage__Execute(t *testing.T) {
 		assert.Equal(t, 60*time.Second, requests.Duration)
 	})
 
-	t.Run("missing timeout -> schedules default timeout of 3600s", func(t *testing.T) {
+	t.Run("missing timeout -> schedules default timeout", func(t *testing.T) {
 		execID := uuid.New()
 		withDefaultTransport(t, func(req *http.Request) (*http.Response, error) {
 			return jsonResponse(http.StatusOK, `{"ok": true, "message": {"ts": "1234.5678"}}`), nil
@@ -133,7 +133,7 @@ func Test__SendAndWaitMessage__Execute(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, "timeout", requests.Action)
-		assert.Equal(t, 3600*time.Second, requests.Duration)
+		assert.Equal(t, time.Duration(DefaultTimeoutSeconds)*time.Second, requests.Duration)
 	})
 }
 
