@@ -71,10 +71,10 @@ func Test__GitLab__Sync(t *testing.T) {
 			Integration:   ctx,
 		})
 
-		require.NoError(t, err)
-		assert.Equal(t, "error", ctx.State)
-		assert.NotNil(t, ctx.BrowserAction)
-		assert.Equal(t, "https://gitlab.com/-/user_settings/personal_access_tokens", ctx.BrowserAction.URL)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "access token is required")
+		assert.Empty(t, ctx.State)
+		assert.Nil(t, ctx.BrowserAction)
 	})
 
 	t.Run("oauth - missing client id - setup instructions", func(t *testing.T) {
@@ -91,9 +91,9 @@ func Test__GitLab__Sync(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "error", ctx.State)
 		assert.NotNil(t, ctx.BrowserAction)
-		assert.Contains(t, ctx.BrowserAction.Description, "Step 1: Create a GitLab OAuth Application")
+		assert.Contains(t, ctx.BrowserAction.Description, "Click the **Continue** button to go to the Applications page in GitLab")
+		assert.Equal(t, "https://gitlab.com/-/user_settings/applications", ctx.BrowserAction.URL)
 	})
 
 	t.Run("oauth - missing client secret - setup instructions", func(t *testing.T) {
@@ -111,9 +111,9 @@ func Test__GitLab__Sync(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "error", ctx.State)
 		assert.NotNil(t, ctx.BrowserAction)
-		assert.Contains(t, ctx.BrowserAction.Description, "Step 1: Create a GitLab OAuth Application")
+		assert.Contains(t, ctx.BrowserAction.Description, "Click the **Continue** button to go to the Applications page in GitLab")
+		assert.Equal(t, "https://gitlab.com/-/user_settings/applications", ctx.BrowserAction.URL)
 	})
 
 	t.Run("oauth - has client id, no tokens - connect button", func(t *testing.T) {
@@ -135,10 +135,9 @@ func Test__GitLab__Sync(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "error", ctx.State)
 		assert.NotNil(t, ctx.BrowserAction)
 		assert.Contains(t, ctx.BrowserAction.URL, "/oauth/authorize")
-		assert.Contains(t, ctx.BrowserAction.Description, "Connect to GitLab")
+		assert.Contains(t, ctx.BrowserAction.Description, "authorize SuperPlane")
 
 		// Verify metadata preservation
 		metadata, ok := ctx.Metadata.(Metadata)

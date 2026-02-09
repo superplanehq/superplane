@@ -52,7 +52,7 @@ func Test__GitLab__ListResources(t *testing.T) {
 		assert.Equal(t, "102", resources[1].ID)
 	})
 
-	t.Run("returns list of repositories from metadata", func(t *testing.T) {
+	t.Run("returns list of projects from metadata", func(t *testing.T) {
 		ctx := &contexts.IntegrationContext{
 			Metadata: Metadata{
 				Projects: []ProjectMetadata{
@@ -62,17 +62,17 @@ func Test__GitLab__ListResources(t *testing.T) {
 			},
 		}
 
-		resources, err := g.ListResources("repository", core.ListResourcesContext{
+		resources, err := g.ListResources("project", core.ListResourcesContext{
 			Integration: ctx,
 		})
 
 		require.NoError(t, err)
 		assert.Len(t, resources, 2)
 		assert.Equal(t, "1", resources[0].ID)
-		assert.Equal(t, "repo1", resources[0].Name)
-		assert.Equal(t, "repository", resources[0].Type)
+		assert.Equal(t, "project1", resources[0].Name)
+		assert.Equal(t, "project", resources[0].Type)
 		assert.Equal(t, "2", resources[1].ID)
-		assert.Equal(t, "repo2", resources[1].Name)
+		assert.Equal(t, "project2", resources[1].Name)
 	})
 
 	t.Run("handles invalid metadata gracefully", func(t *testing.T) {
@@ -80,7 +80,7 @@ func Test__GitLab__ListResources(t *testing.T) {
 			Metadata: "invalid-string-metadata",
 		}
 
-		_, err := g.ListResources("repository", core.ListResourcesContext{
+		_, err := g.ListResources("project", core.ListResourcesContext{
 			Integration: ctx,
 		})
 

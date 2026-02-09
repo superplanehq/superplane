@@ -5,10 +5,12 @@ import { TriggerProps } from "@/ui/trigger";
 import { GitLabNodeMetadata } from "./types";
 import { buildGitlabSubtitle } from "./utils";
 import { getDetailsForWebhookIssue, WebhookIssue } from "./issue_utils";
+import { formatPredicate, Predicate } from "../utils";
 
 interface OnIssueConfiguration {
   actions: string[];
   project: string;
+  labels: Predicate[];
 }
 
 interface OnIssueEventData {
@@ -72,6 +74,13 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
       metadataItems.push({
         icon: "funnel",
         label: configuration.actions.join(", "),
+      });
+    }
+
+    if (configuration?.labels && configuration?.labels?.length > 0) {
+      metadataItems.push({
+        icon: "label",
+        label: configuration.labels.map((label) => formatPredicate(label)).join(", "),
       });
     }
 
