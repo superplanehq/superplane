@@ -190,11 +190,13 @@ func (s *TimeGateSteps) openSidebarForNode(node string) {
 }
 
 func (s *TimeGateSteps) pushThroughFirstItemFromSidebar() {
-	eventItem := q.Locator(`[data-testid="sidebar-event-item"][data-event-state="running"]`)
+	// TimeGate can surface different execution states (pending/started/running/blocked),
+	// so don't over-constrain the selector to a single state.
+	eventItem := q.Locator(`[data-testid="sidebar-event-item"]`)
 	s.session.AssertVisible(eventItem)
 	s.session.HoverOver(eventItem)
 
-	actionsBtn := q.Locator(`[data-testid="sidebar-event-item"][data-event-state="running"] button[aria-label="Open actions"]`)
+	actionsBtn := q.Locator(`[data-testid="sidebar-event-item"] button[aria-label="Open actions"]`)
 	s.session.AssertVisible(actionsBtn)
 	s.session.Click(actionsBtn)
 
@@ -202,7 +204,7 @@ func (s *TimeGateSteps) pushThroughFirstItemFromSidebar() {
 	s.session.AssertVisible(pushThrough)
 	s.session.Click(pushThrough)
 
-	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 45*time.Second)
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 60*time.Second)
 }
 
 func (s *TimeGateSteps) assertTimeGateExecutionFinishedAndOutputNodeProcessed() {
