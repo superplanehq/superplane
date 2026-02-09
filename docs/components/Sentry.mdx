@@ -1,0 +1,130 @@
+---
+title: "Sentry"
+---
+
+Trigger workflows from Sentry issue events and update issues from workflows
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Issue Event" href="#on-issue-event" description="Start a workflow when Sentry sends issue events (created, resolved, assigned, etc.)" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Update Issue" href="#update-issue" description="Update a Sentry issue (resolve, assign, ignore, etc.)" />
+</CardGrid>
+
+## Instructions
+
+Connect Sentry to SuperPlane using a Sentry **Personal Token**.
+
+1. In Sentry: **Settings** → **Developer Settings** → **Personal Tokens**
+2. Create a token with scopes: `org:read`, `project:read`, `event:write`
+3. Paste the token below (tokens typically start with `sntryu_`).
+
+For the **On Issue Event** trigger: configure the webhook in your Sentry integration to point to the trigger's webhook URL and subscribe to Issue events.
+
+<a id="on-issue-event"></a>
+
+## On Issue Event
+
+The On Issue Event trigger runs when Sentry sends webhook events for issues.
+
+### Use Cases
+
+- **Notify on new issues**: Send Slack/Discord messages or create Jira tickets when an issue is created
+- **Resolve after deploy**: When an issue is resolved in Sentry, run follow-up steps
+- **Assign or triage**: React to assigned or archived events
+
+### Configuration
+
+- **Events**: Choose which issue actions to listen for (created, resolved, assigned, archived, unresolved)
+
+### Setup
+
+1. In Sentry: add a webhook URL in your integration/app settings. Use the webhook URL shown for this trigger in SuperPlane.
+2. Subscribe to **Issue** events (e.g. issue.created, issue.resolved).
+
+### Example Data
+
+```json
+{
+  "action": "created",
+  "actor": {
+    "id": "example-app",
+    "name": "Example App",
+    "type": "application"
+  },
+  "installation": {
+    "uuid": "24b397fc-a86e-43ef-9297-949e21b82480"
+  },
+  "issue": {
+    "culprit": "raven.scripts.runner in main",
+    "firstSeen": "2025-11-10T20:56:00.679000+00:00",
+    "id": "1234567890",
+    "lastSeen": "2025-11-10T20:56:00.738000+00:00",
+    "level": "error",
+    "metadata": {
+      "title": "Error: example exception"
+    },
+    "permalink": "https://example-org.sentry.io/issues/1234567890/",
+    "project": {
+      "id": "112313123123134",
+      "name": "python",
+      "slug": "python"
+    },
+    "shortId": "PYTHON-Y",
+    "status": "unresolved",
+    "title": "Error: example exception"
+  }
+}
+```
+
+<a id="update-issue"></a>
+
+## Update Issue
+
+The Update Issue component updates an existing Sentry issue.
+
+### Use Cases
+
+- **Resolve after deploy**: Resolve the issue when a fix is deployed
+- **Assignment**: Assign the issue to a user or team from a workflow
+- **Ignore**: Ignore or archive issues based on workflow logic
+
+### Configuration
+
+- **Organization**: Sentry organization slug (e.g. from trigger payload or your org name)
+- **Issue ID**: The issue ID to update (e.g. from trigger: `$['On Issue Event'].issue.id`)
+- **Status**: resolved, resolvedInNextRelease, unresolved, or ignored
+- **Assigned To**: Actor id or username to assign the issue to
+
+### Output
+
+Returns the updated issue object from Sentry.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "1234567890",
+    "permalink": "https://example-org.sentry.io/issues/1234567890/",
+    "project": {
+      "id": "112313123123134",
+      "name": "python",
+      "slug": "python"
+    },
+    "shortId": "PYTHON-Y",
+    "status": "resolved",
+    "title": "Error: example exception"
+  },
+  "timestamp": "2026-02-07T12:00:00Z",
+  "type": "sentry.issue"
+}
+```
+

@@ -24,9 +24,19 @@ type InvitationEmailConsumer struct {
 	RabbitMQURL  string
 	EmailService services.EmailService
 	BaseURL      string
+	ServiceName  string
 }
 
 func NewInvitationEmailConsumer(rabbitMQURL string, emailService services.EmailService, baseURL string) *InvitationEmailConsumer {
+	return NewInvitationEmailConsumerWithServiceName(rabbitMQURL, emailService, baseURL, InvitationEmailServiceName)
+}
+
+func NewInvitationEmailConsumerWithServiceName(
+	rabbitMQURL string,
+	emailService services.EmailService,
+	baseURL string,
+	serviceName string,
+) *InvitationEmailConsumer {
 	logger := logging.NewTackleLogger(log.StandardLogger().WithFields(log.Fields{
 		"consumer": "invitation_email",
 	}))
@@ -39,6 +49,7 @@ func NewInvitationEmailConsumer(rabbitMQURL string, emailService services.EmailS
 		Consumer:     consumer,
 		EmailService: emailService,
 		BaseURL:      baseURL,
+		ServiceName:  serviceName,
 	}
 }
 
@@ -46,7 +57,7 @@ func (c *InvitationEmailConsumer) Start() error {
 	options := tackle.Options{
 		URL:            c.RabbitMQURL,
 		ConnectionName: InvitationEmailConnectionName,
-		Service:        InvitationEmailServiceName,
+		Service:        c.ServiceName,
 		RemoteExchange: messages.WorkflowExchange,
 		RoutingKey:     messages.InvitationCreatedRoutingKey,
 	}
