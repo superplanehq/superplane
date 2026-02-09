@@ -34,7 +34,14 @@ func (c *ListReleases) Description() string {
 }
 
 func (c *ListReleases) Documentation() string {
-	return `List releases for a GitHub repository with optional pagination.
+	return `The List Releases component returns releases from a GitHub repository with optional pagination.
+
+## Use Cases
+
+- **Release auditing**: Review recent releases for compliance or visibility
+- **Deployment inputs**: Feed release metadata into deployment workflows
+- **Changelog automation**: Aggregate release notes across versions
+- **Reporting**: Build release dashboards or summaries
 
 ## Configuration
 

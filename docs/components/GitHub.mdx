@@ -28,11 +28,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitHub repository" />
+  <LinkCard title="List Releases" href="#list-releases" description="List releases for a GitHub repository" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
   <LinkCard title="Update Release" href="#update-release" description="Update an existing release in a GitHub repository" />
-  <LinkCard title="List Releases" href="#list-releases" description="List releases from a GitHub repository" />
 </CardGrid>
 
 <a id="on-branch-created"></a>
@@ -1221,27 +1221,37 @@ Returns a list of releases and their details including:
 {
   "data": [
     {
-      "id": 3001,
-      "tag_name": "v1.2.3",
-      "name": "Release 1.2.3",
-      "body": "## What's Changed\n\n- Feature A\n- Bug fix B",
-      "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
-      "draft": false,
-      "prerelease": false,
-      "created_at": "2026-01-15T10:00:00Z",
-      "published_at": "2026-01-16T12:00:00Z",
-      "author": {
-        "login": "octocat",
-        "html_url": "https://github.com/octocat"
-      },
       "assets": [
         {
-          "name": "app-v1.2.3.zip",
-          "size": 1024000,
+          "browser_download_url": "https://github.com/acme/widgets/releases/download/v1.2.3/app-v1.2.3.zip",
+          "content_type": "application/zip",
           "download_count": 42,
-          "browser_download_url": "https://github.com/acme/widgets/releases/download/v1.2.3/app-v1.2.3.zip"
+          "id": 1,
+          "label": "Application Bundle",
+          "name": "app-v1.2.3.zip",
+          "size": 1024000
         }
-      ]
+      ],
+      "assets_url": "https://api.github.com/repos/acme/widgets/releases/282931220/assets",
+      "author": {
+        "avatar_url": "https://github.com/images/error/octocat_happy.gif",
+        "html_url": "https://github.com/octocat",
+        "id": 1,
+        "login": "octocat"
+      },
+      "body": "## Bug Fixes\n- Fix token generation when issuer is unset\n- Improve DAG serialization stability",
+      "created_at": "2026-01-15T10:00:00Z",
+      "draft": false,
+      "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
+      "id": 3001,
+      "name": "Acme Widgets 1.2.3",
+      "prerelease": false,
+      "published_at": "2026-01-16T12:00:00Z",
+      "tag_name": "v1.2.3",
+      "tarball_url": "https://api.github.com/repos/acme/widgets/tarball/v1.2.3",
+      "upload_url": "https://uploads.github.com/repos/acme/widgets/releases/282931220/assets{?name,label}",
+      "url": "https://api.github.com/repos/acme/widgets/releases/282931220",
+      "zipball_url": "https://api.github.com/repos/acme/widgets/zipball/v1.2.3"
     }
   ],
   "timestamp": "2026-01-16T17:56:16.680755501Z",
