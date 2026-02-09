@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -27,9 +28,13 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 	if u, err := ctx.GetConfig("baseURL"); err == nil && len(u) > 0 {
 		baseURL = string(u)
 	}
+
+	baseURL = strings.TrimSpace(baseURL)
+	baseURL = strings.TrimRight(baseURL, "/")
+
 	return &Client{
 		BaseURL: baseURL,
-		Token:   string(token),
+		Token:   strings.TrimSpace(string(token)),
 		http:    http,
 	}, nil
 }

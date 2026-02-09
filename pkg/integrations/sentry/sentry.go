@@ -39,7 +39,7 @@ func (s *Sentry) Description() string {
 func (s *Sentry) Instructions() string {
 	return `Connect Sentry to SuperPlane using a Sentry **Personal Token**.
 
-1. In Sentry: **User Settings** → **API** → **Auth Tokens**
+1. In Sentry: **Settings** → **Developer Settings** → **Personal Tokens**
 2. Create a token with scopes: ` + "`org:read`" + `, ` + "`project:read`" + `, ` + "`event:write`" + `
 3. Paste the token below (tokens typically start with ` + "`sntryu_`" + `).
 
@@ -54,7 +54,7 @@ func (s *Sentry) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Sensitive:   true,
-			Description: "Sentry personal token (Bearer). Create via User Settings → API → Auth Tokens.",
+			Description: "Sentry personal token (Bearer). Create via Settings → Developer Settings → Personal Tokens. Requires scopes org:read, project:read, event:write.",
 			Placeholder: "sntryu_...",
 		},
 		{
