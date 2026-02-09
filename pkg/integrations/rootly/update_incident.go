@@ -1,12 +1,8 @@
 package rootly
 
 import (
-	"errors"
 	"fmt"
-	"net/http"
 
-	"github.com/google/uuid"
-	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -14,169 +10,85 @@ import (
 type UpdateIncident struct{}
 
 type UpdateIncidentSpec struct {
-	IncidentID string `json:"incident_id"`
+	// This tag fix the 'Mapstructure won't decode snake_case' issue
+	IncidentID string `mapstructure:"incident_id" json:"incident_id"`
 	Title      string `json:"title"`
 	Summary    string `json:"summary"`
 	Severity   string `json:"severity"`
 	Status     string `json:"status"`
 }
 
-func (c *UpdateIncident) Name() string {
-	return "rootly.updateIncident"
+func (u *UpdateIncident) Name() string {
+	return "update_incident"
 }
 
-func (c *UpdateIncident) Label() string {
+func (u *UpdateIncident) Label() string {
 	return "Update Incident"
 }
 
-func (c *UpdateIncident) Description() string {
+func (u *UpdateIncident) Description() string {
 	return "Update an existing incident in Rootly"
 }
 
-func (c *UpdateIncident) Documentation() string {
-	return `The Update Incident component updates an existing incident in Rootly.
-
-Use Cases
-Sync status: Automatically update incident status from Jira or ServiceNow
-Enrichment: Append new summary information from monitoring tools
-Severity adjustment: Escalate severity based on new alerts
-
-Configuration
-Incident ID: The UUID of the incident to update (required)
-Title: New title (optional)
-Summary: New summary details (optional)
-Severity: New severity level (optional)
-Status: New incident status (optional)
-
-Output
-Returns the updated incident object.`
-}
-
-func (c *UpdateIncident) Icon() string {
-	return "edit-3" // 用編輯圖示
-}
-
-func (c *UpdateIncident) Color() string {
-	return "blue" // 改個顏色區分
-}
-
-func (c *UpdateIncident) OutputChannels(configuration any) []core.OutputChannel {
-	return []core.OutputChannel{core.DefaultOutputChannel}
-}
-
-func (c *UpdateIncident) Configuration() []configuration.Field {
+func (u *UpdateIncident) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "incident_id",
 			Label:       "Incident ID",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "The UUID of the incident to update",
+			Description: "The ID of the incident to update.",
 		},
 		{
 			Name:        "title",
-			Label:       "New Title",
+			Label:       "Title",
 			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "New incident title",
+			Description: "New title for the incident.",
 		},
 		{
 			Name:        "summary",
-			Label:       "New Summary",
-			Type:        configuration.FieldTypeText,
-			Required:    false,
-			Description: "New summary details",
-		},
-		{
-			Name:        "status",
-			Label:       "New Status",
-			Type:        configuration.FieldTypeIntegrationResource, // 使用選單
-			Required:    false,
-			Description: "New incident status",
-			Placeholder: "Select a status",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type:           "status", // Rootly 的狀態資源
-					UseNameAsValue: true,
-				},
-			},
+			Label:       "Summary",
+			Type:        configuration.FieldTypeString,
+			Description: "New summary for the incident.",
 		},
 		{
 			Name:        "severity",
-			Label:       "New Severity",
+			Label:       "Severity",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
-			Description: "New severity level",
-			Placeholder: "Select a severity",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type:           "severity",
-					UseNameAsValue: true,
-				},
-			},
+			Resource:    "severity",
+			Description: "New severity level.",
+		},
+		{
+			Name:        "status",
+			Label:       "Status",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Resource:    "status",
+			Description: "New status for the incident.",
 		},
 	}
 }
 
-func (c *UpdateIncident) Setup(ctx core.SetupContext) error {
+func (u *UpdateIncident) Execute(ctx core.ComponentContext) (any, error) {
 	spec := UpdateIncidentSpec{}
-	err := mapstructure.Decode(ctx.Configuration, &spec)
-	if err != nil {
-		return fmt.Errorf("error decoding configuration: %v", err)
-	}
-
-	if spec.IncidentID == "" {
-		return errors.New("incident_id is required")
-	}
-
-	return nil
-}
-
-func (c *UpdateIncident) Execute(ctx core.ExecutionContext) error {
-	spec := UpdateIncidentSpec{}
-	err := mapstructure.Decode(ctx.Configuration, &spec)
-	if err != nil {
-		return fmt.Errorf("error decoding configuration: %v", err)
+	if err := ctx.DecodeSpec(&spec); err != nil {
+		return nil, fmt.Errorf("failed to decode spec: %w", err)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return fmt.Errorf("error creating client: %v", err)
+		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
-	// 關鍵：這裡呼叫 UpdateIncident，但這個方法在 client.go 還沒寫！
-	incident, err := client.UpdateIncident(spec.IncidentID, spec.Title, spec.Summary, spec.Severity, spec.Status)
-	if err != nil {
-		return fmt.Errorf("failed to update incident: %v", err)
-	}
-
-	return ctx.ExecutionState.Emit(
-		core.DefaultOutputChannel.Name,
-		"rootly.incident",
-		[]any{incident},
+	incident, err := client.UpdateIncident(
+		spec.IncidentID,
+		spec.Title,
+		spec.Summary,
+		spec.Severity,
+		spec.Status,
 	)
-}
+	if err != nil {
+		return nil, fmt.Errorf("failed to update incident: %w", err)
+	}
 
-func (c *UpdateIncident) Cancel(ctx core.ExecutionContext) error {
-	return nil
-}
-
-func (c *UpdateIncident) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
-}
-
-func (c *UpdateIncident) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *UpdateIncident) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
-func (c *UpdateIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return http.StatusOK, nil
-}
-
-func (c *UpdateIncident) Cleanup(ctx core.SetupContext) error {
-	return nil
+	return incident, nil
 }
