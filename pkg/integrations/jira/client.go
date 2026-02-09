@@ -356,10 +356,10 @@ type FailedWebhookResponse struct {
 
 // FailedWebhook contains information about a failed webhook delivery.
 type FailedWebhook struct {
-	ID             string `json:"id"`
-	Body           string `json:"body"`
-	URL            string `json:"url"`
-	FailureReason  string `json:"failureReason"`
+	ID                string `json:"id"`
+	Body              string `json:"body"`
+	URL               string `json:"url"`
+	FailureReason     string `json:"failureReason"`
 	LatestFailureTime string `json:"latestFailureTime"`
 }
 

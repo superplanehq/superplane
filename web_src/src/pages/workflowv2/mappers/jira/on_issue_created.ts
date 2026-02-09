@@ -23,10 +23,7 @@ export const onIssueCreatedTriggerRenderer: TriggerRenderer = {
     const summary = eventData?.issue?.fields?.summary;
     const title = issueKey && summary ? `${issueKey}: ${summary}` : issueKey || summary || "Issue created";
     const creator = eventData?.issue?.fields?.creator?.displayName;
-    const subtitle = buildSubtitle(
-      creator ? `Created by ${creator}` : "Issue created",
-      context.event?.createdAt,
-    );
+    const subtitle = buildSubtitle(creator ? `Created by ${creator}` : "Issue created", context.event?.createdAt);
 
     return { title, subtitle };
   },
@@ -59,10 +56,7 @@ export const onIssueCreatedTriggerRenderer: TriggerRenderer = {
       const summary = eventData?.issue?.fields?.summary;
       const title = issueKey && summary ? `${issueKey}: ${summary}` : issueKey || summary || "Issue created";
       const creator = eventData?.issue?.fields?.creator?.displayName;
-      const subtitle = buildSubtitle(
-        creator ? `Created by ${creator}` : "Issue created",
-        lastEvent.createdAt,
-      );
+      const subtitle = buildSubtitle(creator ? `Created by ${creator}` : "Issue created", lastEvent.createdAt);
 
       props.lastEventData = {
         title,

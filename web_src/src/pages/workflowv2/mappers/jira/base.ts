@@ -29,9 +29,7 @@ export const baseJiraMapper: ComponentBaseMapper = {
         context.componentDefinition.label ||
         context.componentDefinition.name ||
         "Unnamed component",
-      eventSections: lastExecution
-        ? baseEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
