@@ -62,6 +62,7 @@ func (r *Rootly) Configuration() []configuration.Field {
 func (r *Rootly) Components() []core.Component {
 	return []core.Component{
 		&CreateIncident{},
+		&UpdateIncident{},
 	}
 }
 
