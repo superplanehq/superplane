@@ -1,10 +1,12 @@
 package workers
 
 import (
+	"fmt"
 	"sort"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -19,7 +21,8 @@ func Test__NotificationEmailConsumer(t *testing.T) {
 	testEmailService := services.NewNoopEmailService()
 	amqpURL := "amqp://guest:guest@rabbitmq:5672"
 
-	consumer := NewNotificationEmailConsumer(amqpURL, testEmailService, r.AuthService)
+	serviceName := fmt.Sprintf("%s.%s", NotificationEmailServiceName, uuid.NewString())
+	consumer := NewNotificationEmailConsumerWithServiceName(amqpURL, testEmailService, r.AuthService, serviceName)
 
 	go consumer.Start()
 	defer consumer.Stop()
