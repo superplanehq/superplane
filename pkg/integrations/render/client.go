@@ -104,8 +104,8 @@ type DeployEventResponse struct {
 }
 
 type DeployEventResponseEntry struct {
-	DeployID     string `json:"deployId"`
-	DeployStatus string `json:"deployStatus"`
+	DeployID string `json:"deployId"`
+	Status   string `json:"status"`
 }
 
 func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {

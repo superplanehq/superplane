@@ -356,7 +356,7 @@ func (c *Deploy) resolveDeployFromEvent(
 
 	return deployWebhookResult{
 		DeployID:   readString(event.Details.DeployID),
-		Status:     readString(event.Details.DeployStatus),
+		Status:     readString(event.Details.Status),
 		ServiceID:  readString(event.ServiceID),
 		FinishedAt: readString(event.Timestamp),
 		EventID:    eventID,

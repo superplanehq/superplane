@@ -145,7 +145,7 @@ func Test__Render_Deploy__HandleWebhook(t *testing.T) {
 				{
 					StatusCode: http.StatusOK,
 					Body: io.NopCloser(strings.NewReader(
-						`{"id":"evt-cph1rs3idesc73a2b2mg","timestamp":"2026-02-08T21:08:59.718Z","serviceId":"srv-cukouhrtq21c73e9scng","type":"deploy_ended","details":{"deployId":"dep-cukouhrtq21c73e9scng","deployStatus":"succeeded"}}`,
+						`{"id":"evt-cph1rs3idesc73a2b2mg","timestamp":"2026-02-08T21:08:59.718Z","serviceId":"srv-cukouhrtq21c73e9scng","type":"deploy_ended","details":{"deployId":"dep-cukouhrtq21c73e9scng","status":"live"}}`,
 					)),
 				},
 			},
@@ -191,7 +191,7 @@ func Test__Render_Deploy__HandleWebhook(t *testing.T) {
 		updatedMetadata, ok := metadataCtx.Metadata.(DeployExecutionMetadata)
 		require.True(t, ok)
 		require.NotNil(t, updatedMetadata.Deploy)
-		assert.Equal(t, "succeeded", updatedMetadata.Deploy.Status)
+		assert.Equal(t, "live", updatedMetadata.Deploy.Status)
 		assert.Equal(t, "2026-02-08T21:08:59.718Z", updatedMetadata.Deploy.FinishedAt)
 
 		assert.Equal(t, DeploySuccessOutputChannel, executionState.Channel)
@@ -200,7 +200,7 @@ func Test__Render_Deploy__HandleWebhook(t *testing.T) {
 		emittedPayload := readMap(executionState.Payloads[0])
 		data := readMap(emittedPayload["data"])
 		assert.Equal(t, "dep-cukouhrtq21c73e9scng", data["id"])
-		assert.Equal(t, "succeeded", data["status"])
+		assert.Equal(t, "live", data["status"])
 		assert.Equal(t, "evt-cph1rs3idesc73a2b2mg", data["eventId"])
 
 		require.Len(t, httpCtx.Requests, 1)
@@ -259,7 +259,7 @@ func Test__Render_Deploy__HandleWebhook(t *testing.T) {
 				{
 					StatusCode: http.StatusOK,
 					Body: io.NopCloser(strings.NewReader(
-						`{"id":"evt-cph1rs3idesc73a2b2mg","timestamp":"2026-02-08T21:08:59.718Z","serviceId":"srv-cukouhrtq21c73e9scng","type":"deploy_ended","details":{"deployId":"dep-cukouhrtq21c73e9scng","deployStatus":"succeeded"}}`,
+						`{"id":"evt-cph1rs3idesc73a2b2mg","timestamp":"2026-02-08T21:08:59.718Z","serviceId":"srv-cukouhrtq21c73e9scng","type":"deploy_ended","details":{"deployId":"dep-cukouhrtq21c73e9scng","status":"live"}}`,
 					)),
 				},
 			},
