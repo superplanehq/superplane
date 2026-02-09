@@ -179,15 +179,6 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusOK, nil
 	}
 
-	attrs, ok := data["object_attributes"].(map[string]any)
-	if !ok {
-		return http.StatusBadRequest, fmt.Errorf("invalid object_attributes")
-	}
-	state, _ := attrs["state"].(string)
-	if state != "opened" {
-		return http.StatusOK, nil
-	}
-
 	if len(config.Labels) > 0 {
 		eventLabels, ok := data["labels"].([]any)
 		if !ok {

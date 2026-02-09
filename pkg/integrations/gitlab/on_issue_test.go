@@ -118,7 +118,8 @@ func Test__OnIssue__HandleWebhook__StateNotOpened(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code)
 	assert.NoError(t, err)
 
-	assert.Equal(t, 0, eventsCtx.Count())
+	assert.Equal(t, 1, eventsCtx.Count())
+	assert.Equal(t, "gitlab.issue", eventsCtx.Payloads[0].Type)
 }
 
 func Test__OnIssue__HandleWebhook__Success(t *testing.T) {
@@ -185,4 +186,37 @@ func Test__WhitelistedAction__MissingAction(t *testing.T) {
 
 	result := whitelistedAction(data, []string{"open", "close"})
 	assert.False(t, result)
+}
+
+func Test__OnIssue__HandleWebhook__UpdateOnClosed(t *testing.T) {
+	trigger := &OnIssue{}
+
+	headers := http.Header{}
+	headers.Set("X-Gitlab-Event", "Issue Hook")
+	headers.Set("X-Gitlab-Token", "token")
+
+	webhookCtx := &contexts.WebhookContext{Secret: "token"}
+	eventsCtx := &contexts.EventContext{}
+
+	data := map[string]any{
+		"object_attributes": map[string]any{
+			"state":  "closed",
+			"action": "update",
+		},
+	}
+	body, _ := json.Marshal(data)
+
+	ctx := core.WebhookRequestContext{
+		Headers:       headers,
+		Body:          body,
+		Configuration: map[string]any{"project": "123", "actions": []string{"update"}},
+		Webhook:       webhookCtx,
+		Events:        eventsCtx,
+	}
+
+	code, err := trigger.HandleWebhook(ctx)
+	assert.Equal(t, http.StatusOK, code)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 0, eventsCtx.Count())
 }

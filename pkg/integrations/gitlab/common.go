@@ -91,7 +91,17 @@ func whitelistedAction(data map[string]any, allowedActions []string) bool {
 		return false
 	}
 
-	return slices.Contains(allowedActions, actionStr)
+	if !slices.Contains(allowedActions, actionStr) {
+		return false
+	}
+
+	if actionStr == "update" {
+		if state, ok := objAttrs["state"].(string); ok && state != "opened" {
+			return false
+		}
+	}
+
+	return true
 }
 
 func ensureRepoInMetadata(ctx core.MetadataContext, app core.IntegrationContext, projectID string) error {

@@ -132,18 +132,22 @@ type IssueRequest struct {
 }
 
 type Issue struct {
-	ID          int      `json:"id"`
-	IID         int      `json:"iid"`
-	ProjectID   int      `json:"project_id"`
-	Title       string   `json:"title"`
-	Description string   `json:"description"`
-	State       string   `json:"state"`
-	CreatedAt   string   `json:"created_at"`
-	UpdatedAt   string   `json:"updated_at"`
-	Labels      []string `json:"labels"`
-	WebURL      string   `json:"web_url"`
-	Author      User     `json:"author"`
-	Assignees   []User   `json:"assignees"`
+	ID          int        `json:"id"`
+	IID         int        `json:"iid"`
+	ProjectID   int        `json:"project_id"`
+	Title       string     `json:"title"`
+	Description string     `json:"description"`
+	State       string     `json:"state"`
+	CreatedAt   string     `json:"created_at"`
+	UpdatedAt   string     `json:"updated_at"`
+	ClosedAt    *string    `json:"closed_at"`
+	ClosedBy    *User      `json:"closed_by"`
+	Labels      []string   `json:"labels"`
+	Milestone   *Milestone `json:"milestone"`
+	DueDate     *string    `json:"due_date"`
+	WebURL      string     `json:"web_url"`
+	Author      User       `json:"author"`
+	Assignees   []User     `json:"assignees"`
 }
 
 type User struct {

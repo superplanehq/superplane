@@ -206,7 +206,16 @@ func Test__Client__CreateIssue(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockClient := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				GitlabMockResponse(http.StatusCreated, `{"id": 101, "iid": 1, "title": "Test Issue", "web_url": "https://gitlab.com/group/project/issues/1"}`),
+				GitlabMockResponse(http.StatusCreated, `{
+					"id": 101, 
+					"iid": 1, 
+					"title": "Test Issue", 
+					"web_url": "https://gitlab.com/group/project/issues/1",
+					"due_date": "2023-10-27",
+					"milestone": {"id": 12, "title": "v1.0"},
+					"closed_at": "2023-10-28T10:00:00Z",
+					"closed_by": {"id": 5, "username": "closer"}
+				}`),
 			},
 		}
 
@@ -225,6 +234,20 @@ func Test__Client__CreateIssue(t *testing.T) {
 		assert.NotNil(t, result)
 		assert.Equal(t, 101, result.ID)
 		assert.Equal(t, "Test Issue", result.Title)
+
+		require.NotNil(t, result.DueDate)
+		assert.Equal(t, "2023-10-27", *result.DueDate)
+
+		require.NotNil(t, result.Milestone)
+		assert.Equal(t, 12, result.Milestone.ID)
+		assert.Equal(t, "v1.0", result.Milestone.Title)
+
+		require.NotNil(t, result.ClosedAt)
+		assert.Equal(t, "2023-10-28T10:00:00Z", *result.ClosedAt)
+
+		require.NotNil(t, result.ClosedBy)
+		assert.Equal(t, 5, result.ClosedBy.ID)
+		assert.Equal(t, "closer", result.ClosedBy.Username)
 
 		require.Len(t, mockClient.Requests, 1)
 		assert.Equal(t, http.MethodPost, mockClient.Requests[0].Method)
