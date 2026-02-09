@@ -1,0 +1,13 @@
+{
+    "data": {
+        "incident_event": {
+            "id": "evt-123",
+            "event": "Investigation update: database connections stabilized.",
+            "visibility": "internal",
+            "occurred_at": "2026-01-19T12:15:00Z",
+            "created_at": "2026-01-19T12:15:00Z"
+        }
+    },
+    "timestamp": "2026-01-19T12:15:00Z",
+    "type": "rootly.incident.event"
+}
