@@ -153,21 +153,9 @@ func (s *SMTP) HandleRequest(ctx core.HTTPRequestContext) {
 	// SMTP doesn't handle incoming webhooks
 }
 
-func (s *SMTP) CompareWebhookConfig(a, b any) (bool, error) {
-	return true, nil
-}
-
 func (s *SMTP) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	// SMTP doesn't have resources to list
 	return []core.IntegrationResource{}, nil
-}
-
-func (s *SMTP) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	return nil, nil
-}
-
-func (s *SMTP) CleanupWebhook(ctx core.CleanupWebhookContext) error {
-	return nil
 }
 
 func (s *SMTP) Actions() []core.Action {
