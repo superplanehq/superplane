@@ -1,0 +1,18 @@
+{
+  "action": "created",
+  "installation": {"uuid": "24b397fc-a86e-43ef-9297-949e21b82480"},
+  "issue": {
+    "id": "1234567890",
+    "shortId": "PYTHON-Y",
+    "title": "Error: example exception",
+    "culprit": "raven.scripts.runner in main",
+    "permalink": "https://example-org.sentry.io/issues/1234567890/",
+    "level": "error",
+    "status": "unresolved",
+    "project": {"id": "112313123123134", "name": "python", "slug": "python"},
+    "metadata": {"title": "Error: example exception"},
+    "firstSeen": "2025-11-10T20:56:00.679000+00:00",
+    "lastSeen": "2025-11-10T20:56:00.738000+00:00"
+  },
+  "actor": {"type": "application", "id": "example-app", "name": "Example App"}
+}
