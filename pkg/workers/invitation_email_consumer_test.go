@@ -1,9 +1,11 @@
 package workers
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -19,7 +21,8 @@ func Test__InvitationEmailConsumer(t *testing.T) {
 	amqpURL := "amqp://guest:guest@rabbitmq:5672"
 	baseURL := "https://app.superplane.com"
 
-	consumer := NewInvitationEmailConsumer(amqpURL, testEmailService, baseURL)
+	serviceName := fmt.Sprintf("%s.%s", InvitationEmailServiceName, uuid.NewString())
+	consumer := NewInvitationEmailConsumerWithServiceName(amqpURL, testEmailService, baseURL, serviceName)
 
 	go consumer.Start()
 	defer consumer.Stop()
@@ -87,5 +90,6 @@ func TestNewInvitationEmailConsumer(t *testing.T) {
 	assert.Equal(t, rabbitMQURL, consumer.RabbitMQURL)
 	assert.Equal(t, testEmailService, consumer.EmailService)
 	assert.Equal(t, baseURL, consumer.BaseURL)
+	assert.Equal(t, InvitationEmailServiceName, consumer.ServiceName)
 	assert.NotNil(t, consumer.Consumer)
 }

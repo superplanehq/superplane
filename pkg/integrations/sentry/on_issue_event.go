@@ -101,7 +101,7 @@ func (t *OnIssueEvent) Configuration() []configuration.Field {
 			Name:        "webhookSecret",
 			Label:       "Webhook Secret",
 			Type:        configuration.FieldTypeString,
-			Required:    true,
+			Required:    false,
 			Sensitive:   true,
 			Description: "Client Secret from your Sentry Internal Integration (used to verify webhook signatures)",
 			Placeholder: "Paste from Sentry integration settings",
@@ -142,6 +142,9 @@ func (t *OnIssueEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 	if resource != "issue" {
 		return http.StatusOK, nil
 	}
+	if ctx.Webhook == nil {
+		return http.StatusInternalServerError, fmt.Errorf("webhook context is required")
+	}
 
 	signature := ctx.Headers.Get("Sentry-Hook-Signature")
 	if signature == "" {
@@ -150,7 +153,7 @@ func (t *OnIssueEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil || len(secret) == 0 {
-		return http.StatusInternalServerError, fmt.Errorf("webhook secret not configured: %w", err)
+		return http.StatusForbidden, fmt.Errorf("webhook secret is not configured")
 	}
 
 	if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
