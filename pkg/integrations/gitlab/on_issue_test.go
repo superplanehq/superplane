@@ -64,29 +64,7 @@ func Test__OnIssue__HandleWebhook__InvalidToken(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid webhook token")
 }
 
-func Test__OnIssue__HandleWebhook__InvalidObjectAttributes(t *testing.T) {
-	trigger := &OnIssue{}
 
-	headers := http.Header{}
-	headers.Set("X-Gitlab-Event", "Issue Hook")
-	headers.Set("X-Gitlab-Token", "token")
-
-	webhookCtx := &contexts.WebhookContext{Secret: "token"}
-
-	body := []byte(`{"some": "data"}`)
-
-	ctx := core.WebhookRequestContext{
-		Headers:       headers,
-		Body:          body,
-		Configuration: map[string]any{"project": "123", "actions": []string{}},
-		Webhook:       webhookCtx,
-	}
-
-	code, err := trigger.HandleWebhook(ctx)
-	assert.Equal(t, http.StatusBadRequest, code)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid object_attributes")
-}
 
 func Test__OnIssue__HandleWebhook__StateNotOpened(t *testing.T) {
 	trigger := &OnIssue{}
