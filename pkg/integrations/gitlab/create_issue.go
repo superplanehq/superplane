@@ -2,6 +2,7 @@ package gitlab
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -10,6 +11,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
+
+var exampleOutputCreateIssue []byte
 
 type CreateIssue struct{}
 
@@ -36,7 +39,31 @@ func (c *CreateIssue) Description() string {
 }
 
 func (c *CreateIssue) Documentation() string {
-	return `The Create Issue component creates a new issue in a specified GitLab project.`
+	return `The Create Issue component creates a new issue in a specified GitLab project.
+
+## Use Cases
+
+- **Automated Bug Reporting**: Create issues when a monitoring system detects an error
+- **Task Management**: Automatically create tasks for new employee onboarding
+- **Feedback Loop**: Turn customer feedback into actionable issues
+
+## Configuration
+
+- **Project** (required): The GitLab project where the issue will be created
+- **Title** (required): The title of the new issue
+- **Description** (optional): The description/body of the issue
+- **Assignees** (optional): Users to assign the issue to
+- **Labels** (optional): Labels to apply to the issue (e.g., bug, enhancement)
+- **Milestone** (optional): Milestone to associate with the issue
+- **Due Date** (optional): Date when the issue is due
+
+## Output
+
+The component outputs the created issue object, including:
+- **id**: The internal ID of the issue
+- **iid**: The project-relative ID of the issue
+- **web_url**: The URL to view the issue in GitLab
+- **state**: The current state of the issue (opened/closed)`
 }
 
 func (c *CreateIssue) Icon() string {
@@ -52,7 +79,11 @@ func (c *CreateIssue) OutputChannels(configuration any) []core.OutputChannel {
 }
 
 func (c *CreateIssue) ExampleOutput() map[string]any {
-	return map[string]any{}
+	var example map[string]any
+	if err := json.Unmarshal(exampleOutputCreateIssue, &example); err != nil {
+		return map[string]any{}
+	}
+	return example
 }
 
 func (c *CreateIssue) Configuration() []configuration.Field {
