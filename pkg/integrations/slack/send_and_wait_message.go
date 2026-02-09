@@ -205,11 +205,14 @@ func (c *SendAndWaitMessage) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to send message: %w", err)
 	}
 
-	if config.Timeout > 0 {
-		err := ctx.Requests.ScheduleActionCall("timeout", nil, time.Duration(config.Timeout)*time.Second)
-		if err != nil {
-			return fmt.Errorf("failed to schedule timeout: %w", err)
-		}
+	timeout := config.Timeout
+	if timeout <= 0 {
+		timeout = 3600
+	}
+
+	err = ctx.Requests.ScheduleActionCall("timeout", nil, time.Duration(timeout)*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to schedule timeout: %w", err)
 	}
 
 	return nil
