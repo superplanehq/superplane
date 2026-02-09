@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegration("jira", &Jira{})
+	registry.RegisterIntegrationWithWebhookHandler("jira", &Jira{}, &JiraWebhookHandler{})
 }
 
 type Jira struct{}
@@ -437,70 +437,6 @@ func (j *Jira) handleOAuthCallback(ctx core.HTTPRequestContext) {
 		fmt.Sprintf("%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String()),
 		http.StatusSeeOther,
 	)
-}
-
-func (j *Jira) CompareWebhookConfig(a, b any) (bool, error) {
-	var configA, configB WebhookConfiguration
-
-	if err := mapstructure.Decode(a, &configA); err != nil {
-		return false, fmt.Errorf("failed to decode config a: %w", err)
-	}
-
-	if err := mapstructure.Decode(b, &configB); err != nil {
-		return false, fmt.Errorf("failed to decode config b: %w", err)
-	}
-
-	return configA.EventType == configB.EventType && configA.Project == configB.Project, nil
-}
-
-func (j *Jira) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	var config WebhookConfiguration
-	if err := mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config); err != nil {
-		return nil, fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return nil, fmt.Errorf("error creating client: %v", err)
-	}
-
-	jqlFilter := fmt.Sprintf("project = %q", config.Project)
-	events := []string{config.EventType}
-	webhookURL := ctx.Webhook.GetURL()
-
-	response, err := client.RegisterWebhook(webhookURL, jqlFilter, events)
-	if err != nil {
-		return nil, fmt.Errorf("error registering webhook: %v", err)
-	}
-
-	if len(response.WebhookRegistrationResult) == 0 {
-		return nil, fmt.Errorf("no webhook registration result returned")
-	}
-
-	result := response.WebhookRegistrationResult[0]
-	if len(result.Errors) > 0 {
-		return nil, fmt.Errorf("webhook registration failed: %v", result.Errors)
-	}
-
-	return WebhookMetadata{ID: result.CreatedWebhookID}, nil
-}
-
-func (j *Jira) CleanupWebhook(ctx core.CleanupWebhookContext) error {
-	var metadata WebhookMetadata
-	if err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &metadata); err != nil {
-		return fmt.Errorf("failed to decode metadata: %w", err)
-	}
-
-	if metadata.ID == 0 {
-		return nil
-	}
-
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("error creating client: %v", err)
-	}
-
-	return client.DeleteWebhook([]int64{metadata.ID})
 }
 
 func (j *Jira) Actions() []core.Action {

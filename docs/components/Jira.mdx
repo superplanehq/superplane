@@ -16,6 +16,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in Jira" />
+  <LinkCard title="Delete Webhooks" href="#delete-webhooks" description="Delete webhooks registered with Jira" />
+  <LinkCard title="List Webhooks" href="#list-webhooks" description="List all webhooks registered with Jira for this OAuth app" />
 </CardGrid>
 
 <a id="on-issue-created"></a>
@@ -132,6 +134,47 @@ Returns the created issue including:
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "jira.issue"
+}
+```
+
+<a id="delete-webhooks"></a>
+
+## Delete Webhooks
+
+Delete webhooks registered via the Jira REST API.
+
+You can either:
+- Delete a specific webhook by providing its ID
+- Delete all webhooks by enabling "Delete All"
+
+### Example Output
+
+```json
+{
+  "message": "All webhooks deleted"
+}
+```
+
+<a id="list-webhooks"></a>
+
+## List Webhooks
+
+Lists all webhooks registered via the Jira REST API for the current OAuth application.
+
+### Example Output
+
+```json
+{
+  "total": 1,
+  "webhooks": [
+    {
+      "events": [
+        "jira:issue_created"
+      ],
+      "id": 12345,
+      "jqlFilter": "project = TEST"
+    }
+  ]
 }
 ```
 

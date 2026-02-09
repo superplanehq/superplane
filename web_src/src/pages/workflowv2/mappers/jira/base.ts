@@ -6,6 +6,8 @@ import {
   ComponentBaseMapper,
   ComponentBaseContext,
   SubtitleContext,
+  ExecutionDetailsContext,
+  OutputPayload,
   ExecutionInfo,
   NodeInfo,
 } from "../types";
@@ -37,6 +39,17 @@ export const baseJiraMapper: ComponentBaseMapper = {
   subtitle(context: SubtitleContext): string {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
     return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
+  },
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const details: Record<string, string> = {};
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+    const payload = outputs?.default?.[0];
+
+    if (payload?.type) {
+      details["Event Type"] = payload.type;
+    }
+
+    return details;
   },
 };
 
