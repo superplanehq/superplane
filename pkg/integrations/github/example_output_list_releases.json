@@ -1,0 +1,39 @@
+{
+  "data": [
+    {
+      "url": "https://api.github.com/repos/acme/widgets/releases/282931220",
+      "assets_url": "https://api.github.com/repos/acme/widgets/releases/282931220/assets",
+      "upload_url": "https://uploads.github.com/repos/acme/widgets/releases/282931220/assets{?name,label}",
+      "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
+      "id": 3001,
+      "author": {
+        "login": "octocat",
+        "id": 1,
+        "avatar_url": "https://github.com/images/error/octocat_happy.gif",
+        "html_url": "https://github.com/octocat"
+      },
+      "tag_name": "v1.2.3",
+      "name": "Acme Widgets 1.2.3",
+      "body": "## Bug Fixes\n- Fix token generation when issuer is unset\n- Improve DAG serialization stability",
+      "draft": false,
+      "prerelease": false,
+      "created_at": "2026-01-15T10:00:00Z",
+      "published_at": "2026-01-16T12:00:00Z",
+      "assets": [
+        {
+          "id": 1,
+          "name": "app-v1.2.3.zip",
+          "label": "Application Bundle",
+          "content_type": "application/zip",
+          "size": 1024000,
+          "download_count": 42,
+          "browser_download_url": "https://github.com/acme/widgets/releases/download/v1.2.3/app-v1.2.3.zip"
+        }
+      ],
+      "tarball_url": "https://api.github.com/repos/acme/widgets/tarball/v1.2.3",
+      "zipball_url": "https://api.github.com/repos/acme/widgets/zipball/v1.2.3"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.releases.list"
+}
