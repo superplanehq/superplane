@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -38,6 +39,7 @@ func Test__OnIssue__HandleWebhook__WrongEventType(t *testing.T) {
 		Body:          []byte(`{}`),
 		Configuration: map[string]any{"project": "123", "actions": []string{"open"}},
 		Events:        eventsCtx,
+		Logger:        log.NewEntry(log.New()),
 	}
 
 	code, err := trigger.HandleWebhook(ctx)
@@ -60,6 +62,7 @@ func Test__OnIssue__HandleWebhook__InvalidToken(t *testing.T) {
 		Body:          []byte(`{}`),
 		Configuration: map[string]any{"project": "123", "actions": []string{"open"}},
 		Webhook:       webhookCtx,
+		Logger:        log.NewEntry(log.New()),
 	}
 
 	code, err := trigger.HandleWebhook(ctx)
@@ -92,6 +95,7 @@ func Test__OnIssue__HandleWebhook__StateNotOpened(t *testing.T) {
 		Configuration: map[string]any{"project": "123", "actions": []string{"close"}},
 		Webhook:       webhookCtx,
 		Events:        eventsCtx,
+		Logger:        log.NewEntry(log.New()),
 	}
 
 	code, err := trigger.HandleWebhook(ctx)
@@ -127,6 +131,7 @@ func Test__OnIssue__HandleWebhook__Success(t *testing.T) {
 		Configuration: map[string]any{"project": "123", "actions": []string{"open"}},
 		Webhook:       webhookCtx,
 		Events:        eventsCtx,
+		Logger:        log.NewEntry(log.New()),
 	}
 
 	code, err := trigger.HandleWebhook(ctx)
@@ -168,6 +173,7 @@ func Test__OnIssue__HandleWebhook__Filters(t *testing.T) {
 			Configuration: map[string]any{"project": "123", "actions": []string{"open"}, "labels": []configuration.Predicate{{Type: configuration.PredicateTypeEquals, Value: "backend"}}},
 			Webhook:       webhookCtx,
 			Events:        eventsCtx,
+			Logger:        log.NewEntry(log.New()),
 		}
 
 		code, err := trigger.HandleWebhook(ctx)
@@ -194,6 +200,7 @@ func Test__OnIssue__HandleWebhook__Filters(t *testing.T) {
 			Configuration: map[string]any{"project": "123", "actions": []string{"open"}, "labels": []configuration.Predicate{{Type: configuration.PredicateTypeEquals, Value: "backend"}}},
 			Webhook:       webhookCtx,
 			Events:        eventsCtx,
+			Logger:        log.NewEntry(log.New()),
 		}
 
 		code, err := trigger.HandleWebhook(ctx)
@@ -214,7 +221,7 @@ func Test__WhitelistedAction__ValidAction(t *testing.T) {
 				"action": "open",
 			},
 		}
-		result := trigger.whitelistedAction(data, []string{"open", "close"})
+		result := trigger.whitelistedAction(log.NewEntry(log.New()), data, []string{"open", "close"})
 		assert.True(t, result)
 	})
 
@@ -225,7 +232,7 @@ func Test__WhitelistedAction__ValidAction(t *testing.T) {
 			},
 		}
 
-		result := trigger.whitelistedAction(data, []string{"open", "close"})
+		result := trigger.whitelistedAction(log.NewEntry(log.New()), data, []string{"open", "close"})
 		assert.False(t, result)
 	})
 
@@ -234,7 +241,7 @@ func Test__WhitelistedAction__ValidAction(t *testing.T) {
 			"object_attributes": map[string]any{},
 		}
 
-		result := trigger.whitelistedAction(data, []string{"open", "close"})
+		result := trigger.whitelistedAction(log.NewEntry(log.New()), data, []string{"open", "close"})
 		assert.False(t, result)
 	})
 
@@ -264,6 +271,7 @@ func Test__OnIssue__HandleWebhook__UpdateOnClosed(t *testing.T) {
 		Configuration: map[string]any{"project": "123", "actions": []string{"update"}},
 		Webhook:       webhookCtx,
 		Events:        eventsCtx,
+		Logger:        log.NewEntry(log.New()),
 	}
 
 	code, err := trigger.HandleWebhook(ctx)
