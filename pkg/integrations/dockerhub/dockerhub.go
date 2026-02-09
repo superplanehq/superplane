@@ -89,7 +89,8 @@ func (d *DockerHub) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if err := refreshAccessToken(ctx.HTTP, ctx.Integration); err != nil {
+	expiresAt, err := refreshAccessToken(ctx.HTTP, ctx.Integration, config)
+	if err != nil {
 		return fmt.Errorf("failed to refresh access token: %w", err)
 	}
 
@@ -102,7 +103,7 @@ func (d *DockerHub) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to validate Docker Hub credentials: %w", err)
 	}
 
-	if err := ctx.Integration.ScheduleActionCall("refreshAccessToken", map[string]any{}, accessTokenRefreshInterval); err != nil {
+	if err := scheduleAccessTokenRefresh(ctx.Integration, expiresAt); err != nil {
 		return fmt.Errorf("failed to schedule token refresh: %w", err)
 	}
 
@@ -135,11 +136,12 @@ func (d *DockerHub) HandleAction(ctx core.IntegrationActionContext) error {
 			return fmt.Errorf("failed to decode configuration: %w", err)
 		}
 
-		if err := refreshAccessToken(ctx.HTTP, ctx.Integration); err != nil {
+		expiresAt, err := refreshAccessToken(ctx.HTTP, ctx.Integration, config)
+		if err != nil {
 			return fmt.Errorf("failed to refresh access token: %w", err)
 		}
 
-		return ctx.Integration.ScheduleActionCall("refreshAccessToken", map[string]any{}, accessTokenRefreshInterval)
+		return scheduleAccessTokenRefresh(ctx.Integration, expiresAt)
 
 	default:
 		return fmt.Errorf("unknown action: %s", ctx.Name)
