@@ -59,9 +59,15 @@ type Configuration struct {
 }
 
 type Metadata struct {
-	State    string            `mapstructure:"state" json:"state"`
-	Owner    string            `mapstructure:"owner" json:"owner"`
+	State    *string           `mapstructure:"state,omitempty" json:"state,omitempty"`
 	Projects []ProjectMetadata `mapstructure:"projects" json:"projects"`
+	User     *UserMetadata     `mapstructure:"user,omitempty" json:"user,omitempty"`
+}
+
+type UserMetadata struct {
+	ID       int    `mapstructure:"id" json:"id"`
+	Name     string `mapstructure:"name" json:"name"`
+	Username string `mapstructure:"username" json:"username"`
 }
 
 type ProjectMetadata struct {
@@ -200,11 +206,15 @@ func (g *GitLab) Sync(ctx core.SyncContext) error {
 
 func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) error {
 	baseURL := configuration.BaseURL
-
 	callbackURL := fmt.Sprintf("%s/api/v1/integrations/%s/callback", ctx.BaseURL, ctx.Integration.ID())
 
-	// Case 1: No credentials yet - show setup instructions
-	if configuration.ClientID == "" || configuration.ClientSecret == "" {
+	clientID, _ := ctx.Integration.GetConfig("clientId")
+	clientSecret, _ := ctx.Integration.GetConfig("clientSecret")
+
+	//
+	// If no client ID or secret, show setup instructions
+	//
+	if string(clientID) == "" || string(clientSecret) == "" {
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
 			Description: fmt.Sprintf(appSetupDescription, callbackURL, strings.Join(scopeList, ", ")),
 			URL:         fmt.Sprintf("%s/-/user_settings/applications", baseURL),
@@ -214,79 +224,22 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 		return nil
 	}
 
-	// Case 2: Has credentials but no tokens - show auth button
-	refreshToken, _ := findSecret(ctx.Integration, OAuthRefreshToken)
+	//
+	// If access token is not available, ask user to authorize the app.
+	//
 	accessToken, _ := findSecret(ctx.Integration, OAuthAccessToken)
-
-	if refreshToken == "" && accessToken == "" {
-		metadata := Metadata{}
-		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
-			ctx.Logger.Errorf("Failed to decode metadata while setting state: %v", err)
-		}
-
-		state := metadata.State
-		if state == "" {
-			var err error
-			state, err = crypto.Base64String(32)
-			if err != nil {
-				return fmt.Errorf("failed to generate state: %v", err)
-			}
-			metadata.State = state
-			ctx.Integration.SetMetadata(metadata)
-		}
-
-		authURL := fmt.Sprintf(
-			"%s/oauth/authorize?client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s",
-			baseURL,
-			url.QueryEscape(configuration.ClientID),
-			url.QueryEscape(callbackURL),
-			url.QueryEscape(strings.Join(scopeList, " ")),
-			url.QueryEscape(state),
-		)
-
-		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: appConnectDescription,
-			URL:         authURL,
-			Method:      "GET",
-		})
-
-		return nil
+	if accessToken == "" {
+		return g.handleOAuthNoAccessToken(ctx, baseURL, callbackURL, string(clientID))
 	}
 
-	// STEP 3: Has tokens - refresh them if possible, then update metadata
-	if refreshToken != "" {
-		auth := NewAuth(ctx.HTTP)
-		tokenResponse, err := auth.RefreshToken(baseURL, configuration.ClientID, configuration.ClientSecret, refreshToken)
-
-		if err != nil {
-			ctx.Integration.Error(fmt.Sprintf("Failed to refresh token: %v", err))
-
-			_ = ctx.Integration.SetSecret(OAuthRefreshToken, []byte(""))
-			_ = ctx.Integration.SetSecret(OAuthAccessToken, []byte(""))
-			return nil
-		}
-
-		if tokenResponse.AccessToken != "" {
-			if err := ctx.Integration.SetSecret(OAuthAccessToken, []byte(tokenResponse.AccessToken)); err != nil {
-				ctx.Integration.Error("Failed to save access token")
-				return nil
-			}
-		}
-
-		if tokenResponse.RefreshToken != "" {
-			if err := ctx.Integration.SetSecret(OAuthRefreshToken, []byte(tokenResponse.RefreshToken)); err != nil {
-				ctx.Integration.Error("Failed to save refresh token")
-				return nil
-			}
-		}
-
-		if err := ctx.Integration.ScheduleResync(tokenResponse.GetExpiration()); err != nil {
-			ctx.Integration.Error("Failed to schedule resync")
-			return nil
-		}
-	} else {
-		// No refresh token, but we have an access token.
-		ctx.Logger.Warn("GitLab integration has access token but no refresh token. Token refresh will not be possible.")
+	//
+	// If refresh token is available, refresh the token
+	// and update the metadata.
+	//
+	err := g.refreshToken(ctx, baseURL, string(clientID), string(clientSecret))
+	if err != nil {
+		ctx.Logger.Errorf("Failed to refresh token: %v", err)
+		return err
 	}
 
 	if err := g.updateMetadata(ctx); err != nil {
@@ -296,6 +249,77 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 
 	ctx.Integration.RemoveBrowserAction()
 	ctx.Integration.Ready()
+	return nil
+}
+
+func (g *GitLab) refreshToken(ctx core.SyncContext, baseURL, clientID, clientSecret string) error {
+	refreshToken, _ := findSecret(ctx.Integration, OAuthRefreshToken)
+	if refreshToken == "" {
+		ctx.Logger.Warn("GitLab integration has no refresh token - not refreshing token")
+		return nil
+	}
+
+	ctx.Logger.Info("Refreshing GitLab token")
+	auth := NewAuth(ctx.HTTP)
+	tokenResponse, err := auth.RefreshToken(baseURL, clientID, clientSecret, refreshToken)
+
+	if err != nil {
+		_ = ctx.Integration.SetSecret(OAuthRefreshToken, []byte(""))
+		_ = ctx.Integration.SetSecret(OAuthAccessToken, []byte(""))
+		return fmt.Errorf("failed to refresh token: %v", err)
+	}
+
+	if tokenResponse.AccessToken != "" {
+		ctx.Logger.Info("Saving access token")
+		err := ctx.Integration.SetSecret(OAuthAccessToken, []byte(tokenResponse.AccessToken))
+		if err != nil {
+			return fmt.Errorf("failed to save access token: %v", err)
+		}
+	}
+
+	if tokenResponse.RefreshToken != "" {
+		ctx.Logger.Info("Saving refresh token")
+		err := ctx.Integration.SetSecret(OAuthRefreshToken, []byte(tokenResponse.RefreshToken))
+		if err != nil {
+			return fmt.Errorf("failed to save refresh token: %v", err)
+		}
+	}
+
+	ctx.Logger.Info("Token refreshed successfully")
+	return ctx.Integration.ScheduleResync(tokenResponse.GetExpiration())
+}
+
+func (g *GitLab) handleOAuthNoAccessToken(ctx core.SyncContext, baseURL string, callbackURL string, clientID string) error {
+	metadata := Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		ctx.Logger.Errorf("Failed to decode metadata while setting state: %v", err)
+	}
+
+	if metadata.State == nil {
+		var err error
+		s, err := crypto.Base64String(32)
+		if err != nil {
+			return fmt.Errorf("failed to generate state: %v", err)
+		}
+		metadata.State = &s
+		ctx.Integration.SetMetadata(metadata)
+	}
+
+	authURL := fmt.Sprintf(
+		"%s/oauth/authorize?client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s",
+		baseURL,
+		url.QueryEscape(clientID),
+		url.QueryEscape(callbackURL),
+		url.QueryEscape(strings.Join(scopeList, " ")),
+		url.QueryEscape(*metadata.State),
+	)
+
+	ctx.Integration.NewBrowserAction(core.BrowserAction{
+		Description: appConnectDescription,
+		URL:         authURL,
+		Method:      "GET",
+	})
+
 	return nil
 }
 
@@ -345,14 +369,12 @@ func (g *GitLab) updateMetadata(ctx core.SyncContext) error {
 	}
 
 	metadata.Projects = ps
-	if user != nil {
-		metadata.Owner = fmt.Sprintf("%d", user.ID)
+	metadata.State = nil
+	metadata.User = &UserMetadata{
+		ID:       user.ID,
+		Name:     user.Name,
+		Username: user.Username,
 	}
-
-	//
-	// Clear state after successful connection
-	//
-	metadata.State = ""
 
 	ctx.Integration.SetMetadata(metadata)
 
@@ -403,7 +425,7 @@ func (g *GitLab) handleCallback(ctx core.HTTPRequestContext, config *Configurati
 	redirectURI := fmt.Sprintf("%s/api/v1/integrations/%s/callback", redirectBaseURL, ctx.Integration.ID().String())
 
 	auth := NewAuth(ctx.HTTP)
-	tokenResponse, err := auth.HandleCallback(ctx.Request, config, metadata.State, redirectURI)
+	tokenResponse, err := auth.HandleCallback(ctx.Request, config, *metadata.State, redirectURI)
 
 	if err != nil {
 		ctx.Logger.Errorf("Callback error: %v", err)

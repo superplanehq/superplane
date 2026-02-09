@@ -47,6 +47,7 @@ func Test__GitLab__Sync(t *testing.T) {
 			Configuration: ctx.Configuration,
 			Integration:   ctx,
 			HTTP:          mockHTTP,
+			Logger:        logrus.NewEntry(logrus.New()),
 		})
 
 		require.NoError(t, err)
@@ -125,7 +126,11 @@ func Test__GitLab__Sync(t *testing.T) {
 				"clientSecret": "secret",
 			},
 			Metadata: Metadata{
-				Owner: "existing-owner",
+				User: &UserMetadata{
+					ID:       123,
+					Name:     "John Doe",
+					Username: "johndoe",
+				},
 			},
 		}
 
@@ -142,7 +147,9 @@ func Test__GitLab__Sync(t *testing.T) {
 		// Verify metadata preservation
 		metadata, ok := ctx.Metadata.(Metadata)
 		assert.True(t, ok)
-		assert.Equal(t, "existing-owner", metadata.Owner)
+		assert.Equal(t, 123, metadata.User.ID)
+		assert.Equal(t, "John Doe", metadata.User.Name)
+		assert.Equal(t, "johndoe", metadata.User.Username)
 		assert.NotEmpty(t, metadata.State)
 	})
 
@@ -155,6 +162,7 @@ func Test__GitLab__Sync(t *testing.T) {
 				"clientSecret": "secret",
 			},
 			Secrets: map[string]core.IntegrationSecret{
+				OAuthAccessToken:  {Name: OAuthAccessToken, Value: []byte("access-token")},
 				OAuthRefreshToken: {Name: OAuthRefreshToken, Value: []byte("refresh-token")},
 			},
 		}
@@ -167,7 +175,7 @@ func Test__GitLab__Sync(t *testing.T) {
 					"expires_in": 7200,
 					"token_type": "Bearer"
 				}`),
-				GitlabMockResponse(http.StatusOK, `{"id": 1}`),
+				GitlabMockResponse(http.StatusOK, `{"id": 1, "name": "John Doe", "username": "johndoe"}`),
 				GitlabMockResponse(http.StatusOK, `[{"id": 1, "path_with_namespace": "group/project1", "web_url": "https://gitlab.com/group/project1"}]`),
 			},
 		}
@@ -176,6 +184,7 @@ func Test__GitLab__Sync(t *testing.T) {
 			Configuration: ctx.Configuration,
 			Integration:   ctx,
 			HTTP:          mockHTTP,
+			Logger:        logrus.NewEntry(logrus.New()),
 		})
 
 		require.NoError(t, err)
@@ -258,7 +267,7 @@ func Test__GitLab__HandleRequest(t *testing.T) {
 	t.Run("handle callback success", func(t *testing.T) {
 		state := "xyz"
 		ctx := &contexts.IntegrationContext{
-			Metadata: Metadata{State: state},
+			Metadata: Metadata{State: &state},
 			Configuration: map[string]any{
 				"clientId":     "id",
 				"clientSecret": "secret",
@@ -279,8 +288,8 @@ func Test__GitLab__HandleRequest(t *testing.T) {
 						"refresh_token": "refresh",
 						"expires_in": 3600
 					}`),
-				GitlabMockResponse(http.StatusOK, `{"id": 1}`),
-				GitlabMockResponse(http.StatusOK, `[{"id": 1}]`),
+				GitlabMockResponse(http.StatusOK, `{"id": 1, "name": "John Doe", "username": "johndoe"}`),
+				GitlabMockResponse(http.StatusOK, `[{"id": 1, "path_with_namespace": "group/project1", "web_url": "https://gitlab.com/group/project1"}]`),
 			},
 		}
 
@@ -302,7 +311,9 @@ func Test__GitLab__HandleRequest(t *testing.T) {
 		assert.Equal(t, "https://gitlab.com/api/v4/user", mockHTTP.Requests[1].URL.String())
 		assert.Equal(t, "https://gitlab.com/api/v4/groups/123/projects?include_subgroups=true&per_page=100&page=1", mockHTTP.Requests[2].URL.String())
 
-		assert.Equal(t, "1", ctx.Metadata.(Metadata).Owner)
+		assert.Equal(t, 1, ctx.Metadata.(Metadata).User.ID)
+		assert.Equal(t, "John Doe", ctx.Metadata.(Metadata).User.Name)
+		assert.Equal(t, "johndoe", ctx.Metadata.(Metadata).User.Username)
 		assert.Len(t, ctx.Metadata.(Metadata).Projects, 1)
 	})
 
@@ -323,8 +334,9 @@ func Test__GitLab__HandleRequest(t *testing.T) {
 		})
 
 		t.Run("callback failure", func(t *testing.T) {
+			state := "valid-state"
 			ctx := &contexts.IntegrationContext{
-				Metadata: Metadata{State: "valid-state"},
+				Metadata: Metadata{State: &state},
 				Configuration: map[string]any{
 					"clientId":     "id",
 					"clientSecret": "secret",

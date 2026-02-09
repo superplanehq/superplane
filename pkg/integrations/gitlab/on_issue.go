@@ -223,7 +223,11 @@ func (i *OnIssue) hasWhitelistedLabel(data map[string]any, allowedLabels []confi
 	}
 
 	for _, label := range labels {
-		labelMap := label.(map[string]any)
+		labelMap, ok := label.(map[string]any)
+		if !ok {
+			continue
+		}
+
 		title, _ := labelMap["title"].(string)
 		if configuration.MatchesAnyPredicate(allowedLabels, title) {
 			return true
