@@ -1,0 +1,16 @@
+{
+    "type": "rootly.incident",
+    "data": {
+        "incident": {
+            "id": "abc123-def456",
+            "title": "Database connection issues (updated)",
+            "summary": "Issue mitigated. Monitoring impact.",
+            "status": "mitigated",
+            "severity": "sev2",
+            "started_at": "2026-01-19T12:00:00Z",
+            "mitigated_at": "2026-01-19T12:30:00Z",
+            "url": "https://app.rootly.com/incidents/abc123-def456"
+        }
+    },
+    "timestamp": "2026-01-19T12:31:00Z"
+}

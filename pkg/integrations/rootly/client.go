@@ -422,6 +422,63 @@ func (c *Client) CreateWebhookEndpoint(url string, events []string) (*WebhookEnd
 	}, nil
 }
 
+// UpdateIncidentRequest represents the request to update an incident
+type UpdateIncidentRequest struct {
+	Data UpdateIncidentData `json:"data"`
+}
+
+type UpdateIncidentData struct {
+	Type       string                   `json:"type"`
+	ID         string                   `json:"id"`
+	Attributes UpdateIncidentAttributes `json:"attributes"`
+}
+
+type UpdateIncidentAttributes struct {
+	Title      string `json:"title,omitempty"`
+	Summary    string `json:"summary,omitempty"`
+	Status     string `json:"status,omitempty"`
+	SeverityID string `json:"severity_id,omitempty"`
+}
+
+func (c *Client) UpdateIncident(id string, attrs UpdateIncidentAttributes) (*Incident, error) {
+	request := UpdateIncidentRequest{
+		Data: UpdateIncidentData{
+			Type:       "incidents",
+			ID:         id,
+			Attributes: attrs,
+		},
+	}
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/incidents/%s", c.BaseURL, id)
+	responseBody, err := c.execRequest(http.MethodPatch, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response IncidentResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &Incident{
+		ID:          response.Data.ID,
+		Title:       response.Data.Attributes.Title,
+		Summary:     response.Data.Attributes.Summary,
+		Status:      response.Data.Attributes.Status,
+		Severity:    response.Data.Attributes.Severity,
+		StartedAt:   response.Data.Attributes.StartedAt,
+		ResolvedAt:  response.Data.Attributes.ResolvedAt,
+		MitigatedAt: response.Data.Attributes.MitigatedAt,
+		URL:         response.Data.Attributes.URL,
+	}, nil
+}
+
 func (c *Client) DeleteWebhookEndpoint(id string) error {
 	url := fmt.Sprintf("%s/webhooks/endpoints/%s", c.BaseURL, id)
 	_, err := c.execRequest(http.MethodDelete, url, nil)
