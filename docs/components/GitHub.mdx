@@ -28,6 +28,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitHub repository" />
+  <LinkCard title="List Releases" href="#list-releases" description="List releases for a GitHub repository" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
@@ -1182,6 +1183,61 @@ Returns release information including:
     "tag_name": "v1.2.3"
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.release"
+}
+```
+
+<a id="list-releases"></a>
+
+## List Releases
+
+The List Releases component fetches releases from a GitHub repository.
+
+### Use Cases
+
+- **Changelog/reporting**: Fetch recent releases for dashboards or reports
+- **Notifications**: Notify on the latest N releases
+- **Sync**: Mirror releases to external systems
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Per page**: Optional page size (max 100)
+- **Page**: Optional page number for pagination (1-based)
+
+### Output
+
+Emits one payload per release with fields like:
+- id, tag_name, name, body
+- created_at, published_at
+- assets, tarball_url, zipball_url
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assets": [
+      {
+        "browser_download_url": "https://github.com/acme/widgets/releases/download/v2.0.0/widgets-v2.0.0.zip",
+        "content_type": "application/zip",
+        "download_count": 17,
+        "id": 2,
+        "name": "widgets-v2.0.0.zip",
+        "size": 2048000
+      }
+    ],
+    "body": "## What's Changed\n\n- Major refactor\n- Performance improvements",
+    "created_at": "2026-01-20T10:00:00Z",
+    "draft": false,
+    "html_url": "https://github.com/acme/widgets/releases/tag/v2.0.0",
+    "id": 4001,
+    "name": "Release 2.0.0",
+    "prerelease": false,
+    "published_at": "2026-01-21T12:00:00Z",
+    "tag_name": "v2.0.0"
+  },
+  "timestamp": "2026-01-21T17:56:16.680755501Z",
   "type": "github.release"
 }
 ```
