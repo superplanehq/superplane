@@ -1,0 +1,19 @@
+{
+  "days": [
+    {
+      "date": "2026-02-01",
+      "models": {
+        "claude-4-sonnet": {
+          "chat_requests": 12,
+          "composer_requests": 4,
+          "agent_requests": 1
+        }
+      },
+      "accepts": 38,
+      "rejects": 7,
+      "lines_added": 420,
+      "lines_deleted": 120
+    }
+  ]
+}
+

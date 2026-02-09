@@ -1,0 +1,122 @@
+---
+title: "Cursor"
+---
+
+Launch Cursor background agents and fetch team usage analytics
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Get Daily Usage Data" href="#get-daily-usage-data" description="Fetch Cursor team daily usage data (Admin API)" />
+  <LinkCard title="Launch Cloud Agent" href="#launch-cloud-agent" description="Launch a Cursor background agent for a repository and wait for completion" />
+</CardGrid>
+
+## Instructions
+
+Create a Cursor API key in Cursor Dashboard -> Integrations.
+
+<a id="get-daily-usage-data"></a>
+
+## Get Daily Usage Data
+
+Fetches team daily usage data from the Cursor Admin API.
+
+### Requirements
+
+This component requires a Cursor Admin API key (team admin access). Some Cursor plans may not support this API.
+
+### Configuration
+
+- **Start Date**: Default `7d` (e.g., 7d, 30d, 2026-02-01, RFC3339)
+- **End Date**: Default `today` (e.g., today, 2026-02-08)
+
+### Output
+
+Emits `cursor.usage.daily` with the response JSON from Cursor.
+
+### Example Output
+
+```json
+{
+  "days": [
+    {
+      "accepts": 38,
+      "date": "2026-02-01",
+      "lines_added": 420,
+      "lines_deleted": 120,
+      "models": {
+        "claude-4-sonnet": {
+          "agent_requests": 1,
+          "chat_requests": 12,
+          "composer_requests": 4
+        }
+      },
+      "rejects": 7
+    }
+  ]
+}
+```
+
+<a id="launch-cloud-agent"></a>
+
+## Launch Cloud Agent
+
+Launches a Cursor background agent and waits for completion.
+
+### Configuration
+
+- **Repository**: Git repository URL (e.g., https://github.com/org/repo)
+- **Ref**: Branch/tag/commit SHA (defaults to main)
+- **Prompt**: Task instructions for the agent
+- **Model**: Optional Cursor model identifier
+- **Auto-create PR**: Create a PR when the agent finishes
+
+### Output
+
+Emits `cursor.agent.completed` when the agent reaches FINISHED, including final status payload and target URLs (PR URL when created).
+
+### Notes
+
+- Uses a per-execution webhook secret to verify completion callbacks.
+- Falls back to polling agent status if webhook delivery is delayed.
+
+### Example Output
+
+```json
+{
+  "agent": {
+    "createdAt": "2026-02-05T12:34:56Z",
+    "id": "agent_12345",
+    "source": {
+      "ref": "main",
+      "repository": "https://github.com/acme/widgets"
+    },
+    "status": "FINISHED",
+    "summary": "Updated README with setup instructions.",
+    "target": {
+      "branchName": "feature/update-readme",
+      "prUrl": "https://github.com/acme/widgets/pull/42",
+      "url": "https://github.com/acme/widgets/tree/feature/update-readme"
+    }
+  },
+  "status": {
+    "event": "statusChange",
+    "id": "agent_12345",
+    "source": {
+      "ref": "main",
+      "repository": "https://github.com/acme/widgets"
+    },
+    "status": "FINISHED",
+    "summary": "Updated README with setup instructions.",
+    "target": {
+      "branchName": "feature/update-readme",
+      "prUrl": "https://github.com/acme/widgets/pull/42",
+      "url": "https://github.com/acme/widgets/tree/feature/update-readme"
+    },
+    "timestamp": "2026-02-05T12:40:10Z"
+  }
+}
+```
+
