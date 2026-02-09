@@ -90,23 +90,22 @@ func Test__OnIssueEvent__HandleWebhook(t *testing.T) {
 		assert.ErrorContains(t, err, "missing Sentry-Hook-Signature")
 	})
 
-	t.Run("no configured secret and missing Sentry-Hook-Signature -> 200 emit", func(t *testing.T) {
+	t.Run("missing configured secret -> 500", func(t *testing.T) {
 		body := []byte(`{"action":"created","data":{"issue":{"id":"123","title":"Error"}},"installation":{"uuid":"inst-1"},"actor":{"name":"Sentry"}}`)
 		headers := http.Header{}
 		headers.Set("Sentry-Hook-Resource", "issue")
+		headers.Set("Sentry-Hook-Signature", signatureFor("secret", body))
 
-		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: config,
 			Webhook:       &contexts.WebhookContext{Secret: ""},
-			Events:        eventContext,
+			Events:        &contexts.EventContext{},
 		})
 
-		assert.Equal(t, http.StatusOK, code)
-		assert.NoError(t, err)
-		assert.Equal(t, 1, eventContext.Count())
+		assert.Equal(t, http.StatusInternalServerError, code)
+		assert.ErrorContains(t, err, "webhook secret is required")
 	})
 
 	t.Run("invalid signature -> 403", func(t *testing.T) {
