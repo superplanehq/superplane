@@ -160,16 +160,11 @@ func (j *Jira) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (j *Jira) Sync(ctx core.SyncContext) error {
-	ctx.Logger.Infof("Sync: starting, configuration=%+v", ctx.Configuration)
-
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		ctx.Logger.Errorf("Sync: failed to decode config: %v", err)
 		return fmt.Errorf("failed to decode config: %v", err)
 	}
-
-	ctx.Logger.Infof("Sync: authType=%s", config.AuthType)
 
 	if config.AuthType == AuthTypeOAuth {
 		return j.oauthSync(ctx, config)
@@ -212,43 +207,26 @@ func (j *Jira) apiTokenSync(ctx core.SyncContext, config Configuration) error {
 }
 
 func (j *Jira) oauthSync(ctx core.SyncContext, config Configuration) error {
-	ctx.Logger.Infof("oauthSync: starting")
-
 	if config.ClientID == nil || *config.ClientID == "" {
-		ctx.Logger.Errorf("oauthSync: clientId is required")
 		return fmt.Errorf("clientId is required")
 	}
 
-	// Get existing metadata
 	metadata := Metadata{}
 	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
-	ctx.Logger.Infof("oauthSync: existing metadata cloudID=%s, state=%s", metadata.CloudID, metadata.State)
 
-	// Check if we already have valid tokens
 	accessToken, _ := findOAuthSecret(ctx.Integration, OAuthAccessToken)
-	ctx.Logger.Infof("oauthSync: hasAccessToken=%v, hasCloudID=%v", accessToken != "", metadata.CloudID != "")
 
 	if accessToken != "" && metadata.CloudID != "" {
-		ctx.Logger.Infof("oauthSync: attempting to use existing tokens")
-		// Try to use existing tokens
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
 		if err == nil {
 			_, err = client.GetCurrentUser()
 			if err == nil {
-				// Tokens are still valid, refresh projects and mark ready
 				projects, err := client.ListProjects()
 				if err == nil {
-					ctx.Logger.Infof("oauthSync: tokens valid, found %d projects", len(projects))
 					metadata.Projects = projects
 					ctx.Integration.SetMetadata(metadata)
-					ctx.Logger.Infof("oauthSync: calling Ready()")
 					ctx.Integration.Ready()
-					ctx.Logger.Infof("oauthSync: Ready() called, scheduling resync")
-
-					// Schedule token refresh (30 minutes)
-					resyncErr := ctx.Integration.ScheduleResync(30 * time.Minute)
-					ctx.Logger.Infof("oauthSync: ScheduleResync returned: %v", resyncErr)
-					return resyncErr
+					return ctx.Integration.ScheduleResync(30 * time.Minute)
 				}
 				ctx.Logger.Errorf("oauthSync: failed to list projects: %v", err)
 			} else {
@@ -297,9 +275,7 @@ func (j *Jira) oauthSync(ctx core.SyncContext, config Configuration) error {
 	ctx.Integration.SetMetadata(metadata)
 
 	redirectURI := fmt.Sprintf("%s/api/v1/integrations/%s/callback", ctx.WebhooksBaseURL, ctx.Integration.ID().String())
-	ctx.Logger.Infof("oauthSync: WebhooksBaseURL=%s, redirectURI=%s", ctx.WebhooksBaseURL, redirectURI)
 	authURL := buildAuthorizationURL(*config.ClientID, redirectURI, state)
-	ctx.Logger.Infof("oauthSync: authURL=%s", authURL)
 
 	ctx.Integration.NewBrowserAction(core.BrowserAction{
 		Description: "Authorize with Atlassian",
@@ -405,7 +381,6 @@ func (j *Jira) handleOAuthCallback(ctx core.HTTPRequestContext) {
 	}
 
 	redirectURI := fmt.Sprintf("%s/api/v1/integrations/%s/callback", ctx.WebhooksBaseURL, ctx.Integration.ID().String())
-	ctx.Logger.Infof("handleOAuthCallback: WebhooksBaseURL=%s, redirectURI=%s", ctx.WebhooksBaseURL, redirectURI)
 
 	// Exchange code for tokens
 	tokenResponse, err := exchangeCodeForTokens(ctx.HTTP, string(clientID), string(clientSecret), code, redirectURI)
@@ -455,8 +430,6 @@ func (j *Jira) handleOAuthCallback(ctx core.HTTPRequestContext) {
 	// Remove browser action
 	ctx.Integration.RemoveBrowserAction()
 
-	ctx.Logger.Infof("Successfully authenticated with Jira Cloud %s", cloudID)
-
 	// Redirect to integration settings page
 	http.Redirect(
 		ctx.Response,
@@ -481,46 +454,34 @@ func (j *Jira) CompareWebhookConfig(a, b any) (bool, error) {
 }
 
 func (j *Jira) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	logger.Infof("SetupWebhook: called")
-
 	var config WebhookConfiguration
 	if err := mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config); err != nil {
-		logger.Errorf("SetupWebhook: failed to decode configuration: %v", err)
 		return nil, fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	logger.Infof("SetupWebhook: config=%+v", config)
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		logger.Errorf("SetupWebhook: failed to create client: %v", err)
 		return nil, fmt.Errorf("error creating client: %v", err)
 	}
 
 	jqlFilter := fmt.Sprintf("project = %q", config.Project)
 	events := []string{config.EventType}
 	webhookURL := ctx.Webhook.GetURL()
-	logger.Infof("SetupWebhook: webhookURL=%s, jqlFilter=%s, events=%v", webhookURL, jqlFilter, events)
 
 	response, err := client.RegisterWebhook(webhookURL, jqlFilter, events)
 	if err != nil {
-		logger.Errorf("SetupWebhook: error registering webhook: %v", err)
 		return nil, fmt.Errorf("error registering webhook: %v", err)
 	}
 
-	logger.Infof("SetupWebhook: response=%+v", response)
-
 	if len(response.WebhookRegistrationResult) == 0 {
-		logger.Errorf("SetupWebhook: no webhook registration result returned")
 		return nil, fmt.Errorf("no webhook registration result returned")
 	}
 
 	result := response.WebhookRegistrationResult[0]
 	if len(result.Errors) > 0 {
-		logger.Errorf("SetupWebhook: webhook registration failed: %v", result.Errors)
 		return nil, fmt.Errorf("webhook registration failed: %v", result.Errors)
 	}
 
-	logger.Infof("SetupWebhook: webhook created with ID=%d", result.CreatedWebhookID)
 	return WebhookMetadata{ID: result.CreatedWebhookID}, nil
 }
 
@@ -583,13 +544,9 @@ func (j *Jira) HandleAction(ctx core.IntegrationActionContext) error {
 
 	switch ctx.Name {
 	case "listWebhooks":
-		webhooks, err := client.ListWebhooks()
+		_, err := client.ListWebhooks()
 		if err != nil {
 			return fmt.Errorf("error listing webhooks: %v", err)
-		}
-		logger.Infof("HandleAction listWebhooks: found %d webhooks", webhooks.Total)
-		for _, w := range webhooks.Values {
-			logger.Infof("  Webhook ID=%d, JQL=%s, Events=%v", w.ID, w.JQLFilter, w.Events)
 		}
 		return nil
 
@@ -606,7 +563,6 @@ func (j *Jira) HandleAction(ctx core.IntegrationActionContext) error {
 		if err != nil {
 			return fmt.Errorf("error deleting webhook: %v", err)
 		}
-		logger.Infof("HandleAction deleteWebhook: deleted webhook %d", int64(webhookID))
 		return nil
 
 	case "deleteAllWebhooks":
@@ -614,17 +570,12 @@ func (j *Jira) HandleAction(ctx core.IntegrationActionContext) error {
 		if err != nil {
 			return fmt.Errorf("error deleting webhooks: %v", err)
 		}
-		logger.Infof("HandleAction deleteAllWebhooks: all webhooks deleted")
 		return nil
 
 	case "getFailedWebhooks":
-		failed, err := client.GetFailedWebhooks()
+		_, err := client.GetFailedWebhooks()
 		if err != nil {
 			return fmt.Errorf("error getting failed webhooks: %v", err)
-		}
-		logger.Infof("HandleAction getFailedWebhooks: found %d failed webhooks", len(failed.Values))
-		for _, f := range failed.Values {
-			logger.Infof("  Failed webhook ID=%s, URL=%s, Reason=%s, Time=%s", f.ID, f.URL, f.FailureReason, f.LatestFailureTime)
 		}
 		return nil
 

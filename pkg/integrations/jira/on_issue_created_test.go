@@ -16,10 +16,11 @@ import (
 func Test__OnIssueCreated__HandleWebhook(t *testing.T) {
 	trigger := &OnIssueCreated{}
 
-	t.Run("missing signature -> 403", func(t *testing.T) {
+	t.Run("missing signature -> 200 OK, event emitted (OAuth webhook)", func(t *testing.T) {
 		headers := http.Header{}
 		body := []byte(`{"webhookEvent":"jira:issue_created"}`)
 
+		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: headers,
@@ -27,11 +28,12 @@ func Test__OnIssueCreated__HandleWebhook(t *testing.T) {
 				"project": "TEST",
 			},
 			Webhook: &contexts.WebhookContext{Secret: "test-secret"},
-			Events:  &contexts.EventContext{},
+			Events:  eventContext,
 		})
 
-		assert.Equal(t, http.StatusForbidden, code)
-		assert.ErrorContains(t, err, "missing signature")
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, eventContext.Count())
 	})
 
 	t.Run("invalid signature -> 403", func(t *testing.T) {

@@ -8,11 +8,8 @@ import (
 	"io"
 	"net/http"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 )
-
-var logger = log.WithField("integration_name", "jira")
 
 type Client struct {
 	AuthType string
@@ -63,8 +60,6 @@ func newAPITokenClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*
 }
 
 func newOAuthClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
-	logger.Infof("Creating OAuth client")
-
 	accessToken, err := findOAuthSecret(ctx, OAuthAccessToken)
 	if err != nil {
 		return nil, fmt.Errorf("error getting access token: %v", err)
@@ -74,17 +69,13 @@ func newOAuthClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Cli
 		return nil, fmt.Errorf("OAuth access token not found")
 	}
 
-	// Get CloudID from metadata
 	metadata := ctx.GetMetadata()
-	logger.Infof("OAuth client metadata: %+v", metadata)
-
 	metadataMap, ok := metadata.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("invalid metadata format")
 	}
 
 	cloudID, _ := metadataMap["cloudId"].(string)
-	logger.Infof("OAuth client cloudID: %s", cloudID)
 	if cloudID == "" {
 		return nil, fmt.Errorf("cloud ID not found in metadata")
 	}
@@ -112,13 +103,10 @@ func (c *Client) apiURL(path string) string {
 	} else {
 		url = fmt.Sprintf("%s%s", c.BaseURL, path)
 	}
-	logger.Infof("apiURL: authType=%s, cloudID=%s, baseURL=%s, path=%s, result=%s", c.AuthType, c.CloudID, c.BaseURL, path, url)
 	return url
 }
 
 func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error) {
-	logger.Infof("execRequest: method=%s, url=%s", method, url)
-
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, fmt.Errorf("error building request: %v", err)
@@ -130,7 +118,6 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 
 	res, err := c.http.Do(req)
 	if err != nil {
-		logger.Errorf("execRequest error: %v", err)
 		return nil, fmt.Errorf("error executing request: %v", err)
 	}
 	defer res.Body.Close()
@@ -139,8 +126,6 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 	if err != nil {
 		return nil, fmt.Errorf("error reading body: %v", err)
 	}
-
-	logger.Infof("execRequest response: status=%d", res.StatusCode)
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
@@ -381,8 +366,6 @@ type FailedWebhook struct {
 // GetFailedWebhooks returns webhooks that failed to be delivered in the last 72 hours.
 func (c *Client) GetFailedWebhooks() (*FailedWebhookResponse, error) {
 	url := c.apiURL("/rest/api/3/webhook/failed")
-	logger.Infof("GetFailedWebhooks: url=%s", url)
-
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -393,7 +376,6 @@ func (c *Client) GetFailedWebhooks() (*FailedWebhookResponse, error) {
 		return nil, fmt.Errorf("error parsing failed webhooks response: %v", err)
 	}
 
-	logger.Infof("GetFailedWebhooks: found %d failed webhooks", len(response.Values))
 	return &response, nil
 }
 

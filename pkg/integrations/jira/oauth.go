@@ -69,8 +69,6 @@ func buildAuthorizationURL(clientID, redirectURI, state string) string {
 
 // exchangeCodeForTokens exchanges an authorization code for access and refresh tokens.
 func exchangeCodeForTokens(httpCtx core.HTTPContext, clientID, clientSecret, code, redirectURI string) (*OAuthTokenResponse, error) {
-	logger.Infof("exchangeCodeForTokens: redirectURI=%s, tokenURL=%s", redirectURI, atlassianTokenURL)
-
 	requestBody := map[string]string{
 		"grant_type":    "authorization_code",
 		"client_id":     clientID,

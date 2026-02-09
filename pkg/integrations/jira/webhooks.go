@@ -26,8 +26,6 @@ type WebhookDetails struct {
 // ListWebhooks returns all webhooks registered for this OAuth app.
 func (c *Client) ListWebhooks() (*WebhookListResponse, error) {
 	url := c.apiURL("/rest/api/3/webhook")
-	logger.Infof("ListWebhooks: url=%s", url)
-
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -38,13 +36,11 @@ func (c *Client) ListWebhooks() (*WebhookListResponse, error) {
 		return nil, fmt.Errorf("error parsing webhook list response: %v", err)
 	}
 
-	logger.Infof("ListWebhooks: found %d webhooks", response.Total)
 	return &response, nil
 }
 
 // DeleteWebhookByID deletes a single webhook by its Jira ID.
 func (c *Client) DeleteWebhookByID(webhookID int64) error {
-	logger.Infof("DeleteWebhookByID: deleting webhook %d", webhookID)
 	return c.DeleteWebhook([]int64{webhookID})
 }
 
@@ -56,7 +52,6 @@ func (c *Client) DeleteAllWebhooks() error {
 	}
 
 	if len(webhooks.Values) == 0 {
-		logger.Infof("DeleteAllWebhooks: no webhooks to delete")
 		return nil
 	}
 
@@ -65,6 +60,5 @@ func (c *Client) DeleteAllWebhooks() error {
 		ids[i] = w.ID
 	}
 
-	logger.Infof("DeleteAllWebhooks: deleting %d webhooks: %v", len(ids), ids)
 	return c.DeleteWebhook(ids)
 }
