@@ -40,14 +40,7 @@ export const createReviewMapper: ComponentBaseMapper = {
 
     const review = outputs.default[0].data as PullRequestReviewOutput;
     details["Submitted At"] = review?.submitted_at ? new Date(review.submitted_at).toLocaleString() : "-";
-    details["Submitted By"] = review?.user?.login || "-";
-    details["State"] = review?.state || "";
     details["Review URL"] = review?.html_url || "";
-    details["Review ID"] = review?.id?.toString() || "";
-
-    if (review?.body) {
-      details["Body"] = review.body;
-    }
 
     return details;
   },
