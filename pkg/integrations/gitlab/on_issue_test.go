@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -214,7 +215,7 @@ func Test__WhitelistedAction__ValidAction(t *testing.T) {
 				"action": "open",
 			},
 		}
-		result := trigger.whitelistedAction(data, []string{"open", "close"})
+		result := trigger.whitelistedAction(log.NewEntry(log.New()), data, []string{"open", "close"})
 		assert.True(t, result)
 	})
 
@@ -225,7 +226,7 @@ func Test__WhitelistedAction__ValidAction(t *testing.T) {
 			},
 		}
 
-		result := trigger.whitelistedAction(data, []string{"open", "close"})
+		result := trigger.whitelistedAction(log.NewEntry(log.New()), data, []string{"open", "close"})
 		assert.False(t, result)
 	})
 
@@ -234,7 +235,7 @@ func Test__WhitelistedAction__ValidAction(t *testing.T) {
 			"object_attributes": map[string]any{},
 		}
 
-		result := trigger.whitelistedAction(data, []string{"open", "close"})
+		result := trigger.whitelistedAction(log.NewEntry(log.New()), data, []string{"open", "close"})
 		assert.False(t, result)
 	})
 
