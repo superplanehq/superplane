@@ -410,13 +410,17 @@ func (l *LaunchCloudAgent) HandleWebhook(ctx core.WebhookRequestContext) (int, e
 	}
 
 	metadata.Status = &payload
+
+	if payload.Status != agentStatusFinished && payload.Status != agentStatusError {
+		if err := executionCtx.Metadata.Set(metadata); err != nil {
+			return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
+		}
+		return http.StatusOK, nil
+	}
+
 	metadata.WebhookSecret = ""
 	if err := executionCtx.Metadata.Set(metadata); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
-	}
-
-	if payload.Status != agentStatusFinished && payload.Status != agentStatusError {
-		return http.StatusOK, nil
 	}
 
 	if err := l.finishExecution(executionCtx.ExecutionState, AgentCompletedPayloadType, payload, metadata.Agent); err != nil {
