@@ -17,7 +17,7 @@ const (
 	DeployPayloadType          = "render.deploy.finished"
 	DeploySuccessOutputChannel = "success"
 	DeployFailedOutputChannel  = "failed"
-	DeployPollInterval         = 3 * time.Second // fallback when deploy_ended webhook doesn't arrive
+	DeployPollInterval         = 10 * time.Minute // fallback when deploy_ended webhook doesn't arrive
 	deployExecutionKey         = "deploy_id"
 )
 
