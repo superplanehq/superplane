@@ -115,6 +115,7 @@ type WebhookRequestContext struct {
 	WorkflowID    string
 	NodeID        string
 	Configuration any
+	Logger        *log.Entry
 	Webhook       NodeWebhookContext
 	Events        EventContext
 	Integration   IntegrationContext
