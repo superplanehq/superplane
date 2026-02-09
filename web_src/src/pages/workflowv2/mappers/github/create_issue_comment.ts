@@ -27,14 +27,8 @@ export const createIssueCommentMapper: ComponentBaseMapper = {
     }
 
     const comment = outputs.default[0].data as Comment;
-    Object.assign(details, {
-      "Created At": comment?.created_at ? new Date(comment.created_at).toLocaleString() : "-",
-      "Created By": comment?.user?.login || "-",
-    });
-
-    details["ID"] = comment?.id?.toString() || "-";
+    details["Created At"] = comment?.created_at ? new Date(comment.created_at).toLocaleString() : "-";
     details["URL"] = comment?.html_url || "-";
-    details["Body"] = comment?.body || "-";
 
     return details;
   },
