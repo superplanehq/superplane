@@ -28,6 +28,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitHub repository" />
+  <LinkCard title="List Releases" href="#list-releases" description="List releases for a GitHub repository" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
@@ -1183,6 +1184,78 @@ Returns release information including:
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.release"
+}
+```
+
+<a id="list-releases"></a>
+
+## List Releases
+
+The List Releases component returns releases from a GitHub repository with optional pagination.
+
+### Use Cases
+
+- **Release auditing**: Review recent releases for compliance or visibility
+- **Deployment inputs**: Feed release metadata into deployment workflows
+- **Changelog automation**: Aggregate release notes across versions
+- **Reporting**: Build release dashboards or summaries
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Per Page**: Number of releases per page (max 100)
+- **Page**: Page number for pagination
+
+### Output
+
+Returns a list of releases and their details including:
+- Release id, tag, and name
+- Body and published/created timestamps
+- Author information
+- Assets, tarball URL, and zipball URL
+- Other metadata fields
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "assets": [
+        {
+          "browser_download_url": "https://github.com/acme/widgets/releases/download/v1.2.3/app-v1.2.3.zip",
+          "content_type": "application/zip",
+          "download_count": 42,
+          "id": 1,
+          "label": "Application Bundle",
+          "name": "app-v1.2.3.zip",
+          "size": 1024000
+        }
+      ],
+      "assets_url": "https://api.github.com/repos/acme/widgets/releases/282931220/assets",
+      "author": {
+        "avatar_url": "https://github.com/images/error/octocat_happy.gif",
+        "html_url": "https://github.com/octocat",
+        "id": 1,
+        "login": "octocat"
+      },
+      "body": "## Bug Fixes\n- Fix token generation when issuer is unset\n- Improve DAG serialization stability",
+      "created_at": "2026-01-15T10:00:00Z",
+      "draft": false,
+      "html_url": "https://github.com/acme/widgets/releases/tag/v1.2.3",
+      "id": 3001,
+      "name": "Acme Widgets 1.2.3",
+      "prerelease": false,
+      "published_at": "2026-01-16T12:00:00Z",
+      "tag_name": "v1.2.3",
+      "tarball_url": "https://api.github.com/repos/acme/widgets/tarball/v1.2.3",
+      "upload_url": "https://uploads.github.com/repos/acme/widgets/releases/282931220/assets{?name,label}",
+      "url": "https://api.github.com/repos/acme/widgets/releases/282931220",
+      "zipball_url": "https://api.github.com/repos/acme/widgets/zipball/v1.2.3"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.releases.list"
 }
 ```
 
