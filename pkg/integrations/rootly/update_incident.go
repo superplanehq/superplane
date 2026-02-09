@@ -2,7 +2,7 @@ package rootly
 
 import (
 	"fmt"
-
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -10,7 +10,7 @@ import (
 type UpdateIncident struct{}
 
 type UpdateIncidentSpec struct {
-	// This tag fix the 'Mapstructure won't decode snake_case' issue
+	// Fixed: Mapstructure tag added to match JSON field
 	IncidentID string `mapstructure:"incident_id" json:"incident_id"`
 	Title      string `json:"title"`
 	Summary    string `json:"summary"`
@@ -19,7 +19,7 @@ type UpdateIncidentSpec struct {
 }
 
 func (u *UpdateIncident) Name() string {
-	return "update_incident"
+	return "rootly.updateIncident"
 }
 
 func (u *UpdateIncident) Label() string {
@@ -48,35 +48,46 @@ func (u *UpdateIncident) Configuration() []configuration.Field {
 		{
 			Name:        "summary",
 			Label:       "Summary",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeText,
 			Description: "New summary for the incident.",
 		},
 		{
 			Name:        "severity",
 			Label:       "Severity",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Resource:    "severity",
 			Description: "New severity level.",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "severity",
+					UseNameAsValue: true,
+				},
+			},
 		},
 		{
 			Name:        "status",
 			Label:       "Status",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Resource:    "status",
 			Description: "New status for the incident.",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "status",
+					UseNameAsValue: true,
+				},
+			},
 		},
 	}
 }
 
-func (u *UpdateIncident) Execute(ctx core.ComponentContext) (any, error) {
+func (u *UpdateIncident) Execute(ctx core.ExecutionContext) error {
 	spec := UpdateIncidentSpec{}
-	if err := ctx.DecodeSpec(&spec); err != nil {
-		return nil, fmt.Errorf("failed to decode spec: %w", err)
+	err := mapstructure.Decode(ctx.Configuration, &spec)
+	if err != nil {
+		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create client: %w", err)
+		return fmt.Errorf("error creating client: %v", err)
 	}
 
 	incident, err := client.UpdateIncident(
@@ -87,8 +98,16 @@ func (u *UpdateIncident) Execute(ctx core.ComponentContext) (any, error) {
 		spec.Status,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update incident: %w", err)
+		return fmt.Errorf("failed to update incident: %v", err)
 	}
 
-	return incident, nil
+	return ctx.ExecutionState.Emit(
+		core.DefaultOutputChannel.Name,
+		"rootly.incident",
+		[]any{incident},
+	)
 }
+
+// Additional required methods for the interface
+func (u *UpdateIncident) Setup(ctx core.SetupContext) error { return nil }
+func (u *UpdateIncident) Cleanup(ctx core.SetupContext) error { return nil }
