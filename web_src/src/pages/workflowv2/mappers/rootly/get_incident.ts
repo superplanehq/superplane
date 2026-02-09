@@ -13,6 +13,7 @@ import {
 import { MetadataItem } from "@/ui/metadataList";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import { Incident } from "./types";
+import { getDetailsForIncident } from "./base";
 import { formatTimeAgo } from "@/utils/date";
 
 export const getIncidentMapper: ComponentBaseMapper = {
@@ -42,29 +43,15 @@ export const getIncidentMapper: ComponentBaseMapper = {
       return {};
     }
     const incident = outputs.default[0].data as Incident;
+    const baseDetails = getDetailsForIncident(incident);
+
+    // Reorder: put Started At at the top
     const details: Record<string, string> = {};
-
-    if (incident?.started_at) {
-      details["Started At"] = new Date(incident.started_at).toLocaleString();
+    if (baseDetails["Started At"]) {
+      details["Started At"] = baseDetails["Started At"];
+      delete baseDetails["Started At"];
     }
-
-    details.ID = incident?.id || "-";
-    details.Title = incident?.title || "-";
-    details.Summary = incident?.summary || "-";
-    details.Status = incident?.status || "-";
-    details.Severity = incident?.severity?.name || "-";
-
-    if (incident?.mitigated_at) {
-      details["Mitigated At"] = new Date(incident.mitigated_at).toLocaleString();
-    }
-
-    if (incident?.resolved_at) {
-      details["Resolved At"] = new Date(incident.resolved_at).toLocaleString();
-    }
-
-    if (incident?.url) {
-      details["Incident URL"] = incident.url;
-    }
+    Object.assign(details, baseDetails);
 
     return details;
   },
