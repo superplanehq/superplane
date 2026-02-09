@@ -129,18 +129,6 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (j *Jira) CompareWebhookConfig(a, b any) (bool, error) {
-	return false, nil
-}
-
-func (j *Jira) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	return nil, nil
-}
-
-func (j *Jira) CleanupWebhook(ctx core.CleanupWebhookContext) error {
-	return nil
-}
-
 func (j *Jira) Actions() []core.Action {
 	return []core.Action{}
 }
