@@ -262,13 +262,11 @@ func (c *Deploy) poll(ctx core.ActionContext) error {
 		return err
 	}
 
-	ctx.Logger.Infof("polling deploy %s for service %s", metadata.Deploy.ID, spec.Service)
 	deploy, err := client.GetDeploy(spec.Service, metadata.Deploy.ID)
 	if err != nil {
 		return err
 	}
 
-	ctx.Logger.Infof("deploy %s status: %s", metadata.Deploy.ID, deploy.Status)
 	if deploy.FinishedAt == "" {
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, DeployPollInterval)
 	}
@@ -283,8 +281,6 @@ func (c *Deploy) poll(ctx core.ActionContext) error {
 }
 
 func (c *Deploy) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-
-	return http.StatusOK, nil
 	if err := verifyWebhookSignature(ctx); err != nil {
 		return http.StatusForbidden, err
 	}
