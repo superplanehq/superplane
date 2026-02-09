@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -103,6 +104,36 @@ func Test__SendAndWaitMessage__Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, execID.String(), execState.KVs["execution_id"])
 		assert.Equal(t, "timeout", requests.Action)
+		assert.Equal(t, 60*time.Second, requests.Duration)
+	})
+
+	t.Run("missing timeout -> schedules default timeout", func(t *testing.T) {
+		execID := uuid.New()
+		withDefaultTransport(t, func(req *http.Request) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, `{"ok": true, "message": {"ts": "1234.5678"}}`), nil
+		})
+
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		requests := &contexts.RequestContext{}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"botToken": "token-123"},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			ID:             execID,
+			Integration:    integrationCtx,
+			ExecutionState: execState,
+			Requests:       requests,
+			Configuration: map[string]any{
+				"channel": "C123",
+				"message": "Approve this?",
+				"buttons": []any{map[string]any{"name": "Approve", "value": "approve"}},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "timeout", requests.Action)
+		assert.Equal(t, time.Duration(DefaultTimeoutSeconds)*time.Second, requests.Duration)
 	})
 }
 

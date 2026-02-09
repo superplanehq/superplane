@@ -11,6 +11,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+// DefaultTimeoutSeconds is the default timeout in seconds for the send-and-wait message.
+const DefaultTimeoutSeconds = 3600
+
 type SendAndWaitMessage struct{}
 
 type SendAndWaitMessageMetadata struct {
@@ -205,11 +208,14 @@ func (c *SendAndWaitMessage) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to send message: %w", err)
 	}
 
-	if config.Timeout > 0 {
-		err := ctx.Requests.ScheduleActionCall("timeout", nil, time.Duration(config.Timeout)*time.Second)
-		if err != nil {
-			return fmt.Errorf("failed to schedule timeout: %w", err)
-		}
+	timeout := config.Timeout
+	if timeout <= 0 {
+		timeout = DefaultTimeoutSeconds
+	}
+
+	err = ctx.Requests.ScheduleActionCall("timeout", nil, time.Duration(timeout)*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to schedule timeout: %w", err)
 	}
 
 	return nil
@@ -338,7 +344,7 @@ func (c *SendAndWaitMessage) Configuration() []configuration.Field {
 			Label:    "Timeout (seconds)",
 			Type:     configuration.FieldTypeNumber,
 			Required: false,
-			Default:  3600,
+			Default:  DefaultTimeoutSeconds,
 		},
 		{
 			Name:     "buttons",
