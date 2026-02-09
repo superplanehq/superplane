@@ -789,14 +789,26 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 	}
 
 	tx := database.Conn()
+	var integrationCtx core.IntegrationContext
+	if node.AppInstallationID != nil {
+		integration, integrationErr := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
+		if integrationErr != nil {
+			return http.StatusInternalServerError, integrationErr
+		}
+
+		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry)
+	}
+
 	return trigger.HandleWebhook(core.WebhookRequestContext{
 		Body:          body,
 		Headers:       headers,
 		WorkflowID:    node.WorkflowID.String(),
 		NodeID:        node.NodeID,
 		Configuration: node.Configuration.Data(),
+		HTTP:          s.registry.HTTPContext(),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		Events:        contexts.NewEventContext(tx, &node),
+		Integration:   integrationCtx,
 	})
 }
 
@@ -808,14 +820,26 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 	}
 
 	tx := database.Conn()
+	var integrationCtx core.IntegrationContext
+	if node.AppInstallationID != nil {
+		integration, integrationErr := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
+		if integrationErr != nil {
+			return http.StatusInternalServerError, integrationErr
+		}
+
+		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry)
+	}
+
 	return component.HandleWebhook(core.WebhookRequestContext{
 		Body:          body,
 		Headers:       headers,
 		WorkflowID:    node.WorkflowID.String(),
 		NodeID:        node.NodeID,
 		Configuration: node.Configuration.Data(),
+		HTTP:          s.registry.HTTPContext(),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		Events:        contexts.NewEventContext(tx, &node),
+		Integration:   integrationCtx,
 		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 			execution, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)
 			if err != nil {
