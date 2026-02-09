@@ -169,6 +169,7 @@ func Test__OnIssue__HandleWebhook__Filters(t *testing.T) {
 			Configuration: map[string]any{"project": "123", "actions": []string{"open"}, "labels": []configuration.Predicate{{Type: configuration.PredicateTypeEquals, Value: "backend"}}},
 			Webhook:       webhookCtx,
 			Events:        eventsCtx,
+			Logger:        log.NewEntry(log.New()),
 		}
 
 		code, err := trigger.HandleWebhook(ctx)
@@ -195,6 +196,7 @@ func Test__OnIssue__HandleWebhook__Filters(t *testing.T) {
 			Configuration: map[string]any{"project": "123", "actions": []string{"open"}, "labels": []configuration.Predicate{{Type: configuration.PredicateTypeEquals, Value: "backend"}}},
 			Webhook:       webhookCtx,
 			Events:        eventsCtx,
+			Logger:        log.NewEntry(log.New()),
 		}
 
 		code, err := trigger.HandleWebhook(ctx)
