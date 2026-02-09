@@ -274,7 +274,8 @@ func (c *SendAndWaitMessage) OnIntegrationMessage(ctx core.IntegrationMessageCon
 
 		executionCtx, err := ctx.FindExecutionByKV("execution_id", execID)
 		if err != nil {
-			ctx.Logger.Warnf("Failed to find execution by KV (possibly stale): %v", err)
+			ctx.Logger.Errorf("Failed to find execution by KV: %v", err)
+			lastErr = err
 			continue
 		}
 
@@ -338,12 +339,26 @@ func (c *SendAndWaitMessage) Configuration() []configuration.Field {
 			Label:    "Timeout (seconds)",
 			Type:     configuration.FieldTypeNumber,
 			Required: false,
+			Default:  3600,
 		},
 		{
 			Name:     "buttons",
 			Label:    "Buttons",
 			Type:     configuration.FieldTypeList,
 			Required: true,
+			Default: []map[string]any{
+				{
+					"name":  "foo",
+					"value": "bar",
+				},
+			},
+			ValidationRules: []configuration.ValidationRule{
+				{
+					Type:    configuration.ValidationRuleMaxLength,
+					Value:   4,
+					Message: "A maximum of 4 buttons can be configured",
+				},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Button",
