@@ -1,4 +1,4 @@
-.PHONY: lint test test.license.check check
+.PHONY: lint test test.license.check
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -149,7 +149,6 @@ check.build.ui:
 check.build.app:
 	docker compose $(DOCKER_COMPOSE_OPTS) exec app go build cmd/server/main.go
 
-check: format.go lint check.build.app format.js check.build.ui
 
 storybook:
 	docker compose $(DOCKER_COMPOSE_OPTS) exec app /bin/bash -c "cd web_src && npm install && npm run storybook"

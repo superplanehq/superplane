@@ -221,9 +221,6 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 	for i := range nodes {
 		if errorMsg, hasError := nodeValidationErrors[nodes[i].ID]; hasError {
 			nodes[i].ErrorMessage = &errorMsg
-			// Do not persist an integration ID that failed validation (e.g. deleted integration),
-			// so we avoid foreign key violation on workflow_nodes.app_installation_id.
-			nodes[i].IntegrationID = nil
 		} else {
 			nodes[i].ErrorMessage = nil
 		}
