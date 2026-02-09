@@ -9,6 +9,21 @@ import (
 )
 
 /*
+ * Package formats supported by AWS CodeArtifact.
+ * See: https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_DescribePackageVersion.html
+ */
+var PackageFormatOptions = []configuration.FieldOption{
+	{Label: "npm", Value: "npm"},
+	{Label: "pypi", Value: "pypi"},
+	{Label: "maven", Value: "maven"},
+	{Label: "nuget", Value: "nuget"},
+	{Label: "generic", Value: "generic"},
+	{Label: "ruby", Value: "ruby"},
+	{Label: "swift", Value: "swift"},
+	{Label: "cargo", Value: "cargo"},
+}
+
+/*
  * CodeArtifact is only available in the following regions.
  * See: https://docs.aws.amazon.com/general/latest/gr/codeartifact.html
  */
