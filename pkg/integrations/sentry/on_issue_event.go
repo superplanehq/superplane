@@ -56,13 +56,13 @@ func (t *OnIssueEvent) Documentation() string {
 ## Configuration
 
 - **Events**: Choose which issue actions to listen for (created, resolved, assigned, archived, unresolved)
-- **Webhook secret**: Paste the Client Secret from your Sentry Internal Integration (used to verify webhook signatures)
+- **Webhook secret (optional, recommended)**: Paste the Client Secret from your Sentry Internal Integration to verify webhook signatures. If left empty, SuperPlane will accept issue webhooks without signature verification.
 
 ## Setup
 
 1. In Sentry: add a webhook URL in your Internal Integration (Developer Settings → your integration → Webhooks). Use the webhook URL shown for this trigger in SuperPlane.
 2. Subscribe to **Issue** events (e.g. issue.created, issue.resolved).
-3. Copy the integration's **Client Secret** into the Webhook secret field below.`
+3. (Recommended) Copy the integration's **Client Secret** into the Webhook secret field below so SuperPlane can verify webhook signatures.`
 }
 
 func (t *OnIssueEvent) Icon() string {
@@ -101,9 +101,9 @@ func (t *OnIssueEvent) Configuration() []configuration.Field {
 			Name:        "webhookSecret",
 			Label:       "Webhook Secret",
 			Type:        configuration.FieldTypeString,
-			Required:    true,
+			Required:    false,
 			Sensitive:   true,
-			Description: "Client Secret from your Sentry Internal Integration (used to verify webhook signatures)",
+			Description: "Client Secret from your Sentry Internal Integration. Required so SuperPlane can verify that incoming webhooks really come from Sentry (HMAC signature). Paste from Sentry → your integration → Client Secret.",
 			Placeholder: "Paste from Sentry integration settings",
 		},
 	}
@@ -142,19 +142,23 @@ func (t *OnIssueEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 	if resource != "issue" {
 		return http.StatusOK, nil
 	}
-
-	signature := ctx.Headers.Get("Sentry-Hook-Signature")
-	if signature == "" {
-		return http.StatusForbidden, fmt.Errorf("missing Sentry-Hook-Signature")
+	if ctx.Webhook == nil {
+		return http.StatusInternalServerError, fmt.Errorf("webhook context is required")
 	}
 
 	secret, err := ctx.Webhook.GetSecret()
-	if err != nil || len(secret) == 0 {
-		return http.StatusInternalServerError, fmt.Errorf("webhook secret not configured: %w", err)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("get webhook secret: %w", err)
 	}
+	if len(secret) > 0 {
+		signature := ctx.Headers.Get("Sentry-Hook-Signature")
+		if signature == "" {
+			return http.StatusForbidden, fmt.Errorf("missing Sentry-Hook-Signature")
+		}
 
-	if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
-		return http.StatusForbidden, fmt.Errorf("invalid signature: %w", err)
+		if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
+			return http.StatusForbidden, fmt.Errorf("invalid signature: %w", err)
+		}
 	}
 
 	var payload sentryIssueWebhookPayload

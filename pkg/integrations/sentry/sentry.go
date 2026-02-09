@@ -2,6 +2,7 @@ package sentry
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -18,6 +19,23 @@ type Sentry struct{}
 type Configuration struct {
 	AuthToken string `json:"authToken"`
 	BaseURL   string `json:"baseURL"`
+}
+
+func looksLikeClientSecret(token string) bool {
+	token = strings.TrimSpace(token)
+	if len(token) != 64 {
+		return false
+	}
+	if strings.HasPrefix(token, "sntry") {
+		return false
+	}
+	for _, c := range token {
+		if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func (s *Sentry) Name() string {
@@ -37,11 +55,13 @@ func (s *Sentry) Description() string {
 }
 
 func (s *Sentry) Instructions() string {
-	return `Connect Sentry to SuperPlane using an Internal Integration token.
+	return `**Connection (Auth Token):** Use a **Personal Auth Token** from Sentry. Create it in **User Settings** → **Auth Tokens** → **Create New Token** with scopes: ` + "`org:read`" + `, ` + "`project:read`" + `, ` + "`event:write`" + `. The token will start with ` + "`sntryu_`" + `—paste it below.
 
-1. In Sentry: **Organization Settings** → **Developer Settings** → **New Internal Integration**
-2. Name it (e.g. "SuperPlane"), then create an **Auth Token** with scopes: ` + "`org:read`" + `, ` + "`project:read`" + `, ` + "`event:write`" + `
-3. Paste the token below. For the **On Issue Event** trigger, configure the webhook in your Sentry integration to point to the trigger's webhook URL and subscribe to Issue events. Use the same integration's Client Secret as the webhook secret in SuperPlane when prompted.`
+⚠️ **Do not use the Internal Integration hex value** (e.g. ` + "`a22b2023...`" + ` or ` + "`f3233f8f...`" + `). That is the **Client Secret**; Sentry's API returns 401 for it. Use it only in the **On Issue Event** trigger's "Webhook secret" field.
+
+**On Issue Event trigger:** You need an Internal Integration in Sentry (Developer Settings) to get a webhook URL and the **Client Secret**. Paste the Client Secret into the trigger's "Webhook secret" field.
+
+**For each Sentry trigger and action node:** Select your Sentry integration in the **Integration** dropdown, then click **Save** so the node is linked; otherwise you'll see "Component not configured - integration is required".`
 }
 
 func (s *Sentry) Configuration() []configuration.Field {
@@ -52,8 +72,8 @@ func (s *Sentry) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Sensitive:   true,
-			Description: "Sentry auth token (Bearer). Create via Organization Settings → Developer Settings → Internal Integration → Auth Token.",
-			Placeholder: "sntrys_...",
+			Description: "Personal Auth Token from Sentry (User Settings → Auth Tokens). Must start with sntryu_. Do not paste the Client Secret (hex string)—use that only in the trigger's Webhook secret. Scopes: org:read, project:read, event:write.",
+			Placeholder: "sntryu_...",
 		},
 		{
 			Name:        "baseURL",
@@ -95,7 +115,11 @@ func (s *Sentry) Sync(ctx core.SyncContext) error {
 		return err
 	}
 	if err := client.ValidateToken(); err != nil {
-		return fmt.Errorf("invalid Sentry token: %w", err)
+		msg := err.Error()
+		if strings.Contains(msg, "401") && looksLikeClientSecret(config.AuthToken) {
+			msg = "connection returned 401. If you pasted a long hex string (no sntryu_/sntrys_ prefix), that is the Client Secret—use it only for the trigger's Webhook secret. For this field use the Auth Token from 'Create New Token' in the integration. " + msg
+		}
+		return fmt.Errorf("invalid Sentry token: %s", msg)
 	}
 	ctx.Integration.Ready()
 	return nil

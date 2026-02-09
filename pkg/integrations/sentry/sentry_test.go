@@ -11,6 +11,16 @@ import (
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
 )
 
+func Test__looksLikeClientSecret(t *testing.T) {
+	assert.True(t, looksLikeClientSecret("f3233f8fad765a684521a617144e8f15f5b34c1bea18c0354034ce1bfc4414cb"))
+	assert.True(t, looksLikeClientSecret(strings.Repeat("a", 64)))
+	assert.False(t, looksLikeClientSecret("sntryu_not_a_real_token"))
+	assert.False(t, looksLikeClientSecret("sntrys_xxx"))
+	assert.False(t, looksLikeClientSecret("short"))
+	assert.False(t, looksLikeClientSecret(strings.Repeat("a", 63)))
+	assert.False(t, looksLikeClientSecret(strings.Repeat("z", 64))) // z is not hex
+}
+
 func Test__Sentry__Name(t *testing.T) {
 	s := &Sentry{}
 	assert.Equal(t, "sentry", s.Name())
@@ -84,6 +94,27 @@ func Test__Sentry__Sync(t *testing.T) {
 		err := s.Sync(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, "ready", integration.State)
+	})
+
+	t.Run("401 with value that looks like Client Secret -> error hints Client Secret", func(t *testing.T) {
+		clientSecretHex := "f3233f8fad765a684521a617144e8f15f5b34c1bea18c0354034ce1bfc4414cb"
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusUnauthorized, Body: io.NopCloser(strings.NewReader(`{"detail":"..."}`))},
+			},
+		}
+		integration := &contexts.IntegrationContext{
+			Configuration: map[string]any{"authToken": clientSecretHex, "baseURL": "https://sentry.io"},
+		}
+		ctx := core.SyncContext{
+			Configuration: map[string]any{"authToken": clientSecretHex, "baseURL": "https://sentry.io"},
+			HTTP:          httpCtx,
+			Integration:   integration,
+		}
+		err := s.Sync(ctx)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "Client Secret")
+		assert.Contains(t, err.Error(), "Webhook secret")
 	})
 }
 
