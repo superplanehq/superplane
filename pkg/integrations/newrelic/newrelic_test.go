@@ -247,6 +247,7 @@ func Test__Client__NewClient(t *testing.T) {
 		assert.NotNil(t, client)
 		assert.Equal(t, "test-key", client.APIKey)
 		assert.Equal(t, "https://api.newrelic.com/v2", client.BaseURL)
+		assert.Equal(t, "https://api.newrelic.com/graphql", client.NerdGraphURL)
 	})
 
 	t.Run("valid EU API key -> success", func(t *testing.T) {
@@ -263,6 +264,7 @@ func Test__Client__NewClient(t *testing.T) {
 		assert.NotNil(t, client)
 		assert.Equal(t, "test-key", client.APIKey)
 		assert.Equal(t, "https://api.eu.newrelic.com/v2", client.BaseURL)
+		assert.Equal(t, "https://api.eu.newrelic.com/graphql", client.NerdGraphURL)
 	})
 }
 
@@ -281,7 +283,7 @@ func Test__Client__ListAccounts(t *testing.T) {
 		client := &Client{
 			APIKey:  "test-key",
 			BaseURL: "https://api.newrelic.com/v2",
-			HTTP:    httpCtx,
+			http:    httpCtx,
 		}
 
 		accounts, err := client.ListAccounts()
@@ -311,7 +313,7 @@ func Test__Client__ListAccounts(t *testing.T) {
 		client := &Client{
 			APIKey:  "invalid-key",
 			BaseURL: "https://api.newrelic.com/v2",
-			HTTP:    httpCtx,
+			http:    httpCtx,
 		}
 
 		_, err := client.ListAccounts()
@@ -330,7 +332,7 @@ func Test__Client__ListAccounts(t *testing.T) {
 		client := &Client{
 			APIKey:  "test-key",
 			BaseURL: "https://api.newrelic.com/v2",
-			HTTP:    httpCtx,
+			http:    httpCtx,
 		}
 
 		_, err := client.ListAccounts()

@@ -10,9 +10,10 @@ import (
 )
 
 type Client struct {
-	APIKey  string
-	BaseURL string
-	HTTP    core.HTTPContext
+	APIKey       string
+	BaseURL      string
+	NerdGraphURL string
+	http         core.HTTPContext
 }
 
 func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
@@ -32,37 +33,42 @@ func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, 
 	}
 
 	baseURL := restAPIBaseUS
+	nerdGraphURL := nerdGraphAPIBaseUS
+
 	if string(site) == "EU" {
 		baseURL = restAPIBaseEU
+		nerdGraphURL = nerdGraphAPIBaseEU
 	}
 
 	return &Client{
-		APIKey:  key,
-		BaseURL: baseURL,
-		HTTP:    httpCtx,
+		APIKey:       key,
+		BaseURL:      baseURL,
+		NerdGraphURL: nerdGraphURL,
+		http:         httpCtx,
 	}, nil
 }
 
-func (c *Client) doRequest(method, endpoint string, body io.Reader) ([]byte, error) {
-	url := c.BaseURL + endpoint
-
+func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error) {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
+	// New Relic REST API v2 uses 'Api-Key' header
+	// NerdGraph (GraphQL) also accepts 'Api-Key'
 	req.Header.Set("Api-Key", c.APIKey)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
+		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -82,7 +88,8 @@ type ListAccountsResponse struct {
 }
 
 func (c *Client) ListAccounts() ([]Account, error) {
-	responseBody, err := c.doRequest(http.MethodGet, "/accounts.json", nil)
+	url := fmt.Sprintf("%s/accounts.json", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}

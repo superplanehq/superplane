@@ -90,7 +90,9 @@ func (n *NewRelic) Components() []core.Component {
 }
 
 func (n *NewRelic) Triggers() []core.Trigger {
-	return []core.Trigger{}
+	return []core.Trigger{
+		&OnIssue{},
+	}
 }
 
 func (n *NewRelic) Sync(ctx core.SyncContext) error {
