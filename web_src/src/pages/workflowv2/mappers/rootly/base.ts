@@ -21,6 +21,10 @@ export function getDetailsForIncident(incident: Incident): Record<string, string
     details["Resolved At"] = new Date(incident.resolved_at).toLocaleString();
   }
 
+  if (incident?.updated_at) {
+    details["Updated At"] = new Date(incident.updated_at).toLocaleString();
+  }
+
   if (incident?.url) {
     details["Incident URL"] = incident.url;
   }
