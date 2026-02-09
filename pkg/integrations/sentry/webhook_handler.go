@@ -36,6 +36,40 @@ func (h *SentryWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error
 	return ctx.Webhook.GetConfiguration(), nil
 }
 
+func (h *SentryWebhookHandler) Merge(current, requested any) (any, bool, error) {
+	var curCfg, reqCfg WebhookConfiguration
+	if err := mapstructure.Decode(current, &curCfg); err != nil {
+		return nil, false, err
+	}
+	if err := mapstructure.Decode(requested, &reqCfg); err != nil {
+		return nil, false, err
+	}
+
+	seen := make(map[string]bool)
+	mergedEvents := make([]string, 0, len(curCfg.Events)+len(reqCfg.Events))
+	for _, e := range curCfg.Events {
+		if seen[e] {
+			continue
+		}
+		seen[e] = true
+		mergedEvents = append(mergedEvents, e)
+	}
+	for _, e := range reqCfg.Events {
+		if seen[e] {
+			continue
+		}
+		seen[e] = true
+		mergedEvents = append(mergedEvents, e)
+	}
+
+	merged := WebhookConfiguration{Events: mergedEvents}
+	changed, err := h.CompareConfig(curCfg, merged)
+	if err != nil {
+		return nil, false, err
+	}
+	return merged, !changed, nil
+}
+
 func (h *SentryWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 	return nil
 }
