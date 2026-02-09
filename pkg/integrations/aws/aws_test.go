@@ -340,6 +340,51 @@ func Test__AWS__ListResources(t *testing.T) {
 		require.Len(t, httpContext.Requests, 1)
 		assert.Equal(t, "https://api.ecr.us-east-1.amazonaws.com/", httpContext.Requests[0].URL.String())
 	})
+
+	t.Run("sns.topic returns topics", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						<ListTopicsResponse>
+						  <ListTopicsResult>
+							<Topics>
+							  <member>
+								<TopicArn>arn:aws:sns:us-east-1:123456789012:orders-events</TopicArn>
+							  </member>
+							</Topics>
+						  </ListTopicsResult>
+						</ListTopicsResponse>
+					`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Secrets: map[string]core.IntegrationSecret{
+				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+			},
+		}
+
+		resources, err := a.ListResources("sns.topic", core.ListResourcesContext{
+			Integration: integrationCtx,
+			Logger:      logrus.NewEntry(logrus.New()),
+			HTTP:        httpContext,
+			Parameters:  map[string]string{"region": "us-east-1"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		assert.Equal(t, "sns.topic", resources[0].Type)
+		assert.Equal(t, "orders-events", resources[0].Name)
+		assert.Equal(t, "arn:aws:sns:us-east-1:123456789012:orders-events", resources[0].ID)
+
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://sns.us-east-1.amazonaws.com/", httpContext.Requests[0].URL.String())
+	})
 }
 
 func stsResponse(token string, expiration string) string {
