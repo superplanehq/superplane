@@ -1191,14 +1191,13 @@ Returns release information including:
 
 ## Get Workflow Usage
 
-The Get Workflow Usage component retrieves **billable** GitHub Actions usage for the integration installation's organization using GitHub's billing usage API.
+The Get Workflow Usage component retrieves **billable** GitHub Actions usage for an organization using GitHub's billing usage API.
 
-### Important: GitHub App Permissions
+### Important: Authentication
 
-This API requires the GitHub App to have **Organization permission: Administration (read)**. SuperPlane now requests this permission in the GitHub App manifest.
+GitHub's organization billing endpoints are **not accessible** using GitHub App installation tokens. If you see a 403 with `Resource not accessible by integration`, you must provide a **user access token**.
 
-- **Existing installations**: Organization owners will be prompted by GitHub to approve the new permission. Until approved, this action will return **403**.
-- **New installations**: The permission will be requested during installation.
+To enable this component, set a GitHub integration secret named `accessToken` containing a GitHub **PAT** (or OAuth token) that has permission to read the organization's billing/usage.
 
 ### Notes
 
