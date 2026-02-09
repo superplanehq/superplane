@@ -58,6 +58,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   sendgrid: sendgridIcon,
   aws: {
     lambda: awsLambdaIcon,
+    sns: awsIcon,
   },
 };
 
