@@ -266,17 +266,18 @@ func (c *AdminClient) execRequest(method, URL string, body io.Reader) ([]byte, e
 }
 
 func parseRelativeDate(input string, now time.Time) (time.Time, error) {
-	s := strings.TrimSpace(strings.ToLower(input))
-	if s == "" {
+	raw := strings.TrimSpace(input)
+	if raw == "" {
 		return time.Time{}, fmt.Errorf("date is required")
 	}
 
-	if s == "today" || s == "now" {
+	lower := strings.ToLower(raw)
+	if lower == "today" || lower == "now" {
 		return now, nil
 	}
 
-	if strings.HasSuffix(s, "d") {
-		daysStr := strings.TrimSuffix(s, "d")
+	if strings.HasSuffix(lower, "d") {
+		daysStr := strings.TrimSuffix(lower, "d")
 		days, err := strconv.Atoi(daysStr)
 		if err == nil && days >= 0 {
 			return now.Add(-time.Duration(days) * 24 * time.Hour), nil
@@ -284,14 +285,14 @@ func parseRelativeDate(input string, now time.Time) (time.Time, error) {
 	}
 
 	// Try YYYY-MM-DD.
-	if t, err := time.Parse("2006-01-02", s); err == nil {
+	if t, err := time.Parse("2006-01-02", raw); err == nil {
 		return t, nil
 	}
 
 	// Try RFC3339.
-	if t, err := time.Parse(time.RFC3339, s); err == nil {
+	if t, err := time.Parse(time.RFC3339, raw); err == nil {
 		return t, nil
 	}
 
-	return time.Time{}, fmt.Errorf("invalid date format: %s", s)
+	return time.Time{}, fmt.Errorf("invalid date format: %s", raw)
 }
