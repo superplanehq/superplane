@@ -70,7 +70,8 @@ func (u *UpdateIncident) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "status",
-					UseNameAsValue: true,
+					// ⬇️ Changed here: MUST be false to send lowercase ID (e.g., "started")
+					UseNameAsValue: false,
 				},
 			},
 		},
