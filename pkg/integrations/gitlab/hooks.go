@@ -28,8 +28,6 @@ type Hook struct {
 	WikiPageEvents           bool   `json:"wiki_page_events"`
 	DeploymentEvents         bool   `json:"deployment_events"`
 	ReleasesEvents           bool   `json:"releases_events"`
-	MilestoneEvents          bool   `json:"milestone_events"`
-	VulnerabilityEvents      bool   `json:"vulnerability_events"`
 }
 
 type HookEvents struct {
@@ -43,8 +41,6 @@ type HookEvents struct {
 	WikiPageEvents           bool
 	DeploymentEvents         bool
 	ReleasesEvents           bool
-	MilestoneEvents          bool
-	VulnerabilityEvents      bool
 }
 
 func NewHooksClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*HooksClient, error) {
@@ -88,8 +84,6 @@ func (c *HooksClient) CreateHook(projectID string, webhookURL string, secret str
 		"wiki_page_events":           events.WikiPageEvents,
 		"deployment_events":          events.DeploymentEvents,
 		"releases_events":            events.ReleasesEvents,
-		"milestone_events":           events.MilestoneEvents,
-		"vulnerability_events":       events.VulnerabilityEvents,
 	}
 
 	body, err := json.Marshal(payload)

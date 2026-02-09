@@ -227,11 +227,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
   aws: awsEventStateRegistry,
-  prometheus: prometheusEventStateRegistry,
-  cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
-  dockerhub: dockerhubEventStateRegistry,
-  grafana: grafanaEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {

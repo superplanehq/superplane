@@ -7,7 +7,6 @@ import (
 	"slices"
 
 	"github.com/mitchellh/mapstructure"
-	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -160,14 +159,14 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	//
 	// Verify that the action is in the allowed list
 	//
-	if len(config.Actions) > 0 && !i.whitelistedAction(ctx.Logger, data, config.Actions) {
+	if len(config.Actions) > 0 && !i.whitelistedAction(data, config.Actions) {
 		return http.StatusOK, nil
 	}
 
 	//
 	// Verify that the labels are in the allowed list
 	//
-	if len(config.Labels) > 0 && !i.hasWhitelistedLabel(ctx.Logger, data, config.Labels) {
+	if len(config.Labels) > 0 && !i.hasWhitelistedLabel(data, config.Labels) {
 		return http.StatusOK, nil
 	}
 
@@ -182,7 +181,7 @@ func (i *OnIssue) Cleanup(ctx core.TriggerContext) error {
 	return nil
 }
 
-func (i *OnIssue) whitelistedAction(logger *log.Entry, data map[string]any, allowedActions []string) bool {
+func (i *OnIssue) whitelistedAction(data map[string]any, allowedActions []string) bool {
 	attrs, ok := data["object_attributes"].(map[string]any)
 	if !ok {
 		return false
@@ -194,7 +193,6 @@ func (i *OnIssue) whitelistedAction(logger *log.Entry, data map[string]any, allo
 	}
 
 	if !slices.Contains(allowedActions, action) {
-		logger.Infof("Action %s is not in the allowed list: %v", action, allowedActions)
 		return false
 	}
 
@@ -215,41 +213,26 @@ func (i *OnIssue) whitelistedAction(logger *log.Entry, data map[string]any, allo
 		return false
 	}
 
-	if state != "opened" {
-		logger.Infof("Received update for issue in non-opened state: %s - ignoring", state)
-		return false
-	}
-
-	return true
+	return state == "opened"
 }
 
-func (i *OnIssue) hasWhitelistedLabel(logger *log.Entry, data map[string]any, allowedLabels []configuration.Predicate) bool {
+func (i *OnIssue) hasWhitelistedLabel(data map[string]any, allowedLabels []configuration.Predicate) bool {
 	labels, ok := data["labels"].([]any)
 	if !ok {
 		return false
 	}
 
-	labelNames := []string{}
 	for _, label := range labels {
 		labelMap, ok := label.(map[string]any)
 		if !ok {
 			continue
 		}
 
-		title, ok := labelMap["title"].(string)
-		if !ok {
-			continue
-		}
-
-		labelNames = append(labelNames, title)
-	}
-
-	for _, labelName := range labelNames {
-		if configuration.MatchesAnyPredicate(allowedLabels, labelName) {
+		title, _ := labelMap["title"].(string)
+		if configuration.MatchesAnyPredicate(allowedLabels, title) {
 			return true
 		}
 	}
 
-	logger.Infof("Labels do not match the allowed list: Received: %v, Allowed: %v", labelNames, allowedLabels)
 	return false
 }
