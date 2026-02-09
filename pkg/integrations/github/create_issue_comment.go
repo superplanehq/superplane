@@ -147,7 +147,7 @@ func (c *CreateIssueComment) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("issue number is not a number: %v", err)
 	}
 	if issueNumber <= 0 {
-		return fmt.Errorf("issue number is required")
+		return fmt.Errorf("issue number must be greater than 0")
 	}
 
 	var appMetadata Metadata
