@@ -265,7 +265,10 @@ func (t *OnEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 // All filters are optional; if not set, they are ignored.
 func matchesEventFilters(data map[string]any, config OnEventConfiguration) bool {
 	if data == nil {
-		return true
+		// If any filters are configured, nil data should fail the filter checks
+		hasFilters := config.Status != "" || config.Severity != "" || config.Service != "" ||
+			config.Team != "" || config.Source != "" || config.Visibility != "" || config.Kind != ""
+		return !hasFilters
 	}
 
 	if config.Status != "" {
