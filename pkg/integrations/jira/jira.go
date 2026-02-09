@@ -144,8 +144,6 @@ func (j *Jira) Configuration() []configuration.Field {
 func (j *Jira) Components() []core.Component {
 	return []core.Component{
 		&CreateIssue{},
-		&ListWebhooks{},
-		&DeleteWebhooks{},
 	}
 }
 
@@ -297,8 +295,8 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	if strings.HasSuffix(ctx.Request.URL.Path, "/actions/listWebhooks") {
-		j.handleListWebhooks(ctx)
+	if strings.HasSuffix(ctx.Request.URL.Path, "/actions/getFailedWebhooks") {
+		j.handleGetFailedWebhooks(ctx)
 		return
 	}
 }
@@ -320,25 +318,6 @@ func (j *Jira) handleGetFailedWebhooks(ctx core.HTTPRequestContext) {
 
 	ctx.Response.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(ctx.Response).Encode(failed)
-}
-
-func (j *Jira) handleListWebhooks(ctx core.HTTPRequestContext) {
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		ctx.Logger.Errorf("handleListWebhooks: failed to create client: %v", err)
-		http.Error(ctx.Response, fmt.Sprintf("failed to create client: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	webhooks, err := client.ListWebhooks()
-	if err != nil {
-		ctx.Logger.Errorf("handleListWebhooks: error: %v", err)
-		http.Error(ctx.Response, fmt.Sprintf("error listing webhooks: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	ctx.Response.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(ctx.Response).Encode(webhooks)
 }
 
 func (j *Jira) handleOAuthCallback(ctx core.HTTPRequestContext) {
@@ -442,29 +421,6 @@ func (j *Jira) handleOAuthCallback(ctx core.HTTPRequestContext) {
 func (j *Jira) Actions() []core.Action {
 	return []core.Action{
 		{
-			Name:           "listWebhooks",
-			Description:    "List all webhooks registered with Jira for this OAuth app",
-			UserAccessible: true,
-		},
-		{
-			Name:           "deleteWebhook",
-			Description:    "Delete a single webhook by its Jira ID",
-			UserAccessible: true,
-			Parameters: []configuration.Field{
-				{
-					Name:     "webhookId",
-					Label:    "Webhook ID",
-					Type:     configuration.FieldTypeNumber,
-					Required: true,
-				},
-			},
-		},
-		{
-			Name:           "deleteAllWebhooks",
-			Description:    "Delete all webhooks registered with Jira for this OAuth app",
-			UserAccessible: true,
-		},
-		{
 			Name:           "getFailedWebhooks",
 			Description:    "Get webhooks that failed to be delivered in the last 72 hours",
 			UserAccessible: true,
@@ -479,35 +435,6 @@ func (j *Jira) HandleAction(ctx core.IntegrationActionContext) error {
 	}
 
 	switch ctx.Name {
-	case "listWebhooks":
-		_, err := client.ListWebhooks()
-		if err != nil {
-			return fmt.Errorf("error listing webhooks: %v", err)
-		}
-		return nil
-
-	case "deleteWebhook":
-		params, ok := ctx.Parameters.(map[string]any)
-		if !ok {
-			return fmt.Errorf("invalid parameters")
-		}
-		webhookID, ok := params["webhookId"].(float64)
-		if !ok {
-			return fmt.Errorf("webhookId parameter is required")
-		}
-		err := client.DeleteWebhookByID(int64(webhookID))
-		if err != nil {
-			return fmt.Errorf("error deleting webhook: %v", err)
-		}
-		return nil
-
-	case "deleteAllWebhooks":
-		err := client.DeleteAllWebhooks()
-		if err != nil {
-			return fmt.Errorf("error deleting webhooks: %v", err)
-		}
-		return nil
-
 	case "getFailedWebhooks":
 		_, err := client.GetFailedWebhooks()
 		if err != nil {

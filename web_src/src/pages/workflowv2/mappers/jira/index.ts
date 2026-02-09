@@ -5,8 +5,6 @@ import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createIssue: baseJiraMapper,
-  listWebhooks: baseJiraMapper,
-  deleteWebhooks: baseJiraMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -15,6 +13,4 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createIssue: buildActionStateRegistry("created"),
-  listWebhooks: buildActionStateRegistry("listed"),
-  deleteWebhooks: buildActionStateRegistry("deleted"),
 };
