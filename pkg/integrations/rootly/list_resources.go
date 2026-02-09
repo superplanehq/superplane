@@ -46,6 +46,27 @@ func (r *Rootly) ListResources(resourceType string, ctx core.ListResourcesContex
 		}
 		return resources, nil
 
+	case "team":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		teams, err := client.ListTeams()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list teams: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(teams))
+		for _, team := range teams {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: team.Name,
+				ID:   team.ID,
+			})
+		}
+		return resources, nil
+
 	default:
 		return []core.IntegrationResource{}, nil
 	}
