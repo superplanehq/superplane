@@ -3,105 +3,38 @@ package claude
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"testing"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-// --- Mocks ---
-
-// mockHTTPContextForClient implements core.HTTPContext
-type mockHTTPContextForClient struct {
-	// RoundTripFunc allows us to define the response for a specific request
-	RoundTripFunc func(req *http.Request) *http.Response
-}
-
-func (m *mockHTTPContextForClient) Do(req *http.Request) (*http.Response, error) {
-	if m.RoundTripFunc != nil {
-		return m.RoundTripFunc(req), nil
-	}
-	// Default fallback
-	return &http.Response{
-		StatusCode: http.StatusOK,
-		Body:       io.NopCloser(bytes.NewBufferString(`{}`)),
-	}, nil
-}
-
-// mockIntegrationContextForClient implements core.IntegrationContext
-type mockIntegrationContextForClient struct {
-	config map[string][]byte
-}
-
-func newMockIntegrationContextForClient() *mockIntegrationContextForClient {
-	return &mockIntegrationContextForClient{
-		config: make(map[string][]byte),
-	}
-}
-
-func (m *mockIntegrationContextForClient) GetConfig(name string) ([]byte, error) {
-	val, ok := m.config[name]
-	if !ok {
-		return nil, fmt.Errorf("config not found: %s", name)
-	}
-	return val, nil
-}
-
-// Stubs to satisfy the core.IntegrationContext interface
-func (m *mockIntegrationContextForClient) ID() uuid.UUID                       { return uuid.New() }
-func (m *mockIntegrationContextForClient) GetMetadata() any                    { return nil }
-func (m *mockIntegrationContextForClient) SetMetadata(any)                     {}
-func (m *mockIntegrationContextForClient) Ready()                              {}
-func (m *mockIntegrationContextForClient) Error(message string)                {}
-func (m *mockIntegrationContextForClient) NewBrowserAction(core.BrowserAction) {}
-func (m *mockIntegrationContextForClient) RemoveBrowserAction()                {}
-func (m *mockIntegrationContextForClient) SetSecret(string, []byte) error      { return nil }
-func (m *mockIntegrationContextForClient) GetSecrets() ([]core.IntegrationSecret, error) {
-	return nil, nil
-}
-func (m *mockIntegrationContextForClient) RequestWebhook(any) error { return nil }
-func (m *mockIntegrationContextForClient) Subscribe(any) (*uuid.UUID, error) {
-	return nil, nil
-}
-func (m *mockIntegrationContextForClient) ScheduleResync(time.Duration) error { return nil }
-func (m *mockIntegrationContextForClient) ScheduleActionCall(string, any, time.Duration) error {
-	return nil
-}
-func (m *mockIntegrationContextForClient) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
-	return nil, nil
-}
-
-// --- Tests ---
-
 func TestNewClient(t *testing.T) {
-	mockHTTP := &mockHTTPContextForClient{}
+	httpCtx := &contexts.HTTPContext{}
 
 	tests := []struct {
-		name        string
-		setupMock   func(*mockIntegrationContextForClient)
-		ctx         core.IntegrationContext
-		expectError bool
+		name           string
+		integrationCtx *contexts.IntegrationContext
+		expectError    bool
 	}{
 		{
 			name: "Success",
-			setupMock: func(m *mockIntegrationContextForClient) {
-				m.config["apiKey"] = []byte("sk-123")
+			integrationCtx: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiKey": "sk-123"},
 			},
 			expectError: false,
 		},
 		{
-			name:        "Nil Context",
-			ctx:         nil,
-			expectError: true,
+			name:           "Nil Context",
+			integrationCtx: nil,
+			expectError:    true,
 		},
 		{
 			name: "Missing API Key",
-			setupMock: func(m *mockIntegrationContextForClient) {
-				// No API Key
+			integrationCtx: &contexts.IntegrationContext{
+				Configuration: map[string]any{},
 			},
 			expectError: true,
 		},
@@ -110,20 +43,11 @@ func TestNewClient(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var integrationCtx core.IntegrationContext
-
-			if tt.ctx != nil {
-				// Use explicitly provided context (e.g. nil)
-				integrationCtx = tt.ctx
-			} else {
-				// Use the mock
-				mockInt := newMockIntegrationContextForClient()
-				if tt.setupMock != nil {
-					tt.setupMock(mockInt)
-				}
-				integrationCtx = mockInt
+			if tt.integrationCtx != nil {
+				integrationCtx = tt.integrationCtx
 			}
 
-			client, err := NewClient(mockHTTP, integrationCtx)
+			client, err := NewClient(httpCtx, integrationCtx)
 
 			if tt.expectError {
 				if err == nil {
@@ -157,25 +81,19 @@ func TestClient_Verify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockHTTP := &mockHTTPContextForClient{
-				RoundTripFunc: func(req *http.Request) *http.Response {
-					if req.Method != http.MethodGet {
-						t.Errorf("expected method GET, got %s", req.Method)
-					}
-					if req.URL.String() != "https://api.anthropic.com/v1/models" {
-						t.Errorf("expected URL .../models, got %s", req.URL.String())
-					}
-					return &http.Response{
+			httpCtx := &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
 						StatusCode: tt.responseStatus,
 						Body:       io.NopCloser(bytes.NewBufferString(`{}`)),
-					}
+					},
 				},
 			}
 
 			client := &Client{
 				APIKey:  "test-key",
 				BaseURL: defaultBaseURL,
-				http:    mockHTTP,
+				http:    httpCtx,
 			}
 
 			err := client.Verify()
@@ -190,22 +108,22 @@ func TestClient_Verify(t *testing.T) {
 }
 
 func TestClient_ListModels(t *testing.T) {
-	mockHTTP := &mockHTTPContextForClient{
-		RoundTripFunc: func(req *http.Request) *http.Response {
-			jsonResp := `{
-				"data": [
-					{"id": "claude-3-opus"},
-					{"id": "claude-3-sonnet"}
-				]
-			}`
-			return &http.Response{
+	jsonResp := `{
+		"data": [
+			{"id": "claude-3-opus"},
+			{"id": "claude-3-sonnet"}
+		]
+	}`
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
 				StatusCode: 200,
 				Body:       io.NopCloser(bytes.NewBufferString(jsonResp)),
-			}
+			},
 		},
 	}
 
-	client := &Client{http: mockHTTP, BaseURL: defaultBaseURL}
+	client := &Client{http: httpCtx, BaseURL: defaultBaseURL}
 
 	models, err := client.ListModels()
 	if err != nil {
@@ -221,52 +139,30 @@ func TestClient_ListModels(t *testing.T) {
 }
 
 func TestClient_CreateMessage(t *testing.T) {
-	mockHTTP := &mockHTTPContextForClient{
-		RoundTripFunc: func(req *http.Request) *http.Response {
-			// Verify Headers
-			if req.Header.Get("x-api-key") != "my-secret-key" {
-				t.Errorf("missing or wrong x-api-key header")
-			}
-			if req.Header.Get("anthropic-version") != "2023-06-01" {
-				t.Errorf("missing or wrong anthropic-version header")
-			}
-			if req.Header.Get("Content-Type") != "application/json" {
-				t.Errorf("missing or wrong Content-Type")
-			}
-
-			// Verify Body
-			bodyBytes, _ := io.ReadAll(req.Body)
-			var sentReq CreateMessageRequest
-			if err := json.Unmarshal(bodyBytes, &sentReq); err != nil {
-				t.Errorf("failed to unmarshal sent body: %v", err)
-			}
-			if sentReq.Model != "claude-3-opus" {
-				t.Errorf("sent wrong model: %s", sentReq.Model)
-			}
-
-			// Return Success
-			jsonResp := `{
-				"id": "msg_123",
-				"type": "message",
-				"role": "assistant",
-				"content": [
-					{"type": "text", "text": "Hello there"}
-				],
-				"model": "claude-3-opus",
-				"stop_reason": "end_turn",
-				"usage": {"input_tokens": 10, "output_tokens": 5}
-			}`
-			return &http.Response{
+	jsonResp := `{
+		"id": "msg_123",
+		"type": "message",
+		"role": "assistant",
+		"content": [
+			{"type": "text", "text": "Hello there"}
+		],
+		"model": "claude-3-opus",
+		"stop_reason": "end_turn",
+		"usage": {"input_tokens": 10, "output_tokens": 5}
+	}`
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
 				StatusCode: 200,
 				Body:       io.NopCloser(bytes.NewBufferString(jsonResp)),
-			}
+			},
 		},
 	}
 
 	client := &Client{
 		APIKey:  "my-secret-key",
 		BaseURL: defaultBaseURL,
-		http:    mockHTTP,
+		http:    httpCtx,
 	}
 
 	req := CreateMessageRequest{
@@ -287,6 +183,29 @@ func TestClient_CreateMessage(t *testing.T) {
 	}
 	if len(resp.Content) == 0 || resp.Content[0].Text != "Hello there" {
 		t.Error("response content mismatch")
+	}
+
+	// Verify request that was sent
+	if len(httpCtx.Requests) != 1 {
+		t.Fatalf("expected 1 request, got %d", len(httpCtx.Requests))
+	}
+	sentReq := httpCtx.Requests[0]
+	if sentReq.Header.Get("x-api-key") != "my-secret-key" {
+		t.Errorf("missing or wrong x-api-key header")
+	}
+	if sentReq.Header.Get("anthropic-version") != "2023-06-01" {
+		t.Errorf("missing or wrong anthropic-version header")
+	}
+	if sentReq.Header.Get("Content-Type") != "application/json" {
+		t.Errorf("missing or wrong Content-Type")
+	}
+	bodyBytes, _ := io.ReadAll(sentReq.Body)
+	var sentBody CreateMessageRequest
+	if err := json.Unmarshal(bodyBytes, &sentBody); err != nil {
+		t.Errorf("failed to unmarshal sent body: %v", err)
+	}
+	if sentBody.Model != "claude-3-opus" {
+		t.Errorf("sent wrong model: %s", sentBody.Model)
 	}
 }
 
@@ -329,16 +248,16 @@ func TestClient_ErrorHandling(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockHTTP := &mockHTTPContextForClient{
-				RoundTripFunc: func(req *http.Request) *http.Response {
-					return &http.Response{
+			httpCtx := &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
 						StatusCode: tt.statusCode,
 						Body:       io.NopCloser(bytes.NewBufferString(tt.responseBody)),
-					}
+					},
 				},
 			}
 
-			client := &Client{http: mockHTTP, BaseURL: defaultBaseURL}
+			client := &Client{http: httpCtx, BaseURL: defaultBaseURL}
 
 			// We use ListModels as a simple way to trigger execRequest
 			_, err := client.ListModels()

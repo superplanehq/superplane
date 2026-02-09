@@ -400,6 +400,20 @@ func VerifyCanvasEventsCount(t *testing.T, canvasID uuid.UUID, expected int) {
 	require.Equal(t, expected, int(actual))
 }
 
+func VerifyCanvasNodeEventsCount(t *testing.T, canvasID uuid.UUID, nodeID string, expected int) {
+	var actual int64
+
+	err := database.Conn().
+		Model(&models.CanvasEvent{}).
+		Where("workflow_id = ?", canvasID).
+		Where("node_id = ?", nodeID).
+		Count(&actual).
+		Error
+
+	require.NoError(t, err)
+	require.Equal(t, expected, int(actual))
+}
+
 func VerifyNodeExecutionsCount(t *testing.T, workflowID uuid.UUID, expected int) {
 	var actual int64
 

@@ -410,8 +410,8 @@ message Integration {
   }
 
   message NodeRef {
-    string workflow_id = 1;
-    string workflow_name = 2;
+    string canvas_id = 1;
+    string canvas_name = 2;
     string node_id = 3;
     string node_name = 4;
   }
