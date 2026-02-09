@@ -1,45 +1,52 @@
 package contexts
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 type EventContext struct {
-	tx   *gorm.DB
-	node *models.CanvasNode
+	tx             *gorm.DB
+	node           *models.CanvasNode
+	maxPayloadSize int
 }
 
 func NewEventContext(tx *gorm.DB, node *models.CanvasNode) *EventContext {
-	return &EventContext{tx: tx, node: node}
+	return &EventContext{tx: tx, node: node, maxPayloadSize: DefaultMaxPayloadSize}
 }
 
 func (s *EventContext) Emit(payloadType string, payload any) error {
-	var v any
-
 	structuredPayload := map[string]any{
 		"type":      payloadType,
 		"timestamp": time.Now(),
 		"data":      payload,
 	}
 
-	err := mapstructure.Decode(structuredPayload, &v)
+	data, err := json.Marshal(structuredPayload)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal event payload: %w", err)
+	}
+
+	if len(data) > s.maxPayloadSize {
+		return fmt.Errorf("event payload too large: %d bytes (max %d)", len(data), s.maxPayloadSize)
 	}
 
 	now := time.Now()
+
+	//
+	// We use RawMessage here to avoid a second marshal when GORM persists the JSONType.
+	//
 	event := models.CanvasEvent{
 		WorkflowID: s.node.WorkflowID,
 		NodeID:     s.node.NodeID,
 		Channel:    "default",
-		Data:       datatypes.NewJSONType(v),
+		Data:       datatypes.NewJSONType[any](json.RawMessage(data)),
 		State:      models.CanvasEventStatePending,
 		CreatedAt:  &now,
 	}
