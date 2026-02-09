@@ -17,7 +17,7 @@ const (
 	DeployPayloadType          = "render.deploy.finished"
 	DeploySuccessOutputChannel = "success"
 	DeployFailedOutputChannel  = "failed"
-	DeployPollInterval         = 5 * time.Minute // fallback when deploy_ended webhook doesn't arrive
+	DeployPollInterval         = 3 * time.Second // fallback when deploy_ended webhook doesn't arrive
 	deployExecutionKey         = "deploy_id"
 )
 
@@ -253,7 +253,7 @@ func (c *Deploy) poll(ctx core.ActionContext) error {
 		return nil
 	}
 
-	if isDeployFinished(metadata.Deploy.Status) {
+	if metadata.Deploy.FinishedAt != "" {
 		return nil
 	}
 
@@ -262,17 +262,18 @@ func (c *Deploy) poll(ctx core.ActionContext) error {
 		return err
 	}
 
+	ctx.Logger.Infof("polling deploy %s for service %s", metadata.Deploy.ID, spec.Service)
 	deploy, err := client.GetDeploy(spec.Service, metadata.Deploy.ID)
 	if err != nil {
 		return err
 	}
 
-	status := readString(deploy.Status)
-	if !isDeployFinished(status) {
+	ctx.Logger.Infof("deploy %s status: %s", metadata.Deploy.ID, deploy.Status)
+	if deploy.FinishedAt == "" {
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, DeployPollInterval)
 	}
 
-	metadata.Deploy.Status = status
+	metadata.Deploy.Status = deploy.Status
 	metadata.Deploy.FinishedAt = readString(deploy.FinishedAt)
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return err
@@ -282,6 +283,8 @@ func (c *Deploy) poll(ctx core.ActionContext) error {
 }
 
 func (c *Deploy) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+
+	return http.StatusOK, nil
 	if err := verifyWebhookSignature(ctx); err != nil {
 		return http.StatusForbidden, err
 	}
@@ -317,7 +320,7 @@ func (c *Deploy) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusInternalServerError, fmt.Errorf("error decoding metadata: %w", err)
 	}
 
-	if metadata.Deploy != nil && isDeployFinished(metadata.Deploy.Status) {
+	if metadata.Deploy != nil && metadata.Deploy.FinishedAt != "" {
 		return http.StatusOK, nil
 	}
 
@@ -366,7 +369,7 @@ func (c *Deploy) resolveDeployFromEvent(
 
 func (c *Deploy) emitDeployResult(ctx core.ActionContext, deploy DeployResponse) error {
 	payload := deployPayloadFromDeployResponse(deploy)
-	if isDeploySucceeded(deploy.Status) {
+	if deploy.Status == "live" {
 		return ctx.ExecutionState.Emit(DeploySuccessOutputChannel, DeployPayloadType, []any{payload})
 	}
 	return ctx.ExecutionState.Emit(DeployFailedOutputChannel, DeployPayloadType, []any{payload})
@@ -374,7 +377,7 @@ func (c *Deploy) emitDeployResult(ctx core.ActionContext, deploy DeployResponse)
 
 func (c *Deploy) emitDeployResultFromWebhook(ctx *core.ExecutionContext, data map[string]any) error {
 	status := readString(data["status"])
-	if isDeploySucceeded(status) {
+	if status == "live" {
 		return ctx.ExecutionState.Emit(DeploySuccessOutputChannel, DeployPayloadType, []any{data})
 	}
 	return ctx.ExecutionState.Emit(DeployFailedOutputChannel, DeployPayloadType, []any{data})
@@ -517,15 +520,6 @@ func normalizeDeployWebhookEventType(t string) string {
 		return "deploy_ended"
 	}
 	return t
-}
-
-func isDeployFinished(status string) bool {
-	s := strings.TrimSpace(strings.ToLower(status))
-	return s == "succeeded" || s == "failed" || s == "canceled" || s == "cancelled"
-}
-
-func isDeploySucceeded(status string) bool {
-	return strings.TrimSpace(strings.ToLower(status)) == "succeeded"
 }
 
 func (c *Deploy) Cancel(ctx core.ExecutionContext) error {

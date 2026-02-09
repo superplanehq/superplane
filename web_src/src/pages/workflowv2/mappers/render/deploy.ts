@@ -1,19 +1,22 @@
 import {
   ComponentBaseContext,
   ComponentBaseMapper,
+  EventStateRegistry,
   ExecutionDetailsContext,
   ExecutionInfo,
   NodeInfo,
   OutputPayload,
+  StateFunction,
   SubtitleContext,
 } from "../types";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import { ComponentBaseProps, DEFAULT_EVENT_STATE_MAP, EventSection, EventStateMap } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getTriggerRenderer } from "..";
 import { MetadataItem } from "@/ui/metadataList";
 import { formatTimeAgo } from "@/utils/date";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import { formatTimestamp, stringOrDash } from "./common";
+import { defaultStateFunction } from "../stateRegistry";
 
 interface DeployConfiguration {
   service?: string;
@@ -27,6 +30,33 @@ interface DeployOutput {
   finishedAt?: string;
   commitId?: string;
 }
+
+export const DEPLOY_STATE_MAP: EventStateMap = {
+  ...DEFAULT_EVENT_STATE_MAP,
+  failed: {
+    icon: "circle-x",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-red-100",
+    badgeColor: "bg-red-500",
+  },
+};
+
+export const deployStateFunction: StateFunction = (execution) => {
+  if (!execution) return "neutral";
+
+  const outputs = execution.outputs as { failed?: OutputPayload[] } | undefined;
+  if (outputs?.failed?.length) {
+    return "failed";
+  }
+
+  const state = defaultStateFunction(execution);
+  return state === "success" ? "triggered" : state;
+};
+
+export const DEPLOY_STATE_REGISTRY: EventStateRegistry = {
+  stateMap: DEPLOY_STATE_MAP,
+  getState: deployStateFunction,
+};
 
 export const deployMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -46,7 +76,7 @@ export const deployMapper: ComponentBaseMapper = {
       eventSections: lastExecution ? deployEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: deployMetadataList(context.node),
-      eventStateMap: getStateMap(componentName),
+      eventStateMap: DEPLOY_STATE_MAP,
     };
   },
 

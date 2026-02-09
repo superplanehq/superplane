@@ -1,6 +1,5 @@
 import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
-import { buildActionStateRegistry } from "../utils";
-import { deployMapper } from "./deploy";
+import { deployMapper, DEPLOY_STATE_REGISTRY } from "./deploy";
 import { onBuildTriggerRenderer } from "./on_build";
 import { onDeployTriggerRenderer } from "./on_deploy";
 
@@ -14,5 +13,5 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
-  deploy: buildActionStateRegistry("triggered"),
+  deploy: DEPLOY_STATE_REGISTRY,
 };
