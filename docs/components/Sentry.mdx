@@ -20,11 +20,20 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-Connect Sentry to SuperPlane using an Internal Integration token.
+**Connection (Auth Token):** Use a **Personal Auth Token** from Sentry. In Sentry go to **User Settings** → **Auth Tokens** → **Create New Token** and grant `org:read`, `project:read`, `event:write`. The token will start with `sntryu_`—paste it into SuperPlane's Sentry connection form. The Personal Auth Token is used only for API calls (connection check and Update Issue); it does **not** provide a webhook URL or Client Secret.
 
-1. In Sentry: **Organization Settings** → **Developer Settings** → **New Internal Integration**
-2. Name it (e.g. "SuperPlane"), then create an **Auth Token** with scopes: `org:read`, `project:read`, `event:write`
-3. Paste the token below. For the **On Issue Event** trigger, configure the webhook in your Sentry integration to point to the trigger's webhook URL and subscribe to Issue events. Use the same integration's Client Secret as the webhook secret in SuperPlane when prompted.
+**Webhooks (On Issue Event only):** Sentry sends webhooks from an **Internal Integration**, not from your Personal Auth Token. Create an Internal Integration in Sentry (Organization Settings → Developer Settings) to get a **webhook URL** and a **Client Secret**. In that integration, add the webhook URL that SuperPlane shows for the trigger, subscribe to Issue events, and paste the **Client Secret** into the trigger's "Webhook secret" field in SuperPlane. Do **not** paste the Client Secret (the long hex string) into the connection Auth Token field—Sentry's API returns **401 Invalid token** for it.
+
+**Linking the integration to nodes:** For both the **On Issue Event** trigger and the **Update Issue** component, select your **Sentry** integration in the **Integration** dropdown in the configuration panel, then click **Save** (in the panel or the canvas Save button). Until you save, the node has no integration linked and you will see "Component not configured - integration is required".
+
+## Troubleshooting
+
+| Issue | What to do |
+|-------|------------|
+| **401 Invalid token** when connecting | You likely pasted the Internal Integration **Client Secret** (hex string). Use a **Personal Auth Token** (`sntryu_...`) from User Settings → Auth Tokens for the connection instead. |
+| **Component not configured - integration is required** | The node has no integration linked. For **each** Sentry trigger and Sentry action node: open the node, select **Sentry** (your installation) in the **Integration** dropdown, then click **Save**. Save the canvas if needed. The link is only stored when you save. |
+| **Webhook secret required** | The On Issue Event trigger needs the Client Secret to verify webhooks. Paste the **Client Secret** from your Sentry Internal Integration into the trigger's "Webhook secret" field (not into the connection Auth Token field). |
+| **Webhook URL not reachable by Sentry** | Set `WEBHOOKS_BASE_URL` to the public URL Sentry can reach (see [Webhook URL and WEBHOOKS_BASE_URL](#webhook-url-and-webhooks_base_url)). Restart the app, save the canvas, then use the resulting webhook URL in Sentry. |
 
 <a id="on-issue-event"></a>
 
@@ -41,13 +50,26 @@ The On Issue Event trigger runs when Sentry sends webhook events for issues.
 ### Configuration
 
 - **Events**: Choose which issue actions to listen for (created, resolved, assigned, archived, unresolved)
-- **Webhook secret**: Paste the Client Secret from your Sentry Internal Integration (used to verify webhook signatures)
+- **Webhook secret** (required): Paste the Client Secret from your Sentry Internal Integration. SuperPlane uses it to verify that each webhook request really came from Sentry (HMAC signature). Sentry does not send webhooks without a URL and secret configured, so this field is required for the trigger to work.
 
 ### Setup
 
-1. In Sentry: add a webhook URL in your Internal Integration (Developer Settings → your integration → Webhooks). Use the webhook URL shown for this trigger in SuperPlane.
+1. In Sentry: add a webhook URL in your Internal Integration (Developer Settings → your integration → Webhooks). Use the webhook URL shown for this trigger in SuperPlane (the base is controlled by `WEBHOOKS_BASE_URL`—see [Webhook URL and WEBHOOKS_BASE_URL](#webhook-url-and-webhooks_base_url)).
 2. Subscribe to **Issue** events (e.g. issue.created, issue.resolved).
-3. Copy the integration's **Client Secret** into the Webhook secret field below.
+3. Copy the integration's **Client Secret** into the "Webhook secret" field in SuperPlane.
+4. Select **Sentry** in the trigger's **Integration** dropdown and click **Save** (panel or canvas); otherwise you will see "Component not configured - integration is required".
+
+<a id="webhook-url-and-webhooks_base_url"></a>
+
+### Webhook URL and WEBHOOKS_BASE_URL
+
+The webhook URL that Sentry must call is built from **WEBHOOKS_BASE_URL**: the URL is `WEBHOOKS_BASE_URL` + `/api/v1/webhooks/` + &lt;webhook-id&gt;. Sentry must be able to reach this URL over the internet.
+
+**How to set WEBHOOKS_BASE_URL**
+
+- **Docker / docker-compose:** The app often already has `WEBHOOKS_BASE_URL` in the compose file with a default (e.g. `WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}`). To use a public or tunnel URL, set the variable in your `.env` file (e.g. `WEBHOOKS_BASE_URL=https://your-public-hostname` or your tunnel URL). Restart the app after changing it.
+- **Production:** Set it to your public API base URL in your deployment environment (e.g. Kubernetes, host env, or `.env`).
+- **Local development with a tunnel:** Set `WEBHOOKS_BASE_URL` to the tunnel’s public URL in `.env` (or when running `make dev.start`). Restart the app, save the canvas, then use the resulting webhook URL in Sentry.
 
 ### Example Data
 
@@ -98,10 +120,17 @@ The Update Issue component updates an existing Sentry issue.
 
 ### Configuration
 
-- **Organization**: Sentry organization slug (e.g. from trigger payload or your org name)
+- **Organization**: Sentry organization slug (e.g. from trigger payload or your org name). Use the exact slug (e.g. `my-org`), not a typo (e.g. `my-rog`).
 - **Issue ID**: The issue ID to update (e.g. from trigger: `$['On Issue Event'].issue.id`)
 - **Status**: resolved, resolvedInNextRelease, unresolved, or ignored
 - **Assigned To**: Actor id or username to assign the issue to
+
+### Testing Update Issue
+
+1. Ensure the Sentry connection is **Ready** (Personal Auth Token, `sntryu_...`).
+2. In the **Update Issue** component, set **Organization** (your Sentry org slug), **Issue ID** (e.g. a real issue id or `{{ $['On Issue Event'].issue.id }}` from the trigger), and **Status** or **Assigned To**.
+3. Click **Save** on the configuration panel so the component is fully configured.
+4. Run the workflow: either wait for the **On Issue Event** trigger to fire, or use a manual/test run if your setup supports it. The Update Issue step will call Sentry's API and the issue will be updated.
 
 ### Output
 
