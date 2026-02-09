@@ -122,3 +122,180 @@ func Test__Render_Deploy__Execute(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+func Test__Render_Deploy__HandleWebhook(t *testing.T) {
+	component := &Deploy{}
+
+	payload := map[string]any{
+		"id":        "evt-cph1rs3idesc73a2b2mg",
+		"type":      "deploy_ended",
+		"timestamp": "2026-02-08T21:08:59.718Z",
+		"serviceId": "srv-cukouhrtq21c73e9scng",
+	}
+
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
+
+	secret := "whsec-test"
+	headers := buildSignedHeaders(secret, body)
+
+	t.Run("uses event details to resolve deploy and emit result", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"id":"evt-cph1rs3idesc73a2b2mg","timestamp":"2026-02-08T21:08:59.718Z","serviceId":"srv-cukouhrtq21c73e9scng","type":"deploy_ended","details":{"deployId":"dep-cukouhrtq21c73e9scng","deployStatus":"succeeded"}}`,
+					)),
+				},
+			},
+		}
+
+		lookupOrder := []string{}
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: DeployExecutionMetadata{
+				Deploy: &DeployMetadata{
+					ID:        "dep-cukouhrtq21c73e9scng",
+					Status:    "build_in_progress",
+					ServiceID: "srv-cukouhrtq21c73e9scng",
+				},
+			},
+		}
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+		status, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
+			Body:        body,
+			Headers:     headers,
+			HTTP:        httpCtx,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
+			Webhook:     &contexts.WebhookContext{Secret: secret},
+			FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
+				lookupOrder = append(lookupOrder, key+":"+value)
+				if key == "deploy_id" && value == "dep-cukouhrtq21c73e9scng" {
+					return &core.ExecutionContext{
+						Metadata:       metadataCtx,
+						ExecutionState: executionState,
+					}, nil
+				}
+
+				return nil, assert.AnError
+			},
+		})
+
+		assert.Equal(t, http.StatusOK, status)
+		require.NoError(t, webhookErr)
+		assert.Equal(t, []string{
+			"deploy_id:dep-cukouhrtq21c73e9scng",
+		}, lookupOrder)
+
+		updatedMetadata, ok := metadataCtx.Metadata.(DeployExecutionMetadata)
+		require.True(t, ok)
+		require.NotNil(t, updatedMetadata.Deploy)
+		assert.Equal(t, "succeeded", updatedMetadata.Deploy.Status)
+		assert.Equal(t, "2026-02-08T21:08:59.718Z", updatedMetadata.Deploy.FinishedAt)
+
+		assert.Equal(t, DeploySuccessOutputChannel, executionState.Channel)
+		assert.Equal(t, DeployPayloadType, executionState.Type)
+		require.Len(t, executionState.Payloads, 1)
+		emittedPayload := readMap(executionState.Payloads[0])
+		data := readMap(emittedPayload["data"])
+		assert.Equal(t, "dep-cukouhrtq21c73e9scng", data["id"])
+		assert.Equal(t, "succeeded", data["status"])
+		assert.Equal(t, "evt-cph1rs3idesc73a2b2mg", data["eventId"])
+
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+		assert.Contains(t, httpCtx.Requests[0].URL.Path, "/v1/events/evt-cph1rs3idesc73a2b2mg")
+	})
+
+	t.Run("event without deploy details is ignored", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"id":"evt-cph1rs3idesc73a2b2mg","timestamp":"2026-02-08T21:08:59.718Z","serviceId":"srv-cukouhrtq21c73e9scng","type":"autoscaling_config_changed","details":null}`,
+					)),
+				},
+			},
+		}
+
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		status, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
+			Body:        body,
+			Headers:     headers,
+			HTTP:        httpCtx,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
+			Webhook:     &contexts.WebhookContext{Secret: secret},
+			FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
+				if key == "deploy_id" {
+					return &core.ExecutionContext{
+						ExecutionState: executionState,
+					}, nil
+				}
+				return nil, assert.AnError
+			},
+		})
+
+		assert.Equal(t, http.StatusOK, status)
+		require.NoError(t, webhookErr)
+		assert.Empty(t, executionState.Channel)
+	})
+
+	t.Run("event id from data.id resolves deploy", func(t *testing.T) {
+		payload := map[string]any{
+			"type": "deploy_ended",
+			"data": map[string]any{
+				"id":        "evt-cph1rs3idesc73a2b2mg",
+				"serviceId": "srv-cukouhrtq21c73e9scng",
+			},
+		}
+		body, marshalErr := json.Marshal(payload)
+		require.NoError(t, marshalErr)
+
+		headers := buildSignedHeaders(secret, body)
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"id":"evt-cph1rs3idesc73a2b2mg","timestamp":"2026-02-08T21:08:59.718Z","serviceId":"srv-cukouhrtq21c73e9scng","type":"deploy_ended","details":{"deployId":"dep-cukouhrtq21c73e9scng","deployStatus":"succeeded"}}`,
+					)),
+				},
+			},
+		}
+
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: DeployExecutionMetadata{
+				Deploy: &DeployMetadata{
+					ID:        "dep-cukouhrtq21c73e9scng",
+					Status:    "build_in_progress",
+					ServiceID: "srv-cukouhrtq21c73e9scng",
+				},
+			},
+		}
+
+		status, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
+			Body:        body,
+			Headers:     headers,
+			HTTP:        httpCtx,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
+			Webhook:     &contexts.WebhookContext{Secret: secret},
+			FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
+				if key == "deploy_id" && value == "dep-cukouhrtq21c73e9scng" {
+					return &core.ExecutionContext{
+						Metadata:       metadataCtx,
+						ExecutionState: executionState,
+					}, nil
+				}
+
+				return nil, assert.AnError
+			},
+		})
+
+		assert.Equal(t, http.StatusOK, status)
+		require.NoError(t, webhookErr)
+		assert.Equal(t, DeploySuccessOutputChannel, executionState.Channel)
+	})
+}

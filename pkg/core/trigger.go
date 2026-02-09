@@ -115,8 +115,10 @@ type WebhookRequestContext struct {
 	WorkflowID    string
 	NodeID        string
 	Configuration any
+	HTTP          HTTPContext
 	Webhook       NodeWebhookContext
 	Events        EventContext
+	Integration   IntegrationContext
 
 	//
 	// Return an execution context for a given execution,

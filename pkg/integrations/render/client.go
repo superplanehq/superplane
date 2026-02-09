@@ -84,6 +84,30 @@ type deployRequest struct {
 	ClearCache string `json:"clearCache"`
 }
 
+type triggerDeployResponse struct {
+	Deploy DeployResponse `json:"deploy"`
+}
+
+type DeployResponse struct {
+	ID         string `json:"id"`
+	Status     string `json:"status"`
+	CreatedAt  string `json:"createdAt"`
+	FinishedAt string `json:"finishedAt"`
+}
+
+type DeployEventResponse struct {
+	ID        string                    `json:"id"`
+	Timestamp string                    `json:"timestamp"`
+	ServiceID string                    `json:"serviceId"`
+	Type      string                    `json:"type"`
+	Details   *DeployEventResponseEntry `json:"details"`
+}
+
+type DeployEventResponseEntry struct {
+	DeployID     string `json:"deployId"`
+	DeployStatus string `json:"deployStatus"`
+}
+
 func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("no integration context")
@@ -216,9 +240,9 @@ func (c *Client) DeleteWebhook(webhookID string) error {
 	return err
 }
 
-func (c *Client) TriggerDeploy(serviceID string, clearCache bool) (map[string]any, error) {
+func (c *Client) TriggerDeploy(serviceID string, clearCache bool) (DeployResponse, error) {
 	if serviceID == "" {
-		return nil, fmt.Errorf("serviceID is required")
+		return DeployResponse{}, fmt.Errorf("serviceID is required")
 	}
 
 	clearCacheValue := "do_not_clear"
@@ -233,30 +257,28 @@ func (c *Client) TriggerDeploy(serviceID string, clearCache bool) (map[string]an
 		deployRequest{ClearCache: clearCacheValue},
 	)
 	if err != nil {
-		return nil, err
+		return DeployResponse{}, err
 	}
 
-	payload := map[string]any{}
-	if err := json.Unmarshal(body, &payload); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal deploy response: %w", err)
+	wrappedResponse := triggerDeployResponse{}
+	if err := json.Unmarshal(body, &wrappedResponse); err == nil && wrappedResponse.Deploy.ID != "" {
+		return wrappedResponse.Deploy, nil
 	}
 
-	if deployValue, ok := payload["deploy"]; ok {
-		deployMap, ok := deployValue.(map[string]any)
-		if ok {
-			return deployMap, nil
-		}
+	deployResponse := DeployResponse{}
+	if err := json.Unmarshal(body, &deployResponse); err != nil {
+		return DeployResponse{}, fmt.Errorf("failed to unmarshal deploy response: %w", err)
 	}
 
-	return payload, nil
+	return deployResponse, nil
 }
 
-func (c *Client) GetDeploy(serviceID string, deployID string) (map[string]any, error) {
+func (c *Client) GetDeploy(serviceID string, deployID string) (DeployResponse, error) {
 	if serviceID == "" {
-		return nil, fmt.Errorf("serviceID is required")
+		return DeployResponse{}, fmt.Errorf("serviceID is required")
 	}
 	if deployID == "" {
-		return nil, fmt.Errorf("deployID is required")
+		return DeployResponse{}, fmt.Errorf("deployID is required")
 	}
 
 	_, body, err := c.execRequestWithResponse(
@@ -266,22 +288,37 @@ func (c *Client) GetDeploy(serviceID string, deployID string) (map[string]any, e
 		nil,
 	)
 	if err != nil {
-		return nil, err
+		return DeployResponse{}, err
 	}
 
-	payload := map[string]any{}
-	if err := json.Unmarshal(body, &payload); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal deploy response: %w", err)
+	deployResponse := DeployResponse{}
+	if err := json.Unmarshal(body, &deployResponse); err != nil {
+		return DeployResponse{}, fmt.Errorf("failed to unmarshal deploy response: %w", err)
+	}
+	return deployResponse, nil
+}
+
+func (c *Client) GetEvent(eventID string) (DeployEventResponse, error) {
+	if eventID == "" {
+		return DeployEventResponse{}, fmt.Errorf("eventID is required")
 	}
 
-	if deployValue, ok := payload["deploy"]; ok {
-		deployMap, ok := deployValue.(map[string]any)
-		if ok {
-			return deployMap, nil
-		}
+	_, body, err := c.execRequestWithResponse(
+		http.MethodGet,
+		"/events/"+url.PathEscape(eventID),
+		nil,
+		nil,
+	)
+	if err != nil {
+		return DeployEventResponse{}, err
 	}
 
-	return payload, nil
+	response := DeployEventResponse{}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return DeployEventResponse{}, fmt.Errorf("failed to unmarshal event response: %w", err)
+	}
+
+	return response, nil
 }
 
 func parseWorkspaces(body []byte) ([]Workspace, error) {

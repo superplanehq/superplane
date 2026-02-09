@@ -18,6 +18,7 @@ const (
 	DeploySuccessOutputChannel = "success"
 	DeployFailedOutputChannel  = "failed"
 	DeployPollInterval         = 5 * time.Minute // fallback when deploy_ended webhook doesn't arrive
+	deployExecutionKey         = "deploy_id"
 )
 
 type Deploy struct{}
@@ -37,6 +38,22 @@ type DeployMetadata struct {
 type DeployConfiguration struct {
 	Service    string `json:"service" mapstructure:"service"`
 	ClearCache bool   `json:"clearCache" mapstructure:"clearCache"`
+}
+
+type deployWebhookPayload struct {
+	ID        string         `json:"id"`
+	Type      string         `json:"type"`
+	ServiceID string         `json:"serviceId"`
+	Data      map[string]any `json:"data"`
+}
+
+type deployWebhookResult struct {
+	DeployID   string
+	Status     string
+	ServiceID  string
+	CreatedAt  string
+	FinishedAt string
+	EventID    string
 }
 
 func (c *Deploy) Name() string {
@@ -125,14 +142,23 @@ func (c *Deploy) Configuration() []configuration.Field {
 	}
 }
 
-func (c *Deploy) Setup(ctx core.SetupContext) error {
+func decodeDeployConfiguration(configuration any) (DeployConfiguration, error) {
 	spec := DeployConfiguration{}
-	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
+	if err := mapstructure.Decode(configuration, &spec); err != nil {
+		return DeployConfiguration{}, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if strings.TrimSpace(spec.Service) == "" {
-		return fmt.Errorf("service is required")
+	spec.Service = strings.TrimSpace(spec.Service)
+	if spec.Service == "" {
+		return DeployConfiguration{}, fmt.Errorf("service is required")
+	}
+
+	return spec, nil
+}
+
+func (c *Deploy) Setup(ctx core.SetupContext) error {
+	if _, err := decodeDeployConfiguration(ctx.Configuration); err != nil {
+		return err
 	}
 
 	// Request webhook for deploy_ended so this component can receive completion events
@@ -150,13 +176,9 @@ func (c *Deploy) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, err
 }
 
 func (c *Deploy) Execute(ctx core.ExecutionContext) error {
-	spec := DeployConfiguration{}
-	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	if strings.TrimSpace(spec.Service) == "" {
-		return fmt.Errorf("service is required")
+	spec, err := decodeDeployConfiguration(ctx.Configuration)
+	if err != nil {
+		return err
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -169,34 +191,26 @@ func (c *Deploy) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	deployID := readString(deploy["id"])
+	deployID := readString(deploy.ID)
 	if deployID == "" {
 		return fmt.Errorf("deploy response missing id")
 	}
 
-	status := readString(deploy["status"])
-	createdAt := readString(deploy["createdAt"])
-	finishedAt := readString(deploy["finishedAt"])
-
 	err = ctx.Metadata.Set(DeployExecutionMetadata{
 		Deploy: &DeployMetadata{
 			ID:         deployID,
-			Status:     status,
+			Status:     readString(deploy.Status),
 			ServiceID:  spec.Service,
-			CreatedAt:  createdAt,
-			FinishedAt: finishedAt,
+			CreatedAt:  readString(deploy.CreatedAt),
+			FinishedAt: readString(deploy.FinishedAt),
 		},
 	})
 	if err != nil {
 		return err
 	}
 
-	if err := ctx.ExecutionState.SetKV("deploy_id", deployID); err != nil {
+	if err := ctx.ExecutionState.SetKV(deployExecutionKey, deployID); err != nil {
 		return err
-	}
-
-	if ctx.Logger != nil {
-		ctx.Logger.Infof("Triggered deploy %s for service %s", deployID, spec.Service)
 	}
 
 	// Wait for deploy_ended webhook; poll as fallback
@@ -225,8 +239,8 @@ func (c *Deploy) poll(ctx core.ActionContext) error {
 		return nil
 	}
 
-	spec := DeployConfiguration{}
-	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+	spec, err := decodeDeployConfiguration(ctx.Configuration)
+	if err != nil {
 		return err
 	}
 
@@ -253,13 +267,13 @@ func (c *Deploy) poll(ctx core.ActionContext) error {
 		return err
 	}
 
-	status := readString(deploy["status"])
+	status := readString(deploy.Status)
 	if !isDeployFinished(status) {
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, DeployPollInterval)
 	}
 
 	metadata.Deploy.Status = status
-	metadata.Deploy.FinishedAt = readString(deploy["finishedAt"])
+	metadata.Deploy.FinishedAt = readString(deploy.FinishedAt)
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return err
 	}
@@ -272,27 +286,29 @@ func (c *Deploy) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusForbidden, err
 	}
 
-	var payload map[string]any
-	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
+	payload, err := parseDeployWebhookPayload(ctx.Body)
+	if err != nil {
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %w", err)
 	}
 
-	eventType := normalizeDeployWebhookEventType(readString(payload["type"]))
+	eventType := normalizeDeployWebhookEventType(readString(payload.Type))
 	if eventType != "deploy_ended" {
 		return http.StatusOK, nil
 	}
 
-	data := readMap(payload["data"])
-	deployID := readString(data["deployId"])
-	if deployID == "" {
-		deployID = readString(data["id"])
+	result, err := c.resolveDeployWebhookResult(ctx, payload)
+	if err != nil {
+		return http.StatusOK, nil
 	}
-	if deployID == "" {
+	if result.DeployID == "" || result.Status == "" {
 		return http.StatusOK, nil
 	}
 
-	executionCtx, err := ctx.FindExecutionByKV("deploy_id", deployID)
+	executionCtx, err := findDeployExecutionByID(ctx, result.DeployID)
 	if err != nil {
+		return http.StatusOK, nil
+	}
+	if executionCtx == nil {
 		return http.StatusOK, nil
 	}
 
@@ -305,35 +321,55 @@ func (c *Deploy) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusOK, nil
 	}
 
-	status := readString(data["status"])
-	if metadata.Deploy != nil {
-		metadata.Deploy.Status = status
-		metadata.Deploy.FinishedAt = readString(data["finishedAt"])
-	} else {
-		metadata.Deploy = &DeployMetadata{
-			ID:         deployID,
-			Status:     status,
-			ServiceID:  readString(data["serviceId"]),
-			CreatedAt:  readString(data["createdAt"]),
-			FinishedAt: readString(data["finishedAt"]),
-		}
-	}
+	applyDeployWebhookResultToMetadata(&metadata, result)
 	if err := executionCtx.Metadata.Set(metadata); err != nil {
 		return http.StatusInternalServerError, err
 	}
 
-	if err := c.emitDeployResultFromWebhook(executionCtx, data); err != nil {
+	if err := c.emitDeployResultFromWebhook(executionCtx, deployPayloadFromWebhookResult(result)); err != nil {
 		return http.StatusInternalServerError, err
 	}
 
 	return http.StatusOK, nil
 }
 
-func (c *Deploy) emitDeployResult(ctx core.ActionContext, deploy map[string]any) error {
-	if isDeploySucceeded(readString(deploy["status"])) {
-		return ctx.ExecutionState.Emit(DeploySuccessOutputChannel, DeployPayloadType, []any{deploy})
+func (c *Deploy) resolveDeployFromEvent(
+	ctx core.WebhookRequestContext,
+	eventID string,
+) (deployWebhookResult, error) {
+	if eventID == "" || ctx.Integration == nil || ctx.HTTP == nil {
+		return deployWebhookResult{}, nil
 	}
-	return ctx.ExecutionState.Emit(DeployFailedOutputChannel, DeployPayloadType, []any{deploy})
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return deployWebhookResult{}, err
+	}
+
+	event, err := client.GetEvent(eventID)
+	if err != nil {
+		return deployWebhookResult{}, err
+	}
+
+	if event.Details == nil {
+		return deployWebhookResult{}, nil
+	}
+
+	return deployWebhookResult{
+		DeployID:   readString(event.Details.DeployID),
+		Status:     readString(event.Details.DeployStatus),
+		ServiceID:  readString(event.ServiceID),
+		FinishedAt: readString(event.Timestamp),
+		EventID:    eventID,
+	}, nil
+}
+
+func (c *Deploy) emitDeployResult(ctx core.ActionContext, deploy DeployResponse) error {
+	payload := deployPayloadFromDeployResponse(deploy)
+	if isDeploySucceeded(deploy.Status) {
+		return ctx.ExecutionState.Emit(DeploySuccessOutputChannel, DeployPayloadType, []any{payload})
+	}
+	return ctx.ExecutionState.Emit(DeployFailedOutputChannel, DeployPayloadType, []any{payload})
 }
 
 func (c *Deploy) emitDeployResultFromWebhook(ctx *core.ExecutionContext, data map[string]any) error {
@@ -342,6 +378,137 @@ func (c *Deploy) emitDeployResultFromWebhook(ctx *core.ExecutionContext, data ma
 		return ctx.ExecutionState.Emit(DeploySuccessOutputChannel, DeployPayloadType, []any{data})
 	}
 	return ctx.ExecutionState.Emit(DeployFailedOutputChannel, DeployPayloadType, []any{data})
+}
+
+func parseDeployWebhookPayload(body []byte) (deployWebhookPayload, error) {
+	payload := deployWebhookPayload{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return deployWebhookPayload{}, err
+	}
+
+	if payload.Data == nil {
+		payload.Data = map[string]any{}
+	}
+
+	return payload, nil
+}
+
+func deployWebhookResultFromPayload(payload deployWebhookPayload) deployWebhookResult {
+	serviceID := readString(payload.ServiceID)
+	if serviceID == "" {
+		serviceID = readString(payload.Data["serviceId"])
+	}
+
+	eventID := readString(payload.ID)
+	if eventID == "" {
+		eventID = readString(payload.Data["id"])
+	}
+
+	return deployWebhookResult{
+		DeployID:   readString(payload.Data["deployId"]),
+		Status:     readString(payload.Data["status"]),
+		ServiceID:  serviceID,
+		CreatedAt:  readString(payload.Data["createdAt"]),
+		FinishedAt: readString(payload.Data["finishedAt"]),
+		EventID:    eventID,
+	}
+}
+
+func mergeDeployWebhookResults(primary, fallback deployWebhookResult) deployWebhookResult {
+	if primary.DeployID == "" {
+		primary.DeployID = fallback.DeployID
+	}
+	if primary.Status == "" {
+		primary.Status = fallback.Status
+	}
+	if primary.ServiceID == "" {
+		primary.ServiceID = fallback.ServiceID
+	}
+	if primary.CreatedAt == "" {
+		primary.CreatedAt = fallback.CreatedAt
+	}
+	if primary.FinishedAt == "" {
+		primary.FinishedAt = fallback.FinishedAt
+	}
+	if primary.EventID == "" {
+		primary.EventID = fallback.EventID
+	}
+
+	return primary
+}
+
+func (c *Deploy) resolveDeployWebhookResult(
+	ctx core.WebhookRequestContext,
+	payload deployWebhookPayload,
+) (deployWebhookResult, error) {
+	result := deployWebhookResultFromPayload(payload)
+	eventResult, err := c.resolveDeployFromEvent(ctx, result.EventID)
+	if err != nil {
+		return deployWebhookResult{}, err
+	}
+
+	return mergeDeployWebhookResults(result, eventResult), nil
+}
+
+func findDeployExecutionByID(ctx core.WebhookRequestContext, deployID string) (*core.ExecutionContext, error) {
+	if deployID == "" || ctx.FindExecutionByKV == nil {
+		return nil, nil
+	}
+
+	return ctx.FindExecutionByKV(deployExecutionKey, deployID)
+}
+
+func applyDeployWebhookResultToMetadata(metadata *DeployExecutionMetadata, result deployWebhookResult) {
+	if metadata.Deploy != nil {
+		if metadata.Deploy.ID == "" {
+			metadata.Deploy.ID = result.DeployID
+		}
+		metadata.Deploy.Status = result.Status
+		if result.FinishedAt != "" {
+			metadata.Deploy.FinishedAt = result.FinishedAt
+		}
+		if metadata.Deploy.ServiceID == "" {
+			metadata.Deploy.ServiceID = result.ServiceID
+		}
+		return
+	}
+
+	metadata.Deploy = &DeployMetadata{
+		ID:         result.DeployID,
+		Status:     result.Status,
+		ServiceID:  result.ServiceID,
+		CreatedAt:  result.CreatedAt,
+		FinishedAt: result.FinishedAt,
+	}
+}
+
+func deployPayloadFromDeployResponse(deploy DeployResponse) map[string]any {
+	payload := map[string]any{
+		"id":        deploy.ID,
+		"status":    deploy.Status,
+		"createdAt": deploy.CreatedAt,
+	}
+	if deploy.FinishedAt != "" {
+		payload["finishedAt"] = deploy.FinishedAt
+	}
+
+	return payload
+}
+
+func deployPayloadFromWebhookResult(result deployWebhookResult) map[string]any {
+	payload := map[string]any{
+		"id":        result.DeployID,
+		"status":    result.Status,
+		"serviceId": result.ServiceID,
+	}
+	if result.EventID != "" {
+		payload["eventId"] = result.EventID
+	}
+	if result.FinishedAt != "" {
+		payload["finishedAt"] = result.FinishedAt
+	}
+
+	return payload
 }
 
 func normalizeDeployWebhookEventType(t string) string {
