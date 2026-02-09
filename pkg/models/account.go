@@ -75,8 +75,7 @@ func (a *Account) GetAccountProviders() ([]AccountProvider, error) {
 func (a *Account) GetAccountProvider(provider string) (*AccountProvider, error) {
 	var account AccountProvider
 	err := database.Conn().
-		Where("account_id = ?", a.ID, provider).
-		Where("provider = ?", provider).
+		Where("account_id = ? AND provider = ?", a.ID, provider).
 		First(&account).
 		Error
 
