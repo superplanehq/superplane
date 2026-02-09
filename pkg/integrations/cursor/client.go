@@ -284,14 +284,14 @@ func parseRelativeDate(input string, now time.Time) (time.Time, error) {
 	}
 
 	// Try YYYY-MM-DD.
-	if t, err := time.Parse("2006-01-02", input); err == nil {
+	if t, err := time.Parse("2006-01-02", s); err == nil {
 		return t, nil
 	}
 
 	// Try RFC3339.
-	if t, err := time.Parse(time.RFC3339, input); err == nil {
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
 		return t, nil
 	}
 
-	return time.Time{}, fmt.Errorf("invalid date format: %s", input)
+	return time.Time{}, fmt.Errorf("invalid date format: %s", s)
 }
