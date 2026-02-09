@@ -1039,16 +1039,14 @@ The Create Review component submits a pull request review (approve, request chan
 
 - **Automation**: Auto-approve when checks pass
 - **Quality gates**: Request changes when checks fail
-- **Bots**: Post review feedback with inline comments
+- **Bots**: Post review feedback
 
 ### Configuration
 
 - **Repository**: Select the GitHub repository
 - **Pull Number**: Pull request number
-- **Event**: APPROVE, REQUEST_CHANGES, or COMMENT
+- **Event**: Approve, Request changes, or Comment
 - **Body**: Optional review body (required for REQUEST_CHANGES)
-- **Commit ID**: Optional commit SHA to attach inline comments to
-- **Comments**: Optional inline comments (path, line, body)
 
 ### Output
 
@@ -1423,4 +1421,3 @@ Returns the updated release object with all current information.
   "type": "github.release"
 }
 ```
-
