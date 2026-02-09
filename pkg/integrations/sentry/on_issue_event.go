@@ -60,9 +60,11 @@ func (t *OnIssueEvent) Documentation() string {
 
 ## Setup
 
-1. In Sentry: add a webhook URL in your Internal Integration (Developer Settings → your integration → Webhooks). Use the webhook URL shown for this trigger in SuperPlane.
+1. In Sentry: add a webhook URL in your Internal Integration (Developer Settings → your integration → Webhooks). Use the webhook URL shown for this trigger in SuperPlane. The URL is built from WEBHOOKS_BASE_URL (set in your environment; for Docker set it in .env to your public or tunnel URL and restart the app).
 2. Subscribe to **Issue** events (e.g. issue.created, issue.resolved).
-3. Copy the integration's **Client Secret** into the Webhook secret field below so SuperPlane can verify webhook signatures.`
+3. Copy the integration's **Client Secret** into the Webhook secret field below so SuperPlane can verify webhook signatures.
+
+**Troubleshooting:** If you see "Component not configured - integration is required", select your Sentry integration in the Integration dropdown and click Save. If connection returns 401, use a Personal Auth Token (sntryu_...) for the connection, not the Internal Integration hex value (Client Secret).`
 }
 
 func (t *OnIssueEvent) Icon() string {
