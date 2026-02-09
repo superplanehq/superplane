@@ -127,7 +127,7 @@ services:
   pgweb:
     image: sosedoff/pgweb
     environment:
-      DATABASE_URL: "postgres://postgres:the-cake-is-a-lie@db:5432/superplane_dev?sslmode=disable"
+      PGWEB_DATABASE_URL: "postgres://postgres:the-cake-is-a-lie@db:5432/superplane_dev?sslmode=disable"
     ports:
       - ${PGWEB_PORT:-8081}:${PGWEB_PORT:-8081}
     links:
