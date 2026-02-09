@@ -1,8 +1,6 @@
 package rootly
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -161,64 +159,33 @@ func (c *UpdateIncident) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %w", err)
 	}
 
-	// Build the JSON:API request body
-	attributes := map[string]any{}
+	attrs := UpdateIncidentAttributes{}
 
 	if spec.Title != "" {
-		attributes["title"] = spec.Title
+		attrs.Title = spec.Title
 	}
 
 	if spec.Summary != "" {
-		attributes["summary"] = spec.Summary
+		attrs.Summary = spec.Summary
 	}
 
 	if spec.Status != "" {
-		attributes["status"] = spec.Status
+		attrs.Status = spec.Status
 	}
 
 	if spec.Severity != "" {
-		// Look up severity ID from integration metadata
 		severityID, err := resolveSeveritySlug(ctx.Integration, spec.Severity)
 		if err != nil {
 			return fmt.Errorf("failed to resolve severity: %w", err)
 		}
 		if severityID != "" {
-			attributes["severity_id"] = severityID
+			attrs.SeverityID = severityID
 		}
 	}
 
-	requestBody := map[string]any{
-		"data": map[string]any{
-			"type":       "incidents",
-			"id":         spec.IncidentID,
-			"attributes": attributes,
-		},
-	}
-
-	bodyBytes, err := json.Marshal(requestBody)
-	if err != nil {
-		return fmt.Errorf("failed to marshal request body: %w", err)
-	}
-
-	requestURL := fmt.Sprintf("%s/incidents/%s", client.BaseURL, spec.IncidentID)
-
-	responseBody, err := client.execRequest("PUT", requestURL, bytes.NewReader(bodyBytes))
+	incident, err := client.UpdateIncident(spec.IncidentID, attrs)
 	if err != nil {
 		return fmt.Errorf("failed to update incident: %w", err)
-	}
-
-	// Parse the response
-	var response struct {
-		Data json.RawMessage `json:"data"`
-	}
-
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	var incident any
-	if err := json.Unmarshal(response.Data, &incident); err != nil {
-		return fmt.Errorf("failed to parse incident data: %w", err)
 	}
 
 	return ctx.ExecutionState.Emit(
