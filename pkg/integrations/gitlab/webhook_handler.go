@@ -9,6 +9,10 @@ import (
 
 type GitLabWebhookHandler struct{}
 
+func (h *GitLabWebhookHandler) Merge(current, requested any) (any, bool, error) {
+	return current, false, nil
+}
+
 func (h *GitLabWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	configA := WebhookConfiguration{}
 	configB := WebhookConfiguration{}
