@@ -1,4 +1,5 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
+import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import { getState, getTriggerRenderer } from "..";
 import {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -12,7 +13,26 @@ import { Comment } from "./types";
 
 export const createIssueCommentMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    const props = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+    const componentName =
+      context.componentDefinition.name || context.node.componentName || context.componentDefinition.label || "unknown";
+
+    if (lastExecution?.rootEvent) {
+      const rootTriggerNode = context.nodes.find((node) => node.id === lastExecution.rootEvent?.nodeId);
+      const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+      const { title: eventTitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: lastExecution.rootEvent });
+      const eventSection: EventSection = {
+        receivedAt: new Date(lastExecution.createdAt!),
+        eventTitle: eventTitle,
+        eventSubtitle: buildGithubExecutionSubtitle(lastExecution),
+        eventState: getState(componentName)(lastExecution),
+        eventId: lastExecution.rootEvent.id!,
+      };
+      props.eventSections = [eventSection];
+    }
+
+    return props;
   },
 
   subtitle(context: SubtitleContext): string {
@@ -27,16 +47,9 @@ export const createIssueCommentMapper: ComponentBaseMapper = {
       const comment = outputs.default[0].data as Comment;
       Object.assign(details, {
         "Created At": comment.created_at ? new Date(comment.created_at).toLocaleString() : "-",
-        "Created By": comment.user?.login || "-",
       });
 
-      if (comment.updated_at) {
-        details["Updated At"] = new Date(comment.updated_at).toLocaleString();
-      }
-
       details["Comment URL"] = comment.html_url || "";
-      details["Comment ID"] = comment.id?.toString() || "";
-      details["Comment Body"] = comment.body || "";
     }
 
     return details;
