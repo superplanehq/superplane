@@ -2,7 +2,6 @@ package github
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -165,11 +164,6 @@ func (c *ListReleases) Execute(ctx core.ExecutionContext) error {
 	)
 	if err != nil {
 		return fmt.Errorf("failed to list releases: %w", err)
-	}
-
-	payloadBytes, err := json.Marshal(releases)
-	if err != nil {
-		return fmt.Errorf("failed to marshal releases payload: %w", err)
 	}
 
 	return ctx.ExecutionState.Emit(
