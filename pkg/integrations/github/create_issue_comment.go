@@ -160,10 +160,8 @@ func (c *CreateIssueComment) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
-	commentRequest := &github.IssueComment{}
-
-	if config.Body != "" {
-		commentRequest.Body = &config.Body
+	commentRequest := &github.IssueComment{
+		Body: &trimmedBody,
 	}
 
 	comment, _, err := client.Issues.CreateComment(

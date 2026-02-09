@@ -1,5 +1,4 @@
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import { getState, getTriggerRenderer } from "..";
+import { ComponentBaseProps } from "@/ui/componentBase";
 import {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -13,26 +12,7 @@ import { Comment } from "./types";
 
 export const createIssueCommentMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    const props = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
-    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
-    const componentName =
-      context.componentDefinition.name || context.node.componentName || context.componentDefinition.label || "unknown";
-
-    if (lastExecution?.rootEvent) {
-      const rootTriggerNode = context.nodes.find((node) => node.id === lastExecution.rootEvent?.nodeId);
-      const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-      const { title: eventTitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: lastExecution.rootEvent });
-      const eventSection: EventSection = {
-        receivedAt: new Date(lastExecution.createdAt!),
-        eventTitle: eventTitle,
-        eventSubtitle: buildGithubExecutionSubtitle(lastExecution),
-        eventState: getState(componentName)(lastExecution),
-        eventId: lastExecution.rootEvent.id!,
-      };
-      props.eventSections = [eventSection];
-    }
-
-    return props;
+    return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
   },
 
   subtitle(context: SubtitleContext): string {
