@@ -145,7 +145,7 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 
 	err = ctx.Events.Emit(
 		fmt.Sprintf("rootly.%s", eventType),
-		buildIncidentPayload(webhook),
+		buildPayload(webhook),
 	)
 
 	if err != nil {
@@ -166,20 +166,6 @@ type WebhookEvent struct {
 	ID       string `json:"id"`
 	Type     string `json:"type"`
 	IssuedAt string `json:"issued_at"`
-}
-
-func buildIncidentPayload(webhook WebhookPayload) map[string]any {
-	payload := map[string]any{
-		"event":     webhook.Event.Type,
-		"event_id":  webhook.Event.ID,
-		"issued_at": webhook.Event.IssuedAt,
-	}
-
-	if webhook.Data != nil {
-		payload["incident"] = webhook.Data
-	}
-
-	return payload
 }
 
 func (t *OnIncident) Cleanup(ctx core.TriggerContext) error {
