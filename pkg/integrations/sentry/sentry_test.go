@@ -87,37 +87,21 @@ func Test__Sentry__Sync(t *testing.T) {
 	})
 }
 
-func Test__Sentry__CompareWebhookConfig(t *testing.T) {
-	s := &Sentry{}
+func Test__SentryWebhookHandler__CompareConfig(t *testing.T) {
+	h := &SentryWebhookHandler{}
 
-	t.Run("identical events without secrets -> equal", func(t *testing.T) {
+	t.Run("identical events -> equal", func(t *testing.T) {
 		a := WebhookConfiguration{Events: []string{"created", "resolved"}}
 		b := WebhookConfiguration{Events: []string{"created", "resolved"}}
-		equal, err := s.CompareWebhookConfig(a, b)
+		equal, err := h.CompareConfig(a, b)
 		assert.NoError(t, err)
 		assert.True(t, equal)
-	})
-
-	t.Run("identical events with secrets -> equal (secrets ignored)", func(t *testing.T) {
-		a := WebhookConfiguration{Events: []string{"created", "resolved"}, WebhookSecret: "secret1"}
-		b := WebhookConfiguration{Events: []string{"created", "resolved"}, WebhookSecret: "secret2"}
-		equal, err := s.CompareWebhookConfig(a, b)
-		assert.NoError(t, err)
-		assert.True(t, equal, "webhook secrets should be ignored during comparison")
-	})
-
-	t.Run("identical events, one with secret -> equal (secret ignored)", func(t *testing.T) {
-		a := WebhookConfiguration{Events: []string{"created", "resolved"}, WebhookSecret: "secret"}
-		b := WebhookConfiguration{Events: []string{"created", "resolved"}}
-		equal, err := s.CompareWebhookConfig(a, b)
-		assert.NoError(t, err)
-		assert.True(t, equal, "webhook secret should be ignored during comparison")
 	})
 
 	t.Run("different events -> not equal", func(t *testing.T) {
 		a := WebhookConfiguration{Events: []string{"created"}}
 		b := WebhookConfiguration{Events: []string{"resolved"}}
-		equal, err := s.CompareWebhookConfig(a, b)
+		equal, err := h.CompareConfig(a, b)
 		assert.NoError(t, err)
 		assert.False(t, equal)
 	})
@@ -125,7 +109,7 @@ func Test__Sentry__CompareWebhookConfig(t *testing.T) {
 	t.Run("different event counts -> not equal", func(t *testing.T) {
 		a := WebhookConfiguration{Events: []string{"created", "resolved"}}
 		b := WebhookConfiguration{Events: []string{"created"}}
-		equal, err := s.CompareWebhookConfig(a, b)
+		equal, err := h.CompareConfig(a, b)
 		assert.NoError(t, err)
 		assert.False(t, equal)
 	})
@@ -133,7 +117,7 @@ func Test__Sentry__CompareWebhookConfig(t *testing.T) {
 	t.Run("same events different order -> equal", func(t *testing.T) {
 		a := WebhookConfiguration{Events: []string{"created", "resolved", "assigned"}}
 		b := WebhookConfiguration{Events: []string{"resolved", "assigned", "created"}}
-		equal, err := s.CompareWebhookConfig(a, b)
+		equal, err := h.CompareConfig(a, b)
 		assert.NoError(t, err)
 		assert.True(t, equal, "event order should not matter")
 	})

@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegration("sentry", &Sentry{})
+	registry.RegisterIntegrationWithWebhookHandler("sentry", &Sentry{}, &SentryWebhookHandler{})
 }
 
 type Sentry struct{}
@@ -37,11 +37,13 @@ func (s *Sentry) Description() string {
 }
 
 func (s *Sentry) Instructions() string {
-	return `Connect Sentry to SuperPlane using an Internal Integration token.
+	return `Connect Sentry to SuperPlane using a Sentry **Personal Token**.
 
-1. In Sentry: **Organization Settings** → **Developer Settings** → **New Internal Integration**
-2. Name it (e.g. "SuperPlane"), then create an **Auth Token** with scopes: ` + "`org:read`" + `, ` + "`project:read`" + `, ` + "`event:write`" + `
-3. Paste the token below. For the **On Issue Event** trigger, configure the webhook in your Sentry integration to point to the trigger's webhook URL and subscribe to Issue events. Use the same integration's Client Secret as the webhook secret in SuperPlane when prompted.`
+1. In Sentry: **User Settings** → **API** → **Auth Tokens**
+2. Create a token with scopes: ` + "`org:read`" + `, ` + "`project:read`" + `, ` + "`event:write`" + `
+3. Paste the token below (tokens typically start with ` + "`sntryu_`" + `).
+
+For the **On Issue Event** trigger: configure the webhook in your Sentry integration to point to the trigger's webhook URL and subscribe to Issue events.`
 }
 
 func (s *Sentry) Configuration() []configuration.Field {
@@ -52,8 +54,8 @@ func (s *Sentry) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Sensitive:   true,
-			Description: "Sentry auth token (Bearer). Create via Organization Settings → Developer Settings → Internal Integration → Auth Token.",
-			Placeholder: "sntrys_...",
+			Description: "Sentry personal token (Bearer). Create via User Settings → API → Auth Tokens.",
+			Placeholder: "sntryu_...",
 		},
 		{
 			Name:        "baseURL",
@@ -102,50 +104,6 @@ func (s *Sentry) Sync(ctx core.SyncContext) error {
 }
 
 func (s *Sentry) HandleRequest(ctx core.HTTPRequestContext) {}
-
-func (s *Sentry) CompareWebhookConfig(a, b any) (bool, error) {
-	var cfgA, cfgB WebhookConfiguration
-	if err := mapstructure.Decode(a, &cfgA); err != nil {
-		return false, err
-	}
-	if err := mapstructure.Decode(b, &cfgB); err != nil {
-		return false, err
-	}
-
-	// Ignore WebhookSecret field - it's transient and stripped before storage (line 144)
-	// Only compare Events to determine if webhooks can be shared
-	if len(cfgA.Events) != len(cfgB.Events) {
-		return false, nil
-	}
-	seen := make(map[string]bool)
-	for _, e := range cfgA.Events {
-		seen[e] = true
-	}
-	for _, e := range cfgB.Events {
-		if !seen[e] {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-func (s *Sentry) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	var cfg WebhookConfiguration
-	if err := mapstructure.Decode(ctx.Webhook.GetConfiguration(), &cfg); err != nil {
-		return nil, fmt.Errorf("decode webhook config: %w", err)
-	}
-	if cfg.WebhookSecret != "" {
-		if err := ctx.Webhook.SetSecret([]byte(cfg.WebhookSecret)); err != nil {
-			return nil, fmt.Errorf("store webhook secret: %w", err)
-		}
-	}
-	// Return config without the secret (only Events)
-	return WebhookConfiguration{Events: cfg.Events}, nil
-}
-
-func (s *Sentry) CleanupWebhook(ctx core.CleanupWebhookContext) error {
-	return nil
-}
 
 func (s *Sentry) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	return nil, nil

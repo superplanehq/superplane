@@ -20,11 +20,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-Connect Sentry to SuperPlane using an Internal Integration token.
+Connect Sentry to SuperPlane using a Sentry **Personal Token**.
 
-1. In Sentry: **Organization Settings** → **Developer Settings** → **New Internal Integration**
-2. Name it (e.g. "SuperPlane"), then create an **Auth Token** with scopes: `org:read`, `project:read`, `event:write`
-3. Paste the token below. For the **On Issue Event** trigger, configure the webhook in your Sentry integration to point to the trigger's webhook URL and subscribe to Issue events. Use the same integration's Client Secret as the webhook secret in SuperPlane when prompted.
+1. In Sentry: **User Settings** → **API** → **Auth Tokens**
+2. Create a token with scopes: `org:read`, `project:read`, `event:write`
+3. Paste the token below (tokens typically start with `sntryu_`).
+
+For the **On Issue Event** trigger: configure the webhook in your Sentry integration to point to the trigger's webhook URL and subscribe to Issue events.
 
 <a id="on-issue-event"></a>
 
@@ -41,13 +43,11 @@ The On Issue Event trigger runs when Sentry sends webhook events for issues.
 ### Configuration
 
 - **Events**: Choose which issue actions to listen for (created, resolved, assigned, archived, unresolved)
-- **Webhook secret**: Paste the Client Secret from your Sentry Internal Integration (used to verify webhook signatures)
 
 ### Setup
 
-1. In Sentry: add a webhook URL in your Internal Integration (Developer Settings → your integration → Webhooks). Use the webhook URL shown for this trigger in SuperPlane.
+1. In Sentry: add a webhook URL in your integration/app settings. Use the webhook URL shown for this trigger in SuperPlane.
 2. Subscribe to **Issue** events (e.g. issue.created, issue.resolved).
-3. Copy the integration's **Client Secret** into the Webhook secret field below.
 
 ### Example Data
 
