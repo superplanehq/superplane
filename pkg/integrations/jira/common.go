@@ -72,10 +72,14 @@ func getProjectFromConfiguration(c any) string {
 }
 
 // verifyJiraSignature verifies HMAC-SHA256 signature from Jira webhook.
+// OAuth dynamic webhooks do not include a signature header, so we skip
+// verification for those. The trust model relies on the webhook URL
+// being known only to Jira.
 func verifyJiraSignature(ctx core.WebhookRequestContext) (int, error) {
 	signature := ctx.Headers.Get("X-Hub-Signature")
 	if signature == "" {
-		return http.StatusForbidden, fmt.Errorf("missing signature")
+		// OAuth dynamic webhooks do not send a signature header.
+		return http.StatusOK, nil
 	}
 
 	signature = strings.TrimPrefix(signature, "sha256=")

@@ -8,17 +8,36 @@ import (
 	"io"
 	"net/http"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+var logger = log.WithField("integration_name", "jira")
+
 type Client struct {
-	Email   string
-	Token   string
+	AuthType string
+	// For API Token auth
+	Email string
+	Token string
+	// For OAuth auth
+	AccessToken string
+	CloudID     string
+	// Common
 	BaseURL string
 	http    core.HTTPContext
 }
 
 func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
+	authType, _ := ctx.GetConfig("authType")
+
+	if string(authType) == AuthTypeOAuth {
+		return newOAuthClient(httpCtx, ctx)
+	}
+
+	return newAPITokenClient(httpCtx, ctx)
+}
+
+func newAPITokenClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
 	baseURL, err := ctx.GetConfig("baseUrl")
 	if err != nil {
 		return nil, fmt.Errorf("error getting baseUrl: %v", err)
@@ -35,19 +54,71 @@ func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, 
 	}
 
 	return &Client{
-		Email:   string(email),
-		Token:   string(apiToken),
-		BaseURL: string(baseURL),
-		http:    httpCtx,
+		AuthType: AuthTypeAPIToken,
+		Email:    string(email),
+		Token:    string(apiToken),
+		BaseURL:  string(baseURL),
+		http:     httpCtx,
+	}, nil
+}
+
+func newOAuthClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
+	logger.Infof("Creating OAuth client")
+
+	accessToken, err := findOAuthSecret(ctx, OAuthAccessToken)
+	if err != nil {
+		return nil, fmt.Errorf("error getting access token: %v", err)
+	}
+
+	if accessToken == "" {
+		return nil, fmt.Errorf("OAuth access token not found")
+	}
+
+	// Get CloudID from metadata
+	metadata := ctx.GetMetadata()
+	logger.Infof("OAuth client metadata: %+v", metadata)
+
+	metadataMap, ok := metadata.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid metadata format")
+	}
+
+	cloudID, _ := metadataMap["cloudId"].(string)
+	logger.Infof("OAuth client cloudID: %s", cloudID)
+	if cloudID == "" {
+		return nil, fmt.Errorf("cloud ID not found in metadata")
+	}
+
+	return &Client{
+		AuthType:    AuthTypeOAuth,
+		AccessToken: accessToken,
+		CloudID:     cloudID,
+		http:        httpCtx,
 	}, nil
 }
 
 func (c *Client) authHeader() string {
+	if c.AuthType == AuthTypeOAuth {
+		return fmt.Sprintf("Bearer %s", c.AccessToken)
+	}
 	credentials := fmt.Sprintf("%s:%s", c.Email, c.Token)
 	return fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(credentials)))
 }
 
+func (c *Client) apiURL(path string) string {
+	var url string
+	if c.AuthType == AuthTypeOAuth {
+		url = fmt.Sprintf("https://api.atlassian.com/ex/jira/%s%s", c.CloudID, path)
+	} else {
+		url = fmt.Sprintf("%s%s", c.BaseURL, path)
+	}
+	logger.Infof("apiURL: authType=%s, cloudID=%s, baseURL=%s, path=%s, result=%s", c.AuthType, c.CloudID, c.BaseURL, path, url)
+	return url
+}
+
 func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error) {
+	logger.Infof("execRequest: method=%s, url=%s", method, url)
+
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, fmt.Errorf("error building request: %v", err)
@@ -59,6 +130,7 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 
 	res, err := c.http.Do(req)
 	if err != nil {
+		logger.Errorf("execRequest error: %v", err)
 		return nil, fmt.Errorf("error executing request: %v", err)
 	}
 	defer res.Body.Close()
@@ -67,6 +139,8 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 	if err != nil {
 		return nil, fmt.Errorf("error reading body: %v", err)
 	}
+
+	logger.Infof("execRequest response: status=%d", res.StatusCode)
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
@@ -84,7 +158,7 @@ type User struct {
 
 // GetCurrentUser verifies credentials by fetching the authenticated user.
 func (c *Client) GetCurrentUser() (*User, error) {
-	url := fmt.Sprintf("%s/rest/api/3/myself", c.BaseURL)
+	url := c.apiURL("/rest/api/3/myself")
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -107,7 +181,7 @@ type Project struct {
 
 // ListProjects returns all projects accessible to the authenticated user.
 func (c *Client) ListProjects() ([]Project, error) {
-	url := fmt.Sprintf("%s/rest/api/3/project", c.BaseURL)
+	url := c.apiURL("/rest/api/3/project")
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -131,7 +205,7 @@ type Issue struct {
 
 // GetIssue fetches a single issue by its key.
 func (c *Client) GetIssue(issueKey string) (*Issue, error) {
-	url := fmt.Sprintf("%s/rest/api/3/issue/%s", c.BaseURL, issueKey)
+	url := c.apiURL(fmt.Sprintf("/rest/api/3/issue/%s", issueKey))
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -215,7 +289,7 @@ type CreateIssueResponse struct {
 
 // CreateIssue creates a new issue in Jira.
 func (c *Client) CreateIssue(req *CreateIssueRequest) (*CreateIssueResponse, error) {
-	url := fmt.Sprintf("%s/rest/api/3/issue", c.BaseURL)
+	url := c.apiURL("/rest/api/3/issue")
 
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -260,7 +334,7 @@ type WebhookRegistrationResult struct {
 
 // RegisterWebhook registers a new webhook in Jira.
 func (c *Client) RegisterWebhook(webhookURL, jqlFilter string, events []string) (*WebhookRegistrationResponse, error) {
-	url := fmt.Sprintf("%s/rest/api/3/webhook", c.BaseURL)
+	url := c.apiURL("/rest/api/3/webhook")
 
 	req := WebhookRegistrationRequest{
 		URL: webhookURL,
@@ -290,6 +364,39 @@ func (c *Client) RegisterWebhook(webhookURL, jqlFilter string, events []string) 
 	return &response, nil
 }
 
+// FailedWebhookResponse is the response from the failed webhooks endpoint.
+type FailedWebhookResponse struct {
+	Values []FailedWebhook `json:"values"`
+}
+
+// FailedWebhook contains information about a failed webhook delivery.
+type FailedWebhook struct {
+	ID             string `json:"id"`
+	Body           string `json:"body"`
+	URL            string `json:"url"`
+	FailureReason  string `json:"failureReason"`
+	LatestFailureTime string `json:"latestFailureTime"`
+}
+
+// GetFailedWebhooks returns webhooks that failed to be delivered in the last 72 hours.
+func (c *Client) GetFailedWebhooks() (*FailedWebhookResponse, error) {
+	url := c.apiURL("/rest/api/3/webhook/failed")
+	logger.Infof("GetFailedWebhooks: url=%s", url)
+
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response FailedWebhookResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing failed webhooks response: %v", err)
+	}
+
+	logger.Infof("GetFailedWebhooks: found %d failed webhooks", len(response.Values))
+	return &response, nil
+}
+
 // WebhookDeletionRequest is the request body for deleting webhooks.
 type WebhookDeletionRequest struct {
 	WebhookIDs []int64 `json:"webhookIds"`
@@ -297,7 +404,7 @@ type WebhookDeletionRequest struct {
 
 // DeleteWebhook removes webhooks from Jira.
 func (c *Client) DeleteWebhook(webhookIDs []int64) error {
-	url := fmt.Sprintf("%s/rest/api/3/webhook", c.BaseURL)
+	url := c.apiURL("/rest/api/3/webhook")
 
 	req := WebhookDeletionRequest{
 		WebhookIDs: webhookIDs,

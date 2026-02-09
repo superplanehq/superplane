@@ -98,6 +98,8 @@ func (t *OnIssueCreated) Configuration() []configuration.Field {
 }
 
 func (t *OnIssueCreated) Setup(ctx core.TriggerContext) error {
+	ctx.Logger.Infof("OnIssueCreated.Setup: called")
+
 	err := ensureProjectInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
@@ -105,18 +107,30 @@ func (t *OnIssueCreated) Setup(ctx core.TriggerContext) error {
 	)
 
 	if err != nil {
+		ctx.Logger.Errorf("OnIssueCreated.Setup: ensureProjectInMetadata error: %v", err)
 		return err
 	}
 
 	var config OnIssueCreatedConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		ctx.Logger.Errorf("OnIssueCreated.Setup: decode config error: %v", err)
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	return ctx.Integration.RequestWebhook(WebhookConfiguration{
+	ctx.Logger.Infof("OnIssueCreated.Setup: requesting webhook for project=%s, eventType=jira:issue_created", config.Project)
+
+	webhookErr := ctx.Integration.RequestWebhook(WebhookConfiguration{
 		EventType: "jira:issue_created",
 		Project:   config.Project,
 	})
+
+	if webhookErr != nil {
+		ctx.Logger.Errorf("OnIssueCreated.Setup: RequestWebhook error: %v", webhookErr)
+	} else {
+		ctx.Logger.Infof("OnIssueCreated.Setup: RequestWebhook succeeded")
+	}
+
+	return webhookErr
 }
 
 func (t *OnIssueCreated) Actions() []core.Action {
@@ -128,6 +142,8 @@ func (t *OnIssueCreated) HandleAction(ctx core.TriggerActionContext) (map[string
 }
 
 func (t *OnIssueCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	logger.Infof("HandleWebhook: received webhook request")
+
 	config := OnIssueCreatedConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
@@ -140,6 +156,7 @@ func (t *OnIssueCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 	data := map[string]any{}
 	err = json.Unmarshal(ctx.Body, &data)
 	if err != nil {
+		logger.Errorf("HandleWebhook: error parsing body: %v", err)
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
@@ -147,28 +164,40 @@ func (t *OnIssueCreated) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 		webhookEvent = we
 	}
 
+	logger.Infof("HandleWebhook: eventType=%s, webhookEvent=%s", eventType, webhookEvent)
+
 	if eventType == "" && webhookEvent == "" {
+		logger.Errorf("HandleWebhook: missing webhook event identifier")
 		return http.StatusBadRequest, fmt.Errorf("missing webhook event identifier")
 	}
 
 	if webhookEvent != "jira:issue_created" {
+		logger.Infof("HandleWebhook: ignoring event %s (not jira:issue_created)", webhookEvent)
 		return http.StatusOK, nil
 	}
 
 	code, err := verifyJiraSignature(ctx)
 	if err != nil {
+		logger.Errorf("HandleWebhook: signature verification failed: %v", err)
 		return code, err
 	}
 
+	logger.Infof("HandleWebhook: signature verified, checking issue type filter")
+
 	if !whitelistedIssueType(data, config.IssueTypes) {
+		logger.Infof("HandleWebhook: issue type not whitelisted, ignoring")
 		return http.StatusOK, nil
 	}
 
+	logger.Infof("HandleWebhook: emitting jira.issueCreated event")
+
 	err = ctx.Events.Emit("jira.issueCreated", data)
 	if err != nil {
+		logger.Errorf("HandleWebhook: error emitting event: %v", err)
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
 	}
 
+	logger.Infof("HandleWebhook: event emitted successfully")
 	return http.StatusOK, nil
 }
 
