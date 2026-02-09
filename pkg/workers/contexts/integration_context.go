@@ -62,6 +62,10 @@ func (c *IntegrationContext) RequestWebhook(configuration any) error {
 		}
 
 		if ok {
+			if err := c.mergeWebhookConfiguration(handler, &hook, configuration); err != nil {
+				return err
+			}
+
 			c.node.WebhookID = &hook.ID
 			return nil
 		}
@@ -127,6 +131,32 @@ func (c *IntegrationContext) createWebhook(configuration any) error {
 
 	c.node.WebhookID = &webhookID
 	return nil
+}
+
+func (c *IntegrationContext) mergeWebhookConfiguration(
+	handler core.WebhookHandler,
+	webhook *models.Webhook,
+	configuration any,
+) error {
+	mergedConfiguration, changed, err := handler.Merge(webhook.Configuration.Data(), configuration)
+	if err != nil {
+		return err
+	}
+
+	if !changed {
+		return nil
+	}
+
+	webhook.Configuration = datatypes.NewJSONType(mergedConfiguration)
+	webhook.State = models.WebhookStatePending
+	webhook.RetryCount = 0
+
+	return c.tx.Model(webhook).Updates(map[string]any{
+		"configuration": webhook.Configuration,
+		"state":         webhook.State,
+		"retry_count":   webhook.RetryCount,
+		"updated_at":    time.Now(),
+	}).Error
 }
 
 func (c *IntegrationContext) ScheduleResync(interval time.Duration) error {

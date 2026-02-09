@@ -19,6 +19,17 @@ func (h *PanicableWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	return h.underlying.CompareConfig(a, b)
 }
 
+func (h *PanicableWebhookHandler) Merge(current, requested any) (merged any, changed bool, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			merged = current
+			changed = false
+			err = fmt.Errorf("webhook handler panicked in Merge(): %v", r)
+		}
+	}()
+	return h.underlying.Merge(current, requested)
+}
+
 func (h *PanicableWebhookHandler) Setup(ctx core.WebhookHandlerContext) (metadata any, err error) {
 	defer func() {
 		if r := recover(); r != nil {

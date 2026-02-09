@@ -43,6 +43,10 @@ func (h *SemaphoreWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	return configA.Project == configB.Project, nil
 }
 
+func (h *SemaphoreWebhookHandler) Merge(current, requested any) (any, bool, error) {
+	return current, false, nil
+}
+
 func (h *SemaphoreWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
