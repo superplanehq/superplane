@@ -132,15 +132,17 @@ func (c *CreateIssueComment) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if strings.TrimSpace(config.IssueNumber) == "" {
+	trimmedIssueNumber := strings.TrimSpace(config.IssueNumber)
+	if trimmedIssueNumber == "" {
 		return fmt.Errorf("issue number is required")
 	}
 
-	if strings.TrimSpace(config.Body) == "" {
+	trimmedBody := strings.TrimSpace(config.Body)
+	if trimmedBody == "" {
 		return fmt.Errorf("comment body is required")
 	}
 
-	issueNumber, err := strconv.Atoi(config.IssueNumber)
+	issueNumber, err := strconv.Atoi(trimmedIssueNumber)
 	if err != nil {
 		return fmt.Errorf("issue number is not a number: %v", err)
 	}
