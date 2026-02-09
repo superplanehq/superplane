@@ -5,10 +5,12 @@ import { formatTimeAgo } from "@/utils/date";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 
 interface RenderEventData {
-  id?: string;
+  eventId?: string;
   serviceId?: string;
   serviceName?: string;
   status?: string;
+  deployId?: string;
+  buildId?: string;
 }
 
 interface OnEventConfiguration {
@@ -61,14 +63,26 @@ export const renderTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const event = context.event?.data as RenderEventData | undefined;
-    return {
+    const values: Record<string, string> = {
       "Received At": formatTimestamp(context.event?.createdAt),
       Event: stringOrDash(context.event?.type),
-      "Event ID": stringOrDash(event?.id),
+      "Event ID": stringOrDash(event?.eventId),
       "Service ID": stringOrDash(event?.serviceId),
       "Service Name": stringOrDash(event?.serviceName),
-      Status: stringOrDash(event?.status),
     };
+
+    if (event?.deployId) {
+      values["Deploy ID"] = event.deployId;
+    }
+    if (event?.buildId) {
+      values["Build ID"] = event.buildId;
+    }
+
+    if (event?.status) {
+      values["Status"] = event.status;
+    }
+
+    return values;
   },
 
   getTriggerProps: (context: TriggerRendererContext) => {

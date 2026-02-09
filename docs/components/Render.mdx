@@ -55,15 +55,16 @@ Render webhooks are validated using the secret generated when SuperPlane creates
 
 ### Event Data
 
-The default output emits payload data fields like `id`, `serviceId`, `serviceName`, and `status` (when present).
+The default output emits payload data fields like `buildId`, `eventId`, `serviceId`, `serviceName`, and `status` (when present).
 
 ### Example Data
 
 ```json
 {
   "data": {
+    "buildId": "bld-cukouhrtq21c73e9scng",
     "createdAt": "2026-02-05T16:00:00.000000Z",
-    "id": "evj-cukouhrtq21c73e9scng",
+    "eventId": "evj-cukouhrtq21c73e9scng",
     "serviceId": "srv-cukouhrtq21c73e9scng",
     "serviceName": "backend-api",
     "status": "failed"
@@ -99,7 +100,7 @@ Render webhooks are validated using the secret generated when SuperPlane creates
 
 ### Event Data
 
-The default output emits payload data fields like `id`, `serviceId`, `serviceName`, and `status` (when present).
+The default output emits payload data fields like `deployId`, `eventId`, `serviceId`, `serviceName`, and `status` (when present).
 
 ### Example Data
 
@@ -107,7 +108,8 @@ The default output emits payload data fields like `id`, `serviceId`, `serviceNam
 {
   "data": {
     "createdAt": "2026-02-05T16:00:00.000000Z",
-    "id": "evj-cukouhrtq21c73e9scng",
+    "deployId": "dep-cukouhrtq21c73e9scng",
+    "eventId": "evj-cukouhrtq21c73e9scng",
     "serviceId": "srv-cukouhrtq21c73e9scng",
     "serviceName": "backend-api",
     "status": "succeeded"

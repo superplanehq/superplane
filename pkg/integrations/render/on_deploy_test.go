@@ -241,9 +241,21 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 
 	t.Run("default event filter -> event emitted", func(t *testing.T) {
 		eventCtx := &contexts.EventContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"id":"evj-cukouhrtq21c73e9scng","timestamp":"2026-02-05T16:00:01.000000Z","serviceId":"srv-cukouhrtq21c73e9scng","type":"deploy_ended","details":{"deployId":"dep-cukouhrtq21c73e9scng","status":"live"}}`,
+					)),
+				},
+			},
+		}
 		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
+			HTTP:          httpCtx,
+			Integration:   &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
 			Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},
 			Webhook:       &contexts.WebhookContext{Secret: secret},
 			Events:        eventCtx,
@@ -253,13 +265,32 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 		require.NoError(t, webhookErr)
 		require.Equal(t, 1, eventCtx.Count())
 		assert.Equal(t, "render.deploy.ended", eventCtx.Payloads[0].Type)
-		assert.Equal(t, payload["data"], eventCtx.Payloads[0].Data)
+		assert.Equal(t, map[string]any{
+			"eventId":     "evj-cukouhrtq21c73e9scng",
+			"deployId":    "dep-cukouhrtq21c73e9scng",
+			"serviceId":   "srv-cukouhrtq21c73e9scng",
+			"serviceName": "backend-api",
+			"status":      "succeeded",
+		}, eventCtx.Payloads[0].Data)
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+		assert.Contains(t, httpCtx.Requests[0].URL.Path, "/v1/events/evj-cukouhrtq21c73e9scng")
 	})
 
 	t.Run("multiple signatures header -> accepts matching v1 signature", func(t *testing.T) {
 		eventCtx := &contexts.EventContext{}
 		validHeaders := buildSignedHeaders(secret, body)
 		validSignature := strings.TrimPrefix(validHeaders.Get("webhook-signature"), "v1,")
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"id":"evj-cukouhrtq21c73e9scng","timestamp":"2026-02-05T16:00:01.000000Z","serviceId":"srv-cukouhrtq21c73e9scng","type":"deploy_ended","details":{"deployId":"dep-cukouhrtq21c73e9scng","status":"live"}}`,
+					)),
+				},
+			},
+		}
 
 		headersWithMultipleSignatures := http.Header{}
 		headersWithMultipleSignatures.Set("webhook-id", validHeaders.Get("webhook-id"))
@@ -269,6 +300,8 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headersWithMultipleSignatures,
+			HTTP:          httpCtx,
+			Integration:   &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
 			Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},
 			Webhook:       &contexts.WebhookContext{Secret: secret},
 			Events:        eventCtx,
@@ -278,7 +311,13 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 		require.NoError(t, webhookErr)
 		require.Equal(t, 1, eventCtx.Count())
 		assert.Equal(t, "render.deploy.ended", eventCtx.Payloads[0].Type)
-		assert.Equal(t, payload["data"], eventCtx.Payloads[0].Data)
+		assert.Equal(t, map[string]any{
+			"eventId":     "evj-cukouhrtq21c73e9scng",
+			"deployId":    "dep-cukouhrtq21c73e9scng",
+			"serviceId":   "srv-cukouhrtq21c73e9scng",
+			"serviceName": "backend-api",
+			"status":      "succeeded",
+		}, eventCtx.Payloads[0].Data)
 	})
 
 	t.Run("whsec secret format -> accepts decoded signing key", func(t *testing.T) {
@@ -286,10 +325,22 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 		rawSecret := "test-secret"
 		webhookSecret := "whsec_" + base64.RawStdEncoding.EncodeToString([]byte(rawSecret))
 		headers := buildSignedHeaders(rawSecret, body)
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"id":"evj-cukouhrtq21c73e9scng","timestamp":"2026-02-05T16:00:01.000000Z","serviceId":"srv-cukouhrtq21c73e9scng","type":"deploy_ended","details":{"deployId":"dep-cukouhrtq21c73e9scng","status":"live"}}`,
+					)),
+				},
+			},
+		}
 
 		status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
+			HTTP:          httpCtx,
+			Integration:   &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
 			Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},
 			Webhook:       &contexts.WebhookContext{Secret: webhookSecret},
 			Events:        eventCtx,
@@ -299,6 +350,53 @@ func Test__Render_OnDeploy__HandleWebhook(t *testing.T) {
 		require.NoError(t, webhookErr)
 		require.Equal(t, 1, eventCtx.Count())
 		assert.Equal(t, "render.deploy.ended", eventCtx.Payloads[0].Type)
-		assert.Equal(t, payload["data"], eventCtx.Payloads[0].Data)
+		assert.Equal(t, map[string]any{
+			"eventId":     "evj-cukouhrtq21c73e9scng",
+			"deployId":    "dep-cukouhrtq21c73e9scng",
+			"serviceId":   "srv-cukouhrtq21c73e9scng",
+			"serviceName": "backend-api",
+			"status":      "succeeded",
+		}, eventCtx.Payloads[0].Data)
 	})
+}
+
+func Test__Render_OnDeploy__HandleWebhook__WithoutEventResolution(t *testing.T) {
+	trigger := &OnDeploy{}
+
+	payload := map[string]any{
+		"type":      "deploy_ended",
+		"timestamp": "2026-02-05T16:00:01.000000Z",
+		"data": map[string]any{
+			"id":          "evj-cukouhrtq21c73e9scng",
+			"serviceId":   "srv-cukouhrtq21c73e9scng",
+			"serviceName": "backend-api",
+			"status":      "succeeded",
+		},
+	}
+
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
+
+	secret := "whsec-test"
+	headers := buildSignedHeaders(secret, body)
+	eventCtx := &contexts.EventContext{}
+
+	status, webhookErr := trigger.HandleWebhook(core.WebhookRequestContext{
+		Body:          body,
+		Headers:       headers,
+		Configuration: map[string]any{"service": "srv-cukouhrtq21c73e9scng"},
+		Webhook:       &contexts.WebhookContext{Secret: secret},
+		Events:        eventCtx,
+	})
+
+	assert.Equal(t, http.StatusOK, status)
+	require.NoError(t, webhookErr)
+	require.Equal(t, 1, eventCtx.Count())
+	assert.Equal(t, "render.deploy.ended", eventCtx.Payloads[0].Type)
+	assert.Equal(t, map[string]any{
+		"eventId":     "evj-cukouhrtq21c73e9scng",
+		"serviceId":   "srv-cukouhrtq21c73e9scng",
+		"serviceName": "backend-api",
+		"status":      "succeeded",
+	}, eventCtx.Payloads[0].Data)
 }

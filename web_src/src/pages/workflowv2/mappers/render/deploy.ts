@@ -24,11 +24,10 @@ interface DeployConfiguration {
 }
 
 interface DeployOutput {
-  id?: string;
+  deployId?: string;
   status?: string;
   createdAt?: string;
   finishedAt?: string;
-  commitId?: string;
 }
 
 export const DEPLOY_STATE_MAP: EventStateMap = {
@@ -88,10 +87,9 @@ export const deployMapper: ComponentBaseMapper = {
 
     return {
       "Triggered At": formatTimestamp(result?.createdAt, context.execution.createdAt),
-      "Deploy ID": stringOrDash(result?.id),
+      "Deploy ID": stringOrDash(result?.deployId),
       Status: stringOrDash(result?.status),
       "Finished At": formatTimestamp(result?.finishedAt),
-      "Commit ID": stringOrDash(result?.commitId),
     };
   },
 

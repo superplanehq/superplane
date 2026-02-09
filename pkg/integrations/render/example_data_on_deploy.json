@@ -1,7 +1,8 @@
 {
   "data": {
     "createdAt": "2026-02-05T16:00:00.000000Z",
-    "id": "evj-cukouhrtq21c73e9scng",
+    "deployId": "dep-cukouhrtq21c73e9scng",
+    "eventId": "evj-cukouhrtq21c73e9scng",
     "serviceId": "srv-cukouhrtq21c73e9scng",
     "serviceName": "backend-api",
     "status": "succeeded"

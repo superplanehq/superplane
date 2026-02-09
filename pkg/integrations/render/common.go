@@ -324,6 +324,7 @@ func handleOnResourceEventWebhook(
 	config OnResourceEventConfiguration,
 	allowedEventTypes []string,
 	defaultEventTypes []string,
+	requiredResourceIDField string,
 ) (int, error) {
 	if err := verifyWebhookSignature(ctx); err != nil {
 		return http.StatusForbidden, err
@@ -344,6 +345,19 @@ func handleOnResourceEventWebhook(
 	}
 
 	data := readMap(payload["data"])
+	if readString(data["serviceId"]) == "" {
+		serviceID := readString(payload["serviceId"])
+		if serviceID != "" {
+			data["serviceId"] = serviceID
+		}
+	}
+
+	eventID := eventIDFromWebhookPayload(payload, data)
+	resolvedEvent, err := resolveWebhookEvent(ctx, eventID)
+	if err == nil {
+		data = mergeWebhookEventData(data, eventID, resolvedEvent)
+	}
+
 	serviceID := readString(data["serviceId"])
 	if config.Service == "" || serviceID == "" || config.Service != serviceID {
 		return http.StatusOK, nil
@@ -358,11 +372,153 @@ func handleOnResourceEventWebhook(
 		return http.StatusOK, nil
 	}
 
+	ensureResourceIDField(data, eventID, requiredResourceIDField)
+	removeAmbiguousIDField(data, eventID, requiredResourceIDField)
+
 	if err := ctx.Events.Emit(payloadType(eventType), data); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %w", err)
 	}
 
 	return http.StatusOK, nil
+}
+
+func eventIDFromWebhookPayload(payload map[string]any, data map[string]any) string {
+	eventID := readString(payload["id"])
+	if eventID != "" {
+		return eventID
+	}
+
+	return readString(data["id"])
+}
+
+func resolveWebhookEvent(ctx core.WebhookRequestContext, eventID string) (EventResponse, error) {
+	if eventID == "" || ctx.Integration == nil || ctx.HTTP == nil {
+		return EventResponse{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return EventResponse{}, err
+	}
+
+	return client.GetEvent(eventID)
+}
+
+type EventDetailValues struct {
+	DeployID string
+	BuildID  string
+}
+
+func eventDetailValues(event EventResponse) EventDetailValues {
+	if event.Details == nil {
+		return EventDetailValues{}
+	}
+
+	values := EventDetailValues{}
+
+	switch details := event.Details.(type) {
+	case EventDeployResponseDetails:
+		values.DeployID = readString(details.DeployID)
+	case EventBuildResponseDetails:
+		values.BuildID = readString(details.BuildID)
+	}
+
+	return values
+}
+
+func mergeWebhookEventData(
+	data map[string]any,
+	eventID string,
+	event EventResponse,
+) map[string]any {
+	mergedData := map[string]any{}
+	for key, value := range data {
+		mergedData[key] = value
+	}
+
+	if readString(mergedData["serviceId"]) == "" {
+		serviceID := readString(event.ServiceID)
+		if serviceID != "" {
+			mergedData["serviceId"] = serviceID
+		}
+	}
+
+	if event.Details == nil {
+		return mergedData
+	}
+
+	detailValues := eventDetailValues(event)
+	resourceID := detailValues.DeployID
+	if resourceID == "" {
+		resourceID = detailValues.BuildID
+	}
+	if resourceID == "" {
+		return mergedData
+	}
+
+	if readString(mergedData["deployId"]) == "" && detailValues.DeployID != "" {
+		mergedData["deployId"] = detailValues.DeployID
+	}
+
+	if readString(mergedData["buildId"]) == "" && detailValues.BuildID != "" {
+		mergedData["buildId"] = detailValues.BuildID
+	}
+
+	if shouldReplaceResourceID(readString(mergedData["id"]), eventID) && eventID != "" {
+		mergedData["eventId"] = eventID
+	}
+
+	return mergedData
+}
+
+func shouldReplaceResourceID(currentID string, eventID string) bool {
+	if currentID == "" {
+		return true
+	}
+
+	if eventID == "" {
+		return false
+	}
+
+	return currentID == eventID
+}
+
+func ensureResourceIDField(
+	data map[string]any,
+	eventID string,
+	requiredField string,
+) {
+	field := requiredField
+	if field == "" {
+		return
+	}
+
+	if readString(data[field]) != "" {
+		return
+	}
+
+	resourceID := readString(data["id"])
+	if resourceID == "" {
+		return
+	}
+
+	if eventID != "" && resourceID == eventID {
+		return
+	}
+
+	data[field] = resourceID
+}
+
+func removeAmbiguousIDField(data map[string]any, eventID string, requiredField string) {
+	if requiredField == "" {
+		return
+	}
+
+	if readString(data["eventId"]) == "" && eventID != "" {
+		data["eventId"] = eventID
+	}
+
+	delete(data, "id")
 }
 
 func filterAllowedEventTypes(eventTypes []string, allowedEventTypes []string) []string {

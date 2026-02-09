@@ -56,7 +56,7 @@ Render webhooks are validated using the secret generated when SuperPlane creates
 
 ## Event Data
 
-The default output emits payload data fields like ` + "`id`" + `, ` + "`serviceId`" + `, ` + "`serviceName`" + `, and ` + "`status`" + ` (when present).`
+The default output emits payload data fields like ` + "`buildId`" + `, ` + "`eventId`" + `, ` + "`serviceId`" + `, ` + "`serviceName`" + `, and ` + "`status`" + ` (when present).`
 }
 
 func (t *OnBuild) Icon() string {
@@ -105,7 +105,13 @@ func (t *OnBuild) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	return handleOnResourceEventWebhook(ctx, config, buildAllowedEventTypes, buildDefaultEventTypes)
+	return handleOnResourceEventWebhook(
+		ctx,
+		config,
+		buildAllowedEventTypes,
+		buildDefaultEventTypes,
+		"buildId",
+	)
 }
 
 func (t *OnBuild) Cleanup(ctx core.TriggerContext) error {

@@ -290,8 +290,7 @@ func (c *Deploy) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %w", err)
 	}
 
-	eventType := normalizeDeployWebhookEventType(readString(payload.Type))
-	if eventType != "deploy_ended" {
+	if readString(payload.Type) != "deploy_ended" {
 		return http.StatusOK, nil
 	}
 
@@ -336,27 +335,22 @@ func (c *Deploy) resolveDeployFromEvent(
 	ctx core.WebhookRequestContext,
 	eventID string,
 ) (deployWebhookResult, error) {
-	if eventID == "" || ctx.Integration == nil || ctx.HTTP == nil {
+	if eventID == "" {
 		return deployWebhookResult{}, nil
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	event, err := resolveWebhookEvent(ctx, eventID)
 	if err != nil {
 		return deployWebhookResult{}, err
 	}
 
-	event, err := client.GetEvent(eventID)
-	if err != nil {
-		return deployWebhookResult{}, err
-	}
-
-	if event.Details == nil {
+	detailValues := eventDetailValues(event)
+	if detailValues.DeployID == "" {
 		return deployWebhookResult{}, nil
 	}
 
 	return deployWebhookResult{
-		DeployID:   readString(event.Details.DeployID),
-		Status:     readString(event.Details.Status),
+		DeployID:   detailValues.DeployID,
 		ServiceID:  readString(event.ServiceID),
 		FinishedAt: readString(event.Timestamp),
 		EventID:    eventID,
@@ -483,7 +477,7 @@ func applyDeployWebhookResultToMetadata(metadata *DeployExecutionMetadata, resul
 
 func deployPayloadFromDeployResponse(deploy DeployResponse) map[string]any {
 	payload := map[string]any{
-		"id":        deploy.ID,
+		"deployId":  deploy.ID,
 		"status":    deploy.Status,
 		"createdAt": deploy.CreatedAt,
 	}
@@ -496,7 +490,7 @@ func deployPayloadFromDeployResponse(deploy DeployResponse) map[string]any {
 
 func deployPayloadFromWebhookResult(result deployWebhookResult) map[string]any {
 	payload := map[string]any{
-		"id":        result.DeployID,
+		"deployId":  result.DeployID,
 		"status":    result.Status,
 		"serviceId": result.ServiceID,
 	}
@@ -508,14 +502,6 @@ func deployPayloadFromWebhookResult(result deployWebhookResult) map[string]any {
 	}
 
 	return payload
-}
-
-func normalizeDeployWebhookEventType(t string) string {
-	t = strings.TrimSpace(strings.ToLower(t))
-	if t == "render.deploy.ended" {
-		return "deploy_ended"
-	}
-	return t
 }
 
 func (c *Deploy) Cancel(ctx core.ExecutionContext) error {

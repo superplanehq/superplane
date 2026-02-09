@@ -131,6 +131,11 @@ func Test__Render_Deploy__HandleWebhook(t *testing.T) {
 		"type":      "deploy_ended",
 		"timestamp": "2026-02-08T21:08:59.718Z",
 		"serviceId": "srv-cukouhrtq21c73e9scng",
+		"data": map[string]any{
+			"id":        "evt-cph1rs3idesc73a2b2mg",
+			"serviceId": "srv-cukouhrtq21c73e9scng",
+			"status":    "live",
+		},
 	}
 
 	body, err := json.Marshal(payload)
@@ -199,7 +204,7 @@ func Test__Render_Deploy__HandleWebhook(t *testing.T) {
 		require.Len(t, executionState.Payloads, 1)
 		emittedPayload := readMap(executionState.Payloads[0])
 		data := readMap(emittedPayload["data"])
-		assert.Equal(t, "dep-cukouhrtq21c73e9scng", data["id"])
+		assert.Equal(t, "dep-cukouhrtq21c73e9scng", data["deployId"])
 		assert.Equal(t, "live", data["status"])
 		assert.Equal(t, "evt-cph1rs3idesc73a2b2mg", data["eventId"])
 
@@ -248,6 +253,7 @@ func Test__Render_Deploy__HandleWebhook(t *testing.T) {
 			"data": map[string]any{
 				"id":        "evt-cph1rs3idesc73a2b2mg",
 				"serviceId": "srv-cukouhrtq21c73e9scng",
+				"status":    "live",
 			},
 		}
 		body, marshalErr := json.Marshal(payload)
@@ -260,6 +266,98 @@ func Test__Render_Deploy__HandleWebhook(t *testing.T) {
 					StatusCode: http.StatusOK,
 					Body: io.NopCloser(strings.NewReader(
 						`{"id":"evt-cph1rs3idesc73a2b2mg","timestamp":"2026-02-08T21:08:59.718Z","serviceId":"srv-cukouhrtq21c73e9scng","type":"deploy_ended","details":{"deployId":"dep-cukouhrtq21c73e9scng","status":"live"}}`,
+					)),
+				},
+			},
+		}
+
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: DeployExecutionMetadata{
+				Deploy: &DeployMetadata{
+					ID:        "dep-cukouhrtq21c73e9scng",
+					Status:    "build_in_progress",
+					ServiceID: "srv-cukouhrtq21c73e9scng",
+				},
+			},
+		}
+
+		status, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
+			Body:        body,
+			Headers:     headers,
+			HTTP:        httpCtx,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
+			Webhook:     &contexts.WebhookContext{Secret: secret},
+			FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
+				if key == "deploy_id" && value == "dep-cukouhrtq21c73e9scng" {
+					return &core.ExecutionContext{
+						Metadata:       metadataCtx,
+						ExecutionState: executionState,
+					}, nil
+				}
+
+				return nil, assert.AnError
+			},
+		})
+
+		assert.Equal(t, http.StatusOK, status)
+		require.NoError(t, webhookErr)
+		assert.Equal(t, DeploySuccessOutputChannel, executionState.Channel)
+	})
+
+	t.Run("event details with generic id resolve deploy", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"id":"evt-cph1rs3idesc73a2b2mg","timestamp":"2026-02-08T21:08:59.718Z","serviceId":"srv-cukouhrtq21c73e9scng","type":"deploy_ended","details":{"id":"dep-cukouhrtq21c73e9scng","status":"live"}}`,
+					)),
+				},
+			},
+		}
+
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: DeployExecutionMetadata{
+				Deploy: &DeployMetadata{
+					ID:        "dep-cukouhrtq21c73e9scng",
+					Status:    "build_in_progress",
+					ServiceID: "srv-cukouhrtq21c73e9scng",
+				},
+			},
+		}
+
+		status, webhookErr := component.HandleWebhook(core.WebhookRequestContext{
+			Body:        body,
+			Headers:     headers,
+			HTTP:        httpCtx,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
+			Webhook:     &contexts.WebhookContext{Secret: secret},
+			FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
+				if key == "deploy_id" && value == "dep-cukouhrtq21c73e9scng" {
+					return &core.ExecutionContext{
+						Metadata:       metadataCtx,
+						ExecutionState: executionState,
+					}, nil
+				}
+
+				return nil, assert.AnError
+			},
+		})
+
+		assert.Equal(t, http.StatusOK, status)
+		require.NoError(t, webhookErr)
+		assert.Equal(t, DeploySuccessOutputChannel, executionState.Channel)
+	})
+
+	t.Run("event details with nested deploy resolve deploy", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"id":"evt-cph1rs3idesc73a2b2mg","timestamp":"2026-02-08T21:08:59.718Z","serviceId":"srv-cukouhrtq21c73e9scng","type":"deploy_ended","details":{"deploy":{"id":"dep-cukouhrtq21c73e9scng","status":"live"}}}`,
 					)),
 				},
 			},

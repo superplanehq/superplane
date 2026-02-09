@@ -95,17 +95,128 @@ type DeployResponse struct {
 	FinishedAt string `json:"finishedAt"`
 }
 
-type DeployEventResponse struct {
-	ID        string                    `json:"id"`
-	Timestamp string                    `json:"timestamp"`
-	ServiceID string                    `json:"serviceId"`
-	Type      string                    `json:"type"`
-	Details   *DeployEventResponseEntry `json:"details"`
+type EventResponse struct {
+	ID        string               `json:"id"`
+	Timestamp string               `json:"timestamp"`
+	ServiceID string               `json:"serviceId"`
+	Type      string               `json:"type"`
+	Details   EventResponseDetails `json:"details"`
 }
 
-type DeployEventResponseEntry struct {
+type EventResponseDetails interface{}
+
+type EventDeployResponseDetails struct {
 	DeployID string `json:"deployId"`
-	Status   string `json:"status"`
+}
+
+type EventBuildResponseDetails struct {
+	BuildID string `json:"buildId"`
+}
+
+type EventUnknownResponseDetails struct{}
+
+type EventResponseResourceDetails struct {
+	ID string `json:"id"`
+}
+
+type eventResponsePayload struct {
+	ID        string          `json:"id"`
+	Timestamp string          `json:"timestamp"`
+	ServiceID string          `json:"serviceId"`
+	Type      string          `json:"type"`
+	Details   json.RawMessage `json:"details"`
+}
+
+type eventResponseDetailsEnvelope struct {
+	DeployID string                        `json:"deployId"`
+	BuildID  string                        `json:"buildId"`
+	ID       string                        `json:"id"`
+	Deploy   *EventResponseResourceDetails `json:"deploy"`
+	Build    *EventResponseResourceDetails `json:"build"`
+}
+
+func (r *EventResponse) UnmarshalJSON(data []byte) error {
+	payload := eventResponsePayload{}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return err
+	}
+
+	r.ID = payload.ID
+	r.Timestamp = payload.Timestamp
+	r.ServiceID = payload.ServiceID
+	r.Type = payload.Type
+	r.Details = nil
+
+	if len(payload.Details) == 0 {
+		return nil
+	}
+
+	var detailsValue any
+	if err := json.Unmarshal(payload.Details, &detailsValue); err != nil {
+		return err
+	}
+	if detailsValue == nil {
+		return nil
+	}
+
+	details := eventResponseDetailsEnvelope{}
+	if err := json.Unmarshal(payload.Details, &details); err != nil {
+		return err
+	}
+
+	if deployID := resolveDeployID(details, payload.Type); deployID != "" {
+		r.Details = EventDeployResponseDetails{DeployID: deployID}
+		return nil
+	}
+
+	if buildID := resolveBuildID(details, payload.Type); buildID != "" {
+		r.Details = EventBuildResponseDetails{BuildID: buildID}
+		return nil
+	}
+
+	r.Details = EventUnknownResponseDetails{}
+
+	return nil
+}
+
+func resolveDeployID(details eventResponseDetailsEnvelope, eventType string) string {
+	if details.DeployID != "" {
+		return details.DeployID
+	}
+
+	if details.Deploy != nil && details.Deploy.ID != "" {
+		return details.Deploy.ID
+	}
+
+	if details.ID != "" && looksLikeDeployEventType(strings.ToLower(eventType)) {
+		return details.ID
+	}
+
+	return ""
+}
+
+func resolveBuildID(details eventResponseDetailsEnvelope, eventType string) string {
+	if details.BuildID != "" {
+		return details.BuildID
+	}
+
+	if details.Build != nil && details.Build.ID != "" {
+		return details.Build.ID
+	}
+
+	if details.ID != "" && looksLikeBuildEventType(strings.ToLower(eventType)) {
+		return details.ID
+	}
+
+	return ""
+}
+
+func looksLikeDeployEventType(eventType string) bool {
+	return strings.Contains(eventType, "deploy")
+}
+
+func looksLikeBuildEventType(eventType string) bool {
+	return strings.Contains(eventType, "build")
 }
 
 func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
@@ -298,9 +409,9 @@ func (c *Client) GetDeploy(serviceID string, deployID string) (DeployResponse, e
 	return deployResponse, nil
 }
 
-func (c *Client) GetEvent(eventID string) (DeployEventResponse, error) {
+func (c *Client) GetEvent(eventID string) (EventResponse, error) {
 	if eventID == "" {
-		return DeployEventResponse{}, fmt.Errorf("eventID is required")
+		return EventResponse{}, fmt.Errorf("eventID is required")
 	}
 
 	_, body, err := c.execRequestWithResponse(
@@ -310,12 +421,12 @@ func (c *Client) GetEvent(eventID string) (DeployEventResponse, error) {
 		nil,
 	)
 	if err != nil {
-		return DeployEventResponse{}, err
+		return EventResponse{}, err
 	}
 
-	response := DeployEventResponse{}
+	response := EventResponse{}
 	if err := json.Unmarshal(body, &response); err != nil {
-		return DeployEventResponse{}, fmt.Errorf("failed to unmarshal event response: %w", err)
+		return EventResponse{}, fmt.Errorf("failed to unmarshal event response: %w", err)
 	}
 
 	return response, nil
