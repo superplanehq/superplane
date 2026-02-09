@@ -38,6 +38,12 @@ export const DEPLOY_STATE_MAP: EventStateMap = {
     backgroundColor: "bg-red-100",
     badgeColor: "bg-red-500",
   },
+  cancelled: {
+    icon: "circle-slash-2",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-gray-100",
+    badgeColor: "bg-gray-500",
+  },
 };
 
 export const deployStateFunction: StateFunction = (execution) => {
@@ -45,6 +51,11 @@ export const deployStateFunction: StateFunction = (execution) => {
 
   const outputs = execution.outputs as { failed?: OutputPayload[] } | undefined;
   if (outputs?.failed?.length) {
+    const failedOutput = outputs.failed[0]?.data as DeployOutput | undefined;
+    const failedStatus = failedOutput?.status?.toLowerCase();
+    if (failedStatus === "cancelled" || failedStatus === "canceled") {
+      return "cancelled";
+    }
     return "failed";
   }
 
