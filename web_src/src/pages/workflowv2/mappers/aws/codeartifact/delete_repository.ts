@@ -36,7 +36,7 @@ interface RepositoryPayload {
 export const deleteRepositoryMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
-    const componentName = context.componentDefinition.name || "unknown";
+    const componentName = context.componentDefinition.name ?? "unknown";
 
     return {
       title:
@@ -103,16 +103,16 @@ function deleteRepositoryEventSections(
   componentName: string,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [
     {
-      receivedAt: new Date(execution.createdAt!),
+      receivedAt: new Date(execution.createdAt ?? 0),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventSubtitle: formatTimeAgo(new Date(execution.createdAt ?? 0)),
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent!.id!,
+      eventId: execution.rootEvent?.id ?? "",
     },
   ];
 }
