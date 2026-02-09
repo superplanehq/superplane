@@ -16,7 +16,7 @@ type OnIssueConfiguration struct {
 	Project     string   `json:"project" mapstructure:"project"`
 	Actions     []string `json:"actions" mapstructure:"actions"`
 	Labels      []string `json:"labels" mapstructure:"labels"`
-	AssigneeIDs []string `json:"assignee_ids" mapstructure:"assigneeIds"`
+	AssigneeIDs []string `json:"assigneeIds" mapstructure:"assigneeIds"`
 }
 
 func (i *OnIssue) Name() string {
