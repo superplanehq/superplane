@@ -50,23 +50,6 @@ func Test__CreateReview__Execute__Validation(t *testing.T) {
 		})
 		require.ErrorContains(t, err, "body is required for REQUEST_CHANGES")
 	})
-
-	t.Run("inline comment must have numeric line", func(t *testing.T) {
-		err := component.Execute(core.ExecutionContext{
-			Integration:    &contexts.IntegrationContext{},
-			NodeMetadata:   &contexts.MetadataContext{},
-			ExecutionState: &contexts.ExecutionStateContext{},
-			Configuration: map[string]any{
-				"repository": "hello",
-				"pullNumber": "1",
-				"event":      "COMMENT",
-				"comments": []any{
-					map[string]any{"path": "main.go", "line": "abc", "body": "hi"},
-				},
-			},
-		})
-		require.ErrorContains(t, err, "comments[0].line is not a number")
-	})
 }
 
 func Test__CreateReview__Setup(t *testing.T) {

@@ -16,19 +16,11 @@ import (
 
 type CreateReview struct{}
 
-type CreateReviewComment struct {
-	Path string `mapstructure:"path" json:"path"`
-	Line string `mapstructure:"line" json:"line"`
-	Body string `mapstructure:"body" json:"body"`
-}
-
 type CreateReviewConfiguration struct {
-	Repository string                `mapstructure:"repository" json:"repository"`
-	PullNumber string                `mapstructure:"pullNumber" json:"pullNumber"`
-	Event      string                `mapstructure:"event" json:"event"`
-	Body       *string               `mapstructure:"body,omitempty" json:"body,omitempty"`
-	CommitID   *string               `mapstructure:"commitId,omitempty" json:"commitId,omitempty"`
-	Comments   []CreateReviewComment `mapstructure:"comments,omitempty" json:"comments,omitempty"`
+	Repository string  `mapstructure:"repository" json:"repository"`
+	PullNumber string  `mapstructure:"pullNumber" json:"pullNumber"`
+	Event      string  `mapstructure:"event" json:"event"`
+	Body       *string `mapstructure:"body,omitempty" json:"body,omitempty"`
 }
 
 func (c *CreateReview) Name() string {
@@ -50,7 +42,7 @@ func (c *CreateReview) Documentation() string {
 
 - **Automation**: Auto-approve when checks pass
 - **Quality gates**: Request changes when checks fail
-- **Bots**: Post review feedback with inline comments
+- **Bots**: Post review feedback
 
 ## Configuration
 
@@ -58,8 +50,6 @@ func (c *CreateReview) Documentation() string {
 - **Pull Number**: Pull request number
 - **Event**: APPROVE, REQUEST_CHANGES, or COMMENT
 - **Body**: Optional review body (required for REQUEST_CHANGES)
-- **Commit ID**: Optional commit SHA to attach inline comments to
-- **Comments**: Optional inline comments (path, line, body)
 
 ## Output
 
@@ -108,9 +98,9 @@ func (c *CreateReview) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
-						{Label: "APPROVE", Value: "APPROVE"},
-						{Label: "REQUEST_CHANGES", Value: "REQUEST_CHANGES"},
-						{Label: "COMMENT", Value: "COMMENT"},
+						{Label: "Approve", Value: "APPROVE"},
+						{Label: "Request changes", Value: "REQUEST_CHANGES"},
+						{Label: "Comment", Value: "COMMENT"},
 					},
 				},
 			},
@@ -120,46 +110,6 @@ func (c *CreateReview) Configuration() []configuration.Field {
 			Label:       "Body",
 			Type:        configuration.FieldTypeText,
 			Description: "Review body (required for REQUEST_CHANGES).",
-		},
-		{
-			Name:        "commitId",
-			Label:       "Commit ID",
-			Type:        configuration.FieldTypeString,
-			Description: "Optional commit SHA to attach inline comments to.",
-		},
-		{
-			Name:  "comments",
-			Label: "Comments",
-			Type:  configuration.FieldTypeList,
-			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel: "Comment",
-					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeObject,
-						Schema: []configuration.Field{
-							{
-								Name:     "path",
-								Label:    "Path",
-								Type:     configuration.FieldTypeString,
-								Required: true,
-							},
-							{
-								Name:     "line",
-								Label:    "Line",
-								Type:     configuration.FieldTypeString,
-								Required: true,
-							},
-							{
-								Name:     "body",
-								Label:    "Body",
-								Type:     configuration.FieldTypeText,
-								Required: true,
-							},
-						},
-					},
-				},
-			},
-			Description: "Inline review comments (optional).",
 		},
 	}
 }
@@ -199,36 +149,6 @@ func (c *CreateReview) Execute(ctx core.ExecutionContext) error {
 		return errors.New("body is required for REQUEST_CHANGES")
 	}
 
-	draftComments := make([]*github.DraftReviewComment, 0, len(config.Comments))
-	for i, comment := range config.Comments {
-		path := strings.TrimSpace(comment.Path)
-		if path == "" {
-			return fmt.Errorf("comments[%d].path is required", i)
-		}
-
-		lineStr := strings.TrimSpace(comment.Line)
-		if lineStr == "" {
-			return fmt.Errorf("comments[%d].line is required", i)
-		}
-		line, err := strconv.Atoi(lineStr)
-		if err != nil {
-			return fmt.Errorf("comments[%d].line is not a number: %v", i, err)
-		}
-		if line <= 0 {
-			return fmt.Errorf("comments[%d].line must be greater than 0", i)
-		}
-		if strings.TrimSpace(comment.Body) == "" {
-			return fmt.Errorf("comments[%d].body is required", i)
-		}
-
-		draftComments = append(draftComments, &github.DraftReviewComment{
-			Path: github.String(path),
-			Line: github.Int(line),
-			Side: github.String("RIGHT"),
-			Body: github.String(comment.Body),
-		})
-	}
-
 	var appMetadata Metadata
 	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
 		return fmt.Errorf("failed to decode integration metadata: %w", err)
@@ -244,14 +164,6 @@ func (c *CreateReview) Execute(ctx core.ExecutionContext) error {
 	}
 	if config.Body != nil && strings.TrimSpace(*config.Body) != "" {
 		req.Body = config.Body
-	}
-	if len(draftComments) > 0 {
-		if config.CommitID == nil || strings.TrimSpace(*config.CommitID) == "" {
-			return errors.New("commitId is required when comments are provided")
-		}
-
-		req.CommitID = config.CommitID
-		req.Comments = draftComments
 	}
 
 	review, _, err := client.PullRequests.CreateReview(
