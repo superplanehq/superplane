@@ -57,22 +57,22 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
   const workflowGroups = useMemo(() => {
     if (!integration?.status?.usedIn) return [];
 
-    const groups = new Map<string, { workflowName: string; nodes: Array<{ nodeId: string; nodeName: string }> }>();
+    const groups = new Map<string, { canvasName: string; nodes: Array<{ nodeId: string; nodeName: string }> }>();
     integration.status.usedIn.forEach((nodeRef) => {
-      const workflowId = nodeRef.workflowId || "";
-      const workflowName = nodeRef.workflowName || workflowId;
+      const canvasId = nodeRef.canvasId || "";
+      const canvasName = nodeRef.canvasName || canvasId;
       const nodeId = nodeRef.nodeId || "";
       const nodeName = nodeRef.nodeName || nodeId;
 
-      if (!groups.has(workflowId)) {
-        groups.set(workflowId, { workflowName, nodes: [] });
+      if (!groups.has(canvasId)) {
+        groups.set(canvasId, { canvasName, nodes: [] });
       }
-      groups.get(workflowId)?.nodes.push({ nodeId, nodeName });
+      groups.get(canvasId)?.nodes.push({ nodeId, nodeName });
     });
 
-    return Array.from(groups.entries()).map(([workflowId, data]) => ({
-      workflowId,
-      workflowName: data.workflowName,
+    return Array.from(groups.entries()).map(([canvasId, data]) => ({
+      canvasId,
+      canvasName: data.canvasName,
       nodes: data.nodes,
     }));
   }, [integration?.status?.usedIn]);
@@ -252,13 +252,13 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
                   <div className="space-y-2">
                     {workflowGroups.map((group) => (
                       <button
-                        key={group.workflowId}
-                        onClick={() => window.open(`/${organizationId}/canvases/${group.workflowId}`, "_blank")}
+                        key={group.canvasId}
+                        onClick={() => window.open(`/${organizationId}/canvases/${group.canvasId}`, "_blank")}
                         className="w-full flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
                       >
                         <div className="flex-1">
                           <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                            Canvas: {group.workflowName}
+                            Canvas: {group.canvasName}
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             Used in {group.nodes.length} node{group.nodes.length !== 1 ? "s" : ""}:{" "}

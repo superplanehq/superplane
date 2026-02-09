@@ -504,7 +504,7 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		BaseURL:         s.BaseURL,
 		WebhooksBaseURL: s.WebhooksBaseURL,
 		OrganizationID:  integrationInstance.OrganizationID.String(),
-		HTTP:            contexts.NewHTTPContext(s.registry.GetHTTPClient()),
+		HTTP:            s.registry.HTTPContext(),
 		Integration: contexts.NewIntegrationContext(
 			database.Conn(),
 			nil,
@@ -829,7 +829,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 				NodeID:         execution.NodeID,
 				BaseURL:        s.BaseURL,
 				Configuration:  execution.Configuration.Data(),
-				HTTP:           contexts.NewHTTPContext(s.registry.GetHTTPClient()),
+				HTTP:           s.registry.HTTPContext(),
 				Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 				NodeMetadata:   contexts.NewNodeMetadataContext(tx, &node),
 				ExecutionState: contexts.NewExecutionStateContext(tx, execution),

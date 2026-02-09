@@ -5,6 +5,7 @@
 const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   github: "GitHub",
   openai: "OpenAI",
+  claude: "Claude",
   pagerduty: "PagerDuty",
   slack: "Slack",
   discord: "Discord",
@@ -16,6 +17,7 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   dash0: "Dash0",
   aws: "AWS",
   smtp: "SMTP",
+  sendgrid: "SendGrid",
 };
 
 /**

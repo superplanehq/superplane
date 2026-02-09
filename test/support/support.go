@@ -27,6 +27,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/if"
 	_ "github.com/superplanehq/superplane/pkg/components/merge"
 	_ "github.com/superplanehq/superplane/pkg/components/noop"
+	_ "github.com/superplanehq/superplane/pkg/components/ssh"
 	_ "github.com/superplanehq/superplane/pkg/components/wait"
 	_ "github.com/superplanehq/superplane/pkg/integrations/github"
 	_ "github.com/superplanehq/superplane/pkg/integrations/semaphore"
@@ -64,20 +65,22 @@ func Setup(t *testing.T) *ResourceRegistry {
 func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, database.TruncateTables())
 
+	encryptor := crypto.NewNoOpEncryptor()
+	registry, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
+	require.NoError(t, err)
+
 	//
 	// Set up initial test resource registry
 	//
-	encryptor := crypto.NewNoOpEncryptor()
 	r := ResourceRegistry{
 		Encryptor:   encryptor,
-		Registry:    registry.NewRegistry(encryptor),
+		Registry:    registry,
 		AuthService: AuthService(t),
 	}
 
 	//
 	// Create organization and user
 	//
-	var err error
 	tx := database.Conn().Begin()
 	organization, err := models.CreateOrganizationInTransaction(tx, RandomName("org"), RandomName("org-display"))
 	if !assert.NoError(t, err) {
@@ -390,6 +393,20 @@ func VerifyCanvasEventsCount(t *testing.T, canvasID uuid.UUID, expected int) {
 	err := database.Conn().
 		Model(&models.CanvasEvent{}).
 		Where("workflow_id = ?", canvasID).
+		Count(&actual).
+		Error
+
+	require.NoError(t, err)
+	require.Equal(t, expected, int(actual))
+}
+
+func VerifyCanvasNodeEventsCount(t *testing.T, canvasID uuid.UUID, nodeID string, expected int) {
+	var actual int64
+
+	err := database.Conn().
+		Model(&models.CanvasEvent{}).
+		Where("workflow_id = ?", canvasID).
+		Where("node_id = ?", nodeID).
 		Count(&actual).
 		Error
 

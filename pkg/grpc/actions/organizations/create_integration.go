@@ -63,7 +63,7 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 
 	syncErr := integration.Sync(core.SyncContext{
 		Logger:          logging.ForIntegration(*newIntegration),
-		HTTP:            contexts.NewHTTPContext(registry.GetHTTPClient()),
+		HTTP:            registry.HTTPContext(),
 		Integration:     integrationCtx,
 		Configuration:   newIntegration.Configuration.Data(),
 		BaseURL:         baseURL,
@@ -86,7 +86,7 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 		}
 	}
 
-	proto, err := serializeIntegration(registry, newIntegration, []models.WorkflowNodeReference{})
+	proto, err := serializeIntegration(registry, newIntegration, []models.CanvasNodeReference{})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to serialize integration: %v", err)
 	}
@@ -96,7 +96,7 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 	}, nil
 }
 
-func serializeIntegration(registry *registry.Registry, instance *models.Integration, nodeRefs []models.WorkflowNodeReference) (*pb.Integration, error) {
+func serializeIntegration(registry *registry.Registry, instance *models.Integration, nodeRefs []models.CanvasNodeReference) (*pb.Integration, error) {
 	integration, err := registry.GetIntegration(instance.AppName)
 	if err != nil {
 		return nil, err
@@ -144,10 +144,10 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 
 	for _, nodeRef := range nodeRefs {
 		proto.Status.UsedIn = append(proto.Status.UsedIn, &pb.Integration_NodeRef{
-			WorkflowId:   nodeRef.WorkflowID.String(),
-			WorkflowName: nodeRef.WorkflowName,
-			NodeId:       nodeRef.NodeID,
-			NodeName:     nodeRef.NodeName,
+			CanvasId:   nodeRef.CanvasID.String(),
+			CanvasName: nodeRef.CanvasName,
+			NodeId:     nodeRef.NodeID,
+			NodeName:   nodeRef.NodeName,
 		})
 	}
 
