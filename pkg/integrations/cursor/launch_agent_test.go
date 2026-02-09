@@ -79,6 +79,20 @@ func Test__LaunchCloudAgent__HandleWebhook(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, executionState.IsFinished())
 		assert.Equal(t, AgentCompletedPayloadType, executionState.Type)
+
+		require.Len(t, executionState.Payloads, 1)
+		wrapped, ok := executionState.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		data, ok := wrapped["data"].(map[string]any)
+		require.True(t, ok)
+
+		agent, ok := data["agent"].(*LaunchAgentResponse)
+		require.True(t, ok)
+		assert.Equal(t, agentStatusFinished, agent.Status)
+		assert.Equal(t, payload.Summary, agent.Summary)
+		require.NotNil(t, agent.Target)
+		assert.Equal(t, payload.Target.PRURL, agent.Target.PRURL)
+		assert.Equal(t, payload.Target.URL, agent.Target.URL)
 	})
 
 	t.Run("invalid signature -> 403", func(t *testing.T) {

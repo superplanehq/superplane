@@ -57,4 +57,32 @@ func Test__GetDailyUsageData__Execute(t *testing.T) {
 		assert.True(t, execState.IsFinished())
 		assert.Equal(t, DailyUsagePayloadType, execState.Type)
 	})
+
+	t.Run("RFC3339 dates -> success", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+			{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString(`{"days":[]}`)),
+			},
+		}}
+
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{
+			"adminApiKey": "admin",
+		}}
+
+		err := component.Execute(core.ExecutionContext{
+			ID:             uuid.New(),
+			WorkflowID:     uuid.New().String(),
+			NodeID:         "n1",
+			HTTP:           httpCtx,
+			Configuration:  GetDailyUsageSpec{StartDate: "2026-02-05T12:34:56Z", EndDate: "2026-02-05T12:34:56Z"},
+			Integration:    integrationCtx,
+			ExecutionState: execState,
+		})
+
+		assert.NoError(t, err)
+		assert.True(t, execState.IsFinished())
+		assert.Equal(t, DailyUsagePayloadType, execState.Type)
+	})
 }
