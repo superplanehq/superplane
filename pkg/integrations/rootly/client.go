@@ -468,9 +468,24 @@ func (c *Client) GetIncidentDetailed(id string) (map[string]any, error) {
 		}
 	}
 
-	// Resolve relationships using the included index
+	// Only resolve the relationships we explicitly requested via the include
+	// parameter. The API response contains many more relationships (e.g.
+	// severity, user, started_by) that may have "data": null linkage. If we
+	// iterated over all of them, a null data value would overwrite a field
+	// already populated from attributes.
+	requestedRelationships := map[string]bool{
+		"services":     true,
+		"groups":       true,
+		"events":       true,
+		"action_items": true,
+	}
+
 	relationships, _ := data["relationships"].(map[string]any)
 	for relName, relValue := range relationships {
+		if !requestedRelationships[relName] {
+			continue
+		}
+
 		rel, ok := relValue.(map[string]any)
 		if !ok {
 			continue
