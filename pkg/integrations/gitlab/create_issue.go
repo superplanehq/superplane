@@ -2,6 +2,7 @@ package gitlab
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+//go:embed example_output_create_issue.json
 var exampleOutputCreateIssue []byte
 
 type CreateIssue struct{}
