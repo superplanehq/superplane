@@ -5,7 +5,8 @@ High-level steps to add a new integration to SuperPlane.
 ## 1. Pick an integration and claim a ticket
 
 Choose the integration you want to build and **claim the existing issue by commenting on it** so we know you’re working on it.
-[Integrations Board](https://github.com/orgs/superplanehq/projects/2/views/19).
+
+See: [Integrations Board](https://github.com/orgs/superplanehq/projects/2/views/19).
 
 ## 2. Research the connection method
 
@@ -19,12 +20,16 @@ Document your findings in the ticket or in the PR description.
 
 ## 3. Build the integration
 
-- **Backend**: Implement in `pkg/integrations/<name>/`. Follow existing patterns (see [Integration Development Guide](integrations.md) and [Component implementations](component-implementations.md)).
+- **Backend**: Implement in `pkg/integrations/<name>/`. 
 - **Frontend**: Add mappers in `web_src/src/pages/workflowv2/mappers/<name>/`.
 - **Docs**: Write docs in the integration package. Generate with `make gen.components.docs`.
 - **Tests**: Add unit tests in `pkg/integrations/<name>/`.
 
 Keep the same structure and patterns as other integrations. avoid changing core engine or unrelated code.
+
+More info:
+- [Integration Development Guide](integrations.md)
+- [Component implementations](component-implementations.md))
 
 ## 4. Open a PR and follow the PR guide
 
