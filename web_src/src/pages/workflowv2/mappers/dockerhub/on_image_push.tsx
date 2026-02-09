@@ -1,13 +1,12 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import { CustomFieldRenderer, NodeInfo, TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
+import { CustomFieldRenderer, NodeInfo, TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import { DockerHubImagePushEvent, DockerHubTriggerConfiguration, DockerHubTriggerMetadata } from "./types";
 import { buildRepositoryMetadataItems, getRepositoryLabel } from "./utils";
 import { formatTimeAgo } from "@/utils/date";
 import { formatTimestampInUserTimezone } from "@/utils/timezone";
-import { formatPredicate, stringOrDash } from "../../utils";
-import { CopyCodeButton } from "@/components/CopyCodeButton";
+import { formatPredicate, stringOrDash } from "../utils";
 
 /**
  * Renderer for the "dockerhub.onImagePush" trigger
@@ -30,8 +29,7 @@ export const onImagePushTriggerRenderer: TriggerRenderer = {
     const pushData = eventData?.push_data;
     const pushedAt = pushData?.pushed_at ? new Date(pushData.pushed_at * 1000).toISOString() : undefined;
 
-    const visibility =
-      repository?.is_private === undefined ? "-" : repository.is_private ? "Private" : "Public";
+    const visibility = repository?.is_private === undefined ? "-" : repository.is_private ? "Private" : "Public";
 
     return {
       Repository: stringOrDash(getRepositoryLabel(undefined, undefined, repository?.repo_name)),
@@ -95,7 +93,9 @@ export const onImagePushCustomFieldRenderer: CustomFieldRenderer = {
             <div className="text-xs text-gray-800 dark:text-gray-100 mt-2 border-1 border-gray-300 dark:border-gray-600 px-2.5 py-2 bg-gray-50 dark:bg-gray-800 rounded-md">
               <ol className="list-decimal ml-4 space-y-1">
                 <li>Open the Docker Hub repository: {repositoryLabel}</li>
-                <li>Go to <strong>Webhooks</strong> and click <strong>Add webhook</strong></li>
+                <li>
+                  Go to <strong>Webhooks</strong> and click <strong>Add webhook</strong>
+                </li>
                 <li>Set the webhook URL below and save</li>
               </ol>
               <div className="mt-3">
@@ -104,12 +104,10 @@ export const onImagePushCustomFieldRenderer: CustomFieldRenderer = {
                   <pre className="text-xs text-gray-800 dark:text-gray-100 border-1 border-gray-300 dark:border-gray-600 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-md font-mono whitespace-pre-wrap break-all">
                     {webhookUrl}
                   </pre>
-                  {metadata?.webhookUrl && <CopyCodeButton code={webhookUrl} />}
+                  {metadata?.webhookUrl}
                 </div>
               </div>
-              <p className="mt-3">
-                Docker Hub will send tag push events to SuperPlane once the webhook is configured.
-              </p>
+              <p className="mt-3">Docker Hub will send tag push events to SuperPlane once the webhook is configured.</p>
             </div>
           </div>
         </div>

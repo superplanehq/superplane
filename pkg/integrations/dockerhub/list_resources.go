@@ -6,11 +6,21 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+const (
+	ResourceTypeRepository = "dockerhub.repository"
+)
+
 func listDockerHubResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != "dockerhub.repository" {
+	switch resourceType {
+	case ResourceTypeRepository:
+		return listDockerHubRepositories(ctx)
+
+	default:
 		return []core.IntegrationResource{}, nil
 	}
+}
 
+func listDockerHubRepositories(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	namespace, err := resolveNamespace(ctx.Parameters["namespace"], ctx.Integration)
 	if err != nil {
 		return nil, err
@@ -29,7 +39,7 @@ func listDockerHubResources(resourceType string, ctx core.ListResourcesContext) 
 	resources := make([]core.IntegrationResource, 0, len(repositories))
 	for _, repository := range repositories {
 		resources = append(resources, core.IntegrationResource{
-			Type: resourceType,
+			Type: ResourceTypeRepository,
 			Name: repository.Name,
 			ID:   repository.Name,
 		})

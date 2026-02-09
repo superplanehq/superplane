@@ -17,8 +17,8 @@ const (
 
 type Client struct {
 	AccessToken string
-	BaseURL      string
-	http         core.HTTPContext
+	BaseURL     string
+	http        core.HTTPContext
 }
 
 type APIError struct {
@@ -47,9 +47,24 @@ func NewClient(httpClient core.HTTPContext, integration core.IntegrationContext)
 
 	return &Client{
 		AccessToken: token,
-		BaseURL:      defaultBaseURL,
-		http:         httpClient,
+		BaseURL:     defaultBaseURL,
+		http:        httpClient,
 	}, nil
+}
+
+func findSecret(ctx core.IntegrationContext, secretName string) (string, error) {
+	secrets, err := ctx.GetSecrets()
+	if err != nil {
+		return "", err
+	}
+
+	for _, secret := range secrets {
+		if secret.Name == secretName {
+			return string(secret.Value), nil
+		}
+	}
+
+	return "", fmt.Errorf("secret %s not found", secretName)
 }
 
 func (c *Client) doRequest(method, URL string, body io.Reader) (*http.Response, []byte, error) {
@@ -193,13 +208,13 @@ func (i *ImageSet) UnmarshalJSON(data []byte) error {
 }
 
 type Tag struct {
-	ID                 int64    `json:"id"`
-	Name               string   `json:"name"`
-	FullSize           int64    `json:"full_size"`
-	LastUpdated        string   `json:"last_updated"`
-	LastUpdater        int64    `json:"last_updater"`
-	LastUpdaterUsername string  `json:"last_updater_username"`
-	Status             string   `json:"status"`
+	ID                  int64    `json:"id"`
+	Name                string   `json:"name"`
+	FullSize            int64    `json:"full_size"`
+	LastUpdated         string   `json:"last_updated"`
+	LastUpdater         int64    `json:"last_updater"`
+	LastUpdaterUsername string   `json:"last_updater_username"`
+	Status              string   `json:"status"`
 	TagLastPulled       string   `json:"tag_last_pulled"`
 	TagLastPushed       string   `json:"tag_last_pushed"`
 	Repository          int64    `json:"repository"`

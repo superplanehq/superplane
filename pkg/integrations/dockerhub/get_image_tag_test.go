@@ -46,24 +46,9 @@ func Test__GetImageTag__Setup(t *testing.T) {
 	})
 
 	t.Run("valid configuration -> stores metadata", func(t *testing.T) {
-		httpCtx := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"name":"demo","namespace":"superplane"}`)),
-				},
-			},
-		}
-
-		metadata := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{
-			Integration: &contexts.IntegrationContext{
-				Secrets: map[string]core.IntegrationSecret{
-					accessTokenSecretName: {Name: accessTokenSecretName, Value: []byte("token")},
-				},
-			},
-			HTTP:     httpCtx,
-			Metadata: metadata,
+			HTTP:     &contexts.HTTPContext{},
+			Metadata: &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"repository": "demo",
 				"tag":        "latest",
@@ -71,11 +56,6 @@ func Test__GetImageTag__Setup(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		stored, ok := metadata.Metadata.(GetImageTagMetadata)
-		require.True(t, ok)
-		assert.Equal(t, "superplane", stored.Namespace)
-		assert.Equal(t, "demo", stored.Repository.Name)
-		assert.Equal(t, "latest", stored.Tag)
 	})
 }
 

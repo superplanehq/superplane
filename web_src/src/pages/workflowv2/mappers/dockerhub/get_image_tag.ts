@@ -6,17 +6,17 @@ import {
   NodeInfo,
   OutputPayload,
   SubtitleContext,
-} from "../../types";
+} from "../types";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { getState, getStateMap, getTriggerRenderer } from "../..";
+import { getState, getStateMap, getTriggerRenderer } from "..";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import { formatTimeAgo } from "@/utils/date";
 import { formatTimestampInUserTimezone } from "@/utils/timezone";
 import { MetadataItem } from "@/ui/metadataList";
 import { DockerHubRepositoryConfiguration, DockerHubRepositoryMetadata, DockerHubTag } from "./types";
 import { buildRepositoryMetadataItems } from "./utils";
-import { formatBytes, stringOrDash } from "../../utils";
+import { formatBytes, stringOrDash } from "../utils";
 
 export const getImageTagMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {

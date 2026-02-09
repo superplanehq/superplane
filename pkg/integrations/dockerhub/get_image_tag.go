@@ -21,12 +21,6 @@ type GetImageTagConfiguration struct {
 	Tag        string `json:"tag" mapstructure:"tag"`
 }
 
-type GetImageTagMetadata struct {
-	Namespace  string      `json:"namespace" mapstructure:"namespace"`
-	Repository *Repository `json:"repository" mapstructure:"repository"`
-	Tag        string      `json:"tag" mapstructure:"tag"`
-}
-
 func (c *GetImageTag) Name() string {
 	return "dockerhub.getImageTag"
 }
@@ -129,26 +123,7 @@ func (c *GetImageTag) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("tag is required")
 	}
 
-	namespace, err := resolveNamespace(config.Namespace, ctx.Integration)
-	if err != nil {
-		return err
-	}
-
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to create Docker Hub client: %w", err)
-	}
-
-	repoInfo, err := client.GetRepository(namespace, repository)
-	if err != nil {
-		return fmt.Errorf("failed to validate repository: %w", err)
-	}
-
-	return ctx.Metadata.Set(GetImageTagMetadata{
-		Namespace:  namespace,
-		Repository: repoInfo,
-		Tag:        tag,
-	})
+	return nil
 }
 
 func (c *GetImageTag) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {

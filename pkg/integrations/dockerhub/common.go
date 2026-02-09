@@ -7,6 +7,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+type RepositoryMetadata struct {
+	Namespace string `json:"namespace" mapstructure:"namespace"`
+	Name      string `json:"name" mapstructure:"name"`
+	URL       string `json:"url" mapstructure:"url"`
+}
+
 func resolveNamespace(configNamespace string, integration core.IntegrationContext) (string, error) {
 	namespace := strings.TrimSpace(configNamespace)
 	if namespace != "" {
@@ -28,32 +34,4 @@ func resolveNamespace(configNamespace string, integration core.IntegrationContex
 	}
 
 	return namespace, nil
-}
-
-func repositoryNameFromEvent(repoName, name string) string {
-	if name != "" {
-		return strings.TrimSpace(name)
-	}
-
-	parts := strings.Split(strings.TrimSpace(repoName), "/")
-	if len(parts) == 0 {
-		return ""
-	}
-
-	return parts[len(parts)-1]
-}
-
-func findSecret(ctx core.IntegrationContext, secretName string) (string, error) {
-	secrets, err := ctx.GetSecrets()
-	if err != nil {
-		return "", err
-	}
-
-	for _, secret := range secrets {
-		if secret.Name == secretName {
-			return string(secret.Value), nil
-		}
-	}
-
-	return "", fmt.Errorf("secret %s not found", secretName)
 }

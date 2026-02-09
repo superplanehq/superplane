@@ -22,9 +22,9 @@ type OnImagePushConfiguration struct {
 }
 
 type OnImagePushMetadata struct {
-	Namespace  string      `json:"namespace" mapstructure:"namespace"`
-	Repository *Repository `json:"repository" mapstructure:"repository"`
-	WebhookURL string      `json:"webhookUrl" mapstructure:"webhookUrl"`
+	Namespace  string              `json:"namespace" mapstructure:"namespace"`
+	Repository *RepositoryMetadata `json:"repository" mapstructure:"repository"`
+	WebhookURL string              `json:"webhookUrl" mapstructure:"webhookUrl"`
 }
 
 type ImagePushPayload struct {
@@ -186,15 +186,15 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 		}
 	}
 
-	if err := ctx.Metadata.Set(OnImagePushMetadata{
+	return ctx.Metadata.Set(OnImagePushMetadata{
 		Namespace:  namespace,
-		Repository: repoInfo,
 		WebhookURL: webhookURL,
-	}); err != nil {
-		return fmt.Errorf("failed to store metadata: %w", err)
-	}
-
-	return nil
+		Repository: &RepositoryMetadata{
+			Namespace: repoInfo.Namespace,
+			Name:      repoInfo.Name,
+			URL:       repoInfo.RepoURL,
+		},
+	})
 }
 
 func (p *OnImagePush) Actions() []core.Action {
@@ -245,4 +245,17 @@ func (p *OnImagePush) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 
 func (p *OnImagePush) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+func repositoryNameFromEvent(repoName, name string) string {
+	if name != "" {
+		return strings.TrimSpace(name)
+	}
+
+	parts := strings.Split(strings.TrimSpace(repoName), "/")
+	if len(parts) == 0 {
+		return ""
+	}
+
+	return parts[len(parts)-1]
 }

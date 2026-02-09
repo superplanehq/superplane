@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -27,18 +26,18 @@ type accessTokenResponse struct {
 	AccessToken string `json:"access_token"`
 }
 
-func refreshAccessToken(httpCtx core.HTTPContext, integration core.IntegrationContext, config Configuration) error {
-	username := strings.TrimSpace(config.Username)
-	if username == "" {
-		return fmt.Errorf("username is required")
+func refreshAccessToken(httpCtx core.HTTPContext, integration core.IntegrationContext) error {
+	username, err := integration.GetConfig("username")
+	if err != nil {
+		return fmt.Errorf("username is required: %w", err)
 	}
 
-	pat := strings.TrimSpace(config.AccessToken)
-	if pat == "" {
-		return fmt.Errorf("accessToken is required")
+	accessToken, err := integration.GetConfig("accessToken")
+	if err != nil {
+		return fmt.Errorf("access token is required: %w", err)
 	}
 
-	token, err := createAccessToken(httpCtx, username, pat)
+	token, err := createAccessToken(httpCtx, string(username), string(accessToken))
 	if err != nil {
 		return err
 	}

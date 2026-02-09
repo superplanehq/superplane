@@ -11,8 +11,7 @@ export function getRepositoryLabel(
     return undefined;
   }
 
-  const namespace =
-    metadata?.repository?.namespace || metadata?.namespace || configuration?.namespace || undefined;
+  const namespace = metadata?.repository?.namespace || metadata?.namespace || configuration?.namespace || undefined;
 
   return namespace ? `${namespace}/${repoName}` : repoName;
 }

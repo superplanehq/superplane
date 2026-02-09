@@ -10,14 +10,10 @@ import (
 )
 
 const installationInstructions = `
-To connect Docker Hub to SuperPlane:
-
-1. **Create a Docker Hub access token**: Docker Hub → Account Settings → Security → New Access Token
-2. **Copy the token** and store it securely (you will not see it again)
-3. **Enter your Docker Hub username** and access token below
-
-**Scopes**:
-- **Read**: Required to list repositories and read tags
+To generate a Docker Hub access token:
+- Go to **Docker Hub** → **Account Settings** → **Personal Access Tokens**
+- Generate a new token
+- **Copy the token**, and enter your Docker Hub username and the token below
 `
 
 func init() {
@@ -93,7 +89,7 @@ func (d *DockerHub) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if err := refreshAccessToken(ctx.HTTP, ctx.Integration, config); err != nil {
+	if err := refreshAccessToken(ctx.HTTP, ctx.Integration); err != nil {
 		return fmt.Errorf("failed to refresh access token: %w", err)
 	}
 
@@ -139,7 +135,7 @@ func (d *DockerHub) HandleAction(ctx core.IntegrationActionContext) error {
 			return fmt.Errorf("failed to decode configuration: %w", err)
 		}
 
-		if err := refreshAccessToken(ctx.HTTP, ctx.Integration, config); err != nil {
+		if err := refreshAccessToken(ctx.HTTP, ctx.Integration); err != nil {
 			return fmt.Errorf("failed to refresh access token: %w", err)
 		}
 
