@@ -26,10 +26,10 @@ func Test__GitLab__ListResources(t *testing.T) {
 		ctx := core.ListResourcesContext{
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{
-					"baseUrl":             "https://gitlab.com",
-					"groupId":             "123",
-					"authType":            AuthTypePersonalAccessToken,
-					"personalAccessToken": "token",
+					"baseUrl":     "https://gitlab.com",
+					"groupId":     "123",
+					"authType":    AuthTypePersonalAccessToken,
+					"accessToken": "token",
 				},
 			},
 			HTTP: &contexts.HTTPContext{
@@ -55,9 +55,9 @@ func Test__GitLab__ListResources(t *testing.T) {
 	t.Run("returns list of repositories from metadata", func(t *testing.T) {
 		ctx := &contexts.IntegrationContext{
 			Metadata: Metadata{
-				Repositories: []Repository{
-					{ID: 1, Name: "repo1", URL: "http://repo1"},
-					{ID: 2, Name: "repo2", URL: "http://repo2"},
+				Projects: []ProjectMetadata{
+					{ID: 1, Name: "project1", URL: "http://project1"},
+					{ID: 2, Name: "project2", URL: "http://project2"},
 				},
 			},
 		}
@@ -92,10 +92,10 @@ func Test__GitLab__ListResources(t *testing.T) {
 		ctx := core.ListResourcesContext{
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{
-					"baseUrl":             "https://gitlab.com",
-					"groupId":             "123",
-					"authType":            AuthTypePersonalAccessToken,
-					"personalAccessToken": "token",
+					"baseUrl":     "https://gitlab.com",
+					"groupId":     "123",
+					"authType":    AuthTypePersonalAccessToken,
+					"accessToken": "token",
 				},
 			},
 			HTTP: &contexts.HTTPContext{

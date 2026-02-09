@@ -30,42 +30,16 @@ var scopeList = []string{
 
 const (
 	appSetupDescription = `
-## GitLab OAuth Setup
-
-**Step 1: Create a GitLab OAuth Application**
-
-1. Go to GitLab → **User Settings** → **Applications**
-   (For self-hosted: **Admin Area** → **Applications**)
-2. Fill in the following:
-   - **Name**: SuperPlane Integration (or which name you want)
-   - **Redirect URI**: ` + "`%s`" + `
-   - **Scopes**: Select: %s
-3. Click **Save application**
-4. Copy the **Client ID** and **Secret**
-
-**Step 2: Enter Credentials**
-
-Enter the **Client ID** and **Client Secret** in the fields above, then click **Save**.
+- Click the **Continue** button to go to the Applications page in GitLab
+- Add new application:
+  - **Name**: SuperPlane
+  - **Redirect URI**: ` + "`%s`" + `
+  - **Scopes**: %s
+- Copy the **Client ID** and **Client Secret**, and paste them in the fields below.
+- Click **Save** to complete the setup.
 `
 
-	appConnectDescription = `Click **Connect to GitLab** to authorize SuperPlane to access your GitLab account.`
-
-	patSetupDescription = `
-## Personal Access Token Setup
-
-**Step 1: Create a Personal Access Token**
-
-1. Go to GitLab → **User Settings** → **Access Tokens**
-2. Create a new token with:
-   - **Name**: SuperPlane Integration
-   - **Scopes**: Select: %s
-3. Click **Create personal access token**
-4. Copy the token value
-
-**Step 2: Enter Token**
-
-Paste the token into the **Personal Access Token** field above, then click **Save**.
-`
+	appConnectDescription = `Click **Continue** to authorize SuperPlane to access your GitLab account.`
 )
 
 func init() {
@@ -76,21 +50,21 @@ type GitLab struct {
 }
 
 type Configuration struct {
-	AuthType            string `mapstructure:"authType" json:"authType"`
-	BaseURL             string `mapstructure:"baseUrl" json:"baseUrl"`
-	ClientID            string `mapstructure:"clientId" json:"clientId"`
-	ClientSecret        string `mapstructure:"clientSecret" json:"clientSecret"`
-	GroupID             string `mapstructure:"groupId" json:"groupId"`
-	PersonalAccessToken string `mapstructure:"personalAccessToken" json:"personalAccessToken"`
+	AuthType     string `mapstructure:"authType" json:"authType"`
+	BaseURL      string `mapstructure:"baseUrl" json:"baseUrl"`
+	ClientID     string `mapstructure:"clientId" json:"clientId"`
+	ClientSecret string `mapstructure:"clientSecret" json:"clientSecret"`
+	GroupID      string `mapstructure:"groupId" json:"groupId"`
+	AccessToken  string `mapstructure:"accessToken" json:"accessToken"`
 }
 
 type Metadata struct {
-	State        string       `mapstructure:"state" json:"state"`
-	Owner        string       `mapstructure:"owner" json:"owner"`
-	Repositories []Repository `mapstructure:"repositories" json:"repositories"`
+	State    string            `mapstructure:"state" json:"state"`
+	Owner    string            `mapstructure:"owner" json:"owner"`
+	Projects []ProjectMetadata `mapstructure:"projects" json:"projects"`
 }
 
-type Repository struct {
+type ProjectMetadata struct {
 	ID   int    `mapstructure:"id" json:"id"`
 	Name string `mapstructure:"name" json:"name"`
 	URL  string `mapstructure:"url" json:"url"`
@@ -113,7 +87,15 @@ func (g *GitLab) Description() string {
 }
 
 func (g *GitLab) Instructions() string {
-	return fmt.Sprintf("For **App OAuth**, leave **Client ID** and **Secret** empty to start the setup wizard.\n\nFor **Personal Access Token**, use scopes: %s.", strings.Join(scopeList, ", "))
+	return fmt.Sprintf(`
+When connecting using App OAuth:
+- Leave **Client ID** and **Secret** empty to start the setup wizard.
+
+When connecting using Personal Access Token:
+- Go to Preferences → Personal Access Token → Add New token
+- Use **Scopes**: %s
+- Copy the token and paste it into the **Access Token** configuration field, then click **Save**.
+`, strings.Join(scopeList, ", "))
 }
 
 func (g *GitLab) Configuration() []configuration.Field {
@@ -124,6 +106,13 @@ func (g *GitLab) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Description: "GitLab instance URL (or leave empty for https://gitlab.com)",
 			Default:     "https://gitlab.com",
+		},
+		{
+			Name:        "groupId",
+			Label:       "Group ID",
+			Type:        configuration.FieldTypeString,
+			Description: "Group ID",
+			Required:    true,
 		},
 		{
 			Name:     "authType",
@@ -159,21 +148,14 @@ func (g *GitLab) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "personalAccessToken",
-			Label:       "Personal Access Token",
+			Name:        "accessToken",
+			Label:       "Access Token",
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
-			Description: "Personal Access Token from your GitLab user settings",
+			Description: "Access Token from your GitLab user settings",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "authType", Values: []string{AuthTypePersonalAccessToken}},
 			},
-		},
-		{
-			Name:        "groupId",
-			Label:       "Group ID",
-			Type:        configuration.FieldTypeString,
-			Description: "Group ID",
-			Required:    true,
 		},
 	}
 }
@@ -209,7 +191,7 @@ func (g *GitLab) Sync(ctx core.SyncContext) error {
 		return g.oauthSync(ctx, configuration)
 
 	case AuthTypePersonalAccessToken:
-		return g.personalAccessTokenSync(ctx, configuration)
+		return g.personalAccessTokenSync(ctx)
 
 	default:
 		return fmt.Errorf("unknown authType: %s", configuration.AuthType)
@@ -229,7 +211,6 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 			Method:      "GET",
 		})
 
-		ctx.Integration.Error("Enter Client ID and Secret")
 		return nil
 	}
 
@@ -269,7 +250,6 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 			Method:      "GET",
 		})
 
-		ctx.Integration.Error("Click Connect to GitLab to authorize")
 		return nil
 	}
 
@@ -319,20 +299,14 @@ func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) er
 	return nil
 }
 
-func (g *GitLab) personalAccessTokenSync(ctx core.SyncContext, configuration Configuration) error {
-	token := configuration.PersonalAccessToken
+func (g *GitLab) personalAccessTokenSync(ctx core.SyncContext) error {
+	token, err := ctx.Integration.GetConfig("accessToken")
+	if err != nil {
+		return fmt.Errorf("access token is required")
+	}
 
-	if len(token) == 0 {
-		baseURL := configuration.BaseURL
-
-		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: fmt.Sprintf(patSetupDescription, strings.Join(scopeList, ", ")),
-			URL:         fmt.Sprintf("%s/-/user_settings/personal_access_tokens", baseURL),
-			Method:      "GET",
-		})
-
-		ctx.Integration.Error("Waiting for Personal Access Token")
-		return nil
+	if string(token) == "" {
+		return fmt.Errorf("access token is required")
 	}
 
 	if err := g.updateMetadata(ctx); err != nil {
@@ -356,9 +330,9 @@ func (g *GitLab) updateMetadata(ctx core.SyncContext) error {
 		return err
 	}
 
-	repos := []Repository{}
+	ps := []ProjectMetadata{}
 	for _, p := range projects {
-		repos = append(repos, Repository{
+		ps = append(ps, ProjectMetadata{
 			ID:   p.ID,
 			Name: p.PathWithNamespace,
 			URL:  p.WebURL,
@@ -370,7 +344,7 @@ func (g *GitLab) updateMetadata(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	metadata.Repositories = repos
+	metadata.Projects = ps
 	if user != nil {
 		metadata.Owner = fmt.Sprintf("%d", user.ID)
 	}

@@ -29,10 +29,10 @@ func Test__GitLab__Sync(t *testing.T) {
 	t.Run("personal access token - success", func(t *testing.T) {
 		ctx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"authType":            AuthTypePersonalAccessToken,
-				"personalAccessToken": "pat-123",
-				"groupId":             "123",
-				"baseUrl":             "https://gitlab.com",
+				"authType":    AuthTypePersonalAccessToken,
+				"accessToken": "pat-123",
+				"groupId":     "123",
+				"baseUrl":     "https://gitlab.com",
 			},
 		}
 
@@ -60,9 +60,9 @@ func Test__GitLab__Sync(t *testing.T) {
 	t.Run("personal access token - missing token - error state", func(t *testing.T) {
 		ctx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"authType":            AuthTypePersonalAccessToken,
-				"groupId":             "123",
-				"personalAccessToken": "",
+				"authType":    AuthTypePersonalAccessToken,
+				"groupId":     "123",
+				"accessToken": "",
 			},
 		}
 
@@ -304,7 +304,7 @@ func Test__GitLab__HandleRequest(t *testing.T) {
 		assert.Equal(t, "https://gitlab.com/api/v4/groups/123/projects?include_subgroups=true&per_page=100&page=1", mockHTTP.Requests[2].URL.String())
 
 		assert.Equal(t, "1", ctx.Metadata.(Metadata).Owner)
-		assert.Len(t, ctx.Metadata.(Metadata).Repositories, 1)
+		assert.Len(t, ctx.Metadata.(Metadata).Projects, 1)
 	})
 
 	t.Run("error cases", func(t *testing.T) {

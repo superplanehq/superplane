@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -13,10 +14,9 @@ import (
 type OnIssue struct{}
 
 type OnIssueConfiguration struct {
-	Project     string   `json:"project" mapstructure:"project"`
-	Actions     []string `json:"actions" mapstructure:"actions"`
-	Labels      []string `json:"labels" mapstructure:"labels"`
-	AssigneeIDs []string `json:"assigneeIds" mapstructure:"assigneeIds"`
+	Project string                    `json:"project" mapstructure:"project"`
+	Actions []string                  `json:"actions" mapstructure:"actions"`
+	Labels  []configuration.Predicate `json:"labels" mapstructure:"labels"`
 }
 
 func (i *OnIssue) Name() string {
@@ -45,7 +45,6 @@ func (i *OnIssue) Documentation() string {
 - **Project** (required): GitLab project to monitor
 - **Actions** (required): Select which issue actions to listen for (opened, closed, reopened, etc.). Default: opened.
 - **Labels** (optional): Only trigger for issues with specific labels
-- **Assignees** (optional): Only trigger when issue is assigned to specific users
 
 ## Outputs
 
@@ -73,8 +72,7 @@ func (i *OnIssue) Configuration() []configuration.Field {
 			Required: true,
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type:           "repository",
-					UseNameAsValue: false, // Use ID for GitLab
+					Type: ResourceTypeProject,
 				},
 			},
 		},
@@ -97,28 +95,12 @@ func (i *OnIssue) Configuration() []configuration.Field {
 		},
 		{
 			Name:     "labels",
-			Label:    "Label Filter",
-			Type:     configuration.FieldTypeList,
+			Label:    "Labels",
+			Type:     configuration.FieldTypeAnyPredicateList,
 			Required: false,
 			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel: "Label",
-					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeString,
-					},
-				},
-			},
-		},
-		{
-			Name:     "assigneeIds",
-			Label:    "Assignee Filter",
-			Type:     configuration.FieldTypeIntegrationResource,
-			Required: false,
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type:           "member",
-					Multi:          true,
-					UseNameAsValue: false, // Use ID
+				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
+					Operators: configuration.AllPredicateOperators,
 				},
 			},
 		},
@@ -131,7 +113,7 @@ func (i *OnIssue) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if err := ensureRepoInMetadata(ctx.Metadata, ctx.Integration, config.Project); err != nil {
+	if err := ensureProjectInMetadata(ctx.Metadata, ctx.Integration, config.Project); err != nil {
 		return err
 	}
 
@@ -174,66 +156,18 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	if len(config.Actions) > 0 && !whitelistedAction(data, config.Actions) {
+	//
+	// Verify that the action is in the allowed list
+	//
+	if len(config.Actions) > 0 && !i.whitelistedAction(data, config.Actions) {
 		return http.StatusOK, nil
 	}
 
-	if len(config.Labels) > 0 {
-		eventLabels, ok := data["labels"].([]any)
-		if !ok {
-			return http.StatusOK, nil
-		}
-
-		found := false
-		for _, label := range eventLabels {
-			labelMap, ok := label.(map[string]any)
-			if ok {
-				title, _ := labelMap["title"].(string)
-				for _, requiredLabel := range config.Labels {
-					if title == requiredLabel {
-						found = true
-						break
-					}
-				}
-			}
-			if found {
-				break
-			}
-		}
-		if !found {
-			return http.StatusOK, nil
-		}
-	}
-
-	// Filter by Assignees
-	if len(config.AssigneeIDs) > 0 {
-
-		eventAssignees, ok := data["assignees"].([]any)
-		if !ok {
-			return http.StatusOK, nil
-		}
-
-		found := false
-		for _, assignee := range eventAssignees {
-			assigneeMap, ok := assignee.(map[string]any)
-			if ok {
-				idFloat, _ := assigneeMap["id"].(float64)
-				idStr := fmt.Sprintf("%.0f", idFloat)
-
-				for _, requiredID := range config.AssigneeIDs {
-					if idStr == requiredID {
-						found = true
-						break
-					}
-				}
-			}
-			if found {
-				break
-			}
-		}
-		if !found {
-			return http.StatusOK, nil
-		}
+	//
+	// Verify that the labels are in the allowed list
+	//
+	if len(config.Labels) > 0 && !i.hasWhitelistedLabel(data, config.Labels) {
+		return http.StatusOK, nil
 	}
 
 	if err := ctx.Events.Emit("gitlab.issue", data); err != nil {
@@ -245,4 +179,56 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 
 func (i *OnIssue) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+func (i *OnIssue) whitelistedAction(data map[string]any, allowedActions []string) bool {
+	attrs, ok := data["object_attributes"].(map[string]any)
+	if !ok {
+		return false
+	}
+
+	action, ok := attrs["action"].(string)
+	if !ok {
+		return false
+	}
+
+	if !slices.Contains(allowedActions, action) {
+		return false
+	}
+
+	//
+	// If not an update action, just return true,
+	// since it's in the allowed list.
+	//
+	if action != "update" {
+		return true
+	}
+
+	//
+	// Otherwise, we are dealing with an update,
+	// and for those, we only accept if the issue is opened.
+	//
+	state, ok := attrs["state"].(string)
+	if !ok {
+		return false
+	}
+
+	return state == "opened"
+}
+
+func (i *OnIssue) hasWhitelistedLabel(data map[string]any, allowedLabels []configuration.Predicate) bool {
+	labels, ok := data["labels"].([]any)
+	if !ok {
+		return false
+	}
+
+	for _, label := range labels {
+		labelMap := label.(map[string]any)
+		title, _ := labelMap["title"].(string)
+		if configuration.MatchesAnyPredicate(allowedLabels, title) {
+			return true
+		}
+	}
+
+	return false
 }

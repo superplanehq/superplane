@@ -33,8 +33,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as GitLabNodeMetadata;
 
-  if (nodeMetadata?.repository?.name) {
-    metadata.push({ icon: "book", label: nodeMetadata.repository.name });
+  if (nodeMetadata?.project?.name) {
+    metadata.push({ icon: "book", label: nodeMetadata.project.name });
   }
 
   return metadata;

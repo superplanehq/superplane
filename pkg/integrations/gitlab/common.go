@@ -20,14 +20,14 @@ type WebhookMetadata struct {
 }
 
 type NodeMetadata struct {
-	Repository *Repository `json:"repository"`
+	Project *ProjectMetadata `json:"project"`
 }
 
 // getAuthToken retrieves the appropriate authentication token based on auth type
 func getAuthToken(ctx core.IntegrationContext, authType string) (string, error) {
 	switch authType {
 	case AuthTypePersonalAccessToken:
-		tokenBytes, err := ctx.GetConfig("personalAccessToken")
+		tokenBytes, err := ctx.GetConfig("accessToken")
 		if err != nil {
 			return "", err
 		}
@@ -79,32 +79,7 @@ func verifyWebhookToken(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
 
-// whitelistedAction checks if the action is in the allowed list.
-func whitelistedAction(data map[string]any, allowedActions []string) bool {
-	objAttrs, ok := data["object_attributes"].(map[string]any)
-	if !ok {
-		return false
-	}
-
-	actionStr, ok := objAttrs["action"].(string)
-	if !ok {
-		return false
-	}
-
-	if !slices.Contains(allowedActions, actionStr) {
-		return false
-	}
-
-	if actionStr == "update" {
-		if state, ok := objAttrs["state"].(string); ok && state != "opened" {
-			return false
-		}
-	}
-
-	return true
-}
-
-func ensureRepoInMetadata(ctx core.MetadataContext, app core.IntegrationContext, projectID string) error {
+func ensureProjectInMetadata(ctx core.MetadataContext, app core.IntegrationContext, projectID string) error {
 	var nodeMetadata NodeMetadata
 	err := mapstructure.Decode(ctx.Get(), &nodeMetadata)
 	if err != nil {
@@ -123,7 +98,7 @@ func ensureRepoInMetadata(ctx core.MetadataContext, app core.IntegrationContext,
 		return fmt.Errorf("failed to decode application metadata: %w", err)
 	}
 
-	repoIndex := slices.IndexFunc(appMetadata.Repositories, func(r Repository) bool {
+	repoIndex := slices.IndexFunc(appMetadata.Projects, func(r ProjectMetadata) bool {
 		return fmt.Sprintf("%d", r.ID) == projectID
 	})
 
@@ -131,11 +106,11 @@ func ensureRepoInMetadata(ctx core.MetadataContext, app core.IntegrationContext,
 		return fmt.Errorf("project %s is not accessible to integration", projectID)
 	}
 
-	if nodeMetadata.Repository != nil && fmt.Sprintf("%d", nodeMetadata.Repository.ID) == projectID {
+	if nodeMetadata.Project != nil && fmt.Sprintf("%d", nodeMetadata.Project.ID) == projectID {
 		return nil
 	}
 
 	return ctx.Set(NodeMetadata{
-		Repository: &appMetadata.Repositories[repoIndex],
+		Project: &appMetadata.Projects[repoIndex],
 	})
 }

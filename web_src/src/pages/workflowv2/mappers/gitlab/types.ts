@@ -35,7 +35,7 @@ export interface User {
 }
 
 export interface GitLabNodeMetadata {
-  repository?: {
+  project?: {
     name?: string;
     url?: string;
     id?: number;

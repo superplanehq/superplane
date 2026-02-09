@@ -19,13 +19,13 @@ var exampleOutputCreateIssue []byte
 type CreateIssue struct{}
 
 type CreateIssueConfiguration struct {
-	Project     string   `mapstructure:"project"`
-	Title       string   `mapstructure:"title"`
-	Body        string   `mapstructure:"body"`
-	Assignees   []string `mapstructure:"assignees"`
-	Labels      []string `mapstructure:"labels"`
-	MilestoneID string   `mapstructure:"milestoneId"`
-	DueDate     string   `mapstructure:"dueDate"`
+	Project   string   `mapstructure:"project"`
+	Title     string   `mapstructure:"title"`
+	Body      string   `mapstructure:"body"`
+	Assignees []string `mapstructure:"assignees"`
+	Labels    []string `mapstructure:"labels"`
+	Milestone string   `mapstructure:"milestone"`
+	DueDate   string   `mapstructure:"dueDate"`
 }
 
 func (c *CreateIssue) Name() string {
@@ -97,8 +97,7 @@ func (c *CreateIssue) Configuration() []configuration.Field {
 			Required: true,
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type:           "repository",
-					UseNameAsValue: false,
+					Type: ResourceTypeProject,
 				},
 			},
 		},
@@ -121,9 +120,8 @@ func (c *CreateIssue) Configuration() []configuration.Field {
 			Required: false,
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type:           "member",
-					Multi:          true,
-					UseNameAsValue: false,
+					Type:  ResourceTypeMember,
+					Multi: true,
 				},
 			},
 		},
@@ -142,14 +140,13 @@ func (c *CreateIssue) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "milestoneId",
+			Name:     "milestone",
 			Label:    "Milestone",
 			Type:     configuration.FieldTypeIntegrationResource,
 			Required: false,
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type:           "milestone",
-					UseNameAsValue: false,
+					Type: ResourceTypeMilestone,
 					Parameters: []configuration.ParameterRef{
 						{
 							Name:      "project",
@@ -182,7 +179,7 @@ func (c *CreateIssue) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("title is required")
 	}
 
-	return ensureRepoInMetadata(
+	return ensureProjectInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
 		config.Project,
@@ -209,9 +206,9 @@ func (c *CreateIssue) Execute(ctx core.ExecutionContext) error {
 	}
 
 	var milestoneID *int
-	if config.MilestoneID != "" {
+	if config.Milestone != "" {
 		var id int
-		if _, err := fmt.Sscanf(config.MilestoneID, "%d", &id); err == nil {
+		if _, err := fmt.Sscanf(config.Milestone, "%d", &id); err == nil {
 			milestoneID = &id
 		}
 	}

@@ -46,7 +46,7 @@ func Test__CreateIssue__Setup(t *testing.T) {
 			},
 			Integration: &contexts.IntegrationContext{
 				Metadata: Metadata{
-					Repositories: []Repository{
+					Projects: []ProjectMetadata{
 						{ID: 123, Name: "repo", URL: "http://repo"},
 					},
 				},
@@ -72,10 +72,10 @@ func Test__CreateIssue__Execute(t *testing.T) {
 			},
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{
-					"authType":            AuthTypePersonalAccessToken,
-					"groupId":             "123",
-					"personalAccessToken": "pat",
-					"baseUrl":             "https://gitlab.com",
+					"authType":    AuthTypePersonalAccessToken,
+					"groupId":     "123",
+					"accessToken": "pat",
+					"baseUrl":     "https://gitlab.com",
 				},
 			},
 			HTTP: &contexts.HTTPContext{
@@ -117,10 +117,10 @@ func Test__CreateIssue__Execute(t *testing.T) {
 			},
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{
-					"authType":            AuthTypePersonalAccessToken,
-					"groupId":             "123",
-					"personalAccessToken": "pat",
-					"baseUrl":             "https://gitlab.com",
+					"authType":    AuthTypePersonalAccessToken,
+					"groupId":     "123",
+					"accessToken": "pat",
+					"baseUrl":     "https://gitlab.com",
 				},
 			},
 			HTTP: &contexts.HTTPContext{

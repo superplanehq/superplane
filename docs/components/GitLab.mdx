@@ -20,9 +20,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-For **App OAuth**, leave **Client ID** and **Secret** empty to start the setup wizard.
+When connecting using App OAuth:
+- Leave **Client ID** and **Secret** empty to start the setup wizard.
 
-For **Personal Access Token**, use scopes: api, read_user, read_api, write_repository, read_repository.
+When connecting using Personal Access Token:
+- Go to Preferences → Personal Access Token → Add New token
+- Use **Scopes**: api, read_user, read_api, write_repository, read_repository
+- Copy the token and paste it into the **Access Token** configuration field, then click **Save**.
 
 <a id="on-issue"></a>
 
@@ -41,7 +45,6 @@ The On Issue trigger starts a workflow execution when issue events occur in a Gi
 - **Project** (required): GitLab project to monitor
 - **Actions** (required): Select which issue actions to listen for (opened, closed, reopened, etc.). Default: opened.
 - **Labels** (optional): Only trigger for issues with specific labels
-- **Assignees** (optional): Only trigger when issue is assigned to specific users
 
 ### Outputs
 

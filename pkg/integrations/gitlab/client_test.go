@@ -17,10 +17,10 @@ func Test__Client__NewClient(t *testing.T) {
 	t.Run("valid configuration - personal access token", func(t *testing.T) {
 		ctx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"authType":            AuthTypePersonalAccessToken,
-				"baseUrl":             "https://gitlab.example.com",
-				"personalAccessToken": "pat-123",
-				"groupId":             "group-123",
+				"authType":    AuthTypePersonalAccessToken,
+				"baseUrl":     "https://gitlab.example.com",
+				"accessToken": "pat-123",
+				"groupId":     "group-123",
 			},
 		}
 

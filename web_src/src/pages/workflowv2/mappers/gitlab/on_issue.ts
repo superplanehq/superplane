@@ -61,10 +61,10 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     const configuration = node.configuration as unknown as OnIssueConfiguration;
     const metadataItems = [];
 
-    if (metadata?.repository?.name) {
+    if (metadata?.project?.name) {
       metadataItems.push({
         icon: "book",
-        label: metadata.repository.name,
+        label: metadata.project.name,
       });
     }
 
