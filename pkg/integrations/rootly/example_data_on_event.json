@@ -1,0 +1,42 @@
+{
+    "type": "rootly.onEvent",
+    "data": {
+        "event": "incident.updated",
+        "event_id": "evt-abc123",
+        "issued_at": "2026-01-19T12:30:00Z",
+        "incident": {
+            "id": "abc123-def456",
+            "title": "API latency spike detected",
+            "summary": "The API response times have increased significantly across all endpoints.",
+            "status": "started",
+            "severity": "sev2",
+            "started_at": "2026-01-19T12:00:00Z",
+            "mitigated_at": null,
+            "resolved_at": null,
+            "url": "https://app.rootly.com/incidents/abc123-def456",
+            "services": [
+                {
+                    "name": "Production API",
+                    "slug": "production-api"
+                }
+            ],
+            "teams": [
+                {
+                    "name": "Platform",
+                    "slug": "platform"
+                }
+            ],
+            "events": [
+                {
+                    "event": "Investigation note added by on-call engineer",
+                    "kind": "event",
+                    "source": "web",
+                    "visibility": "internal",
+                    "occurred_at": "2026-01-19T12:30:00Z",
+                    "created_at": "2026-01-19T12:30:00Z"
+                }
+            ]
+        }
+    },
+    "timestamp": "2026-01-19T12:30:00Z"
+}
