@@ -788,6 +788,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		return http.StatusInternalServerError, fmt.Errorf("trigger not found: %w", err)
 	}
 
+	logger := logging.ForNode(node)
 	tx := database.Conn()
 	var integrationCtx core.IntegrationContext
 	if node.AppInstallationID != nil {
@@ -796,6 +797,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 			return http.StatusInternalServerError, integrationErr
 		}
 
+		logger = logging.WithIntegration(logger, *integration)
 		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry)
 	}
 
@@ -805,6 +807,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		WorkflowID:    node.WorkflowID.String(),
 		NodeID:        node.NodeID,
 		Configuration: node.Configuration.Data(),
+		Logger:        logger,
 		HTTP:          s.registry.HTTPContext(),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		Events:        contexts.NewEventContext(tx, &node),
@@ -819,6 +822,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 		return http.StatusInternalServerError, fmt.Errorf("component not found: %w", err)
 	}
 
+	logger := logging.ForNode(node)
 	tx := database.Conn()
 	var integrationCtx core.IntegrationContext
 	if node.AppInstallationID != nil {
@@ -827,6 +831,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 			return http.StatusInternalServerError, integrationErr
 		}
 
+		logger = logging.WithIntegration(logger, *integration)
 		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry)
 	}
 
@@ -836,6 +841,7 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 		WorkflowID:    node.WorkflowID.String(),
 		NodeID:        node.NodeID,
 		Configuration: node.Configuration.Data(),
+		Logger:        logger,
 		HTTP:          s.registry.HTTPContext(),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		Events:        contexts.NewEventContext(tx, &node),
