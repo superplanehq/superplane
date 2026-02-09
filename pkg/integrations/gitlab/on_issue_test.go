@@ -39,6 +39,7 @@ func Test__OnIssue__HandleWebhook__WrongEventType(t *testing.T) {
 		Body:          []byte(`{}`),
 		Configuration: map[string]any{"project": "123", "actions": []string{"open"}},
 		Events:        eventsCtx,
+		Logger:        log.NewEntry(log.New()),
 	}
 
 	code, err := trigger.HandleWebhook(ctx)
@@ -61,6 +62,7 @@ func Test__OnIssue__HandleWebhook__InvalidToken(t *testing.T) {
 		Body:          []byte(`{}`),
 		Configuration: map[string]any{"project": "123", "actions": []string{"open"}},
 		Webhook:       webhookCtx,
+		Logger:        log.NewEntry(log.New()),
 	}
 
 	code, err := trigger.HandleWebhook(ctx)
@@ -93,6 +95,7 @@ func Test__OnIssue__HandleWebhook__StateNotOpened(t *testing.T) {
 		Configuration: map[string]any{"project": "123", "actions": []string{"close"}},
 		Webhook:       webhookCtx,
 		Events:        eventsCtx,
+		Logger:        log.NewEntry(log.New()),
 	}
 
 	code, err := trigger.HandleWebhook(ctx)
@@ -128,6 +131,7 @@ func Test__OnIssue__HandleWebhook__Success(t *testing.T) {
 		Configuration: map[string]any{"project": "123", "actions": []string{"open"}},
 		Webhook:       webhookCtx,
 		Events:        eventsCtx,
+		Logger:        log.NewEntry(log.New()),
 	}
 
 	code, err := trigger.HandleWebhook(ctx)
@@ -267,6 +271,7 @@ func Test__OnIssue__HandleWebhook__UpdateOnClosed(t *testing.T) {
 		Configuration: map[string]any{"project": "123", "actions": []string{"update"}},
 		Webhook:       webhookCtx,
 		Events:        eventsCtx,
+		Logger:        log.NewEntry(log.New()),
 	}
 
 	code, err := trigger.HandleWebhook(ctx)
