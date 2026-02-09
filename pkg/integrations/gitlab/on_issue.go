@@ -17,7 +17,6 @@ type OnIssueConfiguration struct {
 	Actions     []string `json:"actions" mapstructure:"actions"`
 	Labels      []string `json:"labels" mapstructure:"labels"`
 	AssigneeIDs []string `json:"assignee_ids" mapstructure:"assigneeIds"`
-	State       string   `json:"state" mapstructure:"state"`
 }
 
 func (i *OnIssue) Name() string {
