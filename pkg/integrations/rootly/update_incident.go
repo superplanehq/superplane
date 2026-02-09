@@ -57,7 +57,7 @@ func (u *UpdateIncident) Configuration() []configuration.Field {
 			Description: "New severity level.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: "severity",
+					Type:           "severity",
 					UseNameAsValue: true,
 				},
 			},
@@ -69,8 +69,7 @@ func (u *UpdateIncident) Configuration() []configuration.Field {
 			Description: "New status for the incident.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: "status",
-					// ⬇️ Changed here: MUST be false to send lowercase ID (e.g., "started")
+					Type:           "status",
 					UseNameAsValue: false,
 				},
 			},
@@ -109,4 +108,17 @@ func (u *UpdateIncident) Execute(ctx core.ExecutionContext) error {
 }
 
 func (u *UpdateIncident) Setup(ctx core.SetupContext) error { return nil }
+
 func (u *UpdateIncident) Cleanup(ctx core.SetupContext) error { return nil }
+
+func (u *UpdateIncident) Actions() []core.Action { return nil }
+
+func (u *UpdateIncident) Cancel(ctx core.ExecutionContext) error { return nil }
+
+func (u *UpdateIncident) Color() string {
+	return "#1D2C3C"
+}
+
+func (u *UpdateIncident) Icon() string {
+	return "rootly"
+}
