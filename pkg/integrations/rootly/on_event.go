@@ -269,10 +269,9 @@ func matchesEventFilters(data map[string]any, config OnEventConfiguration) bool 
 	}
 
 	if config.Status != "" {
-		if status, ok := data["status"].(string); ok {
-			if status != config.Status {
-				return false
-			}
+		status, ok := data["status"].(string)
+		if !ok || status != config.Status {
+			return false
 		}
 	}
 

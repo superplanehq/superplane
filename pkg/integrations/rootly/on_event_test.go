@@ -476,6 +476,60 @@ func Test__OnEvent__HandleWebhook(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, eventContext.Count())
 	})
+
+	t.Run("status filter with missing status field in webhook data -> no emit", func(t *testing.T) {
+		body := []byte(`{"event":{"type":"incident.created","id":"evt-nostatus","issued_at":"2025-01-01T00:00:00Z"},"data":{"id":"inc-nostatus","title":"No Status Field","severity":"sev1"}}`)
+		secret := "test-secret"
+		timestamp := "1234567890"
+
+		headers := http.Header{}
+		headers.Set("X-Rootly-Signature", signatureFor(secret, timestamp, body))
+
+		configWithStatus := map[string]any{
+			"events": []string{"incident.created"},
+			"status": "started",
+		}
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Headers:       headers,
+			Configuration: configWithStatus,
+			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Events:        eventContext,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, eventContext.Count())
+	})
+
+	t.Run("severity filter with missing severity field in webhook data -> no emit", func(t *testing.T) {
+		body := []byte(`{"event":{"type":"incident.created","id":"evt-noseverity","issued_at":"2025-01-01T00:00:00Z"},"data":{"id":"inc-noseverity","title":"No Severity Field","status":"started"}}`)
+		secret := "test-secret"
+		timestamp := "1234567890"
+
+		headers := http.Header{}
+		headers.Set("X-Rootly-Signature", signatureFor(secret, timestamp, body))
+
+		configWithSeverity := map[string]any{
+			"events":   []string{"incident.created"},
+			"severity": "sev1",
+		}
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Headers:       headers,
+			Configuration: configWithSeverity,
+			Webhook:       &contexts.WebhookContext{Secret: secret},
+			Events:        eventContext,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, eventContext.Count())
+	})
 }
 
 func Test__OnEvent__Setup(t *testing.T) {
@@ -578,5 +632,25 @@ func Test__matchesEventFilters(t *testing.T) {
 			Visibility: "internal",
 		})
 		assert.True(t, result)
+	})
+
+	t.Run("status filter with missing status field -> does not match", func(t *testing.T) {
+		data := map[string]any{
+			"severity": "sev1",
+		}
+		result := matchesEventFilters(data, OnEventConfiguration{
+			Status: "started",
+		})
+		assert.False(t, result)
+	})
+
+	t.Run("severity filter with missing severity field -> does not match", func(t *testing.T) {
+		data := map[string]any{
+			"status": "started",
+		}
+		result := matchesEventFilters(data, OnEventConfiguration{
+			Severity: "sev1",
+		})
+		assert.False(t, result)
 	})
 }
