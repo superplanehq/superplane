@@ -334,8 +334,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
           <div className="p-6">
             <h2 className="text-lg font-medium text-red-600 dark:text-red-400 mb-2">Danger Zone</h2>
             <p className="text-sm text-gray-800 dark:text-gray-100 mb-4">
-              Once you delete this integration, all its data will be permanently deleted. This action cannot be
-              undone.
+              Once you delete this integration, all its data will be permanently deleted. This action cannot be undone.
             </p>
             <PermissionTooltip
               allowed={canDeleteIntegrations || permissionsLoading}
