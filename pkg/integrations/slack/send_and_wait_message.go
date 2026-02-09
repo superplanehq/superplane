@@ -338,12 +338,26 @@ func (c *SendAndWaitMessage) Configuration() []configuration.Field {
 			Label:    "Timeout (seconds)",
 			Type:     configuration.FieldTypeNumber,
 			Required: false,
+			Default:  3600,
 		},
 		{
 			Name:     "buttons",
 			Label:    "Buttons",
 			Type:     configuration.FieldTypeList,
 			Required: true,
+			Default: []map[string]any{
+				{
+					"name":  "foo",
+					"value": "bar",
+				},
+			},
+			ValidationRules: []configuration.ValidationRule{
+				{
+					Type:    configuration.ValidationRuleMaxLength,
+					Value:   4,
+					Message: "A maximum of 4 buttons can be configured",
+				},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Button",
