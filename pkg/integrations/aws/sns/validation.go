@@ -32,14 +32,18 @@ func requireTopicArn(topicArn string) (string, error) {
 		return "", fmt.Errorf("topic ARN is required")
 	}
 
-	// Validate ARN format: arn:aws:sns:region:account-id:topic-name
-	if !strings.HasPrefix(normalized, "arn:aws:sns:") {
-		return "", fmt.Errorf("invalid topic ARN format: must start with 'arn:aws:sns:'")
+	// Validate ARN format: arn:<partition>:sns:region:account-id:topic-name
+	if !strings.HasPrefix(normalized, "arn:") {
+		return "", fmt.Errorf("invalid topic ARN format: must start with 'arn:'")
 	}
 
 	parts := strings.Split(normalized, ":")
 	if len(parts) < 6 {
-		return "", fmt.Errorf("invalid topic ARN format: expected arn:aws:sns:region:account-id:topic-name")
+		return "", fmt.Errorf("invalid topic ARN format: expected arn:<partition>:sns:region:account-id:topic-name")
+	}
+
+	if parts[2] != "sns" {
+		return "", fmt.Errorf("invalid topic ARN format: expected SNS service ARN")
 	}
 
 	return normalized, nil
@@ -52,14 +56,18 @@ func requireSubscriptionArn(subscriptionArn string) (string, error) {
 		return "", fmt.Errorf("subscription ARN is required")
 	}
 
-	// Validate ARN format: arn:aws:sns:region:account-id:topic-name:subscription-id
-	if !strings.HasPrefix(normalized, "arn:aws:sns:") {
-		return "", fmt.Errorf("invalid subscription ARN format: must start with 'arn:aws:sns:'")
+	// Validate ARN format: arn:<partition>:sns:region:account-id:topic-name:subscription-id
+	if !strings.HasPrefix(normalized, "arn:") {
+		return "", fmt.Errorf("invalid subscription ARN format: must start with 'arn:'")
 	}
 
 	parts := strings.Split(normalized, ":")
 	if len(parts) < 7 {
-		return "", fmt.Errorf("invalid subscription ARN format: expected arn:aws:sns:region:account-id:topic-name:subscription-id")
+		return "", fmt.Errorf("invalid subscription ARN format: expected arn:<partition>:sns:region:account-id:topic-name:subscription-id")
+	}
+
+	if parts[2] != "sns" {
+		return "", fmt.Errorf("invalid subscription ARN format: expected SNS service ARN")
 	}
 
 	return normalized, nil
