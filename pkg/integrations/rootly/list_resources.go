@@ -45,6 +45,15 @@ func (r *Rootly) ListResources(resourceType string, ctx core.ListResourcesContex
 			})
 		}
 		return resources, nil
+		
+	case "status":
+		return []core.IntegrationResource{
+			{Type: resourceType, Name: "Started", ID: "started"},
+			{Type: resourceType, Name: "Acknowledged", ID: "acknowledged"},
+			{Type: resourceType, Name: "Mitigated", ID: "mitigated"},
+			{Type: resourceType, Name: "Resolved", ID: "resolved"},
+			{Type: resourceType, Name: "Cancelled", ID: "cancelled"},
+		}, nil
 
 	default:
 		return []core.IntegrationResource{}, nil
