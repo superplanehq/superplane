@@ -29,6 +29,6 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return sns.ListSubscriptions(ctx, resourceType)
 
 	default:
-		return nil, nil
+		return []core.IntegrationResource{}, nil
 	}
 }
