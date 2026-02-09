@@ -108,7 +108,17 @@ func (u *UpdateIncident) Execute(ctx core.ExecutionContext) error {
 }
 
 func (u *UpdateIncident) Setup(ctx core.SetupContext) error { return nil }
+
 func (u *UpdateIncident) Cleanup(ctx core.SetupContext) error { return nil }
+
 func (u *UpdateIncident) Actions() []core.Action { return nil }
+
 func (u *UpdateIncident) Cancel(ctx core.ExecutionContext) error { return nil }
-func (u *UpdateIncident) Test(ctx core.ExecutionContext) error { return nil }
+
+func (u *UpdateIncident) Color() string {
+	return "#1D2C3C"
+}
+
+func (u *UpdateIncident) Icon() string {
+	return "rootly"
+}
