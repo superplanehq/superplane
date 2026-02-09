@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Sentry">
+  <!-- Sentry brand glyph (sentry.io/branding) - triangle mark, brand color #362d59 -->
+  <path
+    fill="#362d59"
+    d="M12 3.5L3 20.5h18L12 3.5zm0 3.5l6 11H6l6-11z"
+  />
+</svg>
