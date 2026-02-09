@@ -69,6 +69,10 @@ func (h *GitHubWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	return true, nil
 }
 
+func (h *GitHubWebhookHandler) Merge(current, requested any) (any, bool, error) {
+	return current, false, nil
+}
+
 func (h *GitHubWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	metadata := Metadata{}
 	err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
