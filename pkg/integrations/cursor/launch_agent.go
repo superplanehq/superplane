@@ -63,6 +63,25 @@ type AgentSource struct {
 	Ref        string `json:"ref,omitempty"`
 }
 
+func updateAgentFromWebhook(agent *LaunchAgentResponse, payload AgentStatusWebhook) *LaunchAgentResponse {
+	if agent == nil {
+		agent = &LaunchAgentResponse{}
+	}
+
+	agent.ID = payload.ID
+	agent.Status = payload.Status
+	agent.Summary = payload.Summary
+	agent.Source = &LaunchAgentSource{
+		Repository: payload.Source.Repository,
+		Ref:        payload.Source.Ref,
+	}
+	if payload.Target != nil {
+		agent.Target = payload.Target
+	}
+
+	return agent
+}
+
 func (l *LaunchCloudAgent) Name() string {
 	return "cursor.launchCloudAgent"
 }
@@ -410,6 +429,7 @@ func (l *LaunchCloudAgent) HandleWebhook(ctx core.WebhookRequestContext) (int, e
 	}
 
 	metadata.Status = &payload
+	metadata.Agent = updateAgentFromWebhook(metadata.Agent, payload)
 
 	if payload.Status != agentStatusFinished && payload.Status != agentStatusError {
 		if err := executionCtx.Metadata.Set(metadata); err != nil {
