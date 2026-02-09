@@ -129,7 +129,7 @@ func Test__Jira__Sync(t *testing.T) {
 }
 
 func Test__Jira__CompareWebhookConfig(t *testing.T) {
-	j := &Jira{}
+	h := &JiraWebhookHandler{}
 
 	testCases := []struct {
 		name        string
@@ -227,7 +227,7 @@ func Test__Jira__CompareWebhookConfig(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			equal, err := j.CompareWebhookConfig(tc.configA, tc.configB)
+			equal, err := h.CompareConfig(tc.configA, tc.configB)
 
 			if tc.expectError {
 				assert.Error(t, err)
