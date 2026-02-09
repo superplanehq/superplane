@@ -339,10 +339,11 @@ func (l *LaunchCloudAgent) poll(ctx core.ActionContext) error {
 
 	// Synthesize a status payload for parity with webhook output.
 	status := AgentStatusWebhook{
-		Event:   webhookEventStatusChange,
-		ID:      metadata.Agent.ID,
-		Status:  agent.Status,
-		Summary: agent.Summary,
+		Event:     webhookEventStatusChange,
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		ID:        metadata.Agent.ID,
+		Status:    agent.Status,
+		Summary:   agent.Summary,
 	}
 	if agent.Source != nil {
 		status.Source = AgentSource{

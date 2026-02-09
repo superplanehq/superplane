@@ -1,16 +1,15 @@
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { ComponentBaseProps } from "@/ui/componentBase";
+import { getStateMap } from "..";
 import {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
-  ExecutionInfo,
-  NodeInfo,
   OutputPayload,
   SubtitleContext,
 } from "../types";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import { formatTimeAgo } from "@/utils/date";
+import { baseEventSections } from "./base";
 
 export const launchCloudAgentMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -71,21 +70,3 @@ export const launchCloudAgentMapper: ComponentBaseMapper = {
     return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
   },
 };
-
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-  const subtitleTimestamp = execution.updatedAt || execution.createdAt;
-  const eventSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : "";
-
-  return [
-    {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventSubtitle,
-      eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent!.id!,
-    },
-  ];
-}
