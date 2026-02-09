@@ -251,7 +251,7 @@ func (t *OnEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 
 	err = ctx.Events.Emit(
 		fmt.Sprintf("rootly.%s", eventType),
-		buildEventPayload(webhook),
+		buildPayload(webhook),
 	)
 
 	if err != nil {
@@ -411,20 +411,6 @@ func matchTimelineEventFields(data map[string]any, config OnEventConfiguration) 
 
 	// No event matched all filters
 	return false
-}
-
-func buildEventPayload(webhook WebhookPayload) map[string]any {
-	payload := map[string]any{
-		"event":     webhook.Event.Type,
-		"event_id":  webhook.Event.ID,
-		"issued_at": webhook.Event.IssuedAt,
-	}
-
-	if webhook.Data != nil {
-		payload["incident"] = webhook.Data
-	}
-
-	return payload
 }
 
 func (t *OnEvent) Cleanup(ctx core.TriggerContext) error {
