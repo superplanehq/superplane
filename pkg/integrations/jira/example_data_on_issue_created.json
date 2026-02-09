@@ -1,0 +1,43 @@
+{
+  "data": {
+    "webhookEvent": "jira:issue_created",
+    "issue_event_type_name": "issue_created",
+    "timestamp": 1612345678901,
+    "user": {
+      "accountId": "557058:abcd1234-5678-efgh-ijkl-mnopqrstuvwx",
+      "displayName": "John Doe",
+      "emailAddress": "john.doe@example.com"
+    },
+    "issue": {
+      "id": "10001",
+      "key": "PROJ-123",
+      "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001",
+      "fields": {
+        "summary": "Implement new feature",
+        "issuetype": {
+          "name": "Task",
+          "id": "10001"
+        },
+        "project": {
+          "key": "PROJ",
+          "name": "My Project",
+          "id": "10000"
+        },
+        "status": {
+          "name": "To Do"
+        },
+        "priority": {
+          "name": "Medium"
+        },
+        "creator": {
+          "displayName": "John Doe"
+        },
+        "reporter": {
+          "displayName": "John Doe"
+        }
+      }
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.issueCreated"
+}
