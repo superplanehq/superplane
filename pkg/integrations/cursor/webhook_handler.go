@@ -17,3 +17,7 @@ func (h *CursorWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	// All Cursor nodes can share the same webhook record; executions are routed via agent_id KV.
 	return true, nil
 }
+
+func (h *CursorWebhookHandler) Merge(current, requested any) (any, bool, error) {
+	return current, false, nil
+}
