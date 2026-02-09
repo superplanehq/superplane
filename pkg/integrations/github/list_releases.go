@@ -172,11 +172,6 @@ func (c *ListReleases) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to marshal releases payload: %w", err)
 	}
 
-	const maxPayloadBytes = 1024 * 1024
-	if len(payloadBytes) > maxPayloadBytes {
-		return fmt.Errorf("payload size exceeds 1MB limit")
-	}
-
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"github.releases.list",
