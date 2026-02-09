@@ -64,6 +64,16 @@ func Test__GetTopic__Setup(t *testing.T) {
 		})
 		require.NoError(t, err)
 	})
+
+	t.Run("valid china partition topic arn -> success", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"region":   "cn-north-1",
+				"topicArn": "arn:aws-cn:sns:cn-north-1:123456789012:orders-events",
+			},
+		})
+		require.NoError(t, err)
+	})
 }
 
 // Test__SNSComponents__Setup validates setup requirements across SNS components.
@@ -87,6 +97,17 @@ func Test__SNSComponents__Setup(t *testing.T) {
 			},
 		})
 		require.ErrorContains(t, err, "invalid subscription ARN format")
+	})
+
+	t.Run("get subscription valid china partition subscription arn -> success", func(t *testing.T) {
+		component := &GetSubscription{}
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"region":          "cn-northwest-1",
+				"subscriptionArn": "arn:aws-cn:sns:cn-northwest-1:123456789012:orders-events:sub-123",
+			},
+		})
+		require.NoError(t, err)
 	})
 
 	t.Run("create topic missing name -> error", func(t *testing.T) {
