@@ -1,7 +1,6 @@
 package jira
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -243,165 +242,6 @@ func Test__Jira__CompareWebhookConfig(t *testing.T) {
 func Test__Jira__HandleAction(t *testing.T) {
 	j := &Jira{}
 
-	t.Run("listWebhooks -> success", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"startAt":0,"maxResults":50,"total":1,"values":[{"id":123,"jqlFilter":"project = TEST","events":["jira:issue_created"]}]}`)),
-				},
-			},
-		}
-
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"baseUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "test-token",
-			},
-		}
-
-		err := j.HandleAction(core.IntegrationActionContext{
-			Name:        "listWebhooks",
-			HTTP:        httpContext,
-			Integration: appCtx,
-		})
-
-		require.NoError(t, err)
-		require.Len(t, httpContext.Requests, 1)
-		assert.Contains(t, httpContext.Requests[0].URL.String(), "/rest/api/3/webhook")
-	})
-
-	t.Run("deleteWebhook -> success", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusNoContent,
-					Body:       io.NopCloser(strings.NewReader(`{}`)),
-				},
-			},
-		}
-
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"baseUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "test-token",
-			},
-		}
-
-		err := j.HandleAction(core.IntegrationActionContext{
-			Name:        "deleteWebhook",
-			HTTP:        httpContext,
-			Integration: appCtx,
-			Parameters:  map[string]any{"webhookId": float64(123)},
-		})
-
-		require.NoError(t, err)
-		require.Len(t, httpContext.Requests, 1)
-		assert.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
-	})
-
-	t.Run("deleteWebhook -> missing webhookId", func(t *testing.T) {
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"baseUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "test-token",
-			},
-		}
-
-		err := j.HandleAction(core.IntegrationActionContext{
-			Name:        "deleteWebhook",
-			HTTP:        &contexts.HTTPContext{},
-			Integration: appCtx,
-			Parameters:  map[string]any{},
-		})
-
-		require.ErrorContains(t, err, "webhookId parameter is required")
-	})
-
-	t.Run("deleteWebhook -> invalid parameters type", func(t *testing.T) {
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"baseUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "test-token",
-			},
-		}
-
-		err := j.HandleAction(core.IntegrationActionContext{
-			Name:        "deleteWebhook",
-			HTTP:        &contexts.HTTPContext{},
-			Integration: appCtx,
-			Parameters:  "invalid",
-		})
-
-		require.ErrorContains(t, err, "invalid parameters")
-	})
-
-	t.Run("deleteAllWebhooks -> success with no webhooks", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"startAt":0,"maxResults":50,"total":0,"values":[]}`)),
-				},
-			},
-		}
-
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"baseUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "test-token",
-			},
-		}
-
-		err := j.HandleAction(core.IntegrationActionContext{
-			Name:        "deleteAllWebhooks",
-			HTTP:        httpContext,
-			Integration: appCtx,
-		})
-
-		require.NoError(t, err)
-	})
-
-	t.Run("deleteAllWebhooks -> success with existing webhooks", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"startAt":0,"maxResults":50,"total":2,"values":[{"id":1},{"id":2}]}`)),
-				},
-				{
-					StatusCode: http.StatusNoContent,
-					Body:       io.NopCloser(strings.NewReader(`{}`)),
-				},
-			},
-		}
-
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"baseUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "test-token",
-			},
-		}
-
-		err := j.HandleAction(core.IntegrationActionContext{
-			Name:        "deleteAllWebhooks",
-			HTTP:        httpContext,
-			Integration: appCtx,
-		})
-
-		require.NoError(t, err)
-		// First request: list webhooks, second request: delete webhooks
-		require.Len(t, httpContext.Requests, 2)
-		assert.Equal(t, http.MethodGet, httpContext.Requests[0].Method)
-		assert.Equal(t, http.MethodDelete, httpContext.Requests[1].Method)
-	})
-
 	t.Run("getFailedWebhooks -> success", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -454,21 +294,10 @@ func Test__Jira__Actions(t *testing.T) {
 	j := &Jira{}
 	actions := j.Actions()
 
-	require.Len(t, actions, 4)
+	require.Len(t, actions, 1)
 
-	actionNames := make([]string, len(actions))
-	for i, a := range actions {
-		actionNames[i] = a.Name
-	}
-
-	assert.Contains(t, actionNames, "listWebhooks")
-	assert.Contains(t, actionNames, "deleteWebhook")
-	assert.Contains(t, actionNames, "deleteAllWebhooks")
-	assert.Contains(t, actionNames, "getFailedWebhooks")
-
-	for _, a := range actions {
-		assert.True(t, a.UserAccessible, fmt.Sprintf("%s should be user accessible", a.Name))
-	}
+	assert.Equal(t, "getFailedWebhooks", actions[0].Name)
+	assert.True(t, actions[0].UserAccessible)
 }
 
 func Test__Jira__IntegrationInfo(t *testing.T) {
@@ -484,16 +313,8 @@ func Test__Jira__Components(t *testing.T) {
 	j := &Jira{}
 	components := j.Components()
 
-	require.Len(t, components, 3)
-
-	componentNames := make([]string, len(components))
-	for i, c := range components {
-		componentNames[i] = c.Name()
-	}
-
-	assert.Contains(t, componentNames, "jira.createIssue")
-	assert.Contains(t, componentNames, "jira.listWebhooks")
-	assert.Contains(t, componentNames, "jira.deleteWebhooks")
+	require.Len(t, components, 1)
+	assert.Equal(t, "jira.createIssue", components[0].Name())
 }
 
 func Test__Jira__Triggers(t *testing.T) {
