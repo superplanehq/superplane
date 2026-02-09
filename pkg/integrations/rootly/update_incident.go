@@ -2,15 +2,17 @@ package rootly
 
 import (
 	"fmt"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+// The identity of the component
 type UpdateIncident struct{}
 
+// The data structure for the component
 type UpdateIncidentSpec struct {
-	// Fixed: Mapstructure tag added to match JSON field
 	IncidentID string `mapstructure:"incident_id" json:"incident_id"`
 	Title      string `json:"title"`
 	Summary    string `json:"summary"`
@@ -48,46 +50,35 @@ func (u *UpdateIncident) Configuration() []configuration.Field {
 		{
 			Name:        "summary",
 			Label:       "Summary",
-			Type:        configuration.FieldTypeText,
+			Type:        configuration.FieldTypeString,
 			Description: "New summary for the incident.",
 		},
 		{
 			Name:        "severity",
 			Label:       "Severity",
 			Type:        configuration.FieldTypeIntegrationResource,
+			Resource:    "severity",
 			Description: "New severity level.",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: "severity",
-					UseNameAsValue: true,
-				},
-			},
 		},
 		{
 			Name:        "status",
 			Label:       "Status",
 			Type:        configuration.FieldTypeIntegrationResource,
+			Resource:    "status",
 			Description: "New status for the incident.",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: "status",
-					UseNameAsValue: true,
-				},
-			},
 		},
 	}
 }
 
-func (u *UpdateIncident) Execute(ctx core.ExecutionContext) error {
+func (u *UpdateIncident) Execute(ctx core.ComponentContext) (any, error) {
 	spec := UpdateIncidentSpec{}
-	err := mapstructure.Decode(ctx.Configuration, &spec)
-	if err != nil {
-		return fmt.Errorf("error decoding configuration: %v", err)
+	if err := ctx.DecodeSpec(&spec); err != nil {
+		return nil, fmt.Errorf("failed to decode spec: %w", err)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return fmt.Errorf("error creating client: %v", err)
+		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
 	incident, err := client.UpdateIncident(
@@ -98,16 +89,8 @@ func (u *UpdateIncident) Execute(ctx core.ExecutionContext) error {
 		spec.Status,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to update incident: %v", err)
+		return nil, fmt.Errorf("failed to update incident: %w", err)
 	}
 
-	return ctx.ExecutionState.Emit(
-		core.DefaultOutputChannel.Name,
-		"rootly.incident",
-		[]any{incident},
-	)
+	return incident, nil
 }
-
-// Additional required methods for the interface
-func (u *UpdateIncident) Setup(ctx core.SetupContext) error { return nil }
-func (u *UpdateIncident) Cleanup(ctx core.SetupContext) error { return nil }
