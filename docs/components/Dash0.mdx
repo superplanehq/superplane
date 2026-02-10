@@ -6,12 +6,81 @@ Connect to Dash0 to query data using Prometheus API
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Alert Event" href="#on-alert-event" description="Listen to Dash0 alert webhook events when checks fire or resolve" />
+</CardGrid>
+
 ## Actions
 
 <CardGrid>
   <LinkCard title="List Issues" href="#list-issues" description="Query Dash0 to get a list of all current issues using the metric dash0.issue.status" />
   <LinkCard title="Query Prometheus" href="#query-prometheus" description="Execute a PromQL query against Dash0 Prometheus API and return the response data" />
 </CardGrid>
+
+<a id="on-alert-event"></a>
+
+## On Alert Event
+
+The On Alert Event trigger starts a workflow when Dash0 sends an alert webhook event.
+
+### Use Cases
+
+- **Incident response**: Trigger workflows when checks fire or resolve
+- **Notification routing**: Send fired/resolved events to chat tools and ticketing systems
+- **Automation**: Branch downstream execution based on event type and severity
+
+### Configuration
+
+- **Event Types**: Choose which event types to emit (fired, resolved)
+
+### Webhook Setup
+
+After configuring this trigger, use the generated SuperPlane webhook URL as a notification channel in Dash0 alerting.
+
+### Event Data
+
+Each emitted event includes:
+- **checkId**
+- **checkName**
+- **severity**
+- **labels**
+- **summary**
+- **description**
+- **eventType** (fired or resolved)
+- **timestamp**
+- **event** (raw webhook payload)
+
+### Example Data
+
+```json
+{
+  "checkId": "check-123",
+  "checkName": "Checkout API latency",
+  "description": "p95 latency has been above 750ms for 10 minutes.",
+  "event": {
+    "check": {
+      "id": "check-123",
+      "labels": {
+        "environment": "production",
+        "service": "checkout"
+      },
+      "name": "Checkout API latency",
+      "severity": "critical"
+    },
+    "event_type": "fired"
+  },
+  "eventType": "fired",
+  "labels": {
+    "environment": "production",
+    "service": "checkout"
+  },
+  "severity": "critical",
+  "summary": "Checkout API latency is above threshold",
+  "timestamp": "2026-02-09T12:00:00Z"
+}
+```
 
 <a id="list-issues"></a>
 
@@ -149,4 +218,3 @@ Returns the Prometheus query response including:
   "type": "dash0.prometheus.response"
 }
 ```
-
