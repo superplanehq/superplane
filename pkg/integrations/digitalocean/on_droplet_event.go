@@ -153,6 +153,10 @@ func (t *OnDropletEvent) HandleAction(ctx core.TriggerActionContext) (map[string
 		return nil, fmt.Errorf("failed to parse lastPollTime: %w", err)
 	}
 
+	// Capture the poll timestamp before the API call so events that complete
+	// between the request and response are not permanently missed.
+	now := time.Now().UTC().Format(time.RFC3339)
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("error creating client: %v", err)
@@ -206,7 +210,6 @@ func (t *OnDropletEvent) HandleAction(ctx core.TriggerActionContext) (map[string
 		}
 	}
 
-	now := time.Now().UTC().Format(time.RFC3339)
 	err = ctx.Metadata.Set(OnDropletEventMetadata{
 		LastPollTime: now,
 	})

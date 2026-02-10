@@ -135,7 +135,7 @@ type Size struct {
 
 // ListSizes retrieves all available droplet sizes
 func (c *Client) ListSizes() ([]Size, error) {
-	url := fmt.Sprintf("%s/sizes", c.BaseURL)
+	url := fmt.Sprintf("%s/sizes?per_page=200", c.BaseURL)
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -163,7 +163,7 @@ type Image struct {
 
 // ListImages retrieves images of a given type (e.g., "distribution")
 func (c *Client) ListImages(imageType string) ([]Image, error) {
-	url := fmt.Sprintf("%s/images?type=%s", c.BaseURL, imageType)
+	url := fmt.Sprintf("%s/images?type=%s&per_page=200", c.BaseURL, imageType)
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
