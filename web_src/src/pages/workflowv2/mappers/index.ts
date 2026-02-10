@@ -107,27 +107,11 @@ import {
   eventStateRegistry as claudeEventStateRegistry,
 } from "./claude/index";
 import {
-  componentMappers as prometheusComponentMappers,
-  customFieldRenderers as prometheusCustomFieldRenderers,
-  triggerRenderers as prometheusTriggerRenderers,
-  eventStateRegistry as prometheusEventStateRegistry,
-} from "./prometheus/index";
-import {
-  componentMappers as cursorComponentMappers,
-  triggerRenderers as cursorTriggerRenderers,
-  eventStateRegistry as cursorEventStateRegistry,
-} from "./cursor/index";
-import {
   componentMappers as dockerhubComponentMappers,
   customFieldRenderers as dockerhubCustomFieldRenderers,
   triggerRenderers as dockerhubTriggerRenderers,
   eventStateRegistry as dockerhubEventStateRegistry,
 } from "./dockerhub";
-import {
-  componentMappers as grafanaComponentMappers,
-  triggerRenderers as grafanaTriggerRenderers,
-  eventStateRegistry as grafanaEventStateRegistry,
-} from "./grafana/index";
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
@@ -178,10 +162,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   openai: openaiComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
-  prometheus: prometheusComponentMappers,
-  cursor: cursorComponentMappers,
   dockerhub: dockerhubComponentMappers,
-  grafana: grafanaComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -203,10 +184,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   openai: openaiTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
-  prometheus: prometheusTriggerRenderers,
-  cursor: cursorTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
-  grafana: grafanaTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -228,6 +206,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   claude: claudeEventStateRegistry,
   aws: awsEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
+  dockerhub: dockerhubEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
@@ -253,7 +232,6 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
-  prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
 };
 
