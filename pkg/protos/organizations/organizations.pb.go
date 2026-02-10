@@ -1590,6 +1590,7 @@ type UpdateIntegrationRequest struct {
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	IntegrationId string                 `protobuf:"bytes,2,opt,name=integration_id,json=integrationId,proto3" json:"integration_id,omitempty"`
 	Configuration *_struct.Struct        `protobuf:"bytes,3,opt,name=configuration,proto3" json:"configuration,omitempty"`
+	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1643,6 +1644,13 @@ func (x *UpdateIntegrationRequest) GetConfiguration() *_struct.Struct {
 		return x.Configuration
 	}
 	return nil
+}
+
+func (x *UpdateIntegrationRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
 }
 
 type UpdateIntegrationResponse struct {
@@ -2564,11 +2572,12 @@ const file_organizations_proto_rawDesc = "" +
 	"\x16IntegrationResourceRef\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x0e\n" +
-	"\x02id\x18\x03 \x01(\tR\x02id\"\x90\x01\n" +
+	"\x02id\x18\x03 \x01(\tR\x02id\"\xa4\x01\n" +
 	"\x18UpdateIntegrationRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12%\n" +
 	"\x0eintegration_id\x18\x02 \x01(\tR\rintegrationId\x12=\n" +
-	"\rconfiguration\x18\x03 \x01(\v2\x17.google.protobuf.StructR\rconfiguration\"d\n" +
+	"\rconfiguration\x18\x03 \x01(\v2\x17.google.protobuf.StructR\rconfiguration\x12\x12\n" +
+	"\x04name\x18\x04 \x01(\tR\x04name\"d\n" +
 	"\x19UpdateIntegrationResponse\x12G\n" +
 	"\vintegration\x18\x01 \x01(\v2%.Superplane.Organizations.IntegrationR\vintegration\"Q\n" +
 	"\x18DeleteIntegrationRequest\x12\x0e\n" +
