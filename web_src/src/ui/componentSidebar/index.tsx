@@ -1139,13 +1139,13 @@ export const ComponentSidebar = ({
                     Integration Name
                     <span className="text-gray-800 ml-1">*</span>
                   </Label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">A unique name for this integration</p>
                   <Input
                     type="text"
                     value={configureIntegrationName}
                     onChange={(e) => setConfigureIntegrationName(e.target.value)}
                     placeholder="e.g., my-app-integration"
                   />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
                 </div>
 
                 {configureIntegrationDefinition?.configuration &&

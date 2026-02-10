@@ -45,90 +45,6 @@ export function Integrations({ organizationId }: IntegrationsProps) {
       organizationIntegrations.map((integration) => integration.metadata?.name?.trim()).filter(Boolean) as string[],
     );
   }, [organizationIntegrations]);
-  const connectedInstancesByProvider = useMemo(() => {
-    const groups = new Map<string, typeof organizationIntegrations>();
-
-    organizationIntegrations.forEach((integration) => {
-      const provider = integration.spec?.integrationName;
-      if (!provider) return;
-      const current = groups.get(provider) || [];
-      current.push(integration);
-      groups.set(provider, current);
-    });
-
-    return groups;
-  }, [organizationIntegrations]);
-  const integrationCatalog = useMemo(() => {
-    const catalogByProvider = new Map<
-      string,
-      {
-        providerName: string;
-        providerLabel: string;
-        integrationDef: IntegrationsIntegrationDefinition | null;
-        instances: typeof organizationIntegrations;
-      }
-    >();
-
-    availableIntegrations.forEach((integrationDef) => {
-      const providerName = integrationDef.name || "";
-      const providerLabel =
-        integrationDef.label ||
-        getIntegrationTypeDisplayName(undefined, integrationDef.name) ||
-        integrationDef.name ||
-        "Integration";
-      const instances = [...(connectedInstancesByProvider.get(providerName) || [])].sort((a, b) =>
-        (a.metadata?.name || providerLabel).localeCompare(b.metadata?.name || providerLabel),
-      );
-
-      catalogByProvider.set(providerName, {
-        providerName,
-        providerLabel,
-        integrationDef,
-        instances,
-      });
-    });
-
-    connectedInstancesByProvider.forEach((instances, providerName) => {
-      if (catalogByProvider.has(providerName)) {
-        return;
-      }
-
-      const providerLabel = getIntegrationTypeDisplayName(undefined, providerName) || providerName || "Integration";
-      const sortedInstances = [...instances].sort((a, b) =>
-        (a.metadata?.name || providerLabel).localeCompare(b.metadata?.name || providerLabel),
-      );
-
-      catalogByProvider.set(providerName, {
-        providerName,
-        providerLabel,
-        integrationDef: null,
-        instances: sortedInstances,
-      });
-    });
-
-    return [...catalogByProvider.values()].sort((a, b) => a.providerLabel.localeCompare(b.providerLabel));
-  }, [availableIntegrations, connectedInstancesByProvider]);
-  const filteredIntegrationCatalog = useMemo(() => {
-    const normalizedQuery = filterQuery.trim().toLowerCase();
-    if (!normalizedQuery) {
-      return integrationCatalog;
-    }
-
-    return integrationCatalog.filter((item) => {
-      const providerText = [item.providerLabel, item.providerName, item.integrationDef?.description]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      if (providerText.includes(normalizedQuery)) {
-        return true;
-      }
-
-      return item.instances.some((instance) =>
-        (instance.metadata?.name || instance.spec?.integrationName || "").toLowerCase().includes(normalizedQuery),
-      );
-    });
-  }, [filterQuery, integrationCatalog]);
 
   const selectedInstructions = useMemo(() => {
     return selectedIntegration?.instructions?.trim();
@@ -201,48 +117,60 @@ export function Integrations({ organizationId }: IntegrationsProps) {
 
   return (
     <div className="pt-6">
-      <div className="relative mb-4">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-400" />
-        <Input
-          type="text"
-          value={filterQuery}
-          onChange={(e) => setFilterQuery(e.target.value)}
-          placeholder="Filter integrations..."
-          className="pl-9 pr-9"
-        />
-        {filterQuery.length > 0 ? (
-          <button
-            type="button"
-            onClick={() => setFilterQuery("")}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            aria-label="Clear filter"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        ) : null}
-      </div>
-      {filteredIntegrationCatalog.length === 0 ? (
-        <div className="text-center py-12">
-          <Plug className="w-6 h-6 text-gray-800 mx-auto mb-2" />
-          <p className="text-sm text-gray-800">
-            {integrationCatalog.length === 0 ? "No integrations available." : "No integrations match your filter."}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredIntegrationCatalog.map((item) => {
-            const connectedCount = item.instances.length;
+      {/* Integrations */}
+      {organizationIntegrations.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-lg font-medium mb-4">Connected</h2>
+          <div className="space-y-4">
+            {[...organizationIntegrations]
+              .sort((a, b) =>
+                (a.metadata?.name || a.spec?.integrationName || "").localeCompare(
+                  b.metadata?.name || b.spec?.integrationName || "",
+                ),
+              )
+              .map((integration) => {
+                const integrationDefinition = availableIntegrations.find(
+                  (a) => a.name === integration.spec?.integrationName,
+                );
+                const integrationLabel =
+                  integrationDefinition?.label ||
+                  getIntegrationTypeDisplayName(undefined, integration.spec?.integrationName) ||
+                  integration.spec?.integrationName;
+                const integrationDisplayName =
+                  integration.metadata?.name ||
+                  getIntegrationTypeDisplayName(undefined, integration.spec?.integrationName) ||
+                  integration.spec?.integrationName;
+                const integrationName = integrationDefinition?.name || integration.spec?.integrationName;
+                const statusLabel = integration.status?.state
+                  ? integration.status.state.charAt(0).toUpperCase() + integration.status.state.slice(1)
+                  : "Unknown";
 
-            return (
-              <div key={item.providerName} className="bg-white border border-gray-300 dark:border-gray-700 rounded-md">
-                <div className="p-4 flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 flex h-8 w-8 items-center justify-center">
-                      <IntegrationIcon
-                        integrationName={item.providerName}
-                        iconSlug={item.integrationDef?.icon}
-                        className="w-8 h-8 text-gray-500 dark:text-gray-400"
-                      />
+                return (
+                  <div
+                    key={integration.metadata?.id}
+                    className="bg-white border border-gray-300 dark:border-gray-700 rounded-md p-4 flex items-start justify-between gap-4"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 flex h-4 w-4 items-center justify-center">
+                        <IntegrationIcon
+                          integrationName={integrationName}
+                          iconSlug={integrationDefinition?.icon}
+                          className="w-4 h-4 text-gray-500 dark:text-gray-400"
+                        />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                          {integrationDisplayName}
+                        </h3>
+                        {integrationLabel && integrationDisplayName !== integrationLabel ? (
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Type: {integrationLabel}</p>
+                        ) : null}
+                        {integrationDefinition?.description ? (
+                          <p className="mt-1 text-sm text-gray-800 dark:text-gray-400">
+                            {integrationDefinition.description}
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
                     <div>
                       <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{item.providerLabel}</h3>
@@ -253,23 +181,31 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                       ) : null}
                     </div>
                   </div>
-                  <PermissionTooltip
-                    allowed={Boolean(item.integrationDef) && (canCreateIntegrations || permissionsLoading)}
-                    message={
-                      item.integrationDef
-                        ? "You don't have permission to connect integrations."
-                        : "This integration provider is no longer available for new connections."
-                    }
-                  >
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => {
-                        if (!item.integrationDef) return;
-                        handleConnectClick(item.integrationDef);
-                      }}
-                      className="self-start"
-                      disabled={!item.integrationDef || !canCreateIntegrations}
+                );
+              })}
+          </div>
+        </div>
+      )}
+
+      {/* Available Integrations */}
+      <div>
+        <h2 className="text-lg font-medium mb-4">Available</h2>
+        <div>
+          {availableIntegrations.length === 0 ? (
+            <div className="text-center py-12">
+              <AppWindow className="w-6 h-6 text-gray-800 mx-auto mb-2" />
+              <p className="text-sm text-gray-800">No integrations available.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {[...availableIntegrations]
+                .sort((a, b) => (a.label || a.name || "").localeCompare(b.label || b.name || ""))
+                .map((app) => {
+                  const appName = app.name;
+                  return (
+                    <div
+                      key={app.name}
+                      className="bg-white border border-gray-300 dark:border-gray-700 rounded-md p-4 flex items-start justify-between gap-4"
                     >
                       {item.integrationDef ? "Connect" : "Unavailable"}
                     </Button>
