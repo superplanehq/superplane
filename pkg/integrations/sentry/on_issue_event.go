@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -127,17 +128,19 @@ func (t *OnIssueEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 		return http.StatusBadRequest, fmt.Errorf("invalid JSON: %w", err)
 	}
 
+	action := strings.TrimPrefix(payload.Action, "issue.")
+
 	var config OnIssueEventConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("decode configuration: %w", err)
 	}
-	if !slices.Contains(config.Events, payload.Action) {
+	if !slices.Contains(config.Events, action) {
 		return http.StatusOK, nil
 	}
 
-	eventType := fmt.Sprintf("sentry.issue.%s", payload.Action)
+	eventType := fmt.Sprintf("sentry.issue.%s", action)
 	out := map[string]any{
-		"action":       payload.Action,
+		"action":       action,
 		"installation": payload.Installation,
 		"issue":        payload.Data.Issue,
 		"actor":        payload.Actor,
