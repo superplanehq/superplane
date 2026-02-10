@@ -270,11 +270,14 @@ func (c *CloudAgent) Execute(ctx core.ExecutionContext) error {
 	webhookURL := fmt.Sprintf("%s/api/v1/integrations/%s/webhook", ctx.BaseURL, ctx.Integration.ID().String())
 
 	source := cloudAgentSource{}
+	autoCreatePr := spec.AutoCreatePr
+	openAsCursorGithubApp := spec.UseCursorBot
+	skipReviewerRequest := CloudAgentSkipReviewerRequest
 	target := cloudAgentTarget{
-		AutoCreatePr:          spec.AutoCreatePr,
-		OpenAsCursorGithubApp: spec.UseCursorBot,
+		AutoCreatePr:          &autoCreatePr,
+		OpenAsCursorGithubApp: &openAsCursorGithubApp,
 		BranchName:            branchName,
-		SkipReviewerRequest:   CloudAgentSkipReviewerRequest,
+		SkipReviewerRequest:   &skipReviewerRequest,
 	}
 
 	if spec.SourceMode == "pr" {
@@ -369,7 +372,11 @@ func (c *CloudAgent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	}
 	if metadata.WebhookSecret != "" {
 		signature := ctx.Headers.Get(CloudAgentWebhookSignatureHeader)
-		if signature != "" && !verifyWebhookSignature(ctx.Body, signature, metadata.WebhookSecret) {
+		if signature == "" {
+			executionCtx.Logger.Warnf("Missing webhook signature for Agent %s", payload.ID)
+			return http.StatusUnauthorized, fmt.Errorf("missing webhook signature")
+		}
+		if !verifyWebhookSignature(ctx.Body, signature, metadata.WebhookSecret) {
 			executionCtx.Logger.Warnf("Invalid webhook signature for Agent %s", payload.ID)
 			return http.StatusUnauthorized, fmt.Errorf("invalid webhook signature")
 		}

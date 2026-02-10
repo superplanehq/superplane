@@ -49,11 +49,11 @@ type cloudAgentSource struct {
 }
 
 type cloudAgentTarget struct {
-	AutoCreatePr          bool   `json:"autoCreatePr,omitempty"`
-	OpenAsCursorGithubApp bool   `json:"openAsCursorGithubApp,omitempty"`
+	AutoCreatePr          *bool  `json:"autoCreatePr,omitempty"`
+	OpenAsCursorGithubApp *bool  `json:"openAsCursorGithubApp,omitempty"`
 	BranchName            string `json:"branchName,omitempty"`
 	AutoBranch            *bool  `json:"autoBranch,omitempty"`
-	SkipReviewerRequest   bool   `json:"skipReviewerRequest,omitempty"`
+	SkipReviewerRequest   *bool  `json:"skipReviewerRequest,omitempty"`
 }
 
 type cloudAgentWebhook struct {
@@ -113,9 +113,15 @@ func validateURL(urlStr string, fieldName string) error {
 		return nil
 	}
 
-	_, err := url.Parse(urlStr)
+	u, err := url.Parse(urlStr)
 	if err != nil {
 		return fmt.Errorf("%s is not a valid URL: %w", fieldName, err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("%s must be an absolute http or https URL", fieldName)
+	}
+	if u.Host == "" {
+		return fmt.Errorf("%s must include a host", fieldName)
 	}
 	return nil
 }
@@ -157,7 +163,7 @@ type CloudAgentExecutionMetadata struct {
 	Agent         *AgentMetadata  `json:"agent,omitempty" mapstructure:"agent,omitempty"`
 	Target        *TargetMetadata `json:"target,omitempty" mapstructure:"target,omitempty"`
 	Source        *SourceMetadata `json:"source,omitempty" mapstructure:"source,omitempty"`
-	WebhookSecret string          `json:"-" mapstructure:"webhookSecret,omitempty"` // Hidden from UI via json:"-"
+	WebhookSecret string `json:"webhookSecret,omitempty" mapstructure:"webhookSecret,omitempty"`
 }
 
 type AgentMetadata struct {

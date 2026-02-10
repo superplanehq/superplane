@@ -88,6 +88,7 @@ func Test__Client__LaunchAgent(t *testing.T) {
 		client, err := NewClient(httpContext, integrationCtx)
 		require.NoError(t, err)
 
+		autoCreatePr := true
 		req := cloudAgentRequest{
 			Prompt: cloudAgentPrompt{Text: "Fix the bug"},
 			Source: cloudAgentSource{
@@ -95,7 +96,7 @@ func Test__Client__LaunchAgent(t *testing.T) {
 				Ref:        "main",
 			},
 			Target: cloudAgentTarget{
-				AutoCreatePr: true,
+				AutoCreatePr: &autoCreatePr,
 				BranchName:   "cursor/agent-abc123",
 			},
 		}
