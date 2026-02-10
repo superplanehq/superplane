@@ -25,9 +25,11 @@ const PollInterval = 5 * time.Minute
 type RunPipeline struct{}
 
 type RunPipelineNodeMetadata struct {
-	ProjectID   string `json:"projectId" mapstructure:"projectId"`
-	ProjectSlug string `json:"projectSlug" mapstructure:"projectSlug"`
-	ProjectName string `json:"projectName" mapstructure:"projectName"`
+	ProjectID              string `json:"projectId" mapstructure:"projectId"`
+	ProjectSlug            string `json:"projectSlug" mapstructure:"projectSlug"`
+	ProjectName            string `json:"projectName" mapstructure:"projectName"`
+	PipelineDefinitionID   string `json:"pipelineDefinitionId" mapstructure:"pipelineDefinitionId"`
+	PipelineDefinitionName string `json:"pipelineDefinitionName" mapstructure:"pipelineDefinitionName"`
 }
 
 type RunPipelineExecutionMetadata struct {
@@ -211,8 +213,8 @@ func (t *RunPipeline) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	if metadata.ProjectSlug == config.ProjectSlug {
-		return nil
+	if strings.TrimSpace(config.PipelineDefinitionID) == "" {
+		return fmt.Errorf("pipeline definition ID is required")
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -220,22 +222,63 @@ func (t *RunPipeline) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	project, err := client.GetProject(config.ProjectSlug)
-	if err != nil {
-		return fmt.Errorf("project not found or inaccessible: %w", err)
+	// Check if project changed
+	projectChanged := metadata.ProjectSlug != config.ProjectSlug
+	var project *ProjectResponse
+	if projectChanged {
+		project, err = client.GetProject(config.ProjectSlug)
+		if err != nil {
+			return fmt.Errorf("project not found or inaccessible: %w", err)
+		}
+	} else {
+		// Use existing project ID from metadata
+		project = &ProjectResponse{
+			ID:   metadata.ProjectID,
+			Slug: metadata.ProjectSlug,
+			Name: metadata.ProjectName,
+		}
 	}
 
-	err = ctx.Metadata.Set(RunPipelineNodeMetadata{
-		ProjectID:   project.ID,
-		ProjectSlug: project.Slug,
-		ProjectName: project.Name,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to set metadata: %w", err)
+	// Check if pipeline definition changed
+	pipelineDefinitionChanged := metadata.PipelineDefinitionID != config.PipelineDefinitionID
+	var pipelineDefinitionName string
+	if pipelineDefinitionChanged || projectChanged {
+		// Fetch pipeline definitions to get the name
+		definitions, err := client.GetPipelineDefinitions(project.ID)
+		if err != nil {
+			return fmt.Errorf("failed to fetch pipeline definitions: %w", err)
+		}
+
+		// Find the matching pipeline definition
+		found := false
+		for _, def := range definitions {
+			if def.ID == config.PipelineDefinitionID {
+				pipelineDefinitionName = def.Name
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			return fmt.Errorf("pipeline definition with ID %s not found", config.PipelineDefinitionID)
+		}
+	} else {
+		// Use existing pipeline definition name from metadata
+		pipelineDefinitionName = metadata.PipelineDefinitionName
 	}
 
-	if strings.TrimSpace(config.PipelineDefinitionID) == "" {
-		return fmt.Errorf("pipeline definition ID is required")
+	// Update metadata if anything changed
+	if projectChanged || pipelineDefinitionChanged {
+		err = ctx.Metadata.Set(RunPipelineNodeMetadata{
+			ProjectID:              project.ID,
+			ProjectSlug:            project.Slug,
+			ProjectName:            project.Name,
+			PipelineDefinitionID:   config.PipelineDefinitionID,
+			PipelineDefinitionName: pipelineDefinitionName,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to set metadata: %w", err)
+		}
 	}
 
 	if !IsValidLocation(config.Location) {
