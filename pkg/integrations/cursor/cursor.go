@@ -2,6 +2,7 @@ package cursor
 
 import (
 	"fmt"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -15,8 +16,8 @@ func init() {
 type Cursor struct{}
 
 type Configuration struct {
-	CloudAgentKey string `json:"cloudAgentKey"`
-	AdminKey      string `json:"adminKey"`
+	LaunchAgentKey string `json:"launchAgentKey"`
+	AdminKey       string `json:"adminKey"`
 }
 
 func (i *Cursor) Name() string {
@@ -42,7 +43,7 @@ func (i *Cursor) Instructions() string {
 func (i *Cursor) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "cloudAgentKey",
+			Name:        "launchAgentKey",
 			Label:       "Cloud Agent API Key",
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
@@ -66,7 +67,7 @@ func (i *Cursor) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
 
-	if config.CloudAgentKey == "" && config.AdminKey == "" {
+	if config.LaunchAgentKey == "" && config.AdminKey == "" {
 		return fmt.Errorf("one of the keys is required")
 	}
 
@@ -75,8 +76,8 @@ func (i *Cursor) Sync(ctx core.SyncContext) error {
 		return err
 	}
 
-	if config.CloudAgentKey != "" {
-		if err := client.VerifyCloudAgent(); err != nil {
+	if config.LaunchAgentKey != "" {
+		if err := client.VerifyLaunchAgent(); err != nil {
 			return fmt.Errorf("cloud agent key verification failed: %w", err)
 		}
 	}
@@ -93,7 +94,7 @@ func (i *Cursor) Sync(ctx core.SyncContext) error {
 
 func (i *Cursor) Components() []core.Component {
 	return []core.Component{
-		&CloudAgent{},
+		&LaunchAgent{},
 		&GetDailyUsageData{},
 	}
 }

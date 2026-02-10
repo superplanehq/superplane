@@ -9,67 +9,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
-  <LinkCard title="Launch Cloud Agent" href="#launch-cloud-agent" description="Launches a Cursor Cloud Agent to perform coding tasks asynchronously." />
   <LinkCard title="Get Daily Usage Data" href="#get-daily-usage-data" description="Fetches daily team usage metrics from Cursor's Admin API." />
+  <LinkCard title="Launch Cloud Agent" href="#launch-cloud-agent" description="Launches a Cursor Cloud Agent to perform coding tasks asynchronously." />
 </CardGrid>
 
 ## Instructions
 
 To get your API keys, visit the [Cursor Dashboard](https://cursor.com/dashboard). You may need separate keys for Agents and Admin features.
-
-<a id="launch-cloud-agent"></a>
-
-## Launch Cloud Agent
-
-The Launch Cloud Agent component triggers a Cursor AI coding agent and waits for it to complete.
-
-### Use Cases
-
-- **Automated code generation**: Generate code from natural language prompts
-- **PR fixes**: Automatically fix issues on existing pull requests
-- **Code refactoring**: Refactor code based on instructions
-- **Feature implementation**: Implement new features from specifications
-
-### How It Works
-
-1. Launches a Cursor Cloud Agent with the specified prompt and configuration
-2. Waits for the agent to complete (monitored via webhook and polling)
-3. Routes execution based on agent result:
-   - **Passed channel**: Agent completed successfully
-   - **Failed channel**: Agent failed or encountered an error
-
-### Configuration
-
-- **Instructions**: The prompt/instruction for the agent (required)
-- **Model**: The LLM to use (Claude 3.5 Sonnet, GPT-4o, or o1-mini)
-- **Repository URL**: Full URL of the repository to work on (required if PR URL is not set)
-- **Base Branch**: Branch to start from (default: main, ignored if PR URL is set)
-- **Existing PR URL**: If set, the agent will fix this specific PR instead of creating a new branch
-- **Auto Create PR**: Whether to automatically open a Pull Request when finished
-- **Act as Cursor Bot**: If true, the PR is opened by the Cursor GitHub App
-
-### Output Channels
-
-- **Passed**: Emitted when the agent completes successfully
-- **Failed**: Emitted when the agent fails or encounters an error
-
-### Notes
-
-- Requires a valid Cursor Cloud Agent API key configured in the integration
-- The component automatically generates unique branch names to prevent collisions
-- Falls back to polling if webhook doesn't arrive
-
-### Example Output
-
-```json
-{
-  "agentId": "agent_12345",
-  "branchName": "cursor/agent-550e8400",
-  "prUrl": "https://github.com/org/repo/pull/42",
-  "status": "done",
-  "summary": "Refactored login logic."
-}
-```
 
 <a id="get-daily-usage-data"></a>
 
@@ -137,6 +83,36 @@ The output includes per-user daily metrics:
     "endDate": 1710892800000,
     "startDate": 1710720000000
   }
+}
+```
+
+<a id="launch-cloud-agent"></a>
+
+## Launch Cloud Agent
+
+The Launch Cloud Agent component triggers a Cursor AI coding agent and waits for it to complete.
+
+### Use Cases
+- **Automated code generation**: Generate code from natural language prompts
+- **PR fixes**: Automatically fix issues on existing pull requests
+- **Code refactoring**: Refactor code based on instructions
+- **Feature implementation**: Implement new features from specifications
+
+### How It Works
+1. Launches a Cursor Cloud Agent with the specified prompt and configuration
+2. Waits for the agent to complete (monitored via webhook and polling)
+3. Emits output with the agent result (success or failure)
+
+### Example Output
+
+```json
+{
+  "agentId": "agent_12345",
+  "branchName": "cursor/agent-550e8400",
+  "prUrl": "https://github.com/org/repo/pull/42",
+  "status": "done",
+  "success": true,
+  "summary": "Refactored login logic."
 }
 ```
 

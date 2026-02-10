@@ -11,7 +11,7 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__Client__VerifyCloudAgent(t *testing.T) {
+func Test__Client__VerifyLaunchAgent(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -24,14 +24,14 @@ func Test__Client__VerifyCloudAgent(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"cloudAgentKey": "test-key",
+				"launchAgentKey": "test-key",
 			},
 		}
 
 		client, err := NewClient(httpContext, integrationCtx)
 		require.NoError(t, err)
 
-		err = client.VerifyCloudAgent()
+		err = client.VerifyLaunchAgent()
 		require.NoError(t, err)
 
 		require.Len(t, httpContext.Requests, 1)
@@ -50,14 +50,14 @@ func Test__Client__VerifyCloudAgent(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"cloudAgentKey": "invalid-key",
+				"launchAgentKey": "invalid-key",
 			},
 		}
 
 		client, err := NewClient(httpContext, integrationCtx)
 		require.NoError(t, err)
 
-		err = client.VerifyCloudAgent()
+		err = client.VerifyLaunchAgent()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid or expired")
 	})
@@ -81,20 +81,20 @@ func Test__Client__LaunchAgent(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"cloudAgentKey": "test-key",
+				"launchAgentKey": "test-key",
 			},
 		}
 
 		client, err := NewClient(httpContext, integrationCtx)
 		require.NoError(t, err)
 
-		req := cloudAgentRequest{
-			Prompt: cloudAgentPrompt{Text: "Fix the bug"},
-			Source: cloudAgentSource{
+		req := launchAgentRequest{
+			Prompt: launchAgentPrompt{Text: "Fix the bug"},
+			Source: launchAgentSource{
 				Repository: "https://github.com/org/repo",
 				Ref:        "main",
 			},
-			Target: cloudAgentTarget{
+			Target: launchAgentTarget{
 				AutoCreatePr: true,
 				BranchName:   "cursor/agent-abc123",
 			},
@@ -118,7 +118,7 @@ func Test__Client__LaunchAgent(t *testing.T) {
 		client, err := NewClient(httpContext, integrationCtx)
 		require.NoError(t, err)
 
-		_, err = client.LaunchAgent(cloudAgentRequest{})
+		_, err = client.LaunchAgent(launchAgentRequest{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "Cloud Agent API key is not configured")
 	})
@@ -142,7 +142,7 @@ func Test__Client__GetAgentStatus(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"cloudAgentKey": "test-key",
+				"launchAgentKey": "test-key",
 			},
 		}
 
@@ -240,7 +240,7 @@ func Test__Client__ListModels(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"cloudAgentKey": "test-key",
+				"launchAgentKey": "test-key",
 			},
 		}
 

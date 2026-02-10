@@ -12,12 +12,12 @@ import {
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import { formatTimeAgo } from "@/utils/date";
 
-type CloudAgentMetadata = {
+type LaunchAgentMetadata = {
   agent?: { id?: string; url?: string; status?: string; summary?: string };
   target?: { prUrl?: string; branchName?: string };
 };
 
-type CloudAgentPayloadData = {
+type LaunchAgentPayloadData = {
   status?: string;
   agentId?: string;
   prUrl?: string;
@@ -31,7 +31,7 @@ function addDetail(details: Record<string, string>, key: string, value: string |
   }
 }
 
-export const cloudAgentMapper: ComponentBaseMapper = {
+export const launchAgentMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition.name ?? "cursor";
@@ -46,7 +46,7 @@ export const cloudAgentMapper: ComponentBaseMapper = {
         context.componentDefinition?.label ||
         context.componentDefinition?.name ||
         "Launch Cloud Agent",
-      eventSections: lastExecution ? cloudAgentEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? launchAgentEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -54,12 +54,12 @@ export const cloudAgentMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
-    const metadata = context.execution.metadata as CloudAgentMetadata | undefined;
+    const metadata = context.execution.metadata as LaunchAgentMetadata | undefined;
     const outputs = context.execution.outputs as
       | { passed?: OutputPayload[]; failed?: OutputPayload[]; default?: OutputPayload[] }
       | undefined;
     const payload = outputs?.passed?.[0] ?? outputs?.failed?.[0] ?? outputs?.default?.[0];
-    const data = payload?.data as CloudAgentPayloadData | undefined;
+    const data = payload?.data as LaunchAgentPayloadData | undefined;
 
     // Cloud Agent link (from metadata; API may set agent.url)
     addDetail(details, "Cloud Agent", metadata?.agent?.url);
@@ -87,7 +87,7 @@ export const cloudAgentMapper: ComponentBaseMapper = {
   },
 };
 
-function cloudAgentEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function launchAgentEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });

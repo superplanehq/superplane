@@ -27,7 +27,7 @@ func Test__Cursor__Sync(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"cloudAgentKey": "test-cloud-agent-key",
+				"launchAgentKey": "test-cloud-agent-key",
 			},
 		}
 
@@ -87,8 +87,8 @@ func Test__Cursor__Sync(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"cloudAgentKey": "test-cloud-agent-key",
-				"adminKey":      "test-admin-key",
+				"launchAgentKey": "test-cloud-agent-key",
+				"adminKey":       "test-admin-key",
 			},
 		}
 
@@ -132,7 +132,7 @@ func Test__Cursor__Sync(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"cloudAgentKey": "invalid-key",
+				"launchAgentKey": "invalid-key",
 			},
 		}
 
@@ -184,7 +184,7 @@ func Test__Cursor__Components(t *testing.T) {
 		names[i] = comp.Name()
 	}
 
-	assert.Contains(t, names, "cursor.cloudAgent")
+	assert.Contains(t, names, "cursor.launchAgent")
 	assert.Contains(t, names, "cursor.getDailyUsageData")
 }
 
@@ -203,7 +203,7 @@ func Test__Cursor__ListResources(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"cloudAgentKey": "test-key",
+				"launchAgentKey": "test-key",
 			},
 		}
 

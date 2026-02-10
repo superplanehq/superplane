@@ -15,8 +15,8 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__CloudAgent__Setup(t *testing.T) {
-	c := &CloudAgent{}
+func Test__LaunchAgent__Setup(t *testing.T) {
+	c := &LaunchAgent{}
 
 	t.Run("valid repository mode config", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
@@ -110,8 +110,8 @@ func Test__CloudAgent__Setup(t *testing.T) {
 	})
 }
 
-func Test__CloudAgent__Execute(t *testing.T) {
-	c := &CloudAgent{}
+func Test__LaunchAgent__Execute(t *testing.T) {
+	c := &LaunchAgent{}
 
 	t.Run("successful launch", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
@@ -130,7 +130,7 @@ func Test__CloudAgent__Execute(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			IntegrationID: uuid.New().String(),
 			Configuration: map[string]any{
-				"cloudAgentKey": "test-key",
+				"launchAgentKey": "test-key",
 			},
 		}
 
@@ -191,20 +191,21 @@ func Test__CloudAgent__Execute(t *testing.T) {
 	})
 }
 
-func Test__CloudAgent__HandleWebhook(t *testing.T) {
-	c := &CloudAgent{}
+func Test__LaunchAgent__HandleWebhook(t *testing.T) {
+	c := &LaunchAgent{}
 
 	t.Run("successful completion webhook", func(t *testing.T) {
-		payload := cloudAgentWebhookPayload{
+		payload := launchAgentWebhookPayload{
 			ID:      "agent-123",
 			Status:  "FINISHED",
 			PrURL:   "https://github.com/org/repo/pull/42",
 			Summary: "Fixed the bug",
 		}
 		body, _ := json.Marshal(payload)
-
+		secret := "test-secret"
+		signature := generateSignature(body, secret)
 		metadataCtx := &contexts.MetadataContext{
-			Metadata: CloudAgentExecutionMetadata{
+			Metadata: LaunchAgentExecutionMetadata{
 				Agent: &AgentMetadata{
 					ID:     "agent-123",
 					Status: "RUNNING",
@@ -212,6 +213,7 @@ func Test__CloudAgent__HandleWebhook(t *testing.T) {
 				Target: &TargetMetadata{
 					BranchName: "cursor/agent-abc123",
 				},
+				WebhookSecret: secret,
 			},
 		}
 		executionStateCtx := &contexts.ExecutionStateContext{
@@ -222,7 +224,7 @@ func Test__CloudAgent__HandleWebhook(t *testing.T) {
 
 		webhookCtx := core.WebhookRequestContext{
 			Body:    body,
-			Headers: http.Header{},
+			Headers: http.Header{LaunchAgentWebhookSignatureHeader: []string{signature}},
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return &core.ExecutionContext{
 					Metadata:       metadataCtx,
@@ -236,30 +238,33 @@ func Test__CloudAgent__HandleWebhook(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, status)
 
-		// Verify emit was called on passed channel
-		assert.Equal(t, CloudAgentPassedChannel, executionStateCtx.Channel)
-		assert.Equal(t, CloudAgentPayloadType, executionStateCtx.Type)
+		// Verify emit was called on default channel
+		assert.Equal(t, LaunchAgentDefaultChannel, executionStateCtx.Channel)
+		assert.Equal(t, LaunchAgentPayloadType, executionStateCtx.Type)
 
 		// Verify metadata was updated
-		updatedMetadata := metadataCtx.Metadata.(CloudAgentExecutionMetadata)
+		updatedMetadata := metadataCtx.Metadata.(LaunchAgentExecutionMetadata)
 		assert.Equal(t, "FINISHED", updatedMetadata.Agent.Status)
 		assert.Equal(t, "https://github.com/org/repo/pull/42", updatedMetadata.Target.PrURL)
 	})
 
 	t.Run("failed agent webhook", func(t *testing.T) {
-		payload := cloudAgentWebhookPayload{
+		secret := "test-secret"
+		payload := launchAgentWebhookPayload{
 			ID:      "agent-123",
 			Status:  "failed",
 			Summary: "Agent encountered an error",
 		}
 		body, _ := json.Marshal(payload)
+		signature := generateSignature(body, secret)
 
 		metadataCtx := &contexts.MetadataContext{
-			Metadata: CloudAgentExecutionMetadata{
+			Metadata: LaunchAgentExecutionMetadata{
 				Agent: &AgentMetadata{
 					ID:     "agent-123",
 					Status: "RUNNING",
 				},
+				WebhookSecret: secret, // ADD THIS
 			},
 		}
 		executionStateCtx := &contexts.ExecutionStateContext{
@@ -270,7 +275,7 @@ func Test__CloudAgent__HandleWebhook(t *testing.T) {
 
 		webhookCtx := core.WebhookRequestContext{
 			Body:    body,
-			Headers: http.Header{},
+			Headers: http.Header{LaunchAgentWebhookSignatureHeader: []string{signature}}, // ADD SIGNATURE
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return &core.ExecutionContext{
 					Metadata:       metadataCtx,
@@ -284,12 +289,12 @@ func Test__CloudAgent__HandleWebhook(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, status)
 
-		// Verify emit was called on failed channel
-		assert.Equal(t, CloudAgentFailedChannel, executionStateCtx.Channel)
+		// Verify emit was called on default channel
+		assert.Equal(t, LaunchAgentDefaultChannel, executionStateCtx.Channel)
 	})
 
 	t.Run("missing agent ID -> bad request", func(t *testing.T) {
-		payload := cloudAgentWebhookPayload{
+		payload := launchAgentWebhookPayload{
 			Status: "FINISHED",
 		}
 		body, _ := json.Marshal(payload)
@@ -317,17 +322,11 @@ func Test__CloudAgent__HandleWebhook(t *testing.T) {
 	})
 }
 
-func Test__CloudAgent__OutputChannels(t *testing.T) {
-	c := &CloudAgent{}
+func Test__LaunchAgent__OutputChannels(t *testing.T) {
+	c := &LaunchAgent{}
 	channels := c.OutputChannels(nil)
 
-	assert.Len(t, channels, 2)
-
-	names := make([]string, len(channels))
-	for i, ch := range channels {
-		names[i] = ch.Name
-	}
-
-	assert.Contains(t, names, CloudAgentPassedChannel)
-	assert.Contains(t, names, CloudAgentFailedChannel)
+	assert.Len(t, channels, 1)
+	assert.Equal(t, LaunchAgentDefaultChannel, channels[0].Name)
+	assert.Equal(t, "Default", channels[0].Label)
 }
