@@ -1439,7 +1439,7 @@ function CanvasContent({
   const [logSearch, setLogSearch] = useState("");
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(() => new Set());
   const [logSidebarHeight, setLogSidebarHeight] = useState(320);
-  const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(false);
+  const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
 
   useEffect(() => {
     const activeNoteId = getActiveNoteId();
@@ -2103,7 +2103,7 @@ function CanvasContent({
                 multiSelectionKeyCode: selectionKey,
               })}
             snapToGrid={isSnapToGridEnabled}
-            snapGrid={[16, 16]}
+            snapGrid={[48, 48]}
             panOnScrollSpeed={0.8}
             nodesDraggable={!isReadOnly}
             nodesConnectable={!isReadOnly && !!onEdgeCreate}
