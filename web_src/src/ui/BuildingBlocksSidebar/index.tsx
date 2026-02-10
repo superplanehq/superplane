@@ -19,6 +19,7 @@ import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import discordIcon from "@/assets/icons/integrations/discord.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
+import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
@@ -32,6 +33,7 @@ import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import digitaloceanIcon from "@/assets/icons/integrations/digitalocean.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
+import renderIcon from "@/assets/icons/integrations/render.svg";
 
 export interface BuildingBlock {
   name: string;
@@ -398,6 +400,7 @@ function CategorySection({
     digitalocean: digitaloceanIcon,
     discord: discordIcon,
     github: githubIcon,
+    gitlab: gitlabIcon,
     jira: jiraIcon,
     openai: openAiIcon,
     "open-ai": openAiIcon,
@@ -407,6 +410,7 @@ function CategorySection({
     semaphore: SemaphoreLogo,
     slack: slackIcon,
     sendgrid: sendgridIcon,
+    render: renderIcon,
     aws: {
       codeArtifact: awsIcon,
       lambda: awsLambdaIcon,
@@ -470,6 +474,7 @@ function CategorySection({
             digitalocean: digitaloceanIcon,
             discord: discordIcon,
             github: githubIcon,
+            gitlab: gitlabIcon,
             openai: openAiIcon,
             "open-ai": openAiIcon,
             claude: claudeIcon,
@@ -478,6 +483,7 @@ function CategorySection({
             semaphore: SemaphoreLogo,
             slack: slackIcon,
             sendgrid: sendgridIcon,
+            render: renderIcon,
             aws: {
               codeArtifact: awsCodeArtifactIcon,
               ecr: awsEcrIcon,
