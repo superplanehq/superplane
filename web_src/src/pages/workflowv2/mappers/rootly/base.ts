@@ -30,7 +30,7 @@ export function getDetailsForIncident(incident: Incident): Record<string, string
 
 export function getDetailsForIncidentEvent(incidentEvent: IncidentEvent): Record<string, string> {
   const details: Record<string, string> = {};
-  
+
   if (incidentEvent?.created_at) {
     details["Created At"] = new Date(incidentEvent.created_at).toLocaleString();
   }
