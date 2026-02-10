@@ -19,7 +19,7 @@ interface OnDropletEventData {
 
 export const onDropletEventTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event?.data?.data as OnDropletEventData;
+    const eventData = context.event?.data as OnDropletEventData;
     const action = eventData?.action;
     const title = `${action?.type || ""} - Droplet ${action?.resource_id || ""}`;
     const subtitle = context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
@@ -28,7 +28,7 @@ export const onDropletEventTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data?.data as OnDropletEventData;
+    const eventData = context.event?.data as OnDropletEventData;
     const action = eventData?.action;
 
     return {
