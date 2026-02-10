@@ -268,3 +268,28 @@ func (c *Client) DeleteWebhook(webhookID string) error {
 
 	return nil
 }
+
+type PipelineDefinitionResponse struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	CreatedAt   string `json:"created_at"`
+}
+
+func (c *Client) GetPipelineDefinitions(projectID string) ([]PipelineDefinitionResponse, error) {
+	url := fmt.Sprintf("%s/projects/%s/pipeline-definitions", baseURL, projectID)
+	responseBody, err := c.execRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Items []PipelineDefinitionResponse `json:"items"`
+	}
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return response.Items, nil
+}

@@ -3,9 +3,7 @@ package circleci
 import (
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/superplanehq/superplane/pkg/core"
 )
 
 func Test__RunPipeline__checkWorkflowsStatus(t *testing.T) {
@@ -79,23 +77,17 @@ func Test__RunPipeline__checkWorkflowsStatus(t *testing.T) {
 }
 
 func Test__RunPipeline__buildParameters(t *testing.T) {
-	t.Run("builds parameters with superplane metadata", func(t *testing.T) {
+	t.Run("builds parameters map", func(t *testing.T) {
 		tp := &RunPipeline{}
 		params := []Parameter{
 			{Name: "env", Value: "production"},
 			{Name: "version", Value: "1.0.0"},
 		}
 
-		mockCtx := core.ExecutionContext{
-			ID:         uuid.MustParse("00000000-0000-0000-0000-000000000123"),
-			WorkflowID: "canvas-456",
-		}
-
-		result := tp.buildParameters(mockCtx, params)
+		result := tp.buildParameters(params)
 
 		assert.Equal(t, "production", result["env"])
 		assert.Equal(t, "1.0.0", result["version"])
-		assert.Equal(t, "00000000-0000-0000-0000-000000000123", result["SUPERPLANE_EXECUTION_ID"])
-		assert.Equal(t, "canvas-456", result["SUPERPLANE_CANVAS_ID"])
+		assert.Len(t, result, 2)
 	})
 }

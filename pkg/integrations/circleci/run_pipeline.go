@@ -142,9 +142,23 @@ func (t *RunPipeline) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "pipelineDefinitionId",
-			Label:       "Pipeline definition ID",
-			Type:        configuration.FieldTypeString,
-			Description: "Find in CircleCI. Project Settings → Project Setup.",
+			Label:       "Pipeline definition",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "Select a pipeline definition from the project.",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypePipelineDefinition,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "projectSlug",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "projectSlug",
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:  "parameters",

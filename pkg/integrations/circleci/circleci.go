@@ -101,8 +101,59 @@ func (c *CircleCI) HandleAction(ctx core.IntegrationActionContext) error {
 	return nil
 }
 
+const ResourceTypePipelineDefinition = "pipeline-definition"
+
 func (c *CircleCI) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	return []core.IntegrationResource{}, nil
+	if resourceType != ResourceTypePipelineDefinition {
+		return []core.IntegrationResource{}, nil
+	}
+
+	projectID := ctx.Parameters["project_id"]
+	if projectID == "" {
+		// Try to get project_id from projectSlug if provided
+		projectSlug := ctx.Parameters["projectSlug"]
+		if projectSlug != "" {
+			client, err := NewClient(ctx.HTTP, ctx.Integration)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create client: %v", err)
+			}
+
+			project, err := client.GetProject(projectSlug)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get project: %v", err)
+			}
+			projectID = project.ID
+		}
+	}
+
+	if projectID == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %v", err)
+	}
+
+	definitions, err := client.GetPipelineDefinitions(projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list pipeline definitions: %v", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(definitions))
+	for _, def := range definitions {
+		name := def.Name
+		if name == "" {
+			name = def.ID
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypePipelineDefinition,
+			Name: name,
+			ID:   def.ID,
+		})
+	}
+
+	return resources, nil
 }
 
 func (c *CircleCI) Components() []core.Component {
