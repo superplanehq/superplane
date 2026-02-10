@@ -104,7 +104,7 @@ func Test__CloudAgent__Setup(t *testing.T) {
 			},
 			Integration: integrationCtx,
 		}
-	
+
 		err := c.Setup(setupCtx)
 		require.NoError(t, err)
 	})

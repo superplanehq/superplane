@@ -108,7 +108,6 @@ func (i *Cursor) Cleanup(ctx core.IntegrationCleanupContext) error {
 
 func (i *Cursor) HandleRequest(ctx core.HTTPRequestContext) {}
 
-
 func (i *Cursor) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	if resourceType == "model" {
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -138,8 +137,6 @@ func (i *Cursor) ListResources(resourceType string, ctx core.ListResourcesContex
 
 	return []core.IntegrationResource{}, nil
 }
-
-
 
 func (i *Cursor) Actions() []core.Action {
 	return []core.Action{}
