@@ -26,6 +26,11 @@ import {
   customFieldRenderers as githubCustomFieldRenderers,
 } from "./github/index";
 import {
+  componentMappers as gitlabComponentMappers,
+  triggerRenderers as gitlabTriggerRenderers,
+  eventStateRegistry as gitlabEventStateRegistry,
+} from "./gitlab/index";
+import {
   componentMappers as pagerdutyComponentMappers,
   triggerRenderers as pagerdutyTriggerRenderers,
   eventStateRegistry as pagerdutyEventStateRegistry,
@@ -65,6 +70,11 @@ import {
   triggerRenderers as sendgridTriggerRenderers,
   eventStateRegistry as sendgridEventStateRegistry,
 } from "./sendgrid";
+import {
+  componentMappers as renderComponentMappers,
+  triggerRenderers as renderTriggerRenderers,
+  eventStateRegistry as renderEventStateRegistry,
+} from "./render";
 import {
   componentMappers as rootlyComponentMappers,
   triggerRenderers as rootlyTriggerRenderers,
@@ -127,6 +137,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   cloudflare: cloudflareComponentMappers,
   semaphore: semaphoreComponentMappers,
   github: githubComponentMappers,
+  gitlab: gitlabComponentMappers,
   pagerduty: pagerdutyComponentMappers,
   dash0: dash0ComponentMappers,
   daytona: daytonaComponentMappers,
@@ -134,6 +145,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   slack: slackComponentMappers,
   smtp: smtpComponentMappers,
   sendgrid: sendgridComponentMappers,
+  render: renderComponentMappers,
   rootly: rootlyComponentMappers,
   aws: awsComponentMappers,
   discord: discordComponentMappers,
@@ -145,6 +157,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   cloudflare: cloudflareTriggerRenderers,
   semaphore: semaphoreTriggerRenderers,
   github: githubTriggerRenderers,
+  gitlab: gitlabTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
   dash0: dash0TriggerRenderers,
   daytona: daytonaTriggerRenderers,
@@ -152,6 +165,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   slack: slackTriggerRenderers,
   smtp: smtpTriggerRenderers,
   sendgrid: sendgridTriggerRenderers,
+  render: renderTriggerRenderers,
   rootly: rootlyTriggerRenderers,
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
@@ -170,11 +184,13 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   slack: slackEventStateRegistry,
   smtp: smtpEventStateRegistry,
   sendgrid: sendgridEventStateRegistry,
+  render: renderEventStateRegistry,
   discord: discordEventStateRegistry,
   rootly: rootlyEventStateRegistry,
   openai: openaiEventStateRegistry,
   claude: claudeEventStateRegistry,
   aws: awsEventStateRegistry,
+  gitlab: gitlabEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {

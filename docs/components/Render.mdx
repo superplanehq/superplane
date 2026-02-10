@@ -1,0 +1,173 @@
+---
+title: "Render"
+---
+
+Deploy and manage Render services, and react to Render deploy/build events
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Build" href="#on-build" description="Listen to Render build events for a service" />
+  <LinkCard title="On Deploy" href="#on-deploy" description="Listen to Render deploy events for a service" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Deploy" href="#deploy" description="Trigger a deploy for a Render service and wait for it to complete" />
+</CardGrid>
+
+## Instructions
+
+1. **API Key:** Create it in [Render Account Settings -> API Keys](https://dashboard.render.com/u/settings#api-keys).
+2. **Workspace (optional):** Use your Render workspace ID (`usr-...` or `tea-...`) or workspace name. Leave empty to use the first workspace available to the API key.
+3. **Workspace Plan:** Select **Professional** or **Organization / Enterprise** (used to choose webhook strategy).
+4. **Auth:** SuperPlane sends requests to [Render API v1](https://api.render.com/v1/) using `Authorization: Bearer <API_KEY>`.
+5. **Webhooks:** SuperPlane configures Render webhooks automatically via the [Render Webhooks API](https://render.com/docs/webhooks). No manual setup is required.
+6. **Troubleshooting:** Check [Render Dashboard -> Integrations -> Webhooks](https://dashboard.render.com/) and the [Render webhook docs](https://render.com/docs/webhooks).
+
+Note: **Plan requirement:** Render webhooks require a Professional plan or higher.
+
+<a id="on-build"></a>
+
+## On Build
+
+The On Build trigger emits build-related Render events for one selected service.
+
+### Use Cases
+
+- **Build failure alerts**: Notify your team when builds fail
+- **Build success hooks**: Trigger follow-up automation after successful builds
+
+### Configuration
+
+- **Service**: Required Render service.
+- **Event Types**: Build event states to listen for. Defaults to `build_ended`.
+
+### Webhook Verification
+
+Render webhooks are validated using the secret generated when SuperPlane creates the webhook via the Render API. Verification checks:
+- `webhook-id`
+- `webhook-timestamp`
+- `webhook-signature` (`v1,<base64-signature>`)
+
+### Event Data
+
+The default output emits payload data fields like `buildId`, `eventId`, `serviceId`, `serviceName`, and `status` (when present).
+
+### Example Data
+
+```json
+{
+  "data": {
+    "buildId": "bld-cukouhrtq21c73e9scng",
+    "createdAt": "2026-02-05T16:00:00.000000Z",
+    "eventId": "evj-cukouhrtq21c73e9scng",
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "serviceName": "backend-api",
+    "status": "failed"
+  },
+  "timestamp": "2026-02-05T16:00:01.000000Z",
+  "type": "render.build.ended"
+}
+```
+
+<a id="on-deploy"></a>
+
+## On Deploy
+
+The On Deploy trigger emits deploy-related Render events for one selected service.
+
+### Use Cases
+
+- **Deploy notifications**: Notify Slack or PagerDuty when deploys succeed/fail
+- **Post-deploy automation**: Trigger smoke tests after successful deploy completion events
+- **Release orchestration**: Trigger downstream workflows when deploy stages change
+
+### Configuration
+
+- **Service**: Required Render service.
+- **Event Types**: Deploy event states to listen for. Defaults to `deploy_ended`.
+
+### Webhook Verification
+
+Render webhooks are validated using the secret generated when SuperPlane creates the webhook via the Render API. Verification checks:
+- `webhook-id`
+- `webhook-timestamp`
+- `webhook-signature` (`v1,<base64-signature>`)
+
+### Event Data
+
+The default output emits payload data fields like `deployId`, `eventId`, `serviceId`, `serviceName`, and `status` (when present).
+
+### Example Data
+
+```json
+{
+  "data": {
+    "createdAt": "2026-02-05T16:00:00.000000Z",
+    "deployId": "dep-cukouhrtq21c73e9scng",
+    "eventId": "evj-cukouhrtq21c73e9scng",
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "serviceName": "backend-api",
+    "status": "succeeded"
+  },
+  "timestamp": "2026-02-05T16:00:01.000000Z",
+  "type": "render.deploy.ended"
+}
+```
+
+<a id="deploy"></a>
+
+## Deploy
+
+The Deploy component starts a new deploy for a Render service and waits for it to complete.
+
+### Use Cases
+
+- **Merge to deploy**: Trigger production deploys after a successful GitHub merge and CI pass
+- **Scheduled redeploys**: Redeploy staging services on schedules or external content changes
+- **Chained deploys**: Deploy service B when service A finishes successfully
+
+### How It Works
+
+1. Triggers a new deploy for the selected Render service via the Render API
+2. Waits for the deploy to complete (via deploy_ended webhook and optional polling fallback)
+3. Routes execution based on deploy outcome:
+   - **Success channel**: Deploy completed successfully
+   - **Failed channel**: Deploy failed or was cancelled
+
+### Configuration
+
+- **Service**: Render service to deploy
+- **Clear Cache**: Clear build cache before deploying
+
+### Output Channels
+
+- **Success**: Emitted when the deploy completes successfully
+- **Failed**: Emitted when the deploy fails or is cancelled
+
+### Notes
+
+- Uses the existing integration webhook for deploy_ended events (same as On Deploy trigger)
+- Falls back to polling if the webhook does not arrive
+- Requires a Render API key configured on the integration
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": "2026-02-05T16:10:00.000000Z",
+    "deployId": "dep-cukouhrtq21c73e9scng",
+    "finishedAt": "2026-02-05T16:15:00.000000Z",
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "status": "succeeded"
+  },
+  "timestamp": "2026-02-05T16:15:00.000000Z",
+  "type": "render.deploy.finished"
+}
+```
+
