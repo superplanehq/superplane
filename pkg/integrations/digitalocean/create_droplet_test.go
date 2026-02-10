@@ -63,17 +63,17 @@ func Test__CreateDroplet__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "image is required")
 	})
 
-	t.Run("invalid hostname characters -> error", func(t *testing.T) {
+	t.Run("expression name is accepted at setup time", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":   "my_droplet",
+				"name":   "{{ $.trigger.data.hostname }}",
 				"region": "nyc3",
 				"size":   "s-1vcpu-1gb",
 				"image":  "ubuntu-24-04-x64",
 			},
 		})
 
-		require.ErrorContains(t, err, "invalid droplet name")
+		require.NoError(t, err)
 	})
 
 	t.Run("valid configuration -> no error", func(t *testing.T) {

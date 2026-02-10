@@ -7,6 +7,7 @@ import {
   ExecutionDetailsContext,
   ExecutionInfo,
   NodeInfo,
+  OutputPayload,
   SubtitleContext,
 } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
@@ -31,8 +32,8 @@ export const createDropletMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    const data = context.execution.outputData as any;
-    const droplet = data?.droplet;
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+    const droplet = outputs?.default?.[0]?.data as Record<string, any> | undefined;
     if (!droplet) return {};
 
     const ip = droplet.networks?.v4?.find((n: any) => n.type === "public")?.ip_address;
