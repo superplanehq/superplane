@@ -145,18 +145,6 @@ func (d *Dash0) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (d *Dash0) CompareWebhookConfig(a, b any) (bool, error) {
-	return false, nil
-}
-
-func (d *Dash0) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	return nil, nil
-}
-
-func (d *Dash0) CleanupWebhook(ctx core.CleanupWebhookContext) error {
-	return nil
-}
-
 func (d *Dash0) Actions() []core.Action {
 	return []core.Action{}
 }
