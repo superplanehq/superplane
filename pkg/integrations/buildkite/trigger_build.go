@@ -72,32 +72,7 @@ func (r *TriggerBuild) Label() string {
 }
 
 func (r *TriggerBuild) Description() string {
-	return `Trigger a Buildkite build and wait for completion using polling mechanism
-
-This component periodically polls the Buildkite API to check build status instead of relying on webhooks.
-
-## How It Works
-
-1. **Creates Build**: Triggers a build via Buildkite API
-2. **Sets Correlation**: Stores build ID for tracking
-3. **Starts Polling**: Schedules periodic status checks
-4. **Detects Completion**: Emits to success/failure channels when build finishes
-
-## Configuration
-
-- **Organization**: Select Buildkite organization
-- **Pipeline**: Select pipeline to trigger
-- **Branch**: Git branch to build
-- **Commit**: Git commit SHA (optional, defaults to HEAD)
-- **Message**: Optional build message
-- **Environment Variables**: Optional env vars for the build
-- **Metadata**: Optional metadata for the build
-
-## Output Channels
-
-- **Passed**: Build completed successfully
-- **Failed**: Build failed, was cancelled, or was blocked
-`
+	return "Trigger a Buildkite build and wait for completion."
 }
 
 func (r *TriggerBuild) Icon() string {
