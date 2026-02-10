@@ -254,6 +254,7 @@ export const ComponentSidebar = ({
   const [createIntegrationName, setCreateIntegrationName] = useState("");
   const [createIntegrationConfig, setCreateIntegrationConfig] = useState<Record<string, unknown>>({});
   const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
+  const [configureIntegrationName, setConfigureIntegrationName] = useState("");
   // Use autocompleteExampleObj directly - current node is already filtered out upstream
   const resolvedAutocompleteExampleObj = autocompleteExampleObj ?? null;
 
@@ -327,21 +328,30 @@ export const ComponentSidebar = ({
 
   const handleCloseConfigureIntegrationDialog = useCallback(() => {
     setConfigureIntegrationId(null);
+    setConfigureIntegrationName("");
     setConfigureIntegrationConfig({});
     updateIntegrationMutation.reset();
   }, [updateIntegrationMutation]);
 
   const handleConfigureIntegrationSubmit = useCallback(async () => {
     if (!configureIntegrationId || !domainId) return;
+
+    const nextName = configureIntegrationName.trim();
+    if (!nextName) {
+      showErrorToast("Integration name is required");
+      return;
+    }
+
     try {
-      await updateIntegrationMutation.mutateAsync(configureIntegrationConfig);
+      await updateIntegrationMutation.mutateAsync({ name: nextName, configuration: configureIntegrationConfig });
       handleCloseConfigureIntegrationDialog();
     } catch (_error) {
-      showErrorToast("Failed to update configuration");
+      showErrorToast("Failed to update integration");
     }
   }, [
     configureIntegrationId,
     domainId,
+    configureIntegrationName,
     configureIntegrationConfig,
     updateIntegrationMutation,
     handleCloseConfigureIntegrationDialog,
@@ -377,6 +387,12 @@ export const ComponentSidebar = ({
       setConfigureIntegrationConfig(configureIntegration.spec.configuration);
     }
   }, [configureIntegration?.spec?.configuration]);
+
+  useEffect(() => {
+    setConfigureIntegrationName(
+      configureIntegration?.metadata?.name || configureIntegration?.spec?.integrationName || "",
+    );
+  }, [configureIntegration?.metadata?.name, configureIntegration?.spec?.integrationName]);
 
   // Seed open ids from incoming props (without closing already open ones)
   useEffect(() => {
@@ -1003,16 +1019,30 @@ export const ComponentSidebar = ({
                   className="mb-6"
                 />
               )}
-              {configureIntegrationDefinition?.configuration &&
-              configureIntegrationDefinition.configuration.length > 0 ? (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void handleConfigureIntegrationSubmit();
-                  }}
-                  className="space-y-4"
-                >
-                  {configureIntegrationDefinition.configuration.map((field: ConfigurationField) => {
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void handleConfigureIntegrationSubmit();
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <Label className="text-gray-800 dark:text-gray-100 mb-2">
+                    Integration Name
+                    <span className="text-gray-800 ml-1">*</span>
+                  </Label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">A unique name for this integration</p>
+                  <Input
+                    type="text"
+                    value={configureIntegrationName}
+                    onChange={(e) => setConfigureIntegrationName(e.target.value)}
+                    placeholder="e.g., my-app-integration"
+                  />
+                </div>
+
+                {configureIntegrationDefinition?.configuration &&
+                configureIntegrationDefinition.configuration.length > 0 ? (
+                  configureIntegrationDefinition.configuration.map((field: ConfigurationField) => {
                     if (!field.name) return null;
                     return (
                       <ConfigurationFieldRenderer
@@ -1029,43 +1059,44 @@ export const ComponentSidebar = ({
                         appInstallationId={configureIntegration.metadata?.id}
                       />
                     );
-                  })}
-                  <DialogFooter className="gap-2 sm:justify-start pt-4">
-                    <Button
-                      type="submit"
-                      color="blue"
-                      disabled={updateIntegrationMutation.isPending}
-                      className="flex items-center gap-2"
-                    >
-                      {updateIntegrationMutation.isPending ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        "Save Configuration"
-                      )}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleCloseConfigureIntegrationDialog}
-                      disabled={updateIntegrationMutation.isPending}
-                    >
-                      Cancel
-                    </Button>
-                  </DialogFooter>
-                  {updateIntegrationMutation.isError && (
-                    <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                      <p className="text-sm text-red-800 dark:text-red-200">
-                        Failed to update configuration: {getApiErrorMessage(updateIntegrationMutation.error)}
-                      </p>
-                    </div>
-                  )}
-                </form>
-              ) : (
-                <p className="text-sm text-gray-500 dark:text-gray-400">No configuration fields available.</p>
-              )}
+                  })
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No configuration fields available.</p>
+                )}
+
+                <DialogFooter className="gap-2 sm:justify-start pt-4">
+                  <Button
+                    type="submit"
+                    color="blue"
+                    disabled={updateIntegrationMutation.isPending || !configureIntegrationName.trim()}
+                    className="flex items-center gap-2"
+                  >
+                    {updateIntegrationMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save"
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCloseConfigureIntegrationDialog}
+                    disabled={updateIntegrationMutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                </DialogFooter>
+                {updateIntegrationMutation.isError && (
+                  <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                    <p className="text-sm text-red-800 dark:text-red-200">
+                      Failed to update integration: {getApiErrorMessage(updateIntegrationMutation.error)}
+                    </p>
+                  </div>
+                )}
+              </form>
             </>
           ) : null}
         </DialogContent>
