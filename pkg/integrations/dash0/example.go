@@ -25,6 +25,12 @@ var exampleOutputSendLogEventBytes []byte
 var exampleOutputSendLogEventOnce sync.Once
 var exampleOutputSendLogEvent map[string]any
 
+//go:embed example_output_get_check_details.json
+var exampleOutputGetCheckDetailsBytes []byte
+
+var exampleOutputGetCheckDetailsOnce sync.Once
+var exampleOutputGetCheckDetails map[string]any
+
 func (c *QueryPrometheus) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryPrometheusOnce, exampleOutputQueryPrometheusBytes, &exampleOutputQueryPrometheus)
 }
@@ -36,4 +42,9 @@ func (c *ListIssues) ExampleOutput() map[string]any {
 // ExampleOutput returns sample output data for Send Log Event.
 func (c *SendLogEvent) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputSendLogEventOnce, exampleOutputSendLogEventBytes, &exampleOutputSendLogEvent)
+}
+
+// ExampleOutput returns sample output data for Get Check Details.
+func (c *GetCheckDetails) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetCheckDetailsOnce, exampleOutputGetCheckDetailsBytes, &exampleOutputGetCheckDetails)
 }

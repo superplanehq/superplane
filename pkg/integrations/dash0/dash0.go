@@ -70,6 +70,7 @@ func (d *Dash0) Components() []core.Component {
 		&QueryPrometheus{},
 		&ListIssues{},
 		&SendLogEvent{},
+		&GetCheckDetails{},
 	}
 }
 
