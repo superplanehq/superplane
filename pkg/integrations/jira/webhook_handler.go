@@ -9,6 +9,10 @@ import (
 
 type JiraWebhookHandler struct{}
 
+func (h *JiraWebhookHandler) Merge(current, requested any) (any, bool, error) {
+	return current, false, nil
+}
+
 func (h *JiraWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	var configA, configB WebhookConfiguration
 
