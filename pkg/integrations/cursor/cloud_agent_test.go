@@ -94,7 +94,7 @@ func Test__CloudAgent__Setup(t *testing.T) {
 		assert.Contains(t, err.Error(), "PR URL is required")
 	})
 
-	t.Run("invalid repository URL -> error", func(t *testing.T) {
+	t.Run("repository mode with non-empty repository is accepted", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
 		setupCtx := core.SetupContext{
 			Configuration: map[string]any{
@@ -104,10 +104,9 @@ func Test__CloudAgent__Setup(t *testing.T) {
 			},
 			Integration: integrationCtx,
 		}
-
+	
 		err := c.Setup(setupCtx)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "repository URL")
+		require.NoError(t, err)
 	})
 }
 

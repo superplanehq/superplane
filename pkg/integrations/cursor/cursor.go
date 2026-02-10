@@ -9,7 +9,7 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegration("cursor", &Cursor{})
+	registry.RegisterIntegrationWithWebhookHandler("cursor", &Cursor{}, &CursorWebhookHandler{})
 }
 
 type Cursor struct{}
@@ -108,9 +108,6 @@ func (i *Cursor) Cleanup(ctx core.IntegrationCleanupContext) error {
 
 func (i *Cursor) HandleRequest(ctx core.HTTPRequestContext) {}
 
-func (i *Cursor) CompareWebhookConfig(a, b any) (bool, error) {
-	return true, nil
-}
 
 func (i *Cursor) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	if resourceType == "model" {
@@ -142,13 +139,7 @@ func (i *Cursor) ListResources(resourceType string, ctx core.ListResourcesContex
 	return []core.IntegrationResource{}, nil
 }
 
-func (i *Cursor) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	return nil, nil
-}
 
-func (i *Cursor) CleanupWebhook(ctx core.CleanupWebhookContext) error {
-	return nil
-}
 
 func (i *Cursor) Actions() []core.Action {
 	return []core.Action{}
