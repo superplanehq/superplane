@@ -1,0 +1,14 @@
+{
+  "data": {
+    "id": 5001,
+    "body": "Deployment to production completed successfully.",
+    "html_url": "https://github.com/acme/widgets/issues/42#issuecomment-5001",
+    "user": {
+      "login": "superplane-app[bot]"
+    },
+    "created_at": "2026-01-16T17:56:16Z",
+    "updated_at": "2026-01-16T17:56:16Z"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.issueComment"
+}
