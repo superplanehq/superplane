@@ -370,7 +370,6 @@ export function SettingsTab({
                 </div>
                 {selectedIntegrationFull && (
                   <>
-                    <p className="py-2 text-xs text-gray-500">Connection</p>
                     {(() => {
                       const hasIntegrationError =
                         selectedIntegrationFull.status?.state === "error" &&
@@ -378,7 +377,7 @@ export function SettingsTab({
 
                       const integrationStatusCard = (
                         <div
-                          className={`border border-gray-300 dark:border-gray-700 rounded-md bg-stripe-diagonal p-3 flex items-center justify-between gap-4 ${
+                          className={`mt-3 border border-gray-300 dark:border-gray-700 rounded-md bg-stripe-diagonal p-3 flex items-center justify-between gap-4 ${
                             selectedIntegrationFull.status?.state === "ready"
                               ? "bg-green-100 dark:bg-green-950/30"
                               : selectedIntegrationFull.status?.state === "error"
@@ -405,10 +404,10 @@ export function SettingsTab({
                             <span
                               className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                                 selectedIntegrationFull.status?.state === "ready"
-                                  ? "border border-green-950/15 bg-green-100 text-green-800 dark:border-green-950/15 dark:bg-green-900/30 dark:text-green-400"
+                                  ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
                                   : selectedIntegrationFull.status?.state === "error"
-                                    ? "border border-red-950/15 bg-red-100 text-red-800 dark:border-red-950/15 dark:bg-red-900/30 dark:text-red-400"
-                                    : "border border-orange-950/15 bg-orange-100 text-yellow-800 dark:border-orange-950/15 dark:bg-orange-950/30 dark:text-yellow-400"
+                                    ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                                    : "bg-orange-100 text-yellow-800 dark:text-yellow-900/30 dark:text-yellow-400"
                               }`}
                             >
                               {selectedIntegrationFull.status?.state
