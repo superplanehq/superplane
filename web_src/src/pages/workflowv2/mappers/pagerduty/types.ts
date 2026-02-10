@@ -67,26 +67,3 @@ export interface ListNotesResponse {
   notes: Note[];
   total: number;
 }
-
-export interface LogEntry {
-  id?: string;
-  type?: string;
-  summary?: string;
-  created_at?: string;
-  agent?: ResourceRef;
-  channel?: LogChannel;
-}
-
-export interface LogChannel {
-  type?: string;
-}
-
-export interface ListLogEntriesConfiguration {
-  incidentId?: string;
-  limit?: number;
-}
-
-export interface ListLogEntriesResponse {
-  log_entries: LogEntry[];
-  total: number;
-}

@@ -139,7 +139,6 @@ func (p *PagerDuty) Components() []core.Component {
 		&AnnotateIncident{},
 		&ListIncidents{},
 		&ListNotes{},
-		&ListLogEntries{},
 		&SnoozeIncident{},
 	}
 }
