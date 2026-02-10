@@ -160,9 +160,10 @@ func (t *OnDropletEvent) HandleAction(ctx core.TriggerActionContext) (map[string
 
 	actions, err := client.ListActions("droplet")
 	if err != nil {
-		// Re-schedule even on error so polling continues
+		// On transient API errors, reschedule the poll and return nil so the
+		// framework does not roll back the scheduled call.
 		_ = ctx.Requests.ScheduleActionCall("poll", map[string]any{}, 60*time.Second)
-		return nil, fmt.Errorf("error listing actions: %v", err)
+		return nil, nil
 	}
 
 	for _, action := range actions {

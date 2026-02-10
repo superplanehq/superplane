@@ -262,9 +262,11 @@ type DOAction struct {
 	RegionSlug   string `json:"region_slug"`
 }
 
-// ListActions retrieves actions filtered by resource type
+// ListActions retrieves actions filtered by resource type.
+// The DigitalOcean /v2/actions API does not support resource_type as a query
+// parameter, so we fetch all recent actions and filter client-side.
 func (c *Client) ListActions(resourceType string) ([]DOAction, error) {
-	url := fmt.Sprintf("%s/actions?resource_type=%s&page=1&per_page=50", c.BaseURL, resourceType)
+	url := fmt.Sprintf("%s/actions?page=1&per_page=50", c.BaseURL)
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -278,5 +280,12 @@ func (c *Client) ListActions(resourceType string) ([]DOAction, error) {
 		return nil, fmt.Errorf("error parsing response: %v", err)
 	}
 
-	return response.Actions, nil
+	filtered := make([]DOAction, 0, len(response.Actions))
+	for _, a := range response.Actions {
+		if a.ResourceType == resourceType {
+			filtered = append(filtered, a)
+		}
+	}
+
+	return filtered, nil
 }

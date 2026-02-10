@@ -112,6 +112,16 @@ func Test__OnDropletEvent__HandleAction(t *testing.T) {
 								"resource_id": 666,
 								"resource_type": "droplet",
 								"region_slug": "ams3"
+							},
+							{
+								"id": 777,
+								"status": "completed",
+								"type": "create",
+								"started_at": "` + pastTime + `",
+								"completed_at": "` + futureTime + `",
+								"resource_id": 888,
+								"resource_type": "floating_ip",
+								"region_slug": "nyc3"
 							}
 						]
 					}`)),
