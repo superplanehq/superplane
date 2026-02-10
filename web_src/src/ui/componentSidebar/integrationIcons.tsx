@@ -19,6 +19,7 @@ import smtpIcon from "@/assets/icons/integrations/smtp.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
+import dockerIcon from "@/assets/icons/integrations/docker.svg";
 
 /** Integration type name (e.g. "github") → logo src. Used for Settings tab and header. */
 export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
@@ -41,6 +42,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   smtp: smtpIcon,
   sendgrid: sendgridIcon,
   render: renderIcon,
+  dockerhub: dockerIcon,
 };
 
 /** Block name first part (e.g. "github") or compound (e.g. aws.lambda) → logo src for header. */
@@ -62,6 +64,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   slack: slackIcon,
   sendgrid: sendgridIcon,
   render: renderIcon,
+  dockerhub: dockerIcon,
   aws: {
     lambda: awsLambdaIcon,
   },

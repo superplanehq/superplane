@@ -102,6 +102,12 @@ import {
   eventStateRegistry as claudeEventStateRegistry,
 } from "./claude/index";
 import {
+  componentMappers as dockerhubComponentMappers,
+  customFieldRenderers as dockerhubCustomFieldRenderers,
+  triggerRenderers as dockerhubTriggerRenderers,
+  eventStateRegistry as dockerhubEventStateRegistry,
+} from "./dockerhub";
+import {
   componentMappers as grafanaComponentMappers,
   triggerRenderers as grafanaTriggerRenderers,
   eventStateRegistry as grafanaEventStateRegistry,
@@ -155,6 +161,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   discord: discordComponentMappers,
   openai: openaiComponentMappers,
   claude: claudeComponentMappers,
+  dockerhub: dockerhubComponentMappers,
   grafana: grafanaComponentMappers,
 };
 
@@ -176,6 +183,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   discord: discordTriggerRenderers,
   openai: openaiTriggerRenderers,
   claude: claudeTriggerRenderers,
+  dockerhub: dockerhubTriggerRenderers,
   grafana: grafanaTriggerRenderers,
 };
 
@@ -197,6 +205,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   claude: claudeEventStateRegistry,
   aws: awsEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
+  dockerhub: dockerhubEventStateRegistry,
   grafana: grafanaEventStateRegistry,
 };
 
@@ -223,6 +232,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
+  dockerhub: dockerhubCustomFieldRenderers,
 };
 
 /**
