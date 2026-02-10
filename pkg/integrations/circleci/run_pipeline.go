@@ -36,9 +36,10 @@ type RunPipelineExecutionMetadata struct {
 }
 
 type PipelineInfo struct {
-	ID        string `json:"id"`
-	Number    int    `json:"number"`
-	CreatedAt string `json:"created_at"`
+	ID          string `json:"id"`
+	Number      int    `json:"number"`
+	CreatedAt   string `json:"created_at"`
+	PipelineURL string `json:"pipeline_url"`
 }
 
 type WorkflowInfo struct {
@@ -134,9 +135,10 @@ func (t *RunPipeline) Configuration() []configuration.Field {
 			Description: "CircleCI project slug. Find in CircleCI project settings.",
 		},
 		{
-			Name:  "location",
-			Label: "Location",
-			Type:  configuration.FieldTypeGitRef,
+			Name:    "location",
+			Label:   "Location",
+			Type:    configuration.FieldTypeGitRef,
+			Default: "refs/heads/main",
 		},
 		{
 			Name:        "pipelineDefinitionId",
@@ -222,7 +224,7 @@ func (t *RunPipeline) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("pipeline definition ID is required")
 	}
 
-	if strings.TrimSpace(config.Location) == "" {
+	if IsValidLocation(config.Location) {
 		return fmt.Errorf("branch or tag is required")
 	}
 
@@ -267,9 +269,10 @@ func (t *RunPipeline) Execute(ctx core.ExecutionContext) error {
 
 	err = ctx.Metadata.Set(RunPipelineExecutionMetadata{
 		Pipeline: &PipelineInfo{
-			ID:        response.ID,
-			Number:    response.Number,
-			CreatedAt: response.CreatedAt,
+			ID:          response.ID,
+			Number:      response.Number,
+			CreatedAt:   response.CreatedAt,
+			PipelineURL: fmt.Sprintf("https://app.circleci.com/pipelines/%s/%d", spec.ProjectSlug, response.Number),
 		},
 		Workflows: []WorkflowInfo{},
 	})
@@ -534,6 +537,10 @@ func (t *RunPipeline) getTag(location string) string {
 	}
 
 	return ""
+}
+
+func IsValidLocation(location string) bool {
+	return strings.HasPrefix(location, "refs/heads/") || strings.HasPrefix(location, "refs/tags/")
 }
 
 func (t *RunPipeline) Cleanup(ctx core.SetupContext) error {

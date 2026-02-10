@@ -1,3 +1,17 @@
+import { CanvasesCanvasNodeExecution } from "@/api-client";
+import CircleCILogo from "@/assets/icons/integrations/circleci.svg";
+import {
+  ComponentBaseProps,
+  ComponentBaseSpec,
+  DEFAULT_EVENT_STATE_MAP,
+  EventSection,
+  EventState,
+  EventStateMap,
+} from "@/ui/componentBase";
+import { MetadataItem } from "@/ui/metadataList";
+import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { formatTimeAgo } from "@/utils/date";
+import { getTriggerRenderer } from "..";
 import {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -9,20 +23,6 @@ import {
   StateFunction,
   SubtitleContext,
 } from "../types";
-import {
-  ComponentBaseProps,
-  ComponentBaseSpec,
-  DEFAULT_EVENT_STATE_MAP,
-  EventSection,
-  EventState,
-  EventStateMap,
-} from "@/ui/componentBase";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { MetadataItem } from "@/ui/metadataList";
-import { getTriggerRenderer } from "..";
-import CircleCILogo from "@/assets/icons/integrations/circleci.svg";
-import { formatTimeAgo } from "@/utils/date";
-import { CanvasesCanvasNodeExecution } from "@/api-client";
 
 export const RUN_PIPELINE_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
@@ -141,7 +141,6 @@ export const runPipelineMapper: ComponentBaseMapper = {
     }
 
     const pipeline = sourceData.pipeline as Record<string, any> | undefined;
-    const workflows = sourceData.workflows as Array<Record<string, any>> | undefined;
 
     const addDetail = (key: string, value?: string) => {
       if (value) {
@@ -153,17 +152,7 @@ export const runPipelineMapper: ComponentBaseMapper = {
     addDetail("Finished At", formatDate(context.execution.updatedAt));
     addDetail("Pipeline Number", pipeline?.number?.toString());
     addDetail("Pipeline ID", pipeline?.id);
-
-    if (workflows && workflows.length > 0) {
-      details["Workflows"] = {
-        __type: "circleCIWorkflows",
-        workflows: workflows.map((w) => ({
-          name: w.name as string | undefined,
-          status: w.status as string | undefined,
-          id: w.id as string | undefined,
-        })),
-      };
-    }
+    addDetail("Pipeline URL", pipeline?.pipeline_url);
 
     return details;
   },
