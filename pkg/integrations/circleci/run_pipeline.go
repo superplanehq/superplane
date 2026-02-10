@@ -267,18 +267,16 @@ func (t *RunPipeline) Setup(ctx core.SetupContext) error {
 		pipelineDefinitionName = metadata.PipelineDefinitionName
 	}
 
-	// Update metadata if anything changed
-	if projectChanged || pipelineDefinitionChanged {
-		err = ctx.Metadata.Set(RunPipelineNodeMetadata{
-			ProjectID:              project.ID,
-			ProjectSlug:            project.Slug,
-			ProjectName:            project.Name,
-			PipelineDefinitionID:   config.PipelineDefinitionID,
-			PipelineDefinitionName: pipelineDefinitionName,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to set metadata: %w", err)
-		}
+	// Always update metadata to ensure it's current (in case it was reset or cleared)
+	err = ctx.Metadata.Set(RunPipelineNodeMetadata{
+		ProjectID:              project.ID,
+		ProjectSlug:            project.Slug,
+		ProjectName:            project.Name,
+		PipelineDefinitionID:   config.PipelineDefinitionID,
+		PipelineDefinitionName: pipelineDefinitionName,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to set metadata: %w", err)
 	}
 
 	if !IsValidLocation(config.Location) {
