@@ -1,9 +1,9 @@
 import React, { createContext, useCallback, useContext, useMemo } from "react";
-import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
-import { AuthorizationPermission, meMe, usersListUserPermissions } from "@/api-client";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { AuthorizationPermission, usersListUserPermissions } from "@/api-client";
+import { useOrganizationId, withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { useMe } from "@/hooks/useMe";
 
 interface PermissionsContextType {
   permissions: AuthorizationPermission[];
@@ -30,20 +30,10 @@ interface PermissionsProviderProps {
 }
 
 export const PermissionsProvider: React.FC<PermissionsProviderProps> = ({ children }) => {
-  const { organizationId } = useParams<{ organizationId?: string }>();
+  const organizationId = useOrganizationId();
+  const { data: me, isLoading: meLoading } = useMe();
 
-  const meQuery = useQuery({
-    queryKey: ["me", organizationId],
-    queryFn: async () => {
-      const response = await meMe(withOrganizationHeader());
-      return response.data || null;
-    },
-    enabled: !!organizationId,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-  });
-
-  const userId = meQuery.data?.id;
+  const userId = me?.id;
 
   const permissionsQuery = useQuery({
     queryKey: ["permissions", organizationId, userId],
@@ -84,7 +74,7 @@ export const PermissionsProvider: React.FC<PermissionsProviderProps> = ({ childr
     [permissionSet],
   );
 
-  const isLoading = meQuery.isLoading || permissionsQuery.isLoading;
+  const isLoading = meLoading || permissionsQuery.isLoading;
 
   return (
     <PermissionsContext.Provider value={{ permissions, isLoading, canAct }}>{children}</PermissionsContext.Provider>
