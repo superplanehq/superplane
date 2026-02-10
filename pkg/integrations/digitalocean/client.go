@@ -72,10 +72,10 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 
 // Account represents a DigitalOcean account
 type Account struct {
-	Email       string `json:"email"`
-	UUID        string `json:"uuid"`
-	Status      string `json:"status"`
-	DropletLimit int   `json:"droplet_limit"`
+	Email        string `json:"email"`
+	UUID         string `json:"uuid"`
+	Status       string `json:"status"`
+	DropletLimit int    `json:"droplet_limit"`
 }
 
 // GetAccount validates the API token by fetching account info
@@ -125,12 +125,12 @@ func (c *Client) ListRegions() ([]Region, error) {
 
 // Size represents a DigitalOcean droplet size
 type Size struct {
-	Slug        string  `json:"slug"`
-	Memory      int     `json:"memory"`
-	VCPUs       int     `json:"vcpus"`
-	Disk        int     `json:"disk"`
+	Slug         string  `json:"slug"`
+	Memory       int     `json:"memory"`
+	VCPUs        int     `json:"vcpus"`
+	Disk         int     `json:"disk"`
 	PriceMonthly float64 `json:"price_monthly"`
-	Available   bool    `json:"available"`
+	Available    bool    `json:"available"`
 }
 
 // ListSizes retrieves all available droplet sizes
@@ -192,17 +192,17 @@ type CreateDropletRequest struct {
 
 // Droplet represents a DigitalOcean droplet
 type Droplet struct {
-	ID       int              `json:"id"`
-	Name     string           `json:"name"`
-	Memory   int              `json:"memory"`
-	VCPUs    int              `json:"vcpus"`
-	Disk     int              `json:"disk"`
-	Status   string           `json:"status"`
-	Region   DropletRegion    `json:"region"`
-	Image    DropletImage     `json:"image"`
-	SizeSlug string           `json:"size_slug"`
-	Networks DropletNetworks  `json:"networks"`
-	Tags     []string         `json:"tags"`
+	ID       int             `json:"id"`
+	Name     string          `json:"name"`
+	Memory   int             `json:"memory"`
+	VCPUs    int             `json:"vcpus"`
+	Disk     int             `json:"disk"`
+	Status   string          `json:"status"`
+	Region   DropletRegion   `json:"region"`
+	Image    DropletImage    `json:"image"`
+	SizeSlug string          `json:"size_slug"`
+	Networks DropletNetworks `json:"networks"`
+	Tags     []string        `json:"tags"`
 }
 
 type DropletRegion struct {
