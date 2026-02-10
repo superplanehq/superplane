@@ -43,14 +43,19 @@ function getNotes(execution: ExecutionInfo): Note[] {
 
 export const listNotesMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    const lastExecution = context.lastExecutions && context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+    const lastExecution =
+      context.lastExecutions && context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition?.name || "unknown";
 
     return {
       iconSrc: pdIcon,
       collapsedBackground: getBackgroundColorClass(context.componentDefinition?.color),
       collapsed: context.node?.isCollapsed ?? false,
-      title: context.node?.name || context.componentDefinition?.label || context.componentDefinition?.name || "Unnamed component",
+      title:
+        context.node?.name ||
+        context.componentDefinition?.label ||
+        context.componentDefinition?.name ||
+        "Unnamed component",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
       metadata: metadataList(context.node),
       includeEmptyState: !lastExecution,
@@ -96,11 +101,7 @@ function metadataList(node: { configuration?: unknown }): MetadataItem[] {
   return metadata;
 }
 
-function baseEventSections(
-  nodes: { id: string }[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function baseEventSections(nodes: { id: string }[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer((rootTriggerNode as any)?.trigger?.name || "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
