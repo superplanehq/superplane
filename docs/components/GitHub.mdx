@@ -26,6 +26,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitHub repository" />
   <LinkCard title="Create Issue Comment" href="#create-issue-comment" description="Add a comment to a GitHub issue or pull request" />
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitHub repository" />
+  <LinkCard title="Create Review" href="#create-review" description="Submit a pull request review on GitHub" />
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitHub repository" />
@@ -1073,6 +1074,52 @@ Returns the created release object with all release information including tag, a
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.release"
+}
+```
+
+<a id="create-review"></a>
+
+## Create Review
+
+The Create Review component submits a pull request review (approve, request changes, or comment) on a GitHub pull request.
+
+### Use Cases
+
+- **Automation**: Auto-approve when checks pass
+- **Quality gates**: Request changes when checks fail
+- **Bots**: Post review feedback
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Pull Number**: Pull request number
+- **Event**: APPROVE, REQUEST_CHANGES, or COMMENT
+- **Body**: Optional review body (required for REQUEST_CHANGES and COMMENT)
+
+### Output
+
+Emits the submitted review object including:
+- id, state, submitted_at
+- body and user
+
+### Example Output
+
+```json
+{
+  "data": {
+    "body": "LGTM. Approving after successful CI.",
+    "html_url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9001",
+    "id": 9001,
+    "state": "APPROVED",
+    "submitted_at": "2026-01-25T12:34:56Z",
+    "user": {
+      "html_url": "https://github.com/octocat",
+      "id": 1,
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-01-25T12:34:56.000000000Z",
+  "type": "github.pullRequestReview"
 }
 ```
 
