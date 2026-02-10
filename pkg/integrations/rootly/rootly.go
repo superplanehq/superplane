@@ -63,7 +63,6 @@ func (r *Rootly) Components() []core.Component {
 	return []core.Component{
 		&CreateIncident{},
 		&CreateEvent{},
-		&UpdateIncident{},
 	}
 }
 
