@@ -50,6 +50,7 @@ type Metadata struct {
 	InstallationID string            `mapstructure:"installationId" json:"installationId"`
 	State          string            `mapstructure:"state" json:"state"`
 	Owner          string            `mapstructure:"owner" json:"owner"`
+	OwnerType      string            `mapstructure:"ownerType" json:"ownerType"` // "Organization" or "User"
 	Repositories   []Repository      `mapstructure:"repositories" json:"repositories"`
 	GitHubApp      GitHubAppMetadata `mapstructure:"githubApp" json:"githubApp"`
 }
@@ -102,6 +103,7 @@ func (g *GitHub) Components() []core.Component {
 		&GetRelease{},
 		&UpdateRelease{},
 		&DeleteRelease{},
+		&GetBillingUsage{},
 	}
 }
 
@@ -396,6 +398,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Meta
 			),
 			http.StatusSeeOther,
 		)
+		return
 	}
 
 	installationID := ctx.Request.URL.Query().Get("installation_id")
@@ -423,17 +426,6 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Meta
 		return
 	}
 
-	if metadata.Owner == "" {
-		ghApp, _, err := client.Apps.Get(context.Background(), metadata.GitHubApp.Slug)
-		if err != nil {
-			ctx.Logger.Errorf("failed to get app: %v", err)
-			http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		metadata.Owner = ghApp.Owner.GetLogin()
-	}
-
 	response, _, err := client.Apps.ListRepos(context.Background(), &github.ListOptions{})
 	if err != nil {
 		ctx.Logger.Errorf("failed to list repos: %v", err)
@@ -451,13 +443,34 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Meta
 	}
 
 	metadata.Repositories = repos
+
+	// Get account type from the first repository's owner
+	// All repositories will have the same owner (the installation account)
+	if len(response.Repositories) > 0 && response.Repositories[0].Owner != nil {
+		metadata.Owner = response.Repositories[0].Owner.GetLogin()
+		metadata.OwnerType = response.Repositories[0].Owner.GetType()
+	}
+
+	// Fallback to getting app details if owner is still empty
+	if metadata.Owner == "" {
+		ghApp, _, err := client.Apps.Get(context.Background(), metadata.GitHubApp.Slug)
+		if err != nil {
+			ctx.Logger.Errorf("failed to get app: %v", err)
+			http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		metadata.Owner = ghApp.Owner.GetLogin()
+		metadata.OwnerType = ghApp.Owner.GetType()
+	}
 	metadata.State = ""
 
 	ctx.Integration.SetMetadata(metadata)
 	ctx.Integration.RemoveBrowserAction()
 	ctx.Integration.Ready()
 
-	ctx.Logger.Infof("Successfully installed GitHub App %s - installation=%s", metadata.GitHubApp.Slug, metadata.InstallationID)
+	ctx.Logger.Infof("Successfully installed GitHub App %s - installation=%s, owner=%s, ownerType=%s",
+		metadata.GitHubApp.Slug, metadata.InstallationID, metadata.Owner, metadata.OwnerType)
 	ctx.Logger.Infof("Repositories: %v", metadata.Repositories)
 
 	http.Redirect(
@@ -484,12 +497,13 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 		"public": false,
 		"url":    "https://superplane.com",
 		"default_permissions": map[string]string{
-			"issues":           "write",
-			"actions":          "write",
-			"contents":         "write",
-			"pull_requests":    "write",
-			"repository_hooks": "write",
-			"statuses":         "write",
+			"issues":                      "write",
+			"actions":                     "write",
+			"contents":                    "write",
+			"pull_requests":               "write",
+			"repository_hooks":            "write",
+			"statuses":                    "write",
+			"organization_administration": "read",
 		},
 		"setup_url":    fmt.Sprintf(`%s/api/v1/integrations/%s/setup`, ctx.BaseURL, ctx.Integration.ID().String()),
 		"redirect_url": fmt.Sprintf(`%s/api/v1/integrations/%s/redirect`, ctx.BaseURL, ctx.Integration.ID().String()),
