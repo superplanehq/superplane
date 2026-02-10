@@ -1,22 +1,23 @@
-import {
-  ComponentsNode,
-  ComponentsComponent,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import { getBackgroundColorClass } from "@/utils/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
-import { ComponentBaseMapper, OutputPayload } from "../types";
-import { MetadataItem } from "@/ui/metadataList";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
+import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import { MetadataItem } from "@/ui/metadataList";
+import { getBackgroundColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
+import { getState, getStateMap, getTriggerRenderer } from "..";
+import {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  OutputPayload,
+  SubtitleContext,
+} from "../types";
 import { ListLogEntriesResponse, LogEntry } from "./types";
 
 /**
  * Extracts the first payload from execution outputs.
  */
-function getFirstPayload(execution: CanvasesCanvasNodeExecution): OutputPayload | null {
+function getFirstPayload(execution: ExecutionInfo): OutputPayload | null {
   const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
   if (!outputs) return null;
 
@@ -30,7 +31,7 @@ function getFirstPayload(execution: CanvasesCanvasNodeExecution): OutputPayload 
 /**
  * Extracts log entries from the execution payload.
  */
-function getLogEntries(execution: CanvasesCanvasNodeExecution): LogEntry[] {
+function getLogEntries(execution: ExecutionInfo): LogEntry[] {
   const payload = getFirstPayload(execution);
   if (!payload || !payload.data) return [];
 
@@ -41,31 +42,25 @@ function getLogEntries(execution: CanvasesCanvasNodeExecution): LogEntry[] {
 }
 
 export const listLogEntriesMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    _?: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
-    const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition.name || node.component?.name || "unknown";
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const lastExecution = context.lastExecutions && context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+    const componentName = context.componentDefinition?.name || "unknown";
 
     return {
       iconSrc: pdIcon,
-      collapsedBackground: getBackgroundColorClass(componentDefinition.color),
-      collapsed: node.isCollapsed,
-      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
-      eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
-      metadata: metadataList(node),
+      collapsedBackground: getBackgroundColorClass(context.componentDefinition?.color),
+      collapsed: context.node?.isCollapsed ?? false,
+      title: context.node?.name || context.componentDefinition?.label || context.componentDefinition?.name || "Unnamed component",
+      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
+      metadata: metadataList(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
   },
 
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    const timeAgo = formatTimeAgo(new Date(execution.createdAt!));
-    const logEntries = getLogEntries(execution);
+  subtitle(context: SubtitleContext): string {
+    const timeAgo = formatTimeAgo(new Date(context.execution.createdAt!));
+    const logEntries = getLogEntries(context.execution);
 
     if (logEntries.length > 0) {
       return `${logEntries.length} log entr${logEntries.length === 1 ? "y" : "ies"} · ${timeAgo}`;
@@ -74,23 +69,24 @@ export const listLogEntriesMapper: ComponentBaseMapper = {
     return `no log entries · ${timeAgo}`;
   },
 
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _: ComponentsNode): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
     const details: Record<string, any> = {};
 
     // Add "Checked at" timestamp
-    if (execution.createdAt) {
-      details["Checked at"] = new Date(execution.createdAt).toLocaleString();
+    if (context.execution.createdAt) {
+      details["Checked at"] = new Date(context.execution.createdAt).toLocaleString();
     }
 
-    const logEntries = getLogEntries(execution);
+    const logEntries = getLogEntries(context.execution);
     details["Log Entries"] = `${logEntries.length} log entr${logEntries.length === 1 ? "y" : "ies"} fetched`;
 
     return details;
   },
 };
 
-function metadataList(node: ComponentsNode): MetadataItem[] {
+function metadataList(node: { configuration?: unknown }): MetadataItem[] {
   const metadata: MetadataItem[] = [];
+  if (!node) return metadata;
   const configuration = node.configuration as any;
 
   if (configuration.incidentId) {
@@ -105,13 +101,13 @@ function metadataList(node: ComponentsNode): MetadataItem[] {
 }
 
 function baseEventSections(
-  nodes: ComponentsNode[],
-  execution: CanvasesCanvasNodeExecution,
+  nodes: { id: string }[],
+  execution: ExecutionInfo,
   componentName: string,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const rootTriggerRenderer = getTriggerRenderer((rootTriggerNode as any)?.trigger?.name || "");
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   const logEntries = getLogEntries(execution);
   const timeAgo = formatTimeAgo(new Date(execution.createdAt!));
@@ -129,7 +125,7 @@ function baseEventSections(
       eventTitle: title,
       eventSubtitle,
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent!.id!,
+      eventId: execution.rootEvent!.id,
     },
   ];
 }
