@@ -261,6 +261,46 @@ func (c *Client) SendLogEvents(request OTLPLogsRequest) (map[string]any, error) 
 	return parsed, nil
 }
 
+// GetCheckDetails fetches check context by failed-check ID with check-rules fallback.
+func (c *Client) GetCheckDetails(checkID string, includeHistory bool) (map[string]any, error) {
+	trimmedCheckID := strings.TrimSpace(checkID)
+	if trimmedCheckID == "" {
+		return nil, fmt.Errorf("check id is required")
+	}
+
+	querySuffix := ""
+	if includeHistory {
+		querySuffix = "?include_history=true"
+	}
+
+	escapedID := url.PathEscape(trimmedCheckID)
+	requestURL := fmt.Sprintf("%s/api/alerting/failed-checks/%s%s", c.BaseURL, escapedID, querySuffix)
+
+	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil, "")
+	if err != nil {
+		if strings.Contains(err.Error(), "request got 404 code") {
+			fallbackURL := fmt.Sprintf("%s/api/alerting/check-rules/%s%s", c.BaseURL, escapedID, querySuffix)
+			responseBody, err = c.execRequest(http.MethodGet, fallbackURL, nil, "")
+			if err != nil {
+				return nil, fmt.Errorf("fallback check-rules lookup failed: %v", err)
+			}
+		} else {
+			return nil, err
+		}
+	}
+
+	parsed, err := parseJSONResponse(responseBody)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing check details response: %v", err)
+	}
+
+	if _, ok := parsed["checkId"]; !ok {
+		parsed["checkId"] = trimmedCheckID
+	}
+
+	return parsed, nil
+}
+
 // parseJSONResponse normalizes object or array JSON responses into a map.
 func parseJSONResponse(responseBody []byte) (map[string]any, error) {
 	trimmedBody := strings.TrimSpace(string(responseBody))
