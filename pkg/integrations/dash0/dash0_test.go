@@ -150,3 +150,34 @@ func Test__Dash0__Sync(t *testing.T) {
 		assert.NotContains(t, httpContext.Requests[0].URL.String(), "/api/prometheus/api/prometheus")
 	})
 }
+
+func Test__Dash0__ListResources(t *testing.T) {
+	d := &Dash0{}
+
+	t.Run("lists synthetic check resources", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`[{"origin":"checkout-health-check","name":"Checkout Health"}]`)),
+				},
+			},
+		}
+
+		resources, err := d.ListResources("synthetic-check", core.ListResourcesContext{
+			HTTP:   httpContext,
+			Logger: nil,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken": "token123",
+					"baseURL":  "https://api.us-west-2.aws.dash0.com",
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		assert.Equal(t, "checkout-health-check", resources[0].ID)
+		assert.Equal(t, "Checkout Health", resources[0].Name)
+	})
+}
