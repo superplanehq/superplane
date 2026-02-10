@@ -91,6 +91,12 @@ import {
   triggerRenderers as claudeTriggerRenderers,
   eventStateRegistry as claudeEventStateRegistry,
 } from "./claude/index";
+import {
+  componentMappers as railwayComponentMappers,
+  triggerRenderers as railwayTriggerRenderers,
+  customFieldRenderers as railwayCustomFieldRenderers,
+  eventStateRegistry as railwayEventStateRegistry,
+} from "./railway/index";
 
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
@@ -139,6 +145,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   discord: discordComponentMappers,
   openai: openaiComponentMappers,
   claude: claudeComponentMappers,
+  railway: railwayComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -157,6 +164,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   discord: discordTriggerRenderers,
   openai: openaiTriggerRenderers,
   claude: claudeTriggerRenderers,
+  railway: railwayTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -175,6 +183,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   openai: openaiEventStateRegistry,
   claude: claudeEventStateRegistry,
   aws: awsEventStateRegistry,
+  railway: railwayEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
@@ -200,6 +209,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
+  railway: railwayCustomFieldRenderers,
 };
 
 /**

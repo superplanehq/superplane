@@ -1,0 +1,30 @@
+{
+  "type": "DEPLOY",
+  "details": {
+    "message": "Deployment succeeded"
+  },
+  "resource": {
+    "workspace": {
+      "id": "ws-abc123",
+      "name": "my-workspace"
+    },
+    "project": {
+      "id": "proj-xyz789",
+      "name": "my-project"
+    },
+    "environment": {
+      "id": "env-def456",
+      "name": "production"
+    },
+    "service": {
+      "id": "srv-ghi012",
+      "name": "api-server"
+    },
+    "deployment": {
+      "id": "deploy-jkl345",
+      "status": "SUCCESS"
+    }
+  },
+  "severity": "info",
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
