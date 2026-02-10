@@ -50,6 +50,16 @@ func Test__CreateReview__Execute__Validation(t *testing.T) {
 		})
 		require.ErrorContains(t, err, "body is required for REQUEST_CHANGES")
 	})
+
+	t.Run("body is required for comment", func(t *testing.T) {
+		err := component.Execute(core.ExecutionContext{
+			Integration:    &contexts.IntegrationContext{},
+			NodeMetadata:   &contexts.MetadataContext{},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Configuration:  map[string]any{"repository": "hello", "pullNumber": "1", "event": "COMMENT"},
+		})
+		require.ErrorContains(t, err, "body is required for COMMENT")
+	})
 }
 
 func Test__CreateReview__Setup(t *testing.T) {

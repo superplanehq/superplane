@@ -49,7 +49,7 @@ func (c *CreateReview) Documentation() string {
 - **Repository**: Select the GitHub repository
 - **Pull Number**: Pull request number
 - **Event**: APPROVE, REQUEST_CHANGES, or COMMENT
-- **Body**: Optional review body (required for REQUEST_CHANGES)
+- **Body**: Optional review body (required for REQUEST_CHANGES and COMMENT)
 
 ## Output
 
@@ -109,7 +109,7 @@ func (c *CreateReview) Configuration() []configuration.Field {
 			Name:        "body",
 			Label:       "Body",
 			Type:        configuration.FieldTypeText,
-			Description: "Review body (required for REQUEST_CHANGES).",
+			Description: "Review body (required for REQUEST_CHANGES and COMMENT).",
 		},
 	}
 }
@@ -145,8 +145,8 @@ func (c *CreateReview) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("invalid event: %s", config.Event)
 	}
 
-	if event == "REQUEST_CHANGES" && (config.Body == nil || strings.TrimSpace(*config.Body) == "") {
-		return errors.New("body is required for REQUEST_CHANGES")
+	if (event == "REQUEST_CHANGES" || event == "COMMENT") && (config.Body == nil || strings.TrimSpace(*config.Body) == "") {
+		return fmt.Errorf("body is required for %s", event)
 	}
 
 	var appMetadata Metadata
