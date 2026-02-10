@@ -2099,9 +2099,9 @@ function CanvasContent({
             {...(isSelectionModeEnabled && !isTemporarilyEnabled
               ? {}
               : {
-                selectionKeyCode: selectionKey,
-                multiSelectionKeyCode: selectionKey,
-              })}
+                  selectionKeyCode: selectionKey,
+                  multiSelectionKeyCode: selectionKey,
+                })}
             snapToGrid={isSnapToGridEnabled}
             snapGrid={[48, 48]}
             panOnScrollSpeed={0.8}

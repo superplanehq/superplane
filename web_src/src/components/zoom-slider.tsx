@@ -237,9 +237,7 @@ export function ZoomSlider({
                 <Grid3X3 className="h-3 w-3" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>
-              {isSnapToGridEnabled ? "Disable snap to grid" : "Enable snap to grid"}
-            </TooltipContent>
+            <TooltipContent>{isSnapToGridEnabled ? "Disable snap to grid" : "Enable snap to grid"}</TooltipContent>
           </Tooltip>
         )}
         {children}
