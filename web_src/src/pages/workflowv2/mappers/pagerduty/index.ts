@@ -7,6 +7,7 @@ import { updateIncidentMapper } from "./update_incident";
 import { annotateIncidentMapper } from "./annotate_incident";
 import { listIncidentsMapper, LIST_INCIDENTS_STATE_REGISTRY } from "./list_incidents";
 import { listNotesMapper } from "./list_notes";
+import { listLogEntriesMapper } from "./list_log_entries";
 import { snoozeIncidentMapper } from "./snooze_incident";
 import { buildActionStateRegistry } from "../utils";
 
@@ -16,6 +17,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   annotateIncident: annotateIncidentMapper,
   listIncidents: listIncidentsMapper,
   listNotes: listNotesMapper,
+  listLogEntries: listLogEntriesMapper,
   snoozeIncident: snoozeIncidentMapper,
 };
 
@@ -31,5 +33,6 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   annotateIncident: buildActionStateRegistry("annotated"),
   listIncidents: LIST_INCIDENTS_STATE_REGISTRY,
   listNotes: buildActionStateRegistry("listed"),
+  listLogEntries: buildActionStateRegistry("listed"),
   snoozeIncident: buildActionStateRegistry("snoozed"),
 };
