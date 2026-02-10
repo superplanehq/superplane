@@ -129,6 +129,11 @@ func (s *OrganizationService) CreateIntegration(ctx context.Context, req *pb.Cre
 
 func (s *OrganizationService) UpdateIntegration(ctx context.Context, req *pb.UpdateIntegrationRequest) (*pb.UpdateIntegrationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	configuration := map[string]any{}
+	if req.Configuration != nil {
+		configuration = req.Configuration.AsMap()
+	}
+
 	return organizations.UpdateIntegration(
 		ctx,
 		s.registry,
@@ -137,7 +142,8 @@ func (s *OrganizationService) UpdateIntegration(ctx context.Context, req *pb.Upd
 		s.webhooksBaseURL,
 		orgID,
 		req.IntegrationId,
-		req.Configuration.AsMap(),
+		configuration,
+		req.Name,
 	)
 }
 
