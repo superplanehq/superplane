@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { resolveIcon } from "@/lib/utils";
-import { Check, Copy, Loader2, X } from "lucide-react";
+import { Check, Copy, Loader2, TriangleAlert, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getHeaderIconSrc, IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import {
@@ -1012,6 +1012,12 @@ export const ComponentSidebar = ({
                   </DialogTitle>
                 </div>
               </DialogHeader>
+              {configureIntegration.status?.state === "error" && configureIntegration.status?.stateDescription && (
+                <div className="flex items-start gap-2 text-sm text-red-700 dark:text-red-300">
+                  <TriangleAlert className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <p>{configureIntegration.status.stateDescription}</p>
+                </div>
+              )}
               {configureIntegration?.status?.browserAction && (
                 <IntegrationInstructions
                   description={configureIntegration.status.browserAction.description}
