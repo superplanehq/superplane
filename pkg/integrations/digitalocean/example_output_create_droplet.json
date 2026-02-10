@@ -1,5 +1,5 @@
 {
-  "droplet": {
+  "data": {
     "id": 98765432,
     "name": "my-droplet",
     "memory": 1024,
