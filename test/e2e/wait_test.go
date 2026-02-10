@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -18,7 +17,6 @@ func TestWaitComponent(t *testing.T) {
 	steps := &WaitSteps{t: t}
 
 	t.Run("configure Wait for seconds", func(t *testing.T) {
-		steps.t = t
 		steps.start()
 		steps.givenACanvasExists("Wait Seconds")
 		steps.addWaitWithDuration(10, "Seconds")
@@ -26,7 +24,6 @@ func TestWaitComponent(t *testing.T) {
 	})
 
 	t.Run("configure Wait for minutes", func(t *testing.T) {
-		steps.t = t
 		steps.start()
 		steps.givenACanvasExists("Wait Minutes")
 		steps.addWaitWithDuration(5, "Minutes")
@@ -34,7 +31,6 @@ func TestWaitComponent(t *testing.T) {
 	})
 
 	t.Run("configure Wait for hours", func(t *testing.T) {
-		steps.t = t
 		steps.start()
 		steps.givenACanvasExists("Wait Hours")
 		steps.addWaitWithDuration(2, "Hours")
@@ -42,7 +38,6 @@ func TestWaitComponent(t *testing.T) {
 	})
 
 	t.Run("push through the wait item", func(t *testing.T) {
-		steps.t = t
 		steps.start()
 		steps.givenACanvasWithManualTriggerWaitAndOutput()
 		steps.runManualTrigger()
@@ -91,9 +86,7 @@ func (s *WaitSteps) givenACanvasWithManualTriggerWaitAndOutput() {
 
 	s.canvas.Create()
 	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
-	// Keep the wait long enough that it doesn't finish naturally on slower CI runs
-	// before we can perform the "push through" action.
-	s.canvas.AddWait("Wait", models.Position{X: 1000, Y: 200}, 60, "Seconds")
+	s.canvas.AddWait("Wait", models.Position{X: 1000, Y: 200}, 10, "Seconds")
 	s.canvas.AddNoop("Output", models.Position{X: 1400, Y: 200})
 
 	s.canvas.Connect("Start", "Wait")
@@ -110,35 +103,24 @@ func (s *WaitSteps) runManualTrigger() {
 			models.CanvasNodeExecutionStatePending,
 			models.CanvasNodeExecutionStateStarted,
 		},
-		30*time.Second,
+		10*time.Second,
 	)
 }
 
 func (s *WaitSteps) openSidebarForNode(node string) {
-	// The node header test id is derived from the node's title and can appear in
-	// multiple places in the DOM. Prefer the visible element to avoid hidden
-	// duplicates (e.g. in sidebar/settings templates).
-	nodeSlug := strings.ToLower(node)
-	nodeSlug = strings.ReplaceAll(nodeSlug, " ", "-")
-	header := q.Locator(`[data-testid="node-` + nodeSlug + `-header"]:visible`)
+	header := q.TestID("node", node, "header")
 	s.session.AssertVisible(header)
 	s.session.Click(header)
 }
 
 func (s *WaitSteps) pushThroughFirstItemFromSidebar() {
 	eventItem := q.Locator(`[data-testid="sidebar-event-item"][data-event-state="running"]`)
-	s.session.AssertVisible(eventItem)
 	s.session.HoverOver(eventItem)
-
-	actionsBtn := q.Locator(`[data-testid="sidebar-event-item"][data-event-state="running"] button[aria-label="Open actions"]`)
-	s.session.AssertVisible(actionsBtn)
-	s.session.Click(actionsBtn)
-
-	pushThrough := q.TestID("push-through-item")
-	s.session.AssertVisible(pushThrough)
-	s.session.Click(pushThrough)
-
-	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 45*time.Second)
+	s.session.Sleep(300) // Wait for hover to register and actions button to appear
+	s.session.Click(q.Locator(`[data-testid="sidebar-event-item"][data-event-state="running"] button[aria-label="Open actions"]`))
+	s.session.Sleep(300) // Wait for actions menu to open
+	s.session.Click(q.TestID("push-through-item"))
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 15*time.Second)
 }
 
 func (s *WaitSteps) assertWaitExecutionFinishedAndOutputNodeProcessed() {
