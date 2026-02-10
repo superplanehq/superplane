@@ -1,6 +1,7 @@
 package newrelic
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/mitchellh/mapstructure"
@@ -86,7 +87,10 @@ func (n *NewRelic) Configuration() []configuration.Field {
 }
 
 func (n *NewRelic) Components() []core.Component {
-	return []core.Component{}
+	return []core.Component{
+		&ReportMetric{},
+		&RunNRQLQuery{},
+	}
 }
 
 func (n *NewRelic) Triggers() []core.Trigger {
@@ -106,8 +110,9 @@ func (n *NewRelic) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("API key is required")
 	}
 
-	if config.Site == "" {
-		return fmt.Errorf("site is required")
+	// Default to US region if not specified or not EU
+	if config.Site != "EU" {
+		config.Site = "US"
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -115,13 +120,16 @@ func (n *NewRelic) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	accounts, err := client.ListAccounts()
+	// Validate API key using NerdGraph (GraphQL) identity query
+	// This follows the same pattern as other integrations (AWS, GitHub)
+	err = client.ValidateAPIKey(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to validate API key: %w", err)
 	}
 
+	// Set empty metadata for now - we can fetch accounts later if needed
 	ctx.Integration.SetMetadata(Metadata{
-		Accounts: accounts,
+		Accounts: []Account{},
 	})
 
 	ctx.Integration.Ready()

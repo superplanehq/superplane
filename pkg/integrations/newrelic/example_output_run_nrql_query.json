@@ -1,0 +1,23 @@
+[
+    {
+        "results": [
+            {
+                "count": 1523
+            }
+        ],
+        "totalResult": null,
+        "metadata": {
+            "eventTypes": [
+                "Transaction"
+            ],
+            "facets": null,
+            "messages": [],
+            "timeWindow": {
+                "begin": 1707559740000,
+                "end": 1707563340000
+            }
+        },
+        "query": "SELECT count(*) FROM Transaction SINCE 1 hour ago",
+        "accountId": 1234567
+    }
+]

@@ -1,6 +1,7 @@
 package newrelic
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"strings"
@@ -85,19 +86,23 @@ func Test__NewRelic__Sync(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to validate API key")
 		require.Len(t, httpCtx.Requests, 1)
-		assert.Equal(t, "https://api.newrelic.com/v2/accounts.json", httpCtx.Requests[0].URL.String())
-		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+		assert.Equal(t, "https://api.newrelic.com/graphql", httpCtx.Requests[0].URL.String())
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
 		assert.Equal(t, "invalid-key", httpCtx.Requests[0].Header.Get("Api-Key"))
 	})
 
-	t.Run("valid API key -> sets ready and stores accounts", func(t *testing.T) {
+	t.Run("valid API key -> sets ready", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				jsonResponse(http.StatusOK, `{
-					"accounts": [
-						{"id": 123456, "name": "Test Account"},
-						{"id": 789012, "name": "Production Account"}
-					]
+					"data": {
+						"actor": {
+							"user": {
+								"name": "Test User",
+								"email": "test@example.com"
+							}
+						}
+					}
 				}`),
 			},
 		}
@@ -118,15 +123,9 @@ func Test__NewRelic__Sync(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, "ready", integrationCtx.State)
-
-		metadata, ok := integrationCtx.Metadata.(Metadata)
-		require.True(t, ok)
-		require.Len(t, metadata.Accounts, 2)
-		assert.Equal(t, int64(123456), metadata.Accounts[0].ID)
-		assert.Equal(t, "Test Account", metadata.Accounts[0].Name)
 		require.Len(t, httpCtx.Requests, 1)
-		assert.Equal(t, "https://api.newrelic.com/v2/accounts.json", httpCtx.Requests[0].URL.String())
-		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+		assert.Equal(t, "https://api.newrelic.com/graphql", httpCtx.Requests[0].URL.String())
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
 		assert.Equal(t, "test-api-key", httpCtx.Requests[0].Header.Get("Api-Key"))
 	})
 
@@ -268,33 +267,35 @@ func Test__Client__NewClient(t *testing.T) {
 	})
 }
 
-func Test__Client__ListAccounts(t *testing.T) {
-	t.Run("successful request -> returns accounts", func(t *testing.T) {
+func Test__Client__ValidateAPIKey(t *testing.T) {
+	t.Run("successful request -> validates successfully", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				jsonResponse(http.StatusOK, `{
-					"accounts": [
-						{"id": 123456, "name": "Test Account"}
-					]
+					"data": {
+						"actor": {
+							"user": {
+								"name": "Test User",
+								"email": "test@example.com"
+							}
+						}
+					}
 				}`),
 			},
 		}
 
 		client := &Client{
-			APIKey:  "test-key",
-			BaseURL: "https://api.newrelic.com/v2",
-			http:    httpCtx,
+			APIKey:       "test-key",
+			NerdGraphURL: "https://api.newrelic.com/graphql",
+			http:         httpCtx,
 		}
 
-		accounts, err := client.ListAccounts()
+		err := client.ValidateAPIKey(context.Background())
 
 		require.NoError(t, err)
-		require.Len(t, accounts, 1)
-		assert.Equal(t, int64(123456), accounts[0].ID)
-		assert.Equal(t, "Test Account", accounts[0].Name)
 		require.Len(t, httpCtx.Requests, 1)
-		assert.Equal(t, "https://api.newrelic.com/v2/accounts.json", httpCtx.Requests[0].URL.String())
-		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+		assert.Equal(t, "https://api.newrelic.com/graphql", httpCtx.Requests[0].URL.String())
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
 		assert.Equal(t, "test-key", httpCtx.Requests[0].Header.Get("Api-Key"))
 	})
 
@@ -311,34 +312,39 @@ func Test__Client__ListAccounts(t *testing.T) {
 		}
 
 		client := &Client{
-			APIKey:  "invalid-key",
-			BaseURL: "https://api.newrelic.com/v2",
-			http:    httpCtx,
+			APIKey:       "invalid-key",
+			NerdGraphURL: "https://api.newrelic.com/graphql",
+			http:         httpCtx,
 		}
 
-		_, err := client.ListAccounts()
+		err := client.ValidateAPIKey(context.Background())
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "Unauthorized")
 	})
 
-	t.Run("invalid JSON -> returns error", func(t *testing.T) {
+	t.Run("GraphQL errors -> returns error", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				jsonResponse(http.StatusOK, `invalid json`),
+				jsonResponse(http.StatusOK, `{
+					"errors": [
+						{"message": "Invalid API key"}
+					]
+				}`),
 			},
 		}
 
 		client := &Client{
-			APIKey:  "test-key",
-			BaseURL: "https://api.newrelic.com/v2",
-			http:    httpCtx,
+			APIKey:       "test-key",
+			NerdGraphURL: "https://api.newrelic.com/graphql",
+			http:         httpCtx,
 		}
 
-		_, err := client.ListAccounts()
+		err := client.ValidateAPIKey(context.Background())
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to decode")
+		assert.Contains(t, err.Error(), "GraphQL errors")
+		assert.Contains(t, err.Error(), "Invalid API key")
 	})
 }
 

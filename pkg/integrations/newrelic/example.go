@@ -16,3 +16,13 @@ var exampleDataOnIssue map[string]any
 func (t *OnIssue) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueOnce, exampleDataOnIssueBytes, &exampleDataOnIssue)
 }
+
+//go:embed example_output_report_metric.json
+var exampleOutputReportMetricBytes []byte
+
+var exampleOutputReportMetricOnce sync.Once
+var exampleOutputReportMetric map[string]any
+
+func (c *ReportMetric) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputReportMetricOnce, exampleOutputReportMetricBytes, &exampleOutputReportMetric)
+}

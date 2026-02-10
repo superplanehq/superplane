@@ -36,10 +36,11 @@ func (e *APIError) Error() string {
 	return e.ErrorDetails.Title
 }
 
-func parseErrorResponse(body []byte, statusCode int) error {
+func parseErrorResponse(url string, body []byte, statusCode int) error {
 	var apiErr APIError
 	if err := json.Unmarshal(body, &apiErr); err == nil && apiErr.ErrorDetails.Title != "" {
-		return &apiErr
+		return fmt.Errorf("request to %s failed: %w", url, &apiErr)
 	}
-	return fmt.Errorf("request failed with status %d: %s", statusCode, string(body))
+	// Include full URL and response body for debugging 404s and other errors
+	return fmt.Errorf("request to %s failed with status %d: %s", url, statusCode, string(body))
 }

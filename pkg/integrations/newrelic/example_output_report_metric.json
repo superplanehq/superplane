@@ -1,0 +1,10 @@
+{
+    "metricName": "server.cpu.usage",
+    "metricType": "gauge",
+    "value": 75.5,
+    "timestamp": 1707552000000,
+    "attributes": {
+        "host": "server1.example.com",
+        "environment": "production"
+    }
+}
