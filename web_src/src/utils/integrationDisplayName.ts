@@ -4,6 +4,7 @@
  */
 const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   github: "GitHub",
+  gitlab: "GitLab",
   openai: "OpenAI",
   claude: "Claude",
   pagerduty: "PagerDuty",
@@ -18,6 +19,7 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   aws: "AWS",
   smtp: "SMTP",
   sendgrid: "SendGrid",
+  dockerhub: "DockerHub",
 };
 
 /**
