@@ -147,15 +147,13 @@ Returns the created incident object including:
 ```json
 {
   "data": {
-    "incident": {
-      "id": "abc123-def456",
-      "severity": "sev1",
-      "started_at": "2026-01-19T12:00:00Z",
-      "status": "started",
-      "summary": "Users are experiencing slow database queries and connection timeouts.",
-      "title": "Database connection issues",
-      "url": "https://app.rootly.com/incidents/abc123-def456"
-    }
+    "id": "abc123-def456",
+    "severity": "sev1",
+    "started_at": "2026-01-19T12:00:00Z",
+    "status": "started",
+    "summary": "Users are experiencing slow database queries and connection timeouts.",
+    "title": "Database connection issues",
+    "url": "https://app.rootly.com/incidents/abc123-def456"
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "rootly.incident"
@@ -203,19 +201,17 @@ Returns the updated incident object including:
 ```json
 {
   "data": {
-    "incident": {
-      "id": "abc123-def456",
-      "mitigated_at": "2026-01-19T13:30:00Z",
-      "sequential_id": 42,
-      "severity": "sev1",
-      "slug": "database-connection-issues",
-      "started_at": "2026-01-19T12:00:00Z",
-      "status": "mitigated",
-      "summary": "Root cause identified. Connection pool exhausted.",
-      "title": "Database connection issues - Updated",
-      "updated_at": "2026-01-19T13:30:00Z",
-      "url": "https://app.rootly.com/incidents/abc123-def456"
-    }
+    "id": "abc123-def456",
+    "mitigated_at": "2026-01-19T13:30:00Z",
+    "sequential_id": 42,
+    "severity": "sev1",
+    "slug": "database-connection-issues",
+    "started_at": "2026-01-19T12:00:00Z",
+    "status": "mitigated",
+    "summary": "Root cause identified. Connection pool exhausted.",
+    "title": "Database connection issues - Updated",
+    "updated_at": "2026-01-19T13:30:00Z",
+    "url": "https://app.rootly.com/incidents/abc123-def456"
   },
   "timestamp": "2026-01-19T13:30:00Z",
   "type": "rootly.incident"

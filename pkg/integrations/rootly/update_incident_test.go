@@ -197,6 +197,7 @@ func Test__UpdateIncident__Execute(t *testing.T) {
 		require.NoError(t, json.Unmarshal(body, &reqBody))
 
 		data := reqBody["data"].(map[string]any)
+		assert.Equal(t, "inc-uuid-123", data["id"])
 		assert.Equal(t, "incidents", data["type"])
 
 		attrs := data["attributes"].(map[string]any)

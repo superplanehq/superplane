@@ -538,6 +538,7 @@ type UpdateIncidentRequest struct {
 }
 
 type UpdateIncidentData struct {
+	ID         string                   `json:"id"`
 	Type       string                   `json:"type"`
 	Attributes UpdateIncidentAttributes `json:"attributes"`
 }
@@ -556,6 +557,7 @@ type UpdateIncidentAttributes struct {
 func (c *Client) UpdateIncident(id string, attrs UpdateIncidentAttributes) (*Incident, error) {
 	request := UpdateIncidentRequest{
 		Data: UpdateIncidentData{
+			ID:         id,
 			Type:       "incidents",
 			Attributes: attrs,
 		},
