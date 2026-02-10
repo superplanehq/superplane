@@ -95,3 +95,9 @@ type SyntheticCheck struct {
 	Name   string `json:"name,omitempty"`
 	Origin string `json:"origin,omitempty"`
 }
+
+// UpsertCheckRuleConfiguration stores check rule upsert input.
+type UpsertCheckRuleConfiguration struct {
+	OriginOrID string `json:"originOrId" mapstructure:"originOrId"`
+	Spec       string `json:"spec" mapstructure:"spec"`
+}
