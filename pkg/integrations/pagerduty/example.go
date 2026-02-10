@@ -55,6 +55,12 @@ var exampleOutputListIncidentsBytes []byte
 var exampleOutputListIncidentsOnce sync.Once
 var exampleOutputListIncidents map[string]any
 
+//go:embed example_output_list_notes.json
+var exampleOutputListNotesBytes []byte
+
+var exampleOutputListNotesOnce sync.Once
+var exampleOutputListNotes map[string]any
+
 func (c *CreateIncident) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateIncidentOnce, exampleOutputCreateIncidentBytes, &exampleOutputCreateIncident)
 }
@@ -73,6 +79,10 @@ func (c *SnoozeIncident) ExampleOutput() map[string]any {
 
 func (l *ListIncidents) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputListIncidentsOnce, exampleOutputListIncidentsBytes, &exampleOutputListIncidents)
+}
+
+func (l *ListNotes) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputListNotesOnce, exampleOutputListNotesBytes, &exampleOutputListNotes)
 }
 
 func (t *OnIncident) ExampleData() map[string]any {

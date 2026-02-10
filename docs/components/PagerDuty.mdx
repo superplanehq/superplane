@@ -20,6 +20,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Annotate Incident" href="#annotate-incident" description="Add a note to an existing incident in PagerDuty" />
   <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in PagerDuty" />
   <LinkCard title="List Incidents" href="#list-incidents" description="Query PagerDuty to get a list of all open incidents (triggered and acknowledged)" />
+  <LinkCard title="List Notes" href="#list-notes" description="List all notes (timeline entries) for a PagerDuty incident" />
   <LinkCard title="Snooze Incident" href="#snooze-incident" description="Snooze an acknowledged incident in PagerDuty" />
   <LinkCard title="Update Incident" href="#update-incident" description="Update an existing incident in PagerDuty" />
 </CardGrid>
@@ -650,6 +651,88 @@ Returns a list of open incidents with:
   },
   "timestamp": "2024-01-15T13:00:00Z",
   "type": "pagerduty.incidents.list"
+}
+```
+
+<a id="list-notes"></a>
+
+## List Notes
+
+The List Notes component retrieves all notes (timeline entries) for a PagerDuty incident.
+
+### Use Cases
+
+- **Incident review**: Review all notes added to an incident
+- **Timeline reconstruction**: Build a timeline of incident updates
+- **Audit trail**: Access the history of notes for compliance or review
+- **Note analysis**: Process or analyze notes for patterns or keywords
+
+### Configuration
+
+- **Incident ID**: The ID of the incident to list notes for (e.g., A12BC34567...)
+
+### Output
+
+Returns a list of notes with:
+- **id**: Note ID
+- **content**: The note content
+- **created_at**: When the note was created
+- **user**: The user who created the note
+- **channel**: The channel through which the note was created
+
+### Example Output
+
+```json
+{
+  "data": {
+    "notes": [
+      {
+        "channel": {
+          "type": "web_ui"
+        },
+        "content": "Investigation started. Checking server logs for anomalies.",
+        "created_at": "2024-01-15T10:30:00Z",
+        "id": "PVL9NF8",
+        "user": {
+          "html_url": "https://acme.pagerduty.com/users/PLH1HKV",
+          "id": "PLH1HKV",
+          "summary": "John Smith",
+          "type": "user_reference"
+        }
+      },
+      {
+        "channel": {
+          "type": "web_ui"
+        },
+        "content": "Root cause identified: memory leak in the cache service. Deploying fix now.",
+        "created_at": "2024-01-15T10:45:00Z",
+        "id": "PVL9NF9",
+        "user": {
+          "html_url": "https://acme.pagerduty.com/users/PLH1HKV",
+          "id": "PLH1HKV",
+          "summary": "John Smith",
+          "type": "user_reference"
+        }
+      },
+      {
+        "channel": {
+          "type": "api"
+        },
+        "content": "Fix deployed successfully. Monitoring for stability.",
+        "created_at": "2024-01-15T11:00:00Z",
+        "id": "PVL9NFA",
+        "user": {
+          "html_url": "https://acme.pagerduty.com/users/PLH1HKW",
+          "id": "PLH1HKW",
+          "summary": "Jane Doe",
+          "type": "user_reference"
+        }
+      }
+    ],
+    "total": 3
+  },
+  "timestamp": "2024-01-15T11:05:00Z",
+  "type": "pagerduty.notes.list"
 }
 ```
 

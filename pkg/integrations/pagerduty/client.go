@@ -708,3 +708,37 @@ func (c *Client) SnoozeIncident(incidentID string, fromEmail string, duration in
 
 	return response, nil
 }
+
+// Note represents a note on a PagerDuty incident
+type Note struct {
+	ID        string       `json:"id"`
+	User      *ServiceRef  `json:"user"`
+	Channel   *NoteChannel `json:"channel"`
+	Content   string       `json:"content"`
+	CreatedAt string       `json:"created_at"`
+}
+
+// NoteChannel represents the channel through which a note was created
+type NoteChannel struct {
+	Type string `json:"type"`
+}
+
+// ListIncidentNotes retrieves all notes for a given incident
+func (c *Client) ListIncidentNotes(incidentID string) ([]Note, error) {
+	apiURL := fmt.Sprintf("%s/incidents/%s/notes", c.BaseURL, incidentID)
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Notes []Note `json:"notes"`
+	}
+
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Notes, nil
+}
