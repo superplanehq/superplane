@@ -83,6 +83,7 @@ func (d *Dash0) Components() []core.Component {
 		&GetCheckDetails{},
 		&CreateSyntheticCheck{},
 		&UpdateSyntheticCheck{},
+		&CreateCheckRule{},
 	}
 }
 

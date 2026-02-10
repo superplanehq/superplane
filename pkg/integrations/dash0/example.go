@@ -43,6 +43,12 @@ var exampleOutputUpdateSyntheticCheckBytes []byte
 var exampleOutputUpdateSyntheticCheckOnce sync.Once
 var exampleOutputUpdateSyntheticCheck map[string]any
 
+//go:embed example_output_create_check_rule.json
+var exampleOutputCreateCheckRuleBytes []byte
+
+var exampleOutputCreateCheckRuleOnce sync.Once
+var exampleOutputCreateCheckRule map[string]any
+
 func (c *QueryPrometheus) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryPrometheusOnce, exampleOutputQueryPrometheusBytes, &exampleOutputQueryPrometheus)
 }
@@ -69,4 +75,9 @@ func (c *CreateSyntheticCheck) ExampleOutput() map[string]any {
 // ExampleOutput returns sample output data for Update Synthetic Check.
 func (c *UpdateSyntheticCheck) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateSyntheticCheckOnce, exampleOutputUpdateSyntheticCheckBytes, &exampleOutputUpdateSyntheticCheck)
+}
+
+// ExampleOutput returns sample output data for Create Check Rule.
+func (c *CreateCheckRule) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateCheckRuleOnce, exampleOutputCreateCheckRuleBytes, &exampleOutputCreateCheckRule)
 }

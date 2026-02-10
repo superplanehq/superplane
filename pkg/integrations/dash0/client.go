@@ -420,6 +420,41 @@ func (c *Client) UpsertSyntheticCheck(originOrID string, specification map[strin
 	return parsed, nil
 }
 
+// UpsertCheckRule creates or updates a check rule by origin/id.
+func (c *Client) UpsertCheckRule(originOrID string, specification map[string]any) (map[string]any, error) {
+	trimmedOriginOrID := strings.TrimSpace(originOrID)
+	if trimmedOriginOrID == "" {
+		return nil, fmt.Errorf("origin/id is required")
+	}
+
+	requestURL := fmt.Sprintf("%s/api/alerting/check-rules/%s", c.BaseURL, url.PathEscape(trimmedOriginOrID))
+	requestURL, err := c.withDatasetQuery(requestURL)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := json.Marshal(specification)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPut, requestURL, bytes.NewReader(body), "application/json")
+	if err != nil {
+		return nil, err
+	}
+
+	parsed, err := parseJSONResponse(responseBody)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing upsert check rule response: %v", err)
+	}
+
+	if _, ok := parsed["originOrId"]; !ok {
+		parsed["originOrId"] = trimmedOriginOrID
+	}
+
+	return parsed, nil
+}
+
 // parseJSONResponse normalizes object or array JSON responses into a map.
 func parseJSONResponse(responseBody []byte) (map[string]any, error) {
 	trimmedBody := strings.TrimSpace(string(responseBody))

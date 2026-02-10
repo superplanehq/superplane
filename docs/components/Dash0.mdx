@@ -9,6 +9,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Check Rule" href="#create-check-rule" description="Create a check rule in Dash0 configuration API" />
   <LinkCard title="Create Synthetic Check" href="#create-synthetic-check" description="Create a synthetic check in Dash0 configuration API" />
   <LinkCard title="Get Check Details" href="#get-check-details" description="Get detailed information for a Dash0 check by ID" />
   <LinkCard title="List Issues" href="#list-issues" description="Query Dash0 to get a list of all current issues using the metric dash0.issue.status" />
@@ -141,6 +142,47 @@ Returns a list of issues with:
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "dash0.issues.list"
+}
+```
+
+<a id="create-check-rule"></a>
+
+## Create Check Rule
+
+The Create Check Rule component creates a Dash0 check rule (alert rule) using the configuration API.
+
+### Use Cases
+
+- **Service onboarding**: Create baseline alert rules for new services
+- **Automated governance**: Enforce standard alerting from workflow templates
+- **Deployment automation**: Create environment-specific rules during rollouts
+
+### Configuration
+
+- **Origin or ID (Optional)**: Custom check rule identifier. If omitted, SuperPlane generates one.
+- **Rule Specification (JSON)**: Check rule payload as JSON object.
+  Accepts Dash0 check rule shape (name + expression) or Prometheus-style
+  groups/rules shape with exactly one alert rule.
+
+### Output
+
+Emits:
+- **originOrId**: Check rule identifier used for the API request
+- **response**: Raw Dash0 API response
+
+### Example Output
+
+```json
+{
+  "data": {
+    "originOrId": "superplane-check-rule-ef45gh67",
+    "response": {
+      "id": "superplane-check-rule-ef45gh67",
+      "status": "updated"
+    }
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.check.rule.created"
 }
 ```
 
