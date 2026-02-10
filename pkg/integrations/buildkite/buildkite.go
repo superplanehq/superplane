@@ -3,6 +3,7 @@ package buildkite
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -154,7 +155,9 @@ func (b *Buildkite) handleWebhook(ctx core.HTTPRequestContext) {
 	}
 
 	if eventType == "build.finished" {
-		b.routeToTriggerSubscriptions(ctx, payload)
+		if err := b.routeToTriggerSubscriptions(ctx, payload); err != nil {
+			ctx.Logger.WithError(err).Warn("some subscriptions failed to receive build.finished event")
+		}
 	}
 
 	ctx.Response.WriteHeader(http.StatusOK)
@@ -166,13 +169,20 @@ func (b *Buildkite) routeToTriggerSubscriptions(ctx core.HTTPRequestContext, pay
 		return err
 	}
 
+	var sendErrors []error
 	for _, subscription := range subscriptions {
-		if b.subscriptionApplies(ctx, subscription, "build.finished", payload) {
-			err := subscription.SendMessage(payload)
-			if err != nil {
-				return err
-			}
+		if !b.subscriptionApplies(ctx, subscription, "build.finished", payload) {
+			continue
 		}
+
+		if err := subscription.SendMessage(payload); err != nil {
+			sendErrors = append(sendErrors, err)
+			ctx.Logger.WithError(err).Error("failed to forward build.finished webhook to subscription")
+		}
+	}
+
+	if len(sendErrors) > 0 {
+		return errors.Join(sendErrors...)
 	}
 
 	return nil
