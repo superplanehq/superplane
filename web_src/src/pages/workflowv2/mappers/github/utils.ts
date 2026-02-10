@@ -1,7 +1,5 @@
 import { MetadataItem } from "@/ui/metadataList";
-import { formatTimeAgo } from "@/utils/date";
-import { CanvasesCanvasNodeExecution } from "@/api-client";
-import { Predicate, formatPredicate } from "../utils";
+import { Predicate, formatPredicate, buildSubtitle, buildExecutionSubtitle } from "../utils";
 
 export function createGithubMetadataItems(
   repositoryName: string | undefined,
@@ -26,17 +24,5 @@ export function createGithubMetadataItems(
   return metadataItems;
 }
 
-export function buildGithubSubtitle(content: string | undefined, createdAt?: string): string {
-  const trimmed = (content || "").trim();
-  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
-
-  if (trimmed && timeAgo) {
-    return `${trimmed} · ${timeAgo}`;
-  }
-  return trimmed || timeAgo;
-}
-
-export function buildGithubExecutionSubtitle(execution: CanvasesCanvasNodeExecution, content?: string): string {
-  const timestamp = execution.updatedAt || execution.createdAt;
-  return buildGithubSubtitle(content || "", timestamp);
-}
+export const buildGithubSubtitle = buildSubtitle;
+export const buildGithubExecutionSubtitle = buildExecutionSubtitle;
