@@ -22,6 +22,7 @@ type Client struct {
 	Token         string
 	BaseURL       string
 	LogsIngestURL string
+	Dataset       string
 	http          core.HTTPContext
 }
 
@@ -44,12 +45,22 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 	// Strip /api/prometheus if user included it in the base URL
 	baseURL = strings.TrimSuffix(baseURL, "/api/prometheus")
 
+	dataset := "default"
+	datasetConfig, err := ctx.GetConfig("dataset")
+	if err == nil && datasetConfig != nil && len(datasetConfig) > 0 {
+		trimmedDataset := strings.TrimSpace(string(datasetConfig))
+		if trimmedDataset != "" {
+			dataset = trimmedDataset
+		}
+	}
+
 	logsIngestURL := deriveLogsIngestURL(baseURL)
 
 	return &Client{
 		Token:         string(apiToken),
 		BaseURL:       baseURL,
 		LogsIngestURL: logsIngestURL,
+		Dataset:       dataset,
 		http:          http,
 	}, nil
 }
@@ -78,6 +89,20 @@ func deriveLogsIngestURL(baseURL string) string {
 	parsedURL.Fragment = ""
 
 	return strings.TrimSuffix(parsedURL.String(), "/")
+}
+
+// withDatasetQuery appends the configured dataset query parameter to a request URL.
+func (c *Client) withDatasetQuery(requestURL string) (string, error) {
+	parsedURL, err := url.Parse(requestURL)
+	if err != nil {
+		return "", fmt.Errorf("error parsing request URL: %v", err)
+	}
+
+	query := parsedURL.Query()
+	query.Set("dataset", c.Dataset)
+	parsedURL.RawQuery = query.Encode()
+
+	return parsedURL.String(), nil
 }
 
 func (c *Client) execRequest(method, url string, body io.Reader, contentType string) ([]byte, error) {
@@ -199,8 +224,12 @@ type CheckRule struct {
 
 func (c *Client) ListCheckRules() ([]CheckRule, error) {
 	apiURL := fmt.Sprintf("%s/api/alerting/check-rules", c.BaseURL)
+	requestURL, err := c.withDatasetQuery(apiURL)
+	if err != nil {
+		return nil, err
+	}
 
-	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil, "")
+	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil, "")
 	if err != nil {
 		return nil, err
 	}
@@ -296,6 +325,41 @@ func (c *Client) GetCheckDetails(checkID string, includeHistory bool) (map[strin
 
 	if _, ok := parsed["checkId"]; !ok {
 		parsed["checkId"] = trimmedCheckID
+	}
+
+	return parsed, nil
+}
+
+// UpsertSyntheticCheck creates or updates a synthetic check by origin/id.
+func (c *Client) UpsertSyntheticCheck(originOrID string, specification map[string]any) (map[string]any, error) {
+	trimmedOriginOrID := strings.TrimSpace(originOrID)
+	if trimmedOriginOrID == "" {
+		return nil, fmt.Errorf("origin/id is required")
+	}
+
+	requestURL := fmt.Sprintf("%s/api/synthetic-checks/%s", c.BaseURL, url.PathEscape(trimmedOriginOrID))
+	requestURL, err := c.withDatasetQuery(requestURL)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := json.Marshal(specification)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPut, requestURL, bytes.NewReader(body), "application/json")
+	if err != nil {
+		return nil, err
+	}
+
+	parsed, err := parseJSONResponse(responseBody)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing upsert synthetic check response: %v", err)
+	}
+
+	if _, ok := parsed["originOrId"]; !ok {
+		parsed["originOrId"] = trimmedOriginOrID
 	}
 
 	return parsed, nil
