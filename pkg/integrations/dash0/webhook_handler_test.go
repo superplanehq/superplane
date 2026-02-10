@@ -87,3 +87,30 @@ func Test__Dash0WebhookHandler__SetupCleanup(t *testing.T) {
 
 	require.NoError(t, handler.Cleanup(ctx))
 }
+
+// Test__Dash0WebhookHandler__Merge verifies event-type union behavior for shared webhooks.
+func Test__Dash0WebhookHandler__Merge(t *testing.T) {
+	handler := &Dash0WebhookHandler{}
+
+	merged, changed, err := handler.Merge(
+		map[string]any{"eventTypes": []string{"fired"}},
+		map[string]any{"eventTypes": []string{"resolved"}},
+	)
+	require.NoError(t, err)
+	assert.True(t, changed)
+
+	mergedConfig, ok := merged.(OnAlertEventConfiguration)
+	require.True(t, ok)
+	assert.ElementsMatch(t, []string{"fired", "resolved"}, mergedConfig.EventTypes)
+
+	merged, changed, err = handler.Merge(
+		map[string]any{"eventTypes": []string{"fired", "resolved"}},
+		map[string]any{"eventTypes": []string{"resolved"}},
+	)
+	require.NoError(t, err)
+	assert.False(t, changed)
+
+	mergedConfig, ok = merged.(OnAlertEventConfiguration)
+	require.True(t, ok)
+	assert.ElementsMatch(t, []string{"fired", "resolved"}, mergedConfig.EventTypes)
+}
