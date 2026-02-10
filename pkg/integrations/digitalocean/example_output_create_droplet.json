@@ -1,0 +1,17 @@
+{
+  "data": {
+    "id": 98765432,
+    "name": "my-droplet",
+    "memory": 1024,
+    "vcpus": 1,
+    "disk": 25,
+    "status": "new",
+    "region": { "name": "New York 3", "slug": "nyc3" },
+    "image": { "id": 12345, "name": "Ubuntu 24.04 (LTS) x64", "slug": "ubuntu-24-04-x64" },
+    "size_slug": "s-1vcpu-1gb",
+    "networks": {
+      "v4": [{ "ip_address": "104.131.186.241", "type": "public" }]
+    },
+    "tags": ["web"]
+  }
+}
