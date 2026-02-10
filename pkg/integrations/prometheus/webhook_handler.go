@@ -45,6 +45,10 @@ func (h *PrometheusWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error
 	return nil
 }
 
+func (h *PrometheusWebhookHandler) Merge(current, requested any) (any, bool, error) {
+	return current, false, nil
+}
+
 func readWebhookRuntimeConfiguration(integration core.IntegrationContext) (webhookRuntimeConfiguration, error) {
 	authType, err := requiredConfig(integration, "webhookAuthType")
 	if err != nil {
