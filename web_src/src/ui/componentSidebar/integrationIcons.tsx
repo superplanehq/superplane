@@ -11,6 +11,7 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
+import snykIcon from "@/assets/icons/integrations/snyk.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
@@ -31,6 +32,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   openai: openAiIcon,
   "open-ai": openAiIcon,
   claude: claudeIcon,
+  snyk: snykIcon,
   pagerduty: pagerDutyIcon,
   rootly: rootlyIcon,
   semaphore: SemaphoreLogo,
@@ -51,6 +53,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   openai: openAiIcon,
   "open-ai": openAiIcon,
   claude: claudeIcon,
+  snyk: snykIcon,
   pagerduty: pagerDutyIcon,
   rootly: rootlyIcon,
   semaphore: SemaphoreLogo,

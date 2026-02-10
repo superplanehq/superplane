@@ -91,6 +91,11 @@ import {
   triggerRenderers as claudeTriggerRenderers,
   eventStateRegistry as claudeEventStateRegistry,
 } from "./claude/index";
+import {
+  componentMappers as snykComponentMappers,
+  triggerRenderers as snykTriggerRenderers,
+  eventStateRegistry as snykEventStateRegistry,
+} from "./snyk/index";
 
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
@@ -139,6 +144,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   discord: discordComponentMappers,
   openai: openaiComponentMappers,
   claude: claudeComponentMappers,
+  snyk: snykComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -157,6 +163,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   discord: discordTriggerRenderers,
   openai: openaiTriggerRenderers,
   claude: claudeTriggerRenderers,
+  snyk: snykTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -175,6 +182,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   openai: openaiEventStateRegistry,
   claude: claudeEventStateRegistry,
   aws: awsEventStateRegistry,
+  snyk: snykEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
@@ -319,7 +327,7 @@ export function getExecutionDetails(
   execution: CanvasesCanvasNodeExecution,
   node: ComponentsNode,
   nodes?: ComponentsNode[],
-): Record<string, any> | undefined {
+): Record<string, unknown> | undefined {
   const parts = componentName?.split(".");
   let mapper: ComponentBaseMapper | undefined;
 

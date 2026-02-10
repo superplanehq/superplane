@@ -1,0 +1,21 @@
+{
+  "newIssues": [
+    {
+      "id": "SNYK-JS-12345",
+      "title": "Remote Code Execution",
+      "severity": "high",
+      "description": "A vulnerability in the package allows remote code execution",
+      "packageName": "lodash",
+      "packageVersion": "4.17.20"
+    }
+  ],
+  "project": {
+    "id": "project-123",
+    "name": "my-web-app"
+  },
+  "org": {
+    "id": "org-123",
+    "name": "my-org"
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}

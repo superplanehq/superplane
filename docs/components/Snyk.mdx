@@ -1,0 +1,134 @@
+---
+title: "Snyk"
+---
+
+Security workflow integration with Snyk
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On New Issue Detected" href="#on-new-issue-detected" description="Listen to Snyk for new security issues" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Ignore Issue" href="#ignore-issue" description="Ignore a specific Snyk security issue" />
+</CardGrid>
+
+## Instructions
+
+To get a Snyk API token, go to your [Snyk account settings](https://app.snyk.io/account).
+
+<a id="on-new-issue-detected"></a>
+
+## On New Issue Detected
+
+The On New Issue Detected trigger starts a workflow execution when Snyk detects new security issues in a project.
+
+### Use Cases
+
+- **Security alerts**: Get notified immediately when new vulnerabilities are found
+- **Ticket creation**: Automatically create tickets for new security issues
+- **Compliance workflows**: Trigger compliance processes when issues are detected
+- **Team notifications**: Notify security teams of new findings
+
+### Configuration
+
+- **Organization ID**: The Snyk organization to monitor
+- **Project ID**: Optional project filter - if specified, only issues from this project will trigger
+- **Severity**: Optional severity filter - only issues of this severity or higher will trigger (low, medium, high, critical)
+
+### Event Data
+
+Each issue detection event includes:
+- **issue**: Issue information including ID, title, severity, and description
+- **project**: Project information where the issue was found
+- **org**: Organization information
+
+### Webhook Setup
+
+This trigger automatically sets up a Snyk webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "issue": {
+      "id": "SNYK-JS-12345",
+      "title": "Remote Code Execution",
+      "severity": "high",
+      "description": "A vulnerability in the package allows remote code execution",
+      "packageName": "lodash",
+      "packageVersion": "4.17.20"
+    },
+    "project": {
+      "id": "project-123",
+      "name": "my-web-app"
+    },
+    "org": {
+      "id": "org-123",
+      "name": "my-org"
+    }
+  },
+  "timestamp": "2026-01-15T10:30:00Z",
+  "type": "snyk.issue.detected"
+}
+```
+
+<a id="ignore-issue"></a>
+
+## Ignore Issue
+
+The Ignore Issue component ignores a specific Snyk security issue via the Snyk API.
+
+### Use Cases
+
+- **Risk acceptance**: Temporarily accept risks while a fix is being developed
+- **False positive handling**: Suppress issues that are determined to be false positives
+- **Automated suppression**: Automatically ignore issues based on predefined criteria
+- **Workflow integration**: Integrate issue ignoring into broader security workflows
+
+### Configuration
+
+- **Organization ID**: The Snyk organization ID containing the issue
+- **Project ID**: The project ID where the issue exists
+- **Issue ID**: The specific issue ID to ignore
+- **Reason**: The reason for ignoring the issue
+- **Expires At**: Optional expiration date for the ignore rule (ISO 8601 format)
+
+### Output
+
+Returns information about the ignored issue including:
+- **success**: Whether the operation succeeded
+- **message**: Status message from the API
+- **organizationId**: The organization ID
+- **projectId**: The project ID
+- **issueId**: The issue that was ignored
+- **reason**: The reason provided
+
+### Notes
+
+- The issue will no longer appear in Snyk reports after being ignored
+- Ignored issues can be unignored later through the Snyk UI or API
+- Requires a Snyk plan with API access
+
+### Example Output
+
+```json
+{
+  "data": {
+    "success": true,
+    "message": "Issue SNYK-JS-12345 ignored successfully",
+    "organizationId": "3a3dac70-cfeb-4648-9471-4f398bdf0f31",
+    "projectId": "project-123",
+    "issueId": "SNYK-JS-12345",
+    "reason": "Acceptable risk for this dependency"
+  },
+  "timestamp": "2026-01-15T10:30:00Z",
+  "type": "snyk.issue.ignored"
+}
+```

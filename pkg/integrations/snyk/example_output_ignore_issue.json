@@ -1,0 +1,8 @@
+{
+  "success": true,
+  "message": "Issue SNYK-JS-12345 ignored successfully",
+  "organizationId": "3a3dac70-cfeb-4648-9471-4f398bdf0f31",
+  "projectId": "project-123",
+  "issueId": "SNYK-JS-12345",
+  "reason": "Acceptable risk for this dependency"
+}
