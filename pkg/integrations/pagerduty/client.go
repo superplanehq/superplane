@@ -742,3 +742,38 @@ func (c *Client) ListIncidentNotes(incidentID string) ([]Note, error) {
 
 	return response.Notes, nil
 }
+
+// LogEntry represents a log entry for a PagerDuty incident
+type LogEntry struct {
+	ID        string      `json:"id"`
+	Type      string      `json:"type"`
+	Summary   string      `json:"summary"`
+	CreatedAt string      `json:"created_at"`
+	Agent     *ServiceRef `json:"agent"`
+	Channel   *LogChannel `json:"channel"`
+}
+
+// LogChannel represents the channel through which a log entry was created
+type LogChannel struct {
+	Type string `json:"type"`
+}
+
+// ListIncidentLogEntries retrieves log entries for a given incident
+func (c *Client) ListIncidentLogEntries(incidentID string, limit int) ([]LogEntry, error) {
+	apiURL := fmt.Sprintf("%s/incidents/%s/log_entries?limit=%d", c.BaseURL, incidentID, limit)
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		LogEntries []LogEntry `json:"log_entries"`
+	}
+
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.LogEntries, nil
+}

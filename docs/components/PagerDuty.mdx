@@ -20,6 +20,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Annotate Incident" href="#annotate-incident" description="Add a note to an existing incident in PagerDuty" />
   <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in PagerDuty" />
   <LinkCard title="List Incidents" href="#list-incidents" description="Query PagerDuty to get a list of all open incidents (triggered and acknowledged)" />
+  <LinkCard title="List Log Entries" href="#list-log-entries" description="List all log entries (audit trail) for a PagerDuty incident" />
   <LinkCard title="List Notes" href="#list-notes" description="List all notes (timeline entries) for a PagerDuty incident" />
   <LinkCard title="Snooze Incident" href="#snooze-incident" description="Snooze an acknowledged incident in PagerDuty" />
   <LinkCard title="Update Incident" href="#update-incident" description="Update an existing incident in PagerDuty" />
@@ -651,6 +652,93 @@ Returns a list of open incidents with:
   },
   "timestamp": "2024-01-15T13:00:00Z",
   "type": "pagerduty.incidents.list"
+}
+```
+
+<a id="list-log-entries"></a>
+
+## List Log Entries
+
+The List Log Entries component retrieves all log entries (audit trail) for a PagerDuty incident.
+
+### Use Cases
+
+- **Audit trail**: Access complete incident history for compliance or review
+- **Timeline reconstruction**: Build a detailed timeline of all incident activity
+- **Incident analysis**: Analyze escalation patterns and response times
+- **Forensics**: Review all actions taken during an incident
+
+### Configuration
+
+- **Incident ID**: The ID of the incident to list log entries for (e.g., A12BC34567...)
+- **Limit**: Maximum number of log entries to return (default: 100)
+
+### Output
+
+Returns a list of log entries with:
+- **id**: Log entry ID
+- **type**: The type of log entry (e.g., trigger_log_entry, acknowledge_log_entry, annotate_log_entry)
+- **summary**: A summary of what happened
+- **created_at**: When the log entry was created
+- **agent**: The agent (user or service) that caused the log entry
+- **channel**: The channel through which the action was performed
+
+### Example Output
+
+```json
+{
+  "data": {
+    "log_entries": [
+      {
+        "agent": {
+          "html_url": "https://acme.pagerduty.com/services/PLH1HKV",
+          "id": "PLH1HKV",
+          "summary": "API Service",
+          "type": "service_reference"
+        },
+        "channel": {
+          "type": "api"
+        },
+        "created_at": "2024-01-15T10:00:00Z",
+        "id": "Q02JTSNZWHSEKV",
+        "summary": "Triggered through the API",
+        "type": "trigger_log_entry"
+      },
+      {
+        "agent": {
+          "html_url": "https://acme.pagerduty.com/users/PUSER01",
+          "id": "PUSER01",
+          "summary": "John Smith",
+          "type": "user_reference"
+        },
+        "channel": {
+          "type": "web_ui"
+        },
+        "created_at": "2024-01-15T10:15:00Z",
+        "id": "Q02JTSNZWHSEKW",
+        "summary": "Acknowledged by John Smith",
+        "type": "acknowledge_log_entry"
+      },
+      {
+        "agent": {
+          "html_url": "https://acme.pagerduty.com/users/PUSER01",
+          "id": "PUSER01",
+          "summary": "John Smith",
+          "type": "user_reference"
+        },
+        "channel": {
+          "type": "web_ui"
+        },
+        "created_at": "2024-01-15T10:30:00Z",
+        "id": "Q02JTSNZWHSEKX",
+        "summary": "John Smith added a note",
+        "type": "annotate_log_entry"
+      }
+    ],
+    "total": 3
+  },
+  "timestamp": "2024-01-15T11:00:00Z",
+  "type": "pagerduty.log_entries.list"
 }
 ```
 
