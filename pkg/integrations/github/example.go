@@ -177,6 +177,8 @@ func (c *RunWorkflow) ExampleOutput() map[string]any {
 
 func (c *GetBillingUsage) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetBillingUsageOnce, exampleOutputGetBillingUsageBytes, &exampleOutputGetBillingUsage)
+}
+
 func (c *CreateReview) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(
 		&exampleOutputCreateReviewOnce,
