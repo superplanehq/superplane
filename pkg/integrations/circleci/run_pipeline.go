@@ -225,7 +225,7 @@ func (t *RunPipeline) Setup(ctx core.SetupContext) error {
 	}
 
 	if IsValidLocation(config.Location) {
-		return fmt.Errorf("branch or tag is required")
+		return fmt.Errorf("branch or tag is required, got: %s", config.Location)
 	}
 
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
