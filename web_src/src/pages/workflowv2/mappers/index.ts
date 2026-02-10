@@ -97,6 +97,11 @@ import {
   eventStateRegistry as openaiEventStateRegistry,
 } from "./openai/index";
 import {
+  componentMappers as jenkinsComponentMappers,
+  triggerRenderers as jenkinsTriggerRenderers,
+  eventStateRegistry as jenkinsEventStateRegistry,
+} from "./jenkins/index";
+import {
   componentMappers as claudeComponentMappers,
   triggerRenderers as claudeTriggerRenderers,
   eventStateRegistry as claudeEventStateRegistry,
@@ -150,6 +155,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   aws: awsComponentMappers,
   discord: discordComponentMappers,
   openai: openaiComponentMappers,
+  jenkins: jenkinsComponentMappers,
   claude: claudeComponentMappers,
 };
 
@@ -170,6 +176,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
   openai: openaiTriggerRenderers,
+  jenkins: jenkinsTriggerRenderers,
   claude: claudeTriggerRenderers,
 };
 
@@ -191,6 +198,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   claude: claudeEventStateRegistry,
   aws: awsEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
+  jenkins: jenkinsEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
