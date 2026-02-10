@@ -25,6 +25,7 @@ const PollInterval = 5 * time.Minute
 type RunPipeline struct{}
 
 type RunPipelineNodeMetadata struct {
+	ProjectID   string `json:"projectId" mapstructure:"projectId"`
 	ProjectSlug string `json:"projectSlug" mapstructure:"projectSlug"`
 	ProjectName string `json:"projectName" mapstructure:"projectName"`
 }
@@ -49,7 +50,7 @@ type WorkflowInfo struct {
 type RunPipelineSpec struct {
 	ProjectSlug          string      `json:"projectSlug"`
 	Location             string      `json:"location"`
-	PipelineDefinitionID string      `json:"pipelineDefinitionId"` // Find in CircleCI: Project Settings → Project Setup
+	PipelineDefinitionID string      `json:"pipelineDefinitionId"`
 	Parameters           []Parameter `json:"parameters"`
 }
 
@@ -130,7 +131,7 @@ func (t *RunPipeline) Configuration() []configuration.Field {
 			Label:       "Project slug",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "CircleCI project slug (e.g. gh/org/repo). Find in CircleCI project settings.",
+			Description: "CircleCI project slug. Find in CircleCI project settings.",
 		},
 		{
 			Name:  "location",
@@ -141,7 +142,7 @@ func (t *RunPipeline) Configuration() []configuration.Field {
 			Name:        "pipelineDefinitionId",
 			Label:       "Pipeline definition ID",
 			Type:        configuration.FieldTypeString,
-			Description: "Find in CircleCI: Project Settings → Project Setup.",
+			Description: "Find in CircleCI. Project Settings → Project Setup.",
 		},
 		{
 			Name:  "parameters",
@@ -209,15 +210,22 @@ func (t *RunPipeline) Setup(ctx core.SetupContext) error {
 	}
 
 	err = ctx.Metadata.Set(RunPipelineNodeMetadata{
-		ProjectSlug: config.ProjectSlug,
+		ProjectID:   project.ID,
+		ProjectSlug: project.Slug,
 		ProjectName: project.Name,
 	})
-
 	if err != nil {
-		return fmt.Errorf("error setting metadata: %v", err)
+		return fmt.Errorf("failed to set metadata: %w", err)
 	}
 
-	// Request webhook for this project
+	if strings.TrimSpace(config.PipelineDefinitionID) == "" {
+		return fmt.Errorf("pipeline definition ID is required")
+	}
+
+	if strings.TrimSpace(config.Location) == "" {
+		return fmt.Errorf("branch or tag is required")
+	}
+
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		ProjectSlug: config.ProjectSlug,
 		Events:      []string{"workflow-completed"},
@@ -236,60 +244,27 @@ func (t *RunPipeline) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	params := RunPipelineParams{
-		Parameters: t.buildParameters(ctx, spec.Parameters),
+	runPipelineConfig := map[string]string{}
+	if t.getBranch(spec.Location) != "" {
+		runPipelineConfig["branch"] = t.getBranch(spec.Location)
 	}
-	var branch, tag string
-	if spec.Location != "" {
-		switch {
-		case strings.HasPrefix(spec.Location, "refs/tags/"):
-			tag = strings.TrimPrefix(spec.Location, "refs/tags/")
-			params.Tag = tag
-		case strings.HasPrefix(spec.Location, "ref/tags/"):
-			tag = strings.TrimPrefix(spec.Location, "ref/tags/")
-			params.Tag = tag
-		case strings.HasPrefix(spec.Location, "refs/heads/"):
-			branch = strings.TrimPrefix(spec.Location, "refs/heads/")
-			params.Branch = branch
-		case strings.HasPrefix(spec.Location, "ref/heads/"):
-			branch = strings.TrimPrefix(spec.Location, "ref/heads/")
-			params.Branch = branch
-		default:
-			branch = strings.TrimSpace(spec.Location)
-			params.Branch = branch
-		}
+	if t.getTag(spec.Location) != "" {
+		runPipelineConfig["tag"] = t.getTag(spec.Location)
+	}
+
+	runParams := RunPipelineParams{
+		DefinitionID: strings.TrimSpace(spec.PipelineDefinitionID),
+		Parameters:   t.buildParameters(ctx, spec.Parameters),
+		Config:       runPipelineConfig,
+		Checkout:     runPipelineConfig,
 	}
 
 	var response *RunPipelineResponse
-	if spec.PipelineDefinitionID != "" {
-		// Use pipeline/run API (required for GitHub App and Bitbucket Data Center)
-		runParams := RunPipelineRunParams{
-			DefinitionID: strings.TrimSpace(spec.PipelineDefinitionID),
-			Parameters:   t.buildParameters(ctx, spec.Parameters),
-		}
-		if tag != "" {
-			runParams.Config = map[string]string{"tag": tag}
-			runParams.Checkout = map[string]string{"tag": tag}
-		} else {
-			if branch == "" {
-				branch = "main"
-			}
-			runParams.Config = map[string]string{"branch": branch}
-			runParams.Checkout = map[string]string{"branch": branch}
-		}
-		response, err = client.RunPipelineRun(spec.ProjectSlug, runParams)
-	} else {
-		response, err = client.RunPipeline(spec.ProjectSlug, params)
-	}
+	response, err = client.RunPipeline(spec.ProjectSlug, runParams)
 	if err != nil {
-		if strings.Contains(err.Error(), "400") &&
-			(strings.Contains(err.Error(), "GitHub App") || strings.Contains(err.Error(), "not yet supported")) {
-			return fmt.Errorf("GitHub App project: add Pipeline Definition ID (CircleCI Project Settings → Project Setup). See https://circleci.com/docs/triggers-overview/#run-a-pipeline-using-the-api")
-		}
-		return fmt.Errorf("error triggering pipeline: %v", err)
+		return fmt.Errorf("failed to run pipeline: %w", err)
 	}
 
-	// Store pipeline info in metadata
 	err = ctx.Metadata.Set(RunPipelineExecutionMetadata{
 		Pipeline: &PipelineInfo{
 			ID:        response.ID,
@@ -302,13 +277,11 @@ func (t *RunPipeline) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error setting metadata: %v", err)
 	}
 
-	// Associate pipeline ID with this execution for webhook handling
 	err = ctx.ExecutionState.SetKV("pipeline", response.ID)
 	if err != nil {
 		return err
 	}
 
-	// Schedule polling as fallback
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 }
 
@@ -317,14 +290,11 @@ func (t *RunPipeline) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (t *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	// Verify webhook signature first before any processing
-	// CircleCI sends signature as "v1=<hex>" format
 	signatureHeader := ctx.Headers.Get("circleci-signature")
 	if signatureHeader == "" {
 		return http.StatusForbidden, fmt.Errorf("missing signature")
 	}
 
-	// Parse "v1=<hex>" format - extract just the hex part
 	signature := signatureHeader
 	if strings.HasPrefix(signatureHeader, "v1=") {
 		signature = strings.TrimPrefix(signatureHeader, "v1=")
@@ -339,7 +309,6 @@ func (t *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusForbidden, fmt.Errorf("invalid signature")
 	}
 
-	// Parse webhook payload (same as OnPipelineCompleted)
 	data := map[string]any{}
 	if err := json.Unmarshal(ctx.Body, &data); err != nil {
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
@@ -408,30 +377,28 @@ func (t *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	}
 
 	var allDone, anyFailed bool
-	if executionCtx.Integration != nil {
-		client, err := NewClient(executionCtx.HTTP, executionCtx.Integration)
+	client, err := NewClient(executionCtx.HTTP, executionCtx.Integration)
+	if err == nil {
+		allWorkflows, err := client.GetPipelineWorkflows(metadata.Pipeline.ID)
 		if err == nil {
-			allWorkflows, err := client.GetPipelineWorkflows(metadata.Pipeline.ID)
-			if err == nil {
-				updatedWorkflows := make([]WorkflowInfo, 0, len(allWorkflows))
-				for _, w := range allWorkflows {
-					updatedWorkflows = append(updatedWorkflows, WorkflowInfo{
-						ID:     w.ID,
-						Name:   w.Name,
-						Status: w.Status,
-					})
-				}
-				metadata.Workflows = updatedWorkflows
-				_ = executionCtx.Metadata.Set(metadata)
-				allDone, anyFailed = t.checkWorkflowsStatus(updatedWorkflows)
+			updatedWorkflows := make([]WorkflowInfo, 0, len(allWorkflows))
+			for _, w := range allWorkflows {
+				updatedWorkflows = append(updatedWorkflows, WorkflowInfo{
+					ID:     w.ID,
+					Name:   w.Name,
+					Status: w.Status,
+				})
 			}
+			metadata.Workflows = updatedWorkflows
+			_ = executionCtx.Metadata.Set(metadata)
+			allDone, anyFailed = t.checkWorkflowsStatus(updatedWorkflows)
 		}
 	}
-	// When Integration is nil (e.g. webhook context from server doesn't set it), or API call failed,
-	// use only the workflow data we have from webhook events (same as Semaphore Run Workflow).
+
 	if !allDone {
 		allDone, anyFailed = t.checkWorkflowsStatus(metadata.Workflows)
 	}
+
 	if !allDone {
 		return http.StatusOK, nil
 	}
@@ -509,7 +476,6 @@ func (t *RunPipeline) poll(ctx core.ActionContext) error {
 	}
 
 	allDone, anyFailed := t.checkWorkflowsStatus(updatedWorkflows)
-
 	if !allDone {
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 	}
@@ -518,7 +484,6 @@ func (t *RunPipeline) poll(ctx core.ActionContext) error {
 		"pipeline":  metadata.Pipeline,
 		"workflows": metadata.Workflows,
 	}
-
 	if anyFailed {
 		return ctx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{payload})
 	}
@@ -556,6 +521,22 @@ func (t *RunPipeline) buildParameters(ctx core.ExecutionContext, params []Parame
 	parameters["SUPERPLANE_CANVAS_ID"] = ctx.WorkflowID
 
 	return parameters
+}
+
+func (t *RunPipeline) getBranch(location string) string {
+	if strings.HasPrefix(location, "refs/heads/") {
+		return strings.TrimPrefix(location, "refs/heads/")
+	}
+
+	return ""
+}
+
+func (t *RunPipeline) getTag(location string) string {
+	if strings.HasPrefix(location, "refs/tags/") {
+		return strings.TrimPrefix(location, "refs/tags/")
+	}
+
+	return ""
 }
 
 func (t *RunPipeline) Cleanup(ctx core.SetupContext) error {

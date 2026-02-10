@@ -127,9 +127,10 @@ func (c *Client) GetPipeline(pipelineID string) (*PipelineResponse, error) {
 }
 
 type RunPipelineParams struct {
-	Branch     string            `json:"branch,omitempty"`
-	Tag        string            `json:"tag,omitempty"`
-	Parameters map[string]string `json:"parameters,omitempty"`
+	DefinitionID string            `json:"definition_id"`
+	Config       map[string]string `json:"config"`   // e.g. {"branch": "main"} or {"tag": "v1.0"}
+	Checkout     map[string]string `json:"checkout"` // same as config
+	Parameters   map[string]string `json:"parameters,omitempty"`
 }
 
 type RunPipelineResponse struct {
@@ -140,34 +141,6 @@ type RunPipelineResponse struct {
 }
 
 func (c *Client) RunPipeline(projectSlug string, params RunPipelineParams) (*RunPipelineResponse, error) {
-	path := fmt.Sprintf("%s/project/%s/pipeline", baseURL, projectSlug)
-	body, err := json.Marshal(params)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling params: %v", err)
-	}
-
-	responseBody, err := c.execRequest("POST", path, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	var response RunPipelineResponse
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
-	}
-
-	return &response, nil
-}
-
-type RunPipelineRunParams struct {
-	DefinitionID string            `json:"definition_id"`
-	Config       map[string]string `json:"config"`   // e.g. {"branch": "main"} or {"tag": "v1.0"}
-	Checkout     map[string]string `json:"checkout"` // same as config
-	Parameters   map[string]string `json:"parameters,omitempty"`
-}
-
-func (c *Client) RunPipelineRun(projectSlug string, params RunPipelineRunParams) (*RunPipelineResponse, error) {
 	path := fmt.Sprintf("%s/project/%s/pipeline/run", baseURL, projectSlug)
 
 	body, err := json.Marshal(params)
