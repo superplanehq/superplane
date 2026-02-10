@@ -442,30 +442,39 @@ func (t *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
 	}
 
-	var allDone, anyFailed bool
-	client, err := NewClient(executionCtx.HTTP, executionCtx.Integration)
-	if err == nil && metadata.Pipeline.ID != "" {
-		allWorkflows, err := client.GetPipelineWorkflows(metadata.Pipeline.ID)
-		if err == nil {
-			updatedWorkflows := make([]WorkflowInfo, 0, len(allWorkflows))
-			for _, w := range allWorkflows {
-				updatedWorkflows = append(updatedWorkflows, WorkflowInfo{
-					ID:     w.ID,
-					Name:   w.Name,
-					Status: w.Status,
-				})
-			}
-			metadata.Workflows = updatedWorkflows
-			// Ensure Pipeline info is preserved
-			metadata.Pipeline = existingPipeline
-			_ = executionCtx.Metadata.Set(metadata)
-			allDone, anyFailed = t.checkWorkflowsStatus(updatedWorkflows)
-		}
+	if metadata.Pipeline.ID == "" {
+		return http.StatusOK, nil
 	}
 
-	if !allDone {
-		allDone, anyFailed = t.checkWorkflowsStatus(metadata.Workflows)
+	client, err := NewClient(executionCtx.HTTP, executionCtx.Integration)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to create client: %w", err)
 	}
+
+	result, err := client.CheckPipelineStatus(metadata.Pipeline.ID)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to check pipeline status: %w", err)
+	}
+
+	// Convert WorkflowResponse to WorkflowInfo
+	updatedWorkflows := make([]WorkflowInfo, 0, len(result.Workflows))
+	for _, w := range result.Workflows {
+		updatedWorkflows = append(updatedWorkflows, WorkflowInfo{
+			ID:     w.ID,
+			Name:   w.Name,
+			Status: w.Status,
+		})
+	}
+	metadata.Workflows = updatedWorkflows
+	// Ensure Pipeline info is preserved
+	metadata.Pipeline = existingPipeline
+	err = executionCtx.Metadata.Set(metadata)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
+	}
+
+	allDone := result.AllDone
+	anyFailed := result.AnyFailed
 
 	if !allDone {
 		return http.StatusOK, nil
@@ -530,13 +539,14 @@ func (t *RunPipeline) poll(ctx core.ActionContext) error {
 		return err
 	}
 
-	workflows, err := client.GetPipelineWorkflows(metadata.Pipeline.ID)
+	result, err := client.CheckPipelineStatus(metadata.Pipeline.ID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to check pipeline status: %w", err)
 	}
 
-	updatedWorkflows := []WorkflowInfo{}
-	for _, w := range workflows {
+	// Convert WorkflowResponse to WorkflowInfo
+	updatedWorkflows := make([]WorkflowInfo, 0, len(result.Workflows))
+	for _, w := range result.Workflows {
 		updatedWorkflows = append(updatedWorkflows, WorkflowInfo{
 			ID:     w.ID,
 			Name:   w.Name,
@@ -552,7 +562,8 @@ func (t *RunPipeline) poll(ctx core.ActionContext) error {
 		return err
 	}
 
-	allDone, anyFailed := t.checkWorkflowsStatus(updatedWorkflows)
+	allDone := result.AllDone
+	anyFailed := result.AnyFailed
 	if !allDone {
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 	}

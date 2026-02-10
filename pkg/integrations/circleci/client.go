@@ -204,6 +204,47 @@ func (c *Client) GetWorkflow(workflowID string) (*WorkflowResponse, error) {
 	return &workflow, nil
 }
 
+type PipelineStatusResult struct {
+	AllDone   bool
+	AnyFailed bool
+	Workflows []WorkflowResponse
+}
+
+func (c *Client) CheckPipelineStatus(pipelineID string) (*PipelineStatusResult, error) {
+	workflows, err := c.GetPipelineWorkflows(pipelineID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pipeline workflows: %w", err)
+	}
+
+	if len(workflows) == 0 {
+		return &PipelineStatusResult{
+			AllDone:   false,
+			AnyFailed: false,
+			Workflows: workflows,
+		}, nil
+	}
+
+	allDone := true
+	anyFailed := false
+
+	for _, w := range workflows {
+		// Check if workflow is still running
+		if w.Status == "running" || w.Status == "on_hold" || w.Status == "not_run" || w.Status == "failing" {
+			allDone = false
+		}
+		// Check if workflow failed
+		if w.Status == "failed" || w.Status == "canceled" || w.Status == "error" || w.Status == "failing" || w.Status == "unauthorized" {
+			anyFailed = true
+		}
+	}
+
+	return &PipelineStatusResult{
+		AllDone:   allDone,
+		AnyFailed: anyFailed,
+		Workflows: workflows,
+	}, nil
+}
+
 type WebhookResponse struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
