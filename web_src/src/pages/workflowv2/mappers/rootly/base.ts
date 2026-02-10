@@ -1,4 +1,4 @@
-import { Incident } from "./types";
+import { Incident, IncidentEvent } from "./types";
 
 export function getDetailsForIncident(incident: Incident): Record<string, string> {
   const details: Record<string, string> = {};
@@ -23,6 +23,28 @@ export function getDetailsForIncident(incident: Incident): Record<string, string
 
   if (incident?.url) {
     details["Incident URL"] = incident.url;
+  }
+
+  return details;
+}
+
+export function getDetailsForIncidentEvent(incidentEvent: IncidentEvent): Record<string, string> {
+  const details: Record<string, string> = {};
+  
+  if (incidentEvent?.created_at) {
+    details["Created At"] = new Date(incidentEvent.created_at).toLocaleString();
+  }
+
+  if (incidentEvent?.id) {
+    details["Event ID"] = incidentEvent.id;
+  }
+
+  if (incidentEvent?.event) {
+    details["Event"] = incidentEvent.event;
+  }
+
+  if (incidentEvent?.visibility) {
+    details["Visibility"] = incidentEvent.visibility;
   }
 
   return details;
