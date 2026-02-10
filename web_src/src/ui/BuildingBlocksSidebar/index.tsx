@@ -30,6 +30,7 @@ import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+import digitaloceanIcon from "@/assets/icons/integrations/digitalocean.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 
 export interface BuildingBlock {
@@ -394,6 +395,7 @@ function CategorySection({
     dash0: dash0Icon,
     datadog: datadogIcon,
     daytona: daytonaIcon,
+    digitalocean: digitaloceanIcon,
     discord: discordIcon,
     github: githubIcon,
     jira: jiraIcon,
@@ -465,6 +467,7 @@ function CategorySection({
             dash0: dash0Icon,
             daytona: daytonaIcon,
             datadog: datadogIcon,
+            digitalocean: digitaloceanIcon,
             discord: discordIcon,
             github: githubIcon,
             openai: openAiIcon,

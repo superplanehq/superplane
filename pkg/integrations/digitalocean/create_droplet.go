@@ -155,9 +155,9 @@ func (c *CreateDroplet) Setup(ctx core.SetupContext) error {
 		return errors.New("name is required")
 	}
 
-	if err := validateHostname(spec.Name); err != nil {
-		return err
-	}
+	// Hostname validation is deferred to Execute because the name field
+	// supports expressions (e.g. {{ $.trigger.data.hostname }}) that are
+	// only resolved at execution time.
 
 	if spec.Region == "" {
 		return errors.New("region is required")
