@@ -1,0 +1,33 @@
+{
+  "type": "prometheus.alert",
+  "data": {
+    "status": "firing",
+    "labels": {
+      "alertname": "HighRequestLatency",
+      "instance": "api-1:9090",
+      "job": "api"
+    },
+    "annotations": {
+      "summary": "API latency is above threshold",
+      "description": "95th percentile latency is above 500ms"
+    },
+    "startsAt": "2026-01-19T12:00:00Z",
+    "endsAt": "0001-01-01T00:00:00Z",
+    "generatorURL": "http://prometheus.example.com/graph?g0.expr=...",
+    "fingerprint": "f8f1d8a0b7de3f0a",
+    "receiver": "superplane",
+    "groupKey": "{}:{alertname=\"HighRequestLatency\"}",
+    "groupLabels": {
+      "alertname": "HighRequestLatency"
+    },
+    "commonLabels": {
+      "alertname": "HighRequestLatency",
+      "severity": "critical"
+    },
+    "commonAnnotations": {
+      "summary": "API latency is above threshold"
+    },
+    "externalURL": "http://alertmanager.example.com"
+  },
+  "timestamp": "2026-01-19T12:00:00Z"
+}

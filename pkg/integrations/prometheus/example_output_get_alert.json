@@ -1,0 +1,18 @@
+{
+  "type": "prometheus.alert",
+  "data": {
+    "status": "firing",
+    "labels": {
+      "alertname": "HighRequestLatency",
+      "instance": "api-1:9090",
+      "job": "api"
+    },
+    "annotations": {
+      "summary": "API latency is above threshold",
+      "description": "95th percentile latency is above 500ms"
+    },
+    "startsAt": "2026-01-19T12:00:00Z",
+    "value": "1"
+  },
+  "timestamp": "2026-01-19T12:00:00Z"
+}
