@@ -587,12 +587,12 @@ func Test__OnEvent__Setup(t *testing.T) {
 }
 
 func Test__matchesEventFilters(t *testing.T) {
-	t.Run("nil data -> passes all filters", func(t *testing.T) {
+	t.Run("nil data with filters configured -> fails filter check", func(t *testing.T) {
 		result := matchesEventFilters(nil, OnEventConfiguration{
 			Status:   "started",
 			Severity: "sev1",
 		})
-		assert.True(t, result)
+		assert.False(t, result)
 	})
 
 	t.Run("empty config -> passes all filters", func(t *testing.T) {
