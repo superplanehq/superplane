@@ -25,3 +25,11 @@ export interface Incident {
   mitigated_at?: string;
   url?: string;
 }
+
+export interface IncidentEvent {
+  id?: string;
+  event?: string;
+  visibility?: string;
+  occurred_at?: string;
+  created_at?: string;
+}
