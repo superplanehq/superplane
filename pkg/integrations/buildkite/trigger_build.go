@@ -393,7 +393,7 @@ func (r *TriggerBuild) poll(ctx core.ActionContext) error {
 
 	targetBuild, err := client.GetBuild(metadata.Organization, metadata.Pipeline, metadata.BuildNumber)
 	if err != nil {
-		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
+		return err
 	}
 
 	if targetBuild.ID != metadata.BuildID {
