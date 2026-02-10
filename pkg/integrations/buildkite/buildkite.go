@@ -40,37 +40,24 @@ func extractOrgSlug(orgInput string) (string, error) {
 		return "", fmt.Errorf("organization input is empty")
 	}
 
-	// Pattern 1: Full URL with https://
-	fullURLPattern := regexp.MustCompile(`https?://(?:www\.)?buildkite\.com/organizations/([^/]+)`)
-	if matches := fullURLPattern.FindStringSubmatch(strings.TrimSpace(orgInput)); len(matches) > 1 {
+	urlPattern := regexp.MustCompile(`(?:https?://)?(?:www\.)?buildkite\.com/(?:organizations/)?([^/]+)`)
+	if matches := urlPattern.FindStringSubmatch(strings.TrimSpace(orgInput)); len(matches) > 1 {
 		return matches[1], nil
 	}
 
-	// Pattern 2: URL without protocol
-	noProtocolPattern := regexp.MustCompile(`(?:www\.)?buildkite\.com/organizations/([^/]+)`)
-	if matches := noProtocolPattern.FindStringSubmatch(strings.TrimSpace(orgInput)); len(matches) > 1 {
-		return matches[1], nil
-	}
-
-	// Pattern 3: organizations/my-org
-	orgsPathPattern := regexp.MustCompile(`organizations/([^/]+)`)
-	if matches := orgsPathPattern.FindStringSubmatch(strings.TrimSpace(orgInput)); len(matches) > 1 {
-		return matches[1], nil
-	}
-
-	// Pattern 4: Just the slug (validate it looks like a valid org slug)
+	// Just the slug (validate it looks like a valid org slug)
 	slugPattern := regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*[a-zA-Z0-9]$`)
 	if slugPattern.MatchString(strings.TrimSpace(orgInput)) {
 		return strings.TrimSpace(orgInput), nil
 	}
 
-	return "", fmt.Errorf("invalid organization format: %s. Expected format: https://buildkite.com/organizations/your-org or just 'your-org'", orgInput)
+	return "", fmt.Errorf("invalid organization format: %s. Expected format: https://buildkite.com/my-org or just 'my-org'", orgInput)
 }
 
 func (b *Buildkite) createWebhookSetupAction(ctx core.SyncContext, orgSlug string) {
 	ctx.Integration.NewBrowserAction(core.BrowserAction{
 		Description: fmt.Sprintf(
-			"Click to setup webhook.\n\n**Webhook URL**: `%s/api/v1/integrations/%s/webhook`\n**Events**: `build.finished`\n**Pipelines**: All Pipelines",
+			"Click to setup webhook.\n\n**Webhook URL**:\n`%s/api/v1/integrations/%s/webhook`\n**Events**: `build.finished`\n**Pipelines**: All Pipelines",
 			ctx.WebhooksBaseURL,
 			ctx.Integration.ID(),
 		),
@@ -113,8 +100,8 @@ func (b *Buildkite) Configuration() []configuration.Field {
 			Name:        "organization",
 			Label:       "Organization URL",
 			Type:        configuration.FieldTypeString,
-			Description: "Buildkite organization URL (e.g. https://buildkite.com/organizations/your-org or just your-org)",
-			Placeholder: "e.g. https://buildkite.com/organizations/my-org or my-org",
+			Description: "Buildkite organization URL (e.g. https://buildkite.com/my-org or just my-org)",
+			Placeholder: "e.g. https://buildkite.com/my-org or my-org",
 			Required:    true,
 		},
 		{
