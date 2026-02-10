@@ -217,7 +217,7 @@ type IncidentAttributes struct {
 	Slug         string `json:"slug"`
 	Summary      string `json:"summary"`
 	Status       string `json:"status"`
-	Severity     string `json:"severity"`
+	Severity     any    `json:"severity"`
 	StartedAt    string `json:"started_at"`
 	ResolvedAt   string `json:"resolved_at"`
 	MitigatedAt  string `json:"mitigated_at"`
@@ -233,6 +233,24 @@ type IncidentsResponse struct {
 	Data []IncidentData `json:"data"`
 }
 
+// severityString extracts the severity slug from the API response.
+// Rootly returns severity as a string (slug) or an object with slug/name fields.
+func severityString(v any) string {
+	switch s := v.(type) {
+	case string:
+		return s
+	case map[string]any:
+		if slug, ok := s["slug"].(string); ok {
+			return slug
+		}
+		if name, ok := s["name"].(string); ok {
+			return name
+		}
+	}
+
+	return ""
+}
+
 // incidentFromData converts a JSON:API IncidentData to a flat Incident struct.
 func incidentFromData(data IncidentData) *Incident {
 	return &Incident{
@@ -242,7 +260,7 @@ func incidentFromData(data IncidentData) *Incident {
 		Slug:         data.Attributes.Slug,
 		Summary:      data.Attributes.Summary,
 		Status:       data.Attributes.Status,
-		Severity:     data.Attributes.Severity,
+		Severity:     severityString(data.Attributes.Severity),
 		StartedAt:    data.Attributes.StartedAt,
 		ResolvedAt:   data.Attributes.ResolvedAt,
 		MitigatedAt:  data.Attributes.MitigatedAt,
@@ -386,6 +404,56 @@ func (c *Client) ListTeams() ([]Team, error) {
 	return teams, nil
 }
 
+// SubStatus represents a Rootly sub-status (custom status)
+type SubStatus struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Slug         string `json:"slug"`
+	ParentStatus string `json:"parent_status"`
+}
+
+type SubStatusData struct {
+	ID         string              `json:"id"`
+	Type       string              `json:"type"`
+	Attributes SubStatusAttributes `json:"attributes"`
+}
+
+type SubStatusAttributes struct {
+	Name         string `json:"name"`
+	Slug         string `json:"slug"`
+	ParentStatus string `json:"parent_status"`
+}
+
+type SubStatusesResponse struct {
+	Data []SubStatusData `json:"data"`
+}
+
+func (c *Client) ListSubStatuses() ([]SubStatus, error) {
+	url := fmt.Sprintf("%s/sub_statuses", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response SubStatusesResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	subStatuses := make([]SubStatus, 0, len(response.Data))
+	for _, data := range response.Data {
+		subStatuses = append(subStatuses, SubStatus{
+			ID:           data.ID,
+			Name:         data.Attributes.Name,
+			Slug:         data.Attributes.Slug,
+			ParentStatus: data.Attributes.ParentStatus,
+		})
+	}
+
+	return subStatuses, nil
+}
+
 // UpdateIncidentRequest represents the JSON:API request to update an incident
 type UpdateIncidentRequest struct {
 	Data UpdateIncidentData `json:"data"`
@@ -397,13 +465,14 @@ type UpdateIncidentData struct {
 }
 
 type UpdateIncidentAttributes struct {
-	Title      string            `json:"title,omitempty"`
-	Summary    string            `json:"summary,omitempty"`
-	Status     string            `json:"status,omitempty"`
-	SeverityID string            `json:"severity_id,omitempty"`
-	ServiceIDs []string          `json:"service_ids,omitempty"`
-	GroupIDs   []string          `json:"group_ids,omitempty"`
-	Labels     map[string]string `json:"labels,omitempty"`
+	Title       string            `json:"title,omitempty"`
+	Summary     string            `json:"summary,omitempty"`
+	Status      string            `json:"status,omitempty"`
+	SubStatusID string            `json:"sub_status_id,omitempty"`
+	SeverityID  string            `json:"severity_id,omitempty"`
+	ServiceIDs  []string          `json:"service_ids,omitempty"`
+	GroupIDs    []string          `json:"group_ids,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
 }
 
 func (c *Client) UpdateIncident(id string, attrs UpdateIncidentAttributes) (*Incident, error) {
