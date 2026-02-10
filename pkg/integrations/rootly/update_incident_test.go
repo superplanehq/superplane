@@ -185,7 +185,7 @@ func Test__UpdateIncident__Execute(t *testing.T) {
 		// Verify request
 		require.Len(t, httpContext.Requests, 1)
 		req := httpContext.Requests[0]
-		assert.Equal(t, http.MethodPut, req.Method)
+		assert.Equal(t, http.MethodPatch, req.Method)
 		assert.Contains(t, req.URL.String(), "/incidents/inc-uuid-123")
 		assert.Equal(t, "application/vnd.api+json", req.Header.Get("Content-Type"))
 

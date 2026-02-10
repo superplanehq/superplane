@@ -491,7 +491,7 @@ func (c *Client) UpdateIncident(id string, attrs UpdateIncidentAttributes) (*Inc
 	}
 
 	url := fmt.Sprintf("%s/incidents/%s", c.BaseURL, id)
-	responseBody, err := c.execRequest(http.MethodPut, url, bytes.NewReader(body))
+	responseBody, err := c.execRequest(http.MethodPatch, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
