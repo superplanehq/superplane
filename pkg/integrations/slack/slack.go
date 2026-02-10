@@ -446,21 +446,3 @@ func (s *Slack) readAndVerify(ctx core.HTTPRequestContext) ([]byte, error) {
 
 	return body, nil
 }
-
-/*
- * All the events we receive from Slack are on the app's HandleWebhook(),
- * so all the Slack components and triggers use app subscriptions,
- * and not webhooks.
- */
-
-func (s *Slack) CompareWebhookConfig(a, b any) (bool, error) {
-	return false, nil
-}
-
-func (s *Slack) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	return nil, nil
-}
-
-func (s *Slack) CleanupWebhook(ctx core.CleanupWebhookContext) error {
-	return nil
-}

@@ -83,7 +83,7 @@ func UpdateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 		return nil, status.Error(codes.Internal, "failed to save integration")
 	}
 
-	proto, err := serializeIntegration(registry, instance, []models.WorkflowNodeReference{})
+	proto, err := serializeIntegration(registry, instance, []models.CanvasNodeReference{})
 	if err != nil {
 		log.Errorf("failed to serialize integration %s: %v", instance.ID, err)
 		return nil, status.Error(codes.Internal, "failed to serialize integration")
