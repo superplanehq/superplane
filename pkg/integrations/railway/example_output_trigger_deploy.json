@@ -1,0 +1,6 @@
+{
+  "project": "proj-xyz789",
+  "service": "srv-ghi012",
+  "environment": "env-def456",
+  "triggered": true
+}
