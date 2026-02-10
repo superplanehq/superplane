@@ -24,6 +24,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitHub repository" />
+  <LinkCard title="Create Issue Comment" href="#create-issue-comment" description="Add a comment to a GitHub issue or pull request" />
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitHub repository" />
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
@@ -980,6 +981,53 @@ Returns the created issue object with details including:
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.issue"
+}
+```
+
+<a id="create-issue-comment"></a>
+
+## Create Issue Comment
+
+The Create Issue Comment component adds a comment to an existing GitHub issue or pull request.
+Issues and pull requests share the same comment API in GitHub.
+
+### Use Cases
+
+- **Deployment updates**: Post deployment status or remediation updates to GitHub issues
+- **Runbook linking**: Add runbook links, error details, or status for responders
+- **Cross-platform sync**: Sync Slack or PagerDuty notes into GitHub as comments
+- **Automated comments**: Add automated comments based on workflow events
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the issue
+- **Issue Number**: The issue or PR number to comment on (supports expressions)
+- **Body**: The comment text (supports Markdown and expressions)
+
+### Output
+
+Returns the created comment object including:
+- Comment ID and URL
+- Comment body
+- Author information
+- Created timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "body": "Deployment to production completed successfully.",
+    "created_at": "2026-01-16T17:56:16Z",
+    "html_url": "https://github.com/acme/widgets/issues/42#issuecomment-5001",
+    "id": 5001,
+    "updated_at": "2026-01-16T17:56:16Z",
+    "user": {
+      "login": "superplane-app[bot]"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.issueComment"
 }
 ```
 
