@@ -30,7 +30,7 @@ func Test__Client__EncodeJobPath(t *testing.T) {
 		{
 			name:     "job with spaces",
 			input:    "my folder/my job",
-			expected: "job/my+folder/job/my+job",
+			expected: "job/my%20folder/job/my%20job",
 		},
 	}
 

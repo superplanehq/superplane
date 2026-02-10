@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -213,6 +214,7 @@ func Test__TriggerBuild__Execute(t *testing.T) {
 			NodeMetadata:   nodeMetadata,
 			ExecutionState: execState,
 			Requests:       reqCtx,
+			Logger:         logrus.NewEntry(logrus.New()),
 		})
 
 		require.NoError(t, err)
@@ -258,6 +260,7 @@ func Test__TriggerBuild__Execute(t *testing.T) {
 			NodeMetadata:   nodeMetadata,
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 			Requests:       &contexts.RequestContext{},
+			Logger:         logrus.NewEntry(logrus.New()),
 		})
 
 		require.Error(t, err)
