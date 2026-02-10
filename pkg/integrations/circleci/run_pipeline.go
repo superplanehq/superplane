@@ -31,7 +31,7 @@ type RunPipelineNodeMetadata struct {
 }
 
 type RunPipelineExecutionMetadata struct {
-	Pipeline  *PipelineInfo  `json:"pipeline" mapstructure:"pipeline"`
+	Pipeline  PipelineInfo   `json:"pipeline" mapstructure:"pipeline"`
 	Workflows []WorkflowInfo `json:"workflows" mapstructure:"workflows"`
 }
 
@@ -224,7 +224,7 @@ func (t *RunPipeline) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("pipeline definition ID is required")
 	}
 
-	if IsValidLocation(config.Location) {
+	if !IsValidLocation(config.Location) {
 		return fmt.Errorf("branch or tag is required, got: %s", config.Location)
 	}
 
@@ -267,15 +267,17 @@ func (t *RunPipeline) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to run pipeline: %w", err)
 	}
 
-	err = ctx.Metadata.Set(RunPipelineExecutionMetadata{
-		Pipeline: &PipelineInfo{
+	metadata := RunPipelineExecutionMetadata{
+		Pipeline: PipelineInfo{
 			ID:          response.ID,
 			Number:      response.Number,
 			CreatedAt:   response.CreatedAt,
 			PipelineURL: fmt.Sprintf("https://app.circleci.com/pipelines/%s/%d", spec.ProjectSlug, response.Number),
 		},
 		Workflows: []WorkflowInfo{},
-	})
+	}
+
+	err = ctx.Metadata.Set(metadata)
 	if err != nil {
 		return fmt.Errorf("error setting metadata: %v", err)
 	}
