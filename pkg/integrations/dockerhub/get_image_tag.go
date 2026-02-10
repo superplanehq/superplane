@@ -84,7 +84,6 @@ func (c *GetImageTag) Configuration() []configuration.Field {
 			Label:       "Tag",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Default:     "latest",
 			Placeholder: "latest",
 		},
 	}
@@ -145,8 +144,6 @@ func (c *GetImageTag) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
-
-	ctx.Logger.Infof("Fetching image tag %s in repository %s in namespace %s", tag, repositoryName, namespace)
 
 	tagResponse, err := client.GetRepositoryTag(namespace, repositoryName, tag)
 	if err != nil {

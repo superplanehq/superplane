@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -49,7 +50,7 @@ func Test__OnImagePush__Setup(t *testing.T) {
 			Metadata:    metadata,
 			Webhook:     &contexts.WebhookContext{},
 			Configuration: map[string]any{
-				"repository": "demo",
+				"repository": "superplane/demo",
 			},
 		})
 
@@ -68,7 +69,16 @@ func Test__OnImagePush__HandleWebhook(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          []byte(`invalid`),
 			Events:        &contexts.EventContext{},
-			Configuration: map[string]any{"repository": "demo"},
+			Configuration: map[string]any{"repository": "superplane/demo"},
+			Metadata: &contexts.MetadataContext{
+				Metadata: OnImagePushMetadata{
+					Repository: &RepositoryMetadata{
+						Namespace: "superplane",
+						Name:      "demo",
+					},
+				},
+			},
+			Logger: log.NewEntry(log.New()),
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
@@ -76,12 +86,21 @@ func Test__OnImagePush__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("repository mismatch -> ignored", func(t *testing.T) {
-		body := []byte(`{"repository":{"name":"other"},"push_data":{"tag":"latest"}}`)
+		body := []byte(`{"repository":{"name":"other", "namespace":"superplane"},"push_data":{"tag":"latest"}}`)
 		events := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Events:        events,
-			Configuration: map[string]any{"repository": "demo"},
+			Configuration: map[string]any{"repository": "superplane/demo"},
+			Logger:        log.NewEntry(log.New()),
+			Metadata: &contexts.MetadataContext{
+				Metadata: OnImagePushMetadata{
+					Repository: &RepositoryMetadata{
+						Namespace: "superplane",
+						Name:      "demo",
+					},
+				},
+			},
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -90,13 +109,22 @@ func Test__OnImagePush__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("tag filter mismatch -> ignored", func(t *testing.T) {
-		body := []byte(`{"repository":{"name":"demo"},"push_data":{"tag":"latest"}}`)
+		body := []byte(`{"repository":{"name":"demo", "namespace":"superplane"},"push_data":{"tag":"latest"}}`)
 		events := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:   body,
+			Logger: log.NewEntry(log.New()),
 			Events: events,
+			Metadata: &contexts.MetadataContext{
+				Metadata: OnImagePushMetadata{
+					Repository: &RepositoryMetadata{
+						Namespace: "superplane",
+						Name:      "demo",
+					},
+				},
+			},
 			Configuration: map[string]any{
-				"repository": "demo",
+				"repository": "superplane/demo",
 				"tags": []map[string]any{
 					{
 						"type":  configuration.PredicateTypeEquals,
@@ -112,17 +140,26 @@ func Test__OnImagePush__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("match -> event emitted", func(t *testing.T) {
-		body := []byte(`{"repository":{"name":"demo"},"push_data":{"tag":"v1.2.3"}}`)
+		body := []byte(`{"repository":{"name":"demo", "namespace":"superplane"},"push_data":{"tag":"v1.2.3"}}`)
 		events := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:   body,
 			Events: events,
+			Logger: log.NewEntry(log.New()),
+			Metadata: &contexts.MetadataContext{
+				Metadata: OnImagePushMetadata{
+					Repository: &RepositoryMetadata{
+						Namespace: "superplane",
+						Name:      "demo",
+					},
+				},
+			},
 			Configuration: map[string]any{
-				"repository": "demo",
+				"repository": "superplane/demo",
 				"tags": []map[string]any{
 					{
 						"type":  configuration.PredicateTypeMatches,
-						"value": "^v[0-9]+",
+						"value": "^v1.*",
 					},
 				},
 			},

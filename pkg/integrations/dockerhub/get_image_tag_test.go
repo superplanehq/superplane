@@ -39,7 +39,7 @@ func Test__GetImageTag__Setup(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Integration:   &contexts.IntegrationContext{},
 			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"repository": "demo"},
+			Configuration: map[string]any{"repository": "superplane/demo"},
 		})
 
 		require.ErrorContains(t, err, "tag is required")
@@ -50,7 +50,7 @@ func Test__GetImageTag__Setup(t *testing.T) {
 			HTTP:     &contexts.HTTPContext{},
 			Metadata: &contexts.MetadataContext{},
 			Configuration: map[string]any{
-				"repository": "demo",
+				"repository": "superplane/demo",
 				"tag":        "latest",
 			},
 		})
@@ -82,8 +82,7 @@ func Test__GetImageTag__Execute(t *testing.T) {
 		HTTP:           httpCtx,
 		ExecutionState: execState,
 		Configuration: map[string]any{
-			"namespace":  "superplane",
-			"repository": "demo",
+			"repository": "superplane/demo",
 			"tag":        "latest",
 		},
 	})
