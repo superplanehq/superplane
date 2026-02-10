@@ -50,23 +50,27 @@ This trigger generates a webhook URL in SuperPlane. Add that URL as a DockerHub 
 
 ```json
 {
-  "callback_url": "https://hub.docker.com/u/superplane/demo/hook/abcd/",
-  "push_data": {
-    "pushed_at": 1736400000,
-    "pusher": "superplane-bot",
-    "tag": "v1.2.3"
+  "data": {
+    "callback_url": "https://hub.docker.com/u/superplane/demo/hook/abcd/",
+    "push_data": {
+      "pushed_at": 1736400000,
+      "pusher": "superplane-bot",
+      "tag": "v1.2.3"
+    },
+    "repository": {
+      "description": "Demo image for SuperPlane workflows",
+      "is_private": false,
+      "name": "demo",
+      "namespace": "superplane",
+      "pull_count": 3456,
+      "repo_name": "superplane/demo",
+      "repo_url": "https://hub.docker.com/r/superplane/demo",
+      "star_count": 12,
+      "status": "Active"
+    }
   },
-  "repository": {
-    "description": "Demo image for SuperPlane workflows",
-    "is_private": false,
-    "name": "demo",
-    "namespace": "superplane",
-    "pull_count": 3456,
-    "repo_name": "superplane/demo",
-    "repo_url": "https://hub.docker.com/r/superplane/demo",
-    "star_count": 12,
-    "status": "Active"
-  }
+  "timestamp": "2026-02-03T12:00:00Z",
+  "type": "dockerhub.image.push"
 }
 ```
 
@@ -91,28 +95,32 @@ The Get Image Tag component retrieves metadata for a DockerHub image tag.
 
 ```json
 {
-  "full_size": 52837442,
-  "id": 123456,
-  "images": [
-    {
-      "architecture": "amd64",
-      "digest": "sha256:fe12ab34cd56ef78ab90cd12ef34ab56cd78ef90ab12cd34ef56ab78cd90ef12",
-      "last_pulled": "2025-01-06T11:02:10.123456Z",
-      "last_pushed": "2025-01-05T21:06:53.506400Z",
-      "os": "linux",
-      "size": 52837442,
-      "status": "active"
-    }
-  ],
-  "last_updated": "2025-01-05T21:06:53.506400Z",
-  "last_updater": 1234,
-  "last_updater_username": "superplane-bot",
-  "name": "latest",
-  "repository": 98765,
-  "status": "active",
-  "tag_last_pulled": "2025-01-06T11:02:10.123456Z",
-  "tag_last_pushed": "2025-01-05T21:06:53.506400Z",
-  "v2": "true"
+  "data": {
+    "full_size": 52837442,
+    "id": 123456,
+    "images": [
+      {
+        "architecture": "amd64",
+        "digest": "sha256:fe12ab34cd56ef78ab90cd12ef34ab56cd78ef90ab12cd34ef56ab78cd90ef12",
+        "last_pulled": "2025-01-06T11:02:10.123456Z",
+        "last_pushed": "2025-01-05T21:06:53.506400Z",
+        "os": "linux",
+        "size": 52837442,
+        "status": "active"
+      }
+    ],
+    "last_updated": "2025-01-05T21:06:53.506400Z",
+    "last_updater": 1234,
+    "last_updater_username": "superplane-bot",
+    "name": "latest",
+    "repository": 98765,
+    "status": "active",
+    "tag_last_pulled": "2025-01-06T11:02:10.123456Z",
+    "tag_last_pushed": "2025-01-05T21:06:53.506400Z",
+    "v2": "true"
+  },
+  "timestamp": "2026-02-03T12:00:00Z",
+  "type": "dockerhub.tag"
 }
 ```
 
