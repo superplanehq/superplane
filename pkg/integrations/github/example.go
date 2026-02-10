@@ -39,6 +39,7 @@ var exampleOutputRunWorkflowBytes []byte
 
 //go:embed example_output_get_billing_usage.json
 var exampleOutputGetBillingUsageBytes []byte
+
 //go:embed example_output_create_review.json
 var exampleOutputCreateReviewBytes []byte
 
@@ -101,6 +102,7 @@ var exampleOutputRunWorkflow map[string]any
 
 var exampleOutputGetBillingUsageOnce sync.Once
 var exampleOutputGetBillingUsage map[string]any
+
 var exampleOutputCreateReviewOnce sync.Once
 var exampleOutputCreateReview map[string]any
 
