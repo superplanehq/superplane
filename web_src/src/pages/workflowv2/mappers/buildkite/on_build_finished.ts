@@ -5,13 +5,10 @@ import BuildkiteLogo from "@/assets/buildkite-logo.svg";
 import { formatTimeAgo } from "@/utils/date";
 
 interface OnBuildFinishedMetadata {
-  url?: string;
-  token?: string;
-  project?: {
-    id: string;
-    name: string;
-    url: string;
-  };
+  organization?: string;
+  pipeline?: string;
+  branch?: string;
+  appSubscriptionID?: string;
 }
 
 interface OnBuildFinishedEventData {
@@ -93,10 +90,24 @@ export const onBuildFinishedTriggerRenderer: TriggerRenderer = {
     const metadata = node.metadata as unknown as OnBuildFinishedMetadata;
     const metadataItems = [];
 
-    if (metadata?.project?.name) {
+    if (metadata?.organization) {
       metadataItems.push({
-        icon: "folder",
-        label: `${metadata.project.name} (${metadata.project.id})`,
+        icon: "users",
+        label: metadata.organization,
+      });
+    }
+
+    if (metadata?.pipeline) {
+      metadataItems.push({
+        icon: "layers",
+        label: metadata.pipeline,
+      });
+    }
+
+    if (metadata?.branch) {
+      metadataItems.push({
+        icon: "git-branch",
+        label: metadata.branch,
       });
     }
 
