@@ -37,6 +37,12 @@ var exampleOutputCreateSyntheticCheckBytes []byte
 var exampleOutputCreateSyntheticCheckOnce sync.Once
 var exampleOutputCreateSyntheticCheck map[string]any
 
+//go:embed example_output_update_synthetic_check.json
+var exampleOutputUpdateSyntheticCheckBytes []byte
+
+var exampleOutputUpdateSyntheticCheckOnce sync.Once
+var exampleOutputUpdateSyntheticCheck map[string]any
+
 func (c *QueryPrometheus) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryPrometheusOnce, exampleOutputQueryPrometheusBytes, &exampleOutputQueryPrometheus)
 }
@@ -58,4 +64,9 @@ func (c *GetCheckDetails) ExampleOutput() map[string]any {
 // ExampleOutput returns sample output data for Create Synthetic Check.
 func (c *CreateSyntheticCheck) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateSyntheticCheckOnce, exampleOutputCreateSyntheticCheckBytes, &exampleOutputCreateSyntheticCheck)
+}
+
+// ExampleOutput returns sample output data for Update Synthetic Check.
+func (c *UpdateSyntheticCheck) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateSyntheticCheckOnce, exampleOutputUpdateSyntheticCheckBytes, &exampleOutputUpdateSyntheticCheck)
 }

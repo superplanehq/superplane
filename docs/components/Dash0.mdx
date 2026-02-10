@@ -14,8 +14,69 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="List Issues" href="#list-issues" description="Query Dash0 to get a list of all current issues using the metric dash0.issue.status" />
   <LinkCard title="Query Prometheus" href="#query-prometheus" description="Execute a PromQL query against Dash0 Prometheus API and return the response data" />
   <LinkCard title="Send Log Event" href="#send-log-event" description="Send one or more workflow log records to Dash0 OTLP HTTP ingestion" />
+  <LinkCard title="Update Synthetic Check" href="#update-synthetic-check" description="Update an existing synthetic check in Dash0 configuration API" />
 </CardGrid>
 
+<a id="update-synthetic-check"></a>
+
+## Update Synthetic Check
+
+The Update Synthetic Check component updates an existing Dash0 synthetic check.
+
+### Use Cases
+
+- **Change monitoring target**: Update URLs, probes, or assertions after infrastructure changes
+- **Tune schedules**: Adjust check intervals as traffic and SLOs evolve
+- **Workflow-driven changes**: Roll out check updates as part of deployment workflows
+
+### Configuration
+
+- **Synthetic Check**: Existing synthetic check origin/ID
+- **Specification (JSON)**: Updated synthetic check payload as JSON object
+
+Example specification:
+```json
+{
+  "kind": "Dash0SyntheticCheck",
+  "metadata": {
+    "name": "checkout-health"
+  },
+  "spec": {
+    "enabled": true,
+    "plugin": {
+      "kind": "http",
+      "spec": {
+        "request": {
+          "method": "get",
+          "url": "https://www.example.com/health"
+        }
+      }
+    }
+  }
+}
+```
+
+### Output
+
+Emits:
+- **originOrId**: Synthetic check identifier used for the API request
+- **response**: Raw Dash0 API response
+
+### Example Output
+
+```json
+{
+  "data": {
+    "originOrId": "superplane-synthetic-ab12cd34",
+    "response": {
+      "id": "superplane-synthetic-ab12cd34",
+      "status": "updated"
+    }
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.synthetic.check.updated"
+}
+```
 <a id="list-issues"></a>
 
 ## List Issues
@@ -302,4 +363,3 @@ Returns the Prometheus query response including:
   "type": "dash0.prometheus.response"
 }
 ```
-

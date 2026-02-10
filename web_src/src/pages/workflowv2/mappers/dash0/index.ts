@@ -7,6 +7,7 @@ import { buildActionStateRegistry } from "../utils";
 import { sendLogEventMapper } from "./send_log_event";
 import { getCheckDetailsMapper } from "./get_check_details";
 import { createSyntheticCheckMapper } from "./create_synthetic_check";
+import { updateSyntheticCheckMapper } from "./update_synthetic_check";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   queryPrometheus: queryPrometheusMapper,
@@ -14,6 +15,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   sendLogEvent: sendLogEventMapper,
   getCheckDetails: getCheckDetailsMapper,
   createSyntheticCheck: createSyntheticCheckMapper,
+  updateSyntheticCheck: updateSyntheticCheckMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {};
@@ -24,6 +26,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   sendLogEvent: buildActionStateRegistry("sent"),
   getCheckDetails: buildActionStateRegistry("retrieved"),
   createSyntheticCheck: buildActionStateRegistry("created"),
+  updateSyntheticCheck: buildActionStateRegistry("updated"),
 };
 
 export async function resolveExecutionErrors(canvasId: string, executionIds: string[]) {

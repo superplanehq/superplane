@@ -268,6 +268,61 @@ func (c *Client) ListCheckRules() ([]CheckRule, error) {
 	return checkRules, nil
 }
 
+// ListSyntheticChecks lists Dash0 synthetic checks for resource pickers and lookups.
+func (c *Client) ListSyntheticChecks() ([]SyntheticCheck, error) {
+	apiURL := fmt.Sprintf("%s/api/synthetic-checks", c.BaseURL)
+	requestURL, err := c.withDatasetQuery(apiURL)
+	if err != nil {
+		return nil, err
+	}
+
+	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil, "")
+	if err != nil {
+		return nil, err
+	}
+
+	var checks []SyntheticCheck
+
+	var stringList []string
+	if err := json.Unmarshal(responseBody, &stringList); err == nil {
+		checks = make([]SyntheticCheck, 0, len(stringList))
+		for _, id := range stringList {
+			trimmed := strings.TrimSpace(id)
+			if trimmed == "" {
+				continue
+			}
+			checks = append(checks, SyntheticCheck{
+				ID:     trimmed,
+				Name:   trimmed,
+				Origin: trimmed,
+			})
+		}
+		return checks, nil
+	}
+
+	if err := json.Unmarshal(responseBody, &checks); err != nil {
+		return nil, fmt.Errorf("error parsing synthetic checks response: %v", err)
+	}
+
+	for index := range checks {
+		if checks[index].ID == "" {
+			checks[index].ID = checks[index].Origin
+		}
+		if checks[index].Origin == "" {
+			checks[index].Origin = checks[index].ID
+		}
+		if checks[index].Name == "" {
+			if checks[index].ID != "" {
+				checks[index].Name = checks[index].ID
+			} else {
+				checks[index].Name = checks[index].Origin
+			}
+		}
+	}
+
+	return checks, nil
+}
+
 // SendLogEvents sends OTLP log batches to Dash0 ingestion endpoint.
 func (c *Client) SendLogEvents(request OTLPLogsRequest) (map[string]any, error) {
 	requestURL := fmt.Sprintf("%s/v1/logs", c.LogsIngestURL)
