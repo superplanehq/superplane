@@ -29,7 +29,16 @@ To set up New Relic integration:
 4. **Copy API Key**: Copy the generated API key (you won't be able to see it again)
 5. **Paste API Key**: Paste the API key in the field below
 
-**Note**: The API key needs permissions to read accounts and create webhooks.
+## Usage
+
+- **Report Metric**: Use this action to send custom telemetry (Gauge, Count, Summary) to New Relic.
+- **Run NRQL Query**: Use this action to fetch data from New Relic for decision making or reporting.
+
+## Note
+
+The **Report Metric** action requires a **License Key** (Ingest - License) or an **API Key** (User) with ingest permissions. 
+If you use a User API Key, it must have the necessary permissions. A License Key is generally recommended for metric ingestion.
+The **Run NRQL Query** action requires a **User API Key** (NRAK-) with query permissions.
 
 <a id="on-issue"></a>
 

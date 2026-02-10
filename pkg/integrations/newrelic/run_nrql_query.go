@@ -16,9 +16,9 @@ const RunNRQLQueryPayloadType = "newrelic.nrqlQuery"
 type RunNRQLQuery struct{}
 
 type RunNRQLQuerySpec struct {
-	AccountID string `json:"accountId"`
-	Query     string `json:"query"`
-	Timeout   int    `json:"timeout"`
+	AccountID string `json:"accountId" yaml:"accountId"`
+	Query     string `json:"query" yaml:"query"`
+	Timeout   int    `json:"timeout" yaml:"timeout"`
 }
 
 type RunNRQLQueryPayload struct {

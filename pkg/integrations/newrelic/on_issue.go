@@ -14,8 +14,8 @@ import (
 type OnIssue struct{}
 
 type OnIssueConfiguration struct {
-	Priorities []string `json:"priorities"`
-	States     []string `json:"states"`
+	Priorities []string `json:"priorities" yaml:"priorities"`
+	States     []string `json:"states" yaml:"states"`
 }
 
 func (t *OnIssue) Name() string {

@@ -16,11 +16,11 @@ const ReportMetricPayloadType = "newrelic.metric"
 type ReportMetric struct{}
 
 type ReportMetricSpec struct {
-	MetricName string         `json:"metricName"`
-	MetricType string         `json:"metricType"`
-	Value      float64        `json:"value"`
-	Timestamp  int64          `json:"timestamp"`
-	Attributes map[string]any `json:"attributes"`
+	MetricName string         `json:"metricName" yaml:"metricName"`
+	MetricType string         `json:"metricType" yaml:"metricType"`
+	Value      float64        `json:"value" yaml:"value"`
+	Timestamp  int64          `json:"timestamp" yaml:"timestamp"`
+	Attributes map[string]any `json:"attributes" yaml:"attributes"`
 }
 
 func (c *ReportMetric) Name() string {
