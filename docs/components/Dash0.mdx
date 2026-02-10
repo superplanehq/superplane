@@ -9,6 +9,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Synthetic Check" href="#create-synthetic-check" description="Create a synthetic check in Dash0 configuration API" />
   <LinkCard title="Get Check Details" href="#get-check-details" description="Get detailed information for a Dash0 check by ID" />
   <LinkCard title="List Issues" href="#list-issues" description="Query Dash0 to get a list of all current issues using the metric dash0.issue.status" />
   <LinkCard title="Query Prometheus" href="#query-prometheus" description="Execute a PromQL query against Dash0 Prometheus API and return the response data" />
@@ -79,6 +80,67 @@ Returns a list of issues with:
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "dash0.issues.list"
+}
+```
+
+<a id="create-synthetic-check"></a>
+
+## Create Synthetic Check
+
+The Create Synthetic Check component creates a Dash0 synthetic check using the configuration API.
+
+### Use Cases
+
+- **Service onboarding**: Create synthetic checks when new services are deployed
+- **Environment bootstrap**: Provision baseline uptime checks in new environments
+- **Automation workflows**: Create checks from CI/CD or incident workflows
+
+### Configuration
+
+- **Origin or ID (Optional)**: Custom synthetic check identifier. If omitted, SuperPlane generates one.
+- **Specification (JSON)**: Synthetic check JSON payload accepted by Dash0 config API
+
+Example specification:
+```json
+{
+  "kind": "Dash0SyntheticCheck",
+  "metadata": {
+    "name": "checkout-health"
+  },
+  "spec": {
+    "enabled": true,
+    "plugin": {
+      "kind": "http",
+      "spec": {
+        "request": {
+          "method": "get",
+          "url": "https://www.example.com/health"
+        }
+      }
+    }
+  }
+}
+```
+
+### Output
+
+Emits:
+- **originOrId**: Synthetic check identifier used for the API request
+- **response**: Raw Dash0 API response
+
+### Example Output
+
+```json
+{
+  "data": {
+    "originOrId": "superplane-synthetic-ab12cd34",
+    "response": {
+      "id": "superplane-synthetic-ab12cd34",
+      "status": "updated"
+    }
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.synthetic.check.created"
 }
 ```
 

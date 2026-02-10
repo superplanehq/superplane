@@ -82,3 +82,9 @@ type GetCheckDetailsConfiguration struct {
 	CheckID        string `json:"checkId" mapstructure:"checkId"`
 	IncludeHistory bool   `json:"includeHistory" mapstructure:"includeHistory"`
 }
+
+// UpsertSyntheticCheckConfiguration stores synthetic check upsert input.
+type UpsertSyntheticCheckConfiguration struct {
+	OriginOrID string `json:"originOrId" mapstructure:"originOrId"`
+	Spec       string `json:"spec" mapstructure:"spec"`
+}
