@@ -32,6 +32,11 @@ export interface GetCheckDetailsConfiguration {
   includeHistory?: boolean;
 }
 
+export interface UpsertSyntheticCheckConfiguration {
+  originOrId?: string;
+  spec?: string;
+}
+
 export interface PrometheusResponse {
   status: string;
   data: {
