@@ -104,8 +104,7 @@ func (p *OnPipelineCompleted) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("projectSlug is required")
 	}
 
-	// If this is the same project, nothing to do
-	if metadata.Project != nil && config.ProjectSlug == metadata.Project.Slug {
+	if config.ProjectSlug == metadata.Project.Slug {
 		return nil
 	}
 
@@ -119,7 +118,6 @@ func (p *OnPipelineCompleted) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("project not found or inaccessible: %w", err)
 	}
 
-	// Save project metadata
 	err = ctx.Metadata.Set(OnPipelineCompletedMetadata{
 		Project: &Project{
 			ID:   project.ID,
@@ -132,7 +130,6 @@ func (p *OnPipelineCompleted) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("error setting metadata: %v", err)
 	}
 
-	// Request webhook setup
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		ProjectSlug: config.ProjectSlug,
 		Events:      []string{"workflow-completed"},
@@ -148,14 +145,11 @@ func (p *OnPipelineCompleted) HandleAction(ctx core.TriggerActionContext) (map[s
 }
 
 func (p *OnPipelineCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	// Verify webhook signature
-	// CircleCI sends signature as "v1=<hex>" format
 	signatureHeader := ctx.Headers.Get("circleci-signature")
 	if signatureHeader == "" {
 		return http.StatusForbidden, fmt.Errorf("missing signature")
 	}
 
-	// Parse "v1=<hex>" format - extract just the hex part
 	signature := signatureHeader
 	if strings.HasPrefix(signatureHeader, "v1=") {
 		signature = strings.TrimPrefix(signatureHeader, "v1=")
@@ -170,20 +164,17 @@ func (p *OnPipelineCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int
 		return http.StatusForbidden, fmt.Errorf("invalid signature")
 	}
 
-	// Parse webhook payload
 	data := map[string]any{}
 	err = json.Unmarshal(ctx.Body, &data)
 	if err != nil {
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	// Verify this is a workflow-completed event
 	eventType, ok := data["type"].(string)
 	if !ok || eventType != "workflow-completed" {
-		return http.StatusOK, nil // Ignore other event types
+		return http.StatusOK, nil
 	}
 
-	// Emit event to SuperPlane
 	err = ctx.Events.Emit("circleci.workflow.completed", data)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
