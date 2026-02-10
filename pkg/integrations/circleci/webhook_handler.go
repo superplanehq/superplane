@@ -27,63 +27,7 @@ var (
 	}
 )
 
-func normalizeEvents(events []string) ([]string, error) {
-	if len(events) == 0 {
-		return defaultEvents, nil
-	}
-
-	unique := make([]string, 0, len(events))
-	seen := map[string]struct{}{}
-
-	for _, event := range events {
-		if _, ok := allowedEvents[event]; !ok {
-			return nil, fmt.Errorf("unsupported CircleCI event type: %s", event)
-		}
-		if _, exists := seen[event]; exists {
-			continue
-		}
-		seen[event] = struct{}{}
-		unique = append(unique, event)
-	}
-
-	return unique, nil
-}
-
 type CircleCIWebhookHandler struct{}
-
-func (h *CircleCIWebhookHandler) CompareConfig(a, b any) (bool, error) {
-	configA := WebhookConfiguration{}
-	if err := mapstructure.Decode(a, &configA); err != nil {
-		return false, err
-	}
-
-	configB := WebhookConfiguration{}
-	if err := mapstructure.Decode(b, &configB); err != nil {
-		return false, err
-	}
-
-	normalizedA, err := normalizeEvents(configA.Events)
-	if err != nil {
-		return false, err
-	}
-
-	normalizedB, err := normalizeEvents(configB.Events)
-	if err != nil {
-		return false, err
-	}
-
-	if configA.ProjectSlug != configB.ProjectSlug {
-		return false, nil
-	}
-
-	for _, eventB := range normalizedB {
-		if !slices.Contains(normalizedA, eventB) {
-			return false, nil
-		}
-	}
-
-	return true, nil
-}
 
 func (h *CircleCIWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -129,6 +73,64 @@ func (h *CircleCIWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, err
 	}, nil
 }
 
+func (h *CircleCIWebhookHandler) CompareConfig(a, b any) (bool, error) {
+	configA := WebhookConfiguration{}
+	if err := mapstructure.Decode(a, &configA); err != nil {
+		return false, err
+	}
+
+	configB := WebhookConfiguration{}
+	if err := mapstructure.Decode(b, &configB); err != nil {
+		return false, err
+	}
+
+	normalizedA, err := normalizeEvents(configA.Events)
+	if err != nil {
+		return false, err
+	}
+
+	normalizedB, err := normalizeEvents(configB.Events)
+	if err != nil {
+		return false, err
+	}
+
+	if configA.ProjectSlug != configB.ProjectSlug {
+		return false, nil
+	}
+
+	for _, eventB := range normalizedB {
+		if !slices.Contains(normalizedA, eventB) {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+func (h *CircleCIWebhookHandler) Merge(current, requested any) (any, bool, error) {
+	currentConfig := WebhookConfiguration{}
+	if err := mapstructure.Decode(current, &currentConfig); err != nil {
+		return nil, false, err
+	}
+
+	requestedConfig := WebhookConfiguration{}
+	if err := mapstructure.Decode(requested, &requestedConfig); err != nil {
+		return nil, false, err
+	}
+
+	normalizedRequestedEvents, err := normalizeEvents(requestedConfig.Events)
+	if err != nil {
+		return nil, false, err
+	}
+
+	mergedConfig := WebhookConfiguration{
+		ProjectSlug: currentConfig.ProjectSlug,
+		Events:      normalizedRequestedEvents,
+	}
+
+	return mergedConfig, true, nil
+}
+
 func (h *CircleCIWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 	metadata := WebhookMetadata{}
 	err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &metadata)
@@ -142,4 +144,28 @@ func (h *CircleCIWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 	}
 
 	return client.DeleteWebhook(metadata.WebhookID)
+}
+
+func normalizeEvents(events []string) ([]string, error) {
+	if len(events) == 0 {
+		return defaultEvents, nil
+	}
+
+	unique := make([]string, 0, len(events))
+	seen := map[string]struct{}{}
+
+	for _, event := range events {
+		if _, ok := allowedEvents[event]; !ok {
+			return nil, fmt.Errorf("unsupported CircleCI event type: %s", event)
+		}
+
+		if _, exists := seen[event]; exists {
+			continue
+		}
+
+		seen[event] = struct{}{}
+		unique = append(unique, event)
+	}
+
+	return unique, nil
 }
