@@ -12,7 +12,7 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { ListNotesResponse, Note } from "./types";
+import { ListLogEntriesResponse, LogEntry } from "./types";
 
 /**
  * Extracts the first payload from execution outputs.
@@ -29,19 +29,19 @@ function getFirstPayload(execution: ExecutionInfo): OutputPayload | null {
 }
 
 /**
- * Extracts notes from the execution payload.
+ * Extracts log entries from the execution payload.
  */
-function getNotes(execution: ExecutionInfo): Note[] {
+function getLogEntries(execution: ExecutionInfo): LogEntry[] {
   const payload = getFirstPayload(execution);
   if (!payload || !payload.data) return [];
 
-  const responseData = payload.data as ListNotesResponse | undefined;
-  if (!responseData || !responseData.notes) return [];
+  const responseData = payload.data as ListLogEntriesResponse | undefined;
+  if (!responseData || !responseData.log_entries) return [];
 
-  return responseData.notes;
+  return responseData.log_entries;
 }
 
-export const listNotesMapper: ComponentBaseMapper = {
+export const listLogEntriesMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution =
       context.lastExecutions && context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
@@ -65,13 +65,13 @@ export const listNotesMapper: ComponentBaseMapper = {
 
   subtitle(context: SubtitleContext): string {
     const timeAgo = formatTimeAgo(new Date(context.execution.createdAt!));
-    const notes = getNotes(context.execution);
+    const logEntries = getLogEntries(context.execution);
 
-    if (notes.length > 0) {
-      return `${notes.length} note${notes.length === 1 ? "" : "s"} · ${timeAgo}`;
+    if (logEntries.length > 0) {
+      return `${logEntries.length} log entr${logEntries.length === 1 ? "y" : "ies"} · ${timeAgo}`;
     }
 
-    return `no notes · ${timeAgo}`;
+    return `no log entries · ${timeAgo}`;
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
@@ -82,8 +82,8 @@ export const listNotesMapper: ComponentBaseMapper = {
       details["Checked at"] = new Date(context.execution.createdAt).toLocaleString();
     }
 
-    const notes = getNotes(context.execution);
-    details["Notes"] = `${notes.length} note${notes.length === 1 ? "" : "s"} fetched`;
+    const logEntries = getLogEntries(context.execution);
+    details["Log Entries"] = `${logEntries.length} log entr${logEntries.length === 1 ? "y" : "ies"} fetched`;
 
     return details;
   },
@@ -98,6 +98,10 @@ function metadataList(node: { configuration?: unknown }): MetadataItem[] {
     metadata.push({ icon: "alert-triangle", label: `Incident: ${configuration.incidentId}` });
   }
 
+  if (configuration.limit) {
+    metadata.push({ icon: "hash", label: `Limit: ${configuration.limit}` });
+  }
+
   return metadata;
 }
 
@@ -106,14 +110,14 @@ function baseEventSections(nodes: { id: string }[], execution: ExecutionInfo, co
   const rootTriggerRenderer = getTriggerRenderer((rootTriggerNode as any)?.trigger?.name || "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
-  const notes = getNotes(execution);
+  const logEntries = getLogEntries(execution);
   const timeAgo = formatTimeAgo(new Date(execution.createdAt!));
 
   let eventSubtitle: string;
-  if (notes.length > 0) {
-    eventSubtitle = `${notes.length} note${notes.length === 1 ? "" : "s"} · ${timeAgo}`;
+  if (logEntries.length > 0) {
+    eventSubtitle = `${logEntries.length} log entr${logEntries.length === 1 ? "y" : "ies"} · ${timeAgo}`;
   } else {
-    eventSubtitle = `no notes · ${timeAgo}`;
+    eventSubtitle = `no log entries · ${timeAgo}`;
   }
 
   return [
