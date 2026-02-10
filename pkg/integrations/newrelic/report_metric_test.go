@@ -91,7 +91,9 @@ func TestClient_ReportMetric(t *testing.T) {
 		require.Len(t, httpCtx.Requests, 1)
 		assert.Equal(t, "https://metric-api.newrelic.com/metric/v1", httpCtx.Requests[0].URL.String())
 		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
-		assert.Equal(t, "test-key", httpCtx.Requests[0].Header.Get("Api-Key"))
+		// test-key is not an NRAK key, so it should use X-License-Key
+		assert.Equal(t, "", httpCtx.Requests[0].Header.Get("Api-Key"))
+		assert.Equal(t, "test-key", httpCtx.Requests[0].Header.Get("X-License-Key"))
 		assert.Equal(t, "application/json", httpCtx.Requests[0].Header.Get("Content-Type"))
 
 		// Verify request body
@@ -104,6 +106,92 @@ func TestClient_ReportMetric(t *testing.T) {
 		assert.Equal(t, "test.metric", sentBatch[0].Metrics[0].Name)
 		assert.Equal(t, MetricTypeGauge, sentBatch[0].Metrics[0].Type)
 		assert.Equal(t, float64(42.5), sentBatch[0].Metrics[0].Value)
+	})
+
+	t.Run("User API Key (NRAK) request -> uses Api-Key header", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"requestId":"123"}`)),
+					Header:     make(http.Header),
+				},
+			},
+		}
+
+		client := &Client{
+			APIKey:        "NRAK-test-key",
+			BaseURL:       "https://api.newrelic.com/v2",
+			MetricBaseURL: "https://metric-api.newrelic.com/metric/v1",
+			http:          httpCtx,
+		}
+
+		batch := []MetricBatch{
+			{
+				Metrics: []Metric{
+					{
+						Name:  "test.metric",
+						Type:  MetricTypeGauge,
+						Value: 42.5,
+					},
+				},
+			},
+		}
+
+		err := client.ReportMetric(context.Background(), batch)
+
+		require.NoError(t, err)
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, "https://metric-api.newrelic.com/metric/v1", httpCtx.Requests[0].URL.String())
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
+		assert.Equal(t, "NRAK-test-key", httpCtx.Requests[0].Header.Get("Api-Key"))
+		assert.Equal(t, "", httpCtx.Requests[0].Header.Get("X-License-Key"))
+		assert.Equal(t, "application/json", httpCtx.Requests[0].Header.Get("Content-Type"))
+	})
+
+	t.Run("successful request with common attributes -> reports metric", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"requestId":"123"}`)),
+					Header:     make(http.Header),
+				},
+			},
+		}
+
+		client := &Client{
+			APIKey:        "test-key",
+			BaseURL:       "https://api.newrelic.com/v2",
+			MetricBaseURL: "https://metric-api.newrelic.com/metric/v1",
+			http:          httpCtx,
+		}
+
+		common := map[string]any{"app": "test-app"}
+		batch := []MetricBatch{
+			{
+				Common: &common,
+				Metrics: []Metric{
+					{
+						Name:  "test.metric",
+						Type:  MetricTypeGauge,
+						Value: 42.5,
+					},
+				},
+			},
+		}
+
+		err := client.ReportMetric(context.Background(), batch)
+
+		require.NoError(t, err)
+		
+		// Verify request body contains common attributes
+		bodyBytes, _ := io.ReadAll(httpCtx.Requests[0].Body)
+		var sentBatch []MetricBatch
+		err = json.Unmarshal(bodyBytes, &sentBatch)
+		require.NoError(t, err)
+		require.NotNil(t, sentBatch[0].Common)
+		assert.Equal(t, "test-app", (*sentBatch[0].Common)["app"])
 	})
 
 	t.Run("API error -> returns error", func(t *testing.T) {

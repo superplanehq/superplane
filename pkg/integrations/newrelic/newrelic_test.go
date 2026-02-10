@@ -299,6 +299,28 @@ func Test__Client__ValidateAPIKey(t *testing.T) {
 		assert.Equal(t, "test-key", httpCtx.Requests[0].Header.Get("Api-Key"))
 	})
 
+	t.Run("successful request with missing actor -> validates successfully", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(http.StatusOK, `{
+					"data": {
+						"actor": null
+					}
+				}`),
+			},
+		}
+
+		client := &Client{
+			APIKey:       "license-key",
+			NerdGraphURL: "https://api.newrelic.com/graphql",
+			http:         httpCtx,
+		}
+
+		err := client.ValidateAPIKey(context.Background())
+
+		require.NoError(t, err)
+	})
+
 	t.Run("API error -> returns error", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{

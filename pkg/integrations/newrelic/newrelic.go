@@ -121,7 +121,6 @@ func (n *NewRelic) Sync(ctx core.SyncContext) error {
 	}
 
 	// Validate API key using NerdGraph (GraphQL) identity query
-	// This follows the same pattern as other integrations (AWS, GitHub)
 	err = client.ValidateAPIKey(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to validate API key: %w", err)
