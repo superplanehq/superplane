@@ -1,6 +1,7 @@
 package dash0
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,9 +19,10 @@ const (
 )
 
 type Client struct {
-	Token   string
-	BaseURL string
-	http    core.HTTPContext
+	Token         string
+	BaseURL       string
+	LogsIngestURL string
+	http          core.HTTPContext
 }
 
 func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
@@ -42,11 +44,40 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 	// Strip /api/prometheus if user included it in the base URL
 	baseURL = strings.TrimSuffix(baseURL, "/api/prometheus")
 
+	logsIngestURL := deriveLogsIngestURL(baseURL)
+
 	return &Client{
-		Token:   string(apiToken),
-		BaseURL: baseURL,
-		http:    http,
+		Token:         string(apiToken),
+		BaseURL:       baseURL,
+		LogsIngestURL: logsIngestURL,
+		http:          http,
 	}, nil
+}
+
+// deriveLogsIngestURL derives the OTLP logs ingress host from the configured API base URL.
+func deriveLogsIngestURL(baseURL string) string {
+	parsedURL, err := url.Parse(baseURL)
+	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
+		return strings.TrimSuffix(baseURL, "/")
+	}
+
+	hostname := parsedURL.Hostname()
+	if strings.HasPrefix(hostname, "api.") {
+		hostname = "ingress." + strings.TrimPrefix(hostname, "api.")
+	}
+
+	if port := parsedURL.Port(); port != "" {
+		parsedURL.Host = fmt.Sprintf("%s:%s", hostname, port)
+	} else {
+		parsedURL.Host = hostname
+	}
+
+	parsedURL.Path = ""
+	parsedURL.RawPath = ""
+	parsedURL.RawQuery = ""
+	parsedURL.Fragment = ""
+
+	return strings.TrimSuffix(parsedURL.String(), "/")
 }
 
 func (c *Client) execRequest(method, url string, body io.Reader, contentType string) ([]byte, error) {
@@ -206,4 +237,46 @@ func (c *Client) ListCheckRules() ([]CheckRule, error) {
 	}
 
 	return checkRules, nil
+}
+
+// SendLogEvents sends OTLP log batches to Dash0 ingestion endpoint.
+func (c *Client) SendLogEvents(request OTLPLogsRequest) (map[string]any, error) {
+	requestURL := fmt.Sprintf("%s/v1/logs", c.LogsIngestURL)
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling logs request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, requestURL, bytes.NewReader(body), "application/json")
+	if err != nil {
+		return nil, err
+	}
+
+	parsed, err := parseJSONResponse(responseBody)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing send log event response: %v", err)
+	}
+
+	return parsed, nil
+}
+
+// parseJSONResponse normalizes object or array JSON responses into a map.
+func parseJSONResponse(responseBody []byte) (map[string]any, error) {
+	trimmedBody := strings.TrimSpace(string(responseBody))
+	if trimmedBody == "" {
+		return map[string]any{}, nil
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(responseBody, &parsed); err == nil {
+		return parsed, nil
+	}
+
+	var parsedArray []any
+	if err := json.Unmarshal(responseBody, &parsedArray); err == nil {
+		return map[string]any{"items": parsedArray}, nil
+	}
+
+	return nil, fmt.Errorf("unexpected response payload shape")
 }
