@@ -11,6 +11,23 @@ import (
 func Test__CreateReview__Execute__Validation(t *testing.T) {
 	component := CreateReview{}
 
+	t.Run("body is conditionally required for request changes and comment", func(t *testing.T) {
+		fields := component.Configuration()
+		var bodyFieldFound bool
+		for _, f := range fields {
+			if f.Name != "body" {
+				continue
+			}
+
+			bodyFieldFound = true
+			require.Len(t, f.RequiredConditions, 1)
+			require.Equal(t, "event", f.RequiredConditions[0].Field)
+			require.ElementsMatch(t, []string{"REQUEST_CHANGES", "COMMENT"}, f.RequiredConditions[0].Values)
+		}
+
+		require.True(t, bodyFieldFound, "expected to find body field in configuration")
+	})
+
 	t.Run("pull number is required", func(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Integration:    &contexts.IntegrationContext{},

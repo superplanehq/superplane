@@ -110,6 +110,12 @@ func (c *CreateReview) Configuration() []configuration.Field {
 			Label:       "Body",
 			Type:        configuration.FieldTypeText,
 			Description: "Review body (required for REQUEST_CHANGES and COMMENT).",
+			RequiredConditions: []configuration.RequiredCondition{
+				{
+					Field:  "event",
+					Values: []string{"REQUEST_CHANGES", "COMMENT"},
+				},
+			},
 		},
 	}
 }
