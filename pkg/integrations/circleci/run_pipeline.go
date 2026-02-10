@@ -254,7 +254,7 @@ func (t *RunPipeline) Execute(ctx core.ExecutionContext) error {
 
 	runParams := RunPipelineParams{
 		DefinitionID: strings.TrimSpace(spec.PipelineDefinitionID),
-		Parameters:   t.buildParameters(ctx, spec.Parameters),
+		Parameters:   t.buildParameters(spec.Parameters),
 		Config:       runPipelineConfig,
 		Checkout:     runPipelineConfig,
 	}
@@ -511,14 +511,11 @@ func (t *RunPipeline) checkWorkflowsStatus(workflows []WorkflowInfo) (allDone bo
 	return allDone, anyFailed
 }
 
-func (t *RunPipeline) buildParameters(ctx core.ExecutionContext, params []Parameter) map[string]string {
+func (t *RunPipeline) buildParameters(params []Parameter) map[string]string {
 	parameters := make(map[string]string)
 	for _, param := range params {
 		parameters[param.Name] = param.Value
 	}
-
-	parameters["SUPERPLANE_EXECUTION_ID"] = ctx.ID.String()
-	parameters["SUPERPLANE_CANVAS_ID"] = ctx.WorkflowID
 
 	return parameters
 }
