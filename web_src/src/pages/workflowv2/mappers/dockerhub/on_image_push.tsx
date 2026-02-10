@@ -3,10 +3,10 @@ import { CustomFieldRenderer, NodeInfo, TriggerEventContext, TriggerRenderer, Tr
 import { TriggerProps } from "@/ui/trigger";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import { Repository, RepositoryMetadata } from "./types";
-import { buildRepositoryMetadataItems, getRepositoryLabel } from "./utils";
 import { formatTimeAgo } from "@/utils/date";
 import { formatTimestampInUserTimezone } from "@/utils/timezone";
 import { formatPredicate, Predicate, stringOrDash } from "../utils";
+import { MetadataItem } from "@/ui/metadataList";
 
 export interface OnImagePushMetadata {
   repository?: RepositoryMetadata;
@@ -69,7 +69,14 @@ export const onImagePushTriggerRenderer: TriggerRenderer = {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as OnImagePushMetadata | undefined;
     const configuration = node.configuration as OnImagePushConfiguration | undefined;
-    const metadataItems = buildRepositoryMetadataItems(metadata, configuration);
+    const metadataItems: MetadataItem[] = [];
+
+    if (metadata?.repository) {
+      metadataItems.push({
+        icon: "package",
+        label: getRepositoryLabel(metadata),
+      });
+    }
 
     if (configuration?.tags?.length) {
       metadataItems.push({
@@ -103,8 +110,7 @@ export const onImagePushTriggerRenderer: TriggerRenderer = {
 export const onImagePushCustomFieldRenderer: CustomFieldRenderer = {
   render: (node: NodeInfo) => {
     const metadata = node.metadata as OnImagePushMetadata | undefined;
-    const configuration = node.configuration as OnImagePushConfiguration | undefined;
-    const repositoryLabel = getRepositoryLabel(metadata, configuration);
+    const repositoryLabel = getRepositoryLabel(metadata);
     const repositoryUrl = `https://hub.docker.com/repository/docker/${repositoryLabel}/webhooks`;
     const webhookUrl = metadata?.webhookUrl || "[URL GENERATED ONCE THE CANVAS IS SAVED]";
 
@@ -141,3 +147,9 @@ export const onImagePushCustomFieldRenderer: CustomFieldRenderer = {
     );
   },
 };
+
+function getRepositoryLabel(metadata?: OnImagePushMetadata): string | undefined {
+  return metadata?.repository?.namespace
+    ? `${metadata.repository.namespace}/${metadata.repository.name}`
+    : metadata?.repository?.name;
+}
