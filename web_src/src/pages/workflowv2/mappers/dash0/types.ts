@@ -26,6 +26,12 @@ export interface SendLogEventConfiguration {
   serviceName?: string;
   records?: SendLogEventRecordConfiguration[];
 }
+
+export interface GetCheckDetailsConfiguration {
+  checkId?: string;
+  includeHistory?: boolean;
+}
+
 export interface PrometheusResponse {
   status: string;
   data: {
