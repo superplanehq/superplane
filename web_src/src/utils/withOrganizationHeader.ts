@@ -1,7 +1,11 @@
+import { isUUID } from "@/lib/utils";
 import { useParams } from "react-router-dom";
 
 export const useOrganizationId = (): string | null => {
   const { organizationId } = useParams<{ organizationId: string }>();
+  if (organizationId && !isUUID(organizationId)) {
+    return null;
+  }
   return organizationId || null;
 };
 

@@ -75,6 +75,10 @@ func (h *PagerDutyWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	return true, nil
 }
 
+func (h *PagerDutyWebhookHandler) Merge(current, requested any) (any, bool, error) {
+	return current, false, nil
+}
+
 func (h *PagerDutyWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
