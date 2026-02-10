@@ -76,8 +76,7 @@ func (p *OnImagePush) Documentation() string {
 
 ## Configuration
 
-- **Namespace**: DockerHub username or organization that owns the repository (defaults to the integration username)
-- **Repository**: DockerHub repository name
+- **Repository**: DockerHub repository name, in the format of ` + "`namespace/name`" + `
 - **Tags**: Optional filters for image tags (for example: ` + "`latest`" + ` or ` + "`^v[0-9]+`" + `)
 
 ## Webhook Setup

@@ -11,12 +11,12 @@ import { formatPredicate, Predicate, stringOrDash } from "../utils";
 export interface OnImagePushMetadata {
   repository?: RepositoryMetadata;
   webhookUrl?: string;
-};
+}
 
 export interface OnImagePushConfiguration {
   repository?: string;
   tags?: Predicate[];
-};
+}
 
 interface PushData {
   tag?: string;
@@ -116,7 +116,11 @@ export const onImagePushCustomFieldRenderer: CustomFieldRenderer = {
             <div className="text-xs text-gray-800 dark:text-gray-100 mt-2 border-1 border-gray-300 dark:border-gray-600 px-2.5 py-2 bg-gray-50 dark:bg-gray-800 rounded-md">
               <ol className="list-decimal ml-4 space-y-1">
                 <li>
-                  Go to the <a href={repositoryUrl} target="_blank" rel="noopener noreferrer">{repositoryLabel}</a> webhooks page
+                  Go to the{" "}
+                  <a href={repositoryUrl} target="_blank" rel="noopener noreferrer">
+                    {repositoryLabel}
+                  </a>{" "}
+                  webhooks page
                 </li>
                 <li>Add webhook</li>
                 <li>Set the webhook URL below and save</li>

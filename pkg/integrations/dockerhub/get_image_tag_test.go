@@ -89,6 +89,6 @@ func Test__GetImageTag__Execute(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, core.DefaultOutputChannel.Name, execState.Channel)
-	assert.Equal(t, TagPayloadType, execState.Type)
+	assert.Equal(t, "dockerhub.tag", execState.Type)
 	require.Len(t, execState.Payloads, 1)
 }

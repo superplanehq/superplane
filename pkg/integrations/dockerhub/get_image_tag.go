@@ -11,8 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const TagPayloadType = "dockerhub.tag"
-
 type GetImageTag struct{}
 
 type GetImageTagConfiguration struct {
@@ -44,8 +42,7 @@ func (c *GetImageTag) Documentation() string {
 
 ## Configuration
 
-- **Namespace**: DockerHub username or organization that owns the repository (defaults to the integration username)
-- **Repository**: DockerHub repository name
+- **Repository**: DockerHub repository name, in the format of ` + "`namespace/name`" + `
 - **Tag**: Image tag to retrieve (for example: ` + "`latest`" + ` or ` + "`v1.2.3`" + `)
 `
 }
@@ -152,7 +149,7 @@ func (c *GetImageTag) Execute(ctx core.ExecutionContext) error {
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
-		TagPayloadType,
+		"dockerhub.tag",
 		[]any{tagResponse},
 	)
 }
