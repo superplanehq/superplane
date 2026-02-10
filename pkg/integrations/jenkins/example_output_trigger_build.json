@@ -1,0 +1,16 @@
+{
+  "type": "jenkins.build.finished",
+  "data": {
+    "job": {
+      "name": "my-project/my-job",
+      "url": "https://jenkins.example.com/job/my-project/job/my-job/"
+    },
+    "build": {
+      "number": 42,
+      "url": "https://jenkins.example.com/job/my-project/job/my-job/42/",
+      "result": "SUCCESS",
+      "duration": 120000
+    }
+  },
+  "timestamp": "2026-01-23T12:00:00Z"
+}
