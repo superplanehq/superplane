@@ -414,6 +414,9 @@ func (t *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusOK, nil
 	}
 
+	// Preserve existing Pipeline info
+	existingPipeline := metadata.Pipeline
+
 	found := false
 	for i, w := range metadata.Workflows {
 		if w.ID == workflowID {
@@ -431,6 +434,9 @@ func (t *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		})
 	}
 
+	// Ensure Pipeline info is preserved
+	metadata.Pipeline = existingPipeline
+
 	err = executionCtx.Metadata.Set(metadata)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
@@ -438,7 +444,7 @@ func (t *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 
 	var allDone, anyFailed bool
 	client, err := NewClient(executionCtx.HTTP, executionCtx.Integration)
-	if err == nil {
+	if err == nil && metadata.Pipeline.ID != "" {
 		allWorkflows, err := client.GetPipelineWorkflows(metadata.Pipeline.ID)
 		if err == nil {
 			updatedWorkflows := make([]WorkflowInfo, 0, len(allWorkflows))
@@ -450,6 +456,8 @@ func (t *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 				})
 			}
 			metadata.Workflows = updatedWorkflows
+			// Ensure Pipeline info is preserved
+			metadata.Pipeline = existingPipeline
 			_ = executionCtx.Metadata.Set(metadata)
 			allDone, anyFailed = t.checkWorkflowsStatus(updatedWorkflows)
 		}
@@ -510,6 +518,13 @@ func (t *RunPipeline) poll(ctx core.ActionContext) error {
 		return err
 	}
 
+	// Preserve existing Pipeline info
+	existingPipeline := metadata.Pipeline
+
+	if metadata.Pipeline.ID == "" {
+		return fmt.Errorf("pipeline ID is missing from execution metadata")
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
@@ -530,6 +545,8 @@ func (t *RunPipeline) poll(ctx core.ActionContext) error {
 	}
 
 	metadata.Workflows = updatedWorkflows
+	// Ensure Pipeline info is preserved
+	metadata.Pipeline = existingPipeline
 	err = ctx.Metadata.Set(metadata)
 	if err != nil {
 		return err
