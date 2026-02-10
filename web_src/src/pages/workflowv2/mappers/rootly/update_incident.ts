@@ -15,7 +15,7 @@ import { Incident } from "./types";
 import { baseEventSections, getDetailsForIncident } from "./base";
 import { formatTimeAgo } from "@/utils/date";
 
-export const createIncidentMapper: ComponentBaseMapper = {
+export const updateIncidentMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition.name || "unknown";
@@ -53,12 +53,41 @@ export const createIncidentMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as { severity?: string };
+  const configuration = node.configuration as Record<string, unknown>;
 
+  if (configuration?.incidentId) {
+    metadata.push({ icon: "alert-triangle", label: `Incident: ${configuration.incidentId}` });
+  }
+
+  const updates: string[] = [];
+  if (configuration?.status) {
+    updates.push(`Status: ${configuration.status}`);
+  }
+  if (configuration?.subStatus) {
+    updates.push("Sub-Status");
+  }
   if (configuration?.severity) {
-    metadata.push({ icon: "funnel", label: "Severity: " + configuration.severity });
+    updates.push("Severity");
+  }
+  if (configuration?.title) {
+    updates.push("Title");
+  }
+  if (configuration?.summary) {
+    updates.push("Summary");
+  }
+  if (Array.isArray(configuration?.services) && (configuration.services as unknown[]).length > 0) {
+    updates.push(`Services (${(configuration.services as unknown[]).length})`);
+  }
+  if (Array.isArray(configuration?.teams) && (configuration.teams as unknown[]).length > 0) {
+    updates.push(`Teams (${(configuration.teams as unknown[]).length})`);
+  }
+  if (Array.isArray(configuration?.labels) && (configuration.labels as unknown[]).length > 0) {
+    updates.push(`Labels (${(configuration.labels as unknown[]).length})`);
+  }
+
+  if (updates.length > 0) {
+    metadata.push({ icon: "funnel", label: `Updating: ${updates.join(", ")}` });
   }
 
   return metadata;
 }
-
