@@ -1,0 +1,207 @@
+---
+title: "Buildkite"
+---
+
+Trigger and react to your Buildkite builds
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Build Finished" href="#on-build-finished" description="Listen to Buildkite build completion events" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Trigger Build" href="#trigger-build" description="Trigger a Buildkite build and wait for completion using polling mechanism
+
+This component periodically polls the Buildkite API to check build status instead of relying on webhooks.
+
+## How It Works
+
+1. **Creates Build**: Triggers a build via Buildkite API
+2. **Sets Correlation**: Stores build ID for tracking
+3. **Starts Polling**: Schedules periodic status checks
+4. **Detects Completion**: Emits to success/failure channels when build finishes
+
+## Configuration
+
+- **Organization**: Select Buildkite organization
+- **Pipeline**: Select pipeline to trigger
+- **Branch**: Git branch to build
+- **Commit**: Git commit SHA (optional, defaults to HEAD)
+- **Message**: Optional build message
+- **Environment Variables**: Optional env vars for the build
+- **Metadata**: Optional metadata for the build
+
+## Output Channels
+
+- **Passed**: Build completed successfully
+- **Failed**: Build failed, was cancelled, or was blocked" />
+</CardGrid>
+
+## Instructions
+
+In order to connect Buildkite to Superplane, you need to create a webhook.
+
+1. In Buildkite, go to **Settings → Notification Services**
+2. Select **Add Webhook**
+3. Configure the webhook with these settings:
+   - **Description**: SuperPlane Integration
+   - **Webhook URL**: Your SuperPlane webhook URL
+   - **Events**: Select "build.finished"
+   - **Pipelines**: Select "All Pipelines"
+   - **Branch filtering**: Leave empty to receive all branches
+
+Webhook URL is constructed in following way - https://**<Backend URL>**/api/v1/integrations/**<Integration ID>**/webhook.
+
+<a id="on-build-finished"></a>
+
+## On Build Finished
+
+The On Build Finished trigger starts a workflow execution when a Buildkite build completes.
+
+### Use Cases
+
+- **CI/CD pipeline chaining**: Trigger downstream workflows when builds complete
+- **Build monitoring**: Monitor build results and trigger alerts or notifications
+- **Deployment orchestration**: Start deployment workflows only after successful builds
+- **Build result processing**: Process build artifacts or results based on build outcome
+
+### Configuration
+
+- **Organization**: Select the Buildkite organization to monitor
+- **Pipeline**: Select the Buildkite pipeline to monitor
+- **Branch** (optional): Filter to specific branch (exact match)
+
+### Event Data
+
+Each build finished event includes:
+- **build**: Build information including ID, state, result, commit, branch
+- **pipeline**: Pipeline information including ID and name
+- **organization**: Organization information
+- **sender**: User who triggered the build
+
+### Webhook Setup
+
+This trigger automatically handles Buildkite webhook events through the integration-level webhook. When you configure a single webhook for your Buildkite integration, SuperPlane will automatically route build.finished events to all matching triggers based on your configuration.
+
+### Configuration
+
+- **Organization**: Select the Buildkite organization to monitor
+- **Pipeline**: Select the Buildkite pipeline to monitor
+- **Branch** (optional): Filter to specific branch (exact match)
+
+### Event Processing
+
+SuperPlane automatically:
+1. Receives webhook events at integration webhook URL
+2. Authenticates requests using your webhook token
+3. Filters events by organization, pipeline, and branch
+4. Routes matching events to appropriate trigger instances
+5. Emits buildkite.build.finished events to start workflow executions
+
+### Manual Webhook Configuration (if needed)
+
+For manual setup in Buildkite:
+1. In Buildkite, go to Settings → Notification Services → Add → Webhook
+2. Webhook URL: use your SuperPlane integration webhook URL
+3. Token: use your SuperPlane webhook token
+4. Events: select "build.finished"
+5. Pipelines: select the pipelines you want to monitor
+
+### Example Data
+
+```json
+{
+  "build": {
+    "blocked": false,
+    "branch": "main",
+    "commit": "a1b2c3d4e5f6789012345678901234567890abcd",
+    "id": "12345678-1234-1234-1234-123456789012",
+    "message": "Fix: Update dependencies",
+    "number": 123,
+    "state": "passed",
+    "web_url": "https://buildkite.com/example-org/example-pipeline/builds/123"
+  },
+  "event": "build.finished",
+  "organization": {
+    "id": "example-org",
+    "name": "Example Organization"
+  },
+  "pipeline": {
+    "id": "example-pipeline",
+    "name": "Example Pipeline"
+  },
+  "sender": {
+    "email": "john@example.com",
+    "id": "user-123",
+    "name": "John Doe"
+  }
+}
+```
+
+<a id="trigger-build"></a>
+
+## Trigger Build
+
+Trigger a Buildkite build and wait for completion using polling mechanism.
+
+### How It Works
+
+1. **Creates Build**: Triggers a build via Buildkite API
+2. **Sets Correlation**: Stores build ID for tracking
+3. **Starts Polling**: Schedules periodic status checks
+4. **Detects Completion**: Emits to success/failure channels when build finishes
+
+### Why Polling Instead of Webhooks?
+
+This component uses polling instead of webhooks to work around the architectural limitation where Buildkite integration uses a shared webhook for all events. The polling mechanism provides reliable completion detection even when webhook routing is not available.
+
+### Configuration
+
+- **Organization**: Select Buildkite organization
+- **Pipeline**: Select pipeline to trigger
+- **Branch**: Git branch to build
+- **Commit**: Git commit SHA (optional, defaults to HEAD)
+- **Message**: Optional build message
+- **Environment Variables**: Optional env vars for the build
+- **Metadata**: Optional metadata for the build
+
+### Output Channels
+
+- **Passed**: Build completed successfully
+- **Failed**: Build failed, was cancelled, or was blocked
+
+### Polling Details
+
+	- **Frequency**: Controlled by the PollInterval constant (currently 30 seconds)
+	- **API**: Uses the Buildkite GetBuild endpoint to check build status
+	- **Completion Detection**: Checks build state and emits to appropriate channel
+	- **Manual Finish**: Manual action available to force completion if needed
+
+### Example Output
+
+```json
+{
+  "build": {
+    "blocked": false,
+    "branch": "main",
+    "commit": "a1b2c3d4e5f678901234567890abcd",
+    "id": "12345678-1234-1234-123456789012",
+    "message": "Triggered by SuperPlane",
+    "number": 123,
+    "state": "passed",
+    "web_url": "https://buildkite.com/example-org/example-pipeline/builds/123"
+  },
+  "organization": {
+    "id": "example-org"
+  },
+  "pipeline": {
+    "id": "example-pipeline"
+  }
+}
+```
+
