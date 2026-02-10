@@ -28,6 +28,12 @@ var exampleOutputCancelDeployBytes []byte
 //go:embed example_output_rollback_deploy.json
 var exampleOutputRollbackDeployBytes []byte
 
+//go:embed example_output_purge_cache.json
+var exampleOutputPurgeCacheBytes []byte
+
+//go:embed example_output_update_env_var.json
+var exampleOutputUpdateEnvVarBytes []byte
+
 var exampleDataOnDeployOnce sync.Once
 var exampleDataOnDeploy map[string]any
 
@@ -48,6 +54,12 @@ var exampleOutputCancelDeploy map[string]any
 
 var exampleOutputRollbackDeployOnce sync.Once
 var exampleOutputRollbackDeploy map[string]any
+
+var exampleOutputPurgeCacheOnce sync.Once
+var exampleOutputPurgeCache map[string]any
+
+var exampleOutputUpdateEnvVarOnce sync.Once
+var exampleOutputUpdateEnvVar map[string]any
 
 func (t *OnDeploy) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(
@@ -102,5 +114,21 @@ func (c *RollbackDeploy) ExampleOutput() map[string]any {
 		&exampleOutputRollbackDeployOnce,
 		exampleOutputRollbackDeployBytes,
 		&exampleOutputRollbackDeploy,
+	)
+}
+
+func (c *PurgeCache) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputPurgeCacheOnce,
+		exampleOutputPurgeCacheBytes,
+		&exampleOutputPurgeCache,
+	)
+}
+
+func (c *UpdateEnvVar) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputUpdateEnvVarOnce,
+		exampleOutputUpdateEnvVarBytes,
+		&exampleOutputUpdateEnvVar,
 	)
 }
