@@ -21,6 +21,7 @@ type CreateDropletSpec struct {
 	Region   string   `json:"region"`
 	Size     string   `json:"size"`
 	Image    string   `json:"image"`
+	SSHKeys  []string `json:"sshKeys"`
 	Tags     []string `json:"tags"`
 	UserData string   `json:"userData"`
 }
@@ -52,6 +53,7 @@ func (c *CreateDroplet) Documentation() string {
 - **Region**: Region slug where the droplet will be created (required)
 - **Size**: Size slug for the droplet (required)
 - **Image**: Image slug or ID for the droplet OS (required)
+- **SSH Keys**: SSH key fingerprints or IDs to add to the droplet (optional)
 - **Tags**: Tags to apply to the droplet (optional)
 - **User Data**: Cloud-init user data script (optional)
 
@@ -126,12 +128,36 @@ func (c *CreateDroplet) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "sshKeys",
+			Label:       "SSH Keys",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Togglable:   true,
+			Description: "SSH key fingerprints or IDs to add to the droplet",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "SSH Key",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeString,
+					},
+				},
+			},
+		},
+		{
 			Name:        "tags",
 			Label:       "Tags",
 			Type:        configuration.FieldTypeList,
 			Required:    false,
 			Togglable:   true,
 			Description: "Tags to apply to the droplet",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Tag",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeString,
+					},
+				},
+			},
 		},
 		{
 			Name:        "userData",
@@ -202,6 +228,7 @@ func (c *CreateDroplet) Execute(ctx core.ExecutionContext) error {
 		Region:   spec.Region,
 		Size:     spec.Size,
 		Image:    spec.Image,
+		SSHKeys:  spec.SSHKeys,
 		Tags:     spec.Tags,
 		UserData: spec.UserData,
 	})

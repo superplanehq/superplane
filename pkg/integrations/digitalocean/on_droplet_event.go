@@ -201,6 +201,25 @@ func (t *OnDropletEvent) HandleAction(ctx core.TriggerActionContext) (map[string
 			},
 		}
 
+		// Enrich the payload with droplet details when available.
+		// For destroy events the droplet may no longer exist.
+		droplet, err := client.GetDroplet(action.ResourceID)
+		if err == nil {
+			payload["droplet"] = map[string]any{
+				"id":        droplet.ID,
+				"name":      droplet.Name,
+				"size_slug": droplet.SizeSlug,
+				"image": map[string]any{
+					"name": droplet.Image.Name,
+					"slug": droplet.Image.Slug,
+				},
+				"region": map[string]any{
+					"name": droplet.Region.Name,
+					"slug": droplet.Region.Slug,
+				},
+			}
+		}
+
 		err = ctx.Events.Emit(
 			fmt.Sprintf("digitalocean.droplet.%s", action.Type),
 			payload,

@@ -8,5 +8,12 @@
     "resource_id": 98765432,
     "resource_type": "droplet",
     "region_slug": "nyc3"
+  },
+  "droplet": {
+    "id": 98765432,
+    "name": "my-droplet",
+    "size_slug": "s-1vcpu-1gb",
+    "image": { "name": "Ubuntu 24.04 (LTS) x64", "slug": "ubuntu-24-04-x64" },
+    "region": { "name": "New York 3", "slug": "nyc3" }
   }
 }

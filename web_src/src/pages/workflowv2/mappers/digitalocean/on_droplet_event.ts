@@ -15,6 +15,19 @@ interface OnDropletEventData {
     resource_type: string;
     region_slug: string;
   };
+  droplet?: {
+    id: number;
+    name: string;
+    size_slug: string;
+    image: {
+      name: string;
+      slug: string;
+    };
+    region: {
+      name: string;
+      slug: string;
+    };
+  };
 }
 
 export const onDropletEventTriggerRenderer: TriggerRenderer = {
@@ -30,14 +43,17 @@ export const onDropletEventTriggerRenderer: TriggerRenderer = {
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as OnDropletEventData;
     const action = eventData?.action;
+    const droplet = eventData?.droplet;
 
     return {
+      "Started At": action?.started_at ? new Date(action.started_at).toLocaleString() : "-",
+      "Completed At": action?.completed_at ? new Date(action.completed_at).toLocaleString() : "-",
+      "Droplet ID": action?.resource_id?.toString() || "-",
+      "Droplet Name": droplet?.name || "-",
       "Action Type": action?.type || "-",
-      "Resource ID": action?.resource_id?.toString() || "-",
-      Status: action?.status || "-",
-      Region: action?.region_slug || "-",
-      "Started At": action?.started_at || "-",
-      "Completed At": action?.completed_at || "-",
+      Size: droplet?.size_slug || "-",
+      OS: droplet?.image?.name || droplet?.image?.slug || "-",
+      Region: droplet?.region?.name || action?.region_slug || "-",
     };
   },
 

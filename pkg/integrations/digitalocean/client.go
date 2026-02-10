@@ -186,6 +186,7 @@ type CreateDropletRequest struct {
 	Region   string   `json:"region"`
 	Size     string   `json:"size"`
 	Image    string   `json:"image"`
+	SSHKeys  []string `json:"ssh_keys,omitempty"`
 	Tags     []string `json:"tags,omitempty"`
 	UserData string   `json:"user_data,omitempty"`
 }
@@ -235,6 +236,25 @@ func (c *Client) CreateDroplet(req CreateDropletRequest) (*Droplet, error) {
 	}
 
 	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Droplet Droplet `json:"droplet"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Droplet, nil
+}
+
+// GetDroplet retrieves a droplet by its ID
+func (c *Client) GetDroplet(dropletID int) (*Droplet, error) {
+	url := fmt.Sprintf("%s/droplets/%d", c.BaseURL, dropletID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
