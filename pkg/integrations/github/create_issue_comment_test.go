@@ -12,6 +12,17 @@ func Test__CreateIssueComment__Setup(t *testing.T) {
 	helloRepo := Repository{ID: 123456, Name: "hello", URL: "https://github.com/testhq/hello"}
 	component := CreateIssueComment{}
 
+	t.Run("repository is required", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{}
+		err := component.Setup(core.SetupContext{
+			Integration:   integrationCtx,
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"issueNumber": "42", "body": "test", "repository": ""},
+		})
+
+		require.ErrorContains(t, err, "repository is required")
+	})
+
 	t.Run("issue number is required", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
 		err := component.Setup(core.SetupContext{
@@ -32,17 +43,6 @@ func Test__CreateIssueComment__Setup(t *testing.T) {
 		})
 
 		require.ErrorContains(t, err, "body is required")
-	})
-
-	t.Run("repository is required", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{}
-		err := component.Setup(core.SetupContext{
-			Integration:   integrationCtx,
-			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"issueNumber": "42", "body": "test", "repository": ""},
-		})
-
-		require.ErrorContains(t, err, "repository is required")
 	})
 
 	t.Run("repository is not accessible", func(t *testing.T) {

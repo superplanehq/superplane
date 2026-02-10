@@ -108,6 +108,10 @@ func (c *CreateIssueComment) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	if config.Repository == "" {
+		return errors.New("repository is required")
+	}
+
 	if config.IssueNumber == "" {
 		return errors.New("issue number is required")
 	}
