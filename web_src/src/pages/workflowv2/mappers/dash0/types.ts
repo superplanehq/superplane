@@ -37,6 +37,11 @@ export interface UpsertSyntheticCheckConfiguration {
   spec?: string;
 }
 
+export interface UpsertCheckRuleConfiguration {
+  originOrId?: string;
+  spec?: string;
+}
+
 export interface PrometheusResponse {
   status: string;
   data: {
