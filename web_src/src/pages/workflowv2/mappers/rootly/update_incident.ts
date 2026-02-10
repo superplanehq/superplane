@@ -64,6 +64,9 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   if (configuration?.status) {
     updates.push(`Status: ${configuration.status}`);
   }
+  if (configuration?.subStatus) {
+    updates.push("Sub-Status");
+  }
   if (configuration?.severity) {
     updates.push("Severity");
   }

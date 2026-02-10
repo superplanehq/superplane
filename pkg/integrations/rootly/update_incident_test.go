@@ -24,6 +24,7 @@ func Test__UpdateIncident__Setup(t *testing.T) {
 				"title":      "Updated title",
 				"summary":    "Updated summary",
 				"status":     "mitigated",
+				"subStatus":  "sub-status-uuid-1",
 				"severity":   "sev-uuid-123",
 				"services":   []string{"svc-uuid-1"},
 				"teams":      []string{"team-uuid-1"},
@@ -94,6 +95,18 @@ func Test__UpdateIncident__Setup(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("incidentId with subStatus only", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Metadata: &contexts.MetadataContext{},
+			Configuration: map[string]any{
+				"incidentId": "abc123-def456",
+				"subStatus":  "sub-status-uuid-1",
+			},
+		})
+
+		require.NoError(t, err)
+	})
+
 	t.Run("invalid configuration format -> decode error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Metadata:      &contexts.MetadataContext{},
@@ -148,9 +161,11 @@ func Test__UpdateIncident__Execute(t *testing.T) {
 			Configuration: map[string]any{
 				"incidentId": "inc-uuid-123",
 				"title":      "Updated Incident",
+				"summary":    "Updated summary",
 				"status":     "mitigated",
+				"subStatus":  "sub-status-uuid-1",
 				"severity":   "sev-uuid-1",
-				"services":   []string{"svc-uuid-1"},
+				"services":   []string{"svc-uuid-1", "svc-uuid-2"},
 				"teams":      []string{"team-uuid-1"},
 				"labels": []map[string]any{
 					{"key": "env", "value": "production"},
@@ -186,11 +201,22 @@ func Test__UpdateIncident__Execute(t *testing.T) {
 
 		attrs := data["attributes"].(map[string]any)
 		assert.Equal(t, "Updated Incident", attrs["title"])
+		assert.Equal(t, "Updated summary", attrs["summary"])
 		assert.Equal(t, "mitigated", attrs["status"])
+		assert.Equal(t, "sub-status-uuid-1", attrs["sub_status_id"])
 		assert.Equal(t, "sev-uuid-1", attrs["severity_id"])
-		assert.NotNil(t, attrs["service_ids"])
-		assert.NotNil(t, attrs["group_ids"])
-		assert.NotNil(t, attrs["labels"])
+
+		serviceIDs := attrs["service_ids"].([]any)
+		assert.Len(t, serviceIDs, 2)
+		assert.Equal(t, "svc-uuid-1", serviceIDs[0])
+		assert.Equal(t, "svc-uuid-2", serviceIDs[1])
+
+		groupIDs := attrs["group_ids"].([]any)
+		assert.Len(t, groupIDs, 1)
+		assert.Equal(t, "team-uuid-1", groupIDs[0])
+
+		labels := attrs["labels"].(map[string]any)
+		assert.Equal(t, "production", labels["env"])
 	})
 
 	t.Run("API error returns error and does not emit", func(t *testing.T) {
