@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect } from "react";
-import { Camera, Maximize, Minus, MousePointer2, Plus } from "lucide-react";
+import { Camera, Grid3X3, Maximize, Minus, MousePointer2, Plus } from "lucide-react";
 import { toPng } from "html-to-image";
 
 import {
@@ -26,6 +26,8 @@ export function ZoomSlider({
   isSelectionModeEnabled,
   onSelectionModeToggle,
   screenshotName,
+  isSnapToGridEnabled,
+  onSnapToGridToggle,
   ...props
 }: Omit<PanelProps, "children"> & {
   orientation?: "horizontal" | "vertical";
@@ -33,6 +35,8 @@ export function ZoomSlider({
   isSelectionModeEnabled?: boolean;
   onSelectionModeToggle?: () => void;
   screenshotName?: string;
+  isSnapToGridEnabled?: boolean;
+  onSnapToGridToggle?: () => void;
 }) {
   const { zoom } = useViewport();
   const { zoomTo, zoomIn, zoomOut, fitView, getNodes } = useReactFlow();
@@ -219,6 +223,21 @@ export function ZoomSlider({
                 ? "Disable rectangle selection mode"
                 : "Select and move multiple components at once (Ctrl/Cmd + drag)"}
             </TooltipContent>
+          </Tooltip>
+        )}
+        {onSnapToGridToggle && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={isSnapToGridEnabled ? "default" : "ghost"}
+                size="icon-sm"
+                className="h-8 w-8"
+                onClick={onSnapToGridToggle}
+              >
+                <Grid3X3 className="h-3 w-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{isSnapToGridEnabled ? "Disable snap to grid" : "Enable snap to grid"}</TooltipContent>
           </Tooltip>
         )}
         {children}

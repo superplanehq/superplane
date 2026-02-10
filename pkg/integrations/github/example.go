@@ -10,6 +10,9 @@ import (
 //go:embed example_output_create_issue.json
 var exampleOutputCreateIssueBytes []byte
 
+//go:embed example_output_create_issue_comment.json
+var exampleOutputCreateIssueCommentBytes []byte
+
 //go:embed example_output_get_issue.json
 var exampleOutputGetIssueBytes []byte
 
@@ -36,6 +39,8 @@ var exampleOutputRunWorkflowBytes []byte
 
 //go:embed example_output_get_billing_usage.json
 var exampleOutputGetBillingUsageBytes []byte
+//go:embed example_output_create_review.json
+var exampleOutputCreateReviewBytes []byte
 
 //go:embed example_data_on_issue_comment.json
 var exampleDataOnIssueCommentBytes []byte
@@ -67,6 +72,9 @@ var exampleDataOnWorkflowRunBytes []byte
 var exampleOutputCreateIssueOnce sync.Once
 var exampleOutputCreateIssue map[string]any
 
+var exampleOutputCreateIssueCommentOnce sync.Once
+var exampleOutputCreateIssueComment map[string]any
+
 var exampleOutputGetIssueOnce sync.Once
 var exampleOutputGetIssue map[string]any
 
@@ -93,6 +101,8 @@ var exampleOutputRunWorkflow map[string]any
 
 var exampleOutputGetBillingUsageOnce sync.Once
 var exampleOutputGetBillingUsage map[string]any
+var exampleOutputCreateReviewOnce sync.Once
+var exampleOutputCreateReview map[string]any
 
 var exampleDataOnIssueCommentOnce sync.Once
 var exampleDataOnIssueComment map[string]any
@@ -123,6 +133,10 @@ var exampleDataOnWorkflowRun map[string]any
 
 func (c *CreateIssue) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateIssueOnce, exampleOutputCreateIssueBytes, &exampleOutputCreateIssue)
+}
+
+func (c *CreateIssueComment) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateIssueCommentOnce, exampleOutputCreateIssueCommentBytes, &exampleOutputCreateIssueComment)
 }
 
 func (c *GetIssue) ExampleOutput() map[string]any {
@@ -163,6 +177,12 @@ func (c *RunWorkflow) ExampleOutput() map[string]any {
 
 func (c *GetBillingUsage) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetBillingUsageOnce, exampleOutputGetBillingUsageBytes, &exampleOutputGetBillingUsage)
+func (c *CreateReview) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputCreateReviewOnce,
+		exampleOutputCreateReviewBytes,
+		&exampleOutputCreateReview,
+	)
 }
 
 func (t *OnIssueComment) ExampleData() map[string]any {
