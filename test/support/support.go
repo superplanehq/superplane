@@ -29,6 +29,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/noop"
 	_ "github.com/superplanehq/superplane/pkg/components/ssh"
 	_ "github.com/superplanehq/superplane/pkg/components/wait"
+	_ "github.com/superplanehq/superplane/pkg/integrations/circleci"
 	_ "github.com/superplanehq/superplane/pkg/integrations/github"
 	_ "github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
