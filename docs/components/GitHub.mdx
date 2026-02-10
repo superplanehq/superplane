@@ -28,6 +28,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitHub repository" />
   <LinkCard title="Create Review" href="#create-review" description="Submit a pull request review on GitHub" />
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
+  <LinkCard title="Get Billing Usage" href="#get-billing-usage" description="Retrieve billable GitHub Actions usage (minutes) for the organization" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitHub repository" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
@@ -1163,6 +1164,98 @@ Returns confirmation of the deletion.
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.release"
+}
+```
+
+<a id="get-billing-usage"></a>
+
+## Get Billing Usage
+
+The Get Billing Usage component retrieves billable GitHub Actions usage (minutes) for the installation's organization.
+
+### Prerequisites
+
+This action requires the GitHub App to have **Organization permission: Administration (read)**. Existing installations must approve this new permission when prompted by GitHub. Until approved, this action will return a 403 error.
+
+**Note**: This component uses GitHub's enhanced billing usage report API, which provides detailed usage information and is the recommended approach for accessing billing data.
+
+### Use Cases
+
+- **Billing monitoring**: Check Actions usage for billing or quota from SuperPlane workflows
+- **Monthly reporting**: Generate reports on workflow run minutes for cost tracking or compliance
+- **Usage alerts**: Compare usage to thresholds and trigger alerts when approaching limits
+- **Cost allocation**: Track usage per repository for internal chargeback
+
+### How It Works
+
+This component calls GitHub's usage report API to retrieve:
+- Total billable minutes for the specified time period
+- Breakdown by runner OS (Linux, Windows, macOS)
+- Optional per-repository breakdown when specific repositories are selected
+- Optional cost information (if available from the API)
+
+**Note**: Only private repositories on GitHub-hosted runners accrue billable minutes. Public repos and self-hosted runners show zero billable usage.
+
+### Configuration
+
+- **Repositories** (optional, multi-select): List of repositories to include. When empty, returns usage for all repos in the organization. When one or more selected, scopes to those repos only.
+- **Year** (optional): Year for billing period (e.g., "2026"). Defaults to current year.
+- **Month** (optional): Month for billing period (1-12). Defaults to current month.
+- **Day** (optional): Day for billing period (1-31). When specified, narrows to a specific day.
+- **Product** (optional): Billing product to query. Defaults to "actions". Can be used for other products like "copilot" in the future.
+- **Runner OS / SKU** (optional): Filter to a specific runner OS (e.g., "UBUNTU", "WINDOWS", "MACOS"). When unset, returns usage for all runner OSes.
+
+### Output
+
+Returns usage data on the default output channel:
+- **minutes_used**: Total billable minutes in the period
+- **minutes_used_breakdown**: Minutes broken down by OS (Linux/Windows/macOS)
+- **total_cost**: Optional cost information (if available from API)
+- **repository_breakdown**: Per-repository usage when multiple repos are selected
+
+**Important**: Breakdown is by OS (runner SKU) and repository, not by individual workflow. Workflow-level breakdown is not available via the GitHub API.
+
+### Error Handling
+
+Errors do not emit a payload. Common errors include:
+- **403 Forbidden**: Administration permission not granted on the installation
+- **404 Not Found**: Repository or organization not found
+- **5xx errors**: GitHub API issues
+
+### Example Output
+
+```json
+{
+  "data": {
+    "minutes_used": 2450,
+    "minutes_used_breakdown": {
+      "MACOS": 150,
+      "UBUNTU": 1800,
+      "WINDOWS": 500
+    },
+    "repository_breakdown": [
+      {
+        "breakdown": {
+          "UBUNTU": 1000,
+          "WINDOWS": 200
+        },
+        "minutes_used": 1200,
+        "repository_name": "backend-api"
+      },
+      {
+        "breakdown": {
+          "MACOS": 150,
+          "UBUNTU": 800,
+          "WINDOWS": 300
+        },
+        "minutes_used": 1250,
+        "repository_name": "frontend-app"
+      }
+    ],
+    "total_cost": 24.5
+  },
+  "timestamp": "2026-02-09T04:47:31.680755501Z",
+  "type": "github.billing.usage"
 }
 ```
 
