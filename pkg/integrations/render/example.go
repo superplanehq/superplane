@@ -16,6 +16,12 @@ var exampleDataOnBuildBytes []byte
 //go:embed example_output_deploy.json
 var exampleOutputDeployBytes []byte
 
+//go:embed example_output_get_service.json
+var exampleOutputGetServiceBytes []byte
+
+//go:embed example_output_get_deploy.json
+var exampleOutputGetDeployBytes []byte
+
 var exampleDataOnDeployOnce sync.Once
 var exampleDataOnDeploy map[string]any
 
@@ -24,6 +30,12 @@ var exampleDataOnBuild map[string]any
 
 var exampleOutputDeployOnce sync.Once
 var exampleOutputDeploy map[string]any
+
+var exampleOutputGetServiceOnce sync.Once
+var exampleOutputGetService map[string]any
+
+var exampleOutputGetDeployOnce sync.Once
+var exampleOutputGetDeploy map[string]any
 
 func (t *OnDeploy) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(
@@ -46,5 +58,21 @@ func (c *Deploy) ExampleOutput() map[string]any {
 		&exampleOutputDeployOnce,
 		exampleOutputDeployBytes,
 		&exampleOutputDeploy,
+	)
+}
+
+func (c *GetService) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputGetServiceOnce,
+		exampleOutputGetServiceBytes,
+		&exampleOutputGetService,
+	)
+}
+
+func (c *GetDeploy) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputGetDeployOnce,
+		exampleOutputGetDeployBytes,
+		&exampleOutputGetDeploy,
 	)
 }
