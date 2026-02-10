@@ -67,6 +67,27 @@ func (r *Rootly) ListResources(resourceType string, ctx core.ListResourcesContex
 		}
 		return resources, nil
 
+	case "sub_status":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		subStatuses, err := client.ListSubStatuses()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list sub-statuses: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(subStatuses))
+		for _, subStatus := range subStatuses {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: subStatus.Name,
+				ID:   subStatus.ID,
+			})
+		}
+		return resources, nil
+
 	default:
 		return []core.IntegrationResource{}, nil
 	}

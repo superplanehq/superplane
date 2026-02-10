@@ -18,6 +18,7 @@ type UpdateIncidentSpec struct {
 	Title      string       `json:"title"`
 	Summary    string       `json:"summary"`
 	Status     string       `json:"status"`
+	SubStatus  string       `json:"subStatus"`
 	Severity   string       `json:"severity"`
 	Services   []string     `json:"services"`
 	Teams      []string     `json:"teams"`
@@ -58,6 +59,7 @@ func (c *UpdateIncident) Documentation() string {
 - **Title**: Update the incident title (optional, supports expressions)
 - **Summary**: Update the incident summary (optional, supports expressions)
 - **Status**: Update the incident status (optional)
+- **Sub-Status**: Update the incident sub-status (optional, required by some Rootly accounts when changing status)
 - **Severity**: Update the incident severity level (optional)
 - **Services**: Services to attach to the incident (optional)
 - **Teams**: Teams to attach to the incident (optional)
@@ -128,6 +130,18 @@ func (c *UpdateIncident) Configuration() []configuration.Field {
 						{Label: "Closed", Value: "closed"},
 						{Label: "Cancelled", Value: "cancelled"},
 					},
+				},
+			},
+		},
+		{
+			Name:        "subStatus",
+			Label:       "Sub-Status",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Update the incident sub-status (required by some accounts when changing status)",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "sub_status",
 				},
 			},
 		},
@@ -216,7 +230,7 @@ func (c *UpdateIncident) Setup(ctx core.SetupContext) error {
 	}
 
 	hasUpdate := spec.Title != "" || spec.Summary != "" ||
-		spec.Status != "" || spec.Severity != "" ||
+		spec.Status != "" || spec.SubStatus != "" || spec.Severity != "" ||
 		len(spec.Services) > 0 || len(spec.Teams) > 0 ||
 		len(spec.Labels) > 0
 
@@ -240,10 +254,11 @@ func (c *UpdateIncident) Execute(ctx core.ExecutionContext) error {
 	}
 
 	attrs := UpdateIncidentAttributes{
-		Title:      spec.Title,
-		Summary:    spec.Summary,
-		Status:     spec.Status,
-		SeverityID: spec.Severity,
+		Title:       spec.Title,
+		Summary:     spec.Summary,
+		Status:      spec.Status,
+		SubStatusID: spec.SubStatus,
+		SeverityID:  spec.Severity,
 	}
 
 	// Only set list/map fields when non-empty so that empty arrays from the frontend
