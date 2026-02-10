@@ -9,6 +9,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Get Check Details" href="#get-check-details" description="Get detailed information for a Dash0 check by ID" />
   <LinkCard title="List Issues" href="#list-issues" description="Query Dash0 to get a list of all current issues using the metric dash0.issue.status" />
   <LinkCard title="Query Prometheus" href="#query-prometheus" description="Execute a PromQL query against Dash0 Prometheus API and return the response data" />
 </CardGrid>
@@ -80,6 +81,51 @@ Returns a list of issues with:
 }
 ```
 
+<a id="get-check-details"></a>
+
+## Get Check Details
+
+The Get Check Details component fetches full context for a Dash0 check by ID.
+
+### Use Cases
+
+- **Alert enrichment**: Expand webhook payloads with full check context before notifying responders
+- **Workflow branching**: Use check attributes (severity, thresholds, services) in downstream conditions
+- **Incident automation**: Add rich check details to incident tickets or chat messages
+
+### Configuration
+
+- **Check ID**: The Dash0 check identifier to retrieve
+- **Include History**: Include additional history data when supported by the Dash0 API
+
+### Output
+
+Emits a payload containing:
+- **checkId**: Check identifier used in the request
+- **details**: Raw details response from Dash0
+
+### Example Output
+
+```json
+{
+  "data": {
+    "checkId": "check-123",
+    "details": {
+      "annotations": {
+        "summary": "Checkout latency is above threshold"
+      },
+      "id": "check-123",
+      "labels": {
+        "service": "checkout",
+        "severity": "warning"
+      },
+      "name": "Checkout latency"
+    }
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.check.details.retrieved"
+}
+```
 <a id="query-prometheus"></a>
 
 ## Query Prometheus
@@ -149,4 +195,3 @@ Returns the Prometheus query response including:
   "type": "dash0.prometheus.response"
 }
 ```
-
