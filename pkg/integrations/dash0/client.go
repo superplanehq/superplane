@@ -1,6 +1,7 @@
 package dash0
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,9 +19,11 @@ const (
 )
 
 type Client struct {
-	Token   string
-	BaseURL string
-	http    core.HTTPContext
+	Token         string
+	BaseURL       string
+	LogsIngestURL string
+	Dataset       string
+	http          core.HTTPContext
 }
 
 func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
@@ -42,11 +45,64 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 	// Strip /api/prometheus if user included it in the base URL
 	baseURL = strings.TrimSuffix(baseURL, "/api/prometheus")
 
+	dataset := "default"
+	datasetConfig, err := ctx.GetConfig("dataset")
+	if err == nil && datasetConfig != nil && len(datasetConfig) > 0 {
+		trimmedDataset := strings.TrimSpace(string(datasetConfig))
+		if trimmedDataset != "" {
+			dataset = trimmedDataset
+		}
+	}
+
+	logsIngestURL := deriveLogsIngestURL(baseURL)
+
 	return &Client{
-		Token:   string(apiToken),
-		BaseURL: baseURL,
-		http:    http,
+		Token:         string(apiToken),
+		BaseURL:       baseURL,
+		LogsIngestURL: logsIngestURL,
+		Dataset:       dataset,
+		http:          http,
 	}, nil
+}
+
+// deriveLogsIngestURL derives the OTLP logs ingress host from the configured API base URL.
+func deriveLogsIngestURL(baseURL string) string {
+	parsedURL, err := url.Parse(baseURL)
+	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
+		return strings.TrimSuffix(baseURL, "/")
+	}
+
+	hostname := parsedURL.Hostname()
+	if strings.HasPrefix(hostname, "api.") {
+		hostname = "ingress." + strings.TrimPrefix(hostname, "api.")
+	}
+
+	if port := parsedURL.Port(); port != "" {
+		parsedURL.Host = fmt.Sprintf("%s:%s", hostname, port)
+	} else {
+		parsedURL.Host = hostname
+	}
+
+	parsedURL.Path = ""
+	parsedURL.RawPath = ""
+	parsedURL.RawQuery = ""
+	parsedURL.Fragment = ""
+
+	return strings.TrimSuffix(parsedURL.String(), "/")
+}
+
+// withDatasetQuery appends the configured dataset query parameter to a request URL.
+func (c *Client) withDatasetQuery(requestURL string) (string, error) {
+	parsedURL, err := url.Parse(requestURL)
+	if err != nil {
+		return "", fmt.Errorf("error parsing request URL: %v", err)
+	}
+
+	query := parsedURL.Query()
+	query.Set("dataset", c.Dataset)
+	parsedURL.RawQuery = query.Encode()
+
+	return parsedURL.String(), nil
 }
 
 func (c *Client) execRequest(method, url string, body io.Reader, contentType string) ([]byte, error) {
@@ -168,8 +224,12 @@ type CheckRule struct {
 
 func (c *Client) ListCheckRules() ([]CheckRule, error) {
 	apiURL := fmt.Sprintf("%s/api/alerting/check-rules", c.BaseURL)
+	requestURL, err := c.withDatasetQuery(apiURL)
+	if err != nil {
+		return nil, err
+	}
 
-	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil, "")
+	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil, "")
 	if err != nil {
 		return nil, err
 	}
@@ -206,4 +266,121 @@ func (c *Client) ListCheckRules() ([]CheckRule, error) {
 	}
 
 	return checkRules, nil
+}
+
+// SendLogEvents sends OTLP log batches to Dash0 ingestion endpoint.
+func (c *Client) SendLogEvents(request OTLPLogsRequest) (map[string]any, error) {
+	requestURL := fmt.Sprintf("%s/v1/logs", c.LogsIngestURL)
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling logs request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, requestURL, bytes.NewReader(body), "application/json")
+	if err != nil {
+		return nil, err
+	}
+
+	parsed, err := parseJSONResponse(responseBody)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing send log event response: %v", err)
+	}
+
+	return parsed, nil
+}
+
+// GetCheckDetails fetches check context by failed-check ID with check-rules fallback.
+func (c *Client) GetCheckDetails(checkID string, includeHistory bool) (map[string]any, error) {
+	trimmedCheckID := strings.TrimSpace(checkID)
+	if trimmedCheckID == "" {
+		return nil, fmt.Errorf("check id is required")
+	}
+
+	querySuffix := ""
+	if includeHistory {
+		querySuffix = "?include_history=true"
+	}
+
+	escapedID := url.PathEscape(trimmedCheckID)
+	requestURL := fmt.Sprintf("%s/api/alerting/failed-checks/%s%s", c.BaseURL, escapedID, querySuffix)
+
+	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil, "")
+	if err != nil {
+		if strings.Contains(err.Error(), "request got 404 code") {
+			fallbackURL := fmt.Sprintf("%s/api/alerting/check-rules/%s%s", c.BaseURL, escapedID, querySuffix)
+			responseBody, err = c.execRequest(http.MethodGet, fallbackURL, nil, "")
+			if err != nil {
+				return nil, fmt.Errorf("fallback check-rules lookup failed: %v", err)
+			}
+		} else {
+			return nil, err
+		}
+	}
+
+	parsed, err := parseJSONResponse(responseBody)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing check details response: %v", err)
+	}
+
+	if _, ok := parsed["checkId"]; !ok {
+		parsed["checkId"] = trimmedCheckID
+	}
+
+	return parsed, nil
+}
+
+// UpsertSyntheticCheck creates or updates a synthetic check by origin/id.
+func (c *Client) UpsertSyntheticCheck(originOrID string, specification map[string]any) (map[string]any, error) {
+	trimmedOriginOrID := strings.TrimSpace(originOrID)
+	if trimmedOriginOrID == "" {
+		return nil, fmt.Errorf("origin/id is required")
+	}
+
+	requestURL := fmt.Sprintf("%s/api/synthetic-checks/%s", c.BaseURL, url.PathEscape(trimmedOriginOrID))
+	requestURL, err := c.withDatasetQuery(requestURL)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := json.Marshal(specification)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPut, requestURL, bytes.NewReader(body), "application/json")
+	if err != nil {
+		return nil, err
+	}
+
+	parsed, err := parseJSONResponse(responseBody)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing upsert synthetic check response: %v", err)
+	}
+
+	if _, ok := parsed["originOrId"]; !ok {
+		parsed["originOrId"] = trimmedOriginOrID
+	}
+
+	return parsed, nil
+}
+
+// parseJSONResponse normalizes object or array JSON responses into a map.
+func parseJSONResponse(responseBody []byte) (map[string]any, error) {
+	trimmedBody := strings.TrimSpace(string(responseBody))
+	if trimmedBody == "" {
+		return map[string]any{}, nil
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(responseBody, &parsed); err == nil {
+		return parsed, nil
+	}
+
+	var parsedArray []any
+	if err := json.Unmarshal(responseBody, &parsedArray); err == nil {
+		return map[string]any{"items": parsedArray}, nil
+	}
+
+	return nil, fmt.Errorf("unexpected response payload shape")
 }
