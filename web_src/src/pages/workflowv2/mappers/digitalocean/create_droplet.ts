@@ -32,20 +32,29 @@ export const createDropletMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+    const details: Record<string, string> = {};
+
+    if (context.execution.createdAt) {
+      details["Created At"] = new Date(context.execution.createdAt).toLocaleString();
+    }
+
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const droplet = outputs?.default?.[0]?.data as Record<string, any> | undefined;
-    if (!droplet) return {};
+    if (!droplet) return details;
 
     const ip = droplet.networks?.v4?.find((n: any) => n.type === "public")?.ip_address;
 
-    return {
-      "Droplet ID": droplet.id?.toString() || "-",
-      Name: droplet.name || "-",
-      Status: droplet.status || "-",
-      Region: droplet.region?.name || droplet.region?.slug || "-",
-      "IP Address": ip || "-",
-      Size: droplet.size_slug || "-",
-    };
+    details["Droplet ID"] = droplet.id?.toString() || "-";
+    details["Name"] = droplet.name || "-";
+    details["Region"] = droplet.region?.name || droplet.region?.slug || "-";
+    details["Size"] = droplet.size_slug || "-";
+    details["OS"] = droplet.image?.name || droplet.image?.slug || "-";
+
+    if (ip) {
+      details["IP Address"] = ip;
+    }
+
+    return details;
   },
 
   subtitle(context: SubtitleContext): string {
