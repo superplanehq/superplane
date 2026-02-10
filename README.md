@@ -66,7 +66,7 @@ This section gives a quick snapshot of what SuperPlane already supports and what
 
 **Available now**
 
-✓ 40+ starter components (10+ core, 30+ integrations)  
+✓ 75+ components  
 ✓ Event-driven workflow engine  
 ✓ Visual Canvas builder  
 ✓ Run history, event chain view, debug console  
