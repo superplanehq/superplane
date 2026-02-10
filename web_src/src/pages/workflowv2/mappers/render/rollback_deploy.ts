@@ -11,6 +11,7 @@ import { MetadataItem } from "@/ui/metadataList";
 import { formatTimeAgo } from "@/utils/date";
 import { formatTimestamp, stringOrDash } from "./common";
 import { baseProps } from "./base";
+import { DEPLOY_STATE_MAP } from "./deploy";
 
 interface RollbackDeployConfiguration {
   service?: string;
@@ -44,7 +45,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 export const rollbackDeployMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const base = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
-    return { ...base, metadata: metadataList(context.node) };
+    return { ...base, metadata: metadataList(context.node), eventStateMap: DEPLOY_STATE_MAP };
   },
 
   subtitle(context: SubtitleContext): string {
@@ -53,8 +54,10 @@ export const rollbackDeployMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as RollbackDeployOutput | undefined;
+    const outputs = context.execution.outputs as { success?: OutputPayload[]; failed?: OutputPayload[] } | undefined;
+    const result =
+      (outputs?.success?.[0]?.data as RollbackDeployOutput | undefined) ??
+      (outputs?.failed?.[0]?.data as RollbackDeployOutput | undefined);
 
     return {
       "Triggered At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",
