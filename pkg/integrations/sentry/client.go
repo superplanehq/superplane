@@ -109,15 +109,11 @@ func (c *Client) UpdateIssue(org, issueID string, req UpdateIssueRequest) (map[s
 	if issueID == "" {
 		return nil, fmt.Errorf("issue id is required")
 	}
-	// Sentry API: https://docs.sentry.io/api/events/update-an-issue/
-	// Canonical endpoint uses only the issue id.
 	path := fmt.Sprintf("/api/0/issues/%s/", issueID)
 	body, err := c.do(http.MethodPut, path, req)
 	if err != nil {
 		var apiErr *SentryAPIError
 		if org != "" && errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
-			// Some Sentry deployments (or permission models) return 404 on the canonical endpoint.
-			// Fall back to the org-scoped endpoint.
 			fallbackPath := fmt.Sprintf("/api/0/organizations/%s/issues/%s/", org, issueID)
 			body, err = c.do(http.MethodPut, fallbackPath, req)
 			if err != nil {
