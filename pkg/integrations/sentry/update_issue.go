@@ -117,7 +117,7 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 
 func (c *UpdateIssue) Setup(ctx core.SetupContext) error {
 	var spec UpdateIssueSpec
-	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+	if err := mapstructure.WeakDecode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("decode configuration: %w", err)
 	}
 	if spec.Organization == "" {
@@ -135,7 +135,7 @@ func (c *UpdateIssue) Setup(ctx core.SetupContext) error {
 
 func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 	var spec UpdateIssueSpec
-	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+	if err := mapstructure.WeakDecode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("decode configuration: %w", err)
 	}
 

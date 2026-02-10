@@ -80,14 +80,20 @@ export const updateIssueMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+
+    const executionConfiguration = context.execution.configuration as UpdateIssueConfiguration | undefined;
+    const nodeConfiguration = context.node.configuration as UpdateIssueConfiguration | undefined;
+    const configuration = executionConfiguration ?? nodeConfiguration;
     const updatedAt = context.execution.updatedAt || context.execution.createdAt;
 
     return {
       "Updated At": updatedAt ? formatTimeAgo(new Date(updatedAt)) : "-",
-      "Issue ID": stringOrDash(result?.id),
+      Organization: stringOrDash(configuration?.organization),
+      "Issue ID": stringOrDash(result?.id ?? configuration?.issueId),
       "Short ID": stringOrDash(result?.shortId),
-      Status: stringOrDash(result?.status),
+      Status: stringOrDash(result?.status ?? configuration?.status),
       Title: stringOrDash(result?.title),
+      "Assigned To": stringOrDash(configuration?.assignedTo),
     };
   },
 

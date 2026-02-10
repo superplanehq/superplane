@@ -5,6 +5,18 @@ import { TriggerProps } from "@/ui/trigger";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { stringOrDash } from "../utils";
 
+interface WebhookMetadata {
+  url?: string;
+}
+
+function formatWebhookUrl(metadata?: WebhookMetadata): string {
+  if (!metadata?.url) {
+    return "Save the canvas to generate a webhook URL";
+  }
+
+  return metadata.url;
+}
+
 const eventLabels: Record<string, string> = {
   created: "Created",
   resolved: "Resolved",
@@ -15,14 +27,48 @@ const eventLabels: Record<string, string> = {
 
 interface OnIssueEventData {
   action?: string;
+  installation?: {
+    uuid?: string;
+  };
   issue?: {
     id?: string;
     title?: string;
     shortId?: string;
     status?: string;
     permalink?: string;
+    project?: {
+      id?: string;
+      slug?: string;
+      name?: string;
+    };
   };
-  actor?: Record<string, unknown>;
+  actor?: {
+    id?: string | number;
+    name?: string;
+    type?: string;
+  };
+}
+
+function normalizeEventData(raw: unknown): OnIssueEventData | undefined {
+  if (!raw) return undefined;
+
+  let value: unknown = raw;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value) as unknown;
+    } catch {
+      return undefined;
+    }
+  }
+
+  if (!value || typeof value !== "object") return undefined;
+
+  const maybeWrapped = value as { data?: unknown };
+  if (maybeWrapped.data && typeof maybeWrapped.data === "object") {
+    return maybeWrapped.data as OnIssueEventData;
+  }
+
+  return value as OnIssueEventData;
 }
 
 function formatAction(action: string): string {
@@ -41,7 +87,7 @@ function buildSubtitle(label: string, createdAt?: string): string {
  */
 export const onIssueEventTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event?.data as OnIssueEventData | undefined;
+    const eventData = normalizeEventData(context.event?.data);
     const action = eventData?.action ? formatAction(eventData.action) : "Issue event";
     const title = eventData?.issue?.title?.trim() || eventData?.issue?.shortId || action;
     const subtitle = buildSubtitle(action, context.event?.createdAt);
@@ -53,15 +99,22 @@ export const onIssueEventTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data as OnIssueEventData | undefined;
+    const eventData = normalizeEventData(context.event?.data);
     const issue = eventData?.issue;
+    const project = issue?.project;
+    const actor = eventData?.actor;
 
     return {
       Action: stringOrDash(eventData?.action && formatAction(eventData.action)),
+      "Installation UUID": stringOrDash(eventData?.installation?.uuid),
       "Issue ID": stringOrDash(issue?.id),
       "Short ID": stringOrDash(issue?.shortId),
       Title: stringOrDash(issue?.title),
       Status: stringOrDash(issue?.status),
+      Project: stringOrDash(project?.slug || project?.name),
+      "Project ID": stringOrDash(project?.id),
+      Actor: stringOrDash(actor?.name),
+      "Actor ID": stringOrDash(actor?.id),
       Permalink: stringOrDash(issue?.permalink),
     };
   },
@@ -69,7 +122,13 @@ export const onIssueEventTriggerRenderer: TriggerRenderer = {
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
     const { node, definition, lastEvent } = context;
     const configuration = node.configuration as { events?: string[] } | undefined;
+    const webhookMetadata = node.metadata as WebhookMetadata | undefined;
     const metadataItems: { icon: string; label: string }[] = [];
+
+    metadataItems.push({
+      icon: "link",
+      label: formatWebhookUrl(webhookMetadata),
+    });
 
     if (configuration?.events?.length) {
       const label =
@@ -92,7 +151,7 @@ export const onIssueEventTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnIssueEventData | undefined;
+      const eventData = normalizeEventData(lastEvent.data);
       const action = eventData?.action ? formatAction(eventData.action) : "Issue event";
       const title = eventData?.issue?.title?.trim() || eventData?.issue?.shortId || action;
       const subtitle = buildSubtitle(action, lastEvent.createdAt);

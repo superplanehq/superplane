@@ -3,6 +3,7 @@ package sentry
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +18,17 @@ type Client struct {
 	BaseURL string
 	Token   string
 	http    core.HTTPContext
+}
+
+type SentryAPIError struct {
+	Method     string
+	URL        string
+	StatusCode int
+	Body       string
+}
+
+func (e *SentryAPIError) Error() string {
+	return fmt.Sprintf("sentry API %s %s: %d %s", e.Method, e.URL, e.StatusCode, e.Body)
 }
 
 func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
@@ -68,7 +80,12 @@ func (c *Client) do(method, path string, body any) ([]byte, error) {
 		return nil, fmt.Errorf("read response: %w", err)
 	}
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, fmt.Errorf("sentry API %s %s: %d %s", method, path, res.StatusCode, string(resBody))
+		return nil, &SentryAPIError{
+			Method:     method,
+			URL:        url,
+			StatusCode: res.StatusCode,
+			Body:       string(resBody),
+		}
 	}
 	return resBody, nil
 }
@@ -89,14 +106,26 @@ type UpdateIssueRequest struct {
 }
 
 func (c *Client) UpdateIssue(org, issueID string, req UpdateIssueRequest) (map[string]any, error) {
-	if org == "" || issueID == "" {
-		return nil, fmt.Errorf("organization and issue id are required")
+	if issueID == "" {
+		return nil, fmt.Errorf("issue id is required")
 	}
-	path := fmt.Sprintf("/api/0/organizations/%s/issues/%s/", org, issueID)
 	// Sentry API: https://docs.sentry.io/api/events/update-an-issue/
+	// Canonical endpoint uses only the issue id.
+	path := fmt.Sprintf("/api/0/issues/%s/", issueID)
 	body, err := c.do(http.MethodPut, path, req)
 	if err != nil {
-		return nil, err
+		var apiErr *SentryAPIError
+		if org != "" && errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
+			// Some Sentry deployments (or permission models) return 404 on the canonical endpoint.
+			// Fall back to the org-scoped endpoint.
+			fallbackPath := fmt.Sprintf("/api/0/organizations/%s/issues/%s/", org, issueID)
+			body, err = c.do(http.MethodPut, fallbackPath, req)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
 	}
 	var out map[string]any
 	if err := json.Unmarshal(body, &out); err != nil {
