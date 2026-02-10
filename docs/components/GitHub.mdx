@@ -30,6 +30,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitHub repository" />
+  <LinkCard title="Get Workflow Usage" href="#get-workflow-usage" description="Retrieve billable GitHub Actions usage (minutes) for an organization" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
@@ -1278,6 +1279,52 @@ Returns release information including:
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.release"
+}
+```
+
+<a id="get-workflow-usage"></a>
+
+## Get Workflow Usage
+
+The Get Workflow Usage component retrieves **billable** GitHub Actions usage for an organization using GitHub's billing usage API.
+
+### Important: Authentication
+
+GitHub's organization billing endpoints are **not accessible** using GitHub App installation tokens. If you see a 403 with `Resource not accessible by integration`, you must provide a **user access token**.
+
+To enable this component, set a GitHub integration secret named `accessToken` containing a GitHub **PAT** (or OAuth token) that has permission to read the organization's billing/usage.
+
+### Notes
+
+- Only **private repositories** on **GitHub-hosted runners** accrue billable minutes. Public repos and self-hosted runners generally show **0 billable usage**.
+- Breakdown is available **by runner OS (SKU)** (and optionally by repository if you select repositories). Breakdown **by workflow** is not available via the GitHub API.
+
+### Configuration
+
+- **Repositories** (optional): If empty, returns organization-wide usage. If one or more repositories are selected, usage is scoped and aggregated across those repositories.
+- **Time range** (optional): `year`, `month`, `day` for billing period. Defaults to current month when omitted.
+- **Product** (optional): Defaults to `Actions`.
+- **Runner OS / SKU** (optional): Filter to a specific SKU (e.g. `actions_linux`, `actions_windows`).
+
+### Output
+
+Emits a single object containing:
+- `minutes_used`: total billable minutes
+- `minutes_used_breakdown`: map of SKU -> minutes
+- optionally `net_amount` (if provided by the API)
+
+### Example Output
+
+```json
+{
+  "minutes_used": 123,
+  "minutes_used_breakdown": {
+    "actions_linux": 100,
+    "actions_windows": 23
+  },
+  "month": 2,
+  "product": "Actions",
+  "year": 2026
 }
 ```
 
