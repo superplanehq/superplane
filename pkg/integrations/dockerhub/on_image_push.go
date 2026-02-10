@@ -11,20 +11,21 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const ImagePushEventType = "dockerhub.image.push"
-
 type OnImagePush struct{}
 
 type OnImagePushConfiguration struct {
-	Namespace  string                    `json:"namespace" mapstructure:"namespace"`
 	Repository string                    `json:"repository" mapstructure:"repository"`
 	Tags       []configuration.Predicate `json:"tags" mapstructure:"tags"`
 }
 
 type OnImagePushMetadata struct {
-	Namespace  string              `json:"namespace" mapstructure:"namespace"`
 	Repository *RepositoryMetadata `json:"repository" mapstructure:"repository"`
 	WebhookURL string              `json:"webhookUrl" mapstructure:"webhookUrl"`
+}
+
+type RepositoryMetadata struct {
+	Namespace string `json:"namespace" mapstructure:"namespace"`
+	Name      string `json:"name" mapstructure:"name"`
 }
 
 type ImagePushPayload struct {
@@ -57,15 +58,15 @@ func (p *OnImagePush) Name() string {
 }
 
 func (p *OnImagePush) Label() string {
-	return "Docker Hub • On Image Push"
+	return "On Image Push"
 }
 
 func (p *OnImagePush) Description() string {
-	return "Listen to Docker Hub image push events"
+	return "Listen to DockerHub image push events"
 }
 
 func (p *OnImagePush) Documentation() string {
-	return `The On Image Push trigger starts a workflow execution when an image tag is pushed to Docker Hub.
+	return `The On Image Push trigger starts a workflow execution when an image tag is pushed to DockerHub.
 
 ## Use Cases
 
@@ -75,13 +76,13 @@ func (p *OnImagePush) Documentation() string {
 
 ## Configuration
 
-- **Namespace**: Docker Hub username or organization that owns the repository (defaults to the integration username)
-- **Repository**: Docker Hub repository name
+- **Namespace**: DockerHub username or organization that owns the repository (defaults to the integration username)
+- **Repository**: DockerHub repository name
 - **Tags**: Optional filters for image tags (for example: ` + "`latest`" + ` or ` + "`^v[0-9]+`" + `)
 
 ## Webhook Setup
 
-This trigger generates a webhook URL in SuperPlane. Add that URL as a Docker Hub webhook for the selected repository so Docker Hub can deliver push events.`
+This trigger generates a webhook URL in SuperPlane. Add that URL as a DockerHub webhook for the selected repository so DockerHub can deliver push events.`
 }
 
 func (p *OnImagePush) Icon() string {
@@ -98,14 +99,6 @@ func (p *OnImagePush) ExampleData() map[string]any {
 
 func (p *OnImagePush) Configuration() []configuration.Field {
 	return []configuration.Field{
-		{
-			Name:        "namespace",
-			Label:       "Namespace",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Placeholder: "my-organization",
-			Description: "Docker Hub username or organization",
-		},
 		{
 			Name:     "repository",
 			Label:    "Repository",
@@ -156,26 +149,29 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("repository is required")
 	}
 
-	namespace, err := resolveNamespace(config.Namespace, ctx.Integration)
-	if err != nil {
-		return err
+	parts := strings.Split(repository, "/")
+	if len(parts) != 2 {
+		return fmt.Errorf("repository must be in the format of namespace/name")
 	}
 
+	namespace := parts[0]
+	repositoryName := parts[1]
+
 	if metadata.Repository != nil &&
-		metadata.Repository.Name == repository &&
-		metadata.Namespace == namespace &&
+		metadata.Repository.Name == repositoryName &&
+		metadata.Repository.Namespace == namespace &&
 		metadata.WebhookURL != "" {
 		return nil
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return fmt.Errorf("failed to create Docker Hub client: %w", err)
+		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	repoInfo, err := client.GetRepository(namespace, repository)
+	repoInfo, err := client.GetRepository(namespace, repositoryName)
 	if err != nil {
-		return fmt.Errorf("failed to validate repository: %w", err)
+		return fmt.Errorf("failed to validate repository %s in namespace %s: %w", repositoryName, namespace, err)
 	}
 
 	webhookURL := metadata.WebhookURL
@@ -187,12 +183,10 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 	}
 
 	return ctx.Metadata.Set(OnImagePushMetadata{
-		Namespace:  namespace,
 		WebhookURL: webhookURL,
 		Repository: &RepositoryMetadata{
 			Namespace: repoInfo.Namespace,
 			Name:      repoInfo.Name,
-			URL:       repoInfo.RepoURL,
 		},
 	})
 }
@@ -211,17 +205,27 @@ func (p *OnImagePush) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	metadata := OnImagePushMetadata{}
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
 	payload := ImagePushPayload{}
 	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %w", err)
 	}
 
-	repositoryName := repositoryNameFromEvent(payload.Repository.RepoName, payload.Repository.Name)
-	if repositoryName == "" {
-		return http.StatusBadRequest, fmt.Errorf("missing repository name in event payload")
+	if metadata.Repository == nil {
+		return http.StatusOK, nil
 	}
 
-	if strings.TrimSpace(config.Repository) != "" && repositoryName != strings.TrimSpace(config.Repository) {
+	if metadata.Repository.Namespace != payload.Repository.Namespace {
+		ctx.Logger.Infof("Ignoring event for namespace %s", payload.Repository.Namespace)
+		return http.StatusOK, nil
+	}
+
+	if metadata.Repository.Name != payload.Repository.Name {
+		ctx.Logger.Infof("Ignoring event for repository %s", payload.Repository.Name)
 		return http.StatusOK, nil
 	}
 
@@ -232,11 +236,12 @@ func (p *OnImagePush) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		}
 
 		if !configuration.MatchesAnyPredicate(config.Tags, tag) {
+			ctx.Logger.Infof("Ignoring event with non-matching tag %s", tag)
 			return http.StatusOK, nil
 		}
 	}
 
-	if err := ctx.Events.Emit(ImagePushEventType, payload); err != nil {
+	if err := ctx.Events.Emit("dockerhub.image.push", payload); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %w", err)
 	}
 
@@ -245,17 +250,4 @@ func (p *OnImagePush) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 
 func (p *OnImagePush) Cleanup(ctx core.TriggerContext) error {
 	return nil
-}
-
-func repositoryNameFromEvent(repoName, name string) string {
-	if name != "" {
-		return strings.TrimSpace(name)
-	}
-
-	parts := strings.Split(strings.TrimSpace(repoName), "/")
-	if len(parts) == 0 {
-		return ""
-	}
-
-	return parts[len(parts)-1]
 }

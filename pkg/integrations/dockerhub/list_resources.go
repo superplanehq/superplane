@@ -21,9 +21,9 @@ func listDockerHubResources(resourceType string, ctx core.ListResourcesContext) 
 }
 
 func listDockerHubRepositories(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	namespace, err := resolveNamespace(ctx.Parameters["namespace"], ctx.Integration)
+	namespace, err := ctx.Integration.GetConfig("username")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("integration username is required: %w", err)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -31,17 +31,18 @@ func listDockerHubRepositories(ctx core.ListResourcesContext) ([]core.Integratio
 		return nil, err
 	}
 
-	repositories, err := client.ListRepositories(namespace)
+	repositories, err := client.ListRepositories(string(namespace))
 	if err != nil {
-		return nil, fmt.Errorf("failed to list Docker Hub repositories: %w", err)
+		return nil, fmt.Errorf("failed to list repositories: %w", err)
 	}
 
 	resources := make([]core.IntegrationResource, 0, len(repositories))
 	for _, repository := range repositories {
+		name := repository.Namespace + "/" + repository.Name
 		resources = append(resources, core.IntegrationResource{
 			Type: ResourceTypeRepository,
-			Name: repository.Name,
-			ID:   repository.Name,
+			Name: name,
+			ID:   name,
 		})
 	}
 

@@ -9,13 +9,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-const installationInstructions = `
-To generate a Docker Hub access token:
-- Go to **Docker Hub** → **Account Settings** → **Personal Access Tokens**
-- Generate a new token
-- **Copy the token**, and enter your Docker Hub username and the token below
-`
-
 func init() {
 	registry.RegisterIntegration("dockerhub", &DockerHub{})
 }
@@ -32,7 +25,7 @@ func (d *DockerHub) Name() string {
 }
 
 func (d *DockerHub) Label() string {
-	return "Docker Hub"
+	return "DockerHub"
 }
 
 func (d *DockerHub) Icon() string {
@@ -40,11 +33,16 @@ func (d *DockerHub) Icon() string {
 }
 
 func (d *DockerHub) Description() string {
-	return "Manage and react to Docker Hub repositories and tags"
+	return "Manage and react to DockerHub repositories and tags"
 }
 
 func (d *DockerHub) Instructions() string {
-	return installationInstructions
+	return `
+To generate a DockerHub access token:
+- Go to **DockerHub** → **Account Settings** → **Personal Access Tokens**
+- Generate a new token
+- **Copy the token**, and enter your DockerHub username and the token below
+`
 }
 
 func (d *DockerHub) Configuration() []configuration.Field {
@@ -54,7 +52,7 @@ func (d *DockerHub) Configuration() []configuration.Field {
 			Label:       "Username",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "Docker Hub username or organization name",
+			Description: "Username or organization name",
 		},
 		{
 			Name:        "accessToken",
@@ -62,7 +60,7 @@ func (d *DockerHub) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Sensitive:   true,
-			Description: "Docker Hub personal access token",
+			Description: "Personal access token",
 		},
 	}
 }
@@ -89,21 +87,23 @@ func (d *DockerHub) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	expiresAt, err := refreshAccessToken(ctx.HTTP, ctx.Integration, config)
+	refreshIn, err := refreshAccessToken(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to refresh access token: %w", err)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return fmt.Errorf("failed to create Docker Hub client: %w", err)
+		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	if err := client.ValidateCredentials(config.Username); err != nil {
-		return fmt.Errorf("failed to validate Docker Hub credentials: %w", err)
+	err = client.ValidateCredentials(config.Username)
+	if err != nil {
+		return fmt.Errorf("failed to validate credentials: %w", err)
 	}
 
-	if err := scheduleAccessTokenRefresh(ctx.Integration, expiresAt); err != nil {
+	err = ctx.Integration.ScheduleActionCall("refreshAccessToken", map[string]any{}, *refreshIn)
+	if err != nil {
 		return fmt.Errorf("failed to schedule token refresh: %w", err)
 	}
 
@@ -123,7 +123,7 @@ func (d *DockerHub) Actions() []core.Action {
 	return []core.Action{
 		{
 			Name:        "refreshAccessToken",
-			Description: "Refresh Docker Hub access token",
+			Description: "Refresh access token",
 		},
 	}
 }
@@ -131,17 +131,12 @@ func (d *DockerHub) Actions() []core.Action {
 func (d *DockerHub) HandleAction(ctx core.IntegrationActionContext) error {
 	switch ctx.Name {
 	case "refreshAccessToken":
-		config := Configuration{}
-		if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-			return fmt.Errorf("failed to decode configuration: %w", err)
-		}
-
-		expiresAt, err := refreshAccessToken(ctx.HTTP, ctx.Integration, config)
+		refreshIn, err := refreshAccessToken(ctx.HTTP, ctx.Integration)
 		if err != nil {
 			return fmt.Errorf("failed to refresh access token: %w", err)
 		}
 
-		return scheduleAccessTokenRefresh(ctx.Integration, expiresAt)
+		return ctx.Integration.ScheduleActionCall("refreshAccessToken", map[string]any{}, *refreshIn)
 
 	default:
 		return fmt.Errorf("unknown action: %s", ctx.Name)

@@ -483,6 +483,7 @@ function CategorySection({
             slack: slackIcon,
             sendgrid: sendgridIcon,
             render: renderIcon,
+            dockerhub: dockerIcon,
             aws: {
               codeArtifact: awsCodeArtifactIcon,
               ecr: awsEcrIcon,

@@ -56,7 +56,6 @@ func Test__OnImagePush__Setup(t *testing.T) {
 		require.NoError(t, err)
 		stored, ok := metadata.Metadata.(OnImagePushMetadata)
 		require.True(t, ok)
-		assert.Equal(t, "superplane", stored.Namespace)
 		assert.Equal(t, "demo", stored.Repository.Name)
 		assert.NotEmpty(t, stored.WebhookURL)
 	})
@@ -132,6 +131,6 @@ func Test__OnImagePush__HandleWebhook(t *testing.T) {
 		assert.Equal(t, http.StatusOK, code)
 		require.NoError(t, err)
 		require.Equal(t, 1, events.Count())
-		assert.Equal(t, ImagePushEventType, events.Payloads[0].Type)
+		assert.Equal(t, "dockerhub.image.push", events.Payloads[0].Type)
 	})
 }

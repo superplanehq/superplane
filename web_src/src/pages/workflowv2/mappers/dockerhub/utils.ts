@@ -1,24 +1,22 @@
 import { MetadataItem } from "@/ui/metadataList";
-import { DockerHubRepositoryConfiguration, DockerHubRepositoryMetadata } from "./types";
+import { OnImagePushConfiguration, OnImagePushMetadata } from "./types";
 
 export function getRepositoryLabel(
-  metadata?: DockerHubRepositoryMetadata,
-  configuration?: DockerHubRepositoryConfiguration,
-  fallback?: string,
+  metadata?: OnImagePushMetadata,
+  configuration?: OnImagePushConfiguration,
 ): string | undefined {
-  const repoName = metadata?.repository?.name || configuration?.repository || fallback;
+  const repoName = metadata?.repository?.name || configuration?.repository;
   if (!repoName) {
     return undefined;
   }
 
-  const namespace = metadata?.repository?.namespace || metadata?.namespace || configuration?.namespace || undefined;
-
+  const namespace = metadata?.repository?.namespace;
   return namespace ? `${namespace}/${repoName}` : repoName;
 }
 
 export function buildRepositoryMetadataItems(
-  metadata?: DockerHubRepositoryMetadata,
-  configuration?: DockerHubRepositoryConfiguration,
+  metadata?: OnImagePushMetadata,
+  configuration?: OnImagePushConfiguration,
 ): MetadataItem[] {
   const repositoryLabel = getRepositoryLabel(metadata, configuration);
   if (!repositoryLabel) {

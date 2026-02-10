@@ -14,9 +14,13 @@ import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import { formatTimeAgo } from "@/utils/date";
 import { formatTimestampInUserTimezone } from "@/utils/timezone";
 import { MetadataItem } from "@/ui/metadataList";
-import { DockerHubRepositoryConfiguration, DockerHubRepositoryMetadata, DockerHubTag } from "./types";
-import { buildRepositoryMetadataItems } from "./utils";
+import { Tag } from "./types";
 import { formatBytes, stringOrDash } from "../utils";
+
+interface GetImageTagConfiguration {
+  repository?: string;
+  tag?: string;
+}
 
 export const getImageTagMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -24,11 +28,7 @@ export const getImageTagMapper: ComponentBaseMapper = {
     const componentName = context.componentDefinition.name || "unknown";
 
     return {
-      title:
-        context.node.name ||
-        context.componentDefinition.label ||
-        context.componentDefinition.name ||
-        "Unnamed component",
+      title: context.node.name || context.componentDefinition.label || "Unnamed component",
       iconSrc: dockerIcon,
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
@@ -42,7 +42,7 @@ export const getImageTagMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as DockerHubTag | undefined;
+    const result = outputs?.default?.[0]?.data as Tag | undefined;
 
     if (!result) {
       return {};
@@ -54,6 +54,7 @@ export const getImageTagMapper: ComponentBaseMapper = {
     return {
       Tag: stringOrDash(result.name),
       Status: stringOrDash(result.status),
+      "Image Size": formatBytes(image?.size),
       "Full Size": formatBytes(result.full_size),
       "Last Updated": result.last_updated ? formatTimestampInUserTimezone(result.last_updated) : "-",
       "Last Pushed": result.tag_last_pushed ? formatTimestampInUserTimezone(result.tag_last_pushed) : "-",
@@ -62,9 +63,6 @@ export const getImageTagMapper: ComponentBaseMapper = {
       "Image Digest": stringOrDash(image?.digest),
       Architecture: stringOrDash(image?.architecture),
       OS: stringOrDash(image?.os),
-      "Image Size": formatBytes(image?.size),
-      "Image Last Pushed": image?.last_pushed ? formatTimestampInUserTimezone(image.last_pushed) : "-",
-      "Image Last Pulled": image?.last_pulled ? formatTimestampInUserTimezone(image.last_pulled) : "-",
     };
   },
 
@@ -78,10 +76,11 @@ export const getImageTagMapper: ComponentBaseMapper = {
 
 function getImageTagMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const nodeMetadata = node.metadata as DockerHubRepositoryMetadata | undefined;
-  const configuration = node.configuration as DockerHubRepositoryConfiguration | undefined;
+  const configuration = node.configuration as GetImageTagConfiguration | undefined;
 
-  metadata.push(...buildRepositoryMetadataItems(nodeMetadata, configuration));
+  if (configuration?.repository) {
+    metadata.push({ icon: "package", label: configuration.repository });
+  }
 
   if (configuration?.tag) {
     metadata.push({ icon: "tag", label: configuration.tag });

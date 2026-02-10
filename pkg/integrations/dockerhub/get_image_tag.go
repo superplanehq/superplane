@@ -26,15 +26,15 @@ func (c *GetImageTag) Name() string {
 }
 
 func (c *GetImageTag) Label() string {
-	return "Docker Hub • Get Image Tag"
+	return "Get Image Tag"
 }
 
 func (c *GetImageTag) Description() string {
-	return "Get metadata for a Docker Hub image tag"
+	return "Get metadata for a DockerHub image tag"
 }
 
 func (c *GetImageTag) Documentation() string {
-	return `The Get Image Tag component retrieves metadata for a Docker Hub image tag.
+	return `The Get Image Tag component retrieves metadata for a DockerHub image tag.
 
 ## Use Cases
 
@@ -44,8 +44,8 @@ func (c *GetImageTag) Documentation() string {
 
 ## Configuration
 
-- **Namespace**: Docker Hub username or organization that owns the repository (defaults to the integration username)
-- **Repository**: Docker Hub repository name
+- **Namespace**: DockerHub username or organization that owns the repository (defaults to the integration username)
+- **Repository**: DockerHub repository name
 - **Tag**: Image tag to retrieve (for example: ` + "`latest`" + ` or ` + "`v1.2.3`" + `)
 `
 }
@@ -69,30 +69,13 @@ func (c *GetImageTag) OutputChannels(configuration any) []core.OutputChannel {
 func (c *GetImageTag) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "namespace",
-			Label:       "Namespace",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Placeholder: "my-organization",
-			Description: "Docker Hub username or organization",
-		},
-		{
 			Name:     "repository",
 			Label:    "Repository",
 			Type:     configuration.FieldTypeIntegrationResource,
 			Required: true,
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type:           "dockerhub.repository",
-					UseNameAsValue: true,
-					Parameters: []configuration.ParameterRef{
-						{
-							Name: "namespace",
-							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "namespace",
-							},
-						},
-					},
+					Type: "dockerhub.repository",
 				},
 			},
 		},
@@ -146,17 +129,26 @@ func (c *GetImageTag) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("tag is required")
 	}
 
-	namespace, err := resolveNamespace(config.Namespace, ctx.Integration)
-	if err != nil {
-		return err
+	parts := strings.Split(repository, "/")
+	if len(parts) != 2 {
+		return fmt.Errorf("repository must be in the format of namespace/name")
+	}
+
+	namespace := strings.TrimSpace(parts[0])
+	repositoryName := strings.TrimSpace(parts[1])
+
+	if namespace == "" || repositoryName == "" {
+		return fmt.Errorf("repository must be in the format of namespace/name")
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return fmt.Errorf("failed to create Docker Hub client: %w", err)
+		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	tagResponse, err := client.GetRepositoryTag(namespace, repository, tag)
+	ctx.Logger.Infof("Fetching image tag %s in repository %s in namespace %s", tag, repositoryName, namespace)
+
+	tagResponse, err := client.GetRepositoryTag(namespace, repositoryName, tag)
 	if err != nil {
 		return fmt.Errorf("failed to fetch image tag: %w", err)
 	}

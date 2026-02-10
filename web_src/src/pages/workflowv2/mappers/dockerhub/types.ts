@@ -1,6 +1,4 @@
-import { Predicate } from "../utils";
-
-export interface DockerHubRepository {
+export interface Repository {
   name?: string;
   namespace?: string;
   repo_name?: string;
@@ -12,35 +10,12 @@ export interface DockerHubRepository {
   status?: string;
 }
 
-export interface DockerHubRepositoryMetadata {
+export interface RepositoryMetadata {
+  name?: string;
   namespace?: string;
-  repository?: DockerHubRepository;
-  webhookUrl?: string;
 }
 
-export interface DockerHubRepositoryConfiguration {
-  namespace?: string;
-  repository?: string;
-  tag?: string;
-  tags?: Predicate[];
-}
-
-export type DockerHubTriggerMetadata = DockerHubRepositoryMetadata;
-export type DockerHubTriggerConfiguration = DockerHubRepositoryConfiguration;
-
-export interface DockerHubPushData {
-  tag?: string;
-  pushed_at?: number;
-  pusher?: string;
-}
-
-export interface DockerHubImagePushEvent {
-  callback_url?: string;
-  push_data?: DockerHubPushData;
-  repository?: DockerHubRepository;
-}
-
-export interface DockerHubTagImage {
+export interface TagImage {
   architecture?: string;
   os?: string;
   digest?: string;
@@ -50,7 +25,7 @@ export interface DockerHubTagImage {
   last_pushed?: string;
 }
 
-export interface DockerHubTag {
+export interface Tag {
   id?: number;
   name?: string;
   full_size?: number;
@@ -61,6 +36,5 @@ export interface DockerHubTag {
   tag_last_pulled?: string;
   tag_last_pushed?: string;
   repository?: number;
-  v2?: string;
-  images?: DockerHubTagImage[] | DockerHubTagImage;
+  images?: TagImage[] | TagImage;
 }

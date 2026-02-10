@@ -21,15 +21,6 @@ type Client struct {
 	http        core.HTTPContext
 }
 
-type APIError struct {
-	StatusCode int
-	Body       string
-}
-
-func (e *APIError) Error() string {
-	return fmt.Sprintf("request failed with %d: %s", e.StatusCode, e.Body)
-}
-
 func NewClient(httpClient core.HTTPContext, integration core.IntegrationContext) (*Client, error) {
 	if integration == nil {
 		return nil, fmt.Errorf("no integration context")
@@ -93,7 +84,7 @@ func (c *Client) doRequest(method, URL string, body io.Reader) (*http.Response, 
 	}
 
 	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
-		return nil, nil, &APIError{StatusCode: res.StatusCode, Body: string(responseBody)}
+		return nil, nil, fmt.Errorf("request failed with %d: %s", res.StatusCode, string(responseBody))
 	}
 
 	return res, responseBody, nil
@@ -103,14 +94,13 @@ type Repository struct {
 	Name        string `json:"name" mapstructure:"name"`
 	Namespace   string `json:"namespace" mapstructure:"namespace"`
 	Description string `json:"description" mapstructure:"description"`
-	RepoURL     string `json:"repo_url" mapstructure:"repo_url"`
 	IsPrivate   bool   `json:"is_private" mapstructure:"is_private"`
 	StarCount   int    `json:"star_count" mapstructure:"star_count"`
 	PullCount   int    `json:"pull_count" mapstructure:"pull_count"`
 	Status      string `json:"status_description" mapstructure:"status_description"`
 }
 
-type listRepositoriesResponse struct {
+type ListRepositoriesResponse struct {
 	Next    string       `json:"next"`
 	Results []Repository `json:"results"`
 }
@@ -140,7 +130,7 @@ func (c *Client) ListRepositories(namespace string) ([]Repository, error) {
 			return nil, err
 		}
 
-		var response listRepositoriesResponse
+		var response ListRepositoriesResponse
 		if err := json.Unmarshal(responseBody, &response); err != nil {
 			return nil, fmt.Errorf("failed to parse repositories response: %w", err)
 		}
@@ -153,8 +143,6 @@ func (c *Client) ListRepositories(namespace string) ([]Repository, error) {
 }
 
 func (c *Client) GetRepository(namespace, repository string) (*Repository, error) {
-	namespace = strings.TrimSpace(namespace)
-	repository = strings.TrimSpace(repository)
 	if namespace == "" || repository == "" {
 		return nil, fmt.Errorf("namespace and repository are required")
 	}
@@ -218,18 +206,10 @@ type Tag struct {
 	TagLastPulled       string   `json:"tag_last_pulled"`
 	TagLastPushed       string   `json:"tag_last_pushed"`
 	Repository          int64    `json:"repository"`
-	V2                  string   `json:"v2"`
 	Images              ImageSet `json:"images"`
 }
 
 func (c *Client) GetRepositoryTag(namespace, repository, tag string) (*Tag, error) {
-	namespace = strings.TrimSpace(namespace)
-	repository = strings.TrimSpace(repository)
-	tag = strings.TrimSpace(tag)
-	if namespace == "" || repository == "" || tag == "" {
-		return nil, fmt.Errorf("namespace, repository, and tag are required")
-	}
-
 	path := fmt.Sprintf("/v2/namespaces/%s/repositories/%s/tags/%s", namespace, repository, tag)
 	_, responseBody, err := c.doRequest(http.MethodGet, path, nil)
 	if err != nil {
