@@ -1,5 +1,6 @@
 import { resolveIcon } from "@/lib/utils";
 import React from "react";
+import { showErrorToast, showSuccessToast } from "@/utils/toast";
 
 export interface MetadataItem {
   icon: string;
@@ -19,6 +20,15 @@ export const MetadataList: React.FC<MetadataListProps> = ({
   iconSize = 16,
   underlined = false,
 }) => {
+  const handleCopy = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      showSuccessToast("Copied to clipboard");
+    } catch (_err) {
+      showErrorToast("Failed to copy text");
+    }
+  };
+
   if (!items || items.length === 0) {
     return null;
   }
@@ -27,6 +37,9 @@ export const MetadataList: React.FC<MetadataListProps> = ({
     <div className={className}>
       {items.map((item, index) => {
         const Icon = resolveIcon(item.icon);
+        const labelText = typeof item.label === "string" ? item.label : null;
+        const isCopyableUrl = !!labelText && /^https?:\/\//.test(labelText);
+
         return (
           <div key={index} className="flex items-center min-w-0">
             <div className="w-4 h-4 mr-2">
@@ -35,8 +48,17 @@ export const MetadataList: React.FC<MetadataListProps> = ({
             <span
               className={
                 "text-[13px] font-medium font-inter truncate" +
-                (underlined ? " underline underline-offset-3 decoration-dotted decoration-1" : "")
+                (underlined ? " underline underline-offset-3 decoration-dotted decoration-1" : "") +
+                (isCopyableUrl ? " cursor-pointer" : "")
               }
+              onClick={
+                isCopyableUrl
+                  ? () => {
+                      void handleCopy(labelText);
+                    }
+                  : undefined
+              }
+              title={isCopyableUrl ? "Click to copy" : undefined}
             >
               {item.label}
             </span>
