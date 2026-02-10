@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -22,6 +23,7 @@ func init() {
 type Buildkite struct{}
 
 type Configuration struct {
+	Organization string `json:"organization"`
 	APIToken     string `json:"apiToken"`
 	WebhookToken string `json:"webhookToken"`
 }
@@ -29,6 +31,60 @@ type Configuration struct {
 type Metadata struct {
 	Organizations []string         `json:"organizations"`
 	Webhook       *WebhookMetadata `json:"webhook,omitempty"`
+	SetupComplete bool             `json:"setupComplete"`
+	OrgSlug       string           `json:"orgSlug"`
+}
+
+func extractOrgSlug(orgInput string) (string, error) {
+	if orgInput == "" {
+		return "", fmt.Errorf("organization input is empty")
+	}
+
+	// Pattern 1: Full URL with https://
+	fullURLPattern := regexp.MustCompile(`https?://(?:www\.)?buildkite\.com/organizations/([^/]+)`)
+	if matches := fullURLPattern.FindStringSubmatch(strings.TrimSpace(orgInput)); len(matches) > 1 {
+		return matches[1], nil
+	}
+
+	// Pattern 2: URL without protocol
+	noProtocolPattern := regexp.MustCompile(`(?:www\.)?buildkite\.com/organizations/([^/]+)`)
+	if matches := noProtocolPattern.FindStringSubmatch(strings.TrimSpace(orgInput)); len(matches) > 1 {
+		return matches[1], nil
+	}
+
+	// Pattern 3: organizations/my-org
+	orgsPathPattern := regexp.MustCompile(`organizations/([^/]+)`)
+	if matches := orgsPathPattern.FindStringSubmatch(strings.TrimSpace(orgInput)); len(matches) > 1 {
+		return matches[1], nil
+	}
+
+	// Pattern 4: Just the slug (validate it looks like a valid org slug)
+	slugPattern := regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*[a-zA-Z0-9]$`)
+	if slugPattern.MatchString(strings.TrimSpace(orgInput)) {
+		return strings.TrimSpace(orgInput), nil
+	}
+
+	return "", fmt.Errorf("invalid organization format: %s. Expected format: https://buildkite.com/organizations/your-org or just 'your-org'", orgInput)
+}
+
+func (b *Buildkite) createWebhookSetupAction(ctx core.SyncContext, orgSlug string) {
+	ctx.Integration.NewBrowserAction(core.BrowserAction{
+		Description: fmt.Sprintf(
+			"Click to setup webhook.\n\n**Webhook URL**: `%s/api/v1/integrations/%s/webhook`\n**Events**: `build.finished`\n**Pipelines**: All Pipelines",
+			ctx.WebhooksBaseURL,
+			ctx.Integration.ID(),
+		),
+		URL:    fmt.Sprintf("https://buildkite.com/organizations/%s/services/webhook/new", orgSlug),
+		Method: "GET",
+	})
+}
+
+func (b *Buildkite) createTokenSetupAction(ctx core.SyncContext, orgSlug string) {
+	ctx.Integration.NewBrowserAction(core.BrowserAction{
+		Description: "Generate API token for triggering builds. Required permissions: `read_organizations`, `read_user`, `read_pipelines`, `read_builds`, `write_builds`.",
+		URL:         "https://buildkite.com/user/api-access-tokens",
+		Method:      "GET",
+	})
 }
 
 func (b *Buildkite) Name() string {
@@ -48,30 +104,26 @@ func (b *Buildkite) Description() string {
 }
 
 func (b *Buildkite) Instructions() string {
-	return `
-In order to connect Buildkite to Superplane, you need to create a webhook.
-
-1. In Buildkite, go to **Settings → Notification Services**
-2. Select **Add Webhook**
-3. Configure the webhook with these settings:
-   - **Description**: SuperPlane Integration
-   - **Webhook URL**: Your SuperPlane webhook URL
-   - **Events**: Select "build.finished"
-   - **Pipelines**: Select "All Pipelines"
-   - **Branch filtering**: Leave empty to receive all branches
-
-Webhook URL is constructed in following way - https://**<Backend URL>**/api/v1/integrations/**<Integration ID>**/webhook.`
+	return ""
 }
 
 func (b *Buildkite) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:        "organization",
+			Label:       "Organization URL",
+			Type:        configuration.FieldTypeString,
+			Description: "Buildkite organization URL (e.g. https://buildkite.com/organizations/your-org or just your-org)",
+			Placeholder: "e.g. https://buildkite.com/organizations/my-org or my-org",
+			Required:    true,
+		},
+		{
 			Name:        "apiToken",
 			Label:       "API Token",
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
-			Description: "Buildkite API token",
-			Placeholder: "e.g. bkpi_...",
+			Description: "Buildkite API token with permissions: read_organizations, read_user, read_pipelines, read_builds, write_builds",
+			Placeholder: "e.g. bkua_...",
 			Required:    true,
 		},
 		{
@@ -79,9 +131,9 @@ func (b *Buildkite) Configuration() []configuration.Field {
 			Label:       "Webhook Token",
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
-			Description: "Buildkite webhook token for verifying incoming webhook requests",
+			Description: "Buildkite webhook token (provided when you create webhook in Buildkite)",
 			Placeholder: "e.g. c86b6bbbc...",
-			Required:    false,
+			Required:    true,
 		},
 	}
 }
@@ -94,19 +146,41 @@ func (b *Buildkite) Sync(ctx core.SyncContext) error {
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		return fmt.Errorf("failed to decode configuration: %v", err)
+		return fmt.Errorf("Failed to decode configuration: %v", err)
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if config.Organization == "" {
+		return fmt.Errorf("Organization is required")
+	}
+
+	orgSlug, err := extractOrgSlug(config.Organization)
 	if err != nil {
-		return fmt.Errorf("error creating client: %v", err)
+		return fmt.Errorf("Invalid organization format: %v", err)
 	}
 
-	_, err = client.GetCurrentUser()
-	if err != nil {
-		return fmt.Errorf("error validating API token: %v", err)
+	// Prompt user to create API token
+	if config.APIToken == "" {
+		b.createTokenSetupAction(ctx, orgSlug)
+		return nil
 	}
 
+	// Prompt user to create webhook
+	if config.WebhookToken == "" {
+		b.createWebhookSetupAction(ctx, orgSlug)
+		return nil
+	}
+
+	// Update metadata to track setup completion
+	metadata := Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		metadata = Metadata{}
+	}
+
+	metadata.OrgSlug = orgSlug
+	metadata.SetupComplete = true
+	ctx.Integration.SetMetadata(metadata)
+
+	ctx.Integration.RemoveBrowserAction()
 	ctx.Integration.Ready()
 	return nil
 }
@@ -299,13 +373,28 @@ type WebhookMetadata struct {
 }
 
 func (b *Buildkite) SetupWebhook(ctx core.WebhookContext) (any, error) {
-	secret, err := ctx.GetSecret()
+	config := Configuration{}
+	err := mapstructure.Decode(ctx.GetConfiguration(), &config)
 	if err != nil {
-		return nil, fmt.Errorf("error getting webhook secret: %w", err)
+		return nil, fmt.Errorf("failed to decode configuration: %v", err)
 	}
+
+	if config.WebhookToken == "" {
+		// Return empty webhook metadata if no token configured yet
+		// The UI will prompt user to configure webhook token
+		return WebhookMetadata{
+			URL:             ctx.GetURL(),
+			Token:           "",
+			VerifySignature: false,
+			Active:          false,
+			Events:          []string{"build.finished"},
+			Pipelines:       []string{"*"},
+		}, nil
+	}
+
 	return WebhookMetadata{
 		URL:             ctx.GetURL(),
-		Token:           string(secret),
+		Token:           config.WebhookToken,
 		VerifySignature: true,
 		Active:          true,
 		Events:          []string{"build.finished"},
