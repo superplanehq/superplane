@@ -46,3 +46,24 @@ export interface ListIncidentsResponse {
   incidents: Incident[];
   total: number;
 }
+
+export interface Note {
+  id?: string;
+  content?: string;
+  created_at?: string;
+  user?: ResourceRef;
+  channel?: NoteChannel;
+}
+
+export interface NoteChannel {
+  type?: string;
+}
+
+export interface ListNotesConfiguration {
+  incidentId?: string;
+}
+
+export interface ListNotesResponse {
+  notes: Note[];
+  total: number;
+}
