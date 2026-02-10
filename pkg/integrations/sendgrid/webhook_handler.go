@@ -14,6 +14,10 @@ func (s *SendGridWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	return true, nil
 }
 
+func (s *SendGridWebhookHandler) Merge(current, requested any) (any, bool, error) {
+	return current, false, nil
+}
+
 func (s *SendGridWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
