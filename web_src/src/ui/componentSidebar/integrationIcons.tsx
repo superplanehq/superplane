@@ -9,6 +9,7 @@ import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import digitaloceanIcon from "@/assets/icons/integrations/digitalocean.svg";
 import discordIcon from "@/assets/icons/integrations/discord.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
+import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
@@ -18,6 +19,7 @@ import slackIcon from "@/assets/icons/integrations/slack.svg";
 import smtpIcon from "@/assets/icons/integrations/smtp.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
+import renderIcon from "@/assets/icons/integrations/render.svg";
 
 /** Integration type name (e.g. "github") → logo src. Used for Settings tab and header. */
 export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
@@ -29,6 +31,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   digitalocean: digitaloceanIcon,
   discord: discordIcon,
   github: githubIcon,
+  gitlab: gitlabIcon,
   jira: jiraIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
@@ -39,6 +42,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   slack: slackIcon,
   smtp: smtpIcon,
   sendgrid: sendgridIcon,
+  render: renderIcon,
 };
 
 /** Block name first part (e.g. "github") or compound (e.g. aws.lambda) → logo src for header. */
@@ -50,6 +54,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   digitalocean: digitaloceanIcon,
   discord: discordIcon,
   github: githubIcon,
+  gitlab: gitlabIcon,
   jira: jiraIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
@@ -59,6 +64,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   semaphore: SemaphoreLogo,
   slack: slackIcon,
   sendgrid: sendgridIcon,
+  render: renderIcon,
   aws: {
     lambda: awsLambdaIcon,
   },

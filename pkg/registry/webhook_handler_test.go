@@ -16,6 +16,10 @@ func (p *panickingWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	panic("compare config panic")
 }
 
+func (p *panickingWebhookHandler) Merge(current, requested any) (any, bool, error) {
+	panic("merge panic")
+}
+
 func (p *panickingWebhookHandler) Setup(ctx core.WebhookHandlerContext) (metadata any, err error) {
 	panic("setup panic")
 }
@@ -46,4 +50,15 @@ func Test_PanicableWebhookHandler_Cleanup_CatchesPanic(t *testing.T) {
 	err := panicable.Cleanup(ctx)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cleanup panic")
+}
+
+func Test_PanicableWebhookHandler_Merge_CatchesPanic(t *testing.T) {
+	handler := &panickingWebhookHandler{}
+	panicable := NewPanicableWebhookHandler(handler)
+
+	merged, changed, err := panicable.Merge(map[string]any{"a": "b"}, nil)
+	require.Error(t, err)
+	assert.False(t, changed)
+	assert.Equal(t, map[string]any{"a": "b"}, merged)
+	assert.Contains(t, err.Error(), "merge panic")
 }
