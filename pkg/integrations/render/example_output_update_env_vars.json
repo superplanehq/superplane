@@ -1,0 +1,11 @@
+{
+  "data": {
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "envVars": [
+      {"key": "NODE_ENV", "value": "production"},
+      {"key": "API_URL", "value": "https://api.example.com"}
+    ]
+  },
+  "timestamp": "2026-02-05T16:15:00.000000Z",
+  "type": "render.envVars.updated"
+}
