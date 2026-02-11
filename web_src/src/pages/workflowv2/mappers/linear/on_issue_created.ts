@@ -4,7 +4,7 @@ import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "..
 import { TriggerProps } from "@/ui/trigger";
 import linearIcon from "@/assets/icons/integrations/linear.svg";
 import { Issue } from "./types";
-import { getDetailsForIssue } from "./base";
+
 
 interface OnIssueCreatedEventData {
   action?: string;
