@@ -123,7 +123,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 			Error
 
 		if err != nil {
-			w.logger.Errorf("Execution %s already being processed - skipping", id.String())
+			w.logger.Debugf("Execution %s already being processed - skipping", id.String())
 			return ErrRecordLocked
 		}
 

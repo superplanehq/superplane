@@ -8,13 +8,25 @@ import { buildActionStateRegistry } from "../utils";
 import { scanImageMapper } from "./ecr/scan_image";
 import { onPackageVersionTriggerRenderer } from "./codeartifact/on_package_version";
 import { getPackageVersionMapper } from "./codeartifact/get_package_version";
+import { createRepositoryMapper } from "./codeartifact/create_repository";
+import { copyPackageVersionsMapper } from "./codeartifact/copy_package_versions";
+import { deletePackageVersionsMapper } from "./codeartifact/delete_package_versions";
+import { deleteRepositoryMapper } from "./codeartifact/delete_repository";
+import { disposePackageVersionsMapper } from "./codeartifact/dispose_package_versions";
+import { updatePackageVersionsStatusMapper } from "./codeartifact/update_package_versions_status";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   "lambda.runFunction": runFunctionMapper,
   "ecr.getImage": getImageMapper,
   "ecr.getImageScanFindings": getImageScanFindingsMapper,
   "ecr.scanImage": scanImageMapper,
+  "codeArtifact.copyPackageVersions": copyPackageVersionsMapper,
+  "codeArtifact.createRepository": createRepositoryMapper,
+  "codeArtifact.deletePackageVersions": deletePackageVersionsMapper,
+  "codeArtifact.deleteRepository": deleteRepositoryMapper,
+  "codeArtifact.disposePackageVersions": disposePackageVersionsMapper,
   "codeArtifact.getPackageVersion": getPackageVersionMapper,
+  "codeArtifact.updatePackageVersionsStatus": updatePackageVersionsStatusMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -27,5 +39,11 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "ecr.getImage": buildActionStateRegistry("retrieved"),
   "ecr.getImageScanFindings": buildActionStateRegistry("retrieved"),
   "ecr.scanImage": buildActionStateRegistry("scanned"),
+  "codeArtifact.copyPackageVersions": buildActionStateRegistry("copied"),
+  "codeArtifact.createRepository": buildActionStateRegistry("created"),
+  "codeArtifact.deletePackageVersions": buildActionStateRegistry("deleted"),
+  "codeArtifact.deleteRepository": buildActionStateRegistry("deleted"),
+  "codeArtifact.disposePackageVersions": buildActionStateRegistry("disposed"),
   "codeArtifact.getPackageVersion": buildActionStateRegistry("retrieved"),
+  "codeArtifact.updatePackageVersionsStatus": buildActionStateRegistry("updated"),
 };
