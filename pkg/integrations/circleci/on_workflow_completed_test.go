@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,8 +13,8 @@ import (
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
-	trigger := &OnPipelineCompleted{}
+func Test__OnWorkflowCompleted__HandleWebhook(t *testing.T) {
+	trigger := &OnWorkflowCompleted{}
 
 	t.Run("no circleci-signature -> 403", func(t *testing.T) {
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -55,21 +54,19 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		headers.Set("circleci-signature", signature)
 
 		eventContext := &contexts.EventContext{}
-		requestContext := &contexts.RequestContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:     body,
-			Headers:  headers,
-			Webhook:  &contexts.WebhookContext{Secret: secret},
-			Events:   eventContext,
-			Requests: requestContext,
+			Body:    body,
+			Headers: headers,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+			Events:  eventContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
 		require.NoError(t, err)
-		// The webhook schedules a poll action instead of emitting immediately
-		assert.Equal(t, "poll", requestContext.Action)
-		assert.Equal(t, "pipe-123", requestContext.Params["pipelineId"])
-		assert.Equal(t, 3*time.Second, requestContext.Duration)
+		// The webhook should emit the event directly
+		assert.Equal(t, 1, eventContext.Count())
+		require.Len(t, eventContext.Payloads, 1)
+		assert.Equal(t, "circleci.workflow.completed", eventContext.Payloads[0].Type)
 	})
 
 	t.Run("valid signature with non-workflow-completed event -> no event emitted", func(t *testing.T) {

@@ -10,14 +10,14 @@ import (
 //go:embed example_output_run_pipeline.json
 var exampleOutputRunPipelineBytes []byte
 
-//go:embed example_data_on_pipeline_completed.json
-var exampleDataOnPipelineCompletedBytes []byte
+//go:embed example_data_on_workflow_completed.json
+var exampleDataOnWorkflowCompletedBytes []byte
 
 var exampleOutputRunPipelineOnce sync.Once
 var exampleOutputRunPipeline map[string]any
 
-var exampleDataOnPipelineCompletedOnce sync.Once
-var exampleDataOnPipelineCompleted map[string]any
+var exampleDataOnWorkflowCompletedOnce sync.Once
+var exampleDataOnWorkflowCompleted map[string]any
 
 func (c *RunPipeline) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(
@@ -27,10 +27,10 @@ func (c *RunPipeline) ExampleOutput() map[string]any {
 	)
 }
 
-func (t *OnPipelineCompleted) ExampleData() map[string]any {
+func (t *OnWorkflowCompleted) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(
-		&exampleDataOnPipelineCompletedOnce,
-		exampleDataOnPipelineCompletedBytes,
-		&exampleDataOnPipelineCompleted,
+		&exampleDataOnWorkflowCompletedOnce,
+		exampleDataOnWorkflowCompletedBytes,
+		&exampleDataOnWorkflowCompleted,
 	)
 }

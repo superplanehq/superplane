@@ -4,14 +4,14 @@ import { TriggerProps } from "@/ui/trigger";
 import CircleCILogo from "@/assets/icons/integrations/circleci.svg";
 import { formatTimeAgo } from "@/utils/date";
 
-interface OnPipelineCompletedMetadata {
+interface OnWorkflowCompletedMetadata {
   project?: {
     name: string;
     slug: string;
   };
 }
 
-interface OnPipelineCompletedEventData {
+interface OnWorkflowCompletedEventData {
   workflow?: {
     id: string;
     name: string;
@@ -31,9 +31,9 @@ interface OnPipelineCompletedEventData {
   };
 }
 
-export const onPipelineCompletedTriggerRenderer: TriggerRenderer = {
+export const onWorkflowCompletedTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event?.data as OnPipelineCompletedEventData;
+    const eventData = context.event?.data as OnWorkflowCompletedEventData;
     const workflowName = eventData?.workflow?.name || "Workflow";
     const status = eventData?.workflow?.status || "";
     const timeAgo = context.event?.createdAt ? formatTimeAgo(new Date(context.event?.createdAt)) : "";
@@ -46,7 +46,7 @@ export const onPipelineCompletedTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data as OnPipelineCompletedEventData;
+    const eventData = context.event?.data as OnWorkflowCompletedEventData;
     const workflowUrl = eventData?.workflow?.url || "";
 
     return {
@@ -61,7 +61,7 @@ export const onPipelineCompletedTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
-    const metadata = node.metadata as unknown as OnPipelineCompletedMetadata;
+    const metadata = node.metadata as unknown as OnWorkflowCompletedMetadata;
     const configuration = node.configuration as any;
     const metadataItems = [];
 
@@ -82,7 +82,7 @@ export const onPipelineCompletedTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnPipelineCompletedEventData;
+      const eventData = lastEvent.data as OnWorkflowCompletedEventData;
       const workflowName = eventData?.workflow?.name || "Workflow";
       const status = eventData?.workflow?.status || "";
       const timeAgo = lastEvent.createdAt ? formatTimeAgo(new Date(lastEvent.createdAt)) : "";

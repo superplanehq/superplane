@@ -164,6 +164,6 @@ func (c *CircleCI) Components() []core.Component {
 
 func (c *CircleCI) Triggers() []core.Trigger {
 	return []core.Trigger{
-		&OnPipelineCompleted{},
+		&OnWorkflowCompleted{},
 	}
 }
