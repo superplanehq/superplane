@@ -113,37 +113,59 @@ func (c *Client) GetViewer() (*Viewer, error) {
 // teamsResponse matches the GraphQL teams query.
 type teamsResponse struct {
 	Teams struct {
-		Nodes []Team `json:"nodes"`
+		Nodes    []Team   `json:"nodes"`
+		PageInfo pageInfo `json:"pageInfo"`
 	} `json:"teams"`
 }
 
 // ListTeams returns all teams the user can access.
 func (c *Client) ListTeams() ([]Team, error) {
-	const query = `query { teams { nodes { id name key } } }`
-	var out teamsResponse
-	if err := c.execGraphQL(query, nil, &out); err != nil {
-		return nil, err
+	const query = `query($after: String) { teams(first: 100, after: $after) { nodes { id name key } pageInfo { hasNextPage endCursor } } }`
+	var all []Team
+	var cursor *string
+	for {
+		vars := map[string]any{"after": cursor}
+		var out teamsResponse
+		if err := c.execGraphQL(query, vars, &out); err != nil {
+			return nil, err
+		}
+		all = append(all, out.Teams.Nodes...)
+		if !out.Teams.PageInfo.HasNextPage {
+			break
+		}
+		cursor = &out.Teams.PageInfo.EndCursor
 	}
-	return out.Teams.Nodes, nil
+	return all, nil
 }
 
 // organizationLabelsResponse for org-level labels.
 type organizationLabelsResponse struct {
 	Organization struct {
 		Labels struct {
-			Nodes []Label `json:"nodes"`
+			Nodes    []Label  `json:"nodes"`
+			PageInfo pageInfo `json:"pageInfo"`
 		} `json:"labels"`
 	} `json:"organization"`
 }
 
 // ListLabels returns all labels in the organization.
 func (c *Client) ListLabels() ([]Label, error) {
-	const query = `query { organization { labels { nodes { id name } } } }`
-	var out organizationLabelsResponse
-	if err := c.execGraphQL(query, nil, &out); err != nil {
-		return nil, err
+	const query = `query($after: String) { organization { labels(first: 100, after: $after) { nodes { id name } pageInfo { hasNextPage endCursor } } } }`
+	var all []Label
+	var cursor *string
+	for {
+		vars := map[string]any{"after": cursor}
+		var out organizationLabelsResponse
+		if err := c.execGraphQL(query, vars, &out); err != nil {
+			return nil, err
+		}
+		all = append(all, out.Organization.Labels.Nodes...)
+		if !out.Organization.Labels.PageInfo.HasNextPage {
+			break
+		}
+		cursor = &out.Organization.Labels.PageInfo.EndCursor
 	}
-	return out.Organization.Labels.Nodes, nil
+	return all, nil
 }
 
 // IssueCreateInput is the input for issueCreate mutation.
