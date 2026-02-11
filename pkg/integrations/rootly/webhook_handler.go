@@ -43,7 +43,34 @@ func (h *RootlyWebhookHandler) CompareConfig(a, b any) (bool, error) {
 }
 
 func (h *RootlyWebhookHandler) Merge(current, requested any) (any, bool, error) {
-	return current, false, nil
+	currentConfig := WebhookConfiguration{}
+	requestedConfig := WebhookConfiguration{}
+
+	if err := mapstructure.Decode(current, &currentConfig); err != nil {
+		return nil, false, err
+	}
+
+	if err := mapstructure.Decode(requested, &requestedConfig); err != nil {
+		return nil, false, err
+	}
+
+	merged := WebhookConfiguration{
+		Events: append([]string{}, currentConfig.Events...),
+	}
+
+	changed := false
+	for _, eventType := range requestedConfig.Events {
+		if !slices.Contains(merged.Events, eventType) {
+			merged.Events = append(merged.Events, eventType)
+			changed = true
+		}
+	}
+
+	if !changed {
+		return current, false, nil
+	}
+
+	return merged, changed, nil
 }
 
 func (h *RootlyWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
@@ -58,14 +85,31 @@ func (h *RootlyWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error
 		return nil, fmt.Errorf("error decoding webhook configuration: %v", err)
 	}
 
-	endpoint, err := client.CreateWebhookEndpoint(ctx.Webhook.GetURL(), config.Events)
-	if err != nil {
-		return nil, fmt.Errorf("error creating webhook endpoint: %v", err)
+	metadata := WebhookMetadata{}
+	if rawMetadata := ctx.Webhook.GetMetadata(); rawMetadata != nil {
+		if err := mapstructure.Decode(rawMetadata, &metadata); err != nil {
+			return nil, fmt.Errorf("error decoding webhook metadata: %v", err)
+		}
 	}
 
-	err = ctx.Webhook.SetSecret([]byte(endpoint.Secret))
-	if err != nil {
-		return nil, fmt.Errorf("error updating webhook secret: %v", err)
+	var endpoint *WebhookEndpoint
+	if metadata.EndpointID != "" {
+		endpoint, err = client.UpdateWebhookEndpoint(metadata.EndpointID, config.Events)
+		if err != nil {
+			return nil, fmt.Errorf("error updating webhook endpoint: %v", err)
+		}
+	} else {
+		endpoint, err = client.CreateWebhookEndpoint(ctx.Webhook.GetURL(), config.Events)
+		if err != nil {
+			return nil, fmt.Errorf("error creating webhook endpoint: %v", err)
+		}
+	}
+
+	if endpoint.Secret != "" {
+		err = ctx.Webhook.SetSecret([]byte(endpoint.Secret))
+		if err != nil {
+			return nil, fmt.Errorf("error updating webhook secret: %v", err)
+		}
 	}
 
 	return WebhookMetadata{

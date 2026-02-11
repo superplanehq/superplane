@@ -7,6 +7,7 @@ Manage and react to incidents in Rootly
 ## Triggers
 
 <CardGrid>
+  <LinkCard title="On Event" href="#on-event" description="Listen to incident timeline events" />
   <LinkCard title="On Incident" href="#on-incident" description="Listen to incident events" />
 </CardGrid>
 
@@ -18,6 +19,71 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Event" href="#create-event" description="Add a timeline event to a Rootly incident" />
   <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in Rootly" />
 </CardGrid>
+
+<a id="on-event"></a>
+
+## On Event
+
+The On Event trigger starts a workflow execution when Rootly incident timeline events are created or updated.
+
+### Use Cases
+
+- **Incident notes**: Notify Slack or other systems when a note is added
+- **Timeline sync**: Mirror timeline events into external systems
+- **Investigation automation**: React to annotations as they are added or edited
+
+### Configuration
+
+- **Incident Status** (optional): Filter by incident status
+- **Severity** (optional): Filter by incident severity
+- **Service** (optional): Filter by service name
+- **Team** (optional): Filter by team name
+- **Event Source** (optional): Filter by event source
+- **Visibility** (optional): Filter by visibility (internal/external)
+- **Event Kind** (optional): Filter by event kind (e.g. note, annotation)
+
+### Event Data
+
+Each event includes:
+- **id**: Timeline event ID
+- **event**: Event text
+- **kind**: Event kind
+- **occurred_at**: When the event occurred
+- **created_at**: When the event was created
+- **user_display_name**: Display name of the event author (if available)
+- **incident**: Incident data from Rootly
+
+### Webhook Setup
+
+This trigger automatically sets up a Rootly webhook endpoint when configured. The endpoint is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "created_at": "2026-02-05T15:00:00Z",
+    "event": "Alice Example added a note",
+    "id": "evt-789",
+    "incident": {
+      "id": "inc-123",
+      "mitigated_at": null,
+      "resolved_at": null,
+      "severity": "sev2",
+      "started_at": "2026-02-05T14:30:00Z",
+      "status": "started",
+      "summary": "The API response times have increased significantly across all endpoints.",
+      "title": "API latency spike detected",
+      "url": "https://app.rootly.com/incidents/inc-123"
+    },
+    "kind": "note",
+    "occurred_at": "2026-02-05T15:00:00Z",
+    "user_display_name": "Alice Example"
+  },
+  "timestamp": "2026-02-05T15:00:00Z",
+  "type": "rootly.onEvent"
+}
+```
 
 <a id="on-incident"></a>
 
