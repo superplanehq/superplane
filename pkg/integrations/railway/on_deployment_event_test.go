@@ -216,6 +216,32 @@ func Test__OnDeploymentEvent__HandleWebhook(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 1, eventContext.Count())
 	})
+
+	t.Run("deployment event with empty action and filter configured -> event is not emitted", func(t *testing.T) {
+		body := []byte(`{
+			"type": "Deployment.",
+			"resource": {
+				"deployment": {
+					"id": "deploy-123"
+				}
+			}
+		}`)
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: http.Header{},
+			Configuration: map[string]any{
+				"project":  "proj-123",
+				"statuses": []string{"succeeded", "failed"},
+			},
+			Events: eventContext,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Zero(t, eventContext.Count())
+	})
 }
 
 func Test__OnDeploymentEvent__Setup(t *testing.T) {

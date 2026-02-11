@@ -122,46 +122,10 @@ func (t *OnDeploymentEvent) Configuration() []configuration.Field {
 	}
 }
 
-func (t *OnDeploymentEvent) ExampleData() map[string]any {
-	return map[string]any{
-		"type": "Deployment.succeeded",
-		"details": map[string]any{
-			"status": "SUCCESS",
-		},
-		"resource": map[string]any{
-			"owner": map[string]any{
-				"id":    "owner-abc123",
-				"email": "user@example.com",
-			},
-			"project": map[string]any{
-				"id":   "proj-xyz789",
-				"name": "my-project",
-			},
-			"environment": map[string]any{
-				"id":   "env-def456",
-				"name": "production",
-			},
-			"service": map[string]any{
-				"id":   "srv-ghi012",
-				"name": "api-server",
-			},
-			"deployment": map[string]any{
-				"id": "deploy-jkl345",
-			},
-		},
-		"timestamp": "2024-01-15T10:30:00.000Z",
-	}
-}
-
 func (t *OnDeploymentEvent) Setup(ctx core.TriggerContext) error {
 	var metadata OnDeploymentEventMetadata
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
 		return fmt.Errorf("failed to parse metadata: %w", err)
-	}
-
-	// If already set up with webhook URL, nothing to do
-	if metadata.Project != nil && metadata.WebhookURL != "" {
-		return nil
 	}
 
 	config := OnDeploymentEventConfiguration{}
@@ -171,6 +135,11 @@ func (t *OnDeploymentEvent) Setup(ctx core.TriggerContext) error {
 
 	if config.Project == "" {
 		return fmt.Errorf("project is required")
+	}
+
+	// If already set up with matching project and webhook URL, nothing to do
+	if metadata.Project != nil && metadata.Project.ID == config.Project && metadata.WebhookURL != "" {
+		return nil
 	}
 
 	// Fetch project details to validate it exists
@@ -234,8 +203,9 @@ func (t *OnDeploymentEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, 
 	}
 
 	// Filter by event action if configured
-	if len(config.Statuses) > 0 && eventAction != "" {
-		if !slices.Contains(config.Statuses, eventAction) {
+	if len(config.Statuses) > 0 {
+		// Reject events with empty action when filter is active
+		if eventAction == "" || !slices.Contains(config.Statuses, eventAction) {
 			return http.StatusOK, nil
 		}
 	}
