@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -137,11 +138,78 @@ func (p *OnPipelineCompleted) Setup(ctx core.TriggerContext) error {
 }
 
 func (p *OnPipelineCompleted) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		{
+			Name:           "poll",
+			UserAccessible: false,
+		},
+	}
 }
 
 func (p *OnPipelineCompleted) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
-	return nil, nil
+	switch ctx.Name {
+	case "poll":
+		return nil, p.poll(ctx)
+	}
+
+	return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+}
+
+func (p *OnPipelineCompleted) poll(ctx core.TriggerActionContext) error {
+	pipelineID, ok := ctx.Parameters["pipelineId"].(string)
+	if !ok || pipelineID == "" {
+		return fmt.Errorf("pipeline ID missing from poll parameters")
+	}
+
+	webhookData, ok := ctx.Parameters["webhookData"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("webhook data missing from poll parameters")
+	}
+
+	// Get retry count, default to 0 if not set
+	retryCount := 0
+	if count, ok := ctx.Parameters["retryCount"].(float64); ok {
+		retryCount = int(count)
+	}
+
+	// Stop polling after 5 tries
+	if retryCount >= 5 {
+		// Max retries reached, emit the event anyway
+		// The pipeline might be done but API is still inconsistent
+		err := ctx.Events.Emit("circleci.workflow.completed", webhookData)
+		if err != nil {
+			return fmt.Errorf("failed to emit event: %w", err)
+		}
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	result, err := client.CheckPipelineStatus(pipelineID)
+	if err != nil {
+		return fmt.Errorf("failed to check pipeline status: %w", err)
+	}
+
+	if !result.AllDone {
+		// Pipeline not done yet, schedule another poll with incremented retry count
+		params := make(map[string]any)
+		for k, v := range ctx.Parameters {
+			params[k] = v
+		}
+		params["retryCount"] = retryCount + 1
+		return ctx.Requests.ScheduleActionCall("poll", params, 3*time.Second)
+	}
+
+	// Pipeline is done, emit the event
+	err = ctx.Events.Emit("circleci.workflow.completed", webhookData)
+	if err != nil {
+		return fmt.Errorf("failed to emit event: %w", err)
+	}
+
+	return nil
 }
 
 func (p *OnPipelineCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
@@ -172,9 +240,31 @@ func (p *OnPipelineCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int
 		return http.StatusOK, nil
 	}
 
-	err = ctx.Events.Emit("circleci.workflow.completed", data)
+	pipelineData, ok := data["pipeline"].(map[string]any)
+	if !ok {
+		return http.StatusBadRequest, fmt.Errorf("pipeline data missing from webhook payload")
+	}
+
+	pipelineID, _ := pipelineData["id"].(string)
+	if pipelineID == "" {
+		return http.StatusBadRequest, fmt.Errorf("pipeline id missing from webhook payload")
+	}
+
+	//
+	// Context by Igor. Circle's API is weird. :)
+	//
+	// 1/ They don't have a concept of pipeline status. You need to get it by fetching and calculating the status of all workflows.
+	// 2/ The API is eventually consistent. When you get a webhook, the pipeline might not be finished yet. *internal cry*
+	//
+	// Instead of trying to process the webhook immediately, we'll schedule a poll action in 3 seconds.
+	//
+
+	err = ctx.Integration.ScheduleActionCall("poll", map[string]any{
+		"pipelineId":  pipelineID,
+		"webhookData": data,
+	}, 3*time.Second)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+		return http.StatusInternalServerError, fmt.Errorf("failed to schedule poll action: %w", err)
 	}
 
 	return http.StatusOK, nil
