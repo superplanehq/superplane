@@ -16,6 +16,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run Semaphore workflow" />
+  <LinkCard title="Get Pipeline" href="#get-pipeline" description="Fetch a Semaphore pipeline by ID" />
 </CardGrid>
 
 <a id="on-pipeline-done"></a>
@@ -243,6 +244,47 @@ The Run Workflow component triggers a Semaphore CI/CD workflow and waits for it 
   },
   "timestamp": "2026-01-22T15:32:56.061430218Z",
   "type": "semaphore.workflow.finished"
+}
+```
+
+<a id="get-pipeline"></a>
+
+## Get Pipeline
+
+The Get Pipeline component fetches a Semaphore pipeline by ID and returns its current state, result, workflow ID, and metadata.
+
+### Use Cases
+
+- **Poll pipeline status**: After triggering a workflow, poll for pipeline status to decide when to proceed
+- **Status verification**: Check if a specific pipeline passed or failed before triggering dependent actions
+- **Workflow branching**: Branch workflows based on pipeline state (running vs done) or result (passed/failed)
+
+### Configuration
+
+- **Pipeline ID**: The Semaphore pipeline ID (e.g., from Run Workflow output or On Pipeline Done event). Supports expressions.
+
+### Output
+
+**Default channel**: Emits pipeline data including:
+- `ppl_id`: Pipeline ID
+- `wf_id`: Workflow ID
+- `name`: Pipeline name
+- `state`: Current state (e.g., pending, running, done)
+- `result`: Result when done (e.g., passed, failed, cancelled)
+
+### Example Data
+
+```json
+{
+  "type": "semaphore.pipeline",
+  "timestamp": "2026-02-05T00:00:00Z",
+  "data": {
+    "ppl_id": "7f1a3c2b-4d5e-6f7a-8b9c-0d1e2f3a4b5c",
+    "wf_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+    "name": "test-pipeline",
+    "state": "done",
+    "result": "passed"
+  }
 }
 ```
 
