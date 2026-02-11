@@ -19,6 +19,7 @@ import smtpIcon from "@/assets/icons/integrations/smtp.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
+import BuildkiteLogo from "@/assets/buildkite-logo.svg";
 
 /** Integration type name (e.g. "github") → logo src. Used for Settings tab and header. */
 export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
@@ -37,6 +38,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   pagerduty: pagerDutyIcon,
   rootly: rootlyIcon,
   semaphore: SemaphoreLogo,
+  buildkite: BuildkiteLogo,
   slack: slackIcon,
   smtp: smtpIcon,
   sendgrid: sendgridIcon,
@@ -59,6 +61,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   pagerduty: pagerDutyIcon,
   rootly: rootlyIcon,
   semaphore: SemaphoreLogo,
+  buildkite: BuildkiteLogo,
   slack: slackIcon,
   sendgrid: sendgridIcon,
   render: renderIcon,

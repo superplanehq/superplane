@@ -31,6 +31,7 @@ import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+import BuildkiteLogo from "@/assets/buildkite-logo.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 
@@ -406,6 +407,7 @@ function CategorySection({
     pagerduty: pagerDutyIcon,
     rootly: rootlyIcon,
     semaphore: SemaphoreLogo,
+    buildkite: BuildkiteLogo,
     slack: slackIcon,
     sendgrid: sendgridIcon,
     render: renderIcon,
@@ -478,6 +480,7 @@ function CategorySection({
             pagerduty: pagerDutyIcon,
             rootly: rootlyIcon,
             semaphore: SemaphoreLogo,
+            buildkite: BuildkiteLogo,
             slack: slackIcon,
             sendgrid: sendgridIcon,
             render: renderIcon,

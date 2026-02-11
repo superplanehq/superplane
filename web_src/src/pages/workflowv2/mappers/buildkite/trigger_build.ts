@@ -20,6 +20,7 @@ import {
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
 import { formatTimeAgo } from "@/utils/date";
+import BuildkiteLogo from "@/assets/buildkite-logo.svg";
 import { CanvasesCanvasNodeExecution } from "@/api-client";
 import { getTriggerRenderer } from "..";
 
@@ -184,6 +185,7 @@ export const triggerBuildMapper: ComponentBaseMapper = {
         context.componentDefinition.label ||
         context.componentDefinition.name ||
         "Unnamed component",
+      iconSrc: BuildkiteLogo,
       iconColor: getColorClass(context.componentDefinition?.color || "gray"),
       collapsedBackground: getBackgroundColorClass("white"),
       eventSections: lastExecution ? triggerBuildEventSections(context.nodes, lastExecution) : undefined,
