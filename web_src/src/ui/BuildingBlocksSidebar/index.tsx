@@ -32,6 +32,7 @@ import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.sv
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
+import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 
@@ -409,6 +410,7 @@ function CategorySection({
     semaphore: SemaphoreLogo,
     slack: slackIcon,
     sendgrid: sendgridIcon,
+    sentry: sentryIcon,
     render: renderIcon,
     dockerhub: dockerIcon,
     aws: {
@@ -482,6 +484,7 @@ function CategorySection({
             semaphore: SemaphoreLogo,
             slack: slackIcon,
             sendgrid: sendgridIcon,
+            sentry: sentryIcon,
             render: renderIcon,
             dockerhub: dockerIcon,
             aws: {

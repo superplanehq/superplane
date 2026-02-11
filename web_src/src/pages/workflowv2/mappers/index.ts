@@ -81,6 +81,12 @@ import {
   eventStateRegistry as rootlyEventStateRegistry,
 } from "./rootly/index";
 import {
+  componentMappers as sentryComponentMappers,
+  triggerRenderers as sentryTriggerRenderers,
+  eventStateRegistry as sentryEventStateRegistry,
+  customFieldRenderers as sentryCustomFieldRenderers,
+} from "./sentry";
+import {
   componentMappers as awsComponentMappers,
   triggerRenderers as awsTriggerRenderers,
   eventStateRegistry as awsEventStateRegistry,
@@ -151,6 +157,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   slack: slackComponentMappers,
   smtp: smtpComponentMappers,
   sendgrid: sendgridComponentMappers,
+  sentry: sentryComponentMappers,
   render: renderComponentMappers,
   rootly: rootlyComponentMappers,
   aws: awsComponentMappers,
@@ -172,6 +179,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   slack: slackTriggerRenderers,
   smtp: smtpTriggerRenderers,
   sendgrid: sendgridTriggerRenderers,
+  sentry: sentryTriggerRenderers,
   render: renderTriggerRenderers,
   rootly: rootlyTriggerRenderers,
   aws: awsTriggerRenderers,
@@ -192,6 +200,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   slack: slackEventStateRegistry,
   smtp: smtpEventStateRegistry,
   sendgrid: sendgridEventStateRegistry,
+  sentry: sentryEventStateRegistry,
   render: renderEventStateRegistry,
   discord: discordEventStateRegistry,
   rootly: rootlyEventStateRegistry,
@@ -225,6 +234,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
+  sentry: sentryCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
 };
 
