@@ -104,7 +104,7 @@ func (p *OnPipelineCompleted) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("projectSlug is required")
 	}
 
-	if config.ProjectSlug == metadata.Project.Slug {
+	if metadata.Project != nil && config.ProjectSlug == metadata.Project.Slug {
 		return nil
 	}
 
@@ -125,7 +125,6 @@ func (p *OnPipelineCompleted) Setup(ctx core.TriggerContext) error {
 			Name: project.Name,
 		},
 	})
-
 	if err != nil {
 		return fmt.Errorf("error setting metadata: %v", err)
 	}
