@@ -1,0 +1,177 @@
+---
+title: "Railway"
+---
+
+Deploy and monitor Railway applications
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Deployment Event" href="#on-deployment-event" description="Trigger when a Railway deployment status changes" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Trigger Deploy" href="#trigger-deploy" description="Trigger a new deployment for a Railway service" />
+</CardGrid>
+
+## Instructions
+
+## Connect Railway
+
+### Creating an API Token
+
+1. Go to [Railway Account Settings → Tokens](https://railway.app/account/tokens)
+2. Click **"Create Token"** to generate a new API token
+3. Give your token a descriptive name (e.g., "SuperPlane Integration")
+
+
+### Token Scoping
+
+Railway offers different token scoping options:
+
+| Scope | Access Level | Use Case |
+|-------|--------------|----------|
+| **No Workspace** | All workspaces and projects | Recommended for SuperPlane |
+| **Project-specific** | Projects in a specific workspace only | Limited to one workspace |
+
+**Recommendation:** Select **"No Workspace"** when creating your token. This allows SuperPlane to access all your projects across workspaces. If you scope the token to a specific workspace, only projects in that workspace will be available.
+
+### Permissions
+
+The API token allows SuperPlane to:
+- List your projects, services, and environments
+- Trigger deployments on your services
+- Receive deployment status webhooks
+
+### Webhook Configuration
+
+For the **On Deployment Event** trigger, you'll need to manually configure webhooks in Railway:
+
+1. Create the trigger in SuperPlane and save the canvas
+2. Copy the generated webhook URL from the trigger settings
+3. Go to your Railway project → Settings → Webhooks
+4. Add the webhook URL and select "Deploy" events
+
+### Troubleshooting
+
+- **"Not Authorized" error**: Your token may be scoped to a workspace that doesn't include the project you're trying to access. Create a new token with "No Scoping" selected.
+- **Projects not showing**: Try disconnecting and reconnecting the integration to refresh the project list.
+
+<a id="on-deployment-event"></a>
+
+## On Deployment Event
+
+The On Deployment Event trigger starts a workflow when Railway sends deployment status webhooks.
+
+### Setup
+
+After configuring this trigger:
+1. Copy the webhook URL shown in the trigger settings
+2. Go to Railway → Your Project → Settings → Webhooks
+3. Add the webhook URL and select "Deploy" events
+4. Save the webhook configuration
+
+### Use Cases
+
+- **Deployment notifications**: Notify Slack when deployments succeed or fail
+- **Incident creation**: Create tickets when deployments crash
+- **Pipeline chaining**: Trigger downstream workflows after successful deployments
+
+### Configuration
+
+- **Project**: Select the Railway project to monitor
+- **Event Filter**: Optionally filter by deployment event type (succeeded, failed, crashed, etc.)
+  - Leave empty to receive all deployment events
+
+### Event Data
+
+Each deployment event includes:
+- `type`: Event type (e.g., Deployment.succeeded, Deployment.failed)
+- `details.status`: Deployment status
+- `resource.deployment.id`: Deployment ID
+- `resource.service`: Service name and ID
+- `resource.environment`: Environment name and ID
+- `resource.project`: Project information
+- `timestamp`: When the event occurred
+
+### Example Data
+
+```json
+{
+  "details": {
+    "status": "SUCCESS"
+  },
+  "resource": {
+    "deployment": {
+      "id": "deploy-jkl345"
+    },
+    "environment": {
+      "id": "env-def456",
+      "name": "production"
+    },
+    "owner": {
+      "email": "user@example.com",
+      "id": "owner-abc123"
+    },
+    "project": {
+      "id": "proj-xyz789",
+      "name": "my-project"
+    },
+    "service": {
+      "id": "srv-ghi012",
+      "name": "api-server"
+    }
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "type": "Deployment.succeeded"
+}
+```
+
+<a id="trigger-deploy"></a>
+
+## Trigger Deploy
+
+The Trigger Deploy component starts a new deployment for a Railway service in a specific environment.
+
+### Use Cases
+
+- **Deploy on merge**: Automatically deploy when code is merged to main
+- **Scheduled deployments**: Deploy on a schedule (e.g., nightly releases)
+- **Manual approval**: Deploy after approval in the workflow
+- **Cross-service orchestration**: Deploy services in sequence
+
+### Configuration
+
+- **Project**: Select the Railway project
+- **Service**: Select the service to deploy
+- **Environment**: Select the target environment (e.g., production, staging)
+
+### How It Works
+
+1. Calls Railway's `environmentTriggersDeploy` API
+2. Railway queues a new deployment for the service
+3. Component emits the deployment trigger result
+
+### Output
+
+The component emits:
+- `project`: Project ID
+- `service`: Service ID
+- `environment`: Environment ID
+- `triggered`: Whether the deployment was triggered
+
+### Example Output
+
+```json
+{
+  "environment": "env-def456",
+  "project": "proj-xyz789",
+  "service": "srv-ghi012",
+  "triggered": true
+}
+```
+

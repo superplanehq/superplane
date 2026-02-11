@@ -1,0 +1,28 @@
+{
+  "type": "Deployment.succeeded",
+  "details": {
+    "status": "SUCCESS"
+  },
+  "resource": {
+    "owner": {
+      "id": "owner-abc123",
+      "email": "user@example.com"
+    },
+    "project": {
+      "id": "proj-xyz789",
+      "name": "my-project"
+    },
+    "environment": {
+      "id": "env-def456",
+      "name": "production"
+    },
+    "service": {
+      "id": "srv-ghi012",
+      "name": "api-server"
+    },
+    "deployment": {
+      "id": "deploy-jkl345"
+    }
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
