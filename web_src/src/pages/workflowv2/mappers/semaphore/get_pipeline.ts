@@ -11,7 +11,7 @@ import {
     SubtitleContext,
 } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
-import semaphoreIcon from "@/assets/icons/integrations/semaphore.svg";
+import semaphoreIcon from "@/assets/semaphore-logo-sign-black.svg";
 import { formatTimeAgo } from "@/utils/date";
 
 interface SemaphorePipeline {
