@@ -8,6 +8,7 @@ Manage resources and execute AWS commands in workflows
 
 <CardGrid>
   <LinkCard title="CodeArtifact • On Package Version" href="#code-artifact-•-on-package-version" description="Listen to AWS CodeArtifact package version events" />
+  <LinkCard title="CodeBuild • On Build" href="#code-build-•-on-build" description="Listen to AWS CodeBuild build state change events" />
   <LinkCard title="ECR • On Image Push" href="#ecr-•-on-image-push" description="Listen to AWS ECR image push events" />
   <LinkCard title="ECR • On Image Scan" href="#ecr-•-on-image-scan" description="Listen to AWS ECR image scan events" />
 </CardGrid>
@@ -18,6 +19,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="CodeArtifact • Get Package Version" href="#code-artifact-•-get-package-version" description="Describe an AWS CodeArtifact package version" />
+  <LinkCard title="CodeBuild • Run Build" href="#code-build-•-run-build" description="Start an AWS CodeBuild build and wait for it to finish" />
   <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
   <LinkCard title="ECR • Scan Image" href="#ecr-•-scan-image" description="Scan an ECR image for vulnerabilities" />
@@ -80,6 +82,62 @@ The On Package Version trigger starts a workflow execution when a package versio
   },
   "timestamp": "2026-03-10T14:25:30.31254162Z",
   "type": "aws.codeartifact.package.version"
+}
+```
+
+<a id="code-build-•-on-build"></a>
+
+## CodeBuild • On Build
+
+The On Build trigger starts a workflow execution when AWS CodeBuild emits a build state change event.
+
+### Use Cases
+
+- **Build observability**: Trigger notifications when builds fail, succeed, or stop
+- **Automated quality gates**: Start follow-up checks after successful builds
+- **Pipeline orchestration**: Chain downstream workflows based on build outcomes
+
+### Event Data
+
+Each build state change event includes:
+- **detail.project-name**: CodeBuild project name
+- **detail.build-status**: Build status (for example: IN_PROGRESS, SUCCEEDED, FAILED)
+- **detail.build-id**: Build identifier ARN
+- **detail.current-phase**: Current phase of the build lifecycle
+
+### Example Data
+
+```json
+{
+  "data": {
+    "version": "0",
+    "id": "00112233-4455-6677-8899-aabbccddeeff",
+    "detail-type": "CodeBuild Build State Change",
+    "source": "aws.codebuild",
+    "account": "123456789012",
+    "time": "2026-02-03T12:00:00Z",
+    "region": "us-east-1",
+    "resources": [
+      "arn:aws:codebuild:us-east-1:123456789012:build/backend-build:3d8b9b4e-5f0a-4d64-a74d-6f7aab2f9a20"
+    ],
+    "detail": {
+      "project-name": "backend-build",
+      "build-status": "SUCCEEDED",
+      "build-id": "arn:aws:codebuild:us-east-1:123456789012:build/backend-build:3d8b9b4e-5f0a-4d64-a74d-6f7aab2f9a20",
+      "current-phase": "COMPLETED",
+      "current-phase-context": "Build completed successfully",
+      "version": "1",
+      "additional-information": {
+        "initiator": "codepipeline/my-pipeline",
+        "source-version": "refs/heads/main",
+        "logs": {
+          "deep-link": "https://console.aws.amazon.com/codesuite/codebuild/projects/backend-build/build/backend-build%3A3d8b9b4e-5f0a-4d64-a74d-6f7aab2f9a20/log"
+        }
+      }
+    }
+  },
+  "timestamp": "2026-02-03T12:00:01Z",
+  "type": "aws.codebuild.build"
 }
 ```
 
@@ -250,6 +308,53 @@ The Get Package Version component retrieves metadata for a specific package vers
   },
   "timestamp": "2026-02-03T12:00:00Z",
   "type": "aws.codeartifact.package.version"
+}
+```
+
+<a id="code-build-•-run-build"></a>
+
+## CodeBuild • Run Build
+
+The Run Build component starts a build in AWS CodeBuild and waits until the build reaches a terminal state.
+
+### Use Cases
+
+- **CI orchestration**: Trigger builds from workflow automation
+- **Release pipelines**: Block downstream steps until build completion
+- **Quality gates**: Fail workflow execution automatically when builds fail
+
+### How It Works
+
+1. Starts a new build for the selected CodeBuild project
+2. Polls CodeBuild for the build status until completion
+3. Emits build details when the build succeeds
+4. Fails the node if the build finishes with a failed status
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "backend-build:3d8b9b4e-5f0a-4d64-a74d-6f7aab2f9a20",
+    "arn": "arn:aws:codebuild:us-east-1:123456789012:build/backend-build:3d8b9b4e-5f0a-4d64-a74d-6f7aab2f9a20",
+    "buildNumber": 42,
+    "currentPhase": "COMPLETED",
+    "buildStatus": "SUCCEEDED",
+    "projectName": "backend-build",
+    "sourceVersion": "refs/heads/main",
+    "initiator": "codepipeline/my-pipeline",
+    "startTime": "2026-02-03T11:58:40Z",
+    "endTime": "2026-02-03T12:00:00Z",
+    "logs": {
+      "deepLink": "https://console.aws.amazon.com/codesuite/codebuild/projects/backend-build/build/backend-build%3A3d8b9b4e-5f0a-4d64-a74d-6f7aab2f9a20/log",
+      "cloudWatchLogsArn": "arn:aws:logs:us-east-1:123456789012:log-group:/aws/codebuild/backend-build:log-stream:3d8b9b4e-5f0a-4d64-a74d-6f7aab2f9a20",
+      "groupName": "/aws/codebuild/backend-build",
+      "streamName": "3d8b9b4e-5f0a-4d64-a74d-6f7aab2f9a20",
+      "status": "SUCCEEDED"
+    }
+  },
+  "timestamp": "2026-02-03T12:00:00Z",
+  "type": "aws.codebuild.build"
 }
 ```
 

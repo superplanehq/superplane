@@ -66,6 +66,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   render: renderIcon,
   dockerhub: dockerIcon,
   aws: {
+    codebuild: awsIcon,
     lambda: awsLambdaIcon,
   },
 };
@@ -95,7 +96,7 @@ export function getHeaderIconSrc(blockName: string | undefined): string | undefi
     const nested = appLogo[nameParts[1]];
     if (nested) return nested;
   }
-  // AWS has a nested map (lambda only); use main AWS icon for other aws.* components
+  // AWS has a partial nested map; use main AWS icon for other aws.* components
   if (first === "aws") return getIntegrationIconSrc("aws");
   return undefined;
 }

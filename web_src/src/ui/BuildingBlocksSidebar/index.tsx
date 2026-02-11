@@ -413,6 +413,7 @@ function CategorySection({
     dockerhub: dockerIcon,
     aws: {
       codeArtifact: awsIcon,
+      codebuild: awsIcon,
       lambda: awsLambdaIcon,
       ecr: awsEcrIcon,
     },
@@ -486,6 +487,7 @@ function CategorySection({
             dockerhub: dockerIcon,
             aws: {
               codeArtifact: awsCodeArtifactIcon,
+              codebuild: awsIcon,
               ecr: awsEcrIcon,
               lambda: awsLambdaIcon,
             },

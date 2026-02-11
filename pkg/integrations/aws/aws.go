@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/codebuild"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/codeartifact"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ecr"
@@ -130,6 +131,7 @@ func (a *AWS) Configuration() []configuration.Field {
 
 func (a *AWS) Components() []core.Component {
 	return []core.Component{
+		&codebuild.RunBuild{},
 		&codeartifact.GetPackageVersion{},
 		&ecr.GetImage{},
 		&ecr.GetImageScanFindings{},
@@ -140,6 +142,7 @@ func (a *AWS) Components() []core.Component {
 
 func (a *AWS) Triggers() []core.Trigger {
 	return []core.Trigger{
+		&codebuild.OnBuild{},
 		&codeartifact.OnPackageVersion{},
 		&ecr.OnImageScan{},
 		&ecr.OnImagePush{},
