@@ -17,7 +17,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="CodeArtifact • Copy Package Versions" href="#code-artifact-•-copy-package-versions" description="Copy package versions from one repository to another in the same domain" />
+  <LinkCard title="CodeArtifact • Create Repository" href="#code-artifact-•-create-repository" description="Create an AWS CodeArtifact repository in a domain" />
+  <LinkCard title="CodeArtifact • Delete Package Versions" href="#code-artifact-•-delete-package-versions" description="Permanently delete one or more package versions from a repository" />
+  <LinkCard title="CodeArtifact • Delete Repository" href="#code-artifact-•-delete-repository" description="Delete an AWS CodeArtifact repository from a domain" />
+  <LinkCard title="CodeArtifact • Dispose Package Versions" href="#code-artifact-•-dispose-package-versions" description="Delete assets and set package version status to Disposed (record remains)" />
   <LinkCard title="CodeArtifact • Get Package Version" href="#code-artifact-•-get-package-version" description="Describe an AWS CodeArtifact package version" />
+  <LinkCard title="CodeArtifact • Update Package Versions Status" href="#code-artifact-•-update-package-versions-status" description="Update the status of one or more package versions (Archived, Published, Unlisted)" />
   <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
   <LinkCard title="ECR • Scan Image" href="#ecr-•-scan-image" description="Scan an ECR image for vulnerabilities" />
@@ -196,6 +202,144 @@ Each image scan event includes:
 }
 ```
 
+<a id="code-artifact-•-copy-package-versions"></a>
+
+## CodeArtifact • Copy Package Versions
+
+The Copy Package Versions component copies one or more package versions from a source repository to a destination repository in the same domain.
+
+### Use Cases
+
+- **Promotion**: Copy approved versions from staging to production
+- **Replication**: Mirror packages across repositories
+- **Migration**: Move versions between repos in the same domain
+
+### Example Output
+
+```json
+{
+  "failedVersions": {},
+  "successfulVersions": {
+    "1.0.0": {
+      "revision": "REVISION1",
+      "status": "Published"
+    },
+    "1.0.1": {
+      "revision": "REVISION2",
+      "status": "Published"
+    }
+  }
+}
+```
+
+<a id="code-artifact-•-create-repository"></a>
+
+## CodeArtifact • Create Repository
+
+The Create Repository component creates a new repository in an AWS CodeArtifact domain.
+
+### Use Cases
+
+- **Automated setup**: Create repositories as part of onboarding or pipeline setup
+- **Environment replication**: Mirror repository structure across domains
+- **Workflow provisioning**: Create a destination repository before copying packages
+
+### Example Output
+
+```json
+{
+  "repository": {
+    "administratorAccount": "123456789012",
+    "arn": "arn:aws:codeartifact:us-east-1:123456789012:repository/example-domain/my-repo",
+    "createdTime": 1706961600,
+    "description": "Example repository created by workflow",
+    "domainName": "example-domain",
+    "domainOwner": "123456789012",
+    "name": "my-repo"
+  }
+}
+```
+
+<a id="code-artifact-•-delete-package-versions"></a>
+
+## CodeArtifact • Delete Package Versions
+
+The Delete Package Versions component permanently removes package versions and their assets. Deleted versions cannot be restored. To remove from view but keep the option to restore later, use Update Package Versions Status to set status to Archived instead.
+
+### Use Cases
+
+- **Cleanup**: Remove obsolete or invalid versions
+- **Compliance**: Permanently remove versions that must not be retained
+- **Storage**: Free space by deleting unused versions
+
+### Example Output
+
+```json
+{
+  "failedVersions": {},
+  "successfulVersions": {
+    "1.0.0": {
+      "revision": "REVISION1",
+      "status": "Deleted"
+    }
+  }
+}
+```
+
+<a id="code-artifact-•-delete-repository"></a>
+
+## CodeArtifact • Delete Repository
+
+The Delete Repository component deletes a repository from an AWS CodeArtifact domain.
+
+### Use Cases
+
+- **Cleanup**: Remove repositories after migration or deprecation
+- **Environment teardown**: Delete temporary repositories created by workflows
+- **Lifecycle management**: Enforce retention by deleting old repositories
+
+### Example Output
+
+```json
+{
+  "repository": {
+    "administratorAccount": "123456789012",
+    "arn": "arn:aws:codeartifact:us-east-1:123456789012:repository/example-domain/my-repo",
+    "createdTime": 1706961600,
+    "description": "Deleted repository",
+    "domainName": "example-domain",
+    "domainOwner": "123456789012",
+    "name": "my-repo"
+  }
+}
+```
+
+<a id="code-artifact-•-dispose-package-versions"></a>
+
+## CodeArtifact • Dispose Package Versions
+
+The Dispose Package Versions component deletes the assets of package versions and sets their status to Disposed. The version record remains so you can still see it in ListPackageVersions with status Disposed; assets cannot be restored.
+
+### Use Cases
+
+- **Retention**: Keep version metadata for audit while removing binary assets
+- **Storage**: Free asset storage while preserving version history
+- **Lifecycle**: Mark versions as disposed after a retention period
+
+### Example Output
+
+```json
+{
+  "failedVersions": {},
+  "successfulVersions": {
+    "1.0.0": {
+      "revision": "REVISION1",
+      "status": "Disposed"
+    }
+  }
+}
+```
+
 <a id="code-artifact-•-get-package-version"></a>
 
 ## CodeArtifact • Get Package Version
@@ -250,6 +394,36 @@ The Get Package Version component retrieves metadata for a specific package vers
   },
   "timestamp": "2026-02-03T12:00:00Z",
   "type": "aws.codeartifact.package.version"
+}
+```
+
+<a id="code-artifact-•-update-package-versions-status"></a>
+
+## CodeArtifact • Update Package Versions Status
+
+The Update Package Versions Status component sets the status of package versions to Archived, Published, or Unlisted.
+
+### Use Cases
+
+- **Lifecycle management**: Archive old versions or publish after validation
+- **Visibility**: Unlist versions without deleting them
+- **Compliance**: Align version status with release policies
+
+### Example Output
+
+```json
+{
+  "failedVersions": {},
+  "successfulVersions": {
+    "1.0.0": {
+      "revision": "REVISION1",
+      "status": "Archived"
+    },
+    "1.0.1": {
+      "revision": "REVISION2",
+      "status": "Archived"
+    }
+  }
 }
 ```
 
