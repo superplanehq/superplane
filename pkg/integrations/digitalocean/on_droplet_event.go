@@ -170,6 +170,10 @@ func (t *OnDropletEvent) HandleAction(ctx core.TriggerActionContext) (map[string
 		return nil, nil
 	}
 
+	// Cache droplet lookups by ResourceID to avoid N+1 API calls
+	// when multiple actions reference the same droplet.
+	dropletCache := map[int]*Droplet{}
+
 	for _, action := range actions {
 		if action.Status != "completed" {
 			continue
@@ -203,8 +207,15 @@ func (t *OnDropletEvent) HandleAction(ctx core.TriggerActionContext) (map[string
 
 		// Enrich the payload with droplet details when available.
 		// For destroy events the droplet may no longer exist.
-		droplet, err := client.GetDroplet(action.ResourceID)
-		if err == nil {
+		droplet, cached := dropletCache[action.ResourceID]
+		if !cached {
+			droplet, err = client.GetDroplet(action.ResourceID)
+			if err != nil {
+				droplet = nil
+			}
+			dropletCache[action.ResourceID] = droplet
+		}
+		if droplet != nil {
 			payload["droplet"] = map[string]any{
 				"id":        droplet.ID,
 				"name":      droplet.Name,
