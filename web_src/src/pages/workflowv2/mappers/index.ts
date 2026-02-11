@@ -107,6 +107,7 @@ import {
   eventStateRegistry as bitbucketEventStateRegistry,
   customFieldRenderers as bitbucketCustomFieldRenderers,
 } from "./bitbucket/index";
+import {
   componentMappers as dockerhubComponentMappers,
   customFieldRenderers as dockerhubCustomFieldRenderers,
   triggerRenderers as dockerhubTriggerRenderers,

@@ -55,6 +55,10 @@ func (h *BitbucketWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	return true, nil
 }
 
+func (h *BitbucketWebhookHandler) Merge(current, requested any) (any, bool, error) {
+	return current, false, nil
+}
+
 func (h *BitbucketWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	metadata := Metadata{}
 	err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
