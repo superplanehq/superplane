@@ -30,6 +30,12 @@ type IDRef struct {
 	ID string `json:"id"`
 }
 
+// pageInfo holds Relay-style cursor pagination info.
+type pageInfo struct {
+	HasNextPage bool   `json:"hasNextPage"`
+	EndCursor   string `json:"endCursor"`
+}
+
 // NodeMetadata stores metadata on trigger/component nodes.
 type NodeMetadata struct {
 	Team *Team `json:"team,omitempty"`
