@@ -1,12 +1,12 @@
 # SuperPlane
 
-SuperPlane is an **open source DevOps control plane** for defining and running
-event-based workflows. It works across the tools you already use such as
-Git, CI/CD, observability, incident response, infra, and notifications.
+Το SuperPlane είναι ένα **open source DevOps control plane** για να ορίζεις και να εκτελείς
+workflows που βασίζονται σε events. Δουλεύει πάνω στα εργαλεία που ήδη χρησιμοποιείς, όπως
+Git, CI/CD, observability, incident response, υποδομή (infra) και ειδοποιήσεις.
 
 ![SuperPlane screenshot](./screenshot.png)
 
-## Project status
+## Κατάσταση έργου
 
 <p>
   <a href="https://superplanehq.semaphoreci.com/projects/superplane"><img src="https://superplanehq.semaphoreci.com/badges/superplane/branches/main.svg?style=shields" alt="CI Status on Semaphore" /></a>
@@ -14,50 +14,50 @@ Git, CI/CD, observability, incident response, infra, and notifications.
   <a href="https://discord.gg/KC78eCNsnw"><img src="https://img.shields.io/discord/1409914582239023200?label=discord" alt="Discord server" /></a>
 </p>
 
-This project is in alpha stage and moving quickly. Expect rough edges and occasional
-breaking changes while we stabilize the core model and integrations.
-If you try it and hit something confusing, please [open an issue](https://github.com/superplanehq/superplane/issues/new).
-Early feedback is extremely valuable.
+Το project είναι σε alpha και εξελίσσεται γρήγορα. Περίμενε «γωνίες», και κατά διαστήματα
+αλλαγές που μπορεί να σπάνε πράγματα, μέχρι να σταθεροποιηθεί το βασικό μοντέλο και οι integrations.
+Αν το δοκιμάσεις και κάτι σε μπερδέψει, άνοιξε ένα issue: [open an issue](https://github.com/superplanehq/superplane/issues/new).
+Το early feedback βοηθάει πολύ.
 
-## What it does
+## Τι κάνει
 
-- **Workflow orchestration**: Model multi-step operational workflows that span multiple systems.
-- **Event-driven automation**: Trigger workflows from pushes, deploy events, alerts, schedules, and webhooks.
-- **Control plane UI**: Design and manage DevOps processes; inspect runs, status, and history in a single place.
-- **Shared operational context**: Keep workflow definitions and operational intent in one system instead of scattered scripts.
+- **Ορχήστρωση workflows**: Μοντελοποίηση πολυβηματικών operational workflows που απλώνονται σε πολλά συστήματα.
+- **Αυτοματοποίηση με events**: Triggers από pushes, deploy events, alerts, schedules και webhooks.
+- **UI control plane**: Σχεδίαση/διαχείριση DevOps διαδικασιών· προβολή runs, status και ιστορικού σε ένα σημείο.
+- **Κοινό operational context**: Κρατάς ορισμούς workflows και «πρόθεση» λειτουργίας σε ένα σύστημα, αντί για διάσπαρτα scripts.
 
-## How it works
+## Πώς δουλεύει
 
-- **Canvases**: You model a workflow as a directed graph (a “Canvas”) of steps and dependencies.
-- **Components**: Each step is a reusable component (built-in or integration-backed) that performs an action (for example: call CI/CD, open an incident, post a notification, wait for a condition, require approval).
-- **Events & triggers**: Incoming events (webhooks, schedules, tool events) match triggers and start executions with the event payload as input.
-- **Execution + visibility**: SuperPlane executes the graph, tracks state, and exposes runs/history/debugging in the UI (and via the CLI).
+- **Canvases**: Μοντελοποιείς ένα workflow ως κατευθυνόμενο γράφο (ένα “Canvas”) με βήματα και εξαρτήσεις.
+- **Components**: Κάθε βήμα είναι ένα επαναχρησιμοποιήσιμο component (built-in ή μέσω integration) που κάνει μια ενέργεια (π.χ. call CI/CD, άνοιγμα incident, notification, αναμονή συνθήκης, approval).
+- **Events & triggers**: Εισερχόμενα events (webhooks, schedules, events από εργαλεία) ταιριάζουν με triggers και ξεκινούν εκτελέσεις με input το payload.
+- **Εκτέλεση + ορατότητα**: Το SuperPlane εκτελεί τον γράφο, παρακολουθεί κατάσταση, και εμφανίζει runs/ιστορικό/debugging στο UI (και μέσω CLI).
 
-### Example use cases
+### Παραδείγματα χρήσης
 
-A few concrete things teams build with SuperPlane:
+Μερικά συγκεκριμένα πράγματα που φτιάχνουν ομάδες με το SuperPlane:
 
-- **Policy-gated production deploy**: when CI finishes green, hold outside business hours, require on-call + product approval, then trigger the deploy.
-- **Progressive delivery (10% → 30% → 60% → 100%)**: deploy in waves, wait/verify at each step, and rollback on failure with an approval gate.
-- **Release train with a multi-repo ship set**: wait for tags/builds from a set of services, fan-in once all are ready, then dispatch a coordinated deploy.
-- **“First 5 minutes” incident triage**: on incident created, fetch context in parallel (recent deploys + health signals), generate an evidence pack, and open an issue.
+- **Production deploy με policies/approvals**: όταν το CI γίνει green, αναμονή εκτός ωραρίου, approvals (on-call + product), και μετά deploy.
+- **Progressive delivery (10% → 30% → 60% → 100%)**: deploy σε κύματα, wait/verify σε κάθε βήμα, και rollback σε failure με approval gate.
+- **Release train με multi-repo ship set**: αναμονή για tags/builds από σύνολο services, fan-in όταν είναι όλα έτοιμα, και μετά συντονισμένο deploy.
+- **Incident triage “πρώτα 5 λεπτά”**: όταν δημιουργηθεί incident, parallel fetch context (πρόσφατα deploys + health signals), evidence pack, και άνοιγμα issue.
 
-## Quick start
+## Γρήγορη εκκίνηση
 
-Run the latest demo container:
+Τρέξε το τελευταίο demo container:
 
 ```
 docker pull ghcr.io/superplanehq/superplane-demo:stable
 docker run --rm -p 3000:3000 -v spdata:/app/data -ti ghcr.io/superplanehq/superplane-demo:stable
 ```
 
-Then open [http://localhost:3000](http://localhost:3000) and follow the [quick startguide](https://docs.superplane.com/get-started/quickstart/).
+Μετά άνοιξε το [http://localhost:3000](http://localhost:3000) και ακολούθησε το [quick start guide](https://docs.superplane.com/get-started/quickstart/).
 
-## Supported Integrations
+## Υποστηριζόμενες ενσωματώσεις (Integrations)
 
-SuperPlane integrates with the tools you already use. Each integration provides triggers (events that start workflows) and components (actions you can run).
+Το SuperPlane συνδέεται με τα εργαλεία που ήδη χρησιμοποιείς. Κάθε integration παρέχει triggers (events που ξεκινούν workflows) και components (actions που μπορείς να τρέξεις).
 
-> View the full list in our [documentation](https://docs.superplane.com/components/). Missing a provider? [Open an issue](https://github.com/superplanehq/superplane/issues/new) to request it.
+> Δες την πλήρη λίστα στην [τεκμηρίωση](https://docs.superplane.com/components/). Λείπει κάποιος provider; άνοιξε issue: [Open an issue](https://github.com/superplanehq/superplane/issues/new).
 
 ### AI & LLM
 
@@ -136,45 +136,45 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-## Production installation
+## Production εγκατάσταση
 
-You can deploy SuperPlane on a single host or on Kubernetes:
+Μπορείς να κάνεις deploy το SuperPlane σε single host ή σε Kubernetes:
 
-- **[Single Host Installation](https://docs.superplane.com/installation/overview/#single-host-installation)** - Deploy on AWS EC2, GCP Compute Engine, or other cloud providers
-- **[Kubernetes Installation](https://docs.superplane.com/installation/overview/#kubernetes)** - Deploy on GKE, EKS, or any Kubernetes cluster
+- **[Single Host Installation](https://docs.superplane.com/installation/overview/#single-host-installation)** - Deploy σε AWS EC2, GCP Compute Engine ή άλλους cloud providers
+- **[Kubernetes Installation](https://docs.superplane.com/installation/overview/#kubernetes)** - Deploy σε GKE, EKS ή οποιοδήποτε Kubernetes cluster
 
-## Roadmap Overview
+## Roadmap (σύνοψη)
 
-This section gives a quick snapshot of what SuperPlane already supports and what’s coming next.
+Μια γρήγορη εικόνα για το τι υποστηρίζει ήδη το SuperPlane και τι έρχεται.
 
-**Available now**
+**Διαθέσιμα τώρα**
 
 ✓ 75+ components  
 ✓ Event-driven workflow engine  
 ✓ Visual Canvas builder  
 ✓ Run history, event chain view, debug console  
-✓ Starter CLI and example workflows
+✓ Starter CLI και παραδείγματα workflows
 
-**In progress / upcoming**
+**Σε εξέλιξη / έρχεται**
 
-→ 200+ new components (AWS, Grafana, DataDog, Azure, GitLab, Jira, and more)  
+→ 200+ νέα components (AWS, Grafana, DataDog, Azure, GitLab, Jira, κ.ά.)  
 → [Canvas version control](https://github.com/superplanehq/superplane/issues/1380)  
-→ [SAML/SCIM](https://github.com/superplanehq/superplane/issues/1377) with [extended RBAC and permissions](https://github.com/superplanehq/superplane/issues/1378)  
+→ [SAML/SCIM](https://github.com/superplanehq/superplane/issues/1377) με [extended RBAC και permissions](https://github.com/superplanehq/superplane/issues/1378)  
 → [Artifact version tracking](https://github.com/superplanehq/superplane/issues/1382)  
 → [Public API](https://github.com/superplanehq/superplane/issues/1854)
 
-## Contributing
+## Συνεισφορά (Contributing)
 
-We welcome your bug reports, ideas for improvement, and focused PRs.
+Καλωσορίζουμε bug reports, ιδέες για βελτιώσεις και στοχευμένα PRs.
 
-- Read the **[Contributing Guide](CONTRIBUTING.md)** to get started.
-- Issues: use GitHub issues for bugs and feature requests.
+- Διάβασε το **[Contributing Guide](CONTRIBUTING.md)** για να ξεκινήσεις.
+- Για bugs/feature requests χρησιμοποίησε τα GitHub issues.
 
-## License
+## Άδεια
 
-Apache License 2.0. See `LICENSE`.
+Apache License 2.0. Δες το `LICENSE`.
 
-## Community
+## Κοινότητα
 
-- **[Discord](https://discord.superplane.com)** - Join our community for discussions, questions, and collaboration
-- **[X](https://x.com/superplanehq)** - Follow us for updates and announcements
+- **[Discord](https://discord.superplane.com)** - Έλα στην κοινότητα για συζητήσεις, ερωτήσεις και συνεργασία
+- **[X](https://x.com/superplanehq)** - Ακολούθησέ μας για updates και ανακοινώσεις
