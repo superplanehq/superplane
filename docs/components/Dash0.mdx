@@ -11,6 +11,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="List Issues" href="#list-issues" description="Query Dash0 to get a list of all current issues using the metric dash0.issue.status" />
   <LinkCard title="Query Prometheus" href="#query-prometheus" description="Execute a PromQL query against Dash0 Prometheus API and return the response data" />
+  <LinkCard title="Send Log Event" href="#send-log-event" description="Send one or more workflow log records to Dash0 OTLP HTTP ingestion" />
 </CardGrid>
 
 <a id="list-issues"></a>
@@ -77,6 +78,49 @@ Returns a list of issues with:
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "dash0.issues.list"
+}
+```
+
+<a id="send-log-event"></a>
+
+## Send Log Event
+
+The Send Log Event component sends workflow log records to Dash0 using OTLP HTTP ingestion.
+
+### Use Cases
+
+- **Audit trails**: Record workflow milestones in Dash0 logs
+- **Change tracking**: Emit deployment, approval, and remediation events
+- **Observability correlation**: Correlate workflow activity with traces and metrics
+
+### Configuration
+
+- **Service Name**: Service name attached to emitted records
+- **Records**: One or more log records containing:
+  - message
+  - severity
+  - timestamp (optional, RFC3339 or unix)
+  - attributes (optional key/value map)
+
+### Output
+
+Emits:
+- **serviceName**: Service name used for ingestion
+- **sentCount**: Number of records sent in this request
+
+### Example Output
+
+```json
+{
+  "data": {
+    "response": {
+      "status": "ok"
+    },
+    "sentCount": 2,
+    "serviceName": "superplane.workflow"
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.log.event.sent"
 }
 ```
 
