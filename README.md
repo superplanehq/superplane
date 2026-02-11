@@ -1,12 +1,12 @@
 # SuperPlane
 
-SuperPlane is an **open source DevOps control plane** for defining and running
-event-based workflows. It works across the tools you already use such as
-Git, CI/CD, observability, incident response, infra, and notifications.
+SuperPlane er et **åpen kildekode DevOps-kontrollplan** for å definere og kjøre
+hendelsesbaserte arbeidsflyter. Det fungerer på tvers av verktøyene du allerede bruker, som
+Git, CI/CD, observabilitet, hendelseshåndtering, infrastruktur og varsler.
 
 ![SuperPlane screenshot](./screenshot.png)
 
-## Project status
+## Prosjektstatus
 
 <p>
   <a href="https://superplanehq.semaphoreci.com/projects/superplane"><img src="https://superplanehq.semaphoreci.com/badges/superplane/branches/main.svg?style=shields" alt="CI Status on Semaphore" /></a>
@@ -14,50 +14,50 @@ Git, CI/CD, observability, incident response, infra, and notifications.
   <a href="https://discord.gg/KC78eCNsnw"><img src="https://img.shields.io/discord/1409914582239023200?label=discord" alt="Discord server" /></a>
 </p>
 
-This project is in alpha stage and moving quickly. Expect rough edges and occasional
-breaking changes while we stabilize the core model and integrations.
-If you try it and hit something confusing, please [open an issue](https://github.com/superplanehq/superplane/issues/new).
-Early feedback is extremely valuable.
+Dette prosjektet er i alfa og utvikles raskt. Forvent litt ru kanter og noen
+bakoverinkompatible endringer mens vi stabiliserer kjernemodellen og integrasjonene.
+Hvis du prøver det og støter på noe forvirrende, vennligst [opprett en issue](https://github.com/superplanehq/superplane/issues/new).
+Tidlige tilbakemeldinger er veldig verdifulle.
 
-## What it does
+## Hva det gjør
 
-- **Workflow orchestration**: Model multi-step operational workflows that span multiple systems.
-- **Event-driven automation**: Trigger workflows from pushes, deploy events, alerts, schedules, and webhooks.
-- **Control plane UI**: Design and manage DevOps processes; inspect runs, status, and history in a single place.
-- **Shared operational context**: Keep workflow definitions and operational intent in one system instead of scattered scripts.
+- **Orkestrering av arbeidsflyter**: Modellér operasjonelle arbeidsflyter med flere steg som spenner over flere systemer.
+- **Hendelsesdrevet automasjon**: Start arbeidsflyter fra pushes, deploy-hendelser, alarmer, tidsplaner og webhooks.
+- **Kontrollplan-UI**: Design og administrer DevOps-prosesser; se kjøringer, status og historikk på ett sted.
+- **Delt operasjonell kontekst**: Hold definisjoner og intensjon samlet i ett system i stedet for spredte scripts.
 
-## How it works
+## Hvordan det fungerer
 
-- **Canvases**: You model a workflow as a directed graph (a “Canvas”) of steps and dependencies.
-- **Components**: Each step is a reusable component (built-in or integration-backed) that performs an action (for example: call CI/CD, open an incident, post a notification, wait for a condition, require approval).
-- **Events & triggers**: Incoming events (webhooks, schedules, tool events) match triggers and start executions with the event payload as input.
-- **Execution + visibility**: SuperPlane executes the graph, tracks state, and exposes runs/history/debugging in the UI (and via the CLI).
+- **Canvas**: Du modellerer en arbeidsflyt som en rettet graf (en «Canvas») av steg og avhengigheter.
+- **Komponenter**: Hvert steg er en gjenbrukbar komponent (innebygd eller via integrasjon) som utfører en handling (f.eks. kjøre CI/CD, opprette en hendelse, sende et varsel, vente på en betingelse, kreve godkjenning).
+- **Hendelser og triggere**: Innkommende hendelser (webhooks, tidsplaner, verktøyhendelser) matcher triggere og starter kjøringer med payloaden som input.
+- **Kjøring + synlighet**: SuperPlane kjører grafen, sporer tilstand og viser kjøringer/historikk/debugging i UI-en (og via CLI).
 
-### Example use cases
+### Eksempelbruk
 
-A few concrete things teams build with SuperPlane:
+Noen konkrete ting team bygger med SuperPlane:
 
-- **Policy-gated production deploy**: when CI finishes green, hold outside business hours, require on-call + product approval, then trigger the deploy.
-- **Progressive delivery (10% → 30% → 60% → 100%)**: deploy in waves, wait/verify at each step, and rollback on failure with an approval gate.
-- **Release train with a multi-repo ship set**: wait for tags/builds from a set of services, fan-in once all are ready, then dispatch a coordinated deploy.
-- **“First 5 minutes” incident triage**: on incident created, fetch context in parallel (recent deploys + health signals), generate an evidence pack, and open an issue.
+- **Produksjonsdeploy med policy/godkjenning**: når CI er grønt, hold igjen utenfor arbeidstid, krev on-call + produktgodkjenning, og trigge deploy.
+- **Progressiv utrulling (10% → 30% → 60% → 100%)**: deploy i bølger, vent/verifiser på hvert steg, og rull tilbake ved feil med godkjenningsport.
+- **Release-train på tvers av repoer**: vent på tags/builds fra flere tjenester, fan-in når alt er klart, og gjør en koordinert deploy.
+- **«Første 5 minutter» hendelsestriage**: ved opprettet hendelse, hent kontekst parallelt (siste deploys + helsesignaler), lag en evidenspakke, og opprett en issue.
 
-## Quick start
+## Hurtigstart
 
-Run the latest demo container:
+Kjør siste demo-container:
 
 ```
 docker pull ghcr.io/superplanehq/superplane-demo:stable
 docker run --rm -p 3000:3000 -v spdata:/app/data -ti ghcr.io/superplanehq/superplane-demo:stable
 ```
 
-Then open [http://localhost:3000](http://localhost:3000) and follow the [quick startguide](https://docs.superplane.com/get-started/quickstart/).
+Åpne så [http://localhost:3000](http://localhost:3000) og følg [hurtigstartguiden](https://docs.superplane.com/get-started/quickstart/).
 
-## Supported Integrations
+## Støttede integrasjoner
 
-SuperPlane integrates with the tools you already use. Each integration provides triggers (events that start workflows) and components (actions you can run).
+SuperPlane integrerer med verktøyene du allerede bruker. Hver integrasjon tilbyr triggere (hendelser som starter arbeidsflyter) og komponenter (handlinger du kan kjøre).
 
-> View the full list in our [documentation](https://docs.superplane.com/components/). Missing a provider? [Open an issue](https://github.com/superplanehq/superplane/issues/new) to request it.
+> Se hele listen i [dokumentasjonen](https://docs.superplane.com/components/). Mangler en leverandør? [Opprett en issue](https://github.com/superplanehq/superplane/issues/new) for å be om den.
 
 ### AI & LLM
 
@@ -68,7 +68,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-### Version Control & CI/CD
+### Versjonskontroll og CI/CD
 
 <table>
 <tr>
@@ -79,7 +79,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-### Cloud & Infrastructure
+### Sky og infrastruktur
 
 <table>
 <tr>
@@ -91,7 +91,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-### Observability
+### Observabilitet
 
 <table>
 <tr>
@@ -100,7 +100,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-### Incident Management
+### Hendelseshåndtering
 
 <table>
 <tr>
@@ -109,7 +109,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-### Communication
+### Kommunikasjon
 
 <table>
 <tr>
@@ -128,7 +128,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-### Developer Tools
+### Utviklerverktøy
 
 <table>
 <tr>
@@ -136,45 +136,45 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-## Production installation
+## Installasjon i produksjon
 
-You can deploy SuperPlane on a single host or on Kubernetes:
+Du kan kjøre SuperPlane på én host eller på Kubernetes:
 
-- **[Single Host Installation](https://docs.superplane.com/installation/overview/#single-host-installation)** - Deploy on AWS EC2, GCP Compute Engine, or other cloud providers
-- **[Kubernetes Installation](https://docs.superplane.com/installation/overview/#kubernetes)** - Deploy on GKE, EKS, or any Kubernetes cluster
+- **[Installasjon på én host](https://docs.superplane.com/installation/overview/#single-host-installation)** – Deploy på AWS EC2, GCP Compute Engine eller andre skyplattformer
+- **[Kubernetes-installasjon](https://docs.superplane.com/installation/overview/#kubernetes)** – Deploy på GKE, EKS eller et hvilket som helst Kubernetes-cluster
 
-## Roadmap Overview
+## Veikart (oversikt)
 
-This section gives a quick snapshot of what SuperPlane already supports and what’s coming next.
+Denne delen gir en rask oversikt over hva SuperPlane støtter nå og hva som kommer.
 
-**Available now**
+**Tilgjengelig nå**
 
 ✓ 75+ components  
-✓ Event-driven workflow engine  
-✓ Visual Canvas builder  
-✓ Run history, event chain view, debug console  
-✓ Starter CLI and example workflows
+✓ Hendelsesdrevet arbeidsflytmotor  
+✓ Visuell Canvas-bygger  
+✓ Kjøringshistorikk, event-kjede-visning, debug-konsoll  
+✓ Enkel CLI og eksempel-workflows
 
-**In progress / upcoming**
+**Pågående / kommer snart**
 
-→ 200+ new components (AWS, Grafana, DataDog, Azure, GitLab, Jira, and more)  
-→ [Canvas version control](https://github.com/superplanehq/superplane/issues/1380)  
-→ [SAML/SCIM](https://github.com/superplanehq/superplane/issues/1377) with [extended RBAC and permissions](https://github.com/superplanehq/superplane/issues/1378)  
-→ [Artifact version tracking](https://github.com/superplanehq/superplane/issues/1382)  
-→ [Public API](https://github.com/superplanehq/superplane/issues/1854)
+→ 200+ nye komponenter (AWS, Grafana, DataDog, Azure, GitLab, Jira, m.m.)  
+→ [Versjonskontroll for Canvas](https://github.com/superplanehq/superplane/issues/1380)  
+→ [SAML/SCIM](https://github.com/superplanehq/superplane/issues/1377) med [utvidet RBAC og tillatelser](https://github.com/superplanehq/superplane/issues/1378)  
+→ [Versjonssporing av artefakter](https://github.com/superplanehq/superplane/issues/1382)  
+→ [Offentlig API](https://github.com/superplanehq/superplane/issues/1854)
 
-## Contributing
+## Bidra
 
-We welcome your bug reports, ideas for improvement, and focused PRs.
+Vi tar gjerne imot bug-rapporter, idéer til forbedring og fokuserte PR-er.
 
-- Read the **[Contributing Guide](CONTRIBUTING.md)** to get started.
-- Issues: use GitHub issues for bugs and feature requests.
+- Les **[bidragsguiden](CONTRIBUTING.md)** for å komme i gang.
+- Issues: bruk GitHub issues for bugs og feature requests.
 
-## License
+## Lisens
 
-Apache License 2.0. See `LICENSE`.
+Apache License 2.0. Se `LICENSE`.
 
-## Community
+## Fellesskap
 
-- **[Discord](https://discord.superplane.com)** - Join our community for discussions, questions, and collaboration
-- **[X](https://x.com/superplanehq)** - Follow us for updates and announcements
+- **[Discord](https://discord.superplane.com)** – Bli med i fellesskapet for diskusjoner, spørsmål og samarbeid
+- **[X](https://x.com/superplanehq)** – Følg oss for oppdateringer og annonseringer
