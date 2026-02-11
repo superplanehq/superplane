@@ -5,7 +5,9 @@ import { getDeployMapper } from "./get_deploy";
 import { getServiceMapper } from "./get_service";
 import { onBuildTriggerRenderer } from "./on_build";
 import { onDeployTriggerRenderer } from "./on_deploy";
+import { purgeCacheMapper } from "./purge_cache";
 import { rollbackDeployMapper } from "./rollback_deploy";
+import { updateEnvVarMapper } from "./update_env_var";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   deploy: deployMapper,
@@ -13,6 +15,8 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   getDeploy: getDeployMapper,
   cancelDeploy: cancelDeployMapper,
   rollbackDeploy: rollbackDeployMapper,
+  purgeCache: purgeCacheMapper,
+  updateEnvVar: updateEnvVarMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
