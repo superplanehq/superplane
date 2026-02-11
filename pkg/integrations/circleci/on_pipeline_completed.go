@@ -170,11 +170,6 @@ func (p *OnPipelineCompleted) poll(ctx core.TriggerActionContext) error {
 	if count, ok := ctx.Parameters["retryCount"].(float64); ok {
 		retryCount = int(count)
 	}
-
-	if retryCount >= 5 {
-		return nil
-	}
-
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
@@ -185,13 +180,24 @@ func (p *OnPipelineCompleted) poll(ctx core.TriggerActionContext) error {
 		return fmt.Errorf("failed to check pipeline status: %w", err)
 	}
 
+	if result.IsErrorState {
+		// Pipeline errored, don't emit event
+		return nil
+	}
+
 	if !result.AllDone {
 		params := make(map[string]any)
 		for k, v := range ctx.Parameters {
 			params[k] = v
 		}
+
 		params["retryCount"] = retryCount + 1
-		return ctx.Requests.ScheduleActionCall("poll", params, 3*time.Second)
+		if retryCount < 5 {
+			// Schedule another poll in 3 seconds
+			return ctx.Requests.ScheduleActionCall("poll", params, 3*time.Second)
+		}
+
+		return nil
 	}
 
 	err = ctx.Events.Emit("circleci.workflow.completed", webhookData)

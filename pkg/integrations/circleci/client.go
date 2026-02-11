@@ -205,9 +205,10 @@ func (c *Client) GetWorkflow(workflowID string) (*WorkflowResponse, error) {
 }
 
 type PipelineStatusResult struct {
-	AllDone   bool
-	AnyFailed bool
-	Workflows []WorkflowResponse
+	AllDone      bool
+	AnyFailed    bool
+	Workflows    []WorkflowResponse
+	IsErrorState bool
 }
 
 func (c *Client) CheckPipelineStatus(pipelineID string) (*PipelineStatusResult, error) {
@@ -217,10 +218,18 @@ func (c *Client) CheckPipelineStatus(pipelineID string) (*PipelineStatusResult, 
 	}
 
 	if len(workflows) == 0 {
+		pipeline, err := c.GetPipeline(pipelineID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get pipeline: %w", err)
+		}
+
+		isErrorState := pipeline.State == "errored"
+
 		return &PipelineStatusResult{
-			AllDone:   false,
-			AnyFailed: false,
-			Workflows: workflows,
+			AllDone:      isErrorState,
+			AnyFailed:    isErrorState,
+			Workflows:    workflows,
+			IsErrorState: isErrorState,
 		}, nil
 	}
 
@@ -239,9 +248,10 @@ func (c *Client) CheckPipelineStatus(pipelineID string) (*PipelineStatusResult, 
 	}
 
 	return &PipelineStatusResult{
-		AllDone:   allDone,
-		AnyFailed: anyFailed,
-		Workflows: workflows,
+		AllDone:      allDone,
+		AnyFailed:    anyFailed,
+		Workflows:    workflows,
+		IsErrorState: false,
 	}, nil
 }
 
