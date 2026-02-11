@@ -8,9 +8,6 @@ import (
 type SentryWebhookHandler struct{}
 
 func (h *SentryWebhookHandler) CompareConfig(a, b any) (bool, error) {
-	// CompareConfig is only used to decide whether an existing webhook can be reused.
-	// For Sentry, different trigger nodes can safely share a single webhook URL.
-	// The actual event subscription is handled by Merge (which unions event sets).
 	var cfgA, cfgB WebhookConfiguration
 	if err := mapstructure.Decode(a, &cfgA); err != nil {
 		return false, err
@@ -23,7 +20,6 @@ func (h *SentryWebhookHandler) CompareConfig(a, b any) (bool, error) {
 }
 
 func (h *SentryWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
-	// Return config as-is.
 	return ctx.Webhook.GetConfiguration(), nil
 }
 
