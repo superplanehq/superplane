@@ -17,12 +17,6 @@ type Client struct {
 	http     core.HTTPContext
 }
 
-type User struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
-}
-
 type Project struct {
 	ID           string        `json:"id"`
 	Name         string        `json:"name"`
@@ -122,34 +116,6 @@ func (c *Client) graphql(query string, variables map[string]any) (map[string]any
 	}
 
 	return gqlResp.Data, nil
-}
-
-func (c *Client) GetCurrentUser() (*User, error) {
-	query := `
-		query {
-			me {
-				id
-				name
-				email
-			}
-		}
-	`
-
-	data, err := c.graphql(query, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	meData, ok := data["me"].(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response format")
-	}
-
-	return &User{
-		ID:    getString(meData, "id"),
-		Name:  getString(meData, "name"),
-		Email: getString(meData, "email"),
-	}, nil
 }
 
 func (c *Client) ListProjects() ([]Project, error) {
