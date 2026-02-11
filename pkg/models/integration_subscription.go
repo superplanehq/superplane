@@ -46,17 +46,6 @@ func CreateIntegrationSubscriptionInTransaction(tx *gorm.DB, node *CanvasNode, i
 	return &s, nil
 }
 
-func DeleteIntegrationSubscription(tx *gorm.DB, id uuid.UUID) error {
-	result := tx.Where("id = ?", id).Delete(&IntegrationSubscription{})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return nil
-}
-
 func DeleteIntegrationSubscriptionsForNodeInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID string) error {
 	return tx.
 		Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).
