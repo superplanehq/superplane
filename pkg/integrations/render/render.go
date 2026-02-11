@@ -100,6 +100,12 @@ func (r *Render) Configuration() []configuration.Field {
 func (r *Render) Components() []core.Component {
 	return []core.Component{
 		&Deploy{},
+		&GetService{},
+		&GetDeploy{},
+		&CancelDeploy{},
+		&Rollback{},
+		&PurgeCache{},
+		&UpdateEnvVars{},
 	}
 }
 

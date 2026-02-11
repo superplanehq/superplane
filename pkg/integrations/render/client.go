@@ -50,6 +50,39 @@ type serviceWithCursor struct {
 	Service Service `json:"service"`
 }
 
+// ServiceDetail represents the full response from GET /services/{serviceId}.
+// Note: Suspended is a string (e.g. "not_suspended", "suspended"), not a bool.
+type ServiceDetail struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Type       string `json:"type"`
+	Suspended  string `json:"suspended"`
+	AutoDeploy string `json:"autoDeploy"`
+	Repo       string `json:"repo"`
+	Branch     string `json:"branch"`
+	CreatedAt  string `json:"createdAt"`
+	UpdatedAt  string `json:"updatedAt"`
+}
+
+// IsSuspended returns true if the service is in any suspended state.
+func (s *ServiceDetail) IsSuspended() bool {
+	return s.Suspended != "not_suspended"
+}
+
+type EnvVar struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+type envVarWithCursor struct {
+	Cursor string `json:"cursor"`
+	EnvVar EnvVar `json:"envVar"`
+}
+
+type rollbackRequest struct {
+	DeployID string `json:"deployId"`
+}
+
 type Webhook struct {
 	ID          string   `json:"id"`
 	WorkspaceID string   `json:"ownerId"`
@@ -432,6 +465,113 @@ func (c *Client) GetEvent(eventID string) (EventResponse, error) {
 	return response, nil
 }
 
+func (c *Client) GetService(serviceID string) (*ServiceDetail, error) {
+	if serviceID == "" {
+		return nil, fmt.Errorf("serviceID is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodGet,
+		"/services/"+url.PathEscape(serviceID),
+		nil,
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	service := ServiceDetail{}
+	if err := json.Unmarshal(body, &service); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal service response: %w", err)
+	}
+
+	return &service, nil
+}
+
+func (c *Client) CancelDeploy(serviceID string, deployID string) (DeployResponse, error) {
+	if serviceID == "" {
+		return DeployResponse{}, fmt.Errorf("serviceID is required")
+	}
+	if deployID == "" {
+		return DeployResponse{}, fmt.Errorf("deployID is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodPost,
+		"/services/"+url.PathEscape(serviceID)+"/deploys/"+url.PathEscape(deployID)+"/cancel",
+		nil,
+		nil,
+	)
+	if err != nil {
+		return DeployResponse{}, err
+	}
+
+	deployResponse := DeployResponse{}
+	if err := json.Unmarshal(body, &deployResponse); err != nil {
+		return DeployResponse{}, fmt.Errorf("failed to unmarshal deploy response: %w", err)
+	}
+
+	return deployResponse, nil
+}
+
+func (c *Client) Rollback(serviceID string, deployID string) (DeployResponse, error) {
+	if serviceID == "" {
+		return DeployResponse{}, fmt.Errorf("serviceID is required")
+	}
+	if deployID == "" {
+		return DeployResponse{}, fmt.Errorf("deployID is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodPost,
+		"/services/"+url.PathEscape(serviceID)+"/rollbacks",
+		nil,
+		rollbackRequest{DeployID: deployID},
+	)
+	if err != nil {
+		return DeployResponse{}, err
+	}
+
+	deployResponse := DeployResponse{}
+	if err := json.Unmarshal(body, &deployResponse); err != nil {
+		return DeployResponse{}, fmt.Errorf("failed to unmarshal rollback response: %w", err)
+	}
+
+	return deployResponse, nil
+}
+
+func (c *Client) PurgeCache(serviceID string) error {
+	if serviceID == "" {
+		return fmt.Errorf("serviceID is required")
+	}
+
+	_, _, err := c.execRequestWithResponse(
+		http.MethodDelete,
+		"/services/"+url.PathEscape(serviceID)+"/cache",
+		nil,
+		nil,
+	)
+	return err
+}
+
+func (c *Client) UpdateEnvVars(serviceID string, envVars []EnvVar) ([]EnvVar, error) {
+	if serviceID == "" {
+		return nil, fmt.Errorf("serviceID is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodPut,
+		"/services/"+url.PathEscape(serviceID)+"/env-vars",
+		nil,
+		envVars,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseEnvVars(body)
+}
+
 func parseWorkspaces(body []byte) ([]Workspace, error) {
 	withCursor := []workspaceWithCursor{}
 	if err := json.Unmarshal(body, &withCursor); err == nil && len(withCursor) > 0 {
@@ -531,6 +671,36 @@ func parseWebhooksWithCursor(withCursor []webhookWithCursor) []Webhook {
 	}
 
 	return webhooks
+}
+
+func parseEnvVars(body []byte) ([]EnvVar, error) {
+	withCursor := []envVarWithCursor{}
+	if err := json.Unmarshal(body, &withCursor); err == nil && len(withCursor) > 0 {
+		parsed := parseEnvVarsWithCursor(withCursor)
+		if len(parsed) > 0 {
+			return parsed, nil
+		}
+	}
+
+	plainEnvVars := []EnvVar{}
+	if err := json.Unmarshal(body, &plainEnvVars); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal env vars response: %w", err)
+	}
+
+	return plainEnvVars, nil
+}
+
+func parseEnvVarsWithCursor(withCursor []envVarWithCursor) []EnvVar {
+	envVars := make([]EnvVar, 0, len(withCursor))
+	for _, item := range withCursor {
+		if item.EnvVar.Key == "" {
+			continue
+		}
+
+		envVars = append(envVars, item.EnvVar)
+	}
+
+	return envVars
 }
 
 func (c *Client) execRequestWithResponse(
