@@ -33,6 +33,12 @@ func (h *RailwayWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	return configA.Project == configB.Project, nil
 }
 
+// Merge combines current and requested webhook configurations.
+// Since Railway webhooks are manually configured, we just return the current config.
+func (h *RailwayWebhookHandler) Merge(current, requested any) (any, bool, error) {
+	return current, false, nil
+}
+
 // Setup is called when a webhook needs to be created.
 // Since Railway webhooks are UI-only, we just return metadata.
 // The webhook URL will be displayed to the user for manual setup.
