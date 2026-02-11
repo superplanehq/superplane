@@ -98,27 +98,41 @@ func Test__SentryWebhookHandler__CompareConfig(t *testing.T) {
 		assert.True(t, equal)
 	})
 
-	t.Run("different events -> not equal", func(t *testing.T) {
+	t.Run("different events -> still equal (webhook can be reused)", func(t *testing.T) {
 		a := WebhookConfiguration{Events: []string{"created"}}
 		b := WebhookConfiguration{Events: []string{"resolved"}}
 		equal, err := h.CompareConfig(a, b)
 		assert.NoError(t, err)
-		assert.False(t, equal)
+		assert.True(t, equal)
+	})
+}
+
+func Test__SentryWebhookHandler__Merge(t *testing.T) {
+	h := &SentryWebhookHandler{}
+
+	t.Run("requested is subset -> unchanged", func(t *testing.T) {
+		current := WebhookConfiguration{Events: []string{"created", "resolved"}}
+		requested := WebhookConfiguration{Events: []string{"created"}}
+
+		mergedAny, changed, err := h.Merge(current, requested)
+		assert.NoError(t, err)
+		assert.False(t, changed)
+
+		merged, ok := mergedAny.(WebhookConfiguration)
+		assert.True(t, ok)
+		assert.ElementsMatch(t, []string{"created", "resolved"}, merged.Events)
 	})
 
-	t.Run("different event counts -> not equal", func(t *testing.T) {
-		a := WebhookConfiguration{Events: []string{"created", "resolved"}}
-		b := WebhookConfiguration{Events: []string{"created"}}
-		equal, err := h.CompareConfig(a, b)
-		assert.NoError(t, err)
-		assert.False(t, equal)
-	})
+	t.Run("requested adds new events -> changed + union", func(t *testing.T) {
+		current := WebhookConfiguration{Events: []string{"created"}}
+		requested := WebhookConfiguration{Events: []string{"resolved", "created"}}
 
-	t.Run("same events different order -> equal", func(t *testing.T) {
-		a := WebhookConfiguration{Events: []string{"created", "resolved", "assigned"}}
-		b := WebhookConfiguration{Events: []string{"resolved", "assigned", "created"}}
-		equal, err := h.CompareConfig(a, b)
+		mergedAny, changed, err := h.Merge(current, requested)
 		assert.NoError(t, err)
-		assert.True(t, equal, "event order should not matter")
+		assert.True(t, changed)
+
+		merged, ok := mergedAny.(WebhookConfiguration)
+		assert.True(t, ok)
+		assert.ElementsMatch(t, []string{"created", "resolved"}, merged.Events)
 	})
 }
