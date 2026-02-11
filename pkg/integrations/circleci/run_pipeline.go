@@ -355,10 +355,7 @@ func (t *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusForbidden, fmt.Errorf("missing signature")
 	}
 
-	signature := signatureHeader
-	if strings.HasPrefix(signatureHeader, "v1=") {
-		signature = strings.TrimPrefix(signatureHeader, "v1=")
-	}
+	signature, _ := strings.CutPrefix(signatureHeader, "v1=")
 
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
@@ -373,7 +370,9 @@ func (t *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	if err := json.Unmarshal(ctx.Body, &data); err != nil {
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
-	if eventType, _ := data["type"].(string); eventType != "workflow-completed" {
+
+	eventType, _ := data["type"].(string)
+	if eventType != "workflow-completed" {
 		return http.StatusOK, nil
 	}
 
@@ -381,6 +380,7 @@ func (t *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	if !ok {
 		return http.StatusBadRequest, fmt.Errorf("pipeline data missing from webhook payload")
 	}
+
 	pipelineID, _ := pipelineData["id"].(string)
 	if pipelineID == "" {
 		return http.StatusBadRequest, fmt.Errorf("pipeline id missing from webhook payload")
@@ -391,108 +391,18 @@ func (t *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusOK, nil
 	}
 
-	workflowData, ok := data["workflow"].(map[string]any)
-	if !ok {
-		return http.StatusBadRequest, fmt.Errorf("workflow data missing from webhook payload")
-	}
+	//
+	// Context by Igor. Circle's API is weird. :)
+	//
+	// 1/ They don't have a concept of pipeline status. You need to get it by calculating the status of all workflows.
+	// 2/ The API is eventually consistent. When you get a webhook, the pipeline might not be finished yet. *internal cry*
+	//
+	// Instead of trying to process the webhook immediately, we'll schedule a poll action in 3 seconds.
+	//
 
-	workflowID, _ := workflowData["id"].(string)
-	workflowName, _ := workflowData["name"].(string)
-	workflowStatus, _ := workflowData["status"].(string)
-
-	if workflowID == "" || workflowStatus == "" {
-		return http.StatusBadRequest, fmt.Errorf("workflow data incomplete")
-	}
-
-	metadata := RunPipelineExecutionMetadata{}
-	err = mapstructure.Decode(executionCtx.Metadata.Get(), &metadata)
+	err = executionCtx.Requests.ScheduleActionCall("poll", map[string]any{}, 3*time.Second)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error decoding metadata: %v", err)
-	}
-
-	if executionCtx.ExecutionState.IsFinished() {
-		return http.StatusOK, nil
-	}
-
-	// Preserve existing Pipeline info
-	existingPipeline := metadata.Pipeline
-
-	found := false
-	for i, w := range metadata.Workflows {
-		if w.ID == workflowID {
-			metadata.Workflows[i].Status = workflowStatus
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		metadata.Workflows = append(metadata.Workflows, WorkflowInfo{
-			ID:     workflowID,
-			Name:   workflowName,
-			Status: workflowStatus,
-		})
-	}
-
-	// Ensure Pipeline info is preserved
-	metadata.Pipeline = existingPipeline
-
-	err = executionCtx.Metadata.Set(metadata)
-	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
-	}
-
-	if metadata.Pipeline.ID == "" {
-		return http.StatusOK, nil
-	}
-
-	client, err := NewClient(executionCtx.HTTP, executionCtx.Integration)
-	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to create client: %w", err)
-	}
-
-	result, err := client.CheckPipelineStatus(metadata.Pipeline.ID)
-	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to check pipeline status: %w", err)
-	}
-
-	// Convert WorkflowResponse to WorkflowInfo
-	updatedWorkflows := make([]WorkflowInfo, 0, len(result.Workflows))
-	for _, w := range result.Workflows {
-		updatedWorkflows = append(updatedWorkflows, WorkflowInfo{
-			ID:     w.ID,
-			Name:   w.Name,
-			Status: w.Status,
-		})
-	}
-	metadata.Workflows = updatedWorkflows
-	// Ensure Pipeline info is preserved
-	metadata.Pipeline = existingPipeline
-	err = executionCtx.Metadata.Set(metadata)
-	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error setting metadata: %v", err)
-	}
-
-	allDone := result.AllDone
-	anyFailed := result.AnyFailed
-
-	if !allDone {
-		return http.StatusOK, nil
-	}
-
-	payload := map[string]any{
-		"pipeline":  metadata.Pipeline,
-		"workflows": metadata.Workflows,
-	}
-
-	if anyFailed {
-		err = executionCtx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{payload})
-	} else {
-		err = executionCtx.ExecutionState.Emit(SuccessOutputChannel, PayloadType, []any{payload})
-	}
-
-	if err != nil {
-		return http.StatusInternalServerError, err
+		return http.StatusInternalServerError, fmt.Errorf("failed to schedule poll action: %w", err)
 	}
 
 	return http.StatusOK, nil
@@ -527,9 +437,6 @@ func (t *RunPipeline) poll(ctx core.ActionContext) error {
 		return err
 	}
 
-	// Preserve existing Pipeline info
-	existingPipeline := metadata.Pipeline
-
 	if metadata.Pipeline.ID == "" {
 		return fmt.Errorf("pipeline ID is missing from execution metadata")
 	}
@@ -544,19 +451,6 @@ func (t *RunPipeline) poll(ctx core.ActionContext) error {
 		return fmt.Errorf("failed to check pipeline status: %w", err)
 	}
 
-	// Convert WorkflowResponse to WorkflowInfo
-	updatedWorkflows := make([]WorkflowInfo, 0, len(result.Workflows))
-	for _, w := range result.Workflows {
-		updatedWorkflows = append(updatedWorkflows, WorkflowInfo{
-			ID:     w.ID,
-			Name:   w.Name,
-			Status: w.Status,
-		})
-	}
-
-	metadata.Workflows = updatedWorkflows
-	// Ensure Pipeline info is preserved
-	metadata.Pipeline = existingPipeline
 	err = ctx.Metadata.Set(metadata)
 	if err != nil {
 		return err
@@ -564,19 +458,24 @@ func (t *RunPipeline) poll(ctx core.ActionContext) error {
 
 	allDone := result.AllDone
 	anyFailed := result.AnyFailed
+
 	if !allDone {
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 	}
 
-	payload := map[string]any{
-		"pipeline":  metadata.Pipeline,
-		"workflows": metadata.Workflows,
-	}
+	payload := map[string]any{"pipeline": metadata.Pipeline}
+
+	channel := SuccessOutputChannel
 	if anyFailed {
-		return ctx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{payload})
+		channel = FailedOutputChannel
 	}
 
-	return ctx.ExecutionState.Emit(SuccessOutputChannel, PayloadType, []any{payload})
+	err = ctx.ExecutionState.Emit(channel, PayloadType, []any{payload})
+	if err != nil {
+		return fmt.Errorf("failed to emit output: %w", err)
+	}
+
+	return nil
 }
 
 func (t *RunPipeline) checkWorkflowsStatus(workflows []WorkflowInfo) (allDone bool, anyFailed bool) {
