@@ -187,6 +187,9 @@ func TagsForAPI(tags []Tag) []any {
 }
 
 func CredentialsFromInstallation(ctx core.IntegrationContext) (*aws.Credentials, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("AWS integration context is missing")
+	}
 	secrets, err := ctx.GetSecrets()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get AWS session secrets: %w", err)
