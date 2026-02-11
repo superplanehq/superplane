@@ -389,6 +389,125 @@ func (c *Client) GetIncident(id string) (*Incident, error) {
 	}, nil
 }
 
+// UpdateIncidentRequest represents the request to update an incident
+type UpdateIncidentRequest struct {
+	Title    string            `json:"title,omitempty"`
+	Summary  string            `json:"summary,omitempty"`
+	Status   string            `json:"status,omitempty"`
+	Severity string            `json:"severity,omitempty"`
+	Services []string          `json:"services,omitempty"`
+	Teams    []string          `json:"teams,omitempty"`
+	Labels   map[string]string `json:"labels,omitempty"`
+}
+
+// UpdateIncidentAPIRequest represents the JSON:API format request
+type UpdateIncidentAPIRequest struct {
+	Data UpdateIncidentAPIData `json:"data"`
+}
+
+type UpdateIncidentAPIData struct {
+	Type       string                      `json:"type"`
+	Attributes UpdateIncidentAPIAttributes `json:"attributes"`
+}
+
+type UpdateIncidentAPIAttributes struct {
+	Title         string            `json:"title,omitempty"`
+	Summary       string            `json:"summary,omitempty"`
+	Status        string            `json:"status,omitempty"`
+	Severity      string            `json:"severity,omitempty"`
+	ServiceIds    []string          `json:"service_ids,omitempty"`
+	GroupIds      []string          `json:"group_ids,omitempty"`
+	LabelsSlugs   []string          `json:"labels_slugs,omitempty"`
+	LabelsMapping map[string]string `json:"-"`
+}
+
+// UpdatedIncident represents the response from updating an incident
+type UpdatedIncident struct {
+	ID           string `json:"id"`
+	SequentialID int    `json:"sequential_id"`
+	Title        string `json:"title"`
+	Slug         string `json:"slug"`
+	Status       string `json:"status"`
+	UpdatedAt    string `json:"updated_at"`
+}
+
+type UpdatedIncidentAttributes struct {
+	SequentialID int    `json:"sequential_id"`
+	Title        string `json:"title"`
+	Slug         string `json:"slug"`
+	Status       string `json:"status"`
+	UpdatedAt    string `json:"updated_at"`
+}
+
+type UpdatedIncidentData struct {
+	ID         string                    `json:"id"`
+	Type       string                    `json:"type"`
+	Attributes UpdatedIncidentAttributes `json:"attributes"`
+}
+
+type UpdatedIncidentResponse struct {
+	Data UpdatedIncidentData `json:"data"`
+}
+
+func (c *Client) UpdateIncident(id string, req UpdateIncidentRequest) (*UpdatedIncident, error) {
+	apiReq := UpdateIncidentAPIRequest{
+		Data: UpdateIncidentAPIData{
+			Type: "incidents",
+			Attributes: UpdateIncidentAPIAttributes{
+				Title:    req.Title,
+				Summary:  req.Summary,
+				Status:   req.Status,
+				Severity: req.Severity,
+			},
+		},
+	}
+
+	// Handle services - need to resolve names to IDs if provided as names
+	if len(req.Services) > 0 {
+		apiReq.Data.Attributes.ServiceIds = req.Services
+	}
+
+	// Handle teams/groups
+	if len(req.Teams) > 0 {
+		apiReq.Data.Attributes.GroupIds = req.Teams
+	}
+
+	// Handle labels - convert map to slugs format
+	if len(req.Labels) > 0 {
+		labelSlugs := make([]string, 0, len(req.Labels))
+		for key, value := range req.Labels {
+			labelSlugs = append(labelSlugs, fmt.Sprintf("%s:%s", key, value))
+		}
+		apiReq.Data.Attributes.LabelsSlugs = labelSlugs
+	}
+
+	body, err := json.Marshal(apiReq)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/incidents/%s", c.BaseURL, id)
+	responseBody, err := c.execRequest(http.MethodPut, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response UpdatedIncidentResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &UpdatedIncident{
+		ID:           response.Data.ID,
+		SequentialID: response.Data.Attributes.SequentialID,
+		Title:        response.Data.Attributes.Title,
+		Slug:         response.Data.Attributes.Slug,
+		Status:       response.Data.Attributes.Status,
+		UpdatedAt:    response.Data.Attributes.UpdatedAt,
+	}, nil
+}
+
 func (c *Client) ListIncidents() ([]Incident, error) {
 	url := fmt.Sprintf("%s/incidents", c.BaseURL)
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
