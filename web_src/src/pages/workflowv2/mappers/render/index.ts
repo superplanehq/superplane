@@ -5,7 +5,7 @@ import { getDeployMapper } from "./get_deploy";
 import { getServiceMapper } from "./get_service";
 import { onBuildTriggerRenderer } from "./on_build";
 import { onDeployTriggerRenderer } from "./on_deploy";
-import { purgeCacheMapper } from "./purge_cache";
+import { PURGE_CACHE_STATE_REGISTRY, purgeCacheMapper } from "./purge_cache";
 import { rollbackDeployMapper } from "./rollback_deploy";
 import { updateEnvVarMapper } from "./update_env_var";
 
@@ -28,4 +28,5 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   deploy: DEPLOY_STATE_REGISTRY,
   cancelDeploy: DEPLOY_STATE_REGISTRY,
   rollbackDeploy: DEPLOY_STATE_REGISTRY,
+  purgeCache: PURGE_CACHE_STATE_REGISTRY,
 };
