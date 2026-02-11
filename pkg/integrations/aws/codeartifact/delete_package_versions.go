@@ -219,10 +219,15 @@ func (c *DeletePackageVersions) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to delete package versions: %w", err)
 	}
 
+	data := map[string]any{
+		"successfulVersions": resp.SuccessfulVersions,
+		"failedVersions":     resp.FailedVersions,
+	}
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"aws.codeartifact.packageVersions",
-		[]any{resp},
+		[]any{data},
 	)
 }
 

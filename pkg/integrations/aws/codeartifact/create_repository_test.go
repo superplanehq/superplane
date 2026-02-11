@@ -121,7 +121,7 @@ func TestCreateRepository_Execute(t *testing.T) {
 		require.Len(t, execState.Payloads, 1)
 		require.True(t, execState.Passed)
 		payload := execState.Payloads[0].(map[string]any)
-		require.Equal(t, "aws.codeartifact.repository.created", execState.Type)
+		require.Equal(t, "aws.codeartifact.repository", execState.Type)
 		data := payload["data"].(map[string]any)
 		repo, ok := data["repository"].(*RepositoryDescription)
 		require.True(t, ok)

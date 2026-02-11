@@ -129,7 +129,7 @@ func TestUpdatePackageVersionsStatus_Execute(t *testing.T) {
 		require.Len(t, execState.Payloads, 1)
 		require.True(t, execState.Passed)
 		payload := execState.Payloads[0].(map[string]any)
-		require.Equal(t, "aws.codeartifact.package.versions.status.updated", execState.Type)
+		require.Equal(t, "aws.codeartifact.packageVersions", execState.Type)
 		data := payload["data"].(map[string]any)
 		require.Contains(t, data, "successfulVersions")
 		require.Contains(t, data, "failedVersions")

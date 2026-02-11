@@ -266,10 +266,15 @@ func (c *UpdatePackageVersionsStatus) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to update package versions status: %w", err)
 	}
 
+	data := map[string]any{
+		"successfulVersions": resp.SuccessfulVersions,
+		"failedVersions":     resp.FailedVersions,
+	}
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"aws.codeartifact.packageVersions",
-		[]any{resp},
+		[]any{data},
 	)
 }
 

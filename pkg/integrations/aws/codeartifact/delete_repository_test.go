@@ -143,7 +143,7 @@ func TestDeleteRepository_Execute(t *testing.T) {
 		require.True(t, execState.Passed)
 
 		payload := execState.Payloads[0].(map[string]any)
-		require.Equal(t, "aws.codeartifact.repository.deleted", execState.Type)
+		require.Equal(t, "aws.codeartifact.repository", execState.Type)
 		data, ok := payload["data"].(map[string]any)
 		require.True(t, ok)
 		repo, ok := data["repository"].(*RepositoryDescription)

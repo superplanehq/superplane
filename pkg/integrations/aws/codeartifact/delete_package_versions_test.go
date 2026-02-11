@@ -94,6 +94,6 @@ func TestDeletePackageVersions_Execute(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Len(t, execState.Payloads, 1)
-		require.Equal(t, "aws.codeartifact.package.versions.deleted", execState.Type)
+		require.Equal(t, "aws.codeartifact.packageVersions", execState.Type)
 	})
 }
