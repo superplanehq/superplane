@@ -8,38 +8,38 @@ Git、CI/CD、オブザーバビリティ、インシデント対応、インフ
 ## プロジェクトの状況
 
 <p>
-  <a href="https://superplanehq.semaphoreci.com/projects/superplane"><img src="https://superplanehq.semaphoreci.com/badges/superplane/branches/main.svg?style=shields" alt="SemaphoreでのCIステータス" /></a>
-  <a href="https://github.com/superplanehq/superplane/pulse"><img src="https://img.shields.io/github/commit-activity/m/superplanehq/superplane" alt="GitHubコミット活動"/></a>
+  <a href="https://superplanehq.semaphoreci.com/projects/superplane"><img src="https://superplanehq.semaphoreci.com/badges/superplane/branches/main.svg?style=shields" alt="Semaphore上のCIステータス" /></a>
+  <a href="https://github.com/superplanehq/superplane/pulse"><img src="https://img.shields.io/github/commit-activity/m/superplanehq/superplane" alt="GitHubコミットアクティビティ"/></a>
   <a href="https://discord.gg/KC78eCNsnw"><img src="https://img.shields.io/discord/1409914582239023200?label=discord" alt="Discordサーバー" /></a>
 </p>
 
-本プロジェクトはアルファ段階にあり、急速に開発が進んでいます。コアモデルとインテグレーションの安定化に伴い、
-粗削りな部分や破壊的変更が発生する可能性があります。
-お試しいただいて分かりにくい点がございましたら、ぜひ[Issueを作成](https://github.com/superplanehq/superplane/issues/new)してください。
-初期のフィードバックは非常に貴重です。
+本プロジェクトはアルファ段階であり、急速に開発が進んでいます。コアモデルとインテグレーションの安定化に向けて取り組んでいる段階のため、
+粗削りな部分や互換性のない変更が発生する可能性があります。
+お試しいただいて分かりにくい点がありましたら、ぜひ[Issueを作成](https://github.com/superplanehq/superplane/issues/new)してください。
+初期段階でのフィードバックは非常に貴重です。
 
 ## 主な機能
 
-- **ワークフローオーケストレーション**: 複数のシステムにまたがるマルチステップの運用ワークフローをモデル化します。
-- **イベント駆動の自動化**: プッシュ、デプロイイベント、アラート、スケジュール、Webhookからワークフローをトリガーします。
-- **コントロールプレーンUI**: DevOpsプロセスを設計・管理し、実行状況、ステータス、履歴を一つの画面で確認できます。
-- **共有された運用コンテキスト**: 散在するスクリプトの代わりに、ワークフロー定義と運用意図を一つのシステムにまとめます。
+- **ワークフローオーケストレーション**: 複数のシステムにまたがるマルチステップの運用ワークフローをモデル化できます。
+- **イベント駆動型の自動化**: プッシュ、デプロイイベント、アラート、スケジュール、Webhookからワークフローをトリガーできます。
+- **コントロールプレーンUI**: DevOpsプロセスの設計・管理、実行の確認、ステータス、履歴を一箇所で把握できます。
+- **共有された運用コンテキスト**: ワークフロー定義と運用意図を、分散したスクリプトではなく一つのシステムに集約できます。
 
 ## 仕組み
 
-- **キャンバス**: ワークフローをステップと依存関係からなる有向グラフ（「キャンバス」）としてモデル化します。
-- **コンポーネント**: 各ステップはアクションを実行する再利用可能なコンポーネント（組み込みまたはインテグレーション連携）です（例: CI/CDの呼び出し、インシデントの作成、通知の送信、条件の待機、承認の要求）。
-- **イベントとトリガー**: 受信イベント（Webhook、スケジュール、ツールイベント）がトリガーにマッチすると、イベントペイロードを入力として実行が開始されます。
-- **実行と可視化**: SuperPlaneがグラフを実行し、状態を追跡し、UI（およびCLI）で実行状況・履歴・デバッグ情報を表示します。
+- **キャンバス**: ワークフローをステップと依存関係の有向グラフ（「キャンバス」）としてモデル化します。
+- **コンポーネント**: 各ステップは再利用可能なコンポーネント（組み込みまたはインテグレーション連携）で、特定のアクションを実行します（例：CI/CDの呼び出し、インシデントのオープン、通知の送信、条件の待機、承認の要求）。
+- **イベントとトリガー**: 受信イベント（Webhook、スケジュール、ツールイベント）がトリガーに一致すると、イベントペイロードを入力として実行が開始されます。
+- **実行と可視性**: SuperPlaneはグラフを実行し、状態を追跡し、UI（およびCLI）で実行履歴やデバッグ情報を公開します。
 
 ### ユースケースの例
 
-SuperPlaneを使ってチームが構築する具体例をいくつかご紹介します:
+SuperPlaneでチームが構築する具体的な例をいくつか紹介します:
 
-- **ポリシーゲート付き本番デプロイ**: CIがグリーンで完了したら、営業時間外は保留し、オンコール担当者とプロダクトの承認を要求した後、デプロイをトリガーします。
-- **プログレッシブデリバリー（10% → 30% → 60% → 100%）**: 段階的にデプロイし、各ステップで待機・検証を行い、承認ゲート付きで失敗時にはロールバックします。
-- **マルチリポジトリのリリーストレイン**: 一連のサービスからのタグ/ビルドを待ち、すべて準備完了したらファンインし、協調したデプロイを実行します。
-- **「最初の5分間」インシデントトリアージ**: インシデント作成時に、コンテキスト（最近のデプロイ＋ヘルスシグナル）を並行取得し、エビデンスパックを生成してIssueを作成します。
+- **ポリシーゲート付き本番デプロイ**: CIがグリーンで完了したら、営業時間外は保留し、オンコール担当者とプロダクト担当者の承認を待ってからデプロイをトリガーします。
+- **プログレッシブデリバリー（10% → 30% → 60% → 100%）**: 段階的にデプロイし、各ステップで待機・検証を行い、承認ゲート付きで障害時にはロールバックします。
+- **マルチリポのリリーストレイン**: 一連のサービスからのタグ/ビルドを待ち、すべて揃ったらファンインし、協調デプロイをディスパッチします。
+- **インシデント発生後の「最初の5分」トリアージ**: インシデント作成時に、コンテキスト（直近のデプロイ＋ヘルスシグナル）を並行取得し、エビデンスパックを生成してIssueを作成します。
 
 ## クイックスタート
 
@@ -54,9 +54,9 @@ docker run --rm -p 3000:3000 -v spdata:/app/data -ti ghcr.io/superplanehq/superp
 
 ## 対応インテグレーション
 
-SuperPlaneは既にお使いのツールと統合できます。各インテグレーションはトリガー（ワークフローを開始するイベント）とコンポーネント（実行可能なアクション）を提供します。
+SuperPlaneは既にお使いのツールと連携します。各インテグレーションは、トリガー（ワークフローを開始するイベント）とコンポーネント（実行可能なアクション）を提供します。
 
-> 完全なリストは[ドキュメント](https://docs.superplane.com/components/)をご覧ください。必要なプロバイダーがない場合は、[Issueを作成](https://github.com/superplanehq/superplane/issues/new)してリクエストしてください。
+> 完全なリストは[ドキュメント](https://docs.superplane.com/components/)をご覧ください。必要なプロバイダーが見つかりませんか？[Issueを作成](https://github.com/superplanehq/superplane/issues/new)してリクエストしてください。
 
 ### AI・LLM
 
@@ -78,7 +78,7 @@ SuperPlaneは既にお使いのツールと統合できます。各インテグ�
 </tr>
 </table>
 
-### クラウド・インフラ
+### クラウド・インフラストラクチャ
 
 <table>
 <tr>
@@ -140,40 +140,40 @@ SuperPlaneは既にお使いのツールと統合できます。各インテグ�
 SuperPlaneは単一ホストまたはKubernetes上にデプロイできます:
 
 - **[単一ホストインストール](https://docs.superplane.com/installation/overview/#single-host-installation)** - AWS EC2、GCP Compute Engine、その他のクラウドプロバイダーにデプロイ
-- **[Kubernetesインストール](https://docs.superplane.com/installation/overview/#kubernetes)** - GKE、EKS、またはその他のKubernetesクラスターにデプロイ
+- **[Kubernetesインストール](https://docs.superplane.com/installation/overview/#kubernetes)** - GKE、EKS、または任意のKubernetesクラスターにデプロイ
 
 ## ロードマップ概要
 
-このセクションでは、SuperPlaneが現在サポートしている機能と今後の予定を簡単にご紹介します。
+このセクションでは、SuperPlaneが既にサポートしている機能と今後の予定を簡単にまとめています。
 
 **現在利用可能**
 
-✓ 75以上のコンポーネント
-✓ イベント駆動ワークフローエンジン
-✓ ビジュアルキャンバスビルダー
-✓ 実行履歴、イベントチェーンビュー、デバッグコンソール
+✓ 75以上のコンポーネント  
+✓ イベント駆動型ワークフローエンジン  
+✓ ビジュアルキャンバスビルダー  
+✓ 実行履歴、イベントチェーンビュー、デバッグコンソール  
 ✓ スターターCLIとサンプルワークフロー
 
-**開発中・今後の予定**
+**進行中・今後の予定**
 
-→ 200以上の新コンポーネント（AWS、Grafana、DataDog、Azure、GitLab、Jiraなど）
-→ [キャンバスのバージョン管理](https://github.com/superplanehq/superplane/issues/1380)
-→ [SAML/SCIM](https://github.com/superplanehq/superplane/issues/1377)および[拡張RBACと権限管理](https://github.com/superplanehq/superplane/issues/1378)
-→ [アーティファクトバージョン追跡](https://github.com/superplanehq/superplane/issues/1382)
+→ 200以上の新コンポーネント（AWS、Grafana、DataDog、Azure、GitLab、Jiraなど）  
+→ [キャンバスのバージョン管理](https://github.com/superplanehq/superplane/issues/1380)  
+→ [SAML/SCIM](https://github.com/superplanehq/superplane/issues/1377)と[拡張RBACおよび権限管理](https://github.com/superplanehq/superplane/issues/1378)  
+→ [アーティファクトバージョントラッキング](https://github.com/superplanehq/superplane/issues/1382)  
 → [パブリックAPI](https://github.com/superplanehq/superplane/issues/1854)
 
 ## コントリビューション
 
-バグレポート、改善のアイデア、的を絞ったPRを歓迎します。
+バグ報告、改善提案、フォーカスされたPRを歓迎します。
 
-- はじめに**[コントリビューションガイド](CONTRIBUTING.md)**をお読みください。
+- まず**[コントリビューションガイド](CONTRIBUTING.md)**をお読みください。
 - Issue: バグや機能リクエストにはGitHub Issueをご利用ください。
 
 ## ライセンス
 
-Apache License 2.0。詳細は `LICENSE` をご覧ください。
+Apache License 2.0。詳細は`LICENSE`をご覧ください。
 
 ## コミュニティ
 
-- **[Discord](https://discord.superplane.com)** - ディスカッション、質問、コラボレーションのためのコミュニティにご参加ください
-- **[X](https://x.com/superplanehq)** - 最新情報やお知らせはこちらをフォローしてください
+- **[Discord](https://discord.superplane.com)** - ディスカッション、質問、コラボレーションのためにコミュニティにご参加ください
+- **[X](https://x.com/superplanehq)** - 最新情報やお知らせをフォローしてください
