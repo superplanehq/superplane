@@ -20,6 +20,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Deploy" href="#deploy" description="Trigger a deploy for a Render service and wait for it to complete" />
   <LinkCard title="Get Deploy" href="#get-deploy" description="Retrieve a deploy by ID for a Render service" />
   <LinkCard title="Get Service" href="#get-service" description="Retrieve a Render service by ID" />
+  <LinkCard title="Rollback Deploy" href="#rollback-deploy" description="Roll back a Render service to a previous deploy and wait for it to complete" />
 </CardGrid>
 
 ## Instructions
@@ -307,6 +308,59 @@ Emits a `render.service` payload containing service fields like `serviceId`, `se
   },
   "timestamp": "2026-02-05T16:05:00.000000Z",
   "type": "render.service"
+}
+```
+
+<a id="rollback-deploy"></a>
+
+## Rollback Deploy
+
+The Rollback Deploy component triggers a rollback deploy for a Render service and waits for it to complete.
+
+### Use Cases
+
+- **Automated recovery**: Roll back after detecting errors in a new deploy
+- **One-click rollback**: Trigger rollbacks from an incident workflow
+
+### How It Works
+
+1. Triggers a rollback deploy for the selected Render service via the Render API
+2. Waits for the deploy to complete (via deploy_ended webhook and optional polling fallback)
+3. Routes execution based on deploy outcome:
+   - **Success channel**: Deploy completed successfully (status is `live`)
+   - **Failed channel**: Deploy failed or was cancelled
+
+### Configuration
+
+- **Service**: Render service to roll back
+- **Deploy ID**: The deploy ID to roll back to (supports expressions)
+
+### Output Channels
+
+- **Success**: Emitted when the rollback deploy completes successfully
+- **Failed**: Emitted when the rollback deploy fails or is cancelled
+
+### Notes
+
+- Uses the existing integration webhook for deploy_ended events
+- Falls back to polling if the webhook does not arrive
+- Includes `rollbackToDeployId` in the output payload for reference
+- Requires a Render API key configured on the integration
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": "2026-02-05T16:18:00.000000Z",
+    "deployId": "dep-cukouhrtq21c73e9scng",
+    "rollbackToDeployId": "dep-cukouhrtq21c73e9scnf",
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "status": "build_in_progress",
+    "trigger": "rollback"
+  },
+  "timestamp": "2026-02-05T16:18:00.000000Z",
+  "type": "render.deploy"
 }
 ```
 
