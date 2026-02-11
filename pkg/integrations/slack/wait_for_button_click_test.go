@@ -229,15 +229,25 @@ func Test__WaitForButtonClick__Execute(t *testing.T) {
 func Test__WaitForButtonClick__HandleAction(t *testing.T) {
 	component := &WaitForButtonClick{}
 
-	t.Run("button click -> emits received event", func(t *testing.T) {
+	t.Run("button click -> emits received event and cleans up subscription", func(t *testing.T) {
+		subscriptionID := uuid.New()
+		subscriptionIDStr := subscriptionID.String()
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		integrationCtx := &contexts.IntegrationContext{
+			Subscriptions: []contexts.Subscription{
+				{ID: subscriptionID, Configuration: map[string]any{"type": "button_click"}},
+			},
+		}
 		metadata := &contexts.MetadataContext{
-			Metadata: WaitForButtonClickMetadata{},
+			Metadata: WaitForButtonClickMetadata{
+				AppSubscriptionID: &subscriptionIDStr,
+			},
 		}
 
 		err := component.HandleAction(core.ActionContext{
-			Name:     ActionButtonClick,
-			Metadata: metadata,
+			Name:        ActionButtonClick,
+			Metadata:    metadata,
+			Integration: integrationCtx,
 			Parameters: map[string]any{
 				"value": "approve",
 			},
@@ -252,17 +262,30 @@ func Test__WaitForButtonClick__HandleAction(t *testing.T) {
 		payload := wrappedPayload["data"].(map[string]any)
 		assert.Equal(t, "approve", payload["value"])
 		assert.NotNil(t, payload["clicked_at"])
+
+		// Verify subscription was cleaned up
+		assert.Empty(t, integrationCtx.Subscriptions)
 	})
 
-	t.Run("timeout -> emits timeout event", func(t *testing.T) {
+	t.Run("timeout -> emits timeout event and cleans up subscription", func(t *testing.T) {
+		subscriptionID := uuid.New()
+		subscriptionIDStr := subscriptionID.String()
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		integrationCtx := &contexts.IntegrationContext{
+			Subscriptions: []contexts.Subscription{
+				{ID: subscriptionID, Configuration: map[string]any{"type": "button_click"}},
+			},
+		}
 		metadata := &contexts.MetadataContext{
-			Metadata: WaitForButtonClickMetadata{},
+			Metadata: WaitForButtonClickMetadata{
+				AppSubscriptionID: &subscriptionIDStr,
+			},
 		}
 
 		err := component.HandleAction(core.ActionContext{
 			Name:           ActionTimeout,
 			Metadata:       metadata,
+			Integration:    integrationCtx,
 			Parameters:     map[string]any{},
 			ExecutionState: execState,
 		})
@@ -274,6 +297,9 @@ func Test__WaitForButtonClick__HandleAction(t *testing.T) {
 		wrappedPayload := execState.Payloads[0].(map[string]any)
 		payload := wrappedPayload["data"].(map[string]any)
 		assert.NotNil(t, payload["timeout_at"])
+
+		// Verify subscription was cleaned up
+		assert.Empty(t, integrationCtx.Subscriptions)
 	})
 
 	t.Run("already finished -> no emit", func(t *testing.T) {
