@@ -20,6 +20,9 @@ const (
 	GitHubAppPEM           = "pem"
 	GitHubAppClientSecret  = "clientSecret"
 	GitHubAppWebhookSecret = "webhookSecret"
+	// GitHubAccessToken is an optional user access token (PAT / OAuth token) used for
+	// endpoints that are not accessible via GitHub App installation tokens (e.g. billing).
+	GitHubAccessToken = "accessToken"
 
 	appBootstrapDescription = `
 To complete the GitHub app setup:
@@ -98,6 +101,7 @@ func (g *GitHub) Components() []core.Component {
 		&CreateIssueComment{},
 		&UpdateIssue{},
 		&CreateReview{},
+		&GetWorkflowUsage{},
 		&RunWorkflow{},
 		&PublishCommitStatus{},
 		&CreateRelease{},
@@ -489,6 +493,7 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 			"issues":           "write",
 			"actions":          "write",
 			"contents":         "write",
+			"administration":   "read",
 			"pull_requests":    "write",
 			"repository_hooks": "write",
 			"statuses":         "write",

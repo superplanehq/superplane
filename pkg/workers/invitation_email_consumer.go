@@ -20,10 +20,12 @@ const InvitationEmailServiceName = "superplane" + "." + messages.WorkflowExchang
 const InvitationEmailConnectionName = "superplane"
 
 type InvitationEmailConsumer struct {
-	Consumer     *tackle.Consumer
-	RabbitMQURL  string
-	EmailService services.EmailService
-	BaseURL      string
+	Consumer       *tackle.Consumer
+	RabbitMQURL    string
+	EmailService   services.EmailService
+	BaseURL        string
+	ServiceName    string
+	ConnectionName string
 }
 
 func NewInvitationEmailConsumer(rabbitMQURL string, emailService services.EmailService, baseURL string) *InvitationEmailConsumer {
@@ -35,18 +37,20 @@ func NewInvitationEmailConsumer(rabbitMQURL string, emailService services.EmailS
 	consumer.SetLogger(logger)
 
 	return &InvitationEmailConsumer{
-		RabbitMQURL:  rabbitMQURL,
-		Consumer:     consumer,
-		EmailService: emailService,
-		BaseURL:      baseURL,
+		RabbitMQURL:    rabbitMQURL,
+		Consumer:       consumer,
+		EmailService:   emailService,
+		BaseURL:        baseURL,
+		ServiceName:    InvitationEmailServiceName,
+		ConnectionName: InvitationEmailConnectionName,
 	}
 }
 
 func (c *InvitationEmailConsumer) Start() error {
 	options := tackle.Options{
 		URL:            c.RabbitMQURL,
-		ConnectionName: InvitationEmailConnectionName,
-		Service:        InvitationEmailServiceName,
+		ConnectionName: c.ConnectionName,
+		Service:        c.ServiceName,
 		RemoteExchange: messages.WorkflowExchange,
 		RoutingKey:     messages.InvitationCreatedRoutingKey,
 	}
