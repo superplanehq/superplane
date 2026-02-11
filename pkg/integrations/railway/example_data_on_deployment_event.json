@@ -1,12 +1,12 @@
 {
-  "type": "DEPLOY",
+  "type": "Deployment.succeeded",
   "details": {
-    "message": "Deployment succeeded"
+    "status": "SUCCESS"
   },
   "resource": {
-    "workspace": {
-      "id": "ws-abc123",
-      "name": "my-workspace"
+    "owner": {
+      "id": "owner-abc123",
+      "email": "user@example.com"
     },
     "project": {
       "id": "proj-xyz789",
@@ -21,10 +21,8 @@
       "name": "api-server"
     },
     "deployment": {
-      "id": "deploy-jkl345",
-      "status": "SUCCESS"
+      "id": "deploy-jkl345"
     }
   },
-  "severity": "info",
   "timestamp": "2024-01-15T10:30:00.000Z"
 }

@@ -144,15 +144,6 @@ func (c *TriggerDeploy) OutputChannels(config any) []core.OutputChannel {
 	}
 }
 
-func (c *TriggerDeploy) ExampleOutput() map[string]any {
-	return map[string]any{
-		"project":     "proj-xyz789",
-		"service":     "srv-ghi012",
-		"environment": "env-def456",
-		"triggered":   true,
-	}
-}
-
 func (c *TriggerDeploy) Setup(ctx core.SetupContext) error {
 	config := TriggerDeployConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
