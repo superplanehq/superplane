@@ -9,7 +9,6 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/models"
 )
 
 const (
@@ -417,14 +416,7 @@ func (r *TriggerBuild) poll(ctx core.ActionContext) error {
 			return ctx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{payload})
 		}
 
-		if err := ctx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{payload}); err != nil {
-			return err
-		}
-		failMessage := fmt.Sprintf("build %s finished with state: %s", targetBuild.ID, targetBuild.State)
-		if targetBuild.Blocked {
-			failMessage = fmt.Sprintf("build %s finished with state: %s (blocked)", targetBuild.ID, targetBuild.State)
-		}
-		return ctx.ExecutionState.Fail(models.CanvasNodeExecutionResultReasonError, failMessage)
+		return ctx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{payload})
 	}
 
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
