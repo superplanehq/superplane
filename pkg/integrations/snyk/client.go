@@ -172,7 +172,7 @@ func (c *Client) RegisterWebhook(orgID, url, secret string) (string, error) {
 		return "", err
 	}
 
-	httpReq.Header.Set("Authorization", fmt.Sprintf("Token %s", string(apiToken))) // Note: Snyk uses "Token " prefix
+	httpReq.Header.Set("Authorization", fmt.Sprintf("token %s", string(apiToken)))
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(httpReq)
@@ -218,7 +218,7 @@ func (c *Client) DeleteWebhook(orgID, webhookID string) error {
 		return err
 	}
 
-	httpReq.Header.Set("Authorization", fmt.Sprintf("Token %s", string(apiToken)))
+	httpReq.Header.Set("Authorization", fmt.Sprintf("token %s", string(apiToken)))
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {

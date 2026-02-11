@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 )
 
 type OnNewIssueDetected struct{}
@@ -135,6 +137,25 @@ func (t *OnNewIssueDetected) HandleWebhook(ctx core.WebhookRequestContext) (int,
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	signature := ctx.Headers.Get("X-Hub-Signature")
+	if signature == "" {
+		return http.StatusForbidden, fmt.Errorf("missing signature")
+	}
+
+	signature = strings.TrimPrefix(signature, "sha256=")
+	if signature == "" {
+		return http.StatusForbidden, fmt.Errorf("invalid signature format")
+	}
+
+	secret, err := ctx.Webhook.GetSecret()
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error getting secret: %v", err)
+	}
+
+	if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
+		return http.StatusForbidden, fmt.Errorf("invalid signature: %v", err)
 	}
 
 	eventType := ctx.Headers.Get("X-Snyk-Event")

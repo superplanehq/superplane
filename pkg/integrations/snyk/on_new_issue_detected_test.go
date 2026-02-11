@@ -1,6 +1,9 @@
 package snyk
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -58,13 +61,53 @@ func TestSeverityComparison(t *testing.T) {
 
 func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 	trigger := &OnNewIssueDetected{}
+	secret := "test-webhook-secret"
 
-	t.Run("missing event header -> 400", func(t *testing.T) {
+	signatureFor := func(secret string, body []byte) string {
+		h := hmac.New(sha256.New, []byte(secret))
+		h.Write(body)
+		return fmt.Sprintf("sha256=%x", h.Sum(nil))
+	}
+
+	t.Run("missing signature -> 403", func(t *testing.T) {
 		headers := http.Header{}
 
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Headers:       headers,
 			Configuration: map[string]any{},
+			Webhook:       &contexts.WebhookContext{},
+		})
+
+		assert.Equal(t, http.StatusForbidden, code)
+		assert.ErrorContains(t, err, "missing signature")
+	})
+
+	t.Run("invalid signature -> 403", func(t *testing.T) {
+		body := []byte(`{}`)
+		headers := http.Header{}
+		headers.Set("X-Hub-Signature", "sha256=invalidsignature")
+
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Headers:       headers,
+			Configuration: map[string]any{},
+			Webhook:       &contexts.WebhookContext{Secret: secret},
+		})
+
+		assert.Equal(t, http.StatusForbidden, code)
+		assert.ErrorContains(t, err, "invalid signature")
+	})
+
+	t.Run("missing event header -> 400", func(t *testing.T) {
+		body := []byte(`{}`)
+		headers := http.Header{}
+		headers.Set("X-Hub-Signature", signatureFor(secret, body))
+
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Headers:       headers,
+			Configuration: map[string]any{},
+			Webhook:       &contexts.WebhookContext{Secret: secret},
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
@@ -72,15 +115,18 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("non-matching event type -> 200, no events emitted", func(t *testing.T) {
+		body := []byte(`{}`)
 		headers := http.Header{}
 		headers.Set("X-Snyk-Event", "ping")
+		headers.Set("X-Hub-Signature", signatureFor(secret, body))
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:          []byte(`{}`),
+			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{},
 			Events:        eventContext,
+			Webhook:       &contexts.WebhookContext{Secret: secret},
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -89,14 +135,17 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("invalid JSON body -> 400", func(t *testing.T) {
+		body := []byte(`not json`)
 		headers := http.Header{}
 		headers.Set("X-Snyk-Event", "project_snapshot/v0")
+		headers.Set("X-Hub-Signature", signatureFor(secret, body))
 
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:          []byte(`not json`),
+			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{},
 			Events:        &contexts.EventContext{},
+			Webhook:       &contexts.WebhookContext{Secret: secret},
 		})
 
 		assert.Equal(t, http.StatusBadRequest, code)
@@ -104,15 +153,18 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("no new issues -> 200, no events emitted", func(t *testing.T) {
+		body := []byte(`{"newIssues": [], "project": {"id": "p1"}}`)
 		headers := http.Header{}
 		headers.Set("X-Snyk-Event", "project_snapshot/v0")
+		headers.Set("X-Hub-Signature", signatureFor(secret, body))
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:          []byte(`{"newIssues": [], "project": {"id": "p1"}}`),
+			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{},
 			Events:        eventContext,
+			Webhook:       &contexts.WebhookContext{Secret: secret},
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -121,9 +173,6 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("new issue detected -> event emitted", func(t *testing.T) {
-		headers := http.Header{}
-		headers.Set("X-Snyk-Event", "project_snapshot/v0")
-
 		body := []byte(`{
 			"newIssues": [
 				{
@@ -138,12 +187,17 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 			"org": {"id": "org-123", "name": "my-org"}
 		}`)
 
+		headers := http.Header{}
+		headers.Set("X-Snyk-Event", "project_snapshot/v0")
+		headers.Set("X-Hub-Signature", signatureFor(secret, body))
+
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{},
 			Events:        eventContext,
+			Webhook:       &contexts.WebhookContext{Secret: secret},
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -153,9 +207,6 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("multiple new issues -> multiple events emitted", func(t *testing.T) {
-		headers := http.Header{}
-		headers.Set("X-Snyk-Event", "project_snapshot/v0")
-
 		body := []byte(`{
 			"newIssues": [
 				{"id": "SNYK-JS-001", "severity": "high"},
@@ -165,12 +216,17 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 			"org": {"id": "org-123", "name": "my-org"}
 		}`)
 
+		headers := http.Header{}
+		headers.Set("X-Snyk-Event", "project_snapshot/v0")
+		headers.Set("X-Hub-Signature", signatureFor(secret, body))
+
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{},
 			Events:        eventContext,
+			Webhook:       &contexts.WebhookContext{Secret: secret},
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -179,9 +235,6 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("severity filter -> only matching issues emitted", func(t *testing.T) {
-		headers := http.Header{}
-		headers.Set("X-Snyk-Event", "project_snapshot/v0")
-
 		body := []byte(`{
 			"newIssues": [
 				{"id": "SNYK-JS-001", "severity": "low"},
@@ -192,6 +245,10 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 			"org": {"id": "org-123", "name": "my-org"}
 		}`)
 
+		headers := http.Header{}
+		headers.Set("X-Snyk-Event", "project_snapshot/v0")
+		headers.Set("X-Hub-Signature", signatureFor(secret, body))
+
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
@@ -199,7 +256,8 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"severity": "high",
 			},
-			Events: eventContext,
+			Events:  eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -208,9 +266,6 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("project filter -> only matching project emitted", func(t *testing.T) {
-		headers := http.Header{}
-		headers.Set("X-Snyk-Event", "project_snapshot/v0")
-
 		body := []byte(`{
 			"newIssues": [
 				{"id": "SNYK-JS-001", "severity": "high"}
@@ -218,6 +273,10 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 			"project": {"id": "project-123", "name": "my-web-app"},
 			"org": {"id": "org-123", "name": "my-org"}
 		}`)
+
+		headers := http.Header{}
+		headers.Set("X-Snyk-Event", "project_snapshot/v0")
+		headers.Set("X-Hub-Signature", signatureFor(secret, body))
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -226,7 +285,8 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"projectId": "project-999",
 			},
-			Events: eventContext,
+			Events:  eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -235,9 +295,6 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("project filter matches -> event emitted", func(t *testing.T) {
-		headers := http.Header{}
-		headers.Set("X-Snyk-Event", "project_snapshot/v0")
-
 		body := []byte(`{
 			"newIssues": [
 				{"id": "SNYK-JS-001", "severity": "high"}
@@ -245,6 +302,10 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 			"project": {"id": "project-123", "name": "my-web-app"},
 			"org": {"id": "org-123", "name": "my-org"}
 		}`)
+
+		headers := http.Header{}
+		headers.Set("X-Snyk-Event", "project_snapshot/v0")
+		headers.Set("X-Hub-Signature", signatureFor(secret, body))
 
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
@@ -253,7 +314,8 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 			Configuration: map[string]any{
 				"projectId": "project-123",
 			},
-			Events: eventContext,
+			Events:  eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -262,9 +324,6 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("X-Snyk-Event-Type header also works", func(t *testing.T) {
-		headers := http.Header{}
-		headers.Set("X-Snyk-Event-Type", "project_snapshot/v0")
-
 		body := []byte(`{
 			"newIssues": [
 				{"id": "SNYK-JS-001", "severity": "high"}
@@ -273,12 +332,17 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 			"org": {"id": "org-123", "name": "my-org"}
 		}`)
 
+		headers := http.Header{}
+		headers.Set("X-Snyk-Event-Type", "project_snapshot/v0")
+		headers.Set("X-Hub-Signature", signatureFor(secret, body))
+
 		eventContext := &contexts.EventContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          body,
 			Headers:       headers,
 			Configuration: map[string]any{},
 			Events:        eventContext,
+			Webhook:       &contexts.WebhookContext{Secret: secret},
 		})
 
 		assert.Equal(t, http.StatusOK, code)
