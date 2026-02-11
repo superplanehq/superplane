@@ -79,21 +79,21 @@ After configuring this trigger:
 
 ### Use Cases
 
-- **Deployment notifications**: Notify Slack when deployments succeed or fail
+- **Deployment notifications**: Notify Slack when deployments complete or fail
 - **Incident creation**: Create tickets when deployments crash
 - **Pipeline chaining**: Trigger downstream workflows after successful deployments
 
 ### Configuration
 
 - **Project**: Select the Railway project to monitor
-- **Event Filter**: Optionally filter by deployment event type (succeeded, failed, crashed, etc.)
+- **Event Filter**: Optionally filter by deployment event type (deployed, failed, crashed, etc.)
   - Leave empty to receive all deployment events
 
 ### Event Data
 
 Each deployment event includes:
-- `type`: Event type (e.g., Deployment.succeeded, Deployment.failed)
-- `details.status`: Deployment status
+- `type`: Event type (e.g., Deployment.deployed, Deployment.failed)
+- `details.status`: Deployment status (SUCCESS, FAILED, etc.)
 - `resource.deployment.id`: Deployment ID
 - `resource.service`: Service name and ID
 - `resource.environment`: Environment name and ID
@@ -105,6 +105,13 @@ Each deployment event includes:
 ```json
 {
   "details": {
+    "branch": "main",
+    "commitAuthor": "developer",
+    "commitHash": "abc123def456",
+    "commitMessage": "Update deployment",
+    "id": "deploy-abc123",
+    "serviceId": "srv-xyz789",
+    "source": "GitHub",
     "status": "SUCCESS"
   },
   "resource": {
@@ -113,11 +120,8 @@ Each deployment event includes:
     },
     "environment": {
       "id": "env-def456",
+      "isEphemeral": false,
       "name": "production"
-    },
-    "owner": {
-      "email": "user@example.com",
-      "id": "owner-abc123"
     },
     "project": {
       "id": "proj-xyz789",
@@ -126,10 +130,15 @@ Each deployment event includes:
     "service": {
       "id": "srv-ghi012",
       "name": "api-server"
+    },
+    "workspace": {
+      "id": "ws-abc123",
+      "name": "My Workspace"
     }
   },
+  "severity": "INFO",
   "timestamp": "2024-01-15T10:30:00.000Z",
-  "type": "Deployment.succeeded"
+  "type": "Deployment.deployed"
 }
 ```
 
