@@ -86,7 +86,7 @@ func (t *RunPipeline) Documentation() string {
 ## How It Works
 
 1. Triggers a CircleCI pipeline with the specified location (branch or tag) and parameters
-2. Waits for all workflows in the pipeline to complete (monitored via webhook and polling)
+2. Waits for all workflows in the pipeline to complete (monitored via webhook)
 3. Routes execution based on workflow results:
    - **Success channel**: All workflows completed successfully
    - **Failed channel**: Any workflow failed or was cancelled
@@ -340,6 +340,12 @@ func (t *RunPipeline) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	err = ctx.Metadata.Set(metadata)
+	if err != nil {
+		return fmt.Errorf("error setting metadata: %v", err)
+	}
+
+	// Schedule poll as backup
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 }
 
@@ -389,15 +395,33 @@ func (t *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusOK, nil
 	}
 
-	//
-	// Context by Igor. Circle's API is weird. :)
-	//
-	// 1/ They don't have a concept of pipeline status. You need to get it by fetching and calculating the status of all workflows.
-	// 2/ The API is eventually consistent. When you get a webhook, the pipeline might not be finished yet. *internal cry*
-	//
-	// Instead of trying to process the webhook immediately, we'll schedule a poll action in 3 seconds.
-	//
+	workflowData, ok := data["workflow"].(map[string]any)
+	if !ok {
+		return http.StatusBadRequest, fmt.Errorf("workflow data missing from webhook payload")
+	}
 
+	workflowStatus, _ := workflowData["status"].(string)
+
+	// Get current metadata
+	var metadata RunPipelineExecutionMetadata
+	err = mapstructure.Decode(executionCtx.Metadata.Get(), &metadata)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	// Check if workflow failed or was cancelled - emit failed immediately
+	isFailed := workflowStatus == WorkflowStatusFailed || workflowStatus == WorkflowStatusCanceled || workflowStatus == "error" || workflowStatus == "failing" || workflowStatus == "unauthorized"
+	if isFailed {
+		// Pipeline failed - emit to failed channel immediately
+		payload := map[string]any{"pipeline": metadata.Pipeline}
+		err = executionCtx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{payload})
+		if err != nil {
+			return http.StatusInternalServerError, fmt.Errorf("failed to emit output: %w", err)
+		}
+		return http.StatusOK, nil
+	}
+
+	// Schedule poll as backup to check if all workflows are done
 	err = executionCtx.Requests.ScheduleActionCall("poll", map[string]any{}, 3*time.Second)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to schedule poll action: %w", err)
@@ -439,30 +463,54 @@ func (t *RunPipeline) poll(ctx core.ActionContext) error {
 		return fmt.Errorf("pipeline ID is missing from execution metadata")
 	}
 
+	// Always fetch workflows fresh
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}
 
-	result, err := client.CheckPipelineStatus(metadata.Pipeline.ID)
+	workflows, err := client.GetPipelineWorkflows(metadata.Pipeline.ID)
 	if err != nil {
-		return fmt.Errorf("failed to check pipeline status: %w", err)
-	}
-
-	err = ctx.Metadata.Set(metadata)
-	if err != nil {
-		return err
-	}
-
-	allDone := result.AllDone
-	anyFailed := result.AnyFailed
-
-	if !allDone {
+		// Can't get workflows, schedule another poll
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 	}
 
-	payload := map[string]any{"pipeline": metadata.Pipeline}
+	if len(workflows) == 0 {
+		// No workflows yet, schedule another poll
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
+	}
 
+	// Check only the first workflow's status
+	firstWorkflow := workflows[0]
+	isDone := firstWorkflow.Status == WorkflowStatusSuccess || firstWorkflow.Status == WorkflowStatusFailed || firstWorkflow.Status == WorkflowStatusCanceled || firstWorkflow.Status == "error" || firstWorkflow.Status == "unauthorized"
+
+	if !isDone {
+		// First workflow still running, schedule another poll
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
+	}
+
+	// First workflow is done, check if all workflows are completed by checking their statuses directly
+	allWorkflowsCompleted := true
+	anyFailed := false
+
+	for _, w := range workflows {
+		// Check if workflow is still running
+		if w.Status == "running" || w.Status == "on_hold" || w.Status == "not_run" || w.Status == "failing" {
+			allWorkflowsCompleted = false
+		}
+		// Check if workflow failed
+		if w.Status == WorkflowStatusFailed || w.Status == WorkflowStatusCanceled || w.Status == "error" || w.Status == "failing" || w.Status == "unauthorized" {
+			anyFailed = true
+		}
+	}
+
+	if !allWorkflowsCompleted {
+		// Not all workflows completed yet, schedule another poll
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
+	}
+
+	// All workflows completed, emit to appropriate channel
+	payload := map[string]any{"pipeline": metadata.Pipeline}
 	channel := SuccessOutputChannel
 	if anyFailed {
 		channel = FailedOutputChannel
@@ -474,26 +522,6 @@ func (t *RunPipeline) poll(ctx core.ActionContext) error {
 	}
 
 	return nil
-}
-
-func (t *RunPipeline) checkWorkflowsStatus(workflows []WorkflowInfo) (allDone bool, anyFailed bool) {
-	if len(workflows) == 0 {
-		return false, false
-	}
-
-	allDone = true
-	anyFailed = false
-
-	for _, w := range workflows {
-		if w.Status == "running" || w.Status == "on_hold" || w.Status == "not_run" || w.Status == "failing" {
-			allDone = false
-		}
-		if w.Status == WorkflowStatusFailed || w.Status == WorkflowStatusCanceled || w.Status == "error" || w.Status == "failing" || w.Status == "unauthorized" {
-			anyFailed = true
-		}
-	}
-
-	return allDone, anyFailed
 }
 
 func (t *RunPipeline) buildParameters(params []Parameter) map[string]string {
