@@ -2,6 +2,7 @@ package shared
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -250,10 +251,9 @@ func (s *CanvasSteps) StartEditingNode(name string) {
 }
 
 func (s *CanvasSteps) RunManualTrigger(name string) {
-	nodeHeader := q.TestID("node", name, "header")
-	s.session.HoverOver(nodeHeader)
-	s.session.Sleep(100)
-	s.session.Click(q.TestID("node-action-run"))
+	// Use the Start node's template Run button (in the default payload template) instead of the removed header Run button
+	startTemplateRun := q.Locator(`.react-flow__node:has([data-testid="node-` + strings.ToLower(name) + `-header"]) [data-testid="start-template-run"]`)
+	s.session.Click(startTemplateRun)
 	s.session.Click(q.TestID("emit-event-submit-button"))
 }
 
