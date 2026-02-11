@@ -255,8 +255,9 @@ export const ComponentSidebar = ({
   const [isCreateIntegrationDialogOpen, setIsCreateIntegrationDialogOpen] = useState(false);
   const [createIntegrationName, setCreateIntegrationName] = useState("");
   const [createIntegrationConfig, setCreateIntegrationConfig] = useState<Record<string, unknown>>({});
-  const [createIntegrationBrowserAction, setCreateIntegrationBrowserAction] =
-    useState<OrganizationsBrowserAction | undefined>(undefined);
+  const [createIntegrationBrowserAction, setCreateIntegrationBrowserAction] = useState<
+    OrganizationsBrowserAction | undefined
+  >(undefined);
   const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
   const [configureIntegrationName, setConfigureIntegrationName] = useState("");
   // Use autocompleteExampleObj directly - current node is already filtered out upstream
