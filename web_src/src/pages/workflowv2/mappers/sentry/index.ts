@@ -1,5 +1,6 @@
-import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
+import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
 import { onIssueEventTriggerRenderer } from "./on_issue_event";
+import { onIssueEventCustomFieldRenderer } from "./on_issue_event_custom_field";
 import { updateIssueMapper } from "./update_issue";
 import { buildActionStateRegistry } from "../utils";
 
@@ -13,4 +14,8 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   updateIssue: buildActionStateRegistry("updated"),
+};
+
+export const customFieldRenderers: Record<string, CustomFieldRenderer> = {
+  onIssueEvent: onIssueEventCustomFieldRenderer,
 };

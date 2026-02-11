@@ -84,6 +84,7 @@ import {
   componentMappers as sentryComponentMappers,
   triggerRenderers as sentryTriggerRenderers,
   eventStateRegistry as sentryEventStateRegistry,
+  customFieldRenderers as sentryCustomFieldRenderers,
 } from "./sentry";
 import {
   componentMappers as awsComponentMappers,
@@ -224,6 +225,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
+  sentry: sentryCustomFieldRenderers,
 };
 
 /**

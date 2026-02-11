@@ -39,11 +39,26 @@ func (s *Sentry) Description() string {
 func (s *Sentry) Instructions() string {
 	return `Connect Sentry to SuperPlane using a Sentry **Personal Token**.
 
+## API token
+
 1. In Sentry: **Settings** → **Developer Settings** → **Personal Tokens**
-2. Create a token with scopes: ` + "`org:read`" + `, ` + "`project:read`" + `, ` + "`event:write`" + `
+2. Create a token with scopes:
+   - ` + "`org:read`" + `, ` + "`org:write`" + `
+   - ` + "`project:read`" + `, ` + "`project:write`" + `
+   - ` + "`event:read`" + `, ` + "`event:write`" + `
 3. Paste the token below (tokens typically start with ` + "`sntryu_`" + `).
 
-For the **On Issue Event** trigger: configure the webhook in your Sentry integration to point to the trigger's webhook URL and subscribe to Issue events.`
+## Webhook (required for triggers)
+
+To use the **On Issue Event** trigger, you must configure a Sentry webhook to call SuperPlane:
+
+1. Add the **On Issue Event** trigger to a canvas and save the canvas.
+2. Copy the webhook URL shown in the trigger configuration sidebar.
+3. In Sentry, create an **Internal Integration** and set its webhook URL to the SuperPlane webhook URL.
+4. Enable **Issue** events (created/resolved/unresolved/assigned/archived).
+5. Trigger an issue change in Sentry and check the trigger’s **Runs** tab.
+
+Docs: https://docs.sentry.io/`
 }
 
 func (s *Sentry) Configuration() []configuration.Field {
@@ -54,7 +69,7 @@ func (s *Sentry) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Sensitive:   true,
-			Description: "Sentry personal token (Bearer). Create via Settings → Developer Settings → Personal Tokens. Requires scopes org:read, project:read, event:write.",
+			Description: "Sentry personal token (Bearer). Create via Settings → Developer Settings → Personal Tokens. Recommended scopes: org:read/org:write, project:read/project:write, event:read/event:write.",
 			Placeholder: "sntryu_...",
 		},
 		{
