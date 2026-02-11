@@ -1,0 +1,31 @@
+{
+  "data": {
+    "version": "0",
+    "id": "00112233-4455-6677-8899-aabbccddeeff",
+    "detail-type": "CodeBuild Build State Change",
+    "source": "aws.codebuild",
+    "account": "123456789012",
+    "time": "2026-02-03T12:00:00Z",
+    "region": "us-east-1",
+    "resources": [
+      "arn:aws:codebuild:us-east-1:123456789012:build/backend-build:3d8b9b4e-5f0a-4d64-a74d-6f7aab2f9a20"
+    ],
+    "detail": {
+      "project-name": "backend-build",
+      "build-status": "SUCCEEDED",
+      "build-id": "arn:aws:codebuild:us-east-1:123456789012:build/backend-build:3d8b9b4e-5f0a-4d64-a74d-6f7aab2f9a20",
+      "current-phase": "COMPLETED",
+      "current-phase-context": "Build completed successfully",
+      "version": "1",
+      "additional-information": {
+        "initiator": "codepipeline/my-pipeline",
+        "source-version": "refs/heads/main",
+        "logs": {
+          "deep-link": "https://console.aws.amazon.com/codesuite/codebuild/projects/backend-build/build/backend-build%3A3d8b9b4e-5f0a-4d64-a74d-6f7aab2f9a20/log"
+        }
+      }
+    }
+  },
+  "timestamp": "2026-02-03T12:00:01Z",
+  "type": "aws.codebuild.build"
+}

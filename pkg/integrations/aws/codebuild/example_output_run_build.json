@@ -1,0 +1,23 @@
+{
+  "data": {
+    "id": "backend-build:3d8b9b4e-5f0a-4d64-a74d-6f7aab2f9a20",
+    "arn": "arn:aws:codebuild:us-east-1:123456789012:build/backend-build:3d8b9b4e-5f0a-4d64-a74d-6f7aab2f9a20",
+    "buildNumber": 42,
+    "currentPhase": "COMPLETED",
+    "buildStatus": "SUCCEEDED",
+    "projectName": "backend-build",
+    "sourceVersion": "refs/heads/main",
+    "initiator": "codepipeline/my-pipeline",
+    "startTime": "2026-02-03T11:58:40Z",
+    "endTime": "2026-02-03T12:00:00Z",
+    "logs": {
+      "deepLink": "https://console.aws.amazon.com/codesuite/codebuild/projects/backend-build/build/backend-build%3A3d8b9b4e-5f0a-4d64-a74d-6f7aab2f9a20/log",
+      "cloudWatchLogsArn": "arn:aws:logs:us-east-1:123456789012:log-group:/aws/codebuild/backend-build:log-stream:3d8b9b4e-5f0a-4d64-a74d-6f7aab2f9a20",
+      "groupName": "/aws/codebuild/backend-build",
+      "streamName": "3d8b9b4e-5f0a-4d64-a74d-6f7aab2f9a20",
+      "status": "SUCCEEDED"
+    }
+  },
+  "timestamp": "2026-02-03T12:00:00Z",
+  "type": "aws.codebuild.build"
+}

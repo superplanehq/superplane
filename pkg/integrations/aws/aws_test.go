@@ -340,6 +340,47 @@ func Test__AWS__ListResources(t *testing.T) {
 		require.Len(t, httpContext.Requests, 1)
 		assert.Equal(t, "https://api.ecr.us-east-1.amazonaws.com/", httpContext.Requests[0].URL.String())
 	})
+
+	t.Run("codebuild.project returns projects", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"projects": ["backend-build", "frontend-build"]
+						}
+					`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Secrets: map[string]core.IntegrationSecret{
+				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+			},
+		}
+
+		resources, err := a.ListResources("codebuild.project", core.ListResourcesContext{
+			Integration: integrationCtx,
+			Logger:      logrus.NewEntry(logrus.New()),
+			HTTP:        httpContext,
+			Parameters:  map[string]string{"region": "us-east-1"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		assert.Equal(t, "codebuild.project", resources[0].Type)
+		assert.Equal(t, "backend-build", resources[0].Name)
+		assert.Equal(t, "backend-build", resources[0].ID)
+		assert.Equal(t, "frontend-build", resources[1].Name)
+		assert.Equal(t, "frontend-build", resources[1].ID)
+
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://codebuild.us-east-1.amazonaws.com/", httpContext.Requests[0].URL.String())
+	})
 }
 
 func stsResponse(token string, expiration string) string {
