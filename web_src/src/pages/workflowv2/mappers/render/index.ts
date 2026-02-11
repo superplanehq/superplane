@@ -26,4 +26,6 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   deploy: DEPLOY_STATE_REGISTRY,
+  cancelDeploy: DEPLOY_STATE_REGISTRY,
+  rollbackDeploy: DEPLOY_STATE_REGISTRY,
 };
