@@ -106,6 +106,12 @@ import {
   triggerRenderers as cursorTriggerRenderers,
   eventStateRegistry as cursorEventStateRegistry,
 } from "./cursor/index";
+import {
+  componentMappers as dockerhubComponentMappers,
+  customFieldRenderers as dockerhubCustomFieldRenderers,
+  triggerRenderers as dockerhubTriggerRenderers,
+  eventStateRegistry as dockerhubEventStateRegistry,
+} from "./dockerhub";
 
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
@@ -157,6 +163,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   openai: openaiComponentMappers,
   claude: claudeComponentMappers,
   cursor: cursorComponentMappers,
+  dockerhub: dockerhubComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -178,6 +185,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   openai: openaiTriggerRenderers,
   claude: claudeTriggerRenderers,
   cursor: cursorTriggerRenderers,
+  dockerhub: dockerhubTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -199,6 +207,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   aws: awsEventStateRegistry,
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
+  dockerhub: dockerhubEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
@@ -224,6 +233,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
+  dockerhub: dockerhubCustomFieldRenderers,
 };
 
 /**

@@ -29,64 +29,18 @@ func generateSignature(body []byte, secret string) string {
 func Test__LaunchAgent__HandleWebhook__SignatureVerification(t *testing.T) {
 	c := &LaunchAgent{}
 
-	t.Run("missing webhook secret in metadata -> unauthorized", func(t *testing.T) {
-		payload := launchAgentWebhookPayload{
-			ID:     "agent-123",
-			Status: "FINISHED",
-		}
-		body, _ := json.Marshal(payload)
-
-		metadataCtx := &contexts.MetadataContext{
-			Metadata: LaunchAgentExecutionMetadata{
-				Agent:         &AgentMetadata{ID: "agent-123", Status: "RUNNING"},
-				WebhookSecret: "", // Empty secret
-			},
-		}
-		executionStateCtx := &contexts.ExecutionStateContext{KVs: map[string]string{"agent_id": "agent-123"}}
-
-		webhookCtx := core.WebhookRequestContext{
-			Body:    body,
-			Headers: http.Header{LaunchAgentWebhookSignatureHeader: []string{"some-signature"}},
-			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
-				return &core.ExecutionContext{
-					Metadata:       metadataCtx,
-					ExecutionState: executionStateCtx,
-					Logger:         logrus.NewEntry(logrus.New()),
-				}, nil
-			},
-		}
-
-		status, err := c.HandleWebhook(webhookCtx)
-		require.Error(t, err)
-		assert.Equal(t, http.StatusUnauthorized, status)
-		assert.Contains(t, err.Error(), "missing webhook secret")
-	})
-
 	t.Run("missing signature header -> unauthorized", func(t *testing.T) {
+		secret := "test-secret"
 		payload := launchAgentWebhookPayload{
 			ID:     "agent-123",
 			Status: "FINISHED",
 		}
 		body, _ := json.Marshal(payload)
-
-		metadataCtx := &contexts.MetadataContext{
-			Metadata: LaunchAgentExecutionMetadata{
-				Agent:         &AgentMetadata{ID: "agent-123", Status: "RUNNING"},
-				WebhookSecret: "test-secret",
-			},
-		}
-		executionStateCtx := &contexts.ExecutionStateContext{KVs: map[string]string{"agent_id": "agent-123"}}
 
 		webhookCtx := core.WebhookRequestContext{
 			Body:    body,
 			Headers: http.Header{}, // No signature header
-			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
-				return &core.ExecutionContext{
-					Metadata:       metadataCtx,
-					ExecutionState: executionStateCtx,
-					Logger:         logrus.NewEntry(logrus.New()),
-				}, nil
-			},
+			Webhook: &contexts.WebhookContext{Secret: secret},
 		}
 
 		status, err := c.HandleWebhook(webhookCtx)
@@ -96,30 +50,17 @@ func Test__LaunchAgent__HandleWebhook__SignatureVerification(t *testing.T) {
 	})
 
 	t.Run("invalid signature -> unauthorized", func(t *testing.T) {
+		secret := "test-secret"
 		payload := launchAgentWebhookPayload{
 			ID:     "agent-123",
 			Status: "FINISHED",
 		}
 		body, _ := json.Marshal(payload)
 
-		metadataCtx := &contexts.MetadataContext{
-			Metadata: LaunchAgentExecutionMetadata{
-				Agent:         &AgentMetadata{ID: "agent-123", Status: "RUNNING"},
-				WebhookSecret: "test-secret",
-			},
-		}
-		executionStateCtx := &contexts.ExecutionStateContext{KVs: map[string]string{"agent_id": "agent-123"}}
-
 		webhookCtx := core.WebhookRequestContext{
 			Body:    body,
 			Headers: http.Header{LaunchAgentWebhookSignatureHeader: []string{"invalid-signature"}},
-			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
-				return &core.ExecutionContext{
-					Metadata:       metadataCtx,
-					ExecutionState: executionStateCtx,
-					Logger:         logrus.NewEntry(logrus.New()),
-				}, nil
-			},
+			Webhook: &contexts.WebhookContext{Secret: secret},
 		}
 
 		status, err := c.HandleWebhook(webhookCtx)
@@ -139,9 +80,8 @@ func Test__LaunchAgent__HandleWebhook__SignatureVerification(t *testing.T) {
 
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: LaunchAgentExecutionMetadata{
-				Agent:         &AgentMetadata{ID: "agent-123", Status: "RUNNING"},
-				Target:        &TargetMetadata{BranchName: "cursor/agent-abc"},
-				WebhookSecret: secret,
+				Agent:  &AgentMetadata{ID: "agent-123", Status: "RUNNING"},
+				Target: &TargetMetadata{BranchName: "cursor/agent-abc"},
 			},
 		}
 		executionStateCtx := &contexts.ExecutionStateContext{KVs: map[string]string{"agent_id": "agent-123"}}
@@ -149,6 +89,7 @@ func Test__LaunchAgent__HandleWebhook__SignatureVerification(t *testing.T) {
 		webhookCtx := core.WebhookRequestContext{
 			Body:    body,
 			Headers: http.Header{LaunchAgentWebhookSignatureHeader: []string{signature}},
+			Webhook: &contexts.WebhookContext{Secret: secret},
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return &core.ExecutionContext{
 					Metadata:       metadataCtx,
@@ -178,8 +119,7 @@ func Test__LaunchAgent__HandleWebhook__IdempotencyCheck(t *testing.T) {
 
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: LaunchAgentExecutionMetadata{
-				Agent:         &AgentMetadata{ID: "agent-123", Status: "FINISHED"}, // Already terminal
-				WebhookSecret: secret,
+				Agent: &AgentMetadata{ID: "agent-123", Status: "FINISHED"}, // Already terminal
 			},
 		}
 		executionStateCtx := &contexts.ExecutionStateContext{KVs: map[string]string{"agent_id": "agent-123"}}
@@ -187,6 +127,7 @@ func Test__LaunchAgent__HandleWebhook__IdempotencyCheck(t *testing.T) {
 		webhookCtx := core.WebhookRequestContext{
 			Body:    body,
 			Headers: http.Header{LaunchAgentWebhookSignatureHeader: []string{signature}},
+			Webhook: &contexts.WebhookContext{Secret: secret},
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return &core.ExecutionContext{
 					Metadata:       metadataCtx,
@@ -208,15 +149,18 @@ func Test__LaunchAgent__HandleWebhook__ExecutionNotFound(t *testing.T) {
 	c := &LaunchAgent{}
 
 	t.Run("execution not found -> returns OK to stop retries", func(t *testing.T) {
+		secret := "test-secret"
 		payload := launchAgentWebhookPayload{
 			ID:     "agent-123",
 			Status: "FINISHED",
 		}
 		body, _ := json.Marshal(payload)
+		signature := generateSignature(body, secret)
 
 		webhookCtx := core.WebhookRequestContext{
 			Body:    body,
-			Headers: http.Header{},
+			Headers: http.Header{LaunchAgentWebhookSignatureHeader: []string{signature}},
+			Webhook: &contexts.WebhookContext{Secret: secret},
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return nil, errors.New("execution not found")
 			},

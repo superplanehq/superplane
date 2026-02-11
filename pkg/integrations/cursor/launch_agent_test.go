@@ -20,6 +20,7 @@ func Test__LaunchAgent__Setup(t *testing.T) {
 
 	t.Run("valid repository mode config", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
+		webhookCtx := &contexts.WebhookContext{}
 		setupCtx := core.SetupContext{
 			Configuration: map[string]any{
 				"prompt":     "Fix the bug",
@@ -28,6 +29,7 @@ func Test__LaunchAgent__Setup(t *testing.T) {
 				"branch":     "main",
 			},
 			Integration: integrationCtx,
+			Webhook:     webhookCtx,
 		}
 
 		err := c.Setup(setupCtx)
@@ -36,6 +38,7 @@ func Test__LaunchAgent__Setup(t *testing.T) {
 
 	t.Run("valid PR mode config", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
+		webhookCtx := &contexts.WebhookContext{}
 		setupCtx := core.SetupContext{
 			Configuration: map[string]any{
 				"prompt":     "Fix the PR",
@@ -43,6 +46,7 @@ func Test__LaunchAgent__Setup(t *testing.T) {
 				"prUrl":      "https://github.com/org/repo/pull/42",
 			},
 			Integration: integrationCtx,
+			Webhook:     webhookCtx,
 		}
 
 		err := c.Setup(setupCtx)
@@ -51,12 +55,14 @@ func Test__LaunchAgent__Setup(t *testing.T) {
 
 	t.Run("missing prompt -> error", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
+		webhookCtx := &contexts.WebhookContext{}
 		setupCtx := core.SetupContext{
 			Configuration: map[string]any{
 				"sourceMode": "repository",
 				"repository": "https://github.com/org/repo",
 			},
 			Integration: integrationCtx,
+			Webhook:     webhookCtx,
 		}
 
 		err := c.Setup(setupCtx)
@@ -66,12 +72,14 @@ func Test__LaunchAgent__Setup(t *testing.T) {
 
 	t.Run("repository mode without repository -> error", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
+		webhookCtx := &contexts.WebhookContext{}
 		setupCtx := core.SetupContext{
 			Configuration: map[string]any{
 				"prompt":     "Fix the bug",
 				"sourceMode": "repository",
 			},
 			Integration: integrationCtx,
+			Webhook:     webhookCtx,
 		}
 
 		err := c.Setup(setupCtx)
@@ -81,12 +89,14 @@ func Test__LaunchAgent__Setup(t *testing.T) {
 
 	t.Run("PR mode without prUrl -> error", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
+		webhookCtx := &contexts.WebhookContext{}
 		setupCtx := core.SetupContext{
 			Configuration: map[string]any{
 				"prompt":     "Fix the PR",
 				"sourceMode": "pr",
 			},
 			Integration: integrationCtx,
+			Webhook:     webhookCtx,
 		}
 
 		err := c.Setup(setupCtx)
@@ -96,6 +106,7 @@ func Test__LaunchAgent__Setup(t *testing.T) {
 
 	t.Run("repository mode with non-empty repository is accepted", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
+		webhookCtx := &contexts.WebhookContext{}
 		setupCtx := core.SetupContext{
 			Configuration: map[string]any{
 				"prompt":     "Fix the bug",
@@ -103,6 +114,7 @@ func Test__LaunchAgent__Setup(t *testing.T) {
 				"repository": "not-a-url",
 			},
 			Integration: integrationCtx,
+			Webhook:     webhookCtx,
 		}
 
 		err := c.Setup(setupCtx)
@@ -138,6 +150,7 @@ func Test__LaunchAgent__Execute(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{}
 		executionStateCtx := &contexts.ExecutionStateContext{KVs: make(map[string]string)}
 		requestsCtx := &contexts.RequestContext{}
+		webhookCtx := &contexts.WebhookContext{Secret: "platform-managed-secret"}
 
 		execCtx := core.ExecutionContext{
 			ID: executionID,
@@ -154,6 +167,7 @@ func Test__LaunchAgent__Execute(t *testing.T) {
 			Metadata:       metadataCtx,
 			ExecutionState: executionStateCtx,
 			Requests:       requestsCtx,
+			Webhook:        webhookCtx,
 			Logger:         logrus.NewEntry(logrus.New()),
 			BaseURL:        "https://superplane.example.com",
 		}
@@ -195,6 +209,7 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 	c := &LaunchAgent{}
 
 	t.Run("successful completion webhook", func(t *testing.T) {
+		secret := "test-secret"
 		payload := launchAgentWebhookPayload{
 			ID:      "agent-123",
 			Status:  "FINISHED",
@@ -202,7 +217,6 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 			Summary: "Fixed the bug",
 		}
 		body, _ := json.Marshal(payload)
-		secret := "test-secret"
 		signature := generateSignature(body, secret)
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: LaunchAgentExecutionMetadata{
@@ -213,7 +227,6 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 				Target: &TargetMetadata{
 					BranchName: "cursor/agent-abc123",
 				},
-				WebhookSecret: secret,
 			},
 		}
 		executionStateCtx := &contexts.ExecutionStateContext{
@@ -225,6 +238,7 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 		webhookCtx := core.WebhookRequestContext{
 			Body:    body,
 			Headers: http.Header{LaunchAgentWebhookSignatureHeader: []string{signature}},
+			Webhook: &contexts.WebhookContext{Secret: secret},
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return &core.ExecutionContext{
 					Metadata:       metadataCtx,
@@ -264,7 +278,6 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 					ID:     "agent-123",
 					Status: "RUNNING",
 				},
-				WebhookSecret: secret, // ADD THIS
 			},
 		}
 		executionStateCtx := &contexts.ExecutionStateContext{
@@ -275,7 +288,8 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 
 		webhookCtx := core.WebhookRequestContext{
 			Body:    body,
-			Headers: http.Header{LaunchAgentWebhookSignatureHeader: []string{signature}}, // ADD SIGNATURE
+			Headers: http.Header{LaunchAgentWebhookSignatureHeader: []string{signature}},
+			Webhook: &contexts.WebhookContext{Secret: secret},
 			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 				return &core.ExecutionContext{
 					Metadata:       metadataCtx,
@@ -294,14 +308,17 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("missing agent ID -> bad request", func(t *testing.T) {
+		secret := "test-secret"
 		payload := launchAgentWebhookPayload{
 			Status: "FINISHED",
 		}
 		body, _ := json.Marshal(payload)
+		signature := generateSignature(body, secret)
 
 		webhookCtx := core.WebhookRequestContext{
 			Body:    body,
-			Headers: http.Header{},
+			Headers: http.Header{LaunchAgentWebhookSignatureHeader: []string{signature}},
+			Webhook: &contexts.WebhookContext{Secret: secret},
 		}
 
 		status, err := c.HandleWebhook(webhookCtx)
@@ -311,9 +328,13 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("invalid JSON -> bad request", func(t *testing.T) {
+		secret := "test-secret"
+		signature := generateSignature([]byte("not json"), secret)
+
 		webhookCtx := core.WebhookRequestContext{
 			Body:    []byte("not json"),
-			Headers: http.Header{},
+			Headers: http.Header{LaunchAgentWebhookSignatureHeader: []string{signature}},
+			Webhook: &contexts.WebhookContext{Secret: secret},
 		}
 
 		status, err := c.HandleWebhook(webhookCtx)

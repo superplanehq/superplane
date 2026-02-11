@@ -12,6 +12,22 @@ import (
 
 // HandleWebhook processes incoming updates from Cursor
 func (c *LaunchAgent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	// 1. Verify webhook signature using the platform-managed secret
+	signature := ctx.Headers.Get(LaunchAgentWebhookSignatureHeader)
+	if signature == "" {
+		return http.StatusUnauthorized, fmt.Errorf("missing signature header")
+	}
+
+	secret, err := ctx.Webhook.GetSecret()
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error getting webhook secret: %w", err)
+	}
+
+	if !verifyWebhookSignature(ctx.Body, signature, string(secret)) {
+		return http.StatusUnauthorized, fmt.Errorf("invalid webhook signature")
+	}
+
+	// 2. Parse payload
 	var payload launchAgentWebhookPayload
 	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
 		return http.StatusBadRequest, fmt.Errorf("invalid json body: %w", err)
@@ -21,7 +37,7 @@ func (c *LaunchAgent) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusBadRequest, fmt.Errorf("id missing from webhook payload")
 	}
 
-	// 1. Correlate Webhook to Execution
+	// 3. Correlate Webhook to Execution
 	executionCtx, err := ctx.FindExecutionByKV("agent_id", payload.ID)
 	if err != nil {
 		// Execution not found (likely old or deleted), ack to stop retries
@@ -33,27 +49,12 @@ func (c *LaunchAgent) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	// 2. Security Verification
-	if metadata.WebhookSecret == "" {
-		executionCtx.Logger.Warnf("Missing webhook secret for Agent %s", payload.ID)
-		return http.StatusUnauthorized, fmt.Errorf("missing webhook secret configuration")
-	}
-
-	signature := ctx.Headers.Get(LaunchAgentWebhookSignatureHeader)
-	if signature == "" {
-		return http.StatusUnauthorized, fmt.Errorf("missing signature header")
-	}
-	if !verifyWebhookSignature(ctx.Body, signature, metadata.WebhookSecret) {
-		executionCtx.Logger.Warnf("Invalid signature for Agent %s", payload.ID)
-		return http.StatusUnauthorized, fmt.Errorf("invalid webhook signature")
-	}
-
-	// 3. Idempotency Check
+	// 4. Idempotency Check
 	if metadata.Agent != nil && isTerminalStatus(metadata.Agent.Status) {
 		return http.StatusOK, nil
 	}
 
-	// 4. Update State
+	// 5. Update State
 	executionCtx.Logger.Infof("Received webhook for Agent %s: %s", payload.ID, payload.Status)
 	if metadata.Agent == nil {
 		metadata.Agent = &AgentMetadata{}
@@ -73,7 +74,7 @@ func (c *LaunchAgent) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusInternalServerError, fmt.Errorf("failed to set metadata: %w", err)
 	}
 
-	// 5. Complete Workflow if finished
+	// 6. Complete Workflow if finished
 	if isTerminalStatus(payload.Status) {
 		branchName := ""
 		if metadata.Target != nil {

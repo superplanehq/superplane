@@ -45,10 +45,9 @@ type LaunchAgentSpec struct {
 // --- STATE STRUCTS (DB PERSISTENCE) ---
 
 type LaunchAgentExecutionMetadata struct {
-	Agent         *AgentMetadata  `json:"agent,omitempty" mapstructure:"agent,omitempty"`
-	Target        *TargetMetadata `json:"target,omitempty" mapstructure:"target,omitempty"`
-	Source        *SourceMetadata `json:"source,omitempty" mapstructure:"source,omitempty"`
-	WebhookSecret string          `json:"webhookSecret" mapstructure:"webhookSecret"`
+	Agent  *AgentMetadata  `json:"agent,omitempty" mapstructure:"agent,omitempty"`
+	Target *TargetMetadata `json:"target,omitempty" mapstructure:"target,omitempty"`
+	Source *SourceMetadata `json:"source,omitempty" mapstructure:"source,omitempty"`
 }
 
 type AgentMetadata struct {

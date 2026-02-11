@@ -2,7 +2,6 @@ package cursor
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -113,7 +112,8 @@ func (c *LaunchAgent) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("PR URL is required when using PR mode")
 	}
 
-	return ctx.Integration.RequestWebhook(nil)
+	_, err := ctx.Webhook.Setup()
+	return err
 }
 
 func (c *LaunchAgent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -144,11 +144,18 @@ func (c *LaunchAgent) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("cloud agent API key is not configured")
 	}
 
-	// 2. Generate Runtime Artifacts (Secret, URL, Branch Name)
+	// 2. Get webhook URL and secret from the platform-managed webhook
+	webhookURL, err := ctx.Webhook.Setup()
+	if err != nil {
+		return fmt.Errorf("failed to setup webhook: %w", err)
+	}
+
+	webhookSecret, err := ctx.Webhook.GetSecret()
+	if err != nil {
+		return fmt.Errorf("failed to get webhook secret: %w", err)
+	}
+
 	branchName := fmt.Sprintf("%s%s", LaunchAgentBranchPrefix, ctx.ID.String()[:8])
-	webhookSecret := uuid.New().String()
-	baseURL := strings.TrimRight(ctx.BaseURL, "/")
-	webhookURL := fmt.Sprintf("%s/api/v1/integrations/%s/webhook", baseURL, ctx.Integration.ID().String())
 
 	// 3. Construct API Payload
 	source := launchAgentSource{}
@@ -172,7 +179,7 @@ func (c *LaunchAgent) Execute(ctx core.ExecutionContext) error {
 		Prompt:  launchAgentPrompt{Text: spec.Prompt},
 		Source:  source,
 		Target:  target,
-		Webhook: launchAgentWebhook{URL: webhookURL, Secret: webhookSecret},
+		Webhook: launchAgentWebhook{URL: webhookURL, Secret: string(webhookSecret)},
 	}
 	if spec.Model != "" {
 		payload.Model = spec.Model
@@ -186,10 +193,9 @@ func (c *LaunchAgent) Execute(ctx core.ExecutionContext) error {
 
 	// 5. Initialize State
 	metadata := LaunchAgentExecutionMetadata{
-		Agent:         &AgentMetadata{ID: result.ID, Name: result.Name, Status: result.Status},
-		Target:        &TargetMetadata{BranchName: branchName},
-		Source:        &SourceMetadata{Repository: spec.Repository, Ref: spec.Branch},
-		WebhookSecret: webhookSecret,
+		Agent:  &AgentMetadata{ID: result.ID, Name: result.Name, Status: result.Status},
+		Target: &TargetMetadata{BranchName: branchName},
+		Source: &SourceMetadata{Repository: spec.Repository, Ref: spec.Branch},
 	}
 
 	// Populate additional target details if available
