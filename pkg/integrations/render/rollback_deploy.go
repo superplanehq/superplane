@@ -262,11 +262,11 @@ func (c *RollbackDeploy) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 
 func rollbackDeployWebhookConfig() deployEndedWebhookConfig {
 	return deployEndedWebhookConfig{
-		executionKey:   rollbackDeployExecutionKey,
-		successStatus:  "live",
-		successChannel: RollbackDeploySuccessOutputChannel,
-		failedChannel:  RollbackDeployFailedOutputChannel,
-		payloadType:    RollbackDeployPayloadType,
+		executionKey:    rollbackDeployExecutionKey,
+		successStatuses: []string{"live", "succeeded"},
+		successChannel:  RollbackDeploySuccessOutputChannel,
+		failedChannel:   RollbackDeployFailedOutputChannel,
+		payloadType:     RollbackDeployPayloadType,
 	}
 }
 

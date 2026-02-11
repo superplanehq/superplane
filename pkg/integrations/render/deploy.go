@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -39,11 +40,11 @@ type DeployMetadata struct {
 // deployEndedWebhookConfig holds the parameters that vary between
 // deploy lifecycle components (Deploy, CancelDeploy, RollbackDeploy).
 type deployEndedWebhookConfig struct {
-	executionKey   string
-	successStatus  string
-	successChannel string
-	failedChannel  string
-	payloadType    string
+	executionKey    string
+	successStatuses []string
+	successChannel  string
+	failedChannel   string
+	payloadType     string
 }
 
 type DeployConfiguration struct {
@@ -290,20 +291,20 @@ func (c *Deploy) poll(ctx core.ActionContext) error {
 
 	payload := deployPayloadFromDeployResponse(deploy)
 	return emitDeployStatusResult(ctx.ExecutionState, deploy.Status, deployEndedWebhookConfig{
-		successStatus:  "live",
-		successChannel: DeploySuccessOutputChannel,
-		failedChannel:  DeployFailedOutputChannel,
-		payloadType:    DeployPayloadType,
+		successStatuses: []string{"live", "succeeded"},
+		successChannel:  DeploySuccessOutputChannel,
+		failedChannel:   DeployFailedOutputChannel,
+		payloadType:     DeployPayloadType,
 	}, payload)
 }
 
 func (c *Deploy) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return handleDeployEndedWebhook(ctx, deployEndedWebhookConfig{
-		executionKey:   deployExecutionKey,
-		successStatus:  "live",
-		successChannel: DeploySuccessOutputChannel,
-		failedChannel:  DeployFailedOutputChannel,
-		payloadType:    DeployPayloadType,
+		executionKey:    deployExecutionKey,
+		successStatuses: []string{"live", "succeeded"},
+		successChannel:  DeploySuccessOutputChannel,
+		failedChannel:   DeployFailedOutputChannel,
+		payloadType:     DeployPayloadType,
 	})
 }
 
@@ -534,7 +535,7 @@ func emitDeployStatusResult(
 	config deployEndedWebhookConfig,
 	payload map[string]any,
 ) error {
-	if status == config.successStatus {
+	if slices.Contains(config.successStatuses, status) {
 		return state.Emit(config.successChannel, config.payloadType, []any{payload})
 	}
 	return state.Emit(config.failedChannel, config.payloadType, []any{payload})

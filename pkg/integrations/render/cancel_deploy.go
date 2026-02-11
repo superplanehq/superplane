@@ -265,11 +265,11 @@ func (c *CancelDeploy) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 
 func cancelDeployWebhookConfig() deployEndedWebhookConfig {
 	return deployEndedWebhookConfig{
-		executionKey:   cancelDeployExecutionKey,
-		successStatus:  "canceled",
-		successChannel: CancelDeploySuccessOutputChannel,
-		failedChannel:  CancelDeployFailedOutputChannel,
-		payloadType:    CancelDeployPayloadType,
+		executionKey:    cancelDeployExecutionKey,
+		successStatuses: []string{"canceled"},
+		successChannel:  CancelDeploySuccessOutputChannel,
+		failedChannel:   CancelDeployFailedOutputChannel,
+		payloadType:     CancelDeployPayloadType,
 	}
 }
 

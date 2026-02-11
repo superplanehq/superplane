@@ -19,11 +19,9 @@ interface RollbackDeployConfiguration {
 }
 
 interface RollbackDeployOutput {
-  serviceId?: string;
   deployId?: string;
   rollbackToDeployId?: string;
   status?: string;
-  trigger?: string;
   createdAt?: string;
   finishedAt?: string;
 }
@@ -61,11 +59,9 @@ export const rollbackDeployMapper: ComponentBaseMapper = {
 
     return {
       "Triggered At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",
-      "Service ID": stringOrDash(result?.serviceId),
       "Deploy ID": stringOrDash(result?.deployId),
       "Rollback To": stringOrDash(result?.rollbackToDeployId),
       Status: stringOrDash(result?.status),
-      Trigger: stringOrDash(result?.trigger),
       "Created At": formatTimestamp(result?.createdAt),
       "Finished At": formatTimestamp(result?.finishedAt),
     };
