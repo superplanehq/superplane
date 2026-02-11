@@ -120,6 +120,7 @@ type WebhookRequestContext struct {
 	Webhook       NodeWebhookContext
 	Events        EventContext
 	Integration   IntegrationContext
+	Requests      RequestContext
 
 	//
 	// Return an execution context for a given execution,
