@@ -7,7 +7,7 @@ Trigger and monitor CircleCI pipelines
 ## Triggers
 
 <CardGrid>
-  <LinkCard title="On Pipeline Completed" href="#on-pipeline-completed" description="Listen to CircleCI workflow completion events within a pipeline" />
+  <LinkCard title="On Workflow Completed" href="#on-workflow-completed" description="Listen to CircleCI workflow completion events" />
 </CardGrid>
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
@@ -22,11 +22,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 Create a Personal API Token in CircleCI → User Settings → Personal API Tokens
 
-<a id="on-pipeline-completed"></a>
+<a id="on-workflow-completed"></a>
 
-## On Pipeline Completed
+## On Workflow Completed
 
-Triggers when all CircleCI workflow completes within a pipeline.
+Triggers when a CircleCI workflow completes.
 
 ### Use Cases
 
@@ -99,7 +99,7 @@ The Run Pipeline component starts a CircleCI pipeline and waits for it to comple
 ### How It Works
 
 1. Triggers a CircleCI pipeline with the specified location (branch or tag) and parameters
-2. Waits for all workflows in the pipeline to complete (monitored via webhook and polling)
+2. Waits for all workflows in the pipeline to complete (monitored via webhook)
 3. Routes execution based on workflow results:
    - **Success channel**: All workflows completed successfully
    - **Failed channel**: Any workflow failed or was cancelled
