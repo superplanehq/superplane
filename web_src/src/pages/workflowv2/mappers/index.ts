@@ -26,6 +26,11 @@ import {
   customFieldRenderers as githubCustomFieldRenderers,
 } from "./github/index";
 import {
+  componentMappers as gitlabComponentMappers,
+  triggerRenderers as gitlabTriggerRenderers,
+  eventStateRegistry as gitlabEventStateRegistry,
+} from "./gitlab/index";
+import {
   componentMappers as pagerdutyComponentMappers,
   triggerRenderers as pagerdutyTriggerRenderers,
   eventStateRegistry as pagerdutyEventStateRegistry,
@@ -66,6 +71,11 @@ import {
   eventStateRegistry as sendgridEventStateRegistry,
 } from "./sendgrid";
 import {
+  componentMappers as renderComponentMappers,
+  triggerRenderers as renderTriggerRenderers,
+  eventStateRegistry as renderEventStateRegistry,
+} from "./render";
+import {
   componentMappers as rootlyComponentMappers,
   triggerRenderers as rootlyTriggerRenderers,
   eventStateRegistry as rootlyEventStateRegistry,
@@ -97,6 +107,11 @@ import {
   eventStateRegistry as bitbucketEventStateRegistry,
   customFieldRenderers as bitbucketCustomFieldRenderers,
 } from "./bitbucket/index";
+  componentMappers as dockerhubComponentMappers,
+  customFieldRenderers as dockerhubCustomFieldRenderers,
+  triggerRenderers as dockerhubTriggerRenderers,
+  eventStateRegistry as dockerhubEventStateRegistry,
+} from "./dockerhub";
 
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
@@ -133,6 +148,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   cloudflare: cloudflareComponentMappers,
   semaphore: semaphoreComponentMappers,
   github: githubComponentMappers,
+  gitlab: gitlabComponentMappers,
   pagerduty: pagerdutyComponentMappers,
   dash0: dash0ComponentMappers,
   daytona: daytonaComponentMappers,
@@ -140,18 +156,21 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   slack: slackComponentMappers,
   smtp: smtpComponentMappers,
   sendgrid: sendgridComponentMappers,
+  render: renderComponentMappers,
   rootly: rootlyComponentMappers,
   aws: awsComponentMappers,
   discord: discordComponentMappers,
   openai: openaiComponentMappers,
   claude: claudeComponentMappers,
   bitbucket: bitbucketComponentMappers,
+  dockerhub: dockerhubComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   cloudflare: cloudflareTriggerRenderers,
   semaphore: semaphoreTriggerRenderers,
   github: githubTriggerRenderers,
+  gitlab: gitlabTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
   dash0: dash0TriggerRenderers,
   daytona: daytonaTriggerRenderers,
@@ -159,12 +178,14 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   slack: slackTriggerRenderers,
   smtp: smtpTriggerRenderers,
   sendgrid: sendgridTriggerRenderers,
+  render: renderTriggerRenderers,
   rootly: rootlyTriggerRenderers,
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
   openai: openaiTriggerRenderers,
   claude: claudeTriggerRenderers,
   bitbucket: bitbucketTriggerRenderers,
+  dockerhub: dockerhubTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -178,12 +199,15 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   slack: slackEventStateRegistry,
   smtp: smtpEventStateRegistry,
   sendgrid: sendgridEventStateRegistry,
+  render: renderEventStateRegistry,
   discord: discordEventStateRegistry,
   rootly: rootlyEventStateRegistry,
   openai: openaiEventStateRegistry,
   claude: claudeEventStateRegistry,
   aws: awsEventStateRegistry,
   bitbucket: bitbucketEventStateRegistry,
+  gitlab: gitlabEventStateRegistry,
+  dockerhub: dockerhubEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
@@ -210,6 +234,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
   bitbucket: bitbucketCustomFieldRenderers,
+  dockerhub: dockerhubCustomFieldRenderers,
 };
 
 /**

@@ -95,7 +95,9 @@ func (g *GitHub) Components() []core.Component {
 	return []core.Component{
 		&GetIssue{},
 		&CreateIssue{},
+		&CreateIssueComment{},
 		&UpdateIssue{},
+		&CreateReview{},
 		&RunWorkflow{},
 		&PublishCommitStatus{},
 		&CreateRelease{},

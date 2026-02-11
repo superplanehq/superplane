@@ -1,0 +1,51 @@
+{
+    "type": "pagerduty.notes.list",
+    "data": {
+        "notes": [
+            {
+                "id": "PVL9NF8",
+                "user": {
+                    "id": "PLH1HKV",
+                    "type": "user_reference",
+                    "summary": "John Smith",
+                    "html_url": "https://acme.pagerduty.com/users/PLH1HKV"
+                },
+                "channel": {
+                    "type": "web_ui"
+                },
+                "content": "Investigation started. Checking server logs for anomalies.",
+                "created_at": "2024-01-15T10:30:00Z"
+            },
+            {
+                "id": "PVL9NF9",
+                "user": {
+                    "id": "PLH1HKV",
+                    "type": "user_reference",
+                    "summary": "John Smith",
+                    "html_url": "https://acme.pagerduty.com/users/PLH1HKV"
+                },
+                "channel": {
+                    "type": "web_ui"
+                },
+                "content": "Root cause identified: memory leak in the cache service. Deploying fix now.",
+                "created_at": "2024-01-15T10:45:00Z"
+            },
+            {
+                "id": "PVL9NFA",
+                "user": {
+                    "id": "PLH1HKW",
+                    "type": "user_reference",
+                    "summary": "Jane Doe",
+                    "html_url": "https://acme.pagerduty.com/users/PLH1HKW"
+                },
+                "channel": {
+                    "type": "api"
+                },
+                "content": "Fix deployed successfully. Monitoring for stability.",
+                "created_at": "2024-01-15T11:00:00Z"
+            }
+        ],
+        "total": 3
+    },
+    "timestamp": "2024-01-15T11:05:00Z"
+}

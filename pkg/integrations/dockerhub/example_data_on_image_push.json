@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-02-03T12:00:00Z",
+  "type": "dockerhub.image.push",
+  "data": {
+    "callback_url": "https://hub.docker.com/u/superplane/demo/hook/abcd/",
+    "push_data": {
+      "tag": "v1.2.3",
+      "pushed_at": 1736400000,
+      "pusher": "superplane-bot"
+    },
+    "repository": {
+      "repo_name": "superplane/demo",
+      "name": "demo",
+      "namespace": "superplane",
+      "repo_url": "https://hub.docker.com/r/superplane/demo",
+      "is_private": false,
+      "status": "Active",
+      "star_count": 12,
+      "pull_count": 3456,
+      "description": "Demo image for SuperPlane workflows"
+    }
+  }
+}
