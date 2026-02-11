@@ -6,6 +6,7 @@ import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
+import digitaloceanIcon from "@/assets/icons/integrations/digitalocean.svg";
 import discordIcon from "@/assets/icons/integrations/discord.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
@@ -28,6 +29,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   dash0: dash0Icon,
   datadog: datadogIcon,
   daytona: daytonaIcon,
+  digitalocean: digitaloceanIcon,
   discord: discordIcon,
   github: githubIcon,
   gitlab: gitlabIcon,
@@ -51,6 +53,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   dash0: dash0Icon,
   datadog: datadogIcon,
   daytona: daytonaIcon,
+  digitalocean: digitaloceanIcon,
   discord: discordIcon,
   github: githubIcon,
   gitlab: gitlabIcon,
