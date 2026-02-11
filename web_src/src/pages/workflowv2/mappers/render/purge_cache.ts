@@ -37,7 +37,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
 export const PURGE_CACHE_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
-  "purged": {
+  purged: {
     icon: "check-circle",
     textColor: "text-green-800",
     backgroundColor: "bg-green-100",
