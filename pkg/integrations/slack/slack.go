@@ -22,6 +22,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"gorm.io/gorm"
 )
 
 const (
@@ -35,6 +36,7 @@ To complete the Slack app setup:
 5.  **Get Bot Token**: In "OAuth & Permissions", copy the "**Bot User OAuth Token**"
 6.  **Update Configuration**: Paste the "Bot User OAuth Token" and "Signing Secret" into the app installation configuration fields in SuperPlane and save
 `
+	apiBasePath = "/api/v1"
 )
 
 func init() {
@@ -199,10 +201,12 @@ func (s *Slack) appManifest(ctx core.SyncContext) ([]byte, error) {
 	// If the runtime/public API is served under a base path (e.g. /v or /v/api/v1),
 	// ensure the URL used in the Slack manifest contains that path. This helps
 	// when the externally routed URL includes an extra prefix (such as github.dev /v).
+	// However, since we also append /api/v1 when building request URLs below, we need
+	// to avoid duplicating that path segment.
 	if publicPath := os.Getenv("PUBLIC_API_BASE_PATH"); publicPath != "" {
-		// If appURL does not already include the public path or the expected /api/v1,
-		// append the public path to the base URL.
-		if !strings.Contains(appURL, publicPath) && !strings.Contains(appURL, "/api/v1") {
+		// Only append the public path if it's not /api/v1 (which we add later in request URLs)
+		// and if the URL doesn't already contain it
+		if publicPath != apiBasePath && !strings.Contains(appURL, publicPath) {
 			appURL = strings.TrimRight(appURL, "/") + "/" + strings.TrimLeft(publicPath, "/")
 		}
 	}
@@ -261,7 +265,7 @@ func (s *Slack) appManifest(ctx core.SyncContext) ([]byte, error) {
 		},
 		"settings": map[string]any{
 			"event_subscriptions": map[string]any{
-				"request_url": fmt.Sprintf("%s/api/v1/integrations/%s/events", appURL, ctx.Integration.ID().String()),
+				"request_url": fmt.Sprintf("%s%s/integrations/%s/events", appURL, apiBasePath, ctx.Integration.ID().String()),
 				"bot_events": []string{
 					"app_mention",
 					"reaction_added",
@@ -274,7 +278,7 @@ func (s *Slack) appManifest(ctx core.SyncContext) ([]byte, error) {
 			},
 			"interactivity": map[string]any{
 				"is_enabled":  true,
-				"request_url": fmt.Sprintf("%s/api/v1/integrations/%s/interactions", appURL, ctx.Integration.ID().String()),
+				"request_url": fmt.Sprintf("%s%s/integrations/%s/interactions", appURL, apiBasePath, ctx.Integration.ID().String()),
 			},
 			"org_deploy_enabled":  false,
 			"socket_mode_enabled": false,
@@ -445,60 +449,49 @@ func (s *Slack) handleInteractivity(ctx core.HTTPRequestContext, body []byte) {
 		return
 	}
 
-	// Find subscriptions that match this message
-	subscriptions, err := ctx.Integration.ListSubscriptions()
+	// Use lightweight query to find subscription by message_ts without loading nodes
+	subscription, err := models.FindIntegrationSubscriptionByMessageTS(database.Conn(), ctx.Integration.ID(), messageTS)
 	if err != nil {
-		ctx.Logger.Errorf("error listing subscriptions: %v", err)
+		if err == gorm.ErrRecordNotFound {
+			ctx.Logger.Warnf("no subscription found for message_ts %s", messageTS)
+			ctx.Response.WriteHeader(http.StatusOK)
+			return
+		}
+		ctx.Logger.Errorf("error finding subscription: %v", err)
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	foundMatch := false
-	for _, subscription := range subscriptions {
-		config := subscription.Configuration()
-		configMap, ok := config.(map[string]any)
-		if !ok {
-			continue
-		}
-
-		// Check if this subscription is for button clicks
-		subscriptionType, ok := configMap["type"].(string)
-		if !ok || subscriptionType != "button_click" {
-			continue
-		}
-
-		// Check if the message_ts matches
-		subscriptionMessageTS, ok := configMap["message_ts"].(string)
-		if !ok || subscriptionMessageTS != messageTS {
-			continue
-		}
-
-		// Get the execution ID from the subscription configuration
-		executionIDStr, ok := configMap["execution_id"].(string)
-		if !ok {
-			ctx.Logger.Errorf("execution_id not found in subscription configuration")
-			continue
-		}
-
-		executionID, err := uuid.Parse(executionIDStr)
-		if err != nil {
-			ctx.Logger.Errorf("invalid execution_id in subscription: %v", err)
-			continue
-		}
-
-		// Create an action request for this execution
-		// We need to find the execution and create the request
-		// Using models package directly since we have the execution ID
-		err = s.createButtonClickAction(executionID, action.Value)
-		if err != nil {
-			ctx.Logger.Errorf("error creating button click action: %v", err)
-		} else {
-			foundMatch = true
-		}
+	// Get the configuration
+	config := subscription.Configuration.Data()
+	configMap, ok := config.(map[string]any)
+	if !ok {
+		ctx.Logger.Errorf("invalid subscription configuration")
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
-	if !foundMatch {
-		ctx.Logger.Warnf("no subscription found for message_ts %s", messageTS)
+	// Get the execution ID from the subscription configuration
+	executionIDStr, ok := configMap["execution_id"].(string)
+	if !ok {
+		ctx.Logger.Errorf("execution_id not found in subscription configuration")
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	executionID, err := uuid.Parse(executionIDStr)
+	if err != nil {
+		ctx.Logger.Errorf("invalid execution_id in subscription: %v", err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Create an action request for this execution
+	err = s.createButtonClickAction(executionID, action.Value)
+	if err != nil {
+		ctx.Logger.Errorf("error creating button click action: %v", err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	ctx.Response.WriteHeader(http.StatusOK)
