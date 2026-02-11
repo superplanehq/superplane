@@ -46,6 +46,7 @@ func (h *CircleCIWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, err
 		return nil, fmt.Errorf("invalid webhook events: %w", err)
 	}
 
+	// Generate deterministic webhook name based on webhook ID
 	hash := sha256.New()
 	hash.Write([]byte(ctx.Webhook.GetID()))
 	suffix := fmt.Sprintf("%x", hash.Sum(nil))
@@ -56,21 +57,41 @@ func (h *CircleCIWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, err
 		return nil, fmt.Errorf("error getting webhook secret: %v", err)
 	}
 
-	webhook, err := client.CreateWebhook(
-		name,
-		ctx.Webhook.GetURL(),
-		string(webhookSecret),
-		configuration.ProjectSlug,
-		normalizedEvents,
-	)
+	webhook, err := upsertWebhook(client, name, ctx.Webhook.GetURL(), string(webhookSecret), configuration.ProjectSlug, normalizedEvents)
 	if err != nil {
-		return nil, fmt.Errorf("error creating CircleCI webhook: %v", err)
+		return nil, err
 	}
 
 	return WebhookMetadata{
 		WebhookID: webhook.ID,
 		Name:      webhook.Name,
 	}, nil
+}
+
+func upsertWebhook(client *Client, name, webhookURL, secret, projectSlug string, events []string) (*WebhookResponse, error) {
+	//
+	// Check if webhook with this name already exists.
+	//
+	webhooks, err := client.ListWebhooks(projectSlug)
+	if err == nil {
+		for _, webhook := range webhooks {
+			if webhook.Name == name {
+				// Webhook with this name already exists, return it.
+				// The webhook system will call CompareConfig to verify the configuration matches.
+				return &webhook, nil
+			}
+		}
+	}
+
+	//
+	// Webhook does not exist, create it.
+	//
+	webhook, err := client.CreateWebhook(name, webhookURL, secret, projectSlug, events)
+	if err != nil {
+		return nil, fmt.Errorf("error creating webhook: %v", err)
+	}
+
+	return webhook, nil
 }
 
 func (h *CircleCIWebhookHandler) CompareConfig(a, b any) (bool, error) {

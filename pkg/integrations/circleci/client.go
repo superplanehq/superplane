@@ -300,6 +300,48 @@ func (c *Client) CreateWebhook(name, webhookURL, secret, projectSlug string, eve
 	return &webhook, nil
 }
 
+func (c *Client) GetWebhook(webhookID string) (*WebhookResponse, error) {
+	url := fmt.Sprintf("%s/webhook/%s", baseURL, webhookID)
+	responseBody, err := c.execRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error getting webhook: %w", err)
+	}
+
+	var webhook WebhookResponse
+	err = json.Unmarshal(responseBody, &webhook)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return &webhook, nil
+}
+
+func (c *Client) ListWebhooks(projectSlug string) ([]WebhookResponse, error) {
+	project, err := c.GetProject(projectSlug)
+	if err != nil {
+		return nil, fmt.Errorf("fetching project for webhooks: %w", err)
+	}
+	if project.ID == "" {
+		return nil, fmt.Errorf("project has no id")
+	}
+
+	url := fmt.Sprintf("%s/webhook?scope-type=project&scope-id=%s", baseURL, project.ID)
+	responseBody, err := c.execRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error listing webhooks: %w", err)
+	}
+
+	var response struct {
+		Items []WebhookResponse `json:"items"`
+	}
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return response.Items, nil
+}
+
 func (c *Client) DeleteWebhook(webhookID string) error {
 	url := fmt.Sprintf("%s/webhook/%s", baseURL, webhookID)
 	_, err := c.execRequest("DELETE", url, nil)

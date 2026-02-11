@@ -104,29 +104,30 @@ func (p *OnPipelineCompleted) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("projectSlug is required")
 	}
 
-	if metadata.Project != nil && config.ProjectSlug == metadata.Project.Slug {
-		return nil
-	}
+	normalizedProjectSlug := strings.TrimSpace(config.ProjectSlug)
+	projectChanged := metadata.Project == nil || normalizedProjectSlug != strings.TrimSpace(metadata.Project.Slug)
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to create client: %w", err)
-	}
+	if projectChanged {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("failed to create client: %w", err)
+		}
 
-	project, err := client.GetProject(config.ProjectSlug)
-	if err != nil {
-		return fmt.Errorf("project not found or inaccessible: %w", err)
-	}
+		project, err := client.GetProject(config.ProjectSlug)
+		if err != nil {
+			return fmt.Errorf("project not found or inaccessible: %w", err)
+		}
 
-	err = ctx.Metadata.Set(OnPipelineCompletedMetadata{
-		Project: &Project{
-			ID:   project.ID,
-			Slug: project.Slug,
-			Name: project.Name,
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("error setting metadata: %v", err)
+		err = ctx.Metadata.Set(OnPipelineCompletedMetadata{
+			Project: &Project{
+				ID:   project.ID,
+				Slug: project.Slug,
+				Name: project.Name,
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("error setting metadata: %v", err)
+		}
 	}
 
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
@@ -149,10 +150,7 @@ func (p *OnPipelineCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int
 		return http.StatusForbidden, fmt.Errorf("missing signature")
 	}
 
-	signature := signatureHeader
-	if strings.HasPrefix(signatureHeader, "v1=") {
-		signature = strings.TrimPrefix(signatureHeader, "v1=")
-	}
+	signature, _ := strings.CutPrefix(signatureHeader, "v1=")
 
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
