@@ -149,6 +149,7 @@ check.build.ui:
 check.build.app:
 	docker compose $(DOCKER_COMPOSE_OPTS) exec app go build cmd/server/main.go
 
+
 storybook:
 	docker compose $(DOCKER_COMPOSE_OPTS) exec app /bin/bash -c "cd web_src && npm install && npm run storybook"
 
