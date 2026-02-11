@@ -17,6 +17,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Deploy" href="#deploy" description="Trigger a deploy for a Render service and wait for it to complete" />
+  <LinkCard title="Get Deploy" href="#get-deploy" description="Retrieve a deploy by ID for a Render service" />
+  <LinkCard title="Get Service" href="#get-service" description="Retrieve a Render service by ID" />
 </CardGrid>
 
 ## Instructions
@@ -168,6 +170,90 @@ The Deploy component starts a new deploy for a Render service and waits for it t
   },
   "timestamp": "2026-02-05T16:15:00.000000Z",
   "type": "render.deploy.finished"
+}
+```
+
+<a id="get-deploy"></a>
+
+## Get Deploy
+
+The Get Deploy component fetches a deploy for a Render service.
+
+### Use Cases
+
+- **Status checks**: Inspect deploy status and timestamps
+- **Debugging**: Fetch deploy metadata after receiving an event
+
+### Configuration
+
+- **Service**: Render service that owns the deploy
+- **Deploy ID**: Deploy ID to retrieve (supports expressions)
+
+### Output
+
+Emits a `render.deploy` payload containing deploy fields like `deployId`, `status`, `trigger`, and timestamps when available.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "commit": {
+      "createdAt": "2026-02-05T16:09:30.000000Z",
+      "id": "1a2b3c4d5e6f",
+      "message": "Release v1.2.3"
+    },
+    "createdAt": "2026-02-05T16:10:00.000000Z",
+    "deployId": "dep-cukouhrtq21c73e9scng",
+    "finishedAt": "2026-02-05T16:15:00.000000Z",
+    "image": {
+      "ref": "registry.example.com/backend-api:1a2b3c4d",
+      "sha": "sha256:4f7c2d7f0bb27e2f8d4d9b3d2b3a1a9a3b2c1d0e"
+    },
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "startedAt": "2026-02-05T16:10:10.000000Z",
+    "status": "live",
+    "trigger": "api"
+  },
+  "timestamp": "2026-02-05T16:15:00.000000Z",
+  "type": "render.deploy"
+}
+```
+
+<a id="get-service"></a>
+
+## Get Service
+
+The Get Service component fetches details for a Render service.
+
+### Use Cases
+
+- **Service inspection**: Fetch current service configuration and metadata
+- **Workflow context**: Use service fields to drive branching decisions in later steps
+
+### Configuration
+
+- **Service**: Render service to retrieve
+
+### Output
+
+Emits a `render.service` payload containing service fields like `serviceId`, `serviceName`, `type`, `dashboardUrl`, and `suspended`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": "2026-02-05T15:00:00.000000Z",
+    "dashboardUrl": "https://dashboard.render.com/web/srv-cukouhrtq21c73e9scng",
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "serviceName": "backend-api",
+    "suspended": "not_suspended",
+    "type": "web_service",
+    "updatedAt": "2026-02-05T16:00:00.000000Z"
+  },
+  "timestamp": "2026-02-05T16:05:00.000000Z",
+  "type": "render.service"
 }
 ```
 
