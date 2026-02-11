@@ -11,7 +11,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { getHeaderIconSrc, IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import {
   useAvailableIntegrations,
-  useConnectedIntegrations,
   useCreateIntegration,
   useIntegration,
   useUpdateIntegration,
@@ -264,9 +263,6 @@ export const ComponentSidebar = ({
   const resolvedAutocompleteExampleObj = autocompleteExampleObj ?? null;
 
   const { data: availableIntegrationDefinitions = [] } = useAvailableIntegrations();
-  const { data: connectedIntegrations = [] } = useConnectedIntegrations(domainId ?? "", {
-    enabled: !!domainId && (!integrations || integrations.length === 0),
-  });
   const createIntegrationMutation = useCreateIntegration(domainId ?? "");
   const { data: configureIntegration, isLoading: configureIntegrationLoading } = useIntegration(
     domainId ?? "",
@@ -287,46 +283,17 @@ export const ComponentSidebar = ({
   );
   const selectedIntegrationForDialog = isCreateIntegrationDialogOpen ? createIntegrationDefinition : undefined;
   const selectedInstructions = selectedIntegrationForDialog?.instructions?.trim();
-  const knownIntegrations = useMemo(() => {
-    if (integrations && integrations.length > 0) return integrations;
-    return connectedIntegrations;
-  }, [integrations, connectedIntegrations]);
   const integrationHomeHref = useMemo(() => {
     if (!domainId) return "#";
     const selectedIntegrationId =
       integrationRef?.id ||
-      knownIntegrations.find((integration) => integration.spec?.integrationName === selectedIntegrationForDialog?.name)
+      integrations?.find((integration) => integration.spec?.integrationName === selectedIntegrationForDialog?.name)
         ?.metadata?.id;
     if (selectedIntegrationId) {
       return `/${domainId}/settings/integrations/${selectedIntegrationId}`;
     }
     return `/${domainId}/settings/integrations`;
-  }, [domainId, integrationRef?.id, knownIntegrations, selectedIntegrationForDialog?.name]);
-  const integrationNames = useMemo(() => {
-    return new Set(
-      knownIntegrations
-        .map((integration) => integration.metadata?.name?.trim().toLocaleLowerCase())
-        .filter(Boolean) as string[],
-    );
-  }, [knownIntegrations]);
-  const getNextIntegrationName = useCallback(
-    (baseName?: string) => {
-      const normalizedBaseName = baseName?.trim() || "integration";
-      if (!integrationNames.has(normalizedBaseName.toLocaleLowerCase())) {
-        return normalizedBaseName;
-      }
-
-      let suffix = 2;
-      let candidate = `${normalizedBaseName}-${suffix}`;
-      while (integrationNames.has(candidate.toLocaleLowerCase())) {
-        suffix += 1;
-        candidate = `${normalizedBaseName}-${suffix}`;
-      }
-
-      return candidate;
-    },
-    [integrationNames],
-  );
+  }, [domainId, integrationRef?.id, integrations, selectedIntegrationForDialog?.name]);
 
   const handleCopyNodeId = useCallback(async () => {
     if (nodeId) {
@@ -337,11 +304,11 @@ export const ComponentSidebar = ({
   }, [nodeId]);
 
   const handleOpenCreateIntegrationDialog = useCallback(() => {
-    setCreateIntegrationName(getNextIntegrationName(createIntegrationDefinition?.name));
+    setCreateIntegrationName(createIntegrationDefinition?.name ?? "");
     setCreateIntegrationConfig({});
     setCreateIntegrationBrowserAction(undefined);
     setIsCreateIntegrationDialogOpen(true);
-  }, [createIntegrationDefinition?.name, getNextIntegrationName]);
+  }, [createIntegrationDefinition?.name]);
 
   const handleCloseCreateIntegrationDialog = useCallback(() => {
     setIsCreateIntegrationDialogOpen(false);
@@ -358,11 +325,6 @@ export const ComponentSidebar = ({
       showErrorToast("Integration name is required");
       return;
     }
-    if (integrationNames.has(nextName.toLocaleLowerCase())) {
-      showErrorToast(`An integration with the name "${nextName}" already exists in this organization`);
-      setCreateIntegrationName(getNextIntegrationName(nextName));
-      return;
-    }
 
     try {
       const result = await createIntegrationMutation.mutateAsync({
@@ -377,19 +339,13 @@ export const ComponentSidebar = ({
       }
       handleCloseCreateIntegrationDialog();
     } catch (error) {
-      const errorMessage = getApiErrorMessage(error);
-      if (errorMessage.toLocaleLowerCase().includes("already exists")) {
-        setCreateIntegrationName(getNextIntegrationName(nextName));
-      }
-      showErrorToast(`Failed to create integration: ${errorMessage}`);
+      showErrorToast(`Failed to create integration: ${getApiErrorMessage(error)}`);
     }
   }, [
     selectedIntegrationForDialog?.name,
     domainId,
     createIntegrationName,
     createIntegrationConfig,
-    integrationNames,
-    getNextIntegrationName,
     createIntegrationMutation,
     handleCloseCreateIntegrationDialog,
   ]);
