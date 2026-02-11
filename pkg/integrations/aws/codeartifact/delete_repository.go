@@ -185,7 +185,7 @@ func (c *DeleteRepository) Execute(ctx core.ExecutionContext) error {
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
-		"aws.codeartifact.repository.deleted",
+		"aws.codeartifact.repository",
 		[]any{output},
 	)
 }

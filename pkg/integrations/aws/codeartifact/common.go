@@ -2,6 +2,7 @@ package codeartifact
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -21,6 +22,17 @@ var PackageFormatOptions = []configuration.FieldOption{
 	{Label: "ruby", Value: "ruby"},
 	{Label: "swift", Value: "swift"},
 	{Label: "cargo", Value: "cargo"},
+}
+
+/*
+ * Package version statuses supported by AWS CodeArtifact.
+ */
+var PackageVersionStatusOptions = []configuration.FieldOption{
+	{Value: "Published", Label: "Published"},
+	{Value: "Unfinished", Label: "Unfinished"},
+	{Value: "Unlisted", Label: "Unlisted"},
+	{Value: "Archived", Label: "Archived"},
+	{Value: "Disposed", Label: "Disposed"},
 }
 
 /*
@@ -101,4 +113,19 @@ func validateRepository(ctx core.IntegrationContext, http core.HTTPContext, regi
 	}
 
 	return nil, fmt.Errorf("repository not found: %s", repository)
+}
+
+/*
+ * Parse a comma separated list of versions into a slice of strings.
+ */
+func parseVersionsList(s string) []string {
+	versions := []string{}
+	for _, v := range strings.Split(s, ",") {
+		v = strings.TrimSpace(v)
+		if v != "" {
+			versions = append(versions, v)
+		}
+	}
+
+	return versions
 }

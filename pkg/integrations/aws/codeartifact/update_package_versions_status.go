@@ -33,7 +33,7 @@ type UpdatePackageVersionsStatusConfiguration struct {
 	Format         string `json:"format" mapstructure:"format"`
 	Package        string `json:"package" mapstructure:"package"`
 	Namespace      string `json:"namespace" mapstructure:"namespace"`
-	Versions       string `json:"versions" mapstructure:"versions"` // comma or newline separated
+	Versions       string `json:"versions" mapstructure:"versions"` // comma separated
 	TargetStatus   string `json:"targetStatus" mapstructure:"targetStatus"`
 	ExpectedStatus string `json:"expectedStatus" mapstructure:"expectedStatus"`
 }
@@ -153,7 +153,8 @@ func (c *UpdatePackageVersionsStatus) Configuration() []configuration.Field {
 			Label:       "Versions",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Placeholder: "1.0.0, 1.0.1 or one per line",
+			Placeholder: "1.0.0, 1.0.1",
+			Description: "Comma separated list of versions",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "repository", Values: []string{"*"}},
 			},
@@ -172,10 +173,13 @@ func (c *UpdatePackageVersionsStatus) Configuration() []configuration.Field {
 		{
 			Name:     "expectedStatus",
 			Label:    "Expected status (optional)",
-			Type:     configuration.FieldTypeString,
+			Type:     configuration.FieldTypeSelect,
 			Required: false,
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "repository", Values: []string{"*"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{Options: PackageVersionStatusOptions},
 			},
 		},
 		{
@@ -190,46 +194,42 @@ func (c *UpdatePackageVersionsStatus) Configuration() []configuration.Field {
 	}
 }
 
-func parseVersionsList(s string) []string {
-	s = strings.ReplaceAll(s, ",", "\n")
-	var out []string
-	for _, v := range strings.Split(s, "\n") {
-		v = strings.TrimSpace(v)
-		if v != "" {
-			out = append(out, v)
-		}
-	}
-	return out
-}
-
 func (c *UpdatePackageVersionsStatus) Setup(ctx core.SetupContext) error {
 	var config UpdatePackageVersionsStatusConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
+
 	config = c.normalizeConfig(config)
 	if config.Region == "" {
 		return fmt.Errorf("region is required")
 	}
+
 	if config.Domain == "" {
 		return fmt.Errorf("domain is required")
 	}
+
 	if config.Repository == "" {
 		return fmt.Errorf("repository is required")
 	}
+
 	if config.Format == "" {
 		return fmt.Errorf("format is required")
 	}
+
 	if config.Package == "" {
 		return fmt.Errorf("package is required")
 	}
+
 	versions := parseVersionsList(config.Versions)
 	if len(versions) == 0 {
 		return fmt.Errorf("at least one version is required")
 	}
+
 	if config.TargetStatus != targetStatusArchived && config.TargetStatus != targetStatusPublished && config.TargetStatus != targetStatusUnlisted {
 		return fmt.Errorf("targetStatus must be Archived, Published, or Unlisted")
 	}
+
 	return nil
 }
 
@@ -242,11 +242,13 @@ func (c *UpdatePackageVersionsStatus) Execute(ctx core.ExecutionContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
+
 	config = c.normalizeConfig(config)
 	creds, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to get AWS credentials: %w", err)
 	}
+
 	versions := parseVersionsList(config.Versions)
 	client := NewClient(ctx.HTTP, creds, config.Region)
 	resp, err := client.UpdatePackageVersionsStatus(UpdatePackageVersionsStatusInput{
@@ -259,17 +261,15 @@ func (c *UpdatePackageVersionsStatus) Execute(ctx core.ExecutionContext) error {
 		TargetStatus:   config.TargetStatus,
 		ExpectedStatus: config.ExpectedStatus,
 	})
+
 	if err != nil {
 		return fmt.Errorf("failed to update package versions status: %w", err)
 	}
-	output := map[string]any{
-		"successfulVersions": resp.SuccessfulVersions,
-		"failedVersions":     resp.FailedVersions,
-	}
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
-		"aws.codeartifact.package.versions.status.updated",
-		[]any{output},
+		"aws.codeartifact.packageVersions",
+		[]any{resp},
 	)
 }
 

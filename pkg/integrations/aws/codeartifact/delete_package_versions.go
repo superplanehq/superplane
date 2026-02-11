@@ -130,15 +130,19 @@ func (c *DeletePackageVersions) Configuration() []configuration.Field {
 			Label:                "Versions",
 			Type:                 configuration.FieldTypeString,
 			Required:             true,
-			Placeholder:          "1.0.0, 1.0.1 or one per line",
+			Placeholder:          "1.0.0, 1.0.1",
+			Description:          "Comma separated list of versions",
 			VisibilityConditions: []configuration.VisibilityCondition{{Field: "repository", Values: []string{"*"}}},
 		},
 		{
 			Name:                 "expectedStatus",
 			Label:                "Expected status (optional)",
-			Type:                 configuration.FieldTypeString,
+			Type:                 configuration.FieldTypeSelect,
 			Required:             false,
 			VisibilityConditions: []configuration.VisibilityCondition{{Field: "repository", Values: []string{"*"}}},
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{Options: PackageVersionStatusOptions},
+			},
 		},
 		{
 			Name:                 "namespace",
@@ -155,25 +159,32 @@ func (c *DeletePackageVersions) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
+
 	config = c.normalizeConfig(config)
 	if config.Region == "" {
 		return fmt.Errorf("region is required")
 	}
+
 	if config.Domain == "" {
 		return fmt.Errorf("domain is required")
 	}
+
 	if config.Repository == "" {
 		return fmt.Errorf("repository is required")
 	}
+
 	if config.Format == "" {
 		return fmt.Errorf("format is required")
 	}
+
 	if config.Package == "" {
 		return fmt.Errorf("package is required")
 	}
+
 	if len(parseVersionsList(config.Versions)) == 0 {
 		return fmt.Errorf("at least one version is required")
 	}
+
 	return nil
 }
 
@@ -186,11 +197,13 @@ func (c *DeletePackageVersions) Execute(ctx core.ExecutionContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
+
 	config = c.normalizeConfig(config)
 	creds, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to get AWS credentials: %w", err)
 	}
+
 	client := NewClient(ctx.HTTP, creds, config.Region)
 	resp, err := client.DeletePackageVersions(DeletePackageVersionsInput{
 		Domain:         config.Domain,
@@ -201,27 +214,37 @@ func (c *DeletePackageVersions) Execute(ctx core.ExecutionContext) error {
 		Versions:       parseVersionsList(config.Versions),
 		ExpectedStatus: config.ExpectedStatus,
 	})
+
 	if err != nil {
 		return fmt.Errorf("failed to delete package versions: %w", err)
 	}
-	output := map[string]any{
-		"successfulVersions": resp.SuccessfulVersions,
-		"failedVersions":     resp.FailedVersions,
-	}
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
-		"aws.codeartifact.package.versions.deleted",
-		[]any{output},
+		"aws.codeartifact.packageVersions",
+		[]any{resp},
 	)
 }
 
-func (c *DeletePackageVersions) Actions() []core.Action                    { return nil }
-func (c *DeletePackageVersions) HandleAction(ctx core.ActionContext) error { return nil }
+func (c *DeletePackageVersions) Actions() []core.Action {
+	return nil
+}
+
+func (c *DeletePackageVersions) HandleAction(ctx core.ActionContext) error {
+	return nil
+}
+
 func (c *DeletePackageVersions) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
-func (c *DeletePackageVersions) Cancel(ctx core.ExecutionContext) error { return nil }
-func (c *DeletePackageVersions) Cleanup(ctx core.SetupContext) error    { return nil }
+
+func (c *DeletePackageVersions) Cancel(ctx core.ExecutionContext) error {
+	return nil
+}
+
+func (c *DeletePackageVersions) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
 
 func (c *DeletePackageVersions) normalizeConfig(config DeletePackageVersionsConfiguration) DeletePackageVersionsConfiguration {
 	config.Region = strings.TrimSpace(config.Region)

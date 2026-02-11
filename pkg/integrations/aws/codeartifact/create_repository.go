@@ -177,7 +177,7 @@ func (c *CreateRepository) Execute(ctx core.ExecutionContext) error {
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
-		"aws.codeartifact.repository.created",
+		"aws.codeartifact.repository",
 		[]any{output},
 	)
 }
