@@ -1,0 +1,14 @@
+{
+  "data": {
+    "checkId": "check-123",
+    "details": {
+      "id": "check-123",
+      "name": "Checkout API latency",
+      "severity": "critical",
+      "query": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service=\"checkout\"}[5m])) by (le))",
+      "currentValue": 0.92
+    }
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.check.details.retrieved"
+}
