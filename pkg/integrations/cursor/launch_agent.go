@@ -119,11 +119,6 @@ func (c *LaunchAgent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 	return ctx.DefaultProcessing()
 }
 
-var (
-	launchAgentFalse = false
-	launchAgentTrue  = true
-)
-
 func ptrFromBool(b bool) *bool { return &b }
 
 func (c *LaunchAgent) Execute(ctx core.ExecutionContext) error {

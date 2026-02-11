@@ -11,13 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const (
-	baseURL                    = "https://api.cursor.com"
-	launchAgentVerificationURL = baseURL + "/v0/agents?limit=1"
-	launchAgentLaunchURL       = baseURL + "/v0/agents"
-	adminVerificationURL       = baseURL + "/teams/daily-usage-data"
-	modelListURL               = baseURL + "/v0/models"
-)
+const defaultBaseURL = "https://api.cursor.com"
 
 func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
 	if ctx == nil {
@@ -30,7 +24,7 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 	return &Client{
 		LaunchAgentKey: string(launchAgentKey),
 		AdminKey:       string(adminAPIKey),
-		BaseURL:        baseURL,
+		BaseURL:        defaultBaseURL,
 		http:           httpClient,
 	}, nil
 }
@@ -63,7 +57,7 @@ func (c *Client) ListModels() ([]string, error) {
 		return nil, fmt.Errorf("Cloud Agent API key is not configured")
 	}
 
-	responseBody, err := c.execRequest(http.MethodGet, modelListURL, nil, c.LaunchAgentKey)
+	responseBody, err := c.execRequest(http.MethodGet, c.BaseURL+"/v0/models", nil, c.LaunchAgentKey)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +71,7 @@ func (c *Client) ListModels() ([]string, error) {
 }
 
 func (c *Client) VerifyLaunchAgent() error {
-	_, err := c.execRequest(http.MethodGet, launchAgentVerificationURL, nil, c.LaunchAgentKey)
+	_, err := c.execRequest(http.MethodGet, c.BaseURL+"/v0/agents?limit=1", nil, c.LaunchAgentKey)
 	return err
 }
 
@@ -104,7 +98,7 @@ func (c *Client) GetDailyUsage(req UsageRequest) (*UsageResponse, error) {
 		return nil, fmt.Errorf("failed to marshal usage request: %v", err)
 	}
 
-	responseBody, err := c.execRequest(http.MethodPost, adminVerificationURL, bytes.NewBuffer(reqBody), c.AdminKey)
+	responseBody, err := c.execRequest(http.MethodPost, c.BaseURL+"/teams/daily-usage-data", bytes.NewBuffer(reqBody), c.AdminKey)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +121,7 @@ func (c *Client) LaunchAgent(req launchAgentRequest) (*LaunchAgentResponse, erro
 		return nil, fmt.Errorf("failed to marshal agent request: %w", err)
 	}
 
-	responseBody, err := c.execRequest(http.MethodPost, launchAgentLaunchURL, bytes.NewBuffer(reqBody), c.LaunchAgentKey)
+	responseBody, err := c.execRequest(http.MethodPost, c.BaseURL+"/v0/agents", bytes.NewBuffer(reqBody), c.LaunchAgentKey)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +139,7 @@ func (c *Client) GetAgentStatus(agentID string) (*LaunchAgentResponse, error) {
 		return nil, fmt.Errorf("Cloud Agent API key is not configured")
 	}
 
-	url := fmt.Sprintf("%s/v0/agents/%s", baseURL, agentID)
+	url := fmt.Sprintf("%s/v0/agents/%s", c.BaseURL, agentID)
 	responseBody, err := c.execRequest(http.MethodGet, url, nil, c.LaunchAgentKey)
 	if err != nil {
 		return nil, err
@@ -164,7 +158,7 @@ func (c *Client) CancelAgent(agentID string) error {
 		return fmt.Errorf("Cloud Agent API key is not configured")
 	}
 
-	url := fmt.Sprintf("%s/v0/agents/%s/cancel", baseURL, agentID)
+	url := fmt.Sprintf("%s/v0/agents/%s/cancel", c.BaseURL, agentID)
 	_, err := c.execRequest(http.MethodPost, url, nil, c.LaunchAgentKey)
 	return err
 }
