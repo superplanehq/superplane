@@ -161,10 +161,12 @@ export const runPipelineMapper: ComponentBaseMapper = {
 function runPipelineMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as any;
-  const nodeMetadata = node.metadata as {
-    projectName?: string;
-    pipelineDefinitionName?: string;
-  } | undefined;
+  const nodeMetadata = node.metadata as
+    | {
+        projectName?: string;
+        pipelineDefinitionName?: string;
+      }
+    | undefined;
 
   const projectLabel = nodeMetadata?.projectName || configuration?.projectSlug;
   if (projectLabel) {
