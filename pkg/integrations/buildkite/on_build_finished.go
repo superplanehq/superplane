@@ -232,10 +232,6 @@ func (t *OnBuildFinished) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 		}
 	}
 
-	if eventType != "build.finished" {
-		return http.StatusOK, nil
-	}
-
 	// Verify webhook signature or token with replay protection
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
@@ -243,6 +239,10 @@ func (t *OnBuildFinished) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 	}
 	if err := VerifyWebhook(ctx.Headers, ctx.Body, secret); err != nil {
 		return http.StatusForbidden, fmt.Errorf("webhook verification failed: %w", err)
+	}
+
+	if eventType != "build.finished" {
+		return http.StatusOK, nil
 	}
 
 	data := map[string]any{}

@@ -158,11 +158,11 @@ export const triggerBuildStateFunction: StateFunction = (execution: CanvasesCanv
   const metadata = execution.metadata as TriggerBuildExecutionMetadata;
   const buildState = metadata?.state;
 
-  if (buildState === "failed") {
-    return "failed";
+  if (buildState === "passed") {
+    return "passed";
   }
 
-  return "passed";
+  return "failed";
 };
 
 /**
