@@ -228,6 +228,27 @@ func (c *WaitForButtonClick) Execute(ctx core.ExecutionContext) error {
 		return errors.New("channel is required")
 	}
 
+	if config.Message == "" {
+		return errors.New("message is required")
+	}
+
+	if len(config.Buttons) == 0 {
+		return errors.New("at least one button is required")
+	}
+
+	if len(config.Buttons) > 4 {
+		return errors.New("maximum of 4 buttons allowed")
+	}
+
+	for i, button := range config.Buttons {
+		if button.Name == "" {
+			return fmt.Errorf("button %d: name is required", i)
+		}
+		if button.Value == "" {
+			return fmt.Errorf("button %d: value is required", i)
+		}
+	}
+
 	client, err := NewClient(ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create Slack client: %w", err)
