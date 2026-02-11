@@ -54,21 +54,21 @@ After configuring this trigger:
 
 ## Use Cases
 
-- **Deployment notifications**: Notify Slack when deployments succeed or fail
+- **Deployment notifications**: Notify Slack when deployments complete or fail
 - **Incident creation**: Create tickets when deployments crash
 - **Pipeline chaining**: Trigger downstream workflows after successful deployments
 
 ## Configuration
 
 - **Project**: Select the Railway project to monitor
-- **Event Filter**: Optionally filter by deployment event type (succeeded, failed, crashed, etc.)
+- **Event Filter**: Optionally filter by deployment event type (deployed, failed, crashed, etc.)
   - Leave empty to receive all deployment events
 
 ## Event Data
 
 Each deployment event includes:
-- ` + "`type`" + `: Event type (e.g., Deployment.succeeded, Deployment.failed)
-- ` + "`details.status`" + `: Deployment status
+- ` + "`type`" + `: Event type (e.g., Deployment.deployed, Deployment.failed)
+- ` + "`details.status`" + `: Deployment status (SUCCESS, FAILED, etc.)
 - ` + "`resource.deployment.id`" + `: Deployment ID
 - ` + "`resource.service`" + `: Service name and ID
 - ` + "`resource.environment`" + `: Environment name and ID
@@ -107,14 +107,21 @@ func (t *OnDeploymentEvent) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: []configuration.FieldOption{
-						{Label: "Succeeded", Value: "succeeded"},
-						{Label: "Failed", Value: "failed"},
+						{Label: "Triggered", Value: "triggered"},
+						{Label: "Resolved", Value: "resolved"},
+						{Label: "Deployed", Value: "deployed"},
 						{Label: "Crashed", Value: "crashed"},
+						{Label: "Oom Killed", Value: "oom_killed"},
+						{Label: "Redeployed", Value: "redeployed"},
+						{Label: "Slept", Value: "slept"},
+						{Label: "Resumed", Value: "resumed"},
+						{Label: "Restarted", Value: "restarted"},
+						{Label: "Removed", Value: "removed"},
 						{Label: "Building", Value: "building"},
 						{Label: "Deploying", Value: "deploying"},
-						{Label: "Initializing", Value: "initializing"},
-						{Label: "Removing", Value: "removing"},
-						{Label: "Removed", Value: "removed"},
+						{Label: "Waiting", Value: "waiting"},
+						{Label: "Needs Approval", Value: "needs_approval"},
+						{Label: "Queued", Value: "queued"},
 					},
 				},
 			},
@@ -138,7 +145,8 @@ func (t *OnDeploymentEvent) Setup(ctx core.TriggerContext) error {
 	}
 
 	// If already set up with matching project and webhook URL, nothing to do
-	if metadata.Project != nil && metadata.Project.ID == config.Project && metadata.WebhookURL != "" {
+	if metadata.Project != nil && metadata.Project.ID == config.Project &&
+		metadata.WebhookURL != "" {
 		return nil
 	}
 
@@ -204,15 +212,17 @@ func (t *OnDeploymentEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, 
 
 	// Validate the project matches the configured project
 	// This is important since Railway doesn't provide webhook signatures
+	var payloadProjectID string
 	if resource, ok := payload["resource"].(map[string]any); ok {
 		if project, ok := resource["project"].(map[string]any); ok {
 			if projectID, ok := project["id"].(string); ok {
-				if projectID != config.Project {
-					// Event is from a different project, ignore
-					return http.StatusOK, nil
-				}
+				payloadProjectID = projectID
 			}
 		}
+	}
+
+	if payloadProjectID != "" && payloadProjectID != config.Project {
+		return http.StatusOK, nil
 	}
 
 	// Filter by event action if configured
