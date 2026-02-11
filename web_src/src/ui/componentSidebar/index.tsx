@@ -283,17 +283,6 @@ export const ComponentSidebar = ({
   );
   const selectedIntegrationForDialog = isCreateIntegrationDialogOpen ? createIntegrationDefinition : undefined;
   const selectedInstructions = selectedIntegrationForDialog?.instructions?.trim();
-  const integrationHomeHref = useMemo(() => {
-    if (!domainId) return "#";
-    const selectedIntegrationId =
-      integrationRef?.id ||
-      integrations?.find((integration) => integration.spec?.integrationName === selectedIntegrationForDialog?.name)
-        ?.metadata?.id;
-    if (selectedIntegrationId) {
-      return `/${domainId}/settings/integrations/${selectedIntegrationId}`;
-    }
-    return `/${domainId}/settings/integrations`;
-  }, [domainId, integrationRef?.id, integrations, selectedIntegrationForDialog?.name]);
   const nodeWebhookUrl = useMemo(() => {
     if (!nodeId) return "";
     const node = workflowNodes.find((n) => n.id === nodeId);
