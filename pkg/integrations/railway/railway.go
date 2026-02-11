@@ -54,16 +54,18 @@ func (r *Railway) Instructions() string {
 3. Give your token a descriptive name (e.g., "SuperPlane Integration")
 
 
-### Token Scoping
+### Token Scoping (Important!)
 
-Railway offers different token scoping options:
+When creating a Railway token, you must select a **specific workspace** to grant access to its projects:
 
 | Scope | Access Level | Use Case |
 |-------|--------------|----------|
-| **No Workspace** | All workspaces and projects | Recommended for SuperPlane |
-| **Project-specific** | Projects in a specific workspace only | Limited to one workspace |
+| **Specific Workspace** | Projects in that workspace | **Recommended for SuperPlane** |
+| **No Workspace** | No projects accessible | Not suitable for SuperPlane |
 
-**Recommendation:** Select **"No Workspace"** when creating your token. This allows SuperPlane to access all your projects across workspaces. If you scope the token to a specific workspace, only projects in that workspace will be available.
+**Important:** Select the **workspace containing your projects** when creating your token. The "No Workspace" option does not provide access to any projects because it lacks a workspace context.
+
+If you have projects in multiple workspaces, you'll need to create separate integrations with tokens scoped to each workspace.
 
 ### Permissions
 
@@ -83,8 +85,8 @@ For the **On Deployment Event** trigger, you'll need to manually configure webho
 
 ### Troubleshooting
 
-- **"Not Authorized" error**: Your token may be scoped to a workspace that doesn't include the project you're trying to access. Create a new token with "No Scoping" selected.
-- **Projects not showing**: Try disconnecting and reconnecting the integration to refresh the project list.`
+- **"Not Authorized" error**: Your token may be scoped to a workspace that doesn't include the project you're trying to access.
+- **Projects not showing**: Make sure your token is scoped to a specific workspace, not "No Workspace". Try disconnecting and reconnecting the integration after creating a new token.`
 }
 
 func (r *Railway) Configuration() []configuration.Field {
@@ -95,7 +97,7 @@ func (r *Railway) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
 			Required:    true,
-			Description: "Create a token at railway.app/account/tokens. Use 'No Workspace' to access all projects.",
+			Description: "Create a token at railway.app/account/tokens. Select a specific workspace to access its projects.",
 			Placeholder: "YOUR RAILWAY API TOKEN",
 		},
 	}
