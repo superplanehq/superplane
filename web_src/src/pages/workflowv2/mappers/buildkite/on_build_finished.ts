@@ -88,13 +88,6 @@ export const onBuildFinishedTriggerRenderer: TriggerRenderer = {
     const metadata = node.metadata as unknown as OnBuildFinishedMetadata;
     const metadataItems = [];
 
-    if (metadata?.organization) {
-      metadataItems.push({
-        icon: "users",
-        label: metadata.organization,
-      });
-    }
-
     if (metadata?.pipeline) {
       metadataItems.push({
         icon: "layers",

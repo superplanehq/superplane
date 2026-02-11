@@ -37,8 +37,7 @@ var TerminalStates = map[string]bool{
 type TriggerBuild struct{}
 
 type TriggerBuildNodeMetadata struct {
-	Organization string `json:"organization"`
-	Pipeline     string `json:"pipeline"`
+	Pipeline string `json:"pipeline"`
 }
 
 type TriggerBuildExecutionMetadata struct {
@@ -58,13 +57,12 @@ type KeyValuePair struct {
 }
 
 type TriggerBuildSpec struct {
-	Organization string         `json:"organization"`
-	Pipeline     string         `json:"pipeline"`
-	Branch       string         `json:"branch"`
-	Commit       string         `json:"commit"`
-	Message      string         `json:"message,omitempty"`
-	Env          []KeyValuePair `json:"env,omitempty" mapstructure:"env"`
-	Metadata     []KeyValuePair `json:"meta_data,omitempty" mapstructure:"meta_data"`
+	Pipeline string         `json:"pipeline"`
+	Branch   string         `json:"branch"`
+	Commit   string         `json:"commit"`
+	Message  string         `json:"message,omitempty"`
+	Env      []KeyValuePair `json:"env,omitempty" mapstructure:"env"`
+	Metadata []KeyValuePair `json:"meta_data,omitempty" mapstructure:"meta_data"`
 }
 
 func (r *TriggerBuild) Name() string {
@@ -124,17 +122,6 @@ func (r *TriggerBuild) ExampleOutput() map[string]any {
 func (r *TriggerBuild) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:     "organization",
-			Label:    "Organization",
-			Type:     configuration.FieldTypeIntegrationResource,
-			Required: true,
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: "organization",
-				},
-			},
-		},
-		{
 			Name:     "pipeline",
 			Label:    "Pipeline",
 			Type:     configuration.FieldTypeIntegrationResource,
@@ -142,14 +129,6 @@ func (r *TriggerBuild) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "pipeline",
-					Parameters: []configuration.ParameterRef{
-						{
-							Name: "organization",
-							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "organization",
-							},
-						},
-					},
 				},
 			},
 		},
@@ -235,8 +214,8 @@ func (r *TriggerBuild) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	if config.Organization == "" || config.Pipeline == "" {
-		return fmt.Errorf("organization and pipeline are required")
+	if config.Pipeline == "" {
+		return fmt.Errorf("pipeline is required")
 	}
 
 	metadata := TriggerBuildNodeMetadata{}
@@ -245,13 +224,12 @@ func (r *TriggerBuild) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	if metadata.Organization == config.Organization && metadata.Pipeline == config.Pipeline {
+	if metadata.Pipeline == config.Pipeline {
 		return nil
 	}
 
 	err = ctx.Metadata.Set(TriggerBuildNodeMetadata{
-		Organization: config.Organization,
-		Pipeline:     config.Pipeline,
+		Pipeline: config.Pipeline,
 	})
 	if err != nil {
 		return err
@@ -277,6 +255,16 @@ func (r *TriggerBuild) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	// Get organization from integration config
+	orgConfig, err := ctx.Integration.GetConfig("organization")
+	if err != nil {
+		return fmt.Errorf("failed to get organization from integration config: %w", err)
+	}
+	orgSlug, err := extractOrgSlug(string(orgConfig))
+	if err != nil {
+		return fmt.Errorf("failed to extract organization slug: %w", err)
+	}
+
 	envMap := make(map[string]string, len(spec.Env))
 	for _, e := range spec.Env {
 		envMap[e.Name] = e.Value
@@ -297,7 +285,7 @@ func (r *TriggerBuild) Execute(ctx core.ExecutionContext) error {
 		Metadata: metadataMap,
 	}
 
-	build, err := client.CreateBuild(spec.Organization, spec.Pipeline, buildReq)
+	build, err := client.CreateBuild(orgSlug, spec.Pipeline, buildReq)
 	if err != nil {
 		return fmt.Errorf("error creating build: %v", err)
 	}
@@ -306,7 +294,7 @@ func (r *TriggerBuild) Execute(ctx core.ExecutionContext) error {
 		BuildID:      build.ID,
 		BuildNumber:  build.Number,
 		WebURL:       build.WebURL,
-		Organization: spec.Organization,
+		Organization: orgSlug,
 		Pipeline:     spec.Pipeline,
 		State:        build.State,
 		Blocked:      build.Blocked,

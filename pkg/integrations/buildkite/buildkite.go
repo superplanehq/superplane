@@ -167,7 +167,6 @@ func (b *Buildkite) Sync(ctx core.SyncContext) error {
 	metadata.SetupComplete = true
 	ctx.Integration.SetMetadata(metadata)
 
-	ctx.Integration.RemoveBrowserAction()
 	ctx.Integration.Ready()
 	return nil
 }
@@ -317,9 +316,13 @@ func (b *Buildkite) ListResources(resourceType string, ctx core.ListResourcesCon
 		return resources, nil
 
 	case "pipeline":
-		orgSlug := ctx.Parameters["organization"]
-		if orgSlug == "" {
-			return []core.IntegrationResource{}, nil
+		orgConfig, err := ctx.Integration.GetConfig("organization")
+		if err != nil {
+			return nil, fmt.Errorf("failed to get organization from integration config: %w", err)
+		}
+		orgSlug, err := extractOrgSlug(string(orgConfig))
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract organization slug: %w", err)
 		}
 
 		pipelines, err := client.ListPipelines(orgSlug)

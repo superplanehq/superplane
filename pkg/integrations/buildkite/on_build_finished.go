@@ -13,16 +13,14 @@ import (
 type OnBuildFinished struct{}
 
 type OnBuildFinishedMetadata struct {
-	Organization      string  `json:"organization"`
 	Pipeline          string  `json:"pipeline"`
 	Branch            string  `json:"branch,omitempty"`
 	AppSubscriptionID *string `json:"appSubscriptionID,omitempty"`
 }
 
 type OnBuildFinishedConfiguration struct {
-	Organization string `json:"organization"`
-	Pipeline     string `json:"pipeline"`
-	Branch       string `json:"branch,omitempty"`
+	Pipeline string `json:"pipeline"`
+	Branch   string `json:"branch,omitempty"`
 }
 
 type BuildkiteSubscriptionConfiguration struct {
@@ -136,17 +134,6 @@ func (t *OnBuildFinished) ExampleData() map[string]any {
 func (t *OnBuildFinished) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:     "organization",
-			Label:    "Organization",
-			Type:     configuration.FieldTypeIntegrationResource,
-			Required: true,
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: "organization",
-				},
-			},
-		},
-		{
 			Name:     "pipeline",
 			Label:    "Pipeline",
 			Type:     configuration.FieldTypeIntegrationResource,
@@ -154,14 +141,6 @@ func (t *OnBuildFinished) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "pipeline",
-					Parameters: []configuration.ParameterRef{
-						{
-							Name: "organization",
-							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "organization",
-							},
-						},
-					},
 				},
 			},
 		},
@@ -190,36 +169,38 @@ func (t *OnBuildFinished) Setup(ctx core.TriggerContext) error {
 	}
 
 	// Validate that we have the required configuration
-	if config.Organization == "" || config.Pipeline == "" {
-		return fmt.Errorf("organization and pipeline are required for trigger configuration")
+	if config.Pipeline == "" {
+		return fmt.Errorf("pipeline is required for trigger configuration")
 	}
 
-	subscriptionID, err := t.subscribe(ctx, metadata)
+	subscriptionID, err := t.subscribe(ctx, metadata, config)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to buildkite events: %w", err)
 	}
 
 	return ctx.Metadata.Set(OnBuildFinishedMetadata{
-		Organization:      config.Organization,
 		Pipeline:          config.Pipeline,
 		Branch:            config.Branch,
 		AppSubscriptionID: subscriptionID,
 	})
 }
 
-func (t *OnBuildFinished) subscribe(ctx core.TriggerContext, metadata OnBuildFinishedMetadata) (*string, error) {
+func (t *OnBuildFinished) subscribe(ctx core.TriggerContext, metadata OnBuildFinishedMetadata, config OnBuildFinishedConfiguration) (*string, error) {
 	if metadata.AppSubscriptionID != nil {
 		return metadata.AppSubscriptionID, nil
 	}
 
-	// Decode configuration for subscription
-	var config OnBuildFinishedConfiguration
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return nil, fmt.Errorf("failed to decode configuration: %w", err)
+	orgConfig, err := ctx.Integration.GetConfig("organization")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get organization from integration config: %w", err)
+	}
+	orgSlug, err := extractOrgSlug(string(orgConfig))
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract organization slug: %w", err)
 	}
 
 	subscriptionID, err := ctx.Integration.Subscribe(BuildkiteSubscriptionConfiguration{
-		Organization: config.Organization,
+		Organization: orgSlug,
 		Pipeline:     config.Pipeline,
 		Branch:       config.Branch,
 	})
@@ -278,13 +259,19 @@ func (t *OnBuildFinished) HandleWebhook(ctx core.WebhookRequestContext) (int, er
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	// Filter by configuration
-	if config.Organization != "" {
-		if org, ok := data["organization"].(map[string]any); ok {
-			if orgSlug, ok := org["slug"].(string); ok {
-				if config.Organization != orgSlug && config.Organization != "*" {
-					return http.StatusOK, nil
-				}
+	// Filter by organization from integration config
+	orgConfig, err := ctx.Integration.GetConfig("organization")
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to get organization from integration config: %w", err)
+	}
+	expectedOrgSlug, err := extractOrgSlug(string(orgConfig))
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to extract organization slug: %w", err)
+	}
+	if org, ok := data["organization"].(map[string]any); ok {
+		if orgSlug, ok := org["slug"].(string); ok {
+			if expectedOrgSlug != orgSlug && expectedOrgSlug != "*" {
+				return http.StatusOK, nil
 			}
 		}
 	}

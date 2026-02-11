@@ -241,19 +241,12 @@ function triggerBuildMetadataList(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as TriggerBuildConfiguration | undefined;
   const nodeMetadata = node.metadata as TriggerBuildNodeMetadata | undefined;
 
-  const organizationName = nodeMetadata?.organization?.name;
   const pipelineName = nodeMetadata?.pipeline?.name;
 
-  if (organizationName) {
-    metadata.push({ icon: "folder", label: organizationName });
-  } else if (configuration?.organization) {
-    metadata.push({ icon: "folder", label: configuration.organization });
-  }
-
   if (pipelineName) {
-    metadata.push({ icon: "git-branch", label: pipelineName });
+    metadata.push({ icon: "layers", label: pipelineName });
   } else if (configuration?.pipeline) {
-    metadata.push({ icon: "git-branch", label: configuration.pipeline });
+    metadata.push({ icon: "layers", label: configuration.pipeline });
   }
 
   if (configuration?.branch) {
