@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -54,17 +55,21 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		headers.Set("circleci-signature", signature)
 
 		eventContext := &contexts.EventContext{}
+		requestContext := &contexts.RequestContext{}
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:    body,
-			Headers: headers,
-			Webhook: &contexts.WebhookContext{Secret: secret},
-			Events:  eventContext,
+			Body:     body,
+			Headers:  headers,
+			Webhook:  &contexts.WebhookContext{Secret: secret},
+			Events:   eventContext,
+			Requests: requestContext,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
 		require.NoError(t, err)
-		assert.Equal(t, 1, eventContext.Count())
-		assert.Equal(t, "circleci.workflow.completed", eventContext.Payloads[0].Type)
+		// The webhook schedules a poll action instead of emitting immediately
+		assert.Equal(t, "poll", requestContext.Action)
+		assert.Equal(t, "pipe-123", requestContext.Params["pipelineId"])
+		assert.Equal(t, 3*time.Second, requestContext.Duration)
 	})
 
 	t.Run("valid signature with non-workflow-completed event -> no event emitted", func(t *testing.T) {
