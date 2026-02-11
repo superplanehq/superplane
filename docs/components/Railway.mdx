@@ -28,6 +28,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 2. Click **"Create Token"** to generate a new API token
 3. Give your token a descriptive name (e.g., "SuperPlane Integration")
 
+
 ### Token Scoping
 
 Railway offers different token scoping options:
@@ -35,7 +36,7 @@ Railway offers different token scoping options:
 | Scope | Access Level | Use Case |
 |-------|--------------|----------|
 | **No Workspace** | All workspaces and projects | Recommended for SuperPlane |
-| **Team/Workspace** | Projects in a specific workspace only | Limited to one workspace |
+| **Project-specific** | Projects in a specific workspace only | Limited to one workspace |
 
 **Recommendation:** Select **"No Workspace"** when creating your token. This allows SuperPlane to access all your projects across workspaces. If you scope the token to a specific workspace, only projects in that workspace will be available.
 
