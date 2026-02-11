@@ -56,7 +56,15 @@ func (t *OnAlertFiring) Configuration() []configuration.Field {
 }
 
 func (t *OnAlertFiring) Setup(ctx core.TriggerContext) error {
-	return ctx.Integration.RequestWebhook(struct{}{})
+	if err := ctx.Integration.RequestWebhook(struct{}{}); err != nil {
+		return err
+	}
+
+	if err := setWebhookURLMetadata(ctx); err != nil {
+		ctx.Logger.Warnf("grafana onAlertFiring: failed to store webhook url metadata: %v", err)
+	}
+
+	return nil
 }
 
 func (t *OnAlertFiring) Actions() []core.Action {
@@ -127,4 +135,23 @@ func extractString(value any) string {
 		return ""
 	}
 	return strings.TrimSpace(text)
+}
+
+func setWebhookURLMetadata(ctx core.TriggerContext) error {
+	webhookURL, err := ctx.Webhook.GetURL()
+	if err != nil {
+		return err
+	}
+
+	metadata := map[string]any{}
+	if existing := ctx.Metadata.Get(); existing != nil {
+		if existingMap, ok := existing.(map[string]any); ok {
+			for key, value := range existingMap {
+				metadata[key] = value
+			}
+		}
+	}
+
+	metadata["webhookUrl"] = webhookURL
+	return ctx.Metadata.Set(metadata)
 }

@@ -49,6 +49,11 @@ func (w *WebhookContext) Setup() (string, error) {
 	return id.String(), nil
 }
 
+func (w *WebhookContext) GetURL() (string, error) {
+	id := uuid.New()
+	return fmt.Sprintf("%s/webhooks/%s", w.GetBaseURL(), id.String()), nil
+}
+
 func (w *WebhookContext) GetBaseURL() string {
 	return "http://localhost:3000/api/v1"
 }

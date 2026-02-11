@@ -33,7 +33,7 @@ type grafanaQueryRequest struct {
 
 type grafanaQuery struct {
 	RefID         string `json:"refId"`
-	DatasourceUID string `json:"datasourceUid"`
+	Datasource    any    `json:"datasource,omitempty"`
 	Expr          string `json:"expr,omitempty"`
 	Query         string `json:"query,omitempty"`
 	Format        string `json:"format,omitempty"`
@@ -160,7 +160,7 @@ func (q *QueryDataSource) Execute(ctx core.ExecutionContext) error {
 		Queries: []grafanaQuery{
 			{
 				RefID:         "A",
-				DatasourceUID: strings.TrimSpace(spec.DataSourceUID),
+				Datasource:    map[string]string{"uid": strings.TrimSpace(spec.DataSourceUID)},
 				Expr:          strings.TrimSpace(spec.Query),
 				Query:         strings.TrimSpace(spec.Query),
 			},

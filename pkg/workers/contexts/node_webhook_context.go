@@ -66,6 +66,14 @@ func (c *NodeWebhookContext) ResetSecret() ([]byte, []byte, error) {
 	return []byte(plainKey), encryptedKey, nil
 }
 
+func (c *NodeWebhookContext) GetURL() (string, error) {
+	if c.node.WebhookID == nil {
+		return "", fmt.Errorf("node does not have a webhook")
+	}
+
+	return fmt.Sprintf("%s/webhooks/%s", c.GetBaseURL(), c.node.WebhookID.String()), nil
+}
+
 func (c *NodeWebhookContext) Setup() (string, error) {
 	webhook, err := c.findOrCreateWebhook()
 	if err != nil {
