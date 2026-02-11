@@ -141,9 +141,6 @@ func (c *RollbackDeploy) Execute(ctx core.ExecutionContext) error {
 	}
 
 	payload := deployPayloadFromDeployResponse(deploy)
-	if deploy.FinishedAt != "" {
-		payload["finishedAt"] = deploy.FinishedAt
-	}
 
 	return ctx.ExecutionState.Emit(RollbackDeployOutputChannel, RollbackDeployPayloadType, []any{payload})
 }
