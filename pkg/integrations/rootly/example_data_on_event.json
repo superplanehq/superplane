@@ -1,69 +1,7 @@
----
-title: "Rootly"
----
-
-Manage and react to incidents in Rootly
-
-## Triggers
-
-<CardGrid>
-  <LinkCard title="On Event" href="#on-event" description="Listen to incident timeline events" />
-  <LinkCard title="On Incident" href="#on-incident" description="Listen to incident events" />
-</CardGrid>
-
-import { CardGrid, LinkCard } from "@astrojs/starlight/components";
-
-## Actions
-
-<CardGrid>
-  <LinkCard title="Create Event" href="#create-event" description="Add a timeline event to a Rootly incident" />
-  <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in Rootly" />
-</CardGrid>
-
-<a id="on-event"></a>
-
-## On Event
-
-The On Event trigger starts a workflow execution when Rootly incident timeline events are created or updated.
-
-### Use Cases
-
-- **Incident notes**: Notify Slack or other systems when a note is added
-- **Timeline sync**: Mirror timeline events into external systems
-- **Investigation automation**: React to annotations as they are added or edited
-
-### Configuration
-
-- **Incident Status** (optional): Filter by incident status
-- **Severity** (optional): Filter by incident severity
-- **Service** (optional): Filter by service name
-- **Team** (optional): Filter by team name
-- **Event Source** (optional): Filter by event source
-- **Visibility** (optional): Filter by visibility (internal/external)
-- **Event Kind** (optional): Filter by event kind (e.g. note, annotation)
-
-### Event Data
-
-Each event includes:
-- **id**: Timeline event ID
-- **event**: Event text
-- **kind**: Event kind
-- **occurred_at**: When the event occurred
-- **created_at**: When the event was created
-- **user_display_name**: Display name of the event author (if available)
-- **incident**: Incident data from Rootly
-
-### Webhook Setup
-
-This trigger automatically sets up a Rootly webhook endpoint when configured. The endpoint is managed by SuperPlane and will be cleaned up when the trigger is removed.
-
-### Example Data
-
-```json
 {
   "data": {
     "created_at": "2026-02-11T16:40:08.611+01:00",
-    "event": "Teams has been added: \u003ca class=\"badge \" style=\"background-color: #D7F5E1 !important; color: #292b2c !important\" target=\"_blank\" href=\"https://rootly.com/account/teams/leadership/status\"\u003eLeadership\u003c/a\u003e",
+    "event": "Teams has been added: <a class=\"badge \" style=\"background-color: #D7F5E1 !important; color: #292b2c !important\" target=\"_blank\" href=\"https://rootly.com/account/teams/leadership/status\">Leadership</a>",
     "id": "db22556b-06e8-45ef-bef9-d53692e67bae",
     "incident": {
       "acknowledged_at": null,
@@ -90,7 +28,7 @@ This trigger automatically sets up a Rootly webhook endpoint when configured. Th
       "events": [
         {
           "created_at": "2026-02-11T16:40:08.611+01:00",
-          "event": "Teams has been added: \u003ca class=\"badge \" style=\"background-color: #D7F5E1 !important; color: #292b2c !important\" target=\"_blank\" href=\"https://rootly.com/account/teams/leadership/status\"\u003eLeadership\u003c/a\u003e",
+          "event": "Teams has been added: <a class=\"badge \" style=\"background-color: #D7F5E1 !important; color: #292b2c !important\" target=\"_blank\" href=\"https://rootly.com/account/teams/leadership/status\">Leadership</a>",
           "event_raw": "Teams has been added: [Leadership](https://rootly.com/account/teams/leadership/status)",
           "id": "db22556b-06e8-45ef-bef9-d53692e67bae",
           "incident_id": "f19305cd-4a58-4f45-8ad3-5f3ea22c3a04",
@@ -138,7 +76,7 @@ This trigger automatically sets up a Rootly webhook endpoint when configured. Th
         },
         {
           "created_at": "2026-02-11T16:38:21.123+01:00",
-          "event": "Started date has been set to \u003cspan class=\"badge badge-info-inverted\"\u003eFebruary 11  4:38 PM CET\u003c/span\u003e",
+          "event": "Started date has been set to <span class=\"badge badge-info-inverted\">February 11  4:38 PM CET</span>",
           "event_raw": "Started date has been set to February 11 4:38 PM CET",
           "id": "24555d11-c74b-4250-a47f-01c55e726f4f",
           "incident_id": "f19305cd-4a58-4f45-8ad3-5f3ea22c3a04",
@@ -326,147 +264,3 @@ This trigger automatically sets up a Rootly webhook endpoint when configured. Th
   "timestamp": "2026-02-11T15:40:28.510102353Z",
   "type": "rootly.onEvent"
 }
-```
-
-<a id="on-incident"></a>
-
-## On Incident
-
-The On Incident trigger starts a workflow execution when Rootly incident events occur.
-
-### Use Cases
-
-- **Incident automation**: Automate responses to incident events
-- **Notification workflows**: Send notifications when incidents are created or resolved
-- **Integration workflows**: Sync incidents with external systems
-- **Post-incident actions**: Trigger follow-up workflows when incidents are mitigated or resolved
-
-### Configuration
-
-- **Events**: Select which incident events to listen for (created, updated, mitigated, resolved, cancelled, deleted)
-
-### Event Data
-
-Each incident event includes:
-- **event**: Event type (incident.created, incident.updated, etc.)
-- **incident**: Complete incident information including title, summary, severity, status
-
-### Webhook Setup
-
-This trigger automatically sets up a Rootly webhook endpoint when configured. The endpoint is managed by SuperPlane and will be cleaned up when the trigger is removed.
-
-### Example Data
-
-```json
-{
-  "data": {
-    "event": "incident.created",
-    "incident": {
-      "id": "abc123-def456",
-      "mitigated_at": null,
-      "resolved_at": null,
-      "severity": "sev2",
-      "started_at": "2026-01-19T12:00:00Z",
-      "status": "started",
-      "summary": "The API response times have increased significantly across all endpoints.",
-      "title": "API latency spike detected",
-      "url": "https://app.rootly.com/incidents/abc123-def456"
-    }
-  },
-  "timestamp": "2026-01-19T12:00:00Z",
-  "type": "rootly.onIncident"
-}
-```
-
-<a id="create-event"></a>
-
-## Create Event
-
-The Create Event component adds a timeline event (note/annotation) to a Rootly incident.
-
-### Use Cases
-
-- **Investigation notes**: Add detailed investigation notes to the incident timeline
-- **Status updates**: Post automated status updates as workflows progress
-- **Cross-system sync**: Sync comments from external tools into the incident timeline
-
-### Configuration
-
-- **Incident ID**: The Rootly incident UUID to add the event to (required, supports expressions)
-- **Event**: The note/annotation text (required, supports expressions)
-- **Visibility**: Internal or external visibility (optional, default per Rootly)
-
-### Output
-
-Returns the created incident event with:
-- **id**: Event ID
-- **event**: Event content
-- **visibility**: Event visibility
-- **occurred_at**: Event timestamp
-- **created_at**: Creation timestamp
-
-### Example Output
-
-```json
-{
-  "data": {
-    "created_at": "2026-02-10T07:34:35.902-8:00",
-    "event": "Investigation update: database connections stabilized.",
-    "id": "a2d32bb7-0417-4d0d-8483-a583c3-7853",
-    "occurred_at": "2026-02-10T07:34:35.902-8:00",
-    "visibility": "internal"
-  },
-  "timestamp": "2026-02-10T15:34:36.09877478Z",
-  "type": "rootly.incident.event"
-}
-```
-
-<a id="create-incident"></a>
-
-## Create Incident
-
-The Create Incident component creates a new incident in Rootly.
-
-### Use Cases
-
-- **Alert escalation**: Create incidents from monitoring alerts
-- **Error tracking**: Automatically create incidents when errors are detected
-- **Manual incident creation**: Create incidents from workflow events
-- **Integration workflows**: Create incidents from external system events
-
-### Configuration
-
-- **Title**: A succinct description of the incident (required, supports expressions)
-- **Summary**: Additional details about the incident (optional, supports expressions)
-- **Severity**: Incident severity level (optional, supports expressions)
-
-### Output
-
-Returns the created incident object including:
-- **id**: Incident ID
-- **title**: Incident title
-- **status**: Current incident status
-- **severity**: Incident severity
-- **started_at**: Incident creation timestamp
-- **url**: Link to the incident in Rootly
-
-### Example Output
-
-```json
-{
-  "data": {
-    "incident": {
-      "id": "abc123-def456",
-      "severity": "sev1",
-      "started_at": "2026-01-19T12:00:00Z",
-      "status": "started",
-      "summary": "Users are experiencing slow database queries and connection timeouts.",
-      "title": "Database connection issues",
-      "url": "https://app.rootly.com/incidents/abc123-def456"
-    }
-  },
-  "timestamp": "2026-01-19T12:00:00Z",
-  "type": "rootly.incident"
-}
-```
-
