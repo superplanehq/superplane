@@ -1,13 +1,11 @@
 {
     "type": "semaphore.pipeline",
     "data": {
-        "pipeline": {
-            "name": "Initial Pipeline",
-            "ppl_id": "00000000-0000-0000-0000-000000000000",
-            "wf_id": "00000000-0000-0000-0000-000000000001",
-            "state": "done",
-            "result": "passed"
-        }
+        "name": "Initial Pipeline",
+        "ppl_id": "00000000-0000-0000-0000-000000000000",
+        "wf_id": "00000000-0000-0000-0000-000000000001",
+        "state": "done",
+        "result": "passed"
     },
     "timestamp": "2026-01-22T15:32:56Z"
 }
