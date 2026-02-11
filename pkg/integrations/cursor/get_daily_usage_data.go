@@ -148,8 +148,19 @@ func (c *GetDailyUsageData) Execute(ctx core.ExecutionContext) error {
 	}
 
 	now := time.Now().UTC()
-	endOfDay := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 0, time.UTC)
-	startOfWeek := endOfDay.AddDate(0, 0, -7)
+
+	startOfToday := time.Date(
+		now.Year(), now.Month(), now.Day(),
+		0, 0, 0, 0, time.UTC,
+	)
+
+	endOfDay := time.Date(
+		now.Year(), now.Month(), now.Day(),
+		23, 59, 59, 0, time.UTC,
+	)
+
+	// Default: 7 days ago at 00:00:00 UTC
+	startOfWeek := startOfToday.AddDate(0, 0, -7)
 
 	var startDate, endDate time.Time
 	var err error

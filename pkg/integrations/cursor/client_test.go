@@ -63,6 +63,8 @@ func Test__Client__VerifyLaunchAgent(t *testing.T) {
 	})
 }
 
+func ptrBool(b bool) *bool { return &b }
+
 func Test__Client__LaunchAgent(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
@@ -95,7 +97,7 @@ func Test__Client__LaunchAgent(t *testing.T) {
 				Ref:        "main",
 			},
 			Target: launchAgentTarget{
-				AutoCreatePr: true,
+				AutoCreatePr: ptrBool(true),
 				BranchName:   "cursor/agent-abc123",
 			},
 		}

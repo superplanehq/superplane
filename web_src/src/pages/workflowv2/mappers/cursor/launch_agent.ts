@@ -55,10 +55,8 @@ export const launchAgentMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
     const metadata = context.execution.metadata as LaunchAgentMetadata | undefined;
-    const outputs = context.execution.outputs as
-      | { passed?: OutputPayload[]; failed?: OutputPayload[]; default?: OutputPayload[] }
-      | undefined;
-    const payload = outputs?.passed?.[0] ?? outputs?.failed?.[0] ?? outputs?.default?.[0];
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+    const payload = outputs?.default?.[0];
     const data = payload?.data as LaunchAgentPayloadData | undefined;
 
     // Cloud Agent link (from metadata; API may set agent.url)

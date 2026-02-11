@@ -127,7 +127,11 @@ func (c *LaunchAgent) poll(ctx core.ActionContext) error {
 	// Check Max Attempts
 	if pollAttempt > LaunchAgentMaxPollAttempts {
 		ctx.Logger.Errorf("Agent %s exceeded maximum poll attempts. Failing.", metadata.Agent.ID)
-		outputPayload := buildOutputPayload("timeout", metadata.Agent.ID, "", "Polling timed out", metadata.Target.BranchName)
+		branchName := ""
+		if metadata.Target != nil {
+			branchName = metadata.Target.BranchName
+		}
+		outputPayload := buildOutputPayload("timeout", metadata.Agent.ID, "", "Polling timed out", branchName)
 		return ctx.ExecutionState.Emit(LaunchAgentDefaultChannel, LaunchAgentPayloadType, []any{outputPayload})
 	}
 
@@ -143,7 +147,11 @@ func (c *LaunchAgent) poll(ctx core.ActionContext) error {
 		pollErrors++
 		if pollErrors >= LaunchAgentMaxPollErrors {
 			ctx.Logger.Errorf("Agent %s exceeded max poll errors. Failing.", metadata.Agent.ID)
-			outputPayload := buildOutputPayload("error", metadata.Agent.ID, "", "Polling failed repeatedly", metadata.Target.BranchName)
+			branchName := ""
+			if metadata.Target != nil {
+				branchName = metadata.Target.BranchName
+			}
+			outputPayload := buildOutputPayload("error", metadata.Agent.ID, "", "Polling failed repeatedly", branchName)
 			return ctx.ExecutionState.Emit(LaunchAgentDefaultChannel, LaunchAgentPayloadType, []any{outputPayload})
 		}
 		return c.scheduleNextPoll(ctx, pollAttempt+1, pollErrors)
@@ -172,10 +180,12 @@ func (c *LaunchAgent) poll(ctx core.ActionContext) error {
 	// Check for Completion
 	if isTerminalStatus(agentStatus.Status) {
 		prURL := ""
+		branchName := ""
 		if metadata.Target != nil {
 			prURL = metadata.Target.PrURL
+			branchName = metadata.Target.BranchName
 		}
-		outputPayload := buildOutputPayload(agentStatus.Status, metadata.Agent.ID, prURL, agentStatus.Summary, metadata.Target.BranchName)
+		outputPayload := buildOutputPayload(agentStatus.Status, metadata.Agent.ID, prURL, agentStatus.Summary, branchName)
 		return ctx.ExecutionState.Emit(LaunchAgentDefaultChannel, LaunchAgentPayloadType, []any{outputPayload})
 	}
 

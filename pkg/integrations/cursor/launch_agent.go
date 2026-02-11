@@ -119,6 +119,13 @@ func (c *LaunchAgent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 	return ctx.DefaultProcessing()
 }
 
+var (
+	launchAgentFalse = false
+	launchAgentTrue  = true
+)
+
+func ptrFromBool(b bool) *bool { return &b }
+
 func (c *LaunchAgent) Execute(ctx core.ExecutionContext) error {
 	spec := LaunchAgentSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
@@ -159,10 +166,10 @@ func (c *LaunchAgent) Execute(ctx core.ExecutionContext) error {
 	// 3. Construct API Payload
 	source := launchAgentSource{}
 	target := launchAgentTarget{
-		AutoCreatePr:          spec.AutoCreatePr,
-		OpenAsCursorGithubApp: spec.UseCursorBot,
+		AutoCreatePr:          ptrFromBool(spec.AutoCreatePr),
+		OpenAsCursorGithubApp: ptrFromBool(spec.UseCursorBot),
 		BranchName:            branchName,
-		SkipReviewerRequest:   LaunchAgentSkipReviewerRequest,
+		SkipReviewerRequest:   ptrFromBool(LaunchAgentSkipReviewerRequest),
 	}
 
 	if spec.SourceMode == "pr" {

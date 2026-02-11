@@ -89,11 +89,11 @@ type launchAgentSource struct {
 }
 
 type launchAgentTarget struct {
-	AutoCreatePr          bool   `json:"autoCreatePr,omitempty"`
-	OpenAsCursorGithubApp bool   `json:"openAsCursorGithubApp,omitempty"`
+	AutoCreatePr          *bool  `json:"autoCreatePr,omitempty"`
+	OpenAsCursorGithubApp *bool  `json:"openAsCursorGithubApp,omitempty"`
 	BranchName            string `json:"branchName,omitempty"`
 	AutoBranch            *bool  `json:"autoBranch,omitempty"`
-	SkipReviewerRequest   bool   `json:"skipReviewerRequest,omitempty"`
+	SkipReviewerRequest   *bool  `json:"skipReviewerRequest,omitempty"`
 }
 
 type launchAgentWebhook struct {
@@ -120,9 +120,9 @@ type launchAgentTargetResponse struct {
 	BranchName            string `json:"branchName,omitempty"`
 	URL                   string `json:"url,omitempty"`
 	PrURL                 string `json:"prUrl,omitempty"`
-	AutoCreatePr          bool   `json:"autoCreatePr,omitempty"`
-	OpenAsCursorGithubApp bool   `json:"openAsCursorGithubApp,omitempty"`
-	SkipReviewerRequest   bool   `json:"skipReviewerRequest,omitempty"`
+	AutoCreatePr          *bool  `json:"autoCreatePr,omitempty"`
+	OpenAsCursorGithubApp *bool  `json:"openAsCursorGithubApp,omitempty"`
+	SkipReviewerRequest   *bool  `json:"skipReviewerRequest,omitempty"`
 }
 
 type launchAgentWebhookPayload struct {
