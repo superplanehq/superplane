@@ -1,0 +1,11 @@
+{
+  "id": "abc123-def456-789ghi",
+  "title": "Database connection timeout",
+  "summary": "Users experiencing slow response times due to database connectivity issues",
+  "status": "investigating",
+  "severity": "sev1",
+  "started_at": "2024-02-11T10:00:00Z",
+  "resolved_at": null,
+  "mitigated_at": "2024-02-11T10:30:00Z",
+  "url": "https://app.rootly.com/incidents/abc123"
+}
