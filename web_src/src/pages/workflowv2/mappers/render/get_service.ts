@@ -20,7 +20,7 @@ interface GetServiceOutput {
   serviceId?: string;
   serviceName?: string;
   type?: string;
-  suspended?: boolean;
+  suspended?: string;
   dashboardUrl?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -57,7 +57,7 @@ export const getServiceMapper: ComponentBaseMapper = {
       "Service ID": stringOrDash(result?.serviceId),
       "Service Name": stringOrDash(result?.serviceName),
       Type: stringOrDash(result?.type),
-      Suspended: result?.suspended === undefined ? "-" : result.suspended ? "Yes" : "No",
+      Suspended: result?.suspended === undefined ? "-" : result.suspended === "suspended" ? "Yes" : "No",
       "Dashboard URL": stringOrDash(result?.dashboardUrl),
       "Created At": formatTimestamp(result?.createdAt),
       "Updated At": formatTimestamp(result?.updatedAt),

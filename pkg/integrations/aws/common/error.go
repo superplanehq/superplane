@@ -13,8 +13,13 @@ type Error struct {
 }
 
 func (e *Error) Error() string {
-	if e.Message != "" {
-		return fmt.Sprintf("%s: %s", e.Code, e.Message)
+	msg := strings.TrimSpace(e.Message)
+	// Avoid leading ": " when code is empty or message already starts with punctuation
+	if e.Code == "" {
+		return strings.TrimPrefix(msg, ": ")
+	}
+	if msg != "" {
+		return fmt.Sprintf("%s: %s", e.Code, msg)
 	}
 	return e.Code
 }

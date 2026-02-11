@@ -88,7 +88,6 @@ func (c *GetDeploy) ExampleOutput() map[string]any {
 		&exampleOutputGetDeploy,
 	)
 }
-
 func (c *CancelDeploy) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(
 		&exampleOutputCancelDeployOnce,

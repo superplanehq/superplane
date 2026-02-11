@@ -752,6 +752,7 @@ export type OrganizationsUpdateIntegrationBody = {
   configuration?: {
     [key: string]: unknown;
   };
+  name?: string;
 };
 
 export type OrganizationsUpdateIntegrationResponse = {
