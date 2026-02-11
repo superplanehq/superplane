@@ -33,8 +33,7 @@ type RunPipelineNodeMetadata struct {
 }
 
 type RunPipelineExecutionMetadata struct {
-	Pipeline  PipelineInfo   `json:"pipeline" mapstructure:"pipeline"`
-	Workflows []WorkflowInfo `json:"workflows" mapstructure:"workflows"`
+	Pipeline PipelineInfo `json:"pipeline" mapstructure:"pipeline"`
 }
 
 type PipelineInfo struct {
@@ -329,7 +328,6 @@ func (t *RunPipeline) Execute(ctx core.ExecutionContext) error {
 			CreatedAt:   response.CreatedAt,
 			PipelineURL: fmt.Sprintf("https://app.circleci.com/pipelines/%s/%d", spec.ProjectSlug, response.Number),
 		},
-		Workflows: []WorkflowInfo{},
 	}
 
 	err = ctx.Metadata.Set(metadata)
@@ -394,7 +392,7 @@ func (t *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	//
 	// Context by Igor. Circle's API is weird. :)
 	//
-	// 1/ They don't have a concept of pipeline status. You need to get it by calculating the status of all workflows.
+	// 1/ They don't have a concept of pipeline status. You need to get it by fetching and calculating the status of all workflows.
 	// 2/ The API is eventually consistent. When you get a webhook, the pipeline might not be finished yet. *internal cry*
 	//
 	// Instead of trying to process the webhook immediately, we'll schedule a poll action in 3 seconds.
