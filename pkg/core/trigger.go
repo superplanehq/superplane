@@ -127,6 +127,7 @@ type WebhookRequestContext struct {
 
 type NodeWebhookContext interface {
 	Setup() (string, error)
+	GetURL() (string, error)
 	GetSecret() ([]byte, error)
 	ResetSecret() ([]byte, []byte, error)
 	GetBaseURL() string
