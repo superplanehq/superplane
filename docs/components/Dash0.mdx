@@ -11,8 +11,49 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="List Issues" href="#list-issues" description="Query Dash0 to get a list of all current issues using the metric dash0.issue.status" />
   <LinkCard title="Query Prometheus" href="#query-prometheus" description="Execute a PromQL query against Dash0 Prometheus API and return the response data" />
+  <LinkCard title="Update Check Rule" href="#update-check-rule" description="Update an existing check rule in Dash0 configuration API" />
 </CardGrid>
 
+<a id="update-check-rule"></a>
+
+## Update Check Rule
+
+The Update Check Rule component updates an existing Dash0 check rule.
+
+### Use Cases
+
+- **Threshold tuning**: Adjust alert sensitivity as service behavior changes
+- **Noise reduction**: Update rules to avoid unnecessary notifications
+- **Progressive rollout**: Modify rule thresholds during canary/rollout workflows
+
+### Configuration
+
+- **Check Rule**: Existing check rule origin/ID
+- **Rule Specification (JSON)**: Updated check rule payload as JSON object.
+  Accepts Dash0 check rule shape (name + expression) or Prometheus-style
+  groups/rules shape with exactly one alert rule.
+
+### Output
+
+Emits:
+- **originOrId**: Check rule identifier used for the API request
+- **response**: Raw Dash0 API response
+
+### Example Output
+
+```json
+{
+  "data": {
+    "originOrId": "superplane-check-rule-ef45gh67",
+    "response": {
+      "id": "superplane-check-rule-ef45gh67",
+      "status": "updated"
+    }
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.check.rule.updated"
+}
+```
 <a id="list-issues"></a>
 
 ## List Issues
@@ -149,4 +190,3 @@ Returns the Prometheus query response including:
   "type": "dash0.prometheus.response"
 }
 ```
-
