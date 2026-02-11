@@ -2,7 +2,6 @@ package render
 
 import (
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
@@ -188,7 +187,8 @@ func (c *CancelDeploy) Execute(ctx core.ExecutionContext) error {
 
 	// If the deploy is already finished (cancel was immediate), emit right away
 	if deploy.FinishedAt != "" {
-		return c.emitResult(ctx, deploy)
+		payload := deployPayloadFromDeployResponse(deploy)
+		return emitDeployStatusResult(ctx.ExecutionState, deploy.Status, cancelDeployWebhookConfig(), payload)
 	}
 
 	// Wait for deploy_ended webhook; poll as fallback
@@ -255,129 +255,22 @@ func (c *CancelDeploy) poll(ctx core.ActionContext) error {
 		return err
 	}
 
-	return c.emitPollResult(ctx, deploy)
+	payload := deployPayloadFromDeployResponse(deploy)
+	return emitDeployStatusResult(ctx.ExecutionState, deploy.Status, cancelDeployWebhookConfig(), payload)
 }
 
 func (c *CancelDeploy) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	if err := verifyWebhookSignature(ctx); err != nil {
-		return http.StatusForbidden, err
-	}
-
-	payload, err := parseDeployWebhookPayload(ctx.Body)
-	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %w", err)
-	}
-
-	if readString(payload.Type) != "deploy_ended" {
-		return http.StatusOK, nil
-	}
-
-	result, err := c.resolveWebhookResult(ctx, payload)
-	if err != nil {
-		return http.StatusOK, nil
-	}
-	if result.DeployID == "" || result.Status == "" {
-		return http.StatusOK, nil
-	}
-
-	executionCtx, err := findCancelDeployExecutionByID(ctx, result.DeployID)
-	if err != nil {
-		return http.StatusOK, nil
-	}
-	if executionCtx == nil {
-		return http.StatusOK, nil
-	}
-
-	metadata := DeployExecutionMetadata{}
-	if err := mapstructure.Decode(executionCtx.Metadata.Get(), &metadata); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error decoding metadata: %w", err)
-	}
-
-	if metadata.Deploy != nil && metadata.Deploy.FinishedAt != "" {
-		return http.StatusOK, nil
-	}
-
-	applyDeployWebhookResultToMetadata(&metadata, result)
-	if err := executionCtx.Metadata.Set(metadata); err != nil {
-		return http.StatusInternalServerError, err
-	}
-
-	if err := c.emitWebhookResult(executionCtx, deployPayloadFromWebhookResult(result)); err != nil {
-		return http.StatusInternalServerError, err
-	}
-
-	return http.StatusOK, nil
+	return handleDeployEndedWebhook(ctx, cancelDeployWebhookConfig())
 }
 
-func (c *CancelDeploy) resolveWebhookResult(
-	ctx core.WebhookRequestContext,
-	payload deployWebhookPayload,
-) (deployWebhookResult, error) {
-	result := deployWebhookResultFromPayload(payload)
-	eventResult, err := c.resolveDeployFromEvent(ctx, result.EventID)
-	if err != nil {
-		return deployWebhookResult{}, err
+func cancelDeployWebhookConfig() deployEndedWebhookConfig {
+	return deployEndedWebhookConfig{
+		executionKey:   cancelDeployExecutionKey,
+		successStatus:  "canceled",
+		successChannel: CancelDeploySuccessOutputChannel,
+		failedChannel:  CancelDeployFailedOutputChannel,
+		payloadType:    CancelDeployPayloadType,
 	}
-
-	return mergeDeployWebhookResults(result, eventResult), nil
-}
-
-func (c *CancelDeploy) resolveDeployFromEvent(
-	ctx core.WebhookRequestContext,
-	eventID string,
-) (deployWebhookResult, error) {
-	if eventID == "" {
-		return deployWebhookResult{}, nil
-	}
-
-	event, err := resolveWebhookEvent(ctx, eventID)
-	if err != nil {
-		return deployWebhookResult{}, err
-	}
-
-	detailValues := eventDetailValues(event)
-	if detailValues.DeployID == "" {
-		return deployWebhookResult{}, nil
-	}
-
-	return deployWebhookResult{
-		DeployID:   detailValues.DeployID,
-		ServiceID:  readString(event.ServiceID),
-		FinishedAt: readString(event.Timestamp),
-		EventID:    eventID,
-	}, nil
-}
-
-func findCancelDeployExecutionByID(ctx core.WebhookRequestContext, deployID string) (*core.ExecutionContext, error) {
-	if deployID == "" || ctx.FindExecutionByKV == nil {
-		return nil, nil
-	}
-
-	return ctx.FindExecutionByKV(cancelDeployExecutionKey, deployID)
-}
-
-func (c *CancelDeploy) emitResult(ctx core.ExecutionContext, deploy DeployResponse) error {
-	payload := deployPayloadFromDeployResponse(deploy)
-	if deploy.Status == "canceled" {
-		return ctx.ExecutionState.Emit(CancelDeploySuccessOutputChannel, CancelDeployPayloadType, []any{payload})
-	}
-	return ctx.ExecutionState.Emit(CancelDeployFailedOutputChannel, CancelDeployPayloadType, []any{payload})
-}
-
-func (c *CancelDeploy) emitPollResult(ctx core.ActionContext, deploy DeployResponse) error {
-	payload := deployPayloadFromDeployResponse(deploy)
-	if deploy.Status == "canceled" {
-		return ctx.ExecutionState.Emit(CancelDeploySuccessOutputChannel, CancelDeployPayloadType, []any{payload})
-	}
-	return ctx.ExecutionState.Emit(CancelDeployFailedOutputChannel, CancelDeployPayloadType, []any{payload})
-}
-
-func (c *CancelDeploy) emitWebhookResult(ctx *core.ExecutionContext, data map[string]any) error {
-	status := readString(data["status"])
-	if status == "canceled" {
-		return ctx.ExecutionState.Emit(CancelDeploySuccessOutputChannel, CancelDeployPayloadType, []any{data})
-	}
-	return ctx.ExecutionState.Emit(CancelDeployFailedOutputChannel, CancelDeployPayloadType, []any{data})
 }
 
 func (c *CancelDeploy) Cancel(ctx core.ExecutionContext) error {

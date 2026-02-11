@@ -2,7 +2,6 @@ package render
 
 import (
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
@@ -172,11 +171,12 @@ func (c *RollbackDeploy) Execute(ctx core.ExecutionContext) error {
 
 	err = ctx.Metadata.Set(DeployExecutionMetadata{
 		Deploy: &DeployMetadata{
-			ID:         deployID,
-			Status:     readString(deploy.Status),
-			ServiceID:  spec.Service,
-			CreatedAt:  readString(deploy.CreatedAt),
-			FinishedAt: readString(deploy.FinishedAt),
+			ID:                 deployID,
+			Status:             readString(deploy.Status),
+			ServiceID:          spec.Service,
+			CreatedAt:          readString(deploy.CreatedAt),
+			FinishedAt:         readString(deploy.FinishedAt),
+			RollbackToDeployID: spec.RollbackToDeployID,
 		},
 	})
 	if err != nil {
@@ -251,121 +251,23 @@ func (c *RollbackDeploy) poll(ctx core.ActionContext) error {
 		return err
 	}
 
-	return c.emitPollResult(ctx, deploy)
+	payload := deployPayloadFromDeployResponse(deploy)
+	enrichPayloadFromMetadata(payload, &metadata)
+	return emitDeployStatusResult(ctx.ExecutionState, deploy.Status, rollbackDeployWebhookConfig(), payload)
 }
 
 func (c *RollbackDeploy) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	if err := verifyWebhookSignature(ctx); err != nil {
-		return http.StatusForbidden, err
-	}
-
-	payload, err := parseDeployWebhookPayload(ctx.Body)
-	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %w", err)
-	}
-
-	if readString(payload.Type) != "deploy_ended" {
-		return http.StatusOK, nil
-	}
-
-	result, err := c.resolveWebhookResult(ctx, payload)
-	if err != nil {
-		return http.StatusOK, nil
-	}
-	if result.DeployID == "" || result.Status == "" {
-		return http.StatusOK, nil
-	}
-
-	executionCtx, err := findRollbackDeployExecutionByID(ctx, result.DeployID)
-	if err != nil {
-		return http.StatusOK, nil
-	}
-	if executionCtx == nil {
-		return http.StatusOK, nil
-	}
-
-	metadata := DeployExecutionMetadata{}
-	if err := mapstructure.Decode(executionCtx.Metadata.Get(), &metadata); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error decoding metadata: %w", err)
-	}
-
-	if metadata.Deploy != nil && metadata.Deploy.FinishedAt != "" {
-		return http.StatusOK, nil
-	}
-
-	applyDeployWebhookResultToMetadata(&metadata, result)
-	if err := executionCtx.Metadata.Set(metadata); err != nil {
-		return http.StatusInternalServerError, err
-	}
-
-	if err := c.emitWebhookResult(executionCtx, deployPayloadFromWebhookResult(result)); err != nil {
-		return http.StatusInternalServerError, err
-	}
-
-	return http.StatusOK, nil
+	return handleDeployEndedWebhook(ctx, rollbackDeployWebhookConfig())
 }
 
-func (c *RollbackDeploy) resolveWebhookResult(
-	ctx core.WebhookRequestContext,
-	payload deployWebhookPayload,
-) (deployWebhookResult, error) {
-	result := deployWebhookResultFromPayload(payload)
-	eventResult, err := c.resolveDeployFromEvent(ctx, result.EventID)
-	if err != nil {
-		return deployWebhookResult{}, err
+func rollbackDeployWebhookConfig() deployEndedWebhookConfig {
+	return deployEndedWebhookConfig{
+		executionKey:   rollbackDeployExecutionKey,
+		successStatus:  "live",
+		successChannel: RollbackDeploySuccessOutputChannel,
+		failedChannel:  RollbackDeployFailedOutputChannel,
+		payloadType:    RollbackDeployPayloadType,
 	}
-
-	return mergeDeployWebhookResults(result, eventResult), nil
-}
-
-func (c *RollbackDeploy) resolveDeployFromEvent(
-	ctx core.WebhookRequestContext,
-	eventID string,
-) (deployWebhookResult, error) {
-	if eventID == "" {
-		return deployWebhookResult{}, nil
-	}
-
-	event, err := resolveWebhookEvent(ctx, eventID)
-	if err != nil {
-		return deployWebhookResult{}, err
-	}
-
-	detailValues := eventDetailValues(event)
-	if detailValues.DeployID == "" {
-		return deployWebhookResult{}, nil
-	}
-
-	return deployWebhookResult{
-		DeployID:   detailValues.DeployID,
-		ServiceID:  readString(event.ServiceID),
-		FinishedAt: readString(event.Timestamp),
-		EventID:    eventID,
-	}, nil
-}
-
-func findRollbackDeployExecutionByID(ctx core.WebhookRequestContext, deployID string) (*core.ExecutionContext, error) {
-	if deployID == "" || ctx.FindExecutionByKV == nil {
-		return nil, nil
-	}
-
-	return ctx.FindExecutionByKV(rollbackDeployExecutionKey, deployID)
-}
-
-func (c *RollbackDeploy) emitPollResult(ctx core.ActionContext, deploy DeployResponse) error {
-	payload := deployPayloadFromDeployResponse(deploy)
-	if deploy.Status == "live" {
-		return ctx.ExecutionState.Emit(RollbackDeploySuccessOutputChannel, RollbackDeployPayloadType, []any{payload})
-	}
-	return ctx.ExecutionState.Emit(RollbackDeployFailedOutputChannel, RollbackDeployPayloadType, []any{payload})
-}
-
-func (c *RollbackDeploy) emitWebhookResult(ctx *core.ExecutionContext, data map[string]any) error {
-	status := readString(data["status"])
-	if status == "live" {
-		return ctx.ExecutionState.Emit(RollbackDeploySuccessOutputChannel, RollbackDeployPayloadType, []any{data})
-	}
-	return ctx.ExecutionState.Emit(RollbackDeployFailedOutputChannel, RollbackDeployPayloadType, []any{data})
 }
 
 func (c *RollbackDeploy) Cancel(ctx core.ExecutionContext) error {
