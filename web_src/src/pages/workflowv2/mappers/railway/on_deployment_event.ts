@@ -16,18 +16,17 @@ interface OnDeploymentEventConfiguration {
 }
 
 interface DeploymentResource {
-  workspace?: { id?: string; name?: string };
+  owner?: { id?: string; email?: string };
   project?: { id?: string; name?: string };
   environment?: { id?: string; name?: string };
   service?: { id?: string; name?: string };
-  deployment?: { id?: string; status?: string };
+  deployment?: { id?: string };
 }
 
 interface OnDeploymentEventData {
   type?: string;
-  details?: { message?: string };
+  details?: { status?: string };
   resource?: DeploymentResource;
-  severity?: string;
   timestamp?: string;
 }
 
@@ -38,7 +37,7 @@ export const onDeploymentEventTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
     const eventData = context.event?.data as OnDeploymentEventData;
     const serviceName = eventData?.resource?.service?.name || "Service";
-    const status = eventData?.resource?.deployment?.status || "";
+    const status = eventData?.details?.status || "";
     const timeAgo = context.event?.createdAt ? formatTimeAgo(new Date(context.event?.createdAt)) : "";
     const subtitle = status && timeAgo ? `${status.toLowerCase()} · ${timeAgo}` : status.toLowerCase() || timeAgo;
 
@@ -55,12 +54,10 @@ export const onDeploymentEventTriggerRenderer: TriggerRenderer = {
 
     return {
       Service: resource?.service?.name || "",
-      Status: resource?.deployment?.status || "",
+      Status: eventData?.details?.status || "",
       Environment: resource?.environment?.name || "",
       Project: resource?.project?.name || "",
-      Workspace: resource?.workspace?.name || "",
       Timestamp: timestamp,
-      Severity: eventData?.severity || "",
     };
   },
 
@@ -97,7 +94,7 @@ export const onDeploymentEventTriggerRenderer: TriggerRenderer = {
     if (lastEvent) {
       const eventData = lastEvent.data as OnDeploymentEventData;
       const serviceName = eventData?.resource?.service?.name || "Service";
-      const status = eventData?.resource?.deployment?.status || "";
+      const status = eventData?.details?.status || "";
       const timeAgo = lastEvent.createdAt ? formatTimeAgo(new Date(lastEvent.createdAt)) : "";
       const subtitle = status && timeAgo ? `${status.toLowerCase()} · ${timeAgo}` : status.toLowerCase() || timeAgo;
 
