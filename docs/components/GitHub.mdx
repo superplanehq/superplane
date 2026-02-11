@@ -30,6 +30,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitHub repository" />
+  <LinkCard title="Get Workflow Usage" href="#get-workflow-usage" description="Retrieve GitHub Actions usage (billable minutes) for the organization" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
@@ -1278,6 +1279,59 @@ Returns release information including:
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.release"
+}
+```
+
+<a id="get-workflow-usage"></a>
+
+## Get Workflow Usage
+
+The Get Workflow Usage component retrieves billable GitHub Actions usage (minutes) for the organization associated with the integration's GitHub App installation.
+
+### Use Cases
+
+- **Billing monitoring**: Check Actions usage for billing or quota awareness from SuperPlane workflows
+- **Cost reporting**: Report on workflow run minutes (e.g., monthly) for cost or compliance purposes
+- **Usage alerts**: Compare usage against thresholds to alert when approaching limits
+- **Resource planning**: Track usage patterns to plan for capacity and costs
+
+### Configuration
+
+This component requires no additional configuration. It automatically uses the organization from the GitHub App installation.
+
+### Output
+
+Returns usage data including:
+- **total_minutes_used**: Total billable minutes consumed in the current billing cycle
+- **total_paid_minutes_used**: Minutes beyond the included free tier
+- **included_minutes**: Free minutes included in the plan
+- **minutes_used_breakdown**: Breakdown by runner OS (Linux, Windows, macOS)
+- **organization**: The organization name
+
+### Notes
+
+- Only private repositories on GitHub-hosted runners accrue billable minutes
+- Public repositories and self-hosted runners show zero billable usage
+- The GitHub App requires **Organization Administration (read)** permission to access billing data
+- Existing app installations may need to approve the new permission before this component works
+
+### Permissions
+
+This component requires the GitHub App to have **Administration (read)** organization permission. If this permission was not granted when the app was installed, organization owners will be prompted by GitHub to approve the new permission; until they do, this component will return a 403 error for those installations.
+
+### Example Output
+
+```json
+{
+  "included_minutes": 1000,
+  "minutes_used_breakdown": {
+    "MACOS": 100,
+    "UBUNTU": 800,
+    "WINDOWS": 350
+  },
+  "organization": "acme",
+  "total_minutes_used": 1250.5,
+  "total_paid_minutes_used": 250.5
 }
 ```
 
