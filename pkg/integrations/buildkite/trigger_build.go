@@ -388,14 +388,16 @@ func (r *TriggerBuild) poll(ctx core.ActionContext) error {
 	if TerminalStates[targetBuild.State] {
 		payload := map[string]any{
 			"build": map[string]any{
-				"id":      targetBuild.ID,
-				"number":  targetBuild.Number,
-				"state":   targetBuild.State,
-				"web_url": targetBuild.WebURL,
-				"commit":  targetBuild.Commit,
-				"branch":  targetBuild.Branch,
-				"message": targetBuild.Message,
-				"blocked": targetBuild.Blocked,
+				"id":          targetBuild.ID,
+				"number":      targetBuild.Number,
+				"state":       targetBuild.State,
+				"web_url":     targetBuild.WebURL,
+				"commit":      targetBuild.Commit,
+				"branch":      targetBuild.Branch,
+				"message":     targetBuild.Message,
+				"blocked":     targetBuild.Blocked,
+				"started_at":  targetBuild.StartedAt,
+				"finished_at": targetBuild.FinishedAt,
 			},
 			"pipeline": map[string]any{
 				"id": metadata.Pipeline,

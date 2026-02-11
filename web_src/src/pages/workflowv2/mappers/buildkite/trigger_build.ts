@@ -34,7 +34,8 @@ interface BuildkiteBuildInfo {
   branch?: string;
   commit?: string;
   message?: string;
-  done_at?: string;
+  started_at?: string;
+  finished_at?: string;
 }
 
 interface BuildkitePipelineInfo {
@@ -215,9 +216,6 @@ export const triggerBuildMapper: ComponentBaseMapper = {
     }
 
     const build = sourceData.build;
-    const pipeline = sourceData.pipeline;
-    const organization = sourceData.organization;
-    const sender = sourceData.sender;
 
     const addDetail = (key: string, value?: string) => {
       if (value) {
@@ -225,15 +223,9 @@ export const triggerBuildMapper: ComponentBaseMapper = {
       }
     };
 
-    addDetail("Done At", build?.done_at ? new Date(build.done_at).toLocaleString() : undefined);
+    addDetail("Started At", build?.started_at ? new Date(build.started_at).toLocaleString() : "");
+    addDetail("Completed At", build?.finished_at ? new Date(build.finished_at).toLocaleString() : "");
     addDetail("Build URL", build?.web_url ?? metadata?.web_url);
-    addDetail("Build Number", build?.number?.toString() ?? metadata?.build_number?.toString());
-    addDetail("Build State", build?.state ?? metadata?.state);
-    addDetail("Pipeline", pipeline?.name ?? metadata?.pipeline);
-    addDetail("Organization", organization?.name ?? metadata?.organization);
-    addDetail("Branch", build?.branch);
-    addDetail("Commit", build?.commit ? `${build.commit.toString().slice(0, 7)} · ${build.message || ""}` : undefined);
-    addDetail("Triggered By", sender?.name);
 
     const blocked = build?.blocked ?? metadata?.blocked;
     if (blocked === true) {

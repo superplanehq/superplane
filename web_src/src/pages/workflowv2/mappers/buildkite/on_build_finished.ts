@@ -22,7 +22,8 @@ interface OnBuildFinishedEventData {
     branch?: string;
     message?: string;
     blocked?: boolean;
-    done_at?: string;
+    started_at?: string;
+    finished_at?: string;
   };
   pipeline?: {
     id: string;
@@ -63,19 +64,16 @@ export const onBuildFinishedTriggerRenderer: TriggerRenderer = {
     const eventData = context.event?.data as OnBuildFinishedEventData;
     const build = eventData?.build;
     const pipeline = eventData?.pipeline;
-    const organization = eventData?.organization;
     const sender = eventData?.sender;
 
-    const doneAt = build?.done_at ? new Date(build.done_at).toLocaleString() : "";
+    const startedAt = build?.started_at ? new Date(build.started_at).toLocaleString() : "";
+    const finishedAt = build?.finished_at ? new Date(build.finished_at).toLocaleString() : "";
     const buildUrl = build?.web_url || "";
 
     return {
-      "Done At": doneAt,
+      "Started At": startedAt,
+      "Finished At": finishedAt,
       "Build State": build?.state || "",
-      "Build Number": build?.number?.toString() || "",
-      Result: build?.blocked ? "blocked" : build?.state || "",
-      Project: organization?.name || "",
-      Organization: organization?.slug || "",
       Pipeline: pipeline?.name || "",
       "Pipeline URL": buildUrl,
       Branch: build?.branch || "",

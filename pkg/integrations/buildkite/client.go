@@ -144,14 +144,16 @@ type CreateBuildRequest struct {
 }
 
 type Build struct {
-	ID      string `json:"id"`
-	Number  int    `json:"number"`
-	State   string `json:"state"`
-	WebURL  string `json:"web_url"`
-	Commit  string `json:"commit"`
-	Branch  string `json:"branch"`
-	Message string `json:"message"`
-	Blocked bool   `json:"blocked"`
+	ID         string `json:"id"`
+	Number     int    `json:"number"`
+	State      string `json:"state"`
+	WebURL     string `json:"web_url"`
+	Commit     string `json:"commit"`
+	Branch     string `json:"branch"`
+	Message    string `json:"message"`
+	Blocked    bool   `json:"blocked"`
+	StartedAt  string `json:"started_at"`
+	FinishedAt string `json:"finished_at"`
 }
 
 func (c *Client) CreateBuild(orgSlug, pipelineSlug string, req CreateBuildRequest) (*Build, error) {
