@@ -91,7 +91,7 @@ func (b *Buildkite) Description() string {
 }
 
 func (b *Buildkite) Instructions() string {
-	return ""
+	return "To create new Buildkite API key, open [Personal Settings > API Access Tokens](https://buildkite.com/user/api-access-tokens/new)."
 }
 
 func (b *Buildkite) Configuration() []configuration.Field {
