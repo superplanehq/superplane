@@ -65,7 +65,6 @@ export const deployStateFunction: StateFunction = (execution) => {
     }
 
     return "failed";
-    
   }
 
   if (outputs?.success?.length) {
