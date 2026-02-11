@@ -299,8 +299,6 @@ func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 - Provider URL: **%s**
 - Audience: **%s**
 
-**Note:** AWS IAM requires the Provider URL to use **HTTPS**. If you are running SuperPlane locally (e.g. http://localhost:8000), AWS will reject the URL. Use an HTTPS tunnel (e.g. [ngrok](https://ngrok.com), [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps)) and use the tunnel’s HTTPS URL here. Configure SuperPlane’s base URL to that same HTTPS URL so OIDC discovery works.
-
 **2. Create IAM Role**
 
 - Go to AWS IAM Console → Roles → Create role
@@ -308,8 +306,7 @@ func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 - Select the identity provider created in step 1
 - Add permissions for the integration to manage EventBridge connections, API destinations, and rules. To get started, you can use the **AmazonEventBridgeFullAccess** managed policy
 - Add permissions for the integration manage IAM roles needed for itself. To get started, you can use the **IAMFullAccess** managed policy
-- **For CodeArtifact components** (Create Repository, Delete Repository, Get Package Version, etc.): attach a policy that allows at least **codeartifact:ListDomains** and **codeartifact:ListRepositories** (for dropdowns in the UI), plus the actions used by each component (e.g. codeartifact:CreateRepository, codeartifact:DeleteRepository). See the AWS documentation for the full list of CodeArtifact permissions.
-- Depending on the SuperPlane actions and triggers you will use, different permissions will be needed. Include the ones you need
+- Depending on the SuperPlane actions and triggers you will use, different permissions will be needed. Include the ones you need.
 - Give it a name and description, and create it
 
 **3. Complete the installation setup**
