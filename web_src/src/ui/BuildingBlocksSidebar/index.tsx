@@ -32,6 +32,7 @@ import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.sv
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
+import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 
@@ -236,15 +237,13 @@ export function BuildingBlocksSidebar({
       {/* Resize handle */}
       <div
         onMouseDown={handleMouseDown}
-        className={`absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-gray-100 transition-colors flex items-center justify-center group ${
-          isResizing ? "bg-blue-50" : ""
-        }`}
+        className={`absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-gray-100 transition-colors flex items-center justify-center group ${isResizing ? "bg-blue-50" : ""
+          }`}
         style={{ marginLeft: "-8px" }}
       >
         <div
-          className={`w-2 h-14 rounded-full bg-gray-300 group-hover:bg-gray-800 transition-colors ${
-            isResizing ? "bg-blue-500" : ""
-          }`}
+          className={`w-2 h-14 rounded-full bg-gray-300 group-hover:bg-gray-800 transition-colors ${isResizing ? "bg-blue-500" : ""
+            }`}
         />
       </div>
 
@@ -371,10 +370,10 @@ function CategorySection({
   const baseBlocks = categoryMatches
     ? category.blocks || []
     : (category.blocks || []).filter((block) => {
-        const name = (block.name || "").toLowerCase();
-        const label = (block.label || "").toLowerCase();
-        return name.includes(query) || label.includes(query);
-      });
+      const name = (block.name || "").toLowerCase();
+      const label = (block.label || "").toLowerCase();
+      return name.includes(query) || label.includes(query);
+    });
 
   // Only show live/ready blocks
   let allBlocks = baseBlocks.filter((b) => b.isLive);
@@ -409,6 +408,7 @@ function CategorySection({
     semaphore: SemaphoreLogo,
     slack: slackIcon,
     sendgrid: sendgridIcon,
+    sentry: sentryIcon,
     render: renderIcon,
     dockerhub: dockerIcon,
     aws: {
@@ -482,6 +482,7 @@ function CategorySection({
             semaphore: SemaphoreLogo,
             slack: slackIcon,
             sendgrid: sendgridIcon,
+            sentry: sentryIcon,
             render: renderIcon,
             dockerhub: dockerIcon,
             aws: {

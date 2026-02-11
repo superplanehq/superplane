@@ -81,6 +81,11 @@ import {
   eventStateRegistry as rootlyEventStateRegistry,
 } from "./rootly/index";
 import {
+  componentMappers as sentryComponentMappers,
+  triggerRenderers as sentryTriggerRenderers,
+  eventStateRegistry as sentryEventStateRegistry,
+} from "./sentry";
+import {
   componentMappers as awsComponentMappers,
   triggerRenderers as awsTriggerRenderers,
   eventStateRegistry as awsEventStateRegistry,
@@ -152,6 +157,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   smtp: smtpComponentMappers,
   sendgrid: sendgridComponentMappers,
   render: renderComponentMappers,
+  sentry: sentryComponentMappers,
   rootly: rootlyComponentMappers,
   aws: awsComponentMappers,
   discord: discordComponentMappers,
@@ -173,6 +179,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   smtp: smtpTriggerRenderers,
   sendgrid: sendgridTriggerRenderers,
   render: renderTriggerRenderers,
+  sentry: sentryTriggerRenderers,
   rootly: rootlyTriggerRenderers,
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
@@ -193,6 +200,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   smtp: smtpEventStateRegistry,
   sendgrid: sendgridEventStateRegistry,
   render: renderEventStateRegistry,
+  sentry: sentryEventStateRegistry,
   discord: discordEventStateRegistry,
   rootly: rootlyEventStateRegistry,
   openai: openaiEventStateRegistry,
