@@ -107,10 +107,11 @@ func (t *OnDeploymentEvent) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: []configuration.FieldOption{
+						{Label: "Deployed", Value: "deployed"},
+						{Label: "Failed", Value: "failed"},
+						{Label: "Crashed", Value: "crashed"},
 						{Label: "Triggered", Value: "triggered"},
 						{Label: "Resolved", Value: "resolved"},
-						{Label: "Deployed", Value: "deployed"},
-						{Label: "Crashed", Value: "crashed"},
 						{Label: "Oom Killed", Value: "oom_killed"},
 						{Label: "Redeployed", Value: "redeployed"},
 						{Label: "Slept", Value: "slept"},
