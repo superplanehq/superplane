@@ -34,6 +34,7 @@ import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
+import dockerIcon from "@/assets/icons/integrations/docker.svg";
 
 export interface BuildingBlock {
   name: string;
@@ -409,6 +410,7 @@ function CategorySection({
     sendgrid: sendgridIcon,
     sentry: sentryIcon,
     render: renderIcon,
+    dockerhub: dockerIcon,
     aws: {
       codeArtifact: awsIcon,
       lambda: awsLambdaIcon,
@@ -482,6 +484,7 @@ function CategorySection({
             sendgrid: sendgridIcon,
             sentry: sentryIcon,
             render: renderIcon,
+            dockerhub: dockerIcon,
             aws: {
               codeArtifact: awsCodeArtifactIcon,
               ecr: awsEcrIcon,
