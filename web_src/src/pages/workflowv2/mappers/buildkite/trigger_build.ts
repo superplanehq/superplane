@@ -298,7 +298,7 @@ function triggerBuildSpecs(node: NodeInfo): ComponentBaseSpec[] {
   // Environment variables
   if (Array.isArray(configuration?.env) && configuration.env.length > 0) {
     specs.push({
-      title: "environment",
+      title: "variable",
       iconSlug: "globe",
       values: configuration.env.map((env) => ({
         badges: [

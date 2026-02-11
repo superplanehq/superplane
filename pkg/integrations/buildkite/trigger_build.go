@@ -53,14 +53,19 @@ type TriggerBuildExecutionMetadata struct {
 	Extra        map[string]any `json:"extra,omitempty" mapstructure:"extra,omitempty"`
 }
 
+type KeyValuePair struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
 type TriggerBuildSpec struct {
-	Organization string            `json:"organization"`
-	Pipeline     string            `json:"pipeline"`
-	Branch       string            `json:"branch"`
-	Commit       string            `json:"commit"`
-	Message      string            `json:"message,omitempty"`
-	Env          map[string]string `json:"env,omitempty"`
-	Metadata     map[string]string `json:"meta_data,omitempty"`
+	Organization string         `json:"organization"`
+	Pipeline     string         `json:"pipeline"`
+	Branch       string         `json:"branch"`
+	Commit       string         `json:"commit"`
+	Message      string         `json:"message,omitempty"`
+	Env          []KeyValuePair `json:"env,omitempty" mapstructure:"env"`
+	Metadata     []KeyValuePair `json:"meta_data,omitempty" mapstructure:"meta_data"`
 }
 
 func (r *TriggerBuild) Name() string {
@@ -273,19 +278,25 @@ func (r *TriggerBuild) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	envMap := make(map[string]string, len(spec.Env))
+	for _, e := range spec.Env {
+		envMap[e.Name] = e.Value
+	}
+
+	metadataMap := make(map[string]string, len(spec.Metadata)+2)
+	for _, m := range spec.Metadata {
+		metadataMap[m.Name] = m.Value
+	}
+	metadataMap["superplane_execution_id"] = ctx.ID.String()
+	metadataMap["superplane_workflow_id"] = ctx.WorkflowID
+
 	buildReq := CreateBuildRequest{
 		Commit:   commit,
 		Branch:   spec.Branch,
 		Message:  spec.Message,
-		Env:      spec.Env,
-		Metadata: spec.Metadata,
+		Env:      envMap,
+		Metadata: metadataMap,
 	}
-
-	if buildReq.Metadata == nil {
-		buildReq.Metadata = make(map[string]string)
-	}
-	buildReq.Metadata["superplane_execution_id"] = ctx.ID.String()
-	buildReq.Metadata["superplane_workflow_id"] = ctx.WorkflowID
 
 	build, err := client.CreateBuild(spec.Organization, spec.Pipeline, buildReq)
 	if err != nil {
