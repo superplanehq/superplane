@@ -345,7 +345,6 @@ func (t *RunPipeline) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error setting metadata: %v", err)
 	}
 
-	// Schedule poll as backup
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 }
 
@@ -402,26 +401,22 @@ func (t *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 
 	workflowStatus, _ := workflowData["status"].(string)
 
-	// Get current metadata
 	var metadata RunPipelineExecutionMetadata
 	err = mapstructure.Decode(executionCtx.Metadata.Get(), &metadata)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	// Check if workflow failed or was cancelled - emit failed immediately
-	isFailed := workflowStatus == WorkflowStatusFailed || workflowStatus == WorkflowStatusCanceled || workflowStatus == "error" || workflowStatus == "failing" || workflowStatus == "unauthorized"
-	if isFailed {
-		// Pipeline failed - emit to failed channel immediately
+	if t.isFailed(workflowStatus) {
 		payload := map[string]any{"pipeline": metadata.Pipeline}
 		err = executionCtx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{payload})
 		if err != nil {
 			return http.StatusInternalServerError, fmt.Errorf("failed to emit output: %w", err)
 		}
+
 		return http.StatusOK, nil
 	}
 
-	// Schedule poll as backup to check if all workflows are done
 	err = executionCtx.Requests.ScheduleActionCall("poll", map[string]any{}, 3*time.Second)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to schedule poll action: %w", err)
@@ -469,59 +464,43 @@ func (t *RunPipeline) poll(ctx core.ActionContext) error {
 		return err
 	}
 
+	pipeline, err := client.GetPipeline(metadata.Pipeline.ID)
+	if err != nil {
+		return err
+	}
+
+	if pipeline.State == "errored" {
+		payload := map[string]any{"pipeline": pipeline}
+		err = ctx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{payload})
+		if err != nil {
+			return fmt.Errorf("failed to emit output: %w", err)
+		}
+
+		return nil
+	}
+
 	workflows, err := client.GetPipelineWorkflows(metadata.Pipeline.ID)
 	if err != nil {
-		// Can't get workflows, schedule another poll
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 	}
 
 	if len(workflows) == 0 {
-		// No workflows yet, schedule another poll
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 	}
 
-	// Check only the first workflow's status
 	firstWorkflow := workflows[0]
-	isDone := firstWorkflow.Status == WorkflowStatusSuccess || firstWorkflow.Status == WorkflowStatusFailed || firstWorkflow.Status == WorkflowStatusCanceled || firstWorkflow.Status == "error" || firstWorkflow.Status == "unauthorized"
 
-	if !isDone {
-		// First workflow still running, schedule another poll
+	if t.isRunning(firstWorkflow.Status) {
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 	}
 
-	// First workflow is done, check if all workflows are completed by checking their statuses directly
-	allWorkflowsCompleted := true
-	anyFailed := false
-
-	for _, w := range workflows {
-		// Check if workflow is still running
-		if w.Status == "running" || w.Status == "on_hold" || w.Status == "not_run" || w.Status == "failing" {
-			allWorkflowsCompleted = false
-		}
-		// Check if workflow failed
-		if w.Status == WorkflowStatusFailed || w.Status == WorkflowStatusCanceled || w.Status == "error" || w.Status == "failing" || w.Status == "unauthorized" {
-			anyFailed = true
-		}
-	}
-
-	if !allWorkflowsCompleted {
-		// Not all workflows completed yet, schedule another poll
-		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
-	}
-
-	// All workflows completed, emit to appropriate channel
 	payload := map[string]any{"pipeline": metadata.Pipeline}
 	channel := SuccessOutputChannel
-	if anyFailed {
+	if t.isFailed(firstWorkflow.Status) {
 		channel = FailedOutputChannel
 	}
 
-	err = ctx.ExecutionState.Emit(channel, PayloadType, []any{payload})
-	if err != nil {
-		return fmt.Errorf("failed to emit output: %w", err)
-	}
-
-	return nil
+	return ctx.ExecutionState.Emit(channel, PayloadType, []any{payload})
 }
 
 func (t *RunPipeline) buildParameters(params []Parameter) map[string]string {
@@ -555,4 +534,12 @@ func IsValidLocation(location string) bool {
 
 func (t *RunPipeline) Cleanup(ctx core.SetupContext) error {
 	return nil
+}
+
+func (t *RunPipeline) isFailed(workflowStatus string) bool {
+	return workflowStatus == WorkflowStatusFailed || workflowStatus == WorkflowStatusCanceled || workflowStatus == "error" || workflowStatus == "failing" || workflowStatus == "unauthorized"
+}
+
+func (t *RunPipeline) isRunning(workflowStatus string) bool {
+	return workflowStatus == "running" || workflowStatus == "on_hold" || workflowStatus == "not_run"
 }
