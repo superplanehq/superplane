@@ -1,0 +1,7 @@
+{
+    "agentId": "agent_12345",
+    "branchName": "cursor/agent-550e8400",
+    "prUrl": "https://github.com/org/repo/pull/42",
+    "status": "done",
+    "summary": "Refactored login logic."
+  }
