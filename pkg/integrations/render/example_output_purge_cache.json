@@ -1,0 +1,8 @@
+{
+  "data": {
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "status": "accepted"
+  },
+  "timestamp": "2026-02-05T16:20:00.000000Z",
+  "type": "render.cache.purge.requested"
+}
