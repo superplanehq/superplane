@@ -20,7 +20,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Deploy" href="#deploy" description="Trigger a deploy for a Render service and wait for it to complete" />
   <LinkCard title="Get Deploy" href="#get-deploy" description="Retrieve a deploy by ID for a Render service" />
   <LinkCard title="Get Service" href="#get-service" description="Retrieve a Render service by ID" />
+  <LinkCard title="Purge Cache" href="#purge-cache" description="Request a purge of the build cache for a Render service" />
   <LinkCard title="Rollback Deploy" href="#rollback-deploy" description="Roll back a Render service to a previous deploy and wait for it to complete" />
+  <LinkCard title="Update Env Var" href="#update-env-var" description="Update or generate a value for a Render service environment variable" />
 </CardGrid>
 
 ## Instructions
@@ -311,6 +313,38 @@ Emits a `render.service` payload containing service fields like `serviceId`, `se
 }
 ```
 
+<a id="purge-cache"></a>
+
+## Purge Cache
+
+The Purge Cache component requests a build cache purge for a Render service.
+
+### Use Cases
+
+- **Cache reset**: Force a clean rebuild when you suspect stale dependencies or build artifacts
+- **Operational tooling**: Provide a one-click cache purge in incident response workflows
+
+### Configuration
+
+- **Service**: Render service whose build cache should be purged
+
+### Output
+
+Emits a `render.cache.purge.requested` payload with `serviceId` and a `status` field indicating the request was accepted.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "status": "accepted"
+  },
+  "timestamp": "2026-02-05T16:20:00.000000Z",
+  "type": "render.cache.purge.requested"
+}
+```
+
 <a id="rollback-deploy"></a>
 
 ## Rollback Deploy
@@ -361,6 +395,45 @@ The Rollback Deploy component triggers a rollback deploy for a Render service an
   },
   "timestamp": "2026-02-05T16:18:00.000000Z",
   "type": "render.deploy"
+}
+```
+
+<a id="update-env-var"></a>
+
+## Update Env Var
+
+The Update Env Var component updates a Render service environment variable.
+
+### Use Cases
+
+- **Rotate secrets**: Generate a new value for an env var (for example, API tokens) and optionally emit it
+- **Configuration changes**: Update non-secret environment values as part of a workflow
+
+### Configuration
+
+- **Service**: Render service that owns the env var
+- **Key**: Env var key to update
+- **Value Strategy**:
+  - `Set value`: provide the `Value` field
+  - `Generate value`: request Render to generate a new value
+- **Value**: New env var value (sensitive). Required when using `Set value`
+- **Emit Value**: When enabled, include the env var `value` in output. Disabled by default to avoid leaking secrets.
+
+### Output
+
+Emits a `render.envVar.updated` payload with `serviceId`, `key`, and a `valueGenerated` boolean. The `value` field is only included when `emitValue` is enabled.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "key": "DATABASE_URL",
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "valueGenerated": false
+  },
+  "timestamp": "2026-02-05T16:25:00.000000Z",
+  "type": "render.envVar.updated"
 }
 ```
 

@@ -104,6 +104,8 @@ func (r *Render) Components() []core.Component {
 		&GetDeploy{},
 		&CancelDeploy{},
 		&RollbackDeploy{},
+		&PurgeCache{},
+		&UpdateEnvVar{},
 	}
 }
 
