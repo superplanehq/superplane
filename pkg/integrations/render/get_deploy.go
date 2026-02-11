@@ -138,12 +138,7 @@ func (c *GetDeploy) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	payload := map[string]any{
-		"deployId":   deploy.ID,
-		"status":     deploy.Status,
-		"createdAt":  deploy.CreatedAt,
-		"finishedAt": deploy.FinishedAt,
-	}
+	payload := deployPayloadFromDeployResponse(deploy)
 
 	return ctx.ExecutionState.Emit(GetDeployOutputChannel, GetDeployPayloadType, []any{payload})
 }

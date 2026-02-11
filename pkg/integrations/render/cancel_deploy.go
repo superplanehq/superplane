@@ -140,12 +140,7 @@ func (c *CancelDeploy) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	payload := map[string]any{
-		"deployId":   deploy.ID,
-		"status":     deploy.Status,
-		"createdAt":  deploy.CreatedAt,
-		"finishedAt": deploy.FinishedAt,
-	}
+	payload := deployPayloadFromDeployResponse(deploy)
 
 	return ctx.ExecutionState.Emit(CancelDeployOutputChannel, CancelDeployPayloadType, []any{payload})
 }
