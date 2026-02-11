@@ -53,7 +53,6 @@ func (t *OnBuildFinished) Documentation() string {
 
 ## Configuration
 
-- **Organization**: Select the Buildkite organization to monitor
 - **Pipeline**: Select the Buildkite pipeline to monitor
 - **Branch** (optional): Filter to specific branch (exact match)
 
@@ -69,12 +68,6 @@ Each build finished event includes:
 
 This trigger automatically handles Buildkite webhook events through the integration-level webhook. When you configure a single webhook for your Buildkite integration, SuperPlane will automatically route build.finished events to all matching triggers based on your configuration.
 
-## Configuration
-
-- **Organization**: Select the Buildkite organization to monitor
-- **Pipeline**: Select the Buildkite pipeline to monitor
-- **Branch** (optional): Filter to specific branch (exact match)
-
 ## Event Processing
 
 SuperPlane automatically:
@@ -89,9 +82,8 @@ SuperPlane automatically:
 For manual setup in Buildkite:
 1. In Buildkite, go to Settings → Notification Services → Add → Webhook
 2. Webhook URL: use your SuperPlane integration webhook URL
-3. Token: use your SuperPlane webhook token
-4. Events: select "build.finished"
-5. Pipelines: select the pipelines you want to monitor`
+3. Events: select "build.finished"
+4. Pipelines: select the pipelines you want to monitor`
 }
 
 func (t *OnBuildFinished) Icon() string {

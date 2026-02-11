@@ -255,7 +255,6 @@ func (r *TriggerBuild) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	// Get organization from integration config
 	orgConfig, err := ctx.Integration.GetConfig("organization")
 	if err != nil {
 		return fmt.Errorf("failed to get organization from integration config: %w", err)
@@ -457,18 +456,12 @@ func (r *TriggerBuild) Documentation() string {
 
 ## How It Works
 
-1. **Creates Build**: Triggers a build via Buildkite API
-2. **Sets Correlation**: Stores build ID for tracking
-3. **Starts Polling**: Schedules periodic status checks
-4. **Detects Completion**: Emits to success/failure channels when build finishes
-
-## Why Polling Instead of Webhooks?
-
-This component uses polling instead of webhooks to work around the architectural limitation where Buildkite integration uses a shared webhook for all events. The polling mechanism provides reliable completion detection even when webhook routing is not available.
+1. Triggers a build via Buildkite API
+2. Monitors build status via polling
+3. Emits to success/failure channels when build finishes
 
 ## Configuration
 
-- **Organization**: Select Buildkite organization
 - **Pipeline**: Select pipeline to trigger
 - **Branch**: Git branch to build
 - **Commit**: Git commit SHA (optional, defaults to HEAD)
@@ -479,13 +472,5 @@ This component uses polling instead of webhooks to work around the architectural
 ## Output Channels
 
 - **Passed**: Build completed successfully
-- **Failed**: Build failed, was cancelled, or was blocked
-
-## Polling Details
-
-	- **Frequency**: Controlled by the PollInterval constant (currently 30 seconds)
-	- **API**: Uses the Buildkite GetBuild endpoint to check build status
-	- **Completion Detection**: Checks build state and emits to appropriate channel
-	- **Manual Finish**: Manual action available to force completion if needed
-	`
+- **Failed**: Build failed, was cancelled, or was blocked`
 }

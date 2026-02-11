@@ -151,21 +151,18 @@ export const triggerBuildStateFunction: StateFunction = (execution: CanvasesCanv
     return "cancelled";
   }
 
-  // If build is still running
   if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
     return "running";
   }
 
   const metadata = execution.metadata as TriggerBuildExecutionMetadata;
   const buildState = metadata?.state;
-  // const blocked = metadata?.blocked;
 
-  if (buildState === "passed") {
-    return "passed";
+  if (buildState === "failed") {
+    return "failed";
   }
 
-  // All other states including failed, canceled, skipped, not_run, or blocked
-  return "failed";
+  return "passed";
 };
 
 /**
