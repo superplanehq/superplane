@@ -41,8 +41,24 @@ type workspaceWithCursor struct {
 }
 
 type Service struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID             string         `json:"id"`
+	Name           string         `json:"name"`
+	OwnerID        string         `json:"ownerId,omitempty"`
+	Type           string         `json:"type,omitempty"`
+	CreatedAt      string         `json:"createdAt,omitempty"`
+	UpdatedAt      string         `json:"updatedAt,omitempty"`
+	DashboardURL   string         `json:"dashboardUrl,omitempty"`
+	Slug           string         `json:"slug,omitempty"`
+	RootDir        string         `json:"rootDir,omitempty"`
+	Suspended      string         `json:"suspended,omitempty"`
+	Suspenders     []string       `json:"suspenders,omitempty"`
+	AutoDeploy     string         `json:"autoDeploy,omitempty"`
+	NotifyOnFail   string         `json:"notifyOnFail,omitempty"`
+	Repo           string         `json:"repo,omitempty"`
+	Branch         string         `json:"branch,omitempty"`
+	EnvironmentID  string         `json:"environmentId,omitempty"`
+	ImagePath      string         `json:"imagePath,omitempty"`
+	ServiceDetails map[string]any `json:"serviceDetails,omitempty"`
 }
 
 type serviceWithCursor struct {
@@ -89,10 +105,41 @@ type triggerDeployResponse struct {
 }
 
 type DeployResponse struct {
-	ID         string `json:"id"`
-	Status     string `json:"status"`
-	CreatedAt  string `json:"createdAt"`
-	FinishedAt string `json:"finishedAt"`
+	ID         string        `json:"id"`
+	Status     string        `json:"status"`
+	Trigger    string        `json:"trigger,omitempty"`
+	CreatedAt  string        `json:"createdAt,omitempty"`
+	UpdatedAt  string        `json:"updatedAt,omitempty"`
+	StartedAt  string        `json:"startedAt,omitempty"`
+	FinishedAt string        `json:"finishedAt,omitempty"`
+	Commit     *DeployCommit `json:"commit,omitempty"`
+	Image      *DeployImage  `json:"image,omitempty"`
+}
+
+type DeployCommit struct {
+	ID        string `json:"id,omitempty"`
+	Message   string `json:"message,omitempty"`
+	CreatedAt string `json:"createdAt,omitempty"`
+}
+
+type DeployImage struct {
+	Ref                string `json:"ref,omitempty"`
+	SHA                string `json:"sha,omitempty"`
+	RegistryCredential string `json:"registryCredential,omitempty"`
+}
+
+type EnvVar struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+type UpdateEnvVarRequest struct {
+	Value         *string `json:"value,omitempty"`
+	GenerateValue *bool   `json:"generateValue,omitempty"`
+}
+
+type rollbackRequest struct {
+	DeployID string `json:"deployId"`
 }
 
 type EventResponse struct {
@@ -409,6 +456,121 @@ func (c *Client) GetDeploy(serviceID string, deployID string) (DeployResponse, e
 	return deployResponse, nil
 }
 
+func (c *Client) GetService(serviceID string) (Service, error) {
+	if serviceID == "" {
+		return Service{}, fmt.Errorf("serviceID is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodGet,
+		"/services/"+url.PathEscape(serviceID),
+		nil,
+		nil,
+	)
+	if err != nil {
+		return Service{}, err
+	}
+
+	service := Service{}
+	if err := json.Unmarshal(body, &service); err != nil {
+		return Service{}, fmt.Errorf("failed to unmarshal service response: %w", err)
+	}
+
+	return service, nil
+}
+
+func (c *Client) CancelDeploy(serviceID string, deployID string) (DeployResponse, error) {
+	if serviceID == "" {
+		return DeployResponse{}, fmt.Errorf("serviceID is required")
+	}
+	if deployID == "" {
+		return DeployResponse{}, fmt.Errorf("deployID is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodPost,
+		"/services/"+url.PathEscape(serviceID)+"/deploys/"+url.PathEscape(deployID)+"/cancel",
+		nil,
+		nil,
+	)
+	if err != nil {
+		return DeployResponse{}, err
+	}
+
+	deployResponse := DeployResponse{}
+	if err := json.Unmarshal(body, &deployResponse); err != nil {
+		return DeployResponse{}, fmt.Errorf("failed to unmarshal deploy response: %w", err)
+	}
+
+	return deployResponse, nil
+}
+
+func (c *Client) RollbackDeploy(serviceID string, deployID string) (DeployResponse, error) {
+	if serviceID == "" {
+		return DeployResponse{}, fmt.Errorf("serviceID is required")
+	}
+	if deployID == "" {
+		return DeployResponse{}, fmt.Errorf("deployID is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodPost,
+		"/services/"+url.PathEscape(serviceID)+"/rollback",
+		nil,
+		rollbackRequest{DeployID: deployID},
+	)
+	if err != nil {
+		return DeployResponse{}, err
+	}
+
+	deployResponse := DeployResponse{}
+	if err := json.Unmarshal(body, &deployResponse); err != nil {
+		return DeployResponse{}, fmt.Errorf("failed to unmarshal deploy response: %w", err)
+	}
+
+	return deployResponse, nil
+}
+
+func (c *Client) PurgeCache(serviceID string) error {
+	if serviceID == "" {
+		return fmt.Errorf("serviceID is required")
+	}
+
+	_, _, err := c.execRequestWithResponse(
+		http.MethodPost,
+		"/services/"+url.PathEscape(serviceID)+"/cache/purge",
+		nil,
+		nil,
+	)
+	return err
+}
+
+func (c *Client) UpdateEnvVar(serviceID string, key string, request UpdateEnvVarRequest) (EnvVar, error) {
+	if serviceID == "" {
+		return EnvVar{}, fmt.Errorf("serviceID is required")
+	}
+	if key == "" {
+		return EnvVar{}, fmt.Errorf("key is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodPut,
+		"/services/"+url.PathEscape(serviceID)+"/env-vars/"+url.PathEscape(key),
+		nil,
+		request,
+	)
+	if err != nil {
+		return EnvVar{}, err
+	}
+
+	response := EnvVar{}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return EnvVar{}, fmt.Errorf("failed to unmarshal env var response: %w", err)
+	}
+
+	return response, nil
+}
+
 func (c *Client) GetEvent(eventID string) (EventResponse, error) {
 	if eventID == "" {
 		return EventResponse{}, fmt.Errorf("eventID is required")
@@ -448,7 +610,8 @@ func parseWorkspaces(body []byte) ([]Workspace, error) {
 
 func parseServices(body []byte) ([]Service, error) {
 	withCursor := []serviceWithCursor{}
-	if err := json.Unmarshal(body, &withCursor); err == nil && len(withCursor) > 0 {
+	err := json.Unmarshal(body, &withCursor)
+	if err == nil && len(withCursor) > 0 {
 		return parseServicesWithCursor(withCursor), nil
 	}
 
