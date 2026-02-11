@@ -1,0 +1,126 @@
+---
+title: "DockerHub"
+---
+
+Manage and react to DockerHub repositories and tags
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Image Push" href="#on-image-push" description="Listen to DockerHub image push events" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Get Image Tag" href="#get-image-tag" description="Get metadata for a DockerHub image tag" />
+</CardGrid>
+
+## Instructions
+
+To generate a DockerHub access token:
+- Go to **DockerHub** → **Account Settings** → **Personal Access Tokens**
+- Generate a new token
+- **Copy the token**, and enter your DockerHub username and the token below
+
+<a id="on-image-push"></a>
+
+## On Image Push
+
+The On Image Push trigger starts a workflow execution when an image tag is pushed to DockerHub.
+
+### Use Cases
+
+- **Build pipelines**: Trigger builds and deployments on container pushes
+- **Release workflows**: Promote artifacts when a new tag is published
+- **Security automation**: Kick off scans or alerts for newly pushed images
+
+### Configuration
+
+- **Repository**: DockerHub repository name, in the format of `namespace/name`
+- **Tags**: Optional filters for image tags (for example: `latest` or `^v[0-9]+`)
+
+### Webhook Setup
+
+This trigger generates a webhook URL in SuperPlane. Add that URL as a DockerHub webhook for the selected repository so DockerHub can deliver push events.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "callback_url": "https://hub.docker.com/u/superplane/demo/hook/abcd/",
+    "push_data": {
+      "pushed_at": 1736400000,
+      "pusher": "superplane-bot",
+      "tag": "v1.2.3"
+    },
+    "repository": {
+      "description": "Demo image for SuperPlane workflows",
+      "is_private": false,
+      "name": "demo",
+      "namespace": "superplane",
+      "pull_count": 3456,
+      "repo_name": "superplane/demo",
+      "repo_url": "https://hub.docker.com/r/superplane/demo",
+      "star_count": 12,
+      "status": "Active"
+    }
+  },
+  "timestamp": "2026-02-03T12:00:00Z",
+  "type": "dockerhub.image.push"
+}
+```
+
+<a id="get-image-tag"></a>
+
+## Get Image Tag
+
+The Get Image Tag component retrieves metadata for a DockerHub image tag.
+
+### Use Cases
+
+- **Release automation**: Fetch tag metadata for deployments
+- **Audit trails**: Resolve tag details for traceability
+- **Insights**: Inspect image sizes, digests, and last pushed times
+
+### Configuration
+
+- **Repository**: DockerHub repository name, in the format of `namespace/name`
+- **Tag**: Image tag to retrieve (for example: `latest` or `v1.2.3`)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "full_size": 52837442,
+    "id": 123456,
+    "images": [
+      {
+        "architecture": "amd64",
+        "digest": "sha256:fe12ab34cd56ef78ab90cd12ef34ab56cd78ef90ab12cd34ef56ab78cd90ef12",
+        "last_pulled": "2025-01-06T11:02:10.123456Z",
+        "last_pushed": "2025-01-05T21:06:53.506400Z",
+        "os": "linux",
+        "size": 52837442,
+        "status": "active"
+      }
+    ],
+    "last_updated": "2025-01-05T21:06:53.506400Z",
+    "last_updater": 1234,
+    "last_updater_username": "superplane-bot",
+    "name": "latest",
+    "repository": 98765,
+    "status": "active",
+    "tag_last_pulled": "2025-01-06T11:02:10.123456Z",
+    "tag_last_pushed": "2025-01-05T21:06:53.506400Z",
+    "v2": "true"
+  },
+  "timestamp": "2026-02-03T12:00:00Z",
+  "type": "dockerhub.tag"
+}
+```
+
