@@ -9,10 +9,75 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Check Rule" href="#create-check-rule" description="Create a check rule in Dash0 configuration API" />
+  <LinkCard title="Create Synthetic Check" href="#create-synthetic-check" description="Create a synthetic check in Dash0 configuration API" />
+  <LinkCard title="Get Check Details" href="#get-check-details" description="Get detailed information for a Dash0 check by ID" />
   <LinkCard title="List Issues" href="#list-issues" description="Query Dash0 to get a list of all current issues using the metric dash0.issue.status" />
   <LinkCard title="Query Prometheus" href="#query-prometheus" description="Execute a PromQL query against Dash0 Prometheus API and return the response data" />
+  <LinkCard title="Send Log Event" href="#send-log-event" description="Send one or more workflow log records to Dash0 OTLP HTTP ingestion" />
+  <LinkCard title="Update Synthetic Check" href="#update-synthetic-check" description="Update an existing synthetic check in Dash0 configuration API" />
 </CardGrid>
 
+<a id="update-synthetic-check"></a>
+
+## Update Synthetic Check
+
+The Update Synthetic Check component updates an existing Dash0 synthetic check.
+
+### Use Cases
+
+- **Change monitoring target**: Update URLs, probes, or assertions after infrastructure changes
+- **Tune schedules**: Adjust check intervals as traffic and SLOs evolve
+- **Workflow-driven changes**: Roll out check updates as part of deployment workflows
+
+### Configuration
+
+- **Synthetic Check**: Existing synthetic check origin/ID
+- **Specification (JSON)**: Updated synthetic check payload as JSON object
+
+Example specification:
+```json
+{
+  "kind": "Dash0SyntheticCheck",
+  "metadata": {
+    "name": "checkout-health"
+  },
+  "spec": {
+    "enabled": true,
+    "plugin": {
+      "kind": "http",
+      "spec": {
+        "request": {
+          "method": "get",
+          "url": "https://www.example.com/health"
+        }
+      }
+    }
+  }
+}
+```
+
+### Output
+
+Emits:
+- **originOrId**: Synthetic check identifier used for the API request
+- **response**: Raw Dash0 API response
+
+### Example Output
+
+```json
+{
+  "data": {
+    "originOrId": "superplane-synthetic-ab12cd34",
+    "response": {
+      "id": "superplane-synthetic-ab12cd34",
+      "status": "updated"
+    }
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.synthetic.check.updated"
+}
+```
 <a id="list-issues"></a>
 
 ## List Issues
@@ -77,6 +142,197 @@ Returns a list of issues with:
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "dash0.issues.list"
+}
+```
+
+<a id="create-check-rule"></a>
+
+## Create Check Rule
+
+The Create Check Rule component creates a Dash0 check rule (alert rule) using the configuration API.
+
+### Use Cases
+
+- **Service onboarding**: Create baseline alert rules for new services
+- **Automated governance**: Enforce standard alerting from workflow templates
+- **Deployment automation**: Create environment-specific rules during rollouts
+
+### Configuration
+
+- **Origin or ID (Optional)**: Custom check rule identifier. If omitted, SuperPlane generates one.
+- **Rule Specification (JSON)**: Check rule payload as JSON object.
+  Accepts Dash0 check rule shape (name + expression) or Prometheus-style
+  groups/rules shape with exactly one alert rule.
+
+### Output
+
+Emits:
+- **originOrId**: Check rule identifier used for the API request
+- **response**: Raw Dash0 API response
+
+### Example Output
+
+```json
+{
+  "data": {
+    "originOrId": "superplane-check-rule-ef45gh67",
+    "response": {
+      "id": "superplane-check-rule-ef45gh67",
+      "status": "updated"
+    }
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.check.rule.created"
+}
+```
+
+<a id="create-synthetic-check"></a>
+
+## Create Synthetic Check
+
+The Create Synthetic Check component creates a Dash0 synthetic check using the configuration API.
+
+### Use Cases
+
+- **Service onboarding**: Create synthetic checks when new services are deployed
+- **Environment bootstrap**: Provision baseline uptime checks in new environments
+- **Automation workflows**: Create checks from CI/CD or incident workflows
+
+### Configuration
+
+- **Origin or ID (Optional)**: Custom synthetic check identifier. If omitted, SuperPlane generates one.
+- **Specification (JSON)**: Synthetic check JSON payload accepted by Dash0 config API
+
+Example specification:
+```json
+{
+  "kind": "Dash0SyntheticCheck",
+  "metadata": {
+    "name": "checkout-health"
+  },
+  "spec": {
+    "enabled": true,
+    "plugin": {
+      "kind": "http",
+      "spec": {
+        "request": {
+          "method": "get",
+          "url": "https://www.example.com/health"
+        }
+      }
+    }
+  }
+}
+```
+
+### Output
+
+Emits:
+- **originOrId**: Synthetic check identifier used for the API request
+- **response**: Raw Dash0 API response
+
+### Example Output
+
+```json
+{
+  "data": {
+    "originOrId": "superplane-synthetic-ab12cd34",
+    "response": {
+      "id": "superplane-synthetic-ab12cd34",
+      "status": "updated"
+    }
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.synthetic.check.created"
+}
+```
+
+<a id="get-check-details"></a>
+
+## Get Check Details
+
+The Get Check Details component fetches full context for a Dash0 check by ID.
+
+### Use Cases
+
+- **Alert enrichment**: Expand webhook payloads with full check context before notifying responders
+- **Workflow branching**: Use check attributes (severity, thresholds, services) in downstream conditions
+- **Incident automation**: Add rich check details to incident tickets or chat messages
+
+### Configuration
+
+- **Check ID**: The Dash0 check identifier to retrieve
+- **Include History**: Include additional history data when supported by the Dash0 API
+
+### Output
+
+Emits a payload containing:
+- **checkId**: Check identifier used in the request
+- **details**: Raw details response from Dash0
+
+### Example Output
+
+```json
+{
+  "data": {
+    "checkId": "check-123",
+    "details": {
+      "annotations": {
+        "summary": "Checkout latency is above threshold"
+      },
+      "id": "check-123",
+      "labels": {
+        "service": "checkout",
+        "severity": "warning"
+      },
+      "name": "Checkout latency"
+    }
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.check.details.retrieved"
+}
+```
+
+<a id="send-log-event"></a>
+
+## Send Log Event
+
+The Send Log Event component sends workflow log records to Dash0 using OTLP HTTP ingestion.
+
+### Use Cases
+
+- **Audit trails**: Record workflow milestones in Dash0 logs
+- **Change tracking**: Emit deployment, approval, and remediation events
+- **Observability correlation**: Correlate workflow activity with traces and metrics
+
+### Configuration
+
+- **Service Name**: Service name attached to emitted records
+- **Records**: One or more log records containing:
+  - message
+  - severity
+  - timestamp (optional, RFC3339 or unix)
+  - attributes (optional key/value map)
+
+### Output
+
+Emits:
+- **serviceName**: Service name used for ingestion
+- **sentCount**: Number of records sent in this request
+
+### Example Output
+
+```json
+{
+  "data": {
+    "response": {
+      "status": "ok"
+    },
+    "sentCount": 2,
+    "serviceName": "superplane.workflow"
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.log.event.sent"
 }
 ```
 
@@ -149,4 +405,3 @@ Returns the Prometheus query response including:
   "type": "dash0.prometheus.response"
 }
 ```
-
