@@ -15,6 +15,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Event" href="#create-event" description="Add a timeline event to a Rootly incident" />
   <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in Rootly" />
 </CardGrid>
 
@@ -65,6 +66,49 @@ This trigger automatically sets up a Rootly webhook endpoint when configured. Th
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "rootly.onIncident"
+}
+```
+
+<a id="create-event"></a>
+
+## Create Event
+
+The Create Event component adds a timeline event (note/annotation) to a Rootly incident.
+
+### Use Cases
+
+- **Investigation notes**: Add detailed investigation notes to the incident timeline
+- **Status updates**: Post automated status updates as workflows progress
+- **Cross-system sync**: Sync comments from external tools into the incident timeline
+
+### Configuration
+
+- **Incident ID**: The Rootly incident UUID to add the event to (required, supports expressions)
+- **Event**: The note/annotation text (required, supports expressions)
+- **Visibility**: Internal or external visibility (optional, default per Rootly)
+
+### Output
+
+Returns the created incident event with:
+- **id**: Event ID
+- **event**: Event content
+- **visibility**: Event visibility
+- **occurred_at**: Event timestamp
+- **created_at**: Creation timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "created_at": "2026-02-10T07:34:35.902-8:00",
+    "event": "Investigation update: database connections stabilized.",
+    "id": "a2d32bb7-0417-4d0d-8483-a583c3-7853",
+    "occurred_at": "2026-02-10T07:34:35.902-8:00",
+    "visibility": "internal"
+  },
+  "timestamp": "2026-02-10T15:34:36.09877478Z",
+  "type": "rootly.incident.event"
 }
 ```
 
