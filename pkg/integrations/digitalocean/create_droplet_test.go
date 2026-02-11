@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -94,7 +93,7 @@ func Test__CreateDroplet__Setup(t *testing.T) {
 func Test__CreateDroplet__Execute(t *testing.T) {
 	component := &CreateDroplet{}
 
-	t.Run("successful creation -> stores metadata and schedules poll", func(t *testing.T) {
+	t.Run("successful creation -> emits droplet data", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -110,7 +109,7 @@ func Test__CreateDroplet__Execute(t *testing.T) {
 							"region": {"name": "New York 3", "slug": "nyc3"},
 							"image": {"id": 12345, "name": "Ubuntu 24.04 (LTS) x64", "slug": "ubuntu-24-04-x64"},
 							"size_slug": "s-1vcpu-1gb",
-							"networks": {"v4": []},
+							"networks": {"v4": [{"ip_address": "104.131.186.241", "type": "public"}]},
 							"tags": ["web"]
 						}
 					}`)),
@@ -124,8 +123,6 @@ func Test__CreateDroplet__Execute(t *testing.T) {
 			},
 		}
 
-		metadataCtx := &contexts.MetadataContext{}
-		requestCtx := &contexts.RequestContext{}
 		executionState := &contexts.ExecutionStateContext{
 			KVs: map[string]string{},
 		}
@@ -141,23 +138,16 @@ func Test__CreateDroplet__Execute(t *testing.T) {
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
 			ExecutionState: executionState,
-			Metadata:       metadataCtx,
-			Requests:       requestCtx,
 		})
 
 		require.NoError(t, err)
+		assert.True(t, executionState.Passed)
+		assert.Equal(t, "default", executionState.Channel)
+		assert.Equal(t, "digitalocean.droplet.created", executionState.Type)
 
-		// Should store droplet ID in metadata
-		metadata, ok := metadataCtx.Metadata.(map[string]any)
-		require.True(t, ok)
-		assert.Equal(t, 98765432, metadata["dropletID"])
-
-		// Should schedule a poll action
-		assert.Equal(t, "poll", requestCtx.Action)
-		assert.Equal(t, 10*time.Second, requestCtx.Duration)
-
-		// Should NOT emit yet (waiting for active status)
-		assert.False(t, executionState.Passed)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://api.digitalocean.com/v2/droplets", httpContext.Requests[0].URL.String())
+		assert.Equal(t, http.MethodPost, httpContext.Requests[0].Method)
 	})
 
 	t.Run("API error -> returns error", func(t *testing.T) {
@@ -194,113 +184,5 @@ func Test__CreateDroplet__Execute(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create droplet")
-	})
-}
-
-func Test__CreateDroplet__HandleAction(t *testing.T) {
-	component := &CreateDroplet{}
-
-	t.Run("droplet active -> emits with IP address", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body: io.NopCloser(strings.NewReader(`{
-						"droplet": {
-							"id": 98765432,
-							"name": "my-droplet",
-							"memory": 1024,
-							"vcpus": 1,
-							"disk": 25,
-							"status": "active",
-							"region": {"name": "New York 3", "slug": "nyc3"},
-							"image": {"id": 12345, "name": "Ubuntu 24.04 (LTS) x64", "slug": "ubuntu-24-04-x64"},
-							"size_slug": "s-1vcpu-1gb",
-							"networks": {"v4": [{"ip_address": "104.131.186.241", "type": "public"}]},
-							"tags": ["web"]
-						}
-					}`)),
-				},
-			},
-		}
-
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"apiToken": "test-token",
-			},
-		}
-
-		metadataCtx := &contexts.MetadataContext{
-			Metadata: map[string]any{"dropletID": 98765432},
-		}
-
-		executionState := &contexts.ExecutionStateContext{
-			KVs: map[string]string{},
-		}
-
-		err := component.HandleAction(core.ActionContext{
-			Name:           "poll",
-			HTTP:           httpContext,
-			Integration:    integrationCtx,
-			Metadata:       metadataCtx,
-			ExecutionState: executionState,
-			Requests:       &contexts.RequestContext{},
-		})
-
-		require.NoError(t, err)
-		assert.True(t, executionState.Passed)
-		assert.Equal(t, "default", executionState.Channel)
-		assert.Equal(t, "digitalocean.droplet.created", executionState.Type)
-	})
-
-	t.Run("droplet still new -> schedules another poll", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body: io.NopCloser(strings.NewReader(`{
-						"droplet": {
-							"id": 98765432,
-							"name": "my-droplet",
-							"status": "new",
-							"region": {"name": "New York 3", "slug": "nyc3"},
-							"image": {"id": 12345, "name": "Ubuntu 24.04 (LTS) x64", "slug": "ubuntu-24-04-x64"},
-							"size_slug": "s-1vcpu-1gb",
-							"networks": {"v4": []},
-							"tags": []
-						}
-					}`)),
-				},
-			},
-		}
-
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"apiToken": "test-token",
-			},
-		}
-
-		metadataCtx := &contexts.MetadataContext{
-			Metadata: map[string]any{"dropletID": 98765432},
-		}
-
-		requestCtx := &contexts.RequestContext{}
-		executionState := &contexts.ExecutionStateContext{
-			KVs: map[string]string{},
-		}
-
-		err := component.HandleAction(core.ActionContext{
-			Name:           "poll",
-			HTTP:           httpContext,
-			Integration:    integrationCtx,
-			Metadata:       metadataCtx,
-			ExecutionState: executionState,
-			Requests:       requestCtx,
-		})
-
-		require.NoError(t, err)
-		assert.False(t, executionState.Passed)
-		assert.Equal(t, "poll", requestCtx.Action)
-		assert.Equal(t, 10*time.Second, requestCtx.Duration)
 	})
 }

@@ -19,9 +19,6 @@ interface OnDropletEventData {
     id: number;
     name: string;
     size_slug: string;
-    networks?: {
-      v4?: { ip_address: string; type: string }[];
-    };
     image: {
       name: string;
       slug: string;
@@ -48,8 +45,7 @@ export const onDropletEventTriggerRenderer: TriggerRenderer = {
     const action = eventData?.action;
     const droplet = eventData?.droplet;
 
-    const ip = droplet?.networks?.v4?.find((n) => n.type === "public")?.ip_address;
-    const values: Record<string, string> = {
+    return {
       "Started At": action?.started_at ? new Date(action.started_at).toLocaleString() : "-",
       "Completed At": action?.completed_at ? new Date(action.completed_at).toLocaleString() : "-",
       "Droplet ID": action?.resource_id?.toString() || "-",
@@ -59,10 +55,6 @@ export const onDropletEventTriggerRenderer: TriggerRenderer = {
       OS: droplet?.image?.name || droplet?.image?.slug || "-",
       Region: droplet?.region?.name || action?.region_slug || "-",
     };
-    if (ip) {
-      values["IP Address"] = ip;
-    }
-    return values;
   },
 
   getTriggerProps: (context: TriggerRendererContext) => {

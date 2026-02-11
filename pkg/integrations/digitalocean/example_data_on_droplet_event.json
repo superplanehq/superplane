@@ -13,7 +13,6 @@
     "id": 98765432,
     "name": "my-droplet",
     "size_slug": "s-1vcpu-1gb",
-    "networks": { "v4": [{ "ip_address": "203.0.113.1", "type": "public" }] },
     "image": { "name": "Ubuntu 24.04 (LTS) x64", "slug": "ubuntu-24-04-x64" },
     "region": { "name": "New York 3", "slug": "nyc3" }
   }
