@@ -166,20 +166,12 @@ func (p *OnPipelineCompleted) poll(ctx core.TriggerActionContext) error {
 		return fmt.Errorf("webhook data missing from poll parameters")
 	}
 
-	// Get retry count, default to 0 if not set
 	retryCount := 0
 	if count, ok := ctx.Parameters["retryCount"].(float64); ok {
 		retryCount = int(count)
 	}
 
-	// Stop polling after 5 tries
 	if retryCount >= 5 {
-		// Max retries reached, emit the event anyway
-		// The pipeline might be done but API is still inconsistent
-		err := ctx.Events.Emit("circleci.workflow.completed", webhookData)
-		if err != nil {
-			return fmt.Errorf("failed to emit event: %w", err)
-		}
 		return nil
 	}
 
@@ -194,7 +186,6 @@ func (p *OnPipelineCompleted) poll(ctx core.TriggerActionContext) error {
 	}
 
 	if !result.AllDone {
-		// Pipeline not done yet, schedule another poll with incremented retry count
 		params := make(map[string]any)
 		for k, v := range ctx.Parameters {
 			params[k] = v
@@ -203,7 +194,6 @@ func (p *OnPipelineCompleted) poll(ctx core.TriggerActionContext) error {
 		return ctx.Requests.ScheduleActionCall("poll", params, 3*time.Second)
 	}
 
-	// Pipeline is done, emit the event
 	err = ctx.Events.Emit("circleci.workflow.completed", webhookData)
 	if err != nil {
 		return fmt.Errorf("failed to emit event: %w", err)
