@@ -202,6 +202,19 @@ func (t *OnDeploymentEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, 
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	// Validate the project matches the configured project
+	// This is important since Railway doesn't provide webhook signatures
+	if resource, ok := payload["resource"].(map[string]any); ok {
+		if project, ok := resource["project"].(map[string]any); ok {
+			if projectID, ok := project["id"].(string); ok {
+				if projectID != config.Project {
+					// Event is from a different project, ignore
+					return http.StatusOK, nil
+				}
+			}
+		}
+	}
+
 	// Filter by event action if configured
 	if len(config.Statuses) > 0 {
 		// Reject events with empty action when filter is active
