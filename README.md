@@ -1,12 +1,11 @@
 # SuperPlane
 
-SuperPlane is an **open source DevOps control plane** for defining and running
-event-based workflows. It works across the tools you already use such as
-Git, CI/CD, observability, incident response, infra, and notifications.
+SuperPlane は、イベント駆動ワークフローを定義・実行するための **オープンソース DevOps コントロールプレーン** です。  
+Git、CI/CD、可観測性、インシデント対応、インフラ、通知など、すでに利用しているツールをまたいで動作します。
 
 ![SuperPlane screenshot](./screenshot.png)
 
-## Project status
+## プロジェクトの状況
 
 <p>
   <a href="https://superplanehq.semaphoreci.com/projects/superplane"><img src="https://superplanehq.semaphoreci.com/badges/superplane/branches/main.svg?style=shields" alt="CI Status on Semaphore" /></a>
@@ -14,52 +13,53 @@ Git, CI/CD, observability, incident response, infra, and notifications.
   <a href="https://discord.gg/KC78eCNsnw"><img src="https://img.shields.io/discord/1409914582239023200?label=discord" alt="Discord server" /></a>
 </p>
 
-This project is in alpha stage and moving quickly. Expect rough edges and occasional
-breaking changes while we stabilize the core model and integrations.
-If you try it and hit something confusing, please [open an issue](https://github.com/superplanehq/superplane/issues/new).
-Early feedback is extremely valuable.
+このプロジェクトはアルファ段階で、現在も急速に進化しています。  
+コアモデルと統合機能を安定化している段階のため、粗い部分や破壊的変更が発生する可能性があります。  
+試してみて分かりづらい点があれば、[Issue を作成](https://github.com/superplanehq/superplane/issues/new) してください。  
+早期のフィードバックは非常に重要です。
 
-## What it does
+## できること
 
-- **Workflow orchestration**: Model multi-step operational workflows that span multiple systems.
-- **Event-driven automation**: Trigger workflows from pushes, deploy events, alerts, schedules, and webhooks.
-- **Control plane UI**: Design and manage DevOps processes; inspect runs, status, and history in a single place.
-- **Shared operational context**: Keep workflow definitions and operational intent in one system instead of scattered scripts.
+- **ワークフローのオーケストレーション**: 複数システムをまたぐ多段の運用ワークフローをモデル化できます。
+- **イベント駆動の自動化**: push、デプロイイベント、アラート、スケジュール、Webhook からワークフローを開始できます。
+- **コントロールプレーン UI**: DevOps プロセスを設計・管理し、実行結果、ステータス、履歴を 1 か所で確認できます。
+- **運用コンテキストの共有**: スクリプトが散在した状態ではなく、ワークフロー定義と運用意図を 1 つのシステムに集約できます。
 
-## How it works
+## 仕組み
 
-- **Canvases**: You model a workflow as a directed graph (a “Canvas”) of steps and dependencies.
-- **Components**: Each step is a reusable component (built-in or integration-backed) that performs an action (for example: call CI/CD, open an incident, post a notification, wait for a condition, require approval).
-- **Events & triggers**: Incoming events (webhooks, schedules, tool events) match triggers and start executions with the event payload as input.
-- **Execution + visibility**: SuperPlane executes the graph, tracks state, and exposes runs/history/debugging in the UI (and via the CLI).
+- **Canvases**: ワークフローを、ステップと依存関係で構成される有向グラフ（「Canvas」）としてモデル化します。
+- **Components**: 各ステップは再利用可能なコンポーネント（組み込みまたは連携ベース）で、アクションを実行します（例: CI/CD 呼び出し、インシデント起票、通知送信、条件待機、承認必須化）。
+- **イベントとトリガー**: 受信イベント（Webhook、スケジュール、各種ツールイベント）がトリガー条件に一致すると、イベントペイロードを入力として実行を開始します。
+- **実行と可視化**: SuperPlane がグラフを実行して状態を追跡し、実行履歴やデバッグ情報を UI（および CLI）で提供します。
 
-### Example use cases
+### 利用例
 
-A few concrete things teams build with SuperPlane:
+SuperPlane でチームが実際に構築している具体例:
 
-- **Policy-gated production deploy**: when CI finishes green, hold outside business hours, require on-call + product approval, then trigger the deploy.
-- **Progressive delivery (10% → 30% → 60% → 100%)**: deploy in waves, wait/verify at each step, and rollback on failure with an approval gate.
-- **Release train with a multi-repo ship set**: wait for tags/builds from a set of services, fan-in once all are ready, then dispatch a coordinated deploy.
-- **“First 5 minutes” incident triage**: on incident created, fetch context in parallel (recent deploys + health signals), generate an evidence pack, and open an issue.
+- **ポリシーで保護された本番デプロイ**: CI が成功したら、営業時間外は保留し、オンコール + プロダクト承認を必須にしてからデプロイを実行。
+- **段階的デリバリー (10% → 30% → 60% → 100%)**: 複数ウェーブでデプロイし、各ステップで待機・検証し、失敗時は承認ゲート付きでロールバック。
+- **マルチリポジトリのリリーストレイン**: 複数サービスのタグ/ビルドを待機し、すべて揃ったら集約して協調デプロイを実行。
+- **インシデント発生後「最初の5分」トリアージ**: インシデント作成時にコンテキスト（直近デプロイ + ヘルスシグナル）を並列取得し、証跡パックを生成して Issue を起票。
 
-## Quick start
+## クイックスタート
 
-Run the latest demo container:
+最新のデモコンテナを実行します:
 
 ```
 docker pull ghcr.io/superplanehq/superplane-demo:stable
 docker run --rm -p 3000:3000 -v spdata:/app/data -ti ghcr.io/superplanehq/superplane-demo:stable
 ```
 
-Then open [http://localhost:3000](http://localhost:3000) and follow the [quick startguide](https://docs.superplane.com/get-started/quickstart/).
+その後 [http://localhost:3000](http://localhost:3000) を開き、[クイックスタートガイド](https://docs.superplane.com/get-started/quickstart/) に従ってください。
 
-## Supported Integrations
+## サポートされている連携
 
-SuperPlane integrates with the tools you already use. Each integration provides triggers (events that start workflows) and components (actions you can run).
+SuperPlane はすでに利用しているツールと連携できます。  
+各連携はトリガー（ワークフロー開始イベント）とコンポーネント（実行可能なアクション）を提供します。
 
-> View the full list in our [documentation](https://docs.superplane.com/components/). Missing a provider? [Open an issue](https://github.com/superplanehq/superplane/issues/new) to request it.
+> 連携一覧は [ドキュメント](https://docs.superplane.com/components/) を参照してください。追加してほしいプロバイダーがあれば、[Issue を作成](https://github.com/superplanehq/superplane/issues/new) してください。
 
-### AI & LLM
+### AI・LLM
 
 <table>
 <tr>
@@ -68,7 +68,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-### Version Control & CI/CD
+### バージョン管理 & CI/CD
 
 <table>
 <tr>
@@ -79,7 +79,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-### Cloud & Infrastructure
+### クラウド & インフラストラクチャ
 
 <table>
 <tr>
@@ -91,7 +91,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-### Observability
+### 可観測性
 
 <table>
 <tr>
@@ -100,7 +100,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-### Incident Management
+### インシデント管理
 
 <table>
 <tr>
@@ -109,7 +109,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-### Communication
+### コミュニケーション
 
 <table>
 <tr>
@@ -120,7 +120,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-### Ticketing
+### チケット管理
 
 <table>
 <tr>
@@ -128,7 +128,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-### Developer Tools
+### 開発ツール
 
 <table>
 <tr>
@@ -136,45 +136,45 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-## Production installation
+## 本番環境へのインストール
 
-You can deploy SuperPlane on a single host or on Kubernetes:
+SuperPlane は単一ホストまたは Kubernetes にデプロイできます:
 
-- **[Single Host Installation](https://docs.superplane.com/installation/overview/#single-host-installation)** - Deploy on AWS EC2, GCP Compute Engine, or other cloud providers
-- **[Kubernetes Installation](https://docs.superplane.com/installation/overview/#kubernetes)** - Deploy on GKE, EKS, or any Kubernetes cluster
+- **[単一ホストインストール](https://docs.superplane.com/installation/overview/#single-host-installation)** - AWS EC2、GCP Compute Engine、その他のクラウド環境にデプロイ
+- **[Kubernetes インストール](https://docs.superplane.com/installation/overview/#kubernetes)** - GKE、EKS、または任意の Kubernetes クラスタにデプロイ
 
-## Roadmap Overview
+## ロードマップ概要
 
-This section gives a quick snapshot of what SuperPlane already supports and what’s coming next.
+このセクションでは、SuperPlane が現在サポートしている内容と今後の予定を簡潔に示します。
 
-**Available now**
+**現在利用可能**
 
-✓ 75+ components  
-✓ Event-driven workflow engine  
-✓ Visual Canvas builder  
-✓ Run history, event chain view, debug console  
-✓ Starter CLI and example workflows
+✓ 75+ 個のコンポーネント  
+✓ イベント駆動ワークフローエンジン  
+✓ ビジュアル Canvas ビルダー  
+✓ 実行履歴、イベントチェーン表示、デバッグコンソール  
+✓ スターター CLI とサンプルワークフロー
 
-**In progress / upcoming**
+**進行中 / 今後予定**
 
-→ 200+ new components (AWS, Grafana, DataDog, Azure, GitLab, Jira, and more)  
-→ [Canvas version control](https://github.com/superplanehq/superplane/issues/1380)  
-→ [SAML/SCIM](https://github.com/superplanehq/superplane/issues/1377) with [extended RBAC and permissions](https://github.com/superplanehq/superplane/issues/1378)  
-→ [Artifact version tracking](https://github.com/superplanehq/superplane/issues/1382)  
-→ [Public API](https://github.com/superplanehq/superplane/issues/1854)
+→ 200+ の新規コンポーネント（AWS、Grafana、DataDog、Azure、GitLab、Jira ほか）  
+→ [Canvas のバージョン管理](https://github.com/superplanehq/superplane/issues/1380)  
+→ [SAML/SCIM](https://github.com/superplanehq/superplane/issues/1377) と [拡張 RBAC / 権限管理](https://github.com/superplanehq/superplane/issues/1378)  
+→ [アーティファクトのバージョントラッキング](https://github.com/superplanehq/superplane/issues/1382)  
+→ [公開 API](https://github.com/superplanehq/superplane/issues/1854)
 
-## Contributing
+## コントリビュート
 
-We welcome your bug reports, ideas for improvement, and focused PRs.
+バグ報告、改善アイデア、焦点を絞った PR を歓迎します。
 
-- Read the **[Contributing Guide](CONTRIBUTING.md)** to get started.
-- Issues: use GitHub issues for bugs and feature requests.
+- まずは **[コントリビューティングガイド](CONTRIBUTING.md)** を確認してください。
+- バグ報告や機能要望は GitHub Issues を利用してください。
 
-## License
+## ライセンス
 
-Apache License 2.0. See `LICENSE`.
+Apache License 2.0. `LICENSE` を参照してください。
 
-## Community
+## コミュニティ
 
-- **[Discord](https://discord.superplane.com)** - Join our community for discussions, questions, and collaboration
-- **[X](https://x.com/superplanehq)** - Follow us for updates and announcements
+- **[Discord](https://discord.superplane.com)** - 議論、質問、コラボレーションのためのコミュニティに参加できます
+- **[X](https://x.com/superplanehq)** - 最新情報やお知らせをフォローできます
