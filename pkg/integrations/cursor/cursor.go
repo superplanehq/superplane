@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegrationWithWebhookHandler("cursor", &Cursor{}, &CursorWebhookHandler{})
+	registry.RegisterIntegration("cursor", &Cursor{})
 }
 
 type Cursor struct{}
