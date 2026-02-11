@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
+	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -354,6 +355,9 @@ func (c *WaitForButtonClick) handleButtonClick(ctx core.ActionContext) error {
 		return fmt.Errorf("failed to update metadata: %w", err)
 	}
 
+	// Clean up the subscription since we've received the button click
+	c.unsubscribe(ctx.Integration, metadata)
+
 	payload := map[string]any{
 		"value":      buttonValue,
 		"clicked_at": time.Now().Format(time.RFC3339),
@@ -371,6 +375,14 @@ func (c *WaitForButtonClick) handleTimeout(ctx core.ActionContext) error {
 		return nil
 	}
 
+	// Clean up the subscription since we've timed out
+	var metadata WaitForButtonClickMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	c.unsubscribe(ctx.Integration, metadata)
+
 	payload := map[string]any{
 		"timeout_at": time.Now().Format(time.RFC3339),
 	}
@@ -380,6 +392,22 @@ func (c *WaitForButtonClick) handleTimeout(ctx core.ActionContext) error {
 		"slack.button.timeout",
 		[]any{payload},
 	)
+}
+
+func (c *WaitForButtonClick) unsubscribe(integration core.IntegrationContext, metadata WaitForButtonClickMetadata) {
+	if metadata.AppSubscriptionID == nil {
+		return
+	}
+
+	subscriptionID, err := uuid.Parse(*metadata.AppSubscriptionID)
+	if err != nil {
+		logrus.Errorf("failed to parse subscription ID: %v", err)
+		return
+	}
+
+	if err := integration.Unsubscribe(subscriptionID); err != nil {
+		logrus.Errorf("failed to unsubscribe: %v", err)
+	}
 }
 
 func (c *WaitForButtonClick) Cancel(ctx core.ExecutionContext) error {
