@@ -115,6 +115,7 @@ func (s *Semaphore) HandleAction(ctx core.IntegrationActionContext) error {
 func (s *Semaphore) Components() []core.Component {
 	return []core.Component{
 		&RunWorkflow{},
+		&GetPipeline{},
 	}
 }
 
