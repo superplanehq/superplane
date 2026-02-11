@@ -249,10 +249,12 @@ func (p *OnPipelineCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int
 	// Instead of trying to process the webhook immediately, we'll schedule a poll action in 3 seconds.
 	//
 
-	err = ctx.Requests.ScheduleActionCall("poll", map[string]any{
+	actionPayload := map[string]any{
 		"pipelineId":  pipelineID,
 		"webhookData": data,
-	}, 3*time.Second)
+	}
+
+	err = ctx.Requests.ScheduleActionCall("poll", actionPayload, 3*time.Second)
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to schedule poll action: %w", err)
 	}
