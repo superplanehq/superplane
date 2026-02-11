@@ -1,0 +1,11 @@
+{
+  "total_minutes_used": 1250.5,
+  "total_paid_minutes_used": 250.5,
+  "included_minutes": 1000,
+  "minutes_used_breakdown": {
+    "UBUNTU": 800,
+    "WINDOWS": 350,
+    "MACOS": 100
+  },
+  "organization": "acme"
+}
