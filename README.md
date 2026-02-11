@@ -1,65 +1,65 @@
 # SuperPlane
 
-SuperPlane is an **open source DevOps control plane** for defining and running
-event-based workflows. It works across the tools you already use such as
-Git, CI/CD, observability, incident response, infra, and notifications.
+SuperPlane ist eine **Open-Source DevOps-Steuerungsebene** zur Definition und Ausführung
+ereignisbasierter Workflows. Es funktioniert mit den Tools, die Sie bereits verwenden, wie
+Git, CI/CD, Observability, Incident Response, Infrastruktur und Benachrichtigungen.
 
-![SuperPlane screenshot](./screenshot.png)
+![SuperPlane Screenshot](./screenshot.png)
 
-## Project status
+## Projektstatus
 
 <p>
-  <a href="https://superplanehq.semaphoreci.com/projects/superplane"><img src="https://superplanehq.semaphoreci.com/badges/superplane/branches/main.svg?style=shields" alt="CI Status on Semaphore" /></a>
-  <a href="https://github.com/superplanehq/superplane/pulse"><img src="https://img.shields.io/github/commit-activity/m/superplanehq/superplane" alt="GitHub commit activity"/></a>
-  <a href="https://discord.gg/KC78eCNsnw"><img src="https://img.shields.io/discord/1409914582239023200?label=discord" alt="Discord server" /></a>
+  <a href="https://superplanehq.semaphoreci.com/projects/superplane"><img src="https://superplanehq.semaphoreci.com/badges/superplane/branches/main.svg?style=shields" alt="CI-Status auf Semaphore" /></a>
+  <a href="https://github.com/superplanehq/superplane/pulse"><img src="https://img.shields.io/github/commit-activity/m/superplanehq/superplane" alt="GitHub Commit-Aktivität"/></a>
+  <a href="https://discord.gg/KC78eCNsnw"><img src="https://img.shields.io/discord/1409914582239023200?label=discord" alt="Discord-Server" /></a>
 </p>
 
-This project is in alpha stage and moving quickly. Expect rough edges and occasional
-breaking changes while we stabilize the core model and integrations.
-If you try it and hit something confusing, please [open an issue](https://github.com/superplanehq/superplane/issues/new).
-Early feedback is extremely valuable.
+Dieses Projekt befindet sich im Alpha-Stadium und entwickelt sich schnell weiter. Erwarten Sie raue Kanten und gelegentliche
+Breaking Changes, während wir das Kernmodell und die Integrationen stabilisieren.
+Wenn Sie es ausprobieren und auf etwas Verwirrendes stoßen, [erstellen Sie bitte ein Issue](https://github.com/superplanehq/superplane/issues/new).
+Frühes Feedback ist äußerst wertvoll.
 
-## What it does
+## Was es macht
 
-- **Workflow orchestration**: Model multi-step operational workflows that span multiple systems.
-- **Event-driven automation**: Trigger workflows from pushes, deploy events, alerts, schedules, and webhooks.
-- **Control plane UI**: Design and manage DevOps processes; inspect runs, status, and history in a single place.
-- **Shared operational context**: Keep workflow definitions and operational intent in one system instead of scattered scripts.
+- **Workflow-Orchestrierung**: Modellieren Sie mehrstufige operationelle Workflows, die mehrere Systeme umfassen.
+- **Ereignisgesteuerte Automatisierung**: Lösen Sie Workflows durch Pushes, Deploy-Events, Alerts, Zeitpläne und Webhooks aus.
+- **Steuerungsebenen-UI**: Entwerfen und verwalten Sie DevOps-Prozesse; inspizieren Sie Ausführungen, Status und Verlauf an einem Ort.
+- **Gemeinsamer operationeller Kontext**: Halten Sie Workflow-Definitionen und operationelle Absichten in einem System, anstatt in verstreuten Skripten.
 
-## How it works
+## Wie es funktioniert
 
-- **Canvases**: You model a workflow as a directed graph (a “Canvas”) of steps and dependencies.
-- **Components**: Each step is a reusable component (built-in or integration-backed) that performs an action (for example: call CI/CD, open an incident, post a notification, wait for a condition, require approval).
-- **Events & triggers**: Incoming events (webhooks, schedules, tool events) match triggers and start executions with the event payload as input.
-- **Execution + visibility**: SuperPlane executes the graph, tracks state, and exposes runs/history/debugging in the UI (and via the CLI).
+- **Canvases**: Sie modellieren einen Workflow als gerichteten Graphen (ein "Canvas") aus Schritten und Abhängigkeiten.
+- **Komponenten**: Jeder Schritt ist eine wiederverwendbare Komponente (eingebaut oder integrationsgestützt), die eine Aktion ausführt (z.B.: CI/CD aufrufen, einen Incident eröffnen, eine Benachrichtigung senden, auf eine Bedingung warten, Genehmigung erfordern).
+- **Events & Trigger**: Eingehende Events (Webhooks, Zeitpläne, Tool-Events) werden mit Triggern abgeglichen und starten Ausführungen mit dem Event-Payload als Eingabe.
+- **Ausführung + Sichtbarkeit**: SuperPlane führt den Graphen aus, verfolgt den Zustand und stellt Ausführungen/Verlauf/Debugging in der UI (und über die CLI) zur Verfügung.
 
-### Example use cases
+### Beispielanwendungsfälle
 
-A few concrete things teams build with SuperPlane:
+Einige konkrete Dinge, die Teams mit SuperPlane erstellen:
 
-- **Policy-gated production deploy**: when CI finishes green, hold outside business hours, require on-call + product approval, then trigger the deploy.
-- **Progressive delivery (10% → 30% → 60% → 100%)**: deploy in waves, wait/verify at each step, and rollback on failure with an approval gate.
-- **Release train with a multi-repo ship set**: wait for tags/builds from a set of services, fan-in once all are ready, then dispatch a coordinated deploy.
-- **“First 5 minutes” incident triage**: on incident created, fetch context in parallel (recent deploys + health signals), generate an evidence pack, and open an issue.
+- **Richtliniengesteuertes Produktions-Deployment**: Wenn CI grün abschließt, außerhalb der Geschäftszeiten zurückhalten, Bereitschafts- und Produktgenehmigung erfordern, dann das Deployment auslösen.
+- **Progressive Delivery (10% → 30% → 60% → 100%)**: In Wellen deployen, bei jedem Schritt warten/verifizieren und bei Fehler mit einem Genehmigungsgate zurückrollen.
+- **Release-Train mit Multi-Repo-Ship-Set**: Auf Tags/Builds von einer Reihe von Services warten, zusammenführen sobald alle bereit sind, dann ein koordiniertes Deployment auslösen.
+- **"Erste 5 Minuten" Incident-Triage**: Bei Incident-Erstellung parallel Kontext abrufen (kürzliche Deployments + Gesundheitssignale), ein Beweispaket erstellen und ein Issue eröffnen.
 
-## Quick start
+## Schnellstart
 
-Run the latest demo container:
+Starten Sie den neuesten Demo-Container:
 
 ```
 docker pull ghcr.io/superplanehq/superplane-demo:stable
 docker run --rm -p 3000:3000 -v spdata:/app/data -ti ghcr.io/superplanehq/superplane-demo:stable
 ```
 
-Then open [http://localhost:3000](http://localhost:3000) and follow the [quick startguide](https://docs.superplane.com/get-started/quickstart/).
+Öffnen Sie dann [http://localhost:3000](http://localhost:3000) und folgen Sie der [Schnellstartanleitung](https://docs.superplane.com/get-started/quickstart/).
 
-## Supported Integrations
+## Unterstützte Integrationen
 
-SuperPlane integrates with the tools you already use. Each integration provides triggers (events that start workflows) and components (actions you can run).
+SuperPlane integriert sich mit den Tools, die Sie bereits verwenden. Jede Integration bietet Trigger (Events, die Workflows starten) und Komponenten (Aktionen, die Sie ausführen können).
 
-> View the full list in our [documentation](https://docs.superplane.com/components/). Missing a provider? [Open an issue](https://github.com/superplanehq/superplane/issues/new) to request it.
+> Die vollständige Liste finden Sie in unserer [Dokumentation](https://docs.superplane.com/components/). Fehlt ein Anbieter? [Erstellen Sie ein Issue](https://github.com/superplanehq/superplane/issues/new), um ihn anzufordern.
 
-### AI & LLM
+### KI & LLM
 
 <table>
 <tr>
@@ -68,7 +68,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-### Version Control & CI/CD
+### Versionsverwaltung & CI/CD
 
 <table>
 <tr>
@@ -79,7 +79,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-### Cloud & Infrastructure
+### Cloud & Infrastruktur
 
 <table>
 <tr>
@@ -100,7 +100,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-### Incident Management
+### Incident-Management
 
 <table>
 <tr>
@@ -109,7 +109,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-### Communication
+### Kommunikation
 
 <table>
 <tr>
@@ -128,7 +128,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-### Developer Tools
+### Entwicklerwerkzeuge
 
 <table>
 <tr>
@@ -136,45 +136,45 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 </tr>
 </table>
 
-## Production installation
+## Produktionsinstallation
 
-You can deploy SuperPlane on a single host or on Kubernetes:
+Sie können SuperPlane auf einem einzelnen Host oder auf Kubernetes bereitstellen:
 
-- **[Single Host Installation](https://docs.superplane.com/installation/overview/#single-host-installation)** - Deploy on AWS EC2, GCP Compute Engine, or other cloud providers
-- **[Kubernetes Installation](https://docs.superplane.com/installation/overview/#kubernetes)** - Deploy on GKE, EKS, or any Kubernetes cluster
+- **[Einzelhost-Installation](https://docs.superplane.com/installation/overview/#single-host-installation)** - Bereitstellung auf AWS EC2, GCP Compute Engine oder anderen Cloud-Anbietern
+- **[Kubernetes-Installation](https://docs.superplane.com/installation/overview/#kubernetes)** - Bereitstellung auf GKE, EKS oder jedem Kubernetes-Cluster
 
-## Roadmap Overview
+## Roadmap-Überblick
 
-This section gives a quick snapshot of what SuperPlane already supports and what’s coming next.
+Dieser Abschnitt gibt einen schnellen Überblick darüber, was SuperPlane bereits unterstützt und was als Nächstes kommt.
 
-**Available now**
+**Bereits verfügbar**
 
-✓ 75+ components  
-✓ Event-driven workflow engine  
-✓ Visual Canvas builder  
-✓ Run history, event chain view, debug console  
-✓ Starter CLI and example workflows
+✓ 75+ Komponenten  
+✓ Ereignisgesteuerte Workflow-Engine  
+✓ Visueller Canvas-Builder  
+✓ Ausführungsverlauf, Event-Chain-Ansicht, Debug-Konsole  
+✓ Starter-CLI und Beispiel-Workflows
 
-**In progress / upcoming**
+**In Arbeit / geplant**
 
-→ 200+ new components (AWS, Grafana, DataDog, Azure, GitLab, Jira, and more)  
-→ [Canvas version control](https://github.com/superplanehq/superplane/issues/1380)  
-→ [SAML/SCIM](https://github.com/superplanehq/superplane/issues/1377) with [extended RBAC and permissions](https://github.com/superplanehq/superplane/issues/1378)  
-→ [Artifact version tracking](https://github.com/superplanehq/superplane/issues/1382)  
-→ [Public API](https://github.com/superplanehq/superplane/issues/1854)
+→ 200+ neue Komponenten (AWS, Grafana, DataDog, Azure, GitLab, Jira und mehr)  
+→ [Canvas-Versionskontrolle](https://github.com/superplanehq/superplane/issues/1380)  
+→ [SAML/SCIM](https://github.com/superplanehq/superplane/issues/1377) mit [erweitertem RBAC und Berechtigungen](https://github.com/superplanehq/superplane/issues/1378)  
+→ [Artefakt-Versionsverfolgung](https://github.com/superplanehq/superplane/issues/1382)  
+→ [Öffentliche API](https://github.com/superplanehq/superplane/issues/1854)
 
-## Contributing
+## Mitwirken
 
-We welcome your bug reports, ideas for improvement, and focused PRs.
+Wir freuen uns über Ihre Fehlerberichte, Verbesserungsvorschläge und gezielte PRs.
 
-- Read the **[Contributing Guide](CONTRIBUTING.md)** to get started.
-- Issues: use GitHub issues for bugs and feature requests.
+- Lesen Sie den **[Beitragsleitfaden](CONTRIBUTING.md)**, um loszulegen.
+- Issues: Verwenden Sie GitHub Issues für Fehler und Feature-Anfragen.
 
-## License
+## Lizenz
 
-Apache License 2.0. See `LICENSE`.
+Apache License 2.0. Siehe `LICENSE`.
 
 ## Community
 
-- **[Discord](https://discord.superplane.com)** - Join our community for discussions, questions, and collaboration
-- **[X](https://x.com/superplanehq)** - Follow us for updates and announcements
+- **[Discord](https://discord.superplane.com)** - Treten Sie unserer Community bei für Diskussionen, Fragen und Zusammenarbeit
+- **[X](https://x.com/superplanehq)** - Folgen Sie uns für Updates und Ankündigungen
