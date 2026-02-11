@@ -56,9 +56,7 @@ export const onDeploymentEventCustomFieldRenderer: CustomFieldRenderer = {
       <div className="border-t-1 border-gray-200 pt-4">
         <div className="space-y-3">
           <div>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Railway Webhook Configuration
-            </span>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Railway Webhook Configuration</span>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
               Copy this URL and add it to your Railway project's webhook settings.
             </p>

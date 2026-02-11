@@ -1,10 +1,5 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import {
-  ComponentBaseMapper,
-  ComponentBaseContext,
-  SubtitleContext,
-  ExecutionDetailsContext,
-} from "../types";
+import { ComponentBaseMapper, ComponentBaseContext, SubtitleContext, ExecutionDetailsContext } from "../types";
 import RailwayLogo from "@/assets/icons/integrations/railway.svg";
 import { formatTimeAgo } from "@/utils/date";
 
