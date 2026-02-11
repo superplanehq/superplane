@@ -375,6 +375,10 @@ func (c *IntegrationContext) Subscribe(configuration any) (*uuid.UUID, error) {
 	return &subscription.ID, nil
 }
 
+func (c *IntegrationContext) Unsubscribe(subscriptionID uuid.UUID) error {
+	return models.DeleteIntegrationSubscription(c.tx, subscriptionID)
+}
+
 func (c *IntegrationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
 	subscriptions, err := models.ListIntegrationSubscriptions(c.tx, c.integration.ID)
 	if err != nil {
