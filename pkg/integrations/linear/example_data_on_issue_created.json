@@ -1,0 +1,26 @@
+{
+  "action": "create",
+  "type": "Issue",
+  "data": {
+    "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+    "createdAt": "2020-01-23T12:53:18.084Z",
+    "updatedAt": "2020-01-23T12:53:18.084Z",
+    "title": "Example issue",
+    "description": "Issue description",
+    "identifier": "ENG-42",
+    "teamId": "72b2a2dc-6f4f-4423-9d34-24b5bd10634a",
+    "stateId": "state-1",
+    "priority": 2,
+    "labelIds": ["label-1"],
+    "assigneeId": "user-1"
+  },
+  "actor": {
+    "id": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+    "type": "user",
+    "name": "Alice",
+    "email": "alice@example.com"
+  },
+  "url": "https://linear.app/company/issue/ENG-42/example-issue",
+  "createdAt": "2020-01-23T12:53:18.084Z",
+  "webhookTimestamp": 1676056940508
+}
