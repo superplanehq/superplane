@@ -2,6 +2,7 @@ import { resolveIcon } from "@/lib/utils";
 import React from "react";
 import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
+import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
@@ -24,6 +25,7 @@ import dockerIcon from "@/assets/icons/integrations/docker.svg";
 /** Integration type name (e.g. "github") → logo src. Used for Settings tab and header. */
 export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   aws: awsIcon,
+  bitbucket: bitbucketIcon,
   cloudflare: cloudflareIcon,
   dash0: dash0Icon,
   datadog: datadogIcon,
@@ -47,6 +49,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
 
 /** Block name first part (e.g. "github") or compound (e.g. aws.lambda) → logo src for header. */
 export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
+  bitbucket: bitbucketIcon,
   cloudflare: cloudflareIcon,
   dash0: dash0Icon,
   datadog: datadogIcon,

@@ -14,6 +14,7 @@ import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
+import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
@@ -393,6 +394,7 @@ function CategorySection({
 
   // Determine category icon
   const appLogoMap: Record<string, string | Record<string, string>> = {
+    bitbucket: bitbucketIcon,
     cloudflare: cloudflareIcon,
     dash0: dash0Icon,
     datadog: datadogIcon,
@@ -467,6 +469,7 @@ function CategorySection({
 
           // Use SVG icons for application components/triggers (SMTP uses resolveIcon("mail"), same as core)
           const appLogoMap: Record<string, string | Record<string, string>> = {
+            bitbucket: bitbucketIcon,
             cloudflare: cloudflareIcon,
             dash0: dash0Icon,
             daytona: daytonaIcon,
