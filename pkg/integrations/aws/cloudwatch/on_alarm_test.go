@@ -271,6 +271,6 @@ func Test__OnAlarm__OnIntegrationMessage(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, 1, eventContext.Count())
-		assert.Equal(t, EventTypeAlarm, eventContext.Payloads[0].Type)
+		assert.Equal(t, "aws.cloudwatch.alarm", eventContext.Payloads[0].Type)
 	})
 }

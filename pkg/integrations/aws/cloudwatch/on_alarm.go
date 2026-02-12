@@ -16,8 +16,6 @@ import (
 const (
 	Source                     = "aws.cloudwatch"
 	DetailTypeAlarmStateChange = "CloudWatch Alarm State Change"
-	AlarmStateValue            = "ALARM"
-	EventTypeAlarm             = "aws.cloudwatch.alarm"
 )
 
 type OnAlarm struct{}
@@ -33,13 +31,15 @@ type OnAlarmMetadata struct {
 }
 
 type AlarmStateChangeDetail struct {
-	AlarmName string `json:"alarmName" mapstructure:"alarmName"`
-	State     struct {
-		Value string `json:"value" mapstructure:"value"`
-	} `json:"state" mapstructure:"state"`
-	PreviousState struct {
-		Value string `json:"value" mapstructure:"value"`
-	} `json:"previousState" mapstructure:"previousState"`
+	AlarmName     string     `json:"alarmName" mapstructure:"alarmName"`
+	State         AlarmState `json:"state" mapstructure:"state"`
+	PreviousState AlarmState `json:"previousState" mapstructure:"previousState"`
+}
+
+type AlarmState struct {
+	Value     string `json:"value" mapstructure:"value"`
+	Reason    string `json:"reason" mapstructure:"reason"`
+	Timestamp string `json:"timestamp" mapstructure:"timestamp"`
 }
 
 func (p *OnAlarm) Name() string {
@@ -104,12 +104,6 @@ func (p *OnAlarm) Configuration() []configuration.Field {
 			Label:    "Alarms",
 			Type:     configuration.FieldTypeAnyPredicateList,
 			Required: false,
-			Default: []map[string]any{
-				{
-					"type":  configuration.PredicateTypeMatches,
-					"value": ".*",
-				},
-			},
 			TypeOptions: &configuration.TypeOptions{
 				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
 					Operators: configuration.AllPredicateOperators,
@@ -299,26 +293,19 @@ func (p *OnAlarm) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 		return fmt.Errorf("missing alarm state in event")
 	}
 
-	if state != AlarmStateValue {
+	if state != AlarmStateAlarm {
 		ctx.Logger.Infof("Skipping event for alarm %s with state %s", alarmName, state)
 		return nil
 	}
 
-	if len(config.Alarms) == 0 {
-		config.Alarms = []configuration.Predicate{
-			{
-				Type:  configuration.PredicateTypeMatches,
-				Value: ".*",
-			},
+	if len(config.Alarms) > 0 {
+		if !configuration.MatchesAnyPredicate(config.Alarms, alarmName) {
+			ctx.Logger.Infof("Skipping event for alarm %s, does not match any predicate: %v", alarmName, config.Alarms)
+			return nil
 		}
 	}
 
-	if !configuration.MatchesAnyPredicate(config.Alarms, alarmName) {
-		ctx.Logger.Infof("Skipping event for alarm %s, does not match any predicate: %v", alarmName, config.Alarms)
-		return nil
-	}
-
-	return ctx.Events.Emit(EventTypeAlarm, ctx.Message)
+	return ctx.Events.Emit("aws.cloudwatch.alarm", ctx.Message)
 }
 
 func (p *OnAlarm) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
