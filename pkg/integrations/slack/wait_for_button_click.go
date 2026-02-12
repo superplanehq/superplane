@@ -129,6 +129,7 @@ func (c *WaitForButtonClick) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeNumber,
 			Description: "Maximum time to wait in seconds (leave empty to wait indefinitely)",
 			Required:    false,
+			Default:     "3600",
 		},
 		{
 			Name:        "buttons",
@@ -140,6 +141,7 @@ func (c *WaitForButtonClick) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Button",
+					MaxItems:  intPtr(4),
 					ItemDefinition: &configuration.ListItemDefinition{
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{
@@ -437,4 +439,8 @@ func (c *WaitForButtonClick) Cancel(ctx core.ExecutionContext) error {
 
 func (c *WaitForButtonClick) Cleanup(ctx core.SetupContext) error {
 	return nil
+}
+
+func intPtr(i int) *int {
+	return &i
 }
