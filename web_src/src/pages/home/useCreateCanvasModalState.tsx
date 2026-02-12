@@ -36,7 +36,13 @@ export function useCreateCanvasModalState() {
   const updateMutation = useUpdateCanvas(organizationId || "", modalState?.workflow?.id || "");
   const { data: workflowTemplates = [] } = useCanvasTemplates(organizationId || "");
 
-  const onSubmit = async (data: { name: string; description?: string; templateId?: string }) => {
+  const onSubmit = async (data: {
+    name: string;
+    description?: string;
+    templateId?: string;
+    nodes?: ComponentsNode[];
+    edges?: ComponentsEdge[];
+  }) => {
     if (!organizationId) {
       return;
     }
@@ -52,12 +58,20 @@ export function useCreateCanvasModalState() {
       return;
     }
 
-    const selectedTemplate = workflowTemplates.find((template) => template.metadata?.id === data.templateId);
+    let nodes = data.nodes;
+    let edges = data.edges;
+
+    if (!nodes && !edges && data.templateId) {
+      const selectedTemplate = workflowTemplates.find((template) => template.metadata?.id === data.templateId);
+      nodes = selectedTemplate?.spec?.nodes;
+      edges = selectedTemplate?.spec?.edges;
+    }
+
     const result = await createMutation.mutateAsync({
       name: data.name,
       description: data.description,
-      nodes: selectedTemplate?.spec?.nodes,
-      edges: selectedTemplate?.spec?.edges,
+      nodes,
+      edges,
     });
 
     if (result?.data?.canvas?.metadata?.id) {
