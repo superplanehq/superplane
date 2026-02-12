@@ -185,6 +185,19 @@ func (c *IntegrationContext) Subscribe(subscription any) (*uuid.UUID, error) {
 	return &s.ID, nil
 }
 
+func (c *IntegrationContext) Unsubscribe(subscriptionID uuid.UUID) error {
+	for i, subscription := range c.Subscriptions {
+		if subscription.ID != subscriptionID {
+			continue
+		}
+
+		c.Subscriptions = append(c.Subscriptions[:i], c.Subscriptions[i+1:]...)
+		return nil
+	}
+
+	return fmt.Errorf("subscription not found: %s", subscriptionID.String())
+}
+
 type ExecutionStateContext struct {
 	Finished       bool
 	Passed         bool
