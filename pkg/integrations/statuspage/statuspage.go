@@ -96,6 +96,7 @@ func (s *Statuspage) HandleAction(ctx core.IntegrationActionContext) error {
 func (s *Statuspage) Components() []core.Component {
 	return []core.Component{
 		&CreateIncident{},
+		&UpdateIncident{},
 	}
 }
 

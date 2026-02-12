@@ -1,0 +1,283 @@
+package statuspage
+
+import (
+	"errors"
+	"fmt"
+	"net/http"
+
+	"github.com/google/uuid"
+	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
+)
+
+type UpdateIncident struct{}
+
+// UpdateIncidentSpec is the strongly typed configuration for the Update Incident component.
+type UpdateIncidentSpec struct {
+	Page            string   `mapstructure:"page"`
+	Incident        string   `mapstructure:"incident"`
+	Status          string   `mapstructure:"status"`
+	Body            string   `mapstructure:"body"`
+	ComponentIDs    []string `mapstructure:"componentIds"`
+	ComponentStatus string   `mapstructure:"componentStatus"`
+}
+
+func (c *UpdateIncident) Name() string {
+	return "statuspage.updateIncident"
+}
+
+func (c *UpdateIncident) Label() string {
+	return "Update Incident"
+}
+
+func (c *UpdateIncident) Description() string {
+	return "Update the status and message of an existing incident on your Statuspage."
+}
+
+func (c *UpdateIncident) Documentation() string {
+	return `The Update Incident component updates an existing incident on your Atlassian Statuspage.
+
+## Use Cases
+
+- **Status transitions**: Update incident status (e.g. investigating → identified → resolved)
+- **Maintenance updates**: Transition scheduled maintenance to in progress or completed
+- **Integration workflows**: Update incidents from monitoring systems or approval workflows
+
+## Configuration
+
+- **Page** (required): The Statuspage containing the incident
+- **Incident** (required): The incident to update
+- **Status** (optional): New status (investigating, identified, monitoring, resolved, scheduled, in_progress, completed)
+- **Body** (optional): Update message shown as the latest incident update
+- **Components** (optional): Components to associate with this update
+- **Component status** (optional): Status to set for selected components
+
+At least one of Status or Body must be provided.
+
+## Output
+
+Returns the full Statuspage Incident object from the API. The payload has structure { type, timestamp, data } where data is the incident. Common expression paths (use $['Node Name'].data. as prefix):
+- data.id, data.name, data.status, data.impact
+- data.shortlink — link to the incident
+- data.created_at, data.updated_at
+- data.components — array of affected components
+- data.incident_updates — array of update messages`
+}
+
+func (c *UpdateIncident) Icon() string {
+	return "activity"
+}
+
+func (c *UpdateIncident) Color() string {
+	return "gray"
+}
+
+func (c *UpdateIncident) OutputChannels(configuration any) []core.OutputChannel {
+	return []core.OutputChannel{core.DefaultOutputChannel}
+}
+
+func (c *UpdateIncident) ExampleOutput() map[string]any {
+	return map[string]any{
+		"id":                  "p31zjtct2jer",
+		"name":                "Database Connection Issues",
+		"status":              "resolved",
+		"impact":              "major",
+		"shortlink":           "http://stspg.io/p31zjtct2jer",
+		"created_at":          "2026-02-12T10:30:00.000Z",
+		"updated_at":          "2026-02-12T11:00:00.000Z",
+		"page_id":             "kctbh9vrtdwd",
+		"affected_components": []string{"API"},
+		"component_count":     1,
+		"latest_update":       "All systems operational. Issue resolved.",
+	}
+}
+
+func (c *UpdateIncident) Configuration() []configuration.Field {
+	return []configuration.Field{
+		{
+			Name:        "page",
+			Label:       "Page",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "The Statuspage containing the incident",
+			Placeholder: "Select a page",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypePage,
+				},
+			},
+		},
+		{
+			Name:        "incident",
+			Label:       "Incident",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "The incident to update",
+			Placeholder: "Select an incident",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeIncident,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "page_id",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "page"},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:        "status",
+			Label:       "Status",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Description: "New incident status",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Investigating", Value: "investigating"},
+						{Label: "Identified", Value: "identified"},
+						{Label: "Monitoring", Value: "monitoring"},
+						{Label: "Resolved", Value: "resolved"},
+						{Label: "Scheduled", Value: "scheduled"},
+						{Label: "In progress", Value: "in_progress"},
+						{Label: "Completed", Value: "completed"},
+					},
+				},
+			},
+		},
+		{
+			Name:        "body",
+			Label:       "Message",
+			Type:        configuration.FieldTypeText,
+			Required:    false,
+			Description: "Update message shown as the latest incident update",
+		},
+		{
+			Name:        "componentIds",
+			Label:       "Components",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Components to update in this incident",
+			Placeholder: "Select components",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:  ResourceTypeComponent,
+					Multi: true,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "page_id",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "page"},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:        "componentStatus",
+			Label:       "Component status",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Description: "Status to set for all selected components",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Operational", Value: "operational"},
+						{Label: "Degraded performance", Value: "degraded_performance"},
+						{Label: "Partial outage", Value: "partial_outage"},
+						{Label: "Major outage", Value: "major_outage"},
+						{Label: "Under maintenance", Value: "under_maintenance"},
+					},
+				},
+			},
+		},
+	}
+}
+
+func (c *UpdateIncident) Setup(ctx core.SetupContext) error {
+	spec := UpdateIncidentSpec{}
+	err := mapstructure.Decode(ctx.Configuration, &spec)
+	if err != nil {
+		return fmt.Errorf("error decoding configuration: %w", err)
+	}
+
+	if spec.Page == "" {
+		return errors.New("page is required")
+	}
+
+	if spec.Incident == "" {
+		return errors.New("incident is required")
+	}
+
+	hasUpdate := spec.Status != "" || spec.Body != "" || len(spec.ComponentIDs) > 0
+	if !hasUpdate {
+		return errors.New("at least one of status, message, or components must be provided")
+	}
+
+	return nil
+}
+
+func (c *UpdateIncident) Execute(ctx core.ExecutionContext) error {
+	spec := UpdateIncidentSpec{}
+	err := mapstructure.Decode(ctx.Configuration, &spec)
+	if err != nil {
+		return fmt.Errorf("error decoding configuration: %w", err)
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("error creating client: %w", err)
+	}
+
+	components := make(map[string]string)
+	for _, id := range spec.ComponentIDs {
+		if spec.ComponentStatus != "" {
+			components[id] = spec.ComponentStatus
+		} else {
+			components[id] = "operational"
+		}
+	}
+
+	req := UpdateIncidentRequest{
+		Status:       spec.Status,
+		Body:         spec.Body,
+		ComponentIDs: spec.ComponentIDs,
+		Components:   components,
+	}
+
+	incident, err := client.UpdateIncident(spec.Page, spec.Incident, req)
+	if err != nil {
+		return fmt.Errorf("failed to update incident: %w", err)
+	}
+
+	return ctx.ExecutionState.Emit(
+		core.DefaultOutputChannel.Name,
+		"statuspage.incident",
+		[]any{incident},
+	)
+}
+
+func (c *UpdateIncident) Cancel(ctx core.ExecutionContext) error {
+	return nil
+}
+
+func (c *UpdateIncident) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+	return ctx.DefaultProcessing()
+}
+
+func (c *UpdateIncident) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (c *UpdateIncident) HandleAction(ctx core.ActionContext) error {
+	return nil
+}
+
+func (c *UpdateIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
+}
+
+func (c *UpdateIncident) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

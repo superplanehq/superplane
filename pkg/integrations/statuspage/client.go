@@ -177,3 +177,76 @@ func (c *Client) CreateIncident(pageID string, req CreateIncidentRequest) (map[s
 	return incident, nil
 }
 
+// Incident is a minimal incident representation for listing.
+type Incident struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// ListIncidents returns incidents for a page. Use empty q and limit 0 for defaults.
+func (c *Client) ListIncidents(pageID string, q string, limit int) ([]Incident, error) {
+	path := fmt.Sprintf("/pages/%s/incidents", url.PathEscape(pageID))
+	if q != "" || limit > 0 {
+		params := url.Values{}
+		if q != "" {
+			params.Set("q", q)
+		}
+		if limit > 0 {
+			params.Set("limit", fmt.Sprintf("%d", limit))
+		}
+		path += "?" + params.Encode()
+	}
+	body, err := c.do(http.MethodGet, path, nil, "")
+	if err != nil {
+		return nil, err
+	}
+	var incidents []Incident
+	if err := json.Unmarshal(body, &incidents); err != nil {
+		return nil, fmt.Errorf("parsing incidents: %w", err)
+	}
+	return incidents, nil
+}
+
+// UpdateIncidentRequest holds the payload for PATCH /pages/{page_id}/incidents/{incident_id}.
+type UpdateIncidentRequest struct {
+	Status         string            `json:"status,omitempty"`
+	Body           string            `json:"body,omitempty"`
+	ComponentIDs   []string          `json:"component_ids,omitempty"`
+	Components     map[string]string `json:"components,omitempty"`
+}
+
+// UpdateIncident updates an incident and returns the full response as map[string]any.
+func (c *Client) UpdateIncident(pageID, incidentID string, req UpdateIncidentRequest) (map[string]any, error) {
+	payload := map[string]any{}
+	if req.Status != "" {
+		payload["status"] = req.Status
+	}
+	if req.Body != "" {
+		payload["body"] = req.Body
+	}
+	if len(req.ComponentIDs) > 0 {
+		payload["component_ids"] = req.ComponentIDs
+	}
+	if len(req.Components) > 0 {
+		payload["components"] = req.Components
+	}
+
+	body := map[string]any{"incident": payload}
+	raw, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling request: %w", err)
+	}
+
+	path := fmt.Sprintf("/pages/%s/incidents/%s", url.PathEscape(pageID), url.PathEscape(incidentID))
+	resBody, err := c.do(http.MethodPatch, path, bytes.NewReader(raw), "application/json")
+	if err != nil {
+		return nil, err
+	}
+
+	var incident map[string]any
+	if err := json.Unmarshal(resBody, &incident); err != nil {
+		return nil, fmt.Errorf("parsing incident response: %w", err)
+	}
+	return incident, nil
+}
+
