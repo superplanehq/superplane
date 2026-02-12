@@ -1,0 +1,203 @@
+---
+title: "Microsoft Azure"
+---
+
+Manage and automate Microsoft Azure resources and services
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="Azure • On VM Created" href="#azure-•-on-vm-created" description="Triggers when a new Virtual Machine is successfully provisioned in Azure" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Azure • Create Virtual Machine" href="#azure-•-create-virtual-machine" description="Creates a new Azure Virtual Machine with the specified configuration" />
+</CardGrid>
+
+## Instructions
+
+## Azure Workload Identity Federation Setup
+
+To connect SuperPlane to Microsoft Azure using Workload Identity Federation:
+
+### 1. Create or Select an App Registration
+
+1. Go to **Azure Portal** → **Azure Active Directory** → **App registrations**
+2. Create a new registration or select an existing app
+3. Note the **Application (client) ID** and **Directory (tenant) ID**
+
+### 2. Configure Federated Identity Credential
+
+1. In your app registration, go to **Certificates & secrets** → **Federated credentials**
+2. Click **Add credential**
+3. Select **Other issuer**
+4. Configure the credential:
+   - **Issuer**: The SuperPlane OIDC issuer URL (provided after creation)
+   - **Subject identifier**: `app-installation:<integration-id>` (provided after creation)
+   - **Audience**: The integration ID (provided after creation)
+   - **Name**: `superplane-integration` (or any descriptive name)
+
+### 3. Grant Required Permissions
+
+Assign appropriate Azure RBAC roles to your app registration:
+
+- **Virtual Machine Contributor** - For VM management
+- **Network Contributor** - For network resource management
+- **Storage Account Contributor** - For storage operations (if needed)
+- **EventGrid Contributor** - For Event Grid subscriptions
+
+You can assign these roles at the subscription or resource group level.
+
+### 4. Complete the Connection
+
+Enter the following information below:
+- **Tenant ID**: Your Azure AD tenant ID
+- **Client ID**: Your app registration's client ID
+- **Subscription ID**: Your Azure subscription ID
+
+SuperPlane will use Workload Identity Federation to authenticate without storing any credentials.
+
+<a id="azure-•-on-vm-created"></a>
+
+## Azure • On VM Created
+
+The On VM Created trigger starts a workflow execution when a new Azure Virtual Machine is successfully provisioned.
+
+### Use Cases
+
+- **Automated configuration**: Run configuration scripts on newly created VMs
+- **Compliance checks**: Verify that new VMs meet security and compliance requirements
+- **Inventory tracking**: Update external inventory systems when VMs are created
+- **Notification workflows**: Send notifications to teams when new VMs are provisioned
+- **Cost tracking**: Log VM creation events for cost analysis and reporting
+
+### How It Works
+
+This trigger listens to Azure Event Grid events for Virtual Machine resource write operations.
+When a VM is successfully created (`provisioningState: Succeeded`), the trigger fires and
+provides detailed information about the new VM.
+
+### Configuration
+
+- **Resource Group** (optional): Filter events to only trigger for VMs created in a specific
+  resource group. Leave empty to trigger for all resource groups in the subscription.
+
+### Event Data
+
+Each VM creation event includes:
+
+- **vmName**: The name of the created virtual machine
+- **vmId**: The full Azure resource ID of the VM
+- **resourceGroup**: The resource group containing the VM
+- **subscriptionId**: The Azure subscription ID
+- **location**: The Azure region where the VM was created
+- **provisioningState**: The provisioning state (typically "Succeeded")
+- **timestamp**: The timestamp when the event occurred
+
+### Azure Event Grid Setup
+
+**Important**: This trigger requires manual setup of an Azure Event Grid subscription.
+
+1. **Create an Event Grid System Topic** (if not already created):
+   - Go to Azure Portal → Event Grid System Topics
+   - Create a new topic for your subscription
+   - Topic Type: "Azure Subscriptions"
+   - Select your subscription
+
+2. **Create an Event Subscription**:
+   - In your Event Grid System Topic, create a new Event Subscription
+   - **Event Types**: Select "Resource Write Success"
+   - **Filters**: 
+     - Subject begins with: `/subscriptions/<subscription-id>/resourceGroups/`
+     - Subject ends with: `/providers/Microsoft.Compute/virtualMachines/`
+   - **Endpoint Type**: Webhook
+   - **Endpoint**: Use the webhook URL provided by SuperPlane for this trigger node
+
+3. **Validation**: Azure Event Grid will send a validation event to verify the endpoint.
+   SuperPlane will automatically respond to this validation request.
+
+### Notes
+
+- The trigger only fires for successfully provisioned VMs (`provisioningState: Succeeded`)
+- Failed VM creations do not trigger the workflow
+- The trigger processes events from Azure Event Grid in real-time
+- Multiple triggers can share the same Event Grid subscription if configured correctly
+
+### Example Data
+
+```json
+{
+  "location": "eastus",
+  "operationName": "Microsoft.Compute/virtualMachines/write",
+  "provisioningState": "Succeeded",
+  "resourceGroup": "my-rg",
+  "subscriptionId": "12345678-1234-1234-1234-123456789abc",
+  "timestamp": "2026-02-11T10:30:00Z",
+  "vmId": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+  "vmName": "my-vm-01"
+}
+```
+
+<a id="azure-•-create-virtual-machine"></a>
+
+## Azure • Create Virtual Machine
+
+The Create Virtual Machine component creates a new Azure VM with full configuration options.
+
+### Use Cases
+
+- **Infrastructure provisioning**: Automatically create VMs as part of deployment workflows
+- **Development environments**: Spin up temporary VMs for testing and development
+- **Auto-scaling**: Create VMs in response to load or events
+- **Disaster recovery**: Quickly provision replacement VMs
+
+### How It Works
+
+1. Validates the VM configuration parameters
+2. Initiates VM creation via the Azure Compute API
+3. Waits for the VM to be fully provisioned (using Azure's Long-Running Operation pattern)
+4. Returns the VM details including ID, name, and provisioning state
+
+### Configuration
+
+- **Resource Group**: The Azure resource group where the VM will be created
+- **Name**: The name for the new virtual machine
+- **Location**: The Azure region (e.g., "eastus", "westeurope")
+- **Size**: The VM size (e.g., "Standard_B1s", "Standard_D2s_v3")
+- **Admin Username**: Administrator username for the VM
+- **Admin Password**: Administrator password for the VM (must meet Azure complexity requirements)
+- **Network Interface ID**: Optional existing NIC. Leave empty to create NIC from selected VNet/Subnet.
+- **Image**: The OS image to use (publisher, offer, SKU, version)
+
+### Output
+
+Returns the created VM information including:
+- **id**: The Azure resource ID of the VM
+- **name**: The name of the VM
+- **provisioningState**: The provisioning state (typically "Succeeded")
+- **location**: The Azure region where the VM was created
+- **size**: The VM size
+
+### Notes
+
+- The VM creation is a Long-Running Operation (LRO) that typically takes 2-5 minutes
+- The component waits for the VM to be fully provisioned before completing
+- The admin password must meet Azure's complexity requirements (12+ characters, mixed case, numbers, symbols)
+- If Network Interface ID is empty, a NIC is created automatically from the selected VNet/Subnet
+
+### Example Output
+
+```json
+{
+  "id": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
+  "location": "eastus",
+  "name": "my-vm",
+  "provisioningState": "Succeeded",
+  "size": "Standard_B1s"
+}
+```
+
