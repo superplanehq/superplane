@@ -1,0 +1,17 @@
+{
+    "type": "rootly.incident",
+    "data": {
+        "id": "abc123-def456",
+        "sequential_id": 42,
+        "title": "Database connection issues - Updated",
+        "slug": "database-connection-issues",
+        "summary": "Root cause identified. Connection pool exhausted.",
+        "status": "mitigated",
+        "severity": "sev1",
+        "started_at": "2026-01-19T12:00:00Z",
+        "mitigated_at": "2026-01-19T13:30:00Z",
+        "updated_at": "2026-01-19T13:30:00Z",
+        "url": "https://app.rootly.com/incidents/abc123-def456"
+    },
+    "timestamp": "2026-01-19T13:30:00Z"
+}
