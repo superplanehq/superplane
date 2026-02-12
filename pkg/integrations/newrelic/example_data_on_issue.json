@@ -1,0 +1,12 @@
+{
+    "issue_id": "12345678-abcd-efgh-ijkl-1234567890ab",
+    "title": "High CPU Usage",
+    "priority": "CRITICAL",
+    "state": "ACTIVATED",
+    "owner": "Team SRE",
+    "issue_url": "https://one.newrelic.com/launcher/nrai.launcher?pane=eyJuZXJkbGV0SWQiOiJhbGVydGluZy11aS1jbGFzc2ljLmluY2lkZW50cyIsInNlbGVjdGVkSW5jaWRlbnRJZCI6IjEyMzQ1Njc4In0=",
+    "impacted_entities": [
+        "infra-host-1"
+    ],
+    "total_incidents": 1
+}
