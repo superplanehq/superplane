@@ -1,6 +1,7 @@
 package dash0
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,6 +21,7 @@ const (
 type Client struct {
 	Token   string
 	BaseURL string
+	Dataset string
 	http    core.HTTPContext
 }
 
@@ -42,11 +44,35 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 	// Strip /api/prometheus if user included it in the base URL
 	baseURL = strings.TrimSuffix(baseURL, "/api/prometheus")
 
+	dataset := "default"
+	datasetConfig, err := ctx.GetConfig("dataset")
+	if err == nil && datasetConfig != nil && len(datasetConfig) > 0 {
+		trimmedDataset := strings.TrimSpace(string(datasetConfig))
+		if trimmedDataset != "" {
+			dataset = trimmedDataset
+		}
+	}
+
 	return &Client{
 		Token:   string(apiToken),
 		BaseURL: baseURL,
+		Dataset: dataset,
 		http:    http,
 	}, nil
+}
+
+// withDatasetQuery appends the configured dataset query parameter to a request URL.
+func (c *Client) withDatasetQuery(requestURL string) (string, error) {
+	parsedURL, err := url.Parse(requestURL)
+	if err != nil {
+		return "", fmt.Errorf("error parsing request URL: %v", err)
+	}
+
+	query := parsedURL.Query()
+	query.Set("dataset", c.Dataset)
+	parsedURL.RawQuery = query.Encode()
+
+	return parsedURL.String(), nil
 }
 
 func (c *Client) execRequest(method, url string, body io.Reader, contentType string) ([]byte, error) {
@@ -168,8 +194,12 @@ type CheckRule struct {
 
 func (c *Client) ListCheckRules() ([]CheckRule, error) {
 	apiURL := fmt.Sprintf("%s/api/alerting/check-rules", c.BaseURL)
+	requestURL, err := c.withDatasetQuery(apiURL)
+	if err != nil {
+		return nil, err
+	}
 
-	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil, "")
+	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil, "")
 	if err != nil {
 		return nil, err
 	}
@@ -206,4 +236,59 @@ func (c *Client) ListCheckRules() ([]CheckRule, error) {
 	}
 
 	return checkRules, nil
+}
+
+// UpsertCheckRule creates or updates a check rule by origin/id.
+func (c *Client) UpsertCheckRule(originOrID string, specification map[string]any) (map[string]any, error) {
+	trimmedOriginOrID := strings.TrimSpace(originOrID)
+	if trimmedOriginOrID == "" {
+		return nil, fmt.Errorf("origin/id is required")
+	}
+
+	requestURL := fmt.Sprintf("%s/api/alerting/check-rules/%s", c.BaseURL, url.PathEscape(trimmedOriginOrID))
+	requestURL, err := c.withDatasetQuery(requestURL)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := json.Marshal(specification)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPut, requestURL, bytes.NewReader(body), "application/json")
+	if err != nil {
+		return nil, err
+	}
+
+	parsed, err := parseJSONResponse(responseBody)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing upsert check rule response: %v", err)
+	}
+
+	if _, ok := parsed["originOrId"]; !ok {
+		parsed["originOrId"] = trimmedOriginOrID
+	}
+
+	return parsed, nil
+}
+
+// parseJSONResponse normalizes object or array JSON responses into a map.
+func parseJSONResponse(responseBody []byte) (map[string]any, error) {
+	trimmedBody := strings.TrimSpace(string(responseBody))
+	if trimmedBody == "" {
+		return map[string]any{}, nil
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(responseBody, &parsed); err == nil {
+		return parsed, nil
+	}
+
+	var parsedArray []any
+	if err := json.Unmarshal(responseBody, &parsedArray); err == nil {
+		return map[string]any{"items": parsedArray}, nil
+	}
+
+	return nil, fmt.Errorf("unexpected response payload shape")
 }
