@@ -187,6 +187,7 @@ func Test__QueryMetricsInsights__Execute(t *testing.T) {
 		assert.Equal(t, "GetMetricData", firstValues.Get("Action"))
 		assert.Equal(t, "2010-08-01", firstValues.Get("Version"))
 		assert.Equal(t, "q1", firstValues.Get("MetricDataQueries.member.1.Id"))
+		assert.Equal(t, "60", firstValues.Get("MetricDataQueries.member.1.Period"))
 		assert.Equal(t, "", firstValues.Get("NextToken"))
 
 		secondRequestBody, err := io.ReadAll(httpContext.Requests[1].Body)

@@ -20,10 +20,11 @@ import (
 )
 
 const (
-	serviceName   = "monitoring"
-	apiVersion    = "2010-08-01"
-	contentType   = "application/x-www-form-urlencoded; charset=utf-8"
-	metricsQueryID = "q1"
+	serviceName                        = "monitoring"
+	apiVersion                         = "2010-08-01"
+	contentType                        = "application/x-www-form-urlencoded; charset=utf-8"
+	metricsQueryID                     = "q1"
+	defaultMetricsInsightsPeriodSeconds = 60
 )
 
 type Client struct {
@@ -153,6 +154,7 @@ func (c *Client) getMetricDataValues(
 	values.Set("MetricDataQueries.member.1.Id", metricsQueryID)
 	values.Set("MetricDataQueries.member.1.Expression", query)
 	values.Set("MetricDataQueries.member.1.ReturnData", "true")
+	values.Set("MetricDataQueries.member.1.Period", strconv.Itoa(defaultMetricsInsightsPeriodSeconds))
 
 	if strings.TrimSpace(nextToken) != "" {
 		values.Set("NextToken", strings.TrimSpace(nextToken))
