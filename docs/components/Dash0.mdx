@@ -33,9 +33,13 @@ The Create Check Rule component creates a Dash0 check rule (alert rule) using th
 ### Configuration
 
 - **Origin or ID (Optional)**: Custom check rule identifier. If omitted, SuperPlane generates one.
-- **Rule Specification (JSON)**: Check rule payload as JSON object.
-  Accepts Dash0 check rule shape (name + expression) or Prometheus-style
-  groups/rules shape with exactly one alert rule.
+- **Name**: Human-readable rule name
+- **Expression**: Prometheus expression evaluated by the rule
+- **For (Optional)**: How long expression must remain true before firing
+- **Interval (Optional)**: Evaluation interval override
+- **Keep Firing For (Optional)**: Additional duration to keep firing after recovery
+- **Labels (Optional)**: Label key/value pairs
+- **Annotations (Optional)**: Annotation key/value pairs
 
 ### Output
 

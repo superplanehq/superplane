@@ -16,16 +16,16 @@ import (
 func Test__CreateCheckRule__Setup(t *testing.T) {
 	component := CreateCheckRule{}
 
-	t.Run("invalid spec fails setup", func(t *testing.T) {
+	t.Run("missing name fails setup", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"spec": "{",
+				"expression": "vector(1)",
 			},
 		})
-		require.ErrorContains(t, err, "parse spec as JSON object")
+		require.ErrorContains(t, err, "name is required")
 	})
 
-	t.Run("prometheus style check rule supports single alert rule", func(t *testing.T) {
+	t.Run("legacy spec remains supported", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"spec": `{"groups":[{"name":"checkout.rules","rules":[{"alert":"CheckoutErrors","expr":"vector(1)"}]}]}`,
@@ -50,8 +50,18 @@ func Test__CreateCheckRule__Execute(t *testing.T) {
 	execCtx := &contexts.ExecutionStateContext{}
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"originOrId": "checkout-errors",
-			"spec":       `{"groups":[{"name":"checkout.rules","interval":"1m","rules":[{"alert":"CheckoutErrors","expr":"sum(rate(http_requests_total{service=\"checkout\",status=~\"5..\"}[5m])) > 0","for":"5m","labels":{"severity":"warning"},"annotations":{"summary":"Checkout errors are above baseline"}}]}]}`,
+			"originOrId":    "checkout-errors",
+			"name":          "CheckoutErrors",
+			"expression":    `sum(rate(http_requests_total{service="checkout",status=~"5.."}[5m])) > 0`,
+			"for":           "5m",
+			"interval":      "1m",
+			"keepFiringFor": "10m",
+			"labels": []map[string]any{
+				{"key": "severity", "value": "warning"},
+			},
+			"annotations": []map[string]any{
+				{"key": "summary", "value": "Checkout errors are above baseline"},
+			},
 		},
 		HTTP: httpContext,
 		Integration: &contexts.IntegrationContext{
@@ -79,4 +89,7 @@ func Test__CreateCheckRule__Execute(t *testing.T) {
 	assert.Equal(t, "sum(rate(http_requests_total{service=\"checkout\",status=~\"5..\"}[5m])) > 0", payload["expression"])
 	assert.Equal(t, "1m", payload["interval"])
 	assert.Equal(t, "5m", payload["for"])
+	assert.Equal(t, "10m", payload["keepFiringFor"])
+	assert.Equal(t, map[string]any{"severity": "warning"}, payload["labels"])
+	assert.Equal(t, map[string]any{"summary": "Checkout errors are above baseline"}, payload["annotations"])
 }
