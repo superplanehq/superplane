@@ -18,6 +18,7 @@ type Dash0 struct{}
 type Configuration struct {
 	APIToken string `json:"apiToken"`
 	BaseURL  string `json:"baseURL"`
+	Dataset  string `json:"dataset"`
 }
 
 type Metadata struct {
@@ -62,6 +63,15 @@ func (d *Dash0) Configuration() []configuration.Field {
 			Description: "Your Dash0 Prometheus API base URL. Find this in Dash0 dashboard: Organization Settings > Endpoints > Prometheus API. You can use either the full endpoint URL (https://api.us-west-2.aws.dash0.com/api/prometheus) or just the base URL (https://api.us-west-2.aws.dash0.com)",
 			Placeholder: "https://api.us-west-2.aws.dash0.com",
 		},
+		{
+			Name:        "dataset",
+			Label:       "Dataset",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Default:     "default",
+			Description: "Dash0 dataset used by config API operations (check rules and synthetic checks).",
+			Placeholder: "default",
+		},
 	}
 }
 
@@ -69,6 +79,11 @@ func (d *Dash0) Components() []core.Component {
 	return []core.Component{
 		&QueryPrometheus{},
 		&ListIssues{},
+		&SendLogEvent{},
+		&GetCheckDetails{},
+		&CreateSyntheticCheck{},
+		&UpdateSyntheticCheck{},
+		&CreateCheckRule{},
 	}
 }
 
@@ -114,31 +129,49 @@ func (d *Dash0) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (d *Dash0) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != "check-rule" {
-		return []core.IntegrationResource{}, nil
-	}
-
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("error creating dash0 client: %w", err)
 	}
 
-	checkRules, err := client.ListCheckRules()
-	if err != nil {
-		ctx.Logger.Warnf("Error fetching check rules: %v", err)
+	switch resourceType {
+	case "check-rule":
+		checkRules, listErr := client.ListCheckRules()
+		if listErr != nil {
+			ctx.Logger.Warnf("Error fetching check rules: %v", listErr)
+			return []core.IntegrationResource{}, nil
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(checkRules))
+		for _, rule := range checkRules {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: rule.Name,
+				ID:   rule.ID,
+			})
+		}
+
+		return resources, nil
+	case "synthetic-check":
+		syntheticChecks, listErr := client.ListSyntheticChecks()
+		if listErr != nil {
+			ctx.Logger.Warnf("Error fetching synthetic checks: %v", listErr)
+			return []core.IntegrationResource{}, nil
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(syntheticChecks))
+		for _, check := range syntheticChecks {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: check.Name,
+				ID:   check.ID,
+			})
+		}
+
+		return resources, nil
+	default:
 		return []core.IntegrationResource{}, nil
 	}
-
-	resources := make([]core.IntegrationResource, 0, len(checkRules))
-	for _, rule := range checkRules {
-		resources = append(resources, core.IntegrationResource{
-			Type: resourceType,
-			Name: rule.Name,
-			ID:   rule.ID,
-		})
-	}
-
-	return resources, nil
 }
 
 func (d *Dash0) HandleRequest(ctx core.HTTPRequestContext) {
