@@ -18,133 +18,6 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Update Synthetic Check" href="#update-synthetic-check" description="Update an existing synthetic check in Dash0 configuration API" />
 </CardGrid>
 
-<a id="update-synthetic-check"></a>
-
-## Update Synthetic Check
-
-The Update Synthetic Check component updates an existing Dash0 synthetic check.
-
-### Use Cases
-
-- **Change monitoring target**: Update URLs, probes, or assertions after infrastructure changes
-- **Tune schedules**: Adjust check intervals as traffic and SLOs evolve
-- **Workflow-driven changes**: Roll out check updates as part of deployment workflows
-
-### Configuration
-
-- **Synthetic Check**: Existing synthetic check origin/ID
-- **Specification (JSON)**: Updated synthetic check payload as JSON object
-
-Example specification:
-```json
-{
-  "kind": "Dash0SyntheticCheck",
-  "metadata": {
-    "name": "checkout-health"
-  },
-  "spec": {
-    "enabled": true,
-    "plugin": {
-      "kind": "http",
-      "spec": {
-        "request": {
-          "method": "get",
-          "url": "https://www.example.com/health"
-        }
-      }
-    }
-  }
-}
-```
-
-### Output
-
-Emits:
-- **originOrId**: Synthetic check identifier used for the API request
-- **response**: Raw Dash0 API response
-
-### Example Output
-
-```json
-{
-  "data": {
-    "originOrId": "superplane-synthetic-ab12cd34",
-    "response": {
-      "id": "superplane-synthetic-ab12cd34",
-      "status": "updated"
-    }
-  },
-  "timestamp": "2026-02-09T12:00:00Z",
-  "type": "dash0.synthetic.check.updated"
-}
-```
-<a id="list-issues"></a>
-
-## List Issues
-
-The List Issues component queries Dash0 to retrieve all current issues and routes execution based on issue severity.
-
-### Use Cases
-
-- **Health monitoring**: Check system health and route based on issue severity
-- **Alert routing**: Route alerts to different channels based on issue status
-- **Issue tracking**: Monitor and process active issues
-- **Automated remediation**: Trigger remediation workflows based on issues
-
-### Configuration
-
-- **Check Rules**: Optional list of check rules to filter issues (leave empty to get all issues)
-
-### Output Channels
-
-- **Clear**: No active issues detected
-- **Degraded**: One or more degraded issues detected
-- **Critical**: One or more critical issues detected
-
-### Output
-
-Returns a list of issues with:
-- **check_rule**: The check rule that generated the issue
-- **status**: Issue status (clear, degraded, critical)
-- **labels**: Metric labels associated with the issue
-- **metadata**: Additional issue metadata
-
-### Example Output
-
-```json
-{
-  "data": {
-    "data": {
-      "result": [
-        {
-          "metric": {
-            "service_name": "test"
-          },
-          "value": [
-            1234567890,
-            "1"
-          ],
-          "values": [
-            [
-              1234567890,
-              "1"
-            ],
-            [
-              1234567900,
-              "2"
-            ]
-          ]
-        }
-      ],
-      "resultType": "vector"
-    },
-    "status": "success"
-  },
-  "timestamp": "2026-01-19T12:00:00Z",
-  "type": "dash0.issues.list"
-}
-```
-
 <a id="create-check-rule"></a>
 
 ## Create Check Rule
@@ -277,15 +150,11 @@ Emits a payload containing:
   "data": {
     "checkId": "check-123",
     "details": {
-      "annotations": {
-        "summary": "Checkout latency is above threshold"
-      },
+      "currentValue": 0.92,
       "id": "check-123",
-      "labels": {
-        "service": "checkout",
-        "severity": "warning"
-      },
-      "name": "Checkout latency"
+      "name": "Checkout API latency",
+      "query": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service=\"checkout\"}[5m])) by (le))",
+      "severity": "critical"
     }
   },
   "timestamp": "2026-02-09T12:00:00Z",
@@ -293,46 +162,70 @@ Emits a payload containing:
 }
 ```
 
-<a id="send-log-event"></a>
+<a id="list-issues"></a>
 
-## Send Log Event
+## List Issues
 
-The Send Log Event component sends workflow log records to Dash0 using OTLP HTTP ingestion.
+The List Issues component queries Dash0 to retrieve all current issues and routes execution based on issue severity.
 
 ### Use Cases
 
-- **Audit trails**: Record workflow milestones in Dash0 logs
-- **Change tracking**: Emit deployment, approval, and remediation events
-- **Observability correlation**: Correlate workflow activity with traces and metrics
+- **Health monitoring**: Check system health and route based on issue severity
+- **Alert routing**: Route alerts to different channels based on issue status
+- **Issue tracking**: Monitor and process active issues
+- **Automated remediation**: Trigger remediation workflows based on issues
 
 ### Configuration
 
-- **Service Name**: Service name attached to emitted records
-- **Records**: One or more log records containing:
-  - message
-  - severity
-  - timestamp (optional, RFC3339 or unix)
-  - attributes (optional key/value map)
+- **Check Rules**: Optional list of check rules to filter issues (leave empty to get all issues)
+
+### Output Channels
+
+- **Clear**: No active issues detected
+- **Degraded**: One or more degraded issues detected
+- **Critical**: One or more critical issues detected
 
 ### Output
 
-Emits:
-- **serviceName**: Service name used for ingestion
-- **sentCount**: Number of records sent in this request
+Returns a list of issues with:
+- **check_rule**: The check rule that generated the issue
+- **status**: Issue status (clear, degraded, critical)
+- **labels**: Metric labels associated with the issue
+- **metadata**: Additional issue metadata
 
 ### Example Output
 
 ```json
 {
   "data": {
-    "response": {
-      "status": "ok"
+    "data": {
+      "result": [
+        {
+          "metric": {
+            "service_name": "test"
+          },
+          "value": [
+            1234567890,
+            "1"
+          ],
+          "values": [
+            [
+              1234567890,
+              "1"
+            ],
+            [
+              1234567900,
+              "2"
+            ]
+          ]
+        }
+      ],
+      "resultType": "vector"
     },
-    "sentCount": 2,
-    "serviceName": "superplane.workflow"
+    "status": "success"
   },
-  "timestamp": "2026-02-09T12:00:00Z",
-  "type": "dash0.log.event.sent"
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "dash0.issues.list"
 }
 ```
 
@@ -405,3 +298,108 @@ Returns the Prometheus query response including:
   "type": "dash0.prometheus.response"
 }
 ```
+
+<a id="send-log-event"></a>
+
+## Send Log Event
+
+The Send Log Event component sends workflow log records to Dash0 using OTLP HTTP ingestion.
+
+### Use Cases
+
+- **Audit trails**: Record workflow milestones in Dash0 logs
+- **Change tracking**: Emit deployment, approval, and remediation events
+- **Observability correlation**: Correlate workflow activity with traces and metrics
+
+### Configuration
+
+- **Service Name**: Service name attached to emitted records
+- **Records**: One or more log records containing:
+  - message
+  - severity
+  - timestamp (optional, RFC3339 or unix)
+  - attributes (optional key/value map)
+
+### Output
+
+Emits:
+- **serviceName**: Service name used for ingestion
+- **sentCount**: Number of records sent in this request
+
+### Example Output
+
+```json
+{
+  "data": {
+    "response": {
+      "status": "ok"
+    },
+    "sentCount": 2,
+    "serviceName": "superplane.workflow"
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.log.event.sent"
+}
+```
+
+<a id="update-synthetic-check"></a>
+
+## Update Synthetic Check
+
+The Update Synthetic Check component updates an existing Dash0 synthetic check.
+
+### Use Cases
+
+- **Change monitoring target**: Update URLs, probes, or assertions after infrastructure changes
+- **Tune schedules**: Adjust check intervals as traffic and SLOs evolve
+- **Workflow-driven changes**: Roll out check updates as part of deployment workflows
+
+### Configuration
+
+- **Synthetic Check**: Existing synthetic check origin/ID
+- **Specification (JSON)**: Updated synthetic check payload as JSON object
+
+Example specification:
+```json
+{
+  "kind": "Dash0SyntheticCheck",
+  "metadata": {
+    "name": "checkout-health"
+  },
+  "spec": {
+    "enabled": true,
+    "plugin": {
+      "kind": "http",
+      "spec": {
+        "request": {
+          "method": "get",
+          "url": "https://www.example.com/health"
+        }
+      }
+    }
+  }
+}
+```
+
+### Output
+
+Emits:
+- **originOrId**: Synthetic check identifier used for the API request
+- **response**: Raw Dash0 API response
+
+### Example Output
+
+```json
+{
+  "data": {
+    "originOrId": "checkout-health-check",
+    "response": {
+      "id": "checkout-health-check",
+      "status": "updated"
+    }
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.synthetic.check.updated"
+}
+```
+

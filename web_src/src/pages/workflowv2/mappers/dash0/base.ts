@@ -60,4 +60,3 @@ export function buildDash0EventSections(
     },
   ];
 }
-
