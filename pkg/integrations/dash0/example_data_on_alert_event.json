@@ -1,0 +1,25 @@
+{
+  "eventType": "fired",
+  "checkId": "check-123",
+  "checkName": "Checkout API latency",
+  "severity": "critical",
+  "labels": {
+    "service": "checkout",
+    "environment": "production"
+  },
+  "summary": "Checkout API latency is above threshold",
+  "description": "p95 latency has been above 750ms for 10 minutes.",
+  "timestamp": "2026-02-09T12:00:00Z",
+  "event": {
+    "event_type": "fired",
+    "check": {
+      "id": "check-123",
+      "name": "Checkout API latency",
+      "severity": "critical",
+      "labels": {
+        "service": "checkout",
+        "environment": "production"
+      }
+    }
+  }
+}

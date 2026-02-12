@@ -15,6 +15,18 @@ export interface ListIssuesConfiguration {
   checkRules?: string[];
 }
 
+export interface OnAlertEventData {
+  eventType?: string;
+  checkId?: string;
+  checkName?: string;
+  severity?: string;
+  labels?: Record<string, unknown>;
+  summary?: string;
+  description?: string;
+  timestamp?: string;
+  event?: Record<string, unknown>;
+}
+
 export interface PrometheusResponse {
   status: string;
   data: {
