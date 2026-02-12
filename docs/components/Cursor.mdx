@@ -1,0 +1,117 @@
+---
+title: "Cursor"
+---
+
+Build workflows with Cursor AI Agents and track usage
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Get Daily Usage Data" href="#get-daily-usage-data" description="Fetches daily team usage metrics from Cursor's Admin API." />
+  <LinkCard title="Launch Cloud Agent" href="#launch-cloud-agent" description="Launches a Cursor Cloud Agent to perform coding tasks asynchronously." />
+</CardGrid>
+
+## Instructions
+
+To get your API keys, visit the [Cursor Dashboard](https://cursor.com/dashboard). You may need separate keys for Agents and Admin features.
+
+<a id="get-daily-usage-data"></a>
+
+## Get Daily Usage Data
+
+The Get Daily Usage Data component fetches team usage metrics from Cursor's Admin API.
+
+### Use Cases
+
+- **Usage reporting**: Track team productivity and AI usage patterns
+- **Cost tracking**: Monitor usage-based requests and subscription consumption
+- **Analytics dashboards**: Build custom dashboards with Cursor usage data
+
+### How It Works
+
+1. Fetches usage data for the specified date range from Cursor's Admin API
+2. Returns detailed metrics per user including lines added/deleted, requests, and model usage
+
+### Configuration
+
+- **Start Date**: Start of the date range (YYYY-MM-DD format, defaults to 7 days ago)
+- **End Date**: End of the date range (YYYY-MM-DD format, defaults to today)
+
+### Output
+
+The output includes per-user daily metrics:
+- Lines added/deleted (total and accepted)
+- Tab completions shown/accepted
+- Composer, chat, and agent requests
+- Subscription vs usage-based request counts
+- Most used model and file extensions
+
+### Notes
+
+- Requires a valid Cursor Admin API key configured in the integration
+- Only returns data for active users
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "acceptedLinesAdded": 1102,
+      "acceptedLinesDeleted": 645,
+      "agentRequests": 12,
+      "chatRequests": 128,
+      "composerRequests": 45,
+      "date": 1710720000000,
+      "email": "developer@company.com",
+      "isActive": true,
+      "mostUsedModel": "gpt-4",
+      "subscriptionIncludedReqs": 180,
+      "totalAccepts": 73,
+      "totalApplies": 87,
+      "totalLinesAdded": 1543,
+      "totalLinesDeleted": 892,
+      "totalRejects": 14,
+      "totalTabsAccepted": 289,
+      "totalTabsShown": 342,
+      "usageBasedReqs": 5
+    }
+  ],
+  "period": {
+    "endDate": 1710892800000,
+    "startDate": 1710720000000
+  }
+}
+```
+
+<a id="launch-cloud-agent"></a>
+
+## Launch Cloud Agent
+
+The Launch Cloud Agent component triggers a Cursor AI coding agent and waits for it to complete.
+
+### Use Cases
+- **Automated code generation**: Generate code from natural language prompts
+- **PR fixes**: Automatically fix issues on existing pull requests
+- **Code refactoring**: Refactor code based on instructions
+- **Feature implementation**: Implement new features from specifications
+
+### How It Works
+1. Launches a Cursor Cloud Agent with the specified prompt and configuration
+2. Waits for the agent to complete (monitored via webhook and polling)
+3. Emits output with the agent result (success or failure)
+
+### Example Output
+
+```json
+{
+  "agentId": "agent_12345",
+  "branchName": "cursor/agent-550e8400",
+  "prUrl": "https://github.com/org/repo/pull/42",
+  "status": "done",
+  "summary": "Refactored login logic."
+}
+```
+
