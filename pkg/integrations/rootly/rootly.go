@@ -70,6 +70,7 @@ func (r *Rootly) Components() []core.Component {
 func (r *Rootly) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnIncident{},
+		&OnEvent{},
 	}
 }
 
