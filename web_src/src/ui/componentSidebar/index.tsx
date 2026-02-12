@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { resolveIcon } from "@/lib/utils";
-import { Check, Copy, Loader2, TriangleAlert, X } from "lucide-react";
+import { Check, Copy, Loader2, Settings, TriangleAlert, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getHeaderIconSrc, IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import {
@@ -283,16 +283,6 @@ export const ComponentSidebar = ({
   );
   const selectedIntegrationForDialog = isCreateIntegrationDialogOpen ? createIntegrationDefinition : undefined;
   const selectedInstructions = selectedIntegrationForDialog?.instructions?.trim();
-  const nodeWebhookUrl = useMemo(() => {
-    if (!nodeId) return "";
-    const node = workflowNodes.find((n) => n.id === nodeId);
-    const metadata = node?.metadata as Record<string, unknown> | undefined;
-    if (!metadata) return "";
-    const webhookUrl = typeof metadata.webhookUrl === "string" ? metadata.webhookUrl : "";
-    const webhookUrlSnake = typeof metadata.webhook_url === "string" ? metadata.webhook_url : "";
-    const legacyUrl = typeof metadata.url === "string" ? metadata.url : "";
-    return webhookUrl || webhookUrlSnake || legacyUrl || "";
-  }, [nodeId, workflowNodes]);
 
   const handleCopyNodeId = useCallback(async () => {
     const textToCopy = nodeWebhookUrl || nodeId;
@@ -1128,13 +1118,13 @@ export const ComponentSidebar = ({
                     Integration Name
                     <span className="text-gray-800 ml-1">*</span>
                   </Label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">A unique name for this integration</p>
                   <Input
                     type="text"
                     value={configureIntegrationName}
                     onChange={(e) => setConfigureIntegrationName(e.target.value)}
                     placeholder="e.g., my-app-integration"
                   />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
                 </div>
 
                 {configureIntegrationDefinition?.configuration &&

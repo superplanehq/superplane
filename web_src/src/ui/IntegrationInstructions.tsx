@@ -39,7 +39,7 @@ export function IntegrationInstructions({ description, onContinue, className = "
               ol: ({ children }) => <ol className="list-decimal ml-5 space-y-1 mb-2">{children}</ol>,
               li: ({ children }) => <li>{children}</li>,
               a: ({ children, href }) => (
-                <a className="underline underline-offset-2" href={href}>
+                <a className="!underline underline-offset-2 decoration-2 decoration-current" href={href}>
                   {children}
                 </a>
               ),
