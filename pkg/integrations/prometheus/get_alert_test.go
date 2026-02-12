@@ -92,4 +92,37 @@ func Test__GetAlert__Execute(t *testing.T) {
 
 		require.ErrorContains(t, err, "was not found")
 	})
+
+	t.Run("execute sanitizes alertName and state", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{"status":"success","data":{"alerts":[
+							{"state":"firing","labels":{"alertname":"HighLatency"},"annotations":{"summary":"latency"},"activeAt":"2026-01-19T12:00:00Z","value":"1"}
+						]}}
+					`)),
+				},
+			},
+		}
+
+		executionCtx := &contexts.ExecutionStateContext{}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{"alertName": "  HighLatency  ", "state": "  FIRING  "},
+			HTTP:          httpCtx,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{
+				"baseURL":  "https://prometheus.example.com",
+				"authType": AuthTypeNone,
+			}},
+			ExecutionState: executionCtx,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, executionCtx.Passed)
+		require.Len(t, executionCtx.Payloads, 1)
+		payload := executionCtx.Payloads[0].(map[string]any)["data"].(map[string]any)
+		assert.Equal(t, "HighLatency", payload["labels"].(map[string]string)["alertname"])
+		assert.Equal(t, "firing", payload["status"])
+	})
 }

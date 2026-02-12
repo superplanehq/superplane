@@ -133,6 +133,41 @@ func Test__OnAlert__HandleWebhook(t *testing.T) {
 		assert.Len(t, eventsCtx.Payloads, 0)
 	})
 
+	t.Run("webhook sanitizes statuses and alert names at runtime", func(t *testing.T) {
+		eventsCtx := &contexts.EventContext{}
+
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          payload,
+			Headers:       http.Header{},
+			Configuration: map[string]any{"statuses": []string{"  FIRING  "}, "alertNames": []string{"  HighRequestLatency  "}},
+			Integration:   &contexts.IntegrationContext{},
+			Events:        eventsCtx,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Len(t, eventsCtx.Payloads, 1)
+		assert.Equal(t, "HighRequestLatency", eventsCtx.Payloads[0].Data.(map[string]any)["labels"].(map[string]string)["alertname"])
+	})
+
+	t.Run("webhook auth config read errors fail closed", func(t *testing.T) {
+		eventsCtx := &contexts.EventContext{}
+
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          payload,
+			Headers:       http.Header{},
+			Configuration: map[string]any{"statuses": []string{AlertStateFiring}},
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{
+				"webhookBearerToken": 123,
+			}},
+			Events: eventsCtx,
+		})
+
+		assert.Equal(t, http.StatusInternalServerError, code)
+		require.ErrorContains(t, err, "failed to read webhook auth configuration")
+		assert.Len(t, eventsCtx.Payloads, 0)
+	})
+
 	t.Run("valid firing and resolved alerts are emitted with bearer auth", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
 		headers := http.Header{}

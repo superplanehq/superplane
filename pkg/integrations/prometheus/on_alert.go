@@ -3,6 +3,7 @@ package prometheus
 import (
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -14,6 +15,8 @@ import (
 )
 
 type OnAlert struct{}
+
+var errWebhookAuthConfig = errors.New("failed to read webhook auth configuration")
 
 type OnAlertConfiguration struct {
 	Statuses   []string `json:"statuses" mapstructure:"statuses"`
@@ -140,7 +143,7 @@ func (t *OnAlert) Setup(ctx core.TriggerContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	config = sanitizeOnAlertConfigurationFromSetup(config)
+	config = sanitizeOnAlertConfiguration(config)
 
 	if err := validateOnAlertConfiguration(config); err != nil {
 		return err
@@ -183,12 +186,16 @@ func (t *OnAlert) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
 	}
+	config = sanitizeOnAlertConfiguration(config)
 
 	if err := validateOnAlertConfiguration(config); err != nil {
 		return http.StatusInternalServerError, err
 	}
 
 	if err := validateWebhookAuth(ctx); err != nil {
+		if errors.Is(err, errWebhookAuthConfig) {
+			return http.StatusInternalServerError, err
+		}
 		return http.StatusForbidden, err
 	}
 
@@ -276,7 +283,7 @@ func validateWebhookAuth(ctx core.WebhookRequestContext) error {
 
 	webhookBearerToken, err := optionalIntegrationConfig(ctx.Integration, "webhookBearerToken")
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %v", errWebhookAuthConfig, err)
 	}
 
 	if webhookBearerToken == "" {
@@ -303,10 +310,23 @@ func optionalIntegrationConfig(integration core.IntegrationContext, name string)
 
 	value, err := integration.GetConfig(name)
 	if err != nil {
-		return "", nil
+		if isMissingIntegrationConfigError(err, name) {
+			return "", nil
+		}
+		return "", err
 	}
 
 	return string(value), nil
+}
+
+func isMissingIntegrationConfigError(err error, name string) bool {
+	if err == nil {
+		return false
+	}
+
+	message := err.Error()
+	return message == fmt.Sprintf("config not found: %s", name) ||
+		message == fmt.Sprintf("config %s not found", name)
 }
 
 func buildAlertPayloadFromAlertmanager(alert AlertmanagerAlert, payload AlertmanagerWebhookPayload) map[string]any {
@@ -343,7 +363,7 @@ func buildAlertPayloadFromPrometheusAlert(alert PrometheusAlert) map[string]any 
 	}
 }
 
-func sanitizeOnAlertConfigurationFromSetup(config OnAlertConfiguration) OnAlertConfiguration {
+func sanitizeOnAlertConfiguration(config OnAlertConfiguration) OnAlertConfiguration {
 	for i := range config.Statuses {
 		config.Statuses[i] = strings.ToLower(strings.TrimSpace(config.Statuses[i]))
 	}

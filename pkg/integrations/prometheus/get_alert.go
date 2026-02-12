@@ -89,7 +89,7 @@ func (c *GetAlert) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	config = sanitizeGetAlertConfigurationFromSetup(config)
+	config = sanitizeGetAlertConfiguration(config)
 
 	if config.AlertName == "" {
 		return fmt.Errorf("alertName is required")
@@ -113,6 +113,7 @@ func (c *GetAlert) Execute(ctx core.ExecutionContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
+	config = sanitizeGetAlertConfiguration(config)
 
 	alertName := config.AlertName
 	state := config.State
@@ -177,7 +178,7 @@ func (c *GetAlert) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
-func sanitizeGetAlertConfigurationFromSetup(config GetAlertConfiguration) GetAlertConfiguration {
+func sanitizeGetAlertConfiguration(config GetAlertConfiguration) GetAlertConfiguration {
 	config.AlertName = strings.TrimSpace(config.AlertName)
 	config.State = strings.ToLower(strings.TrimSpace(config.State))
 	return config
