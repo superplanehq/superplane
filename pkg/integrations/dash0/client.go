@@ -229,7 +229,7 @@ func (c *Client) GetCheckDetails(checkID string, includeHistory bool) (map[strin
 			fallbackURL := fmt.Sprintf("%s/api/alerting/check-rules/%s%s", c.BaseURL, escapedID, querySuffix)
 			responseBody, err = c.execRequest(http.MethodGet, fallbackURL, nil, "")
 			if err != nil {
-				return nil, fmt.Errorf("fallback check-rules lookup failed: %v", err)
+				return nil, fmt.Errorf("fallback check-rules lookup failed: %w", err)
 			}
 		} else {
 			return nil, err
@@ -257,6 +257,10 @@ func parseJSONResponse(responseBody []byte) (map[string]any, error) {
 
 	var parsed map[string]any
 	if err := json.Unmarshal(responseBody, &parsed); err == nil {
+		if parsed == nil {
+			return map[string]any{}, nil
+		}
+
 		return parsed, nil
 	}
 

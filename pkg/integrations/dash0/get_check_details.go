@@ -77,7 +77,7 @@ func (c *GetCheckDetails) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Description: "Dash0 check identifier (for example from an On Alert Event trigger)",
-			Placeholder: "{{ event.data.checkId }}",
+			Placeholder: `{{ $["dash0.onAlertEvent"].data.checkId }}`,
 		},
 		{
 			Name:        "includeHistory",
