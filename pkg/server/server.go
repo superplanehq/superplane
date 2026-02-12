@@ -48,6 +48,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/openai"
 	_ "github.com/superplanehq/superplane/pkg/integrations/pagerduty"
 	_ "github.com/superplanehq/superplane/pkg/integrations/prometheus"
+	_ "github.com/superplanehq/superplane/pkg/integrations/railway"
 	_ "github.com/superplanehq/superplane/pkg/integrations/render"
 	_ "github.com/superplanehq/superplane/pkg/integrations/rootly"
 	_ "github.com/superplanehq/superplane/pkg/integrations/semaphore"
@@ -60,7 +61,13 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/widgets/annotation"
 )
 
-func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, authService authorization.Authorization) {
+func startWorkers(
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	oidcProvider oidc.Provider,
+	baseURL string,
+	authService authorization.Authorization,
+) {
 	log.Println("Starting Workers")
 
 	rabbitMQURL, err := config.RabbitMQURL()
@@ -72,14 +79,16 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 		startEmailConsumers(rabbitMQURL, encryptor, baseURL, authService)
 	}
 
-	if os.Getenv("START_WORKFLOW_EVENT_ROUTER") == "yes" || os.Getenv("START_EVENT_ROUTER") == "yes" {
+	if os.Getenv("START_WORKFLOW_EVENT_ROUTER") == "yes" ||
+		os.Getenv("START_EVENT_ROUTER") == "yes" {
 		log.Println("Starting Event Router")
 
 		w := workers.NewEventRouter()
 		go w.Start(context.Background())
 	}
 
-	if os.Getenv("START_WORKFLOW_NODE_EXECUTOR") == "yes" || os.Getenv("START_NODE_EXECUTOR") == "yes" {
+	if os.Getenv("START_WORKFLOW_NODE_EXECUTOR") == "yes" ||
+		os.Getenv("START_NODE_EXECUTOR") == "yes" {
 		log.Println("Starting Node Executor")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
@@ -94,15 +103,23 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 		go w.Start(context.Background())
 	}
 
-	if os.Getenv("START_APP_INSTALLATION_REQUEST_WORKER") == "yes" || os.Getenv("START_INTEGRATION_REQUEST_WORKER") == "yes" {
+	if os.Getenv("START_APP_INSTALLATION_REQUEST_WORKER") == "yes" ||
+		os.Getenv("START_INTEGRATION_REQUEST_WORKER") == "yes" {
 		log.Println("Starting Integration Request Worker")
 
 		webhooksBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewIntegrationRequestWorker(encryptor, registry, oidcProvider, baseURL, webhooksBaseURL)
+		w := workers.NewIntegrationRequestWorker(
+			encryptor,
+			registry,
+			oidcProvider,
+			baseURL,
+			webhooksBaseURL,
+		)
 		go w.Start(context.Background())
 	}
 
-	if os.Getenv("START_WORKFLOW_NODE_QUEUE_WORKER") == "yes" || os.Getenv("START_NODE_QUEUE_WORKER") == "yes" {
+	if os.Getenv("START_WORKFLOW_NODE_QUEUE_WORKER") == "yes" ||
+		os.Getenv("START_NODE_QUEUE_WORKER") == "yes" {
 		log.Println("Starting Node Queue Worker")
 
 		w := workers.NewNodeQueueWorker(registry)
@@ -124,14 +141,16 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 		go w.Start(context.Background())
 	}
 
-	if os.Getenv("START_INSTALLATION_CLEANUP_WORKER") == "yes" || os.Getenv("START_INTEGRATION_CLEANUP_WORKER") == "yes" {
+	if os.Getenv("START_INSTALLATION_CLEANUP_WORKER") == "yes" ||
+		os.Getenv("START_INTEGRATION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Integration Cleanup Worker")
 
 		w := workers.NewIntegrationCleanupWorker(registry, encryptor, baseURL)
 		go w.Start(context.Background())
 	}
 
-	if os.Getenv("START_WORKFLOW_CLEANUP_WORKER") == "yes" || os.Getenv("START_CANVAS_CLEANUP_WORKER") == "yes" {
+	if os.Getenv("START_WORKFLOW_CLEANUP_WORKER") == "yes" ||
+		os.Getenv("START_CANVAS_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Canvas Cleanup Worker")
 
 		w := workers.NewCanvasCleanupWorker()
@@ -139,10 +158,17 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 	}
 }
 
-func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string, authService authorization.Authorization) {
+func startEmailConsumers(
+	rabbitMQURL string,
+	encryptor crypto.Encryptor,
+	baseURL string,
+	authService authorization.Authorization,
+) {
 	templateDir := os.Getenv("TEMPLATE_DIR")
 	if templateDir == "" {
-		log.Warn("Email Consumers not started - missing required environment variable (TEMPLATE_DIR)")
+		log.Warn(
+			"Email Consumers not started - missing required environment variable (TEMPLATE_DIR)",
+		)
 		return
 	}
 
@@ -158,7 +184,9 @@ func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL
 	fromName := os.Getenv("EMAIL_FROM_NAME")
 	fromEmail := os.Getenv("EMAIL_FROM_ADDRESS")
 	if resendAPIKey == "" || fromName == "" || fromEmail == "" {
-		log.Warn("Email Consumers not started - missing required environment variables (RESEND_API_KEY, EMAIL_FROM_NAME, EMAIL_FROM_ADDRESS)")
+		log.Warn(
+			"Email Consumers not started - missing required environment variables (RESEND_API_KEY, EMAIL_FROM_NAME, EMAIL_FROM_ADDRESS)",
+		)
 		return
 	}
 
@@ -166,22 +194,57 @@ func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL
 	startEmailConsumersWithService(rabbitMQURL, emailService, baseURL, authService)
 }
 
-func startEmailConsumersWithService(rabbitMQURL string, emailService services.EmailService, baseURL string, authService authorization.Authorization) {
+func startEmailConsumersWithService(
+	rabbitMQURL string,
+	emailService services.EmailService,
+	baseURL string,
+	authService authorization.Authorization,
+) {
 	log.Println("Starting Invitation Email Consumer")
-	invitationEmailConsumer := workers.NewInvitationEmailConsumer(rabbitMQURL, emailService, baseURL)
+	invitationEmailConsumer := workers.NewInvitationEmailConsumer(
+		rabbitMQURL,
+		emailService,
+		baseURL,
+	)
 	go invitationEmailConsumer.Start()
 
 	log.Println("Starting Notification Email Consumer")
-	notificationEmailConsumer := workers.NewNotificationEmailConsumer(rabbitMQURL, emailService, authService)
+	notificationEmailConsumer := workers.NewNotificationEmailConsumer(
+		rabbitMQURL,
+		emailService,
+		authService,
+	)
 	go notificationEmailConsumer.Start()
 }
 
-func startInternalAPI(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, oidcProvider oidc.Provider) {
+func startInternalAPI(
+	baseURL, webhooksBaseURL, basePath string,
+	encryptor crypto.Encryptor,
+	authService authorization.Authorization,
+	registry *registry.Registry,
+	oidcProvider oidc.Provider,
+) {
 	log.Println("Starting Internal API")
-	grpc.RunServer(baseURL, webhooksBaseURL, basePath, encryptor, authService, registry, oidcProvider, lookupInternalAPIPort())
+	grpc.RunServer(
+		baseURL,
+		webhooksBaseURL,
+		basePath,
+		encryptor,
+		authService,
+		registry,
+		oidcProvider,
+		lookupInternalAPIPort(),
+	)
 }
 
-func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcProvider oidc.Provider, authService authorization.Authorization) {
+func startPublicAPI(
+	baseURL, basePath string,
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	jwtSigner *jwt.Signer,
+	oidcProvider oidc.Provider,
+	authService authorization.Authorization,
+) {
 	log.Println("Starting Public API with integrated Web Server")
 
 	appEnv := os.Getenv("APP_ENV")
@@ -189,7 +252,19 @@ func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, regist
 	blockSignup := os.Getenv("BLOCK_SIGNUP") == "yes"
 
 	webhooksBaseURL := getWebhookBaseURL(baseURL)
-	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcProvider, basePath, baseURL, webhooksBaseURL, appEnv, templateDir, authService, blockSignup)
+	server, err := public.NewServer(
+		encryptor,
+		registry,
+		jwtSigner,
+		oidcProvider,
+		basePath,
+		baseURL,
+		webhooksBaseURL,
+		appEnv,
+		templateDir,
+		authService,
+		blockSignup,
+	)
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)
 	}
@@ -359,12 +434,28 @@ func Start() {
 	templates.Setup(registry)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
-		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcProvider, authService)
+		go startPublicAPI(
+			baseURL,
+			basePath,
+			encryptorInstance,
+			registry,
+			jwtSigner,
+			oidcProvider,
+			authService,
+		)
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
 		webhooksBaseURL := getWebhookBaseURL(baseURL)
-		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, authService, registry, oidcProvider)
+		go startInternalAPI(
+			baseURL,
+			webhooksBaseURL,
+			basePath,
+			encryptorInstance,
+			authService,
+			registry,
+			oidcProvider,
+		)
 	}
 
 	startWorkers(encryptorInstance, registry, oidcProvider, baseURL, authService)

@@ -107,6 +107,12 @@ import {
   eventStateRegistry as claudeEventStateRegistry,
 } from "./claude/index";
 import {
+  componentMappers as railwayComponentMappers,
+  triggerRenderers as railwayTriggerRenderers,
+  customFieldRenderers as railwayCustomFieldRenderers,
+  eventStateRegistry as railwayEventStateRegistry,
+} from "./railway/index";
+import{
   componentMappers as prometheusComponentMappers,
   customFieldRenderers as prometheusCustomFieldRenderers,
   triggerRenderers as prometheusTriggerRenderers,
@@ -173,6 +179,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   openai: openaiComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
+  railway: railwayComponentMappers,
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
   dockerhub: dockerhubComponentMappers,
@@ -220,6 +227,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
   aws: awsEventStateRegistry,
+  railway: railwayEventStateRegistry,
   prometheus: prometheusEventStateRegistry,
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
