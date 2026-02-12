@@ -67,14 +67,6 @@ type Service struct {
 	Description string `json:"description"`
 }
 
-// Team represents a Rootly team
-type Team struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Slug        string `json:"slug"`
-	Description string `json:"description"`
-}
-
 // ServiceResponse represents the JSON:API response for a service
 type ServiceResponse struct {
 	Data ServiceData `json:"data"`
@@ -102,23 +94,6 @@ type TeamResponse struct {
 	Data TeamData `json:"data"`
 }
 
-type TeamData struct {
-	ID         string         `json:"id"`
-	Type       string         `json:"type"`
-	Attributes TeamAttributes `json:"attributes"`
-}
-
-type TeamAttributes struct {
-	Name        string `json:"name"`
-	Slug        string `json:"slug"`
-	Description string `json:"description"`
-}
-
-// TeamsResponse represents the JSON:API response for listing teams
-type TeamsResponse struct {
-	Data []TeamData `json:"data"`
-}
-
 func (c *Client) ListServices() ([]Service, error) {
 	url := fmt.Sprintf("%s/services", c.BaseURL)
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
@@ -143,32 +118,6 @@ func (c *Client) ListServices() ([]Service, error) {
 	}
 
 	return services, nil
-}
-
-func (c *Client) ListTeams() ([]Team, error) {
-	url := fmt.Sprintf("%s/teams", c.BaseURL)
-	responseBody, err := c.execRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var response TeamsResponse
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	teams := make([]Team, 0, len(response.Data))
-	for _, data := range response.Data {
-		teams = append(teams, Team{
-			ID:          data.ID,
-			Name:        data.Attributes.Name,
-			Slug:        data.Attributes.Slug,
-			Description: data.Attributes.Description,
-		})
-	}
-
-	return teams, nil
 }
 
 func (c *Client) GetService(id string) (*Service, error) {

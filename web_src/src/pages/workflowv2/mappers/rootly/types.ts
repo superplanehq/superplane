@@ -25,14 +25,6 @@ export interface Incident {
 export interface IncidentEvent {
   id?: string;
   event?: string;
-  visibility?: string;
-  occurred_at?: string;
-  created_at?: string;
-}
-
-export interface IncidentEvent {
-  id?: string;
-  event?: string;
   kind?: string;
   source?: string;
   visibility?: string;
