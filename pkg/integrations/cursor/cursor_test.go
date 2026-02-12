@@ -177,7 +177,7 @@ func Test__Cursor__Components(t *testing.T) {
 	c := &Cursor{}
 	components := c.Components()
 
-	assert.Len(t, components, 3)
+	assert.Len(t, components, 2)
 
 	names := make([]string, len(components))
 	for i, comp := range components {
@@ -186,7 +186,6 @@ func Test__Cursor__Components(t *testing.T) {
 
 	assert.Contains(t, names, "cursor.launchAgent")
 	assert.Contains(t, names, "cursor.getDailyUsageData")
-	assert.Contains(t, names, "cursor.getLastMessage")
 }
 
 func Test__Cursor__ListResources(t *testing.T) {

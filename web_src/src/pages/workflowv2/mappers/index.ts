@@ -107,6 +107,11 @@ import {
   eventStateRegistry as claudeEventStateRegistry,
 } from "./claude/index";
 import {
+  componentMappers as cursorComponentMappers,
+  triggerRenderers as cursorTriggerRenderers,
+  eventStateRegistry as cursorEventStateRegistry,
+} from "./cursor/index";
+import {
   componentMappers as dockerhubComponentMappers,
   customFieldRenderers as dockerhubCustomFieldRenderers,
   triggerRenderers as dockerhubTriggerRenderers,
@@ -162,6 +167,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   openai: openaiComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
+  cursor: cursorComponentMappers,
   dockerhub: dockerhubComponentMappers,
 };
 
@@ -184,6 +190,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   openai: openaiTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
+  cursor: cursorTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
 };
 
@@ -205,6 +212,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
   aws: awsEventStateRegistry,
+  cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
 };
