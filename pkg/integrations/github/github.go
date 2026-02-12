@@ -104,6 +104,7 @@ func (g *GitHub) Components() []core.Component {
 		&GetRelease{},
 		&UpdateRelease{},
 		&DeleteRelease{},
+		&GetWorkflowUsage{},
 	}
 }
 
@@ -492,6 +493,9 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 			"pull_requests":    "write",
 			"repository_hooks": "write",
 			"statuses":         "write",
+		},
+		"default_org_permissions": map[string]string{
+			"administration": "read",
 		},
 		"setup_url":    fmt.Sprintf(`%s/api/v1/integrations/%s/setup`, ctx.BaseURL, ctx.Integration.ID().String()),
 		"redirect_url": fmt.Sprintf(`%s/api/v1/integrations/%s/redirect`, ctx.BaseURL, ctx.Integration.ID().String()),
