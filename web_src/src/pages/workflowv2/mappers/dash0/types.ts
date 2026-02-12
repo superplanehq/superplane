@@ -15,6 +15,35 @@ export interface ListIssuesConfiguration {
   checkRules?: string[];
 }
 
+export interface SendLogEventRecordConfiguration {
+  message: string;
+  severity?: string;
+  timestamp?: string;
+  attributes?: Record<string, unknown>;
+}
+
+export interface SendLogEventConfiguration {
+  serviceName?: string;
+  records?: SendLogEventRecordConfiguration[];
+}
+
+export interface GetCheckDetailsConfiguration {
+  checkId?: string;
+  includeHistory?: boolean;
+}
+
+export interface UpsertSyntheticCheckConfiguration {
+  originOrId?: string;
+  name?: string;
+  enabled?: boolean;
+  pluginKind?: string;
+  method?: string;
+  url?: string;
+  headers?: Array<{ key: string; value: string }>;
+  requestBody?: string;
+  spec?: string;
+}
+
 export interface PrometheusResponse {
   status: string;
   data: {

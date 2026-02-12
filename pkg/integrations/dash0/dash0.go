@@ -18,6 +18,7 @@ type Dash0 struct{}
 type Configuration struct {
 	APIToken string `json:"apiToken"`
 	BaseURL  string `json:"baseURL"`
+	Dataset  string `json:"dataset"`
 }
 
 type Metadata struct {
@@ -62,6 +63,15 @@ func (d *Dash0) Configuration() []configuration.Field {
 			Description: "Your Dash0 Prometheus API base URL. Find this in Dash0 dashboard: Organization Settings > Endpoints > Prometheus API. You can use either the full endpoint URL (https://api.us-west-2.aws.dash0.com/api/prometheus) or just the base URL (https://api.us-west-2.aws.dash0.com)",
 			Placeholder: "https://api.us-west-2.aws.dash0.com",
 		},
+		{
+			Name:        "dataset",
+			Label:       "Dataset",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Default:     "default",
+			Description: "Dash0 dataset used by config API operations (check rules and synthetic checks).",
+			Placeholder: "default",
+		},
 	}
 }
 
@@ -69,6 +79,9 @@ func (d *Dash0) Components() []core.Component {
 	return []core.Component{
 		&QueryPrometheus{},
 		&ListIssues{},
+		&SendLogEvent{},
+		&GetCheckDetails{},
+		&CreateSyntheticCheck{},
 	}
 }
 

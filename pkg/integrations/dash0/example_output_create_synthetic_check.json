@@ -1,0 +1,11 @@
+{
+  "data": {
+    "originOrId": "superplane-synthetic-ab12cd34",
+    "response": {
+      "id": "superplane-synthetic-ab12cd34",
+      "status": "updated"
+    }
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.synthetic.check.created"
+}
