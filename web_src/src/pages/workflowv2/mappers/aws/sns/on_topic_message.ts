@@ -1,7 +1,7 @@
 import { getBackgroundColorClass } from "@/utils/colors";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
 import { TriggerProps } from "@/ui/trigger";
-import awsIcon from "@/assets/icons/integrations/aws.svg";
+import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import { SnsTopicMessageEvent, SnsTriggerConfiguration, SnsTriggerMetadata } from "./types";
 import { formatTimeAgo } from "@/utils/date";
 import { stringOrDash } from "../../utils";
@@ -22,16 +22,17 @@ export const onTopicMessageTriggerRenderer: TriggerRenderer = {
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as SnsTopicMessageEvent;
     const topicArn = extractTopicArn(eventData);
+    const messageID = eventData?.messageId || eventData?.detail?.messageId;
     const subject = eventData?.detail?.subject || eventData?.detail?.Subject;
     const message = eventData?.detail?.message || eventData?.detail?.Message;
 
     return {
+      "Message ID": stringOrDash(messageID),
       "Topic ARN": stringOrDash(topicArn),
       Subject: stringOrDash(subject),
       Message: stringOrDash(message),
       Region: stringOrDash(eventData?.region),
       Account: stringOrDash(eventData?.account),
-      Source: stringOrDash(eventData?.source),
     };
   },
 
@@ -44,7 +45,7 @@ export const onTopicMessageTriggerRenderer: TriggerRenderer = {
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
-      iconSrc: awsIcon,
+      iconSrc: awsSnsIcon,
       collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: topicName ? [{ icon: "hash", label: topicName }] : [],
     };
@@ -65,6 +66,10 @@ export const onTopicMessageTriggerRenderer: TriggerRenderer = {
 };
 
 function extractTopicArn(eventData: SnsTopicMessageEvent | undefined): string | undefined {
+  if (eventData?.topicArn) {
+    return eventData.topicArn;
+  }
+
   const fromDetail = eventData?.detail?.topicArn || eventData?.detail?.TopicArn;
   if (fromDetail) {
     return fromDetail;

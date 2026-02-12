@@ -22,8 +22,6 @@ import {
   getSubscriptionMapper,
   getTopicMapper,
   publishMessageMapper,
-  subscribeMapper,
-  unsubscribeMapper,
 } from "./sns/components";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -43,8 +41,6 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "sns.createTopic": createTopicMapper,
   "sns.deleteTopic": deleteTopicMapper,
   "sns.publishMessage": publishMessageMapper,
-  "sns.subscribe": subscribeMapper,
-  "sns.unsubscribe": unsubscribeMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -71,6 +67,4 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "sns.createTopic": buildActionStateRegistry("created"),
   "sns.deleteTopic": buildActionStateRegistry("deleted"),
   "sns.publishMessage": buildActionStateRegistry("published"),
-  "sns.subscribe": buildActionStateRegistry("subscribed"),
-  "sns.unsubscribe": buildActionStateRegistry("unsubscribed"),
 };

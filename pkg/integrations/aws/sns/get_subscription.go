@@ -14,22 +14,18 @@ import (
 // GetSubscription resolves metadata for an SNS subscription.
 type GetSubscription struct{}
 
-// Name returns the component name.
 func (c *GetSubscription) Name() string {
 	return "aws.sns.getSubscription"
 }
 
-// Label returns the component label.
 func (c *GetSubscription) Label() string {
 	return "SNS • Get Subscription"
 }
 
-// Description returns a short component description.
 func (c *GetSubscription) Description() string {
 	return "Get an AWS SNS subscription by ARN"
 }
 
-// Documentation returns detailed Markdown documentation.
 func (c *GetSubscription) Documentation() string {
 	return `The Get Subscription component retrieves metadata and attributes for an AWS SNS subscription.
 
@@ -40,22 +36,18 @@ func (c *GetSubscription) Documentation() string {
 - **Validation**: Confirm subscription existence and protocol`
 }
 
-// Icon returns the icon slug.
 func (c *GetSubscription) Icon() string {
 	return "aws"
 }
 
-// Color returns the component color.
 func (c *GetSubscription) Color() string {
 	return "gray"
 }
 
-// OutputChannels declares the output channels used by this component.
 func (c *GetSubscription) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-// Configuration returns the component configuration schema.
 func (c *GetSubscription) Configuration() []configuration.Field {
 	return []configuration.Field{
 		regionField(),
@@ -63,7 +55,6 @@ func (c *GetSubscription) Configuration() []configuration.Field {
 	}
 }
 
-// Setup validates component configuration.
 func (c *GetSubscription) Setup(ctx core.SetupContext) error {
 	var config GetSubscriptionConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
@@ -81,12 +72,10 @@ func (c *GetSubscription) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-// ProcessQueueItem applies the default queue-item behavior.
 func (c *GetSubscription) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-// Execute retrieves subscription data and emits it on the default output channel.
 func (c *GetSubscription) Execute(ctx core.ExecutionContext) error {
 	var config GetSubscriptionConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
@@ -121,27 +110,22 @@ func (c *GetSubscription) Execute(ctx core.ExecutionContext) error {
 	return nil
 }
 
-// Actions returns supported custom actions.
 func (c *GetSubscription) Actions() []core.Action {
 	return []core.Action{}
 }
 
-// HandleAction handles custom actions for this component.
 func (c *GetSubscription) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-// HandleWebhook handles incoming webhook requests.
 func (c *GetSubscription) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
 
-// Cancel handles execution cancellation.
 func (c *GetSubscription) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-// Cleanup handles component cleanup.
 func (c *GetSubscription) Cleanup(ctx core.SetupContext) error {
 	return nil
 }

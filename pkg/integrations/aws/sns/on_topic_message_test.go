@@ -3,6 +3,7 @@ package sns
 import (
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -10,15 +11,33 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-// Test__OnTopicMessage__Setup validates trigger setup behavior.
+type testNodeWebhookContext struct {
+	url string
+}
+
+func (t *testNodeWebhookContext) Setup() (string, error) {
+	return t.url, nil
+}
+
+func (t *testNodeWebhookContext) GetSecret() ([]byte, error) {
+	return []byte("secret"), nil
+}
+
+func (t *testNodeWebhookContext) ResetSecret() ([]byte, []byte, error) {
+	return []byte("secret"), []byte("secret"), nil
+}
+
+func (t *testNodeWebhookContext) GetBaseURL() string {
+	return "http://localhost:8000"
+}
+
 func Test__OnTopicMessage__Setup(t *testing.T) {
 	trigger := &OnTopicMessage{}
 
-	t.Run("missing rule -> schedules rule provisioning", func(t *testing.T) {
+	t.Run("valid configuration -> subscribes webhook endpoint", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -33,44 +52,28 @@ func Test__OnTopicMessage__Setup(t *testing.T) {
 						</GetTopicAttributesResponse>
 					`)),
 				},
-			},
-		}
-
-		metadataContext := &contexts.MetadataContext{}
-		requestContext := &contexts.RequestContext{}
-		integration := testIntegrationContext()
-		integration.Metadata = common.IntegrationMetadata{}
-
-		err := trigger.Setup(core.TriggerContext{
-			Configuration: map[string]any{
-				"region":   "us-east-1",
-				"topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
-			},
-			HTTP:        httpContext,
-			Metadata:    metadataContext,
-			Requests:    requestContext,
-			Integration: integration,
-		})
-
-		require.NoError(t, err)
-		require.Len(t, integration.ActionRequests, 1)
-		assert.Equal(t, "provisionRule", integration.ActionRequests[0].ActionName)
-		assert.Equal(t, "checkRuleAvailability", requestContext.Action)
-	})
-
-	t.Run("rule exists -> subscribes immediately", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
 					Body: io.NopCloser(strings.NewReader(`
-						<GetTopicAttributesResponse>
-						  <GetTopicAttributesResult>
+						<SubscribeResponse>
+						  <SubscribeResult>
+							<SubscriptionArn>arn:aws:sns:us-east-1:123456789012:orders-events:sub-123</SubscriptionArn>
+						  </SubscribeResult>
+						</SubscribeResponse>
+					`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						<GetSubscriptionAttributesResponse>
+						  <GetSubscriptionAttributesResult>
 							<Attributes>
-							  <entry><key>DisplayName</key><value>Orders Events</value></entry>
+							  <entry><key>TopicArn</key><value>arn:aws:sns:us-east-1:123456789012:orders-events</value></entry>
+							  <entry><key>Protocol</key><value>https</value></entry>
+							  <entry><key>Endpoint</key><value>https://example.com/webhooks/sns-node</value></entry>
 							</Attributes>
-						  </GetTopicAttributesResult>
-						</GetTopicAttributesResponse>
+						  </GetSubscriptionAttributesResult>
+						</GetSubscriptionAttributesResponse>
 					`)),
 				},
 			},
@@ -78,17 +81,6 @@ func Test__OnTopicMessage__Setup(t *testing.T) {
 
 		metadataContext := &contexts.MetadataContext{}
 		integration := testIntegrationContext()
-		integration.Metadata = common.IntegrationMetadata{
-			EventBridge: &common.EventBridgeMetadata{
-				Rules: map[string]common.EventBridgeRuleMetadata{
-					Source: {
-						Source:      Source,
-						Region:      "us-east-1",
-						DetailTypes: []string{DetailTypeTopicNotification},
-					},
-				},
-			},
-		}
 
 		err := trigger.Setup(core.TriggerContext{
 			Configuration: map[string]any{
@@ -97,109 +89,187 @@ func Test__OnTopicMessage__Setup(t *testing.T) {
 			},
 			HTTP:        httpContext,
 			Metadata:    metadataContext,
-			Requests:    &contexts.RequestContext{},
 			Integration: integration,
+			Webhook: &testNodeWebhookContext{
+				url: "https://example.com/webhooks/sns-node",
+			},
 		})
 
 		require.NoError(t, err)
-		require.Len(t, integration.Subscriptions, 1)
+		require.Len(t, httpContext.Requests, 3)
+
+		subscribeForm := requestFormValues(t, httpContext.Requests[1])
+		assert.Equal(t, "Subscribe", subscribeForm.Get("Action"))
+		assert.Equal(t, "https", subscribeForm.Get("Protocol"))
+		assert.Equal(t, "https://example.com/webhooks/sns-node", subscribeForm.Get("Endpoint"))
+		assert.Equal(t, "true", subscribeForm.Get("ReturnSubscriptionArn"))
 
 		metadata, ok := metadataContext.Metadata.(OnTopicMessageMetadata)
 		require.True(t, ok)
 		assert.Equal(t, "us-east-1", metadata.Region)
 		assert.Equal(t, "arn:aws:sns:us-east-1:123456789012:orders-events", metadata.TopicArn)
-		assert.NotEmpty(t, metadata.SubscriptionID)
+		assert.Equal(t, "https://example.com/webhooks/sns-node", metadata.WebhookURL)
+		assert.Equal(t, "arn:aws:sns:us-east-1:123456789012:orders-events:sub-123", metadata.SubscriptionArn)
 	})
-}
 
-// Test__OnTopicMessage__HandleAction validates trigger action behavior.
-func Test__OnTopicMessage__HandleAction(t *testing.T) {
-	trigger := &OnTopicMessage{}
-
-	t.Run("rule exists -> subscribes and stores metadata", func(t *testing.T) {
-		metadataContext := &contexts.MetadataContext{
-			Metadata: OnTopicMessageMetadata{
-				Region:   "us-east-1",
-				TopicArn: "arn:aws:sns:us-east-1:123456789012:orders-events",
-			},
-		}
-
-		integration := testIntegrationContext()
-		integration.Metadata = common.IntegrationMetadata{
-			EventBridge: &common.EventBridgeMetadata{
-				Rules: map[string]common.EventBridgeRuleMetadata{
-					Source: {
-						Source:      Source,
-						Region:      "us-east-1",
-						DetailTypes: []string{DetailTypeTopicNotification},
-					},
+	t.Run("existing matching metadata -> no subscribe call", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						<GetTopicAttributesResponse>
+						  <GetTopicAttributesResult>
+							<Attributes>
+							  <entry><key>DisplayName</key><value>Orders Events</value></entry>
+							</Attributes>
+						  </GetTopicAttributesResult>
+						</GetTopicAttributesResponse>
+					`)),
 				},
 			},
 		}
 
-		_, err := trigger.HandleAction(core.TriggerActionContext{
-			Name:        "checkRuleAvailability",
+		metadataContext := &contexts.MetadataContext{
+			Metadata: OnTopicMessageMetadata{
+				Region:          "us-east-1",
+				TopicArn:        "arn:aws:sns:us-east-1:123456789012:orders-events",
+				WebhookURL:      "https://example.com/webhooks/sns-node",
+				SubscriptionArn: "arn:aws:sns:us-east-1:123456789012:orders-events:sub-123",
+			},
+		}
+
+		err := trigger.Setup(core.TriggerContext{
+			Configuration: map[string]any{
+				"region":   "us-east-1",
+				"topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
+			},
+			HTTP:        httpContext,
 			Metadata:    metadataContext,
-			Integration: integration,
-			Requests:    &contexts.RequestContext{},
+			Integration: testIntegrationContext(),
+			Webhook: &testNodeWebhookContext{
+				url: "https://example.com/webhooks/sns-node",
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+	})
+}
+
+func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
+	trigger := &OnTopicMessage{}
+
+	t.Run("notification for configured topic -> emits event", func(t *testing.T) {
+		eventContext := &contexts.EventContext{}
+
+		status, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body: []byte(`{
+				"Type": "Notification",
+				"MessageId": "msg-123",
+				"TopicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
+				"Subject": "order.created",
+				"Message": "{\"orderId\":\"ord_123\"}",
+				"Timestamp": "2026-01-10T10:00:00Z"
+			}`),
+			Configuration: map[string]any{
+				"region":   "us-east-1",
+				"topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
+			},
+			Events: eventContext,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, status)
+		require.Len(t, eventContext.Payloads, 1)
+		assert.Equal(t, "aws.sns.topic.message", eventContext.Payloads[0].Type)
+
+		payload, ok := eventContext.Payloads[0].Data.(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "arn:aws:sns:us-east-1:123456789012:orders-events", payload["topicArn"])
+		assert.Equal(t, "us-east-1", payload["region"])
+		assert.Equal(t, "123456789012", payload["account"])
+	})
+
+	t.Run("subscription confirmation for different topic -> ignored", func(t *testing.T) {
+		status, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body: []byte(`{
+				"Type": "SubscriptionConfirmation",
+				"TopicArn": "arn:aws:sns:us-east-1:123456789012:different-topic",
+				"SubscribeURL": "https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription"
+			}`),
+			Configuration: map[string]any{
+				"region":   "us-east-1",
+				"topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
+			},
+			Events: &contexts.EventContext{},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, status)
+	})
+
+	t.Run("unsupported message type -> bad request", func(t *testing.T) {
+		status, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body: []byte(`{
+				"Type": "UnknownType",
+				"TopicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
+			}`),
+			Configuration: map[string]any{
+				"region":   "us-east-1",
+				"topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
+			},
+			Events: &contexts.EventContext{},
+		})
+
+		require.Error(t, err)
+		assert.Equal(t, http.StatusBadRequest, status)
+	})
+}
+
+func Test__OnTopicMessage__Cleanup(t *testing.T) {
+	trigger := &OnTopicMessage{}
+
+	t.Run("stored subscription -> unsubscribe request", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`<UnsubscribeResponse/>`)),
+				},
+			},
+		}
+
+		err := trigger.Cleanup(core.TriggerContext{
+			HTTP: httpContext,
+			Metadata: &contexts.MetadataContext{
+				Metadata: OnTopicMessageMetadata{
+					Region:          "us-east-1",
+					SubscriptionArn: "arn:aws:sns:us-east-1:123456789012:orders-events:sub-123",
+				},
+			},
+			Integration: testIntegrationContext(),
 			Logger:      logrus.NewEntry(logrus.New()),
 		})
 
 		require.NoError(t, err)
-		require.Len(t, integration.Subscriptions, 1)
-
-		metadata, ok := metadataContext.Metadata.(OnTopicMessageMetadata)
-		require.True(t, ok)
-		assert.NotEmpty(t, metadata.SubscriptionID)
+		require.Len(t, httpContext.Requests, 1)
+		form := requestFormValues(t, httpContext.Requests[0])
+		assert.Equal(t, "Unsubscribe", form.Get("Action"))
+		assert.Equal(t, "arn:aws:sns:us-east-1:123456789012:orders-events:sub-123", form.Get("SubscriptionArn"))
 	})
 }
 
-// Test__OnTopicMessage__OnIntegrationMessage validates event filtering behavior.
-func Test__OnTopicMessage__OnIntegrationMessage(t *testing.T) {
-	trigger := &OnTopicMessage{}
+func requestFormValues(t *testing.T, request *http.Request) url.Values {
+	t.Helper()
 
-	t.Run("matching topic -> emits event", func(t *testing.T) {
-		eventContext := &contexts.EventContext{}
-		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
-			Message: map[string]any{
-				"detail": map[string]any{
-					"topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
-					"message":  "hello",
-				},
-			},
-			NodeMetadata: &contexts.MetadataContext{
-				Metadata: OnTopicMessageMetadata{
-					TopicArn: "arn:aws:sns:us-east-1:123456789012:orders-events",
-				},
-			},
-			Events: eventContext,
-			Logger: logrus.NewEntry(logrus.New()),
-		})
+	bodyBytes, err := io.ReadAll(request.Body)
+	require.NoError(t, err)
 
-		require.NoError(t, err)
-		require.Len(t, eventContext.Payloads, 1)
-		assert.Equal(t, "aws.sns.topic.message", eventContext.Payloads[0].Type)
-	})
+	require.NoError(t, request.Body.Close())
+	request.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
 
-	t.Run("different topic -> no event", func(t *testing.T) {
-		eventContext := &contexts.EventContext{}
-		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
-			Message: map[string]any{
-				"detail": map[string]any{
-					"topicArn": "arn:aws:sns:us-east-1:123456789012:different-topic",
-					"message":  "hello",
-				},
-			},
-			NodeMetadata: &contexts.MetadataContext{
-				Metadata: OnTopicMessageMetadata{
-					TopicArn: "arn:aws:sns:us-east-1:123456789012:orders-events",
-				},
-			},
-			Events: eventContext,
-			Logger: logrus.NewEntry(logrus.New()),
-		})
-
-		require.NoError(t, err)
-		assert.Empty(t, eventContext.Payloads)
-	})
+	values, err := url.ParseQuery(string(bodyBytes))
+	require.NoError(t, err)
+	return values
 }

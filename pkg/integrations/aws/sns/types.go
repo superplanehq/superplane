@@ -1,27 +1,5 @@
 package sns
 
-import "github.com/superplanehq/superplane/pkg/configuration"
-
-const (
-	// Source is the EventBridge event source used by AWS SNS notifications.
-	Source = "aws.sns"
-	// DetailTypeTopicNotification is the EventBridge detail type for topic notifications.
-	DetailTypeTopicNotification = "SNS Topic Notification"
-)
-
-// SubscriptionProtocols is the list of valid SNS subscription protocols.
-var SubscriptionProtocols = []configuration.FieldOption{
-	{Label: "Email", Value: "email"},
-	{Label: "Email JSON", Value: "email-json"},
-	{Label: "HTTP", Value: "http"},
-	{Label: "HTTPS", Value: "https"},
-	{Label: "SQS", Value: "sqs"},
-	{Label: "SMS", Value: "sms"},
-	{Label: "Lambda", Value: "lambda"},
-	{Label: "Application", Value: "application"},
-	{Label: "Firehose", Value: "firehose"},
-}
-
 // Topic models an AWS SNS topic payload returned by SNS API operations.
 type Topic struct {
 	TopicArn                  string            `json:"topicArn" mapstructure:"topicArn"`
@@ -87,22 +65,6 @@ type PublishMessageConfiguration struct {
 	MessageAttributes map[string]any `json:"messageAttributes" mapstructure:"messageAttributes"`
 }
 
-// SubscribeConfiguration contains user-provided settings for Subscribe.
-type SubscribeConfiguration struct {
-	Region                string         `json:"region" mapstructure:"region"`
-	TopicArn              string         `json:"topicArn" mapstructure:"topicArn"`
-	Protocol              string         `json:"protocol" mapstructure:"protocol"`
-	Endpoint              string         `json:"endpoint" mapstructure:"endpoint"`
-	Attributes            map[string]any `json:"attributes" mapstructure:"attributes"`
-	ReturnSubscriptionArn bool           `json:"returnSubscriptionArn" mapstructure:"returnSubscriptionArn"`
-}
-
-// UnsubscribeConfiguration contains user-provided settings for Unsubscribe.
-type UnsubscribeConfiguration struct {
-	Region          string `json:"region" mapstructure:"region"`
-	SubscriptionArn string `json:"subscriptionArn" mapstructure:"subscriptionArn"`
-}
-
 // OnTopicMessageConfiguration contains user-provided settings for OnTopicMessage.
 type OnTopicMessageConfiguration struct {
 	Region   string `json:"region" mapstructure:"region"`
@@ -111,9 +73,10 @@ type OnTopicMessageConfiguration struct {
 
 // OnTopicMessageMetadata stores trigger setup state for OnTopicMessage.
 type OnTopicMessageMetadata struct {
-	Region         string `json:"region" mapstructure:"region"`
-	TopicArn       string `json:"topicArn" mapstructure:"topicArn"`
-	SubscriptionID string `json:"subscriptionId" mapstructure:"subscriptionId"`
+	Region          string `json:"region" mapstructure:"region"`
+	TopicArn        string `json:"topicArn" mapstructure:"topicArn"`
+	WebhookURL      string `json:"webhookUrl" mapstructure:"webhookUrl"`
+	SubscriptionArn string `json:"subscriptionArn" mapstructure:"subscriptionArn"`
 }
 
 // PublishMessageParameters defines the arguments for a publish operation.
@@ -131,6 +94,27 @@ type SubscribeParameters struct {
 	Endpoint              string
 	Attributes            map[string]string
 	ReturnSubscriptionARN bool
+}
+
+type snsWebhookMessage struct {
+	Type              string                         `json:"Type"`
+	MessageID         string                         `json:"MessageId"`
+	TopicArn          string                         `json:"TopicArn"`
+	Subject           string                         `json:"Subject"`
+	Message           string                         `json:"Message"`
+	Timestamp         string                         `json:"Timestamp"`
+	SignatureVersion  string                         `json:"SignatureVersion"`
+	Signature         string                         `json:"Signature"`
+	SigningCertURL    string                         `json:"SigningCertURL"`
+	UnsubscribeURL    string                         `json:"UnsubscribeURL"`
+	SubscribeURL      string                         `json:"SubscribeURL"`
+	Token             string                         `json:"Token"`
+	MessageAttributes map[string]snsMessageAttribute `json:"MessageAttributes"`
+}
+
+type snsMessageAttribute struct {
+	Type  string `json:"Type"`
+	Value string `json:"Value"`
 }
 
 type attributeEntry struct {

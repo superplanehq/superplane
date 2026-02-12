@@ -14,22 +14,18 @@ import (
 // CreateTopic creates a new SNS topic.
 type CreateTopic struct{}
 
-// Name returns the component name.
 func (c *CreateTopic) Name() string {
 	return "aws.sns.createTopic"
 }
 
-// Label returns the component label.
 func (c *CreateTopic) Label() string {
 	return "SNS • Create Topic"
 }
 
-// Description returns a short component description.
 func (c *CreateTopic) Description() string {
 	return "Create an AWS SNS topic"
 }
 
-// Documentation returns detailed Markdown documentation.
 func (c *CreateTopic) Documentation() string {
 	return `The Create Topic component creates an AWS SNS topic and returns its metadata.
 
@@ -40,22 +36,18 @@ func (c *CreateTopic) Documentation() string {
 - **Self-service operations**: Provision messaging resources on demand`
 }
 
-// Icon returns the icon slug.
 func (c *CreateTopic) Icon() string {
 	return "aws"
 }
 
-// Color returns the component color.
 func (c *CreateTopic) Color() string {
 	return "gray"
 }
 
-// OutputChannels declares the output channels used by this component.
 func (c *CreateTopic) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-// Configuration returns the component configuration schema.
 func (c *CreateTopic) Configuration() []configuration.Field {
 	return []configuration.Field{
 		regionField(),
@@ -88,7 +80,6 @@ func (c *CreateTopic) Configuration() []configuration.Field {
 	}
 }
 
-// Setup validates component configuration.
 func (c *CreateTopic) Setup(ctx core.SetupContext) error {
 	var config CreateTopicConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
@@ -106,12 +97,10 @@ func (c *CreateTopic) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-// ProcessQueueItem applies the default queue-item behavior.
 func (c *CreateTopic) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-// Execute creates a topic and emits the created topic metadata.
 func (c *CreateTopic) Execute(ctx core.ExecutionContext) error {
 	var config CreateTopicConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
@@ -146,27 +135,22 @@ func (c *CreateTopic) Execute(ctx core.ExecutionContext) error {
 	return nil
 }
 
-// Actions returns supported custom actions.
 func (c *CreateTopic) Actions() []core.Action {
 	return []core.Action{}
 }
 
-// HandleAction handles custom actions for this component.
 func (c *CreateTopic) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-// HandleWebhook handles incoming webhook requests.
 func (c *CreateTopic) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
 
-// Cancel handles execution cancellation.
 func (c *CreateTopic) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-// Cleanup handles component cleanup.
 func (c *CreateTopic) Cleanup(ctx core.SetupContext) error {
 	return nil
 }

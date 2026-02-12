@@ -14,22 +14,18 @@ import (
 // GetTopic resolves metadata for an SNS topic.
 type GetTopic struct{}
 
-// Name returns the component name.
 func (c *GetTopic) Name() string {
 	return "aws.sns.getTopic"
 }
 
-// Label returns the component label.
 func (c *GetTopic) Label() string {
 	return "SNS • Get Topic"
 }
 
-// Description returns a short component description.
 func (c *GetTopic) Description() string {
 	return "Get an AWS SNS topic by ARN"
 }
 
-// Documentation returns detailed Markdown documentation.
 func (c *GetTopic) Documentation() string {
 	return `The Get Topic component retrieves metadata and attributes for an AWS SNS topic.
 
@@ -40,22 +36,18 @@ func (c *GetTopic) Documentation() string {
 - **Validation**: Confirm topic existence and ownership`
 }
 
-// Icon returns the icon slug.
 func (c *GetTopic) Icon() string {
 	return "aws"
 }
 
-// Color returns the component color.
 func (c *GetTopic) Color() string {
 	return "gray"
 }
 
-// OutputChannels declares the output channels used by this component.
 func (c *GetTopic) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-// Configuration returns the component configuration schema.
 func (c *GetTopic) Configuration() []configuration.Field {
 	return []configuration.Field{
 		regionField(),
@@ -63,7 +55,6 @@ func (c *GetTopic) Configuration() []configuration.Field {
 	}
 }
 
-// Setup validates component configuration.
 func (c *GetTopic) Setup(ctx core.SetupContext) error {
 	var config GetTopicConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
@@ -81,12 +72,10 @@ func (c *GetTopic) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-// ProcessQueueItem applies the default queue-item behavior.
 func (c *GetTopic) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-// Execute retrieves topic data and emits it on the default output channel.
 func (c *GetTopic) Execute(ctx core.ExecutionContext) error {
 	var config GetTopicConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
@@ -121,27 +110,22 @@ func (c *GetTopic) Execute(ctx core.ExecutionContext) error {
 	return nil
 }
 
-// Actions returns supported custom actions.
 func (c *GetTopic) Actions() []core.Action {
 	return []core.Action{}
 }
 
-// HandleAction handles custom actions for this component.
 func (c *GetTopic) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-// HandleWebhook handles incoming webhook requests.
 func (c *GetTopic) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
 
-// Cancel handles execution cancellation.
 func (c *GetTopic) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-// Cleanup handles component cleanup.
 func (c *GetTopic) Cleanup(ctx core.SetupContext) error {
 	return nil
 }

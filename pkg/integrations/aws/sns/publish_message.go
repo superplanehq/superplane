@@ -14,22 +14,18 @@ import (
 // PublishMessage publishes a message to an SNS topic.
 type PublishMessage struct{}
 
-// Name returns the component name.
 func (c *PublishMessage) Name() string {
 	return "aws.sns.publishMessage"
 }
 
-// Label returns the component label.
 func (c *PublishMessage) Label() string {
 	return "SNS • Publish Message"
 }
 
-// Description returns a short component description.
 func (c *PublishMessage) Description() string {
 	return "Publish a message to an AWS SNS topic"
 }
 
-// Documentation returns detailed Markdown documentation.
 func (c *PublishMessage) Documentation() string {
 	return `The Publish Message component sends a message to an AWS SNS topic.
 
@@ -40,22 +36,18 @@ func (c *PublishMessage) Documentation() string {
 - **Automation**: Trigger downstream subscribers through SNS delivery`
 }
 
-// Icon returns the icon slug.
 func (c *PublishMessage) Icon() string {
 	return "aws"
 }
 
-// Color returns the component color.
 func (c *PublishMessage) Color() string {
 	return "gray"
 }
 
-// OutputChannels declares the output channels used by this component.
 func (c *PublishMessage) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-// Configuration returns the component configuration schema.
 func (c *PublishMessage) Configuration() []configuration.Field {
 	return []configuration.Field{
 		regionField(),
@@ -101,7 +93,6 @@ func (c *PublishMessage) Configuration() []configuration.Field {
 	}
 }
 
-// Setup validates component configuration.
 func (c *PublishMessage) Setup(ctx core.SetupContext) error {
 	var config PublishMessageConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
@@ -123,12 +114,10 @@ func (c *PublishMessage) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-// ProcessQueueItem applies the default queue-item behavior.
 func (c *PublishMessage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-// Execute publishes the configured message and emits publish metadata.
 func (c *PublishMessage) Execute(ctx core.ExecutionContext) error {
 	var config PublishMessageConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
@@ -173,27 +162,22 @@ func (c *PublishMessage) Execute(ctx core.ExecutionContext) error {
 	return nil
 }
 
-// Actions returns supported custom actions.
 func (c *PublishMessage) Actions() []core.Action {
 	return []core.Action{}
 }
 
-// HandleAction handles custom actions for this component.
 func (c *PublishMessage) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-// HandleWebhook handles incoming webhook requests.
 func (c *PublishMessage) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
 
-// Cancel handles execution cancellation.
 func (c *PublishMessage) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-// Cleanup handles component cleanup.
 func (c *PublishMessage) Cleanup(ctx core.SetupContext) error {
 	return nil
 }

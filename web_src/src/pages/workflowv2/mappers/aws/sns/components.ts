@@ -10,7 +10,7 @@ import {
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
-import awsIcon from "@/assets/icons/integrations/aws.svg";
+import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import { formatTimeAgo } from "@/utils/date";
 import { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../../utils";
@@ -31,7 +31,7 @@ function buildSnsComponentMapper(): ComponentBaseMapper {
 
       return {
         title: context.node.name || context.componentDefinition.label || "Unnamed component",
-        iconSrc: awsIcon,
+        iconSrc: awsSnsIcon,
         iconColor: getColorClass(context.componentDefinition.color),
         collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
         collapsed: context.node.isCollapsed,
@@ -141,5 +141,3 @@ export const getSubscriptionMapper = buildSnsComponentMapper();
 export const createTopicMapper = buildSnsComponentMapper();
 export const deleteTopicMapper = buildSnsComponentMapper();
 export const publishMessageMapper = buildSnsComponentMapper();
-export const subscribeMapper = buildSnsComponentMapper();
-export const unsubscribeMapper = buildSnsComponentMapper();

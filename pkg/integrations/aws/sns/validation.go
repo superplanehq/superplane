@@ -2,7 +2,6 @@ package sns
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
@@ -88,41 +87,6 @@ func requireMessage(message string) (string, error) {
 	normalized := strings.TrimSpace(message)
 	if normalized == "" {
 		return "", fmt.Errorf("message is required")
-	}
-
-	return normalized, nil
-}
-
-// requireProtocol validates SNS subscription protocol values.
-func requireProtocol(protocol string) (string, error) {
-	normalized := strings.TrimSpace(protocol)
-	if normalized == "" {
-		return "", fmt.Errorf("protocol is required")
-	}
-
-	allowedProtocols := []string{
-		"email",
-		"email-json",
-		"http",
-		"https",
-		"sqs",
-		"sms",
-		"lambda",
-		"application",
-		"firehose",
-	}
-	if !slices.Contains(allowedProtocols, normalized) {
-		return "", fmt.Errorf("unsupported protocol: %s", normalized)
-	}
-
-	return normalized, nil
-}
-
-// requireEndpoint validates and normalizes SNS subscription endpoints.
-func requireEndpoint(endpoint string) (string, error) {
-	normalized := strings.TrimSpace(endpoint)
-	if normalized == "" {
-		return "", fmt.Errorf("endpoint is required")
 	}
 
 	return normalized, nil

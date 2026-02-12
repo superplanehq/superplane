@@ -14,22 +14,18 @@ import (
 // DeleteTopic deletes an existing SNS topic.
 type DeleteTopic struct{}
 
-// Name returns the component name.
 func (c *DeleteTopic) Name() string {
 	return "aws.sns.deleteTopic"
 }
 
-// Label returns the component label.
 func (c *DeleteTopic) Label() string {
 	return "SNS • Delete Topic"
 }
 
-// Description returns a short component description.
 func (c *DeleteTopic) Description() string {
 	return "Delete an AWS SNS topic"
 }
 
-// Documentation returns detailed Markdown documentation.
 func (c *DeleteTopic) Documentation() string {
 	return `The Delete Topic component deletes an AWS SNS topic.
 
@@ -40,22 +36,18 @@ func (c *DeleteTopic) Documentation() string {
 - **Rollback automation**: Remove topics created in failed provisioning runs`
 }
 
-// Icon returns the icon slug.
 func (c *DeleteTopic) Icon() string {
 	return "aws"
 }
 
-// Color returns the component color.
 func (c *DeleteTopic) Color() string {
 	return "gray"
 }
 
-// OutputChannels declares the output channels used by this component.
 func (c *DeleteTopic) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-// Configuration returns the component configuration schema.
 func (c *DeleteTopic) Configuration() []configuration.Field {
 	return []configuration.Field{
 		regionField(),
@@ -63,7 +55,6 @@ func (c *DeleteTopic) Configuration() []configuration.Field {
 	}
 }
 
-// Setup validates component configuration.
 func (c *DeleteTopic) Setup(ctx core.SetupContext) error {
 	var config DeleteTopicConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
@@ -81,12 +72,10 @@ func (c *DeleteTopic) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-// ProcessQueueItem applies the default queue-item behavior.
 func (c *DeleteTopic) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-// Execute deletes a topic and emits a deletion payload.
 func (c *DeleteTopic) Execute(ctx core.ExecutionContext) error {
 	var config DeleteTopicConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
@@ -125,27 +114,22 @@ func (c *DeleteTopic) Execute(ctx core.ExecutionContext) error {
 	return nil
 }
 
-// Actions returns supported custom actions.
 func (c *DeleteTopic) Actions() []core.Action {
 	return []core.Action{}
 }
 
-// HandleAction handles custom actions for this component.
 func (c *DeleteTopic) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-// HandleWebhook handles incoming webhook requests.
 func (c *DeleteTopic) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
 
-// Cancel handles execution cancellation.
 func (c *DeleteTopic) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-// Cleanup handles component cleanup.
 func (c *DeleteTopic) Cleanup(ctx core.SetupContext) error {
 	return nil
 }

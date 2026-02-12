@@ -144,8 +144,6 @@ func (a *AWS) Components() []core.Component {
 		&sns.CreateTopic{},
 		&sns.DeleteTopic{},
 		&sns.PublishMessage{},
-		&sns.Subscribe{},
-		&sns.Unsubscribe{},
 		&ecr.GetImage{},
 		&ecr.GetImageScanFindings{},
 		&ecr.ScanImage{},

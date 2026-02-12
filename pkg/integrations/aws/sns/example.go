@@ -25,12 +25,6 @@ var exampleOutputDeleteTopicBytes []byte
 //go:embed example_output_publish_message.json
 var exampleOutputPublishMessageBytes []byte
 
-//go:embed example_output_subscribe.json
-var exampleOutputSubscribeBytes []byte
-
-//go:embed example_output_unsubscribe.json
-var exampleOutputUnsubscribeBytes []byte
-
 var exampleDataOnTopicMessageOnce sync.Once
 var exampleDataOnTopicMessage map[string]any
 
@@ -48,12 +42,6 @@ var exampleOutputDeleteTopic map[string]any
 
 var exampleOutputPublishMessageOnce sync.Once
 var exampleOutputPublishMessage map[string]any
-
-var exampleOutputSubscribeOnce sync.Once
-var exampleOutputSubscribe map[string]any
-
-var exampleOutputUnsubscribeOnce sync.Once
-var exampleOutputUnsubscribe map[string]any
 
 // ExampleData returns an example payload for OnTopicMessage events.
 func (t *OnTopicMessage) ExampleData() map[string]any {
@@ -83,14 +71,4 @@ func (c *DeleteTopic) ExampleOutput() map[string]any {
 // ExampleOutput returns an example payload for PublishMessage.
 func (c *PublishMessage) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputPublishMessageOnce, exampleOutputPublishMessageBytes, &exampleOutputPublishMessage)
-}
-
-// ExampleOutput returns an example payload for Subscribe.
-func (c *Subscribe) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputSubscribeOnce, exampleOutputSubscribeBytes, &exampleOutputSubscribe)
-}
-
-// ExampleOutput returns an example payload for Unsubscribe.
-func (c *Unsubscribe) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputUnsubscribeOnce, exampleOutputUnsubscribeBytes, &exampleOutputUnsubscribe)
 }
