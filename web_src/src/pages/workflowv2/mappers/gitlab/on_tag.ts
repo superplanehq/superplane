@@ -2,7 +2,7 @@ import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import { TriggerProps } from "@/ui/trigger";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { Predicate, formatPredicate } from "../utils";
+import { Predicate, formatPredicate, stringOrDash } from "../utils";
 import { buildGitlabSubtitle } from "./utils";
 import { GitLabNodeMetadata } from "./types";
 
@@ -30,7 +30,7 @@ export const onTagTriggerRenderer: TriggerRenderer = {
     const eventData = context.event?.data as OnTagEventData;
 
     return {
-      title: eventData?.ref ? `Tag: ${eventData.ref}` : "Tag Push",
+      title: eventData?.ref ? eventData.ref : "Tag Push",
       subtitle: buildGitlabSubtitle(eventData?.event_name || "", context.event?.createdAt),
     };
   },
@@ -38,9 +38,9 @@ export const onTagTriggerRenderer: TriggerRenderer = {
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as OnTagEventData;
     const values: Record<string, string> = {
-      Ref: eventData?.ref || "",
-      Before: eventData?.before || "",
-      After: eventData?.after || "",
+      Ref: stringOrDash(eventData?.ref),
+      Before: stringOrDash(eventData?.before),
+      After: stringOrDash(eventData?.after),
     };
 
     if (eventData?.user_name) {
@@ -86,7 +86,7 @@ export const onTagTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data as OnTagEventData;
 
       props.lastEventData = {
-        title: eventData?.ref ? `Tag: ${eventData.ref}` : "Tag Push",
+        title: eventData?.ref ? eventData.ref : "Tag Push",
         subtitle: buildGitlabSubtitle(eventData?.event_name || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",

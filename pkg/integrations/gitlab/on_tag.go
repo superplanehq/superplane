@@ -37,7 +37,7 @@ func (t *OnTag) Documentation() string {
 ## Configuration
 
 - **Project** (required): GitLab project to monitor
-- **Tags** (required): Configure tag filters using predicates. You can match full refs (`refs/tags/v1.0.0`) or tag names (`v1.0.0`).
+- **Tags** (required): Configure tag filters using predicates. You can match full refs (refs/tags/v1.0.0) or tag names (v1.0.0).
 
 ## Outputs
 

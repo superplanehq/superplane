@@ -4,6 +4,7 @@ import { TriggerProps } from "@/ui/trigger";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { buildGitlabSubtitle } from "./utils";
 import { GitLabNodeMetadata } from "./types";
+import { stringOrDash } from "../utils";
 
 interface OnMilestoneConfiguration {
   actions: string[];
@@ -23,9 +24,7 @@ interface OnMilestoneEventData {
   object_kind?: string;
   event_type?: string;
   action?: string;
-  object_attributes?: MilestoneObjectAttributes & {
-    action?: string;
-  };
+  object_attributes?: MilestoneObjectAttributes;
   project?: {
     id: number;
     name: string;
@@ -34,18 +33,14 @@ interface OnMilestoneEventData {
   };
 }
 
-function getMilestoneAction(eventData: OnMilestoneEventData): string {
-  return eventData.action || eventData.object_attributes?.action || "";
-}
-
 export const onMilestoneTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
     const eventData = context.event?.data as OnMilestoneEventData;
     const milestone = eventData?.object_attributes;
 
     return {
-      title: milestone?.title ? `Milestone: ${milestone.title}` : "Milestone",
-      subtitle: buildGitlabSubtitle(getMilestoneAction(eventData), context.event?.createdAt),
+      title: milestone?.title ? milestone.title : "Milestone",
+      subtitle: buildGitlabSubtitle(eventData?.action || "", context.event?.createdAt),
     };
   },
 
@@ -53,12 +48,12 @@ export const onMilestoneTriggerRenderer: TriggerRenderer = {
     const eventData = context.event?.data as OnMilestoneEventData;
     const milestone = eventData?.object_attributes;
     const values: Record<string, string> = {
-      Title: milestone?.title || "",
-      Action: getMilestoneAction(eventData),
-      State: milestone?.state || "",
-      IID: milestone?.iid?.toString() || "",
-      "Start Date": milestone?.start_date || "",
-      "Due Date": milestone?.due_date || "",
+      Title: stringOrDash(milestone?.title),
+      Action: stringOrDash(eventData?.action),
+      State: stringOrDash(milestone?.state),
+      IID: stringOrDash(milestone?.iid?.toString()),
+      "Start Date": stringOrDash(milestone?.start_date),
+      "Due Date": stringOrDash(milestone?.due_date),
     };
 
     if (eventData?.project?.path_with_namespace) {
@@ -101,8 +96,8 @@ export const onMilestoneTriggerRenderer: TriggerRenderer = {
       const milestone = eventData?.object_attributes;
 
       props.lastEventData = {
-        title: milestone?.title ? `Milestone: ${milestone.title}` : "Milestone",
-        subtitle: buildGitlabSubtitle(getMilestoneAction(eventData), lastEvent.createdAt),
+        title: milestone?.title ? milestone.title : "Milestone",
+        subtitle: buildGitlabSubtitle(stringOrDash(eventData?.action), lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id!,
