@@ -107,6 +107,12 @@ import {
   eventStateRegistry as claudeEventStateRegistry,
 } from "./claude/index";
 import {
+  componentMappers as railwayComponentMappers,
+  triggerRenderers as railwayTriggerRenderers,
+  customFieldRenderers as railwayCustomFieldRenderers,
+  eventStateRegistry as railwayEventStateRegistry,
+} from "./railway/index";
+import{
   componentMappers as cursorComponentMappers,
   triggerRenderers as cursorTriggerRenderers,
   eventStateRegistry as cursorEventStateRegistry,
@@ -167,6 +173,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   openai: openaiComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
+  railway: railwayComponentMappers,
   cursor: cursorComponentMappers,
   dockerhub: dockerhubComponentMappers,
 };
@@ -190,6 +197,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   openai: openaiTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
+  railway: railwayTriggerRenderers,
   cursor: cursorTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
 };
@@ -212,6 +220,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
   aws: awsEventStateRegistry,
+  railway: railwayEventStateRegistry,
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
@@ -240,6 +249,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
+  railway: railwayCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
 };
 
