@@ -1,0 +1,7 @@
+{
+  "requestId": "b6a5cd4f-2a52-4f43-8b68-61f70a5cbb43",
+  "region": "us-east-1",
+  "namespace": "MyService/Production",
+  "metricCount": 2,
+  "metricNames": ["RequestCount", "LatencyMs"]
+}

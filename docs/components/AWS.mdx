@@ -18,6 +18,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="CloudWatch • Put Metric Data" href="#cloud-watch-•-put-metric-data" description="Push custom metrics to AWS CloudWatch" />
   <LinkCard title="CodeArtifact • Copy Package Versions" href="#code-artifact-•-copy-package-versions" description="Copy package versions from one repository to another in the same domain" />
   <LinkCard title="CodeArtifact • Create Repository" href="#code-artifact-•-create-repository" description="Create an AWS CodeArtifact repository in a domain" />
   <LinkCard title="CodeArtifact • Delete Package Versions" href="#code-artifact-•-delete-package-versions" description="Permanently delete one or more package versions from a repository" />
@@ -91,6 +92,38 @@ Each alarm event includes:
   },
   "timestamp": "2026-02-10T12:00:00Z",
   "type": "aws.cloudwatch.alarm"
+}
+```
+
+<a id="cloud-watch-•-put-metric-data"></a>
+
+## CloudWatch • Put Metric Data
+
+The Put Metric Data component publishes one or more custom metric data points to AWS CloudWatch.
+
+### Use Cases
+
+- **Application telemetry**: Publish request counts, latency, and error rates
+- **Business KPIs**: Send domain metrics (orders, signups, revenue) to dashboards
+- **Operational visibility**: Feed custom service health metrics into alarms and autoscaling
+
+### Configuration
+
+- **Region**: AWS region where the metric data will be published
+- **Namespace**: CloudWatch namespace for your custom metrics (for example: `MyService/Production`)
+- **Metric Data**: List of metric points to publish, each with:
+  - **Metric Name** and **Value** (required)
+  - Optional **Unit**, **Timestamp**, **Storage Resolution**, and **Dimensions**
+
+### Example Output
+
+```json
+{
+  "requestId": "b6a5cd4f-2a52-4f43-8b68-61f70a5cbb43",
+  "region": "us-east-1",
+  "namespace": "MyService/Production",
+  "metricCount": 2,
+  "metricNames": ["RequestCount", "LatencyMs"]
 }
 ```
 
