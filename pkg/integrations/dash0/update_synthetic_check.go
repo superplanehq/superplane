@@ -43,29 +43,13 @@ func (c *UpdateSyntheticCheck) Documentation() string {
 ## Configuration
 
 - **Synthetic Check**: Existing synthetic check origin/ID
-- **Specification (JSON)**: Updated synthetic check payload as JSON object
-
-Example specification:
-` + "```json" + `
-{
-  "kind": "Dash0SyntheticCheck",
-  "metadata": {
-    "name": "checkout-health"
-  },
-  "spec": {
-    "enabled": true,
-    "plugin": {
-      "kind": "http",
-      "spec": {
-        "request": {
-          "method": "get",
-          "url": "https://www.example.com/health"
-        }
-      }
-    }
-  }
-}
-` + "```" + `
+- **Name**: Human-readable synthetic check name
+- **Enabled**: Whether the synthetic check is enabled
+- **Plugin Kind**: Synthetic check plugin type (currently HTTP)
+- **Method**: HTTP method for request checks
+- **URL**: Target URL for the synthetic check
+- **Headers (Optional)**: Request header key/value pairs
+- **Request Body (Optional)**: HTTP request body (useful for POST/PUT/PATCH)
 
 ## Output
 
@@ -106,12 +90,106 @@ func (c *UpdateSyntheticCheck) Configuration() []configuration.Field {
 			Description: "Synthetic check origin/ID to update",
 		},
 		{
-			Name:        "spec",
-			Label:       "Specification (JSON)",
-			Type:        configuration.FieldTypeText,
+			Name:        "name",
+			Label:       "Name",
+			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "Updated synthetic check specification as a JSON object",
-			Placeholder: "{\"kind\":\"Dash0SyntheticCheck\",\"metadata\":{\"name\":\"examplecom\"},\"spec\":{\"enabled\":true,\"plugin\":{\"kind\":\"http\",\"spec\":{\"request\":{\"method\":\"get\",\"url\":\"https://www.example.com/health\"}}}}}",
+			Description: "Human-readable synthetic check name",
+			Placeholder: "checkout-health",
+		},
+		{
+			Name:        "enabled",
+			Label:       "Enabled",
+			Type:        configuration.FieldTypeBool,
+			Required:    true,
+			Default:     true,
+			Description: "Enable or disable the synthetic check",
+		},
+		{
+			Name:     "pluginKind",
+			Label:    "Plugin Kind",
+			Type:     configuration.FieldTypeSelect,
+			Required: true,
+			Default:  "http",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "HTTP", Value: "http"},
+					},
+				},
+			},
+			Description: "Synthetic check plugin kind",
+		},
+		{
+			Name:     "method",
+			Label:    "Method",
+			Type:     configuration.FieldTypeSelect,
+			Required: true,
+			Default:  "get",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "GET", Value: "get"},
+						{Label: "POST", Value: "post"},
+						{Label: "PUT", Value: "put"},
+						{Label: "PATCH", Value: "patch"},
+						{Label: "DELETE", Value: "delete"},
+						{Label: "HEAD", Value: "head"},
+						{Label: "OPTIONS", Value: "options"},
+					},
+				},
+			},
+			Description: "HTTP method used for the synthetic check request",
+		},
+		{
+			Name:        "url",
+			Label:       "URL",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Description: "Target URL for the synthetic check request",
+			Placeholder: "https://www.example.com/health",
+		},
+		{
+			Name:        "headers",
+			Label:       "Headers",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Togglable:   true,
+			Description: "Optional request header key/value pairs",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Header",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:               "key",
+								Label:              "Key",
+								Type:               configuration.FieldTypeString,
+								Required:           true,
+								DisallowExpression: true,
+							},
+							{
+								Name:     "value",
+								Label:    "Value",
+								Type:     configuration.FieldTypeString,
+								Required: true,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:        "requestBody",
+			Label:       "Request Body",
+			Type:        configuration.FieldTypeText,
+			Required:    false,
+			Togglable:   true,
+			Description: "Optional HTTP request body",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "method", Values: []string{"post", "put", "patch"}},
+			},
 		},
 	}
 }
@@ -128,12 +206,8 @@ func (c *UpdateSyntheticCheck) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	specification, err := parseSpecification(config.Spec, "spec", scope)
-	if err != nil {
-		return err
-	}
-
-	return validateSyntheticCheckSpecification(specification, "spec", scope)
+	_, err := buildSyntheticCheckSpecificationFromConfiguration(config, scope)
+	return err
 }
 
 // ProcessQueueItem delegates queue processing to default behavior.
@@ -154,12 +228,8 @@ func (c *UpdateSyntheticCheck) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	specification, err := parseSpecification(config.Spec, "spec", scope)
+	specification, err := buildSyntheticCheckSpecificationFromConfiguration(config, scope)
 	if err != nil {
-		return err
-	}
-
-	if err := validateSyntheticCheckSpecification(specification, "spec", scope); err != nil {
 		return err
 	}
 
