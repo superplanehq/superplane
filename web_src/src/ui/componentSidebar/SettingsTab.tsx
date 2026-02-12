@@ -390,10 +390,10 @@ export function SettingsTab({
                             <span
                               className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                                 selectedIntegrationFull.status?.state === "ready"
-                                  ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                                  ? "border border-green-950/15 bg-green-100 text-green-800 dark:border-green-950/15 dark:bg-green-900/30 dark:text-green-400"
                                   : selectedIntegrationFull.status?.state === "error"
-                                    ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                                    : "bg-orange-100 text-yellow-800 dark:text-yellow-900/30 dark:text-yellow-400"
+                                    ? "border border-red-950/15 bg-red-100 text-red-800 dark:border-red-950/15 dark:bg-red-900/30 dark:text-red-400"
+                                    : "border border-orange-950/15 bg-orange-100 text-yellow-800 dark:border-orange-950/15 dark:bg-orange-950/30 dark:text-yellow-400"
                               }`}
                             >
                               {selectedIntegrationFull.status?.state
