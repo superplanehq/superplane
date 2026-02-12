@@ -913,6 +913,7 @@ type ListTypeOptions struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	ItemDefinition *ListItemDefinition    `protobuf:"bytes,1,opt,name=item_definition,json=itemDefinition,proto3" json:"item_definition,omitempty"`
 	ItemLabel      string                 `protobuf:"bytes,2,opt,name=item_label,json=itemLabel,proto3" json:"item_label,omitempty"`
+	MaxItems       *int32                 `protobuf:"varint,3,opt,name=max_items,json=maxItems,proto3,oneof" json:"max_items,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -959,6 +960,13 @@ func (x *ListTypeOptions) GetItemLabel() string {
 		return x.ItemLabel
 	}
 	return ""
+}
+
+func (x *ListTypeOptions) GetMaxItems() int32 {
+	if x != nil && x.MaxItems != nil {
+		return *x.MaxItems
+	}
+	return 0
 }
 
 type ObjectTypeOptions struct {
@@ -1429,11 +1437,14 @@ const file_configuration_proto_rawDesc = "" +
 	"\n" +
 	"value_from\x18\x03 \x01(\v2,.Superplane.Configuration.ParameterValueFromR\tvalueFrom\"*\n" +
 	"\x12ParameterValueFrom\x12\x14\n" +
-	"\x05field\x18\x01 \x01(\tR\x05field\"\x87\x01\n" +
+	"\x05field\x18\x01 \x01(\tR\x05field\"\xb7\x01\n" +
 	"\x0fListTypeOptions\x12U\n" +
 	"\x0fitem_definition\x18\x01 \x01(\v2,.Superplane.Configuration.ListItemDefinitionR\x0eitemDefinition\x12\x1d\n" +
 	"\n" +
-	"item_label\x18\x02 \x01(\tR\titemLabel\"L\n" +
+	"item_label\x18\x02 \x01(\tR\titemLabel\x12 \n" +
+	"\tmax_items\x18\x03 \x01(\x05H\x00R\bmaxItems\x88\x01\x01B\f\n" +
+	"\n" +
+	"_max_items\"L\n" +
 	"\x11ObjectTypeOptions\x127\n" +
 	"\x06schema\x18\x01 \x03(\v2\x1f.Superplane.Configuration.FieldR\x06schema\":\n" +
 	"\fSelectOption\x12\x14\n" +
@@ -1541,6 +1552,7 @@ func file_configuration_proto_init() {
 	file_configuration_proto_msgTypes[6].OneofWrappers = []any{}
 	file_configuration_proto_msgTypes[7].OneofWrappers = []any{}
 	file_configuration_proto_msgTypes[8].OneofWrappers = []any{}
+	file_configuration_proto_msgTypes[14].OneofWrappers = []any{}
 	file_configuration_proto_msgTypes[20].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
