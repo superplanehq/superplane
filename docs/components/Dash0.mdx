@@ -11,6 +11,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="List Issues" href="#list-issues" description="Query Dash0 to get a list of all current issues using the metric dash0.issue.status" />
   <LinkCard title="Query Prometheus" href="#query-prometheus" description="Execute a PromQL query against Dash0 Prometheus API and return the response data" />
+  <LinkCard title="Update Check Rule" href="#update-check-rule" description="Update an existing check rule in Dash0 configuration API" />
 </CardGrid>
 
 <a id="list-issues"></a>
@@ -147,6 +148,51 @@ Returns the Prometheus query response including:
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "dash0.prometheus.response"
+}
+```
+
+<a id="update-check-rule"></a>
+
+## Update Check Rule
+
+The Update Check Rule component updates an existing Dash0 check rule.
+
+### Use Cases
+
+- **Threshold tuning**: Adjust alert sensitivity as service behavior changes
+- **Rule maintenance**: Update labels, annotations, and notification routing
+- **Operational automation**: Enable or disable rules from workflows
+
+### Configuration
+
+- **Check Rule**: Existing check rule origin/ID
+- **Name**: Human-readable rule name
+- **Expression**: Prometheus expression used by the rule
+- **For (Optional)**: How long expression must remain true before firing
+- **Interval (Optional)**: Evaluation interval override
+- **Keep Firing For (Optional)**: Additional duration to keep firing after recovery
+- **Labels (Optional)**: Label key/value pairs
+- **Annotations (Optional)**: Annotation key/value pairs
+
+### Output
+
+Emits:
+- **originOrId**: Check rule identifier used for the API request
+- **response**: Raw Dash0 API response
+
+### Example Output
+
+```json
+{
+  "data": {
+    "originOrId": "checkout-errors",
+    "response": {
+      "id": "checkout-errors",
+      "status": "updated"
+    }
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.check.rule.updated"
 }
 ```
 
