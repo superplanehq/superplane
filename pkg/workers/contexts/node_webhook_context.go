@@ -3,7 +3,6 @@ package contexts
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -111,22 +110,5 @@ func (c *NodeWebhookContext) findOrCreateWebhook() (*models.Webhook, error) {
 }
 
 func (c *NodeWebhookContext) GetBaseURL() string {
-	// Use WEBHOOKS_BASE_URL if set, otherwise fall back to the provided baseURL.
-	// This allows local installations to use a different URL for webhooks
-	// (e.g., a tunnel URL) when the base app is running on localhost.
-	webhookBaseURL := os.Getenv("WEBHOOKS_BASE_URL")
-	if webhookBaseURL != "" {
-		// Append the API base path if it's set
-		apiBasePath := os.Getenv("PUBLIC_API_BASE_PATH")
-		if apiBasePath != "" {
-			return webhookBaseURL + apiBasePath
-		}
-		return webhookBaseURL
-	}
-	// Append the API base path to the base URL if it's set
-	apiBasePath := os.Getenv("PUBLIC_API_BASE_PATH")
-	if apiBasePath != "" {
-		return c.baseURL + apiBasePath
-	}
 	return c.baseURL
 }
