@@ -10,6 +10,7 @@ import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import discordIcon from "@/assets/icons/integrations/discord.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
+import jenkinsIcon from "@/assets/icons/integrations/jenkins.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
@@ -33,6 +34,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   discord: discordIcon,
   github: githubIcon,
   gitlab: gitlabIcon,
+  jenkins: jenkinsIcon,
   jira: jiraIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
@@ -57,6 +59,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   discord: discordIcon,
   github: githubIcon,
   gitlab: gitlabIcon,
+  jenkins: jenkinsIcon,
   jira: jiraIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
