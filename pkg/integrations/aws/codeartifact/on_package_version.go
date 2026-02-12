@@ -187,10 +187,14 @@ func (p *OnPackageVersion) provisionRule(integration core.IntegrationContext, re
 		return fmt.Errorf("failed to schedule rule provisioning for integration: %w", err)
 	}
 
-	return requests.ScheduleActionCall(
+	//
+	// Wait at most for 1min for the rule to be available.
+	//
+	return requests.ScheduleActionWithRetry(
 		"checkRuleAvailability",
 		map[string]any{},
-		5*time.Second,
+		10*time.Second,
+		6,
 	)
 }
 
@@ -238,21 +242,11 @@ func (p *OnPackageVersion) checkRuleAvailability(ctx core.TriggerActionContext) 
 
 	rule, ok := integrationMetadata.EventBridge.Rules[Source]
 	if !ok {
-		ctx.Logger.Infof("Rule not found for source %s - checking again in 10 seconds", Source)
-		return nil, ctx.Requests.ScheduleActionCall(
-			"checkRuleAvailability",
-			map[string]any{},
-			10*time.Second,
-		)
+		return nil, fmt.Errorf("Rule not found for source %s - checking again in 10 seconds", Source)
 	}
 
 	if !slices.Contains(rule.DetailTypes, DetailTypePackageVersionStateChange) {
-		ctx.Logger.Infof("Rule does not have detail type '%s' - checking again in 10 seconds", DetailTypePackageVersionStateChange)
-		return nil, ctx.Requests.ScheduleActionCall(
-			"checkRuleAvailability",
-			map[string]any{},
-			10*time.Second,
-		)
+		return nil, fmt.Errorf("Rule does not have detail type '%s' - checking again in 10 seconds", DetailTypePackageVersionStateChange)
 	}
 
 	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(metadata.Region))

@@ -28,13 +28,45 @@ func (c *NodeRequestContext) ScheduleActionCall(actionName string, parameters ma
 		return err
 	}
 
-	runAt := time.Now().Add(interval)
-	return c.node.CreateRequest(c.tx, models.NodeRequestTypeInvokeAction, models.NodeExecutionRequestSpec{
+	spec := models.NodeExecutionRequestSpec{
 		InvokeAction: &models.InvokeAction{
 			ActionName: actionName,
 			Parameters: parameters,
 		},
-	}, &runAt)
+	}
+
+	retryStrategy := &models.RetryStrategy{
+		Type: models.RetryStrategyTypeConstant,
+		Constant: &models.ConstantRetryStrategy{
+			MaxAttempts: 1,
+			Delay:       interval,
+		},
+	}
+
+	return c.node.CreateRequest(c.tx, models.NodeRequestTypeInvokeAction, spec, retryStrategy)
+}
+
+func (c *NodeRequestContext) ScheduleActionWithRetry(actionName string, parameters map[string]any, interval time.Duration, maxAttempts int) error {
+	if interval < time.Second {
+		return fmt.Errorf("interval must be bigger than 1s")
+	}
+
+	spec := models.NodeExecutionRequestSpec{
+		InvokeAction: &models.InvokeAction{
+			ActionName: actionName,
+			Parameters: parameters,
+		},
+	}
+
+	retryStrategy := &models.RetryStrategy{
+		Type: models.RetryStrategyTypeConstant,
+		Constant: &models.ConstantRetryStrategy{
+			MaxAttempts: maxAttempts,
+			Delay:       interval,
+		},
+	}
+
+	return c.node.CreateRequest(c.tx, models.NodeRequestTypeInvokeAction, spec, retryStrategy)
 }
 
 func (c *NodeRequestContext) completeCurrentRequestForNode() error {

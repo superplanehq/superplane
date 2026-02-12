@@ -286,15 +286,24 @@ func (c *AuthContext) InGroup(group string) (bool, error) {
 }
 
 type RequestContext struct {
-	Duration time.Duration
-	Action   string
-	Params   map[string]any
+	Duration    time.Duration
+	Action      string
+	Params      map[string]any
+	MaxAttempts int
 }
 
 func (c *RequestContext) ScheduleActionCall(action string, params map[string]any, duration time.Duration) error {
 	c.Action = action
 	c.Params = params
 	c.Duration = duration
+	return nil
+}
+
+func (c *RequestContext) ScheduleActionWithRetry(action string, params map[string]any, duration time.Duration, maxAttempts int) error {
+	c.Action = action
+	c.Params = params
+	c.Duration = duration
+	c.MaxAttempts = maxAttempts
 	return nil
 }
 

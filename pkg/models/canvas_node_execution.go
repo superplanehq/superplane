@@ -590,18 +590,25 @@ func ListCanvasEventsForExecutionsInTransaction(tx *gorm.DB, executionIDs []uuid
 	return events, nil
 }
 
-func (e *CanvasNodeExecution) CreateRequest(tx *gorm.DB, reqType string, spec NodeExecutionRequestSpec, runAt *time.Time) error {
+func (e *CanvasNodeExecution) CreateRequest(tx *gorm.DB, reqType string, spec NodeExecutionRequestSpec, retryStrategy *RetryStrategy) error {
+	runAt, err := retryStrategy.NextRunAt()
+	if err != nil {
+		return fmt.Errorf("failed to get next run at: %w", err)
+	}
+
 	return tx.Create(&CanvasNodeRequest{
-		WorkflowID:  e.WorkflowID,
-		NodeID:      e.NodeID,
-		ExecutionID: &e.ID,
-		ID:          uuid.New(),
-		State:       NodeExecutionRequestStatePending,
-		Type:        reqType,
-		Spec:        datatypes.NewJSONType(spec),
-		RunAt:       *runAt,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		WorkflowID:    e.WorkflowID,
+		NodeID:        e.NodeID,
+		ExecutionID:   &e.ID,
+		ID:            uuid.New(),
+		State:         NodeExecutionRequestStatePending,
+		Type:          reqType,
+		Spec:          datatypes.NewJSONType(spec),
+		Attempts:      1,
+		RetryStrategy: datatypes.NewJSONType(*retryStrategy),
+		RunAt:         *runAt,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}).Error
 }
 

@@ -225,6 +225,7 @@ type RequestContext interface {
 	// Allows the scheduling of a certain component action at a later time
 	//
 	ScheduleActionCall(actionName string, parameters map[string]any, interval time.Duration) error
+	ScheduleActionWithRetry(actionName string, parameters map[string]any, interval time.Duration, maxAttempts int) error
 }
 
 /*

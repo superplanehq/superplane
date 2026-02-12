@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,19 +16,47 @@ const (
 
 	NodeExecutionRequestStatePending   = "pending"
 	NodeExecutionRequestStateCompleted = "completed"
+
+	RetryStrategyTypeConstant = "constant"
 )
 
 type CanvasNodeRequest struct {
-	ID          uuid.UUID
-	WorkflowID  uuid.UUID
-	NodeID      string
-	ExecutionID *uuid.UUID
-	State       string
-	Type        string
-	Spec        datatypes.JSONType[NodeExecutionRequestSpec]
-	RunAt       time.Time
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID            uuid.UUID
+	WorkflowID    uuid.UUID
+	NodeID        string
+	ExecutionID   *uuid.UUID
+	State         string
+	Type          string
+	Spec          datatypes.JSONType[NodeExecutionRequestSpec]
+	RetryStrategy datatypes.JSONType[RetryStrategy]
+	Attempts      int
+	RunAt         time.Time
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+type RetryStrategy struct {
+	Type     string
+	Constant *ConstantRetryStrategy
+}
+
+func (r *RetryStrategy) NextRunAt() (*time.Time, error) {
+	switch r.Type {
+	case RetryStrategyTypeConstant:
+		return r.Constant.NextRunAt()
+	}
+
+	return nil, fmt.Errorf("unknown retry type: %s", r.Type)
+}
+
+type ConstantRetryStrategy struct {
+	MaxAttempts int
+	Delay       time.Duration
+}
+
+func (r *ConstantRetryStrategy) NextRunAt() (*time.Time, error) {
+	nextRunAt := time.Now().Add(r.Delay)
+	return &nextRunAt, nil
 }
 
 func (r *CanvasNodeRequest) TableName() string {

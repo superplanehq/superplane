@@ -22,11 +22,43 @@ func (c *ExecutionRequestContext) ScheduleActionCall(actionName string, paramete
 		return fmt.Errorf("interval must be bigger than 1s")
 	}
 
-	runAt := time.Now().Add(interval)
-	return c.execution.CreateRequest(c.tx, models.NodeRequestTypeInvokeAction, models.NodeExecutionRequestSpec{
+	spec := models.NodeExecutionRequestSpec{
 		InvokeAction: &models.InvokeAction{
 			ActionName: actionName,
 			Parameters: parameters,
 		},
-	}, &runAt)
+	}
+
+	retryStrategy := &models.RetryStrategy{
+		Type: models.RetryStrategyTypeConstant,
+		Constant: &models.ConstantRetryStrategy{
+			MaxAttempts: 1,
+			Delay:       interval,
+		},
+	}
+
+	return c.execution.CreateRequest(c.tx, models.NodeRequestTypeInvokeAction, spec, retryStrategy)
+}
+
+func (c *ExecutionRequestContext) ScheduleActionWithRetry(actionName string, parameters map[string]any, interval time.Duration, maxAttempts int) error {
+	if interval < time.Second {
+		return fmt.Errorf("interval must be bigger than 1s")
+	}
+
+	retryStrategy := &models.RetryStrategy{
+		Type: models.RetryStrategyTypeConstant,
+		Constant: &models.ConstantRetryStrategy{
+			MaxAttempts: maxAttempts,
+			Delay:       interval,
+		},
+	}
+
+	spec := models.NodeExecutionRequestSpec{
+		InvokeAction: &models.InvokeAction{
+			ActionName: actionName,
+			Parameters: parameters,
+		},
+	}
+
+	return c.execution.CreateRequest(c.tx, models.NodeRequestTypeInvokeAction, spec, retryStrategy)
 }

@@ -157,7 +157,7 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Can
 
 	_, err = trigger.HandleAction(actionCtx)
 	if err != nil {
-		return fmt.Errorf("action execution failed: %w", err)
+		return w.handleRetryStrategy(tx, request)
 	}
 
 	err = tx.Save(&node).Error
@@ -166,6 +166,31 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Can
 	}
 
 	return request.Complete(tx)
+}
+
+func (w *NodeRequestWorker) handleRetryStrategy(tx *gorm.DB, request *models.CanvasNodeRequest) error {
+	retryStrategy := request.RetryStrategy.Data()
+	if retryStrategy.Type == models.RetryStrategyTypeConstant {
+		return w.handleConstantRetryStrategy(tx, request, retryStrategy.Constant)
+	}
+
+	return fmt.Errorf("unknown retry strategy type: %s", retryStrategy.Type)
+}
+
+func (w *NodeRequestWorker) handleConstantRetryStrategy(tx *gorm.DB, request *models.CanvasNodeRequest, retryStrategy *models.ConstantRetryStrategy) error {
+	if request.Attempts >= retryStrategy.MaxAttempts {
+		w.log("Max attempts reached for request %s - completing", request.ID)
+		return request.Complete(tx)
+	}
+
+	nextRunAt, err := retryStrategy.NextRunAt()
+	if err != nil {
+		return fmt.Errorf("failed to get next run at: %w", err)
+	}
+
+	request.RunAt = *nextRunAt
+	request.Attempts++
+	return tx.Save(request).Error
 }
 
 func (w *NodeRequestWorker) invokeComponentAction(tx *gorm.DB, request *models.CanvasNodeRequest) error {
@@ -228,7 +253,7 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 	actionCtx.Logger = logger
 	err = component.HandleAction(actionCtx)
 	if err != nil {
-		return fmt.Errorf("action execution failed: %w", err)
+		return w.handleRetryStrategy(tx, request)
 	}
 
 	err = tx.Save(&execution).Error
@@ -291,7 +316,7 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request 
 
 	err = component.HandleAction(actionCtx)
 	if err != nil {
-		return fmt.Errorf("action execution failed: %w", err)
+		return w.handleRetryStrategy(tx, request)
 	}
 
 	err = tx.Save(&execution).Error
