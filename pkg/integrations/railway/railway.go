@@ -45,48 +45,11 @@ func (r *Railway) Description() string {
 }
 
 func (r *Railway) Instructions() string {
-	return `## Connect Railway
+	return `Create an API token in Railway and paste it below.
 
-### Creating an API Token
+**Important:** When creating the token, select a **specific workspace** to access its projects. The "No Workspace" option will not work.
 
-1. Go to [Railway Account Settings → Tokens](https://railway.app/account/tokens)
-2. Click **"Create Token"** to generate a new API token
-3. Give your token a descriptive name (e.g., "SuperPlane Integration")
-
-
-### Token Scoping (Important!)
-
-When creating a Railway token, you must select a **specific workspace** to grant access to its projects:
-
-| Scope | Access Level | Use Case |
-|-------|--------------|----------|
-| **Specific Workspace** | Projects in that workspace | **Recommended for SuperPlane** |
-| **No Workspace** | No projects accessible | Not suitable for SuperPlane |
-
-**Important:** Select the **workspace containing your projects** when creating your token. The "No Workspace" option does not provide access to any projects because it lacks a workspace context.
-
-If you have projects in multiple workspaces, you'll need to create separate integrations with tokens scoped to each workspace.
-
-### Permissions
-
-The API token allows SuperPlane to:
-- List your projects, services, and environments
-- Trigger deployments on your services
-- Receive deployment status webhooks
-
-### Webhook Configuration
-
-For the **On Deployment Event** trigger, you'll need to manually configure webhooks in Railway:
-
-1. Create the trigger in SuperPlane and save the canvas
-2. Copy the generated webhook URL from the trigger settings
-3. Go to your Railway project → Settings → Webhooks
-4. Add the webhook URL and select "Deploy" events
-
-### Troubleshooting
-
-- **"Not Authorized" error**: Your token may be scoped to a workspace that doesn't include the project you're trying to access.
-- **Projects not showing**: Make sure your token is scoped to a specific workspace, not "No Workspace". Try disconnecting and reconnecting the integration after creating a new token.`
+[Create Railway Token →](https://railway.com/account/tokens)`
 }
 
 func (r *Railway) Configuration() []configuration.Field {
@@ -97,7 +60,7 @@ func (r *Railway) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
 			Required:    true,
-			Description: "Create a token at railway.app/account/tokens. Select a specific workspace to access its projects.",
+			Description: "Your Railway API token scoped to a workspace",
 			Placeholder: "YOUR RAILWAY API TOKEN",
 		},
 	}
