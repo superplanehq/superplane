@@ -1,9 +1,5 @@
 import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
-import {
-  TRIGGER_BUILD_STATE_REGISTRY,
-  triggerBuildCustomFieldRenderer,
-  triggerBuildMapper,
-} from "./trigger_build";
+import { TRIGGER_BUILD_STATE_REGISTRY, triggerBuildCustomFieldRenderer, triggerBuildMapper } from "./trigger_build";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   triggerBuild: triggerBuildMapper,

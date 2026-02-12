@@ -245,9 +245,7 @@ export const triggerBuildCustomFieldRenderer: CustomFieldRenderer = {
     if (!webhookUrl) {
       return (
         <div className="border-t-1 border-gray-200 pt-4">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Save the canvas to generate the webhook URL.
-          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Save the canvas to generate the webhook URL.</p>
         </div>
       );
     }
@@ -256,9 +254,7 @@ export const triggerBuildCustomFieldRenderer: CustomFieldRenderer = {
       <div className="border-t-1 border-gray-200 pt-4">
         <div className="space-y-3">
           <div>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Jenkins Notification Plugin
-            </span>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Jenkins Notification Plugin</span>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
               Configure the Jenkins Notification Plugin to POST build events to this URL.
             </p>
