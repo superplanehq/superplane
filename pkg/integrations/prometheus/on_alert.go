@@ -139,13 +139,7 @@ func (t *OnAlert) Setup(ctx core.TriggerContext) error {
 		}
 	}
 
-	config := OnAlertConfiguration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-	config = sanitizeOnAlertConfiguration(config)
-
-	if err := validateOnAlertConfiguration(config); err != nil {
+	if _, err := parseAndValidateOnAlertConfiguration(ctx.Configuration); err != nil {
 		return err
 	}
 
@@ -182,13 +176,8 @@ func (t *OnAlert) HandleAction(ctx core.TriggerActionContext) (map[string]any, e
 }
 
 func (t *OnAlert) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	config := OnAlertConfiguration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
-	}
-	config = sanitizeOnAlertConfiguration(config)
-
-	if err := validateOnAlertConfiguration(config); err != nil {
+	config, err := parseAndValidateOnAlertConfiguration(ctx.Configuration)
+	if err != nil {
 		return http.StatusInternalServerError, err
 	}
 
@@ -206,7 +195,6 @@ func (t *OnAlert) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 
 	filteredNames := filterEmpty(config.AlertNames)
 
-	emitted := 0
 	for _, alert := range payload.Alerts {
 		alertStatus := alert.Status
 		if alertStatus == "" {
@@ -225,11 +213,6 @@ func (t *OnAlert) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		if err := ctx.Events.Emit(PrometheusAlertPayloadType, buildAlertPayloadFromAlertmanager(alert, payload)); err != nil {
 			return http.StatusInternalServerError, fmt.Errorf("failed to emit alert event: %w", err)
 		}
-		emitted++
-	}
-
-	if emitted == 0 {
-		return http.StatusOK, nil
 	}
 
 	return http.StatusOK, nil
@@ -324,9 +307,8 @@ func isMissingIntegrationConfigError(err error, name string) bool {
 		return false
 	}
 
-	message := err.Error()
-	return message == fmt.Sprintf("config not found: %s", name) ||
-		message == fmt.Sprintf("config %s not found", name)
+	message := strings.ToLower(strings.TrimSpace(err.Error()))
+	return strings.Contains(message, strings.ToLower(name)) && strings.Contains(message, "not found")
 }
 
 func buildAlertPayloadFromAlertmanager(alert AlertmanagerAlert, payload AlertmanagerWebhookPayload) map[string]any {
@@ -373,6 +355,20 @@ func sanitizeOnAlertConfiguration(config OnAlertConfiguration) OnAlertConfigurat
 	}
 
 	return config
+}
+
+func parseAndValidateOnAlertConfiguration(configuration any) (OnAlertConfiguration, error) {
+	config := OnAlertConfiguration{}
+	if err := mapstructure.Decode(configuration, &config); err != nil {
+		return OnAlertConfiguration{}, fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	config = sanitizeOnAlertConfiguration(config)
+	if err := validateOnAlertConfiguration(config); err != nil {
+		return OnAlertConfiguration{}, err
+	}
+
+	return config, nil
 }
 
 func containsStatus(allowed []string, state string) bool {

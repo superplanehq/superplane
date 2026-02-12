@@ -53,7 +53,7 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 		return nil, status.Error(codes.Internal, "failed to encrypt sensitive configuration")
 	}
 
-	newIntegration, err := models.CreateIntegration(installationID, uuid.MustParse(orgID), integrationName, name, configuration)
+	newIntegration, err := models.CreateIntegration(installationID, org, integrationName, name, configuration)
 	if err != nil {
 		integrationLogger.WithError(err).Error("failed to create integration")
 		return nil, status.Error(codes.Internal, "failed to create integration")
