@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -28,22 +30,26 @@ func (c *NodeRequestContext) ScheduleActionCall(actionName string, parameters ma
 		return err
 	}
 
-	spec := models.NodeExecutionRequestSpec{
-		InvokeAction: &models.InvokeAction{
-			ActionName: actionName,
-			Parameters: parameters,
-		},
+	runAt := time.Now().Add(interval)
+	request := models.CanvasNodeRequest{
+		WorkflowID: c.node.WorkflowID,
+		NodeID:     c.node.NodeID,
+		ID:         uuid.New(),
+		State:      models.NodeExecutionRequestStatePending,
+		Type:       models.NodeRequestTypeInvokeAction,
+		Attempts:   0,
+		RunAt:      runAt,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: actionName,
+				Parameters: parameters,
+			},
+		}),
 	}
 
-	retryStrategy := &models.RetryStrategy{
-		Type: models.RetryStrategyTypeConstant,
-		Constant: &models.ConstantRetryStrategy{
-			MaxAttempts: 1,
-			Delay:       interval,
-		},
-	}
-
-	return c.node.CreateRequest(c.tx, models.NodeRequestTypeInvokeAction, spec, retryStrategy)
+	return c.tx.Create(&request).Error
 }
 
 func (c *NodeRequestContext) ScheduleActionWithRetry(actionName string, parameters map[string]any, interval time.Duration, maxAttempts int) error {
@@ -51,22 +57,36 @@ func (c *NodeRequestContext) ScheduleActionWithRetry(actionName string, paramete
 		return fmt.Errorf("interval must be bigger than 1s")
 	}
 
-	spec := models.NodeExecutionRequestSpec{
-		InvokeAction: &models.InvokeAction{
-			ActionName: actionName,
-			Parameters: parameters,
-		},
+	runAt := time.Now().Add(interval)
+	request := models.CanvasNodeRequest{
+		WorkflowID: c.node.WorkflowID,
+		NodeID:     c.node.NodeID,
+		ID:         uuid.New(),
+		State:      models.NodeExecutionRequestStatePending,
+		Type:       models.NodeRequestTypeInvokeAction,
+		Attempts:   0,
+		RunAt:      runAt,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: actionName,
+				Parameters: parameters,
+			},
+		}),
 	}
 
-	retryStrategy := &models.RetryStrategy{
-		Type: models.RetryStrategyTypeConstant,
-		Constant: &models.ConstantRetryStrategy{
-			MaxAttempts: maxAttempts,
-			Delay:       interval,
-		},
+	if maxAttempts > 1 {
+		request.RetryStrategy = datatypes.NewJSONType(models.RetryStrategy{
+			Type: models.RetryStrategyTypeConstant,
+			Constant: &models.ConstantRetryStrategy{
+				MaxAttempts: maxAttempts,
+				Delay:       int(interval / time.Second),
+			},
+		})
 	}
 
-	return c.node.CreateRequest(c.tx, models.NodeRequestTypeInvokeAction, spec, retryStrategy)
+	return c.tx.Create(&request).Error
 }
 
 func (c *NodeRequestContext) completeCurrentRequestForNode() error {

@@ -79,7 +79,16 @@ func (p *OnPackageVersion) Configuration() []configuration.Field {
 			Required: true,
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: "codeartifact.repository",
+					Type:           "codeartifact.repository",
+					UseNameAsValue: true,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "region",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "region",
+							},
+						},
+					},
 				},
 			},
 		},
@@ -187,14 +196,11 @@ func (p *OnPackageVersion) provisionRule(integration core.IntegrationContext, re
 		return fmt.Errorf("failed to schedule rule provisioning for integration: %w", err)
 	}
 
-	//
-	// Wait at most for 1min for the rule to be available.
-	//
 	return requests.ScheduleActionWithRetry(
 		"checkRuleAvailability",
 		map[string]any{},
-		10*time.Second,
-		6,
+		common.RuleAvailabilityCheckInterval,
+		common.RuleAvailabilityCheckMaxAttempts,
 	)
 }
 

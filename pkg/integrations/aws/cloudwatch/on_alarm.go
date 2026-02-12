@@ -189,10 +189,11 @@ func (p *OnAlarm) provisionRule(integration core.IntegrationContext, requests co
 		return fmt.Errorf("failed to schedule rule provisioning for integration: %w", err)
 	}
 
-	return requests.ScheduleActionCall(
+	return requests.ScheduleActionWithRetry(
 		"checkRuleAvailability",
 		map[string]any{},
-		5*time.Second,
+		common.RuleAvailabilityCheckInterval,
+		common.RuleAvailabilityCheckMaxAttempts,
 	)
 }
 

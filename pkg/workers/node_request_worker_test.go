@@ -486,7 +486,7 @@ func Test__NodeRequestWorker_RetryStrategy_AttemptsExhausted(t *testing.T) {
 			Type: models.RetryStrategyTypeConstant,
 			Constant: &models.ConstantRetryStrategy{
 				MaxAttempts: 2,
-				Delay:       10 * time.Millisecond,
+				Delay:       1,
 			},
 		}),
 		Attempts: 0,

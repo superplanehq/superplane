@@ -3,6 +3,7 @@ package common
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -13,6 +14,15 @@ const (
 	accessKeyIDSecret     = "accessKeyId"
 	secretAccessKeySecret = "secretAccessKey"
 	sessionTokenSecret    = "sessionToken"
+
+	//
+	// This is used by triggers when checking if the
+	// EventBridge rule was provisioned successfully by the integration.
+	//
+	// 10s interval, 30 attempts => we wait at most 5min.
+	//
+	RuleAvailabilityCheckInterval    = 10 * time.Second
+	RuleAvailabilityCheckMaxAttempts = 30
 )
 
 var AllRegions = []configuration.FieldOption{

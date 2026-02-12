@@ -285,27 +285,6 @@ func (c *CanvasNode) FirstQueueItem(tx *gorm.DB) (*CanvasNodeQueueItem, error) {
 	return &queueItem, nil
 }
 
-func (c *CanvasNode) CreateRequest(tx *gorm.DB, reqType string, spec NodeExecutionRequestSpec, retryStrategy *RetryStrategy) error {
-	runAt, err := retryStrategy.NextRunAt()
-	if err != nil {
-		return fmt.Errorf("failed to get next run at: %w", err)
-	}
-
-	return tx.Create(&CanvasNodeRequest{
-		WorkflowID:    c.WorkflowID,
-		NodeID:        c.NodeID,
-		ID:            uuid.New(),
-		State:         NodeExecutionRequestStatePending,
-		Type:          reqType,
-		Spec:          datatypes.NewJSONType(spec),
-		RetryStrategy: datatypes.NewJSONType(*retryStrategy),
-		Attempts:      0,
-		RunAt:         *runAt,
-		CreatedAt:     time.Now(),
-		UpdatedAt:     time.Now(),
-	}).Error
-}
-
 type CanvasNodeQueueItem struct {
 	ID         uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
 	WorkflowID uuid.UUID

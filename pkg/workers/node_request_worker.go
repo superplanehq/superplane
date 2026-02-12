@@ -184,6 +184,12 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Can
 
 func (w *NodeRequestWorker) handleRetryStrategy(tx *gorm.DB, logger *log.Entry, request *models.CanvasNodeRequest, err error) error {
 	retryStrategy := request.RetryStrategy.Data()
+	if retryStrategy.Type == "" {
+		logger.Errorf("Retry strategy type is not specified: %v", err)
+		request.Fail(tx, err.Error())
+		return nil
+	}
+
 	if retryStrategy.Type == models.RetryStrategyTypeConstant {
 		return w.handleConstantRetryStrategy(tx, request, retryStrategy.Constant, logger, err)
 	}

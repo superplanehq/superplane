@@ -41,8 +41,8 @@ type CanvasNodeRequest struct {
 }
 
 type RetryStrategy struct {
-	Type     string
-	Constant *ConstantRetryStrategy
+	Type     string                 `json:"type"`
+	Constant *ConstantRetryStrategy `json:"constant,omitempty"`
 }
 
 func (r *RetryStrategy) NextRunAt() (*time.Time, error) {
@@ -54,13 +54,18 @@ func (r *RetryStrategy) NextRunAt() (*time.Time, error) {
 	return nil, fmt.Errorf("unknown retry type: %s", r.Type)
 }
 
+/*
+ * Constant retry strategy.
+ * Delay is in seconds.
+ */
 type ConstantRetryStrategy struct {
-	MaxAttempts int
-	Delay       time.Duration
+	MaxAttempts int `json:"max_attempts"`
+	Delay       int `json:"delay"`
 }
 
 func (r *ConstantRetryStrategy) NextRunAt() (*time.Time, error) {
-	nextRunAt := time.Now().Add(r.Delay)
+	delay := time.Duration(r.Delay) * time.Second
+	nextRunAt := time.Now().Add(delay)
 	return &nextRunAt, nil
 }
 
