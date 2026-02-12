@@ -1,6 +1,8 @@
 {
+  "deploymentId": "deploy-abc123",
+  "status": "SUCCESS",
+  "url": "https://my-service-production.up.railway.app",
   "project": "proj-xyz789",
   "service": "srv-ghi012",
-  "environment": "env-def456",
-  "triggered": true
+  "environment": "env-def456"
 }
