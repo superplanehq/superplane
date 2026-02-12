@@ -96,6 +96,7 @@ func (i *Cursor) Components() []core.Component {
 	return []core.Component{
 		&LaunchAgent{},
 		&GetDailyUsageData{},
+		&GetLastMessage{},
 	}
 }
 
