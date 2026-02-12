@@ -79,3 +79,24 @@ func ListIntegrationSubscriptions(tx *gorm.DB, installationID uuid.UUID) ([]Node
 
 	return subscriptions, nil
 }
+
+// FindIntegrationSubscriptionByMessageTS finds a subscription by installation_id and message_ts
+// without loading node information. This is useful for webhook handlers that only need
+// the subscription configuration.
+// Note: This function specifically filters for subscriptions with type='button_click'.
+func FindIntegrationSubscriptionByMessageTS(tx *gorm.DB, installationID uuid.UUID, messageTS string) (*IntegrationSubscription, error) {
+	var subscription IntegrationSubscription
+
+	err := tx.
+		Where("installation_id = ?", installationID).
+		Where("configuration->>'message_ts' = ?", messageTS).
+		Where("configuration->>'type' = ?", "button_click").
+		First(&subscription).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &subscription, nil
+}
