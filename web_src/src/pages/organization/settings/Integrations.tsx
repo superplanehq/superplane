@@ -1,4 +1,4 @@
-import { Loader2, Plug } from "lucide-react";
+import { Loader2, Plug, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -31,6 +31,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   const [integrationName, setIntegrationName] = useState("");
   const [configuration, setConfiguration] = useState<Record<string, unknown>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [filterQuery, setFilterQuery] = useState("");
   const canCreateIntegrations = canAct("integrations", "create");
   const canUpdateIntegrations = canAct("integrations", "update");
 
@@ -79,6 +80,27 @@ export function Integrations({ organizationId }: IntegrationsProps) {
         };
       });
   }, [availableIntegrations, connectedInstancesByProvider]);
+  const filteredIntegrationCatalog = useMemo(() => {
+    const normalizedQuery = filterQuery.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return integrationCatalog;
+    }
+
+    return integrationCatalog.filter((item) => {
+      const providerText = [item.providerLabel, item.providerName, item.integrationDef.description]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      if (providerText.includes(normalizedQuery)) {
+        return true;
+      }
+
+      return item.instances.some((instance) =>
+        (instance.metadata?.name || instance.spec?.integrationName || "").toLowerCase().includes(normalizedQuery),
+      );
+    });
+  }, [filterQuery, integrationCatalog]);
 
   const selectedInstructions = useMemo(() => {
     return selectedIntegration?.instructions?.trim();
@@ -151,14 +173,36 @@ export function Integrations({ organizationId }: IntegrationsProps) {
 
   return (
     <div className="pt-6">
-      {integrationCatalog.length === 0 ? (
+      <div className="relative mb-4">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-400" />
+        <Input
+          type="text"
+          value={filterQuery}
+          onChange={(e) => setFilterQuery(e.target.value)}
+          placeholder="Filter integrations..."
+          className="pl-9 pr-9"
+        />
+        {filterQuery.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => setFilterQuery("")}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            aria-label="Clear filter"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        ) : null}
+      </div>
+      {filteredIntegrationCatalog.length === 0 ? (
         <div className="text-center py-12">
           <Plug className="w-6 h-6 text-gray-800 mx-auto mb-2" />
-          <p className="text-sm text-gray-800">No integrations available.</p>
+          <p className="text-sm text-gray-800">
+            {integrationCatalog.length === 0 ? "No integrations available." : "No integrations match your filter."}
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {integrationCatalog.map((item) => {
+          {filteredIntegrationCatalog.map((item) => {
             const connectedCount = item.instances.length;
 
             return (
@@ -184,12 +228,13 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                     message="You don't have permission to connect integrations."
                   >
                     <Button
-                      color="blue"
+                      variant="default"
+                      size="sm"
                       onClick={() => handleConnectClick(item.integrationDef)}
-                      className="text-sm py-1.5 self-start"
+                      className="self-start"
                       disabled={!canCreateIntegrations}
                     >
-                      Connect...
+                      Connect
                     </Button>
                   </PermissionTooltip>
                 </div>
