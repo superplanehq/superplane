@@ -259,6 +259,42 @@ type IncidentEventResponse struct {
 	Data IncidentEventData `json:"data"`
 }
 
+// severityString extracts the severity slug from the API response.
+// Rootly returns severity as a string (slug) or an object with slug/name fields.
+func severityString(v any) string {
+	switch s := v.(type) {
+	case string:
+		return s
+	case map[string]any:
+		if slug, ok := s["slug"].(string); ok {
+			return slug
+		}
+		if name, ok := s["name"].(string); ok {
+			return name
+		}
+	}
+
+	return ""
+}
+
+// incidentFromData converts a JSON:API IncidentData to a flat Incident struct.
+func incidentFromData(data IncidentData) *Incident {
+	return &Incident{
+		ID:           data.ID,
+		SequentialID: data.Attributes.SequentialID,
+		Title:        data.Attributes.Title,
+		Slug:         data.Attributes.Slug,
+		Summary:      data.Attributes.Summary,
+		Status:       data.Attributes.Status,
+		Severity:     severityString(data.Attributes.Severity),
+		StartedAt:    data.Attributes.StartedAt,
+		ResolvedAt:   data.Attributes.ResolvedAt,
+		MitigatedAt:  data.Attributes.MitigatedAt,
+		UpdatedAt:    data.Attributes.UpdatedAt,
+		URL:          data.Attributes.URL,
+	}
+}
+
 // CreateIncidentRequest represents the request to create an incident
 type CreateIncidentRequest struct {
 	Data CreateIncidentData `json:"data"`
@@ -305,58 +341,6 @@ func (c *Client) CreateIncident(title, summary, severity string) (*Incident, err
 	}
 
 	return incidentFromData(response.Data), nil
-}
-
-// CreateIncidentEventRequest represents the request to create an incident event.
-type CreateIncidentEventRequest struct {
-	Data CreateIncidentEventData `json:"data"`
-}
-
-type CreateIncidentEventData struct {
-	Type       string                        `json:"type"`
-	Attributes CreateIncidentEventAttributes `json:"attributes"`
-}
-
-type CreateIncidentEventAttributes struct {
-	Event      string `json:"event"`
-	Visibility string `json:"visibility,omitempty"`
-}
-
-func (c *Client) CreateIncidentEvent(incidentID, event, visibility string) (*IncidentEvent, error) {
-	request := CreateIncidentEventRequest{
-		Data: CreateIncidentEventData{
-			Type: "incident_events",
-			Attributes: CreateIncidentEventAttributes{
-				Event:      event,
-				Visibility: visibility,
-			},
-		},
-	}
-
-	body, err := json.Marshal(request)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling request: %v", err)
-	}
-
-	url := fmt.Sprintf("%s/incidents/%s/events", c.BaseURL, incidentID)
-	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	var response IncidentEventResponse
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	return &IncidentEvent{
-		ID:         response.Data.ID,
-		Event:      response.Data.Attributes.Event,
-		Visibility: response.Data.Attributes.Visibility,
-		OccurredAt: response.Data.Attributes.OccurredAt,
-		CreatedAt:  response.Data.Attributes.CreatedAt,
-	}, nil
 }
 
 // CreateIncidentEventRequest represents the request to create an incident event.
