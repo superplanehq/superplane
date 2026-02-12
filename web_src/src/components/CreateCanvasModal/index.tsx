@@ -262,7 +262,6 @@ export function CreateCanvasModal({
                   </Button>
                 </div>
 
-                
                 {importedSpec && (
                   <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                     <CanvasFormFields
