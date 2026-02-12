@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
 
@@ -111,23 +111,36 @@ func (w *NodeRequestWorker) invokeAction(tx *gorm.DB, request *models.CanvasNode
 func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.CanvasNodeRequest) error {
 	node, err := models.FindCanvasNode(tx, request.WorkflowID, request.NodeID)
 	if err != nil {
-		return fmt.Errorf("node not found: %w", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			request.Fail(tx, err.Error())
+			return nil
+		}
+
+		return fmt.Errorf("failed to find node: %w", err)
 	}
+
+	logger := logging.ForNode(*node)
 
 	trigger, err := w.registry.GetTrigger(node.Ref.Data().Trigger.Name)
 	if err != nil {
-		return fmt.Errorf("trigger not found: %w", err)
+		logger.Errorf("Failure invoking action: failed to find trigger: %v", err)
+		request.Fail(tx, err.Error())
+		return nil
 	}
 
 	spec := request.Spec.Data()
 	if spec.InvokeAction == nil {
-		return fmt.Errorf("spec is not specified")
+		logger.Errorf("Failure invoking action: spec is not specified")
+		request.Fail(tx, "spec is not specified")
+		return nil
 	}
 
 	actionName := spec.InvokeAction.ActionName
 	actionDef := findAction(trigger.Actions(), actionName)
 	if actionDef == nil {
-		return fmt.Errorf("action '%s' not found for trigger '%s'", actionName, trigger.Name())
+		logger.Errorf("Failure invoking action: action '%s' not found for trigger '%s'", actionName, trigger.Name())
+		request.Fail(tx, fmt.Sprintf("action '%s' not found for trigger '%s'", actionName, trigger.Name()))
+		return nil
 	}
 
 	actionCtx := core.TriggerActionContext{
@@ -145,8 +158,9 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Can
 		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				w.log("integration %s not found - completing request", *node.AppInstallationID)
-				return request.Complete(tx)
+				logger.Errorf("Failure invoking action: integration %s not found", *node.AppInstallationID)
+				request.Fail(tx, fmt.Sprintf("integration %s not found", *node.AppInstallationID))
+				return nil
 			}
 
 			return fmt.Errorf("failed to find integration: %v", err)
@@ -157,7 +171,7 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Can
 
 	_, err = trigger.HandleAction(actionCtx)
 	if err != nil {
-		return w.handleRetryStrategy(tx, request)
+		return w.handleRetryStrategy(tx, logger, request, err)
 	}
 
 	err = tx.Save(&node).Error
@@ -165,70 +179,99 @@ func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.Can
 		return fmt.Errorf("error saving node after action handler: %v", err)
 	}
 
-	return request.Complete(tx)
+	return request.Pass(tx)
 }
 
-func (w *NodeRequestWorker) handleRetryStrategy(tx *gorm.DB, request *models.CanvasNodeRequest) error {
+func (w *NodeRequestWorker) handleRetryStrategy(tx *gorm.DB, logger *log.Entry, request *models.CanvasNodeRequest, err error) error {
 	retryStrategy := request.RetryStrategy.Data()
 	if retryStrategy.Type == models.RetryStrategyTypeConstant {
-		return w.handleConstantRetryStrategy(tx, request, retryStrategy.Constant)
+		return w.handleConstantRetryStrategy(tx, request, retryStrategy.Constant, logger, err)
 	}
 
+	logger.Errorf("Unknown retry strategy type: %s", retryStrategy.Type)
 	return fmt.Errorf("unknown retry strategy type: %s", retryStrategy.Type)
 }
 
-func (w *NodeRequestWorker) handleConstantRetryStrategy(tx *gorm.DB, request *models.CanvasNodeRequest, retryStrategy *models.ConstantRetryStrategy) error {
-	if request.Attempts >= retryStrategy.MaxAttempts {
-		w.log("Max attempts reached for request %s - completing", request.ID)
-		return request.Complete(tx)
+func (w *NodeRequestWorker) handleConstantRetryStrategy(tx *gorm.DB, request *models.CanvasNodeRequest, retryStrategy *models.ConstantRetryStrategy, logger *log.Entry, err error) error {
+	attempts := request.Attempts + 1
+
+	logger.Infof("Attempt %d / %d failed for request %s: %v", attempts, retryStrategy.MaxAttempts, request.ID, err)
+
+	if attempts > retryStrategy.MaxAttempts-1 {
+		logger.Errorf("Max attempts reached for request %s - completing: %v", request.ID, err)
+		return request.Fail(tx, fmt.Sprintf("max attempts reached: %v", err))
 	}
 
 	nextRunAt, err := retryStrategy.NextRunAt()
 	if err != nil {
-		return fmt.Errorf("failed to get next run at: %w", err)
+		logger.Errorf("Failed to get next run at for request %s: %v", request.ID, err)
+		return request.Fail(tx, fmt.Sprintf("failed to get next run at: %v", err))
 	}
 
 	request.RunAt = *nextRunAt
-	request.Attempts++
-	return tx.Save(request).Error
+	request.Attempts = attempts
+	err = tx.Save(request).Error
+	if err != nil {
+		return fmt.Errorf("failed to save request: %w", err)
+	}
+
+	logger.Infof("Next run at %s for request %s", nextRunAt.Format(time.RFC3339), request.ID)
+	return nil
 }
 
 func (w *NodeRequestWorker) invokeComponentAction(tx *gorm.DB, request *models.CanvasNodeRequest) error {
 	execution, err := models.FindNodeExecutionInTransaction(tx, request.WorkflowID, *request.ExecutionID)
 	if err != nil {
-		return fmt.Errorf("execution %s not found: %w", request.ExecutionID, err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			request.Fail(tx, fmt.Sprintf("execution %s not found", request.ExecutionID))
+			return nil
+		}
+
+		return fmt.Errorf("failed to find execution: %w", err)
 	}
 
+	logger := logging.ForExecution(execution, nil)
 	if execution.ParentExecutionID == nil {
-		return w.invokeParentNodeComponentAction(tx, request, execution)
+		return w.invokeParentNodeComponentAction(tx, logger, request, execution)
 	}
 
-	return w.invokeChildNodeComponentAction(tx, request, execution)
+	return w.invokeChildNodeComponentAction(tx, logger, request, execution)
 }
 
-func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request *models.CanvasNodeRequest, execution *models.CanvasNodeExecution) error {
+func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, logger *log.Entry, request *models.CanvasNodeRequest, execution *models.CanvasNodeExecution) error {
 	node, err := models.FindCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
-		return fmt.Errorf("node not found: %w", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			request.Fail(tx, fmt.Sprintf("node %s not found", execution.NodeID))
+			return nil
+		}
+
+		logger.Errorf("Failure invoking action: failed to find node: %v", err)
+		return fmt.Errorf("failed to find node: %w", err)
 	}
 
 	component, err := w.registry.GetComponent(node.Ref.Data().Component.Name)
 	if err != nil {
-		return fmt.Errorf("component not found: %w", err)
+		logger.Errorf("Failure invoking action: failed to find component: %v", err)
+		request.Fail(tx, fmt.Sprintf("component %s not found", node.Ref.Data().Component.Name))
+		return nil
 	}
 
 	spec := request.Spec.Data()
 	if spec.InvokeAction == nil {
-		return fmt.Errorf("spec is not specified")
+		logger.Errorf("Failure invoking action: spec is not specified")
+		request.Fail(tx, "spec is not specified")
+		return nil
 	}
 
 	actionName := spec.InvokeAction.ActionName
 	actionDef := findAction(component.Actions(), actionName)
 	if actionDef == nil {
-		return fmt.Errorf("action '%s' not found for component '%s'", actionName, component.Name())
+		logger.Errorf("Failure invoking action: action '%s' not found for component '%s'", actionName, component.Name())
+		request.Fail(tx, fmt.Sprintf("action '%s' not found for component '%s'", actionName, component.Name()))
+		return nil
 	}
 
-	logger := logging.ForExecution(execution, nil)
 	actionCtx := core.ActionContext{
 		Name:           actionName,
 		Configuration:  node.Configuration.Data(),
@@ -243,6 +286,13 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 	if node.AppInstallationID != nil {
 		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				logger.Errorf("Failure invoking action: integration %s not found", *node.AppInstallationID)
+				request.Fail(tx, fmt.Sprintf("integration %s not found", *node.AppInstallationID))
+				return nil
+			}
+
+			logger.Errorf("Failure invoking action: failed to find integration: %v", err)
 			return fmt.Errorf("failed to find integration: %v", err)
 		}
 
@@ -253,7 +303,7 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 	actionCtx.Logger = logger
 	err = component.HandleAction(actionCtx)
 	if err != nil {
-		return w.handleRetryStrategy(tx, request)
+		return w.handleRetryStrategy(tx, logger, request, err)
 	}
 
 	err = tx.Save(&execution).Error
@@ -261,45 +311,70 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 		return fmt.Errorf("error saving execution after action handler: %v", err)
 	}
 
-	return request.Complete(tx)
+	return request.Pass(tx)
 }
 
-func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request *models.CanvasNodeRequest, execution *models.CanvasNodeExecution) error {
+func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, logger *log.Entry, request *models.CanvasNodeRequest, execution *models.CanvasNodeExecution) error {
 	parentExecution, err := models.FindNodeExecutionInTransaction(tx, execution.WorkflowID, *execution.ParentExecutionID)
 	if err != nil {
-		return fmt.Errorf("parent execution %s not found: %w", execution.ParentExecutionID, err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			request.Fail(tx, fmt.Sprintf("parent execution %s not found", execution.ParentExecutionID))
+			return nil
+		}
+
+		logger.Errorf("Failure invoking action: failed to find parent execution: %v", err)
+		return fmt.Errorf("failed to find parent execution: %w", err)
 	}
 
 	parentNode, err := models.FindCanvasNode(tx, execution.WorkflowID, parentExecution.NodeID)
 	if err != nil {
-		return fmt.Errorf("node not found: %w", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			request.Fail(tx, fmt.Sprintf("node %s not found", execution.NodeID))
+			return nil
+		}
+
+		logger.Errorf("Failure invoking action: failed to find node: %v", err)
+		return fmt.Errorf("failed to find node: %w", err)
 	}
 
 	blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, parentNode.Ref.Data().Blueprint.ID)
 	if err != nil {
-		return fmt.Errorf("blueprint not found: %w", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			request.Fail(tx, fmt.Sprintf("blueprint %s not found", parentNode.Ref.Data().Blueprint.ID))
+			return nil
+		}
+
+		logger.Errorf("Failure invoking action: failed to find blueprint: %v", err)
+		return fmt.Errorf("failed to find blueprint: %w", err)
 	}
 
 	childNodeID := strings.Split(execution.NodeID, ":")[1]
 	childNode, err := blueprint.FindNode(childNodeID)
 	if err != nil {
-		return fmt.Errorf("node not found: %w", err)
+		request.Fail(tx, fmt.Sprintf("node %s not found in blueprint", childNodeID))
+		return nil
 	}
 
 	component, err := w.registry.GetComponent(childNode.Ref.Component.Name)
 	if err != nil {
-		return fmt.Errorf("component not found: %w", err)
+		logger.Errorf("Failure invoking action: failed to find component: %v", err)
+		request.Fail(tx, fmt.Sprintf("component %s not found", childNode.Ref.Component.Name))
+		return nil
 	}
 
 	spec := request.Spec.Data()
 	if spec.InvokeAction == nil {
-		return fmt.Errorf("spec is not specified")
+		logger.Errorf("Failure invoking action: spec is not specified")
+		request.Fail(tx, "spec is not specified")
+		return nil
 	}
 
 	actionName := spec.InvokeAction.ActionName
 	actionDef := findAction(component.Actions(), actionName)
 	if actionDef == nil {
-		return fmt.Errorf("action '%s' not found for component '%s'", actionName, component.Name())
+		logger.Errorf("Failure invoking action: action '%s' not found for component '%s'", actionName, component.Name())
+		request.Fail(tx, fmt.Sprintf("action '%s' not found for component '%s'", actionName, component.Name()))
+		return nil
 	}
 
 	actionCtx := core.ActionContext{
@@ -316,7 +391,7 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request 
 
 	err = component.HandleAction(actionCtx)
 	if err != nil {
-		return w.handleRetryStrategy(tx, request)
+		return w.handleRetryStrategy(tx, logger, request, err)
 	}
 
 	err = tx.Save(&execution).Error
@@ -324,7 +399,7 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request 
 		return fmt.Errorf("error saving execution after action handler: %v", err)
 	}
 
-	return request.Complete(tx)
+	return request.Pass(tx)
 }
 
 func (w *NodeRequestWorker) log(format string, v ...any) {

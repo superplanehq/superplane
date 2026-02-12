@@ -2,6 +2,7 @@ package workers
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -76,10 +77,12 @@ func Test__NodeRequestWorker_InvokeTriggerAction(t *testing.T) {
 	//
 	// Verify the request was marked as completed.
 	//
-	var updatedRequest models.CanvasNodeRequest
-	err = database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error
+	updatedRequest, err := models.FindNodeRequest(request.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
+	assert.Equal(t, models.NodeExecutionRequestResultPassed, updatedRequest.Result)
+	assert.Equal(t, 1, updatedRequest.Attempts)
+	assert.Empty(t, updatedRequest.ResultMessage)
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
@@ -164,10 +167,12 @@ func Test__NodeRequestWorker_PreventsConcurrentProcessing(t *testing.T) {
 	//
 	// Verify the request was marked as completed.
 	//
-	var updatedRequest models.CanvasNodeRequest
-	err := database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error
+	updatedRequest, err := models.FindNodeRequest(request.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
+	assert.Equal(t, models.NodeExecutionRequestResultPassed, updatedRequest.Result)
+	assert.Equal(t, 1, updatedRequest.Attempts)
+	assert.Empty(t, updatedRequest.ResultMessage)
 
 	//
 	// Verify that exactly one workflow event was emitted (proving only one worker processed it).
@@ -287,8 +292,17 @@ func Test__NodeRequestWorker_MissingInvokeActionSpec(t *testing.T) {
 	// Process the request and verify it returns an error.
 	//
 	err := worker.LockAndProcessRequest(request)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "spec is not specified")
+	require.NoError(t, err)
+
+	//
+	// Reload request and verify its state.
+	//
+	updatedRequest, err := models.FindNodeRequest(request.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
+	assert.Equal(t, models.NodeExecutionRequestResultFailed, updatedRequest.Result)
+	assert.Equal(t, 1, updatedRequest.Attempts)
+	assert.Contains(t, updatedRequest.ResultMessage, "spec is not specified")
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
@@ -332,7 +346,7 @@ func Test__NodeRequestWorker_NonExistentTrigger(t *testing.T) {
 		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
 			InvokeAction: &models.InvokeAction{
 				ActionName: "emitEvent",
-				Parameters: map[string]interface{}{},
+				Parameters: map[string]any{},
 			},
 		}),
 		State: models.NodeExecutionRequestStatePending,
@@ -343,8 +357,14 @@ func Test__NodeRequestWorker_NonExistentTrigger(t *testing.T) {
 	// Process the request and verify it returns an error.
 	//
 	err := worker.LockAndProcessRequest(request)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "trigger not found")
+	require.NoError(t, err)
+
+	updatedRequest, err := models.FindNodeRequest(request.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
+	assert.Equal(t, models.NodeExecutionRequestResultFailed, updatedRequest.Result)
+	assert.Equal(t, 1, updatedRequest.Attempts)
+	assert.Contains(t, updatedRequest.ResultMessage, "trigger non-existent-trigger not registered")
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
@@ -405,8 +425,101 @@ func Test__NodeRequestWorker_NonExistentAction(t *testing.T) {
 	// Process the request and verify it returns an error.
 	//
 	err := worker.LockAndProcessRequest(request)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "action 'non-existent-action' not found")
+	require.NoError(t, err)
+
+	//
+	// Reload request and verify its state.
+	//
+	updatedRequest, err := models.FindNodeRequest(request.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
+	assert.Equal(t, models.NodeExecutionRequestResultFailed, updatedRequest.Result)
+	assert.Equal(t, 1, updatedRequest.Attempts)
+	assert.Contains(t, updatedRequest.ResultMessage, "action 'non-existent-action' not found")
+
+	assert.False(t, executionConsumer.HasReceivedMessage())
+}
+
+func Test__NodeRequestWorker_RetryStrategy_AttemptsExhausted(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry)
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	executionConsumer.Start()
+	defer executionConsumer.Stop()
+
+	//
+	// Create a schedule trigger node with an invalid configuration to force action failure.
+	//
+	triggerNode := "trigger-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "schedule"}}),
+				Configuration: datatypes.NewJSONType(map[string]interface{}{
+					"type": "days",
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	request := models.CanvasNodeRequest{
+		ID:         uuid.New(),
+		WorkflowID: canvas.ID,
+		NodeID:     triggerNode,
+		Type:       models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: "emitEvent",
+				Parameters: map[string]interface{}{},
+			},
+		}),
+		RetryStrategy: datatypes.NewJSONType(models.RetryStrategy{
+			Type: models.RetryStrategyTypeConstant,
+			Constant: &models.ConstantRetryStrategy{
+				MaxAttempts: 2,
+				Delay:       10 * time.Millisecond,
+			},
+		}),
+		Attempts: 0,
+		RunAt:    time.Now(),
+		State:    models.NodeExecutionRequestStatePending,
+	}
+
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	//
+	// First try, request should remain in pending state.
+	//
+	err := worker.LockAndProcessRequest(request)
+	require.NoError(t, err)
+	updatedRequest, err := models.FindNodeRequest(request.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.NodeExecutionRequestStatePending, updatedRequest.State)
+	assert.Equal(t, 1, updatedRequest.Attempts)
+	assert.Empty(t, updatedRequest.Result)
+	assert.Empty(t, updatedRequest.ResultMessage)
+
+	//
+	// Second try, request should be completed and failed.
+	//
+	time.Sleep(20 * time.Millisecond)
+	err = worker.LockAndProcessRequest(*updatedRequest)
+	require.NoError(t, err)
+	updatedRequest, err = models.FindNodeRequest(request.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
+	assert.Equal(t, models.NodeExecutionRequestResultFailed, updatedRequest.Result)
+	assert.Equal(t, 2, updatedRequest.Attempts)
+	assert.Contains(t, updatedRequest.ResultMessage, "max attempts reached")
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }

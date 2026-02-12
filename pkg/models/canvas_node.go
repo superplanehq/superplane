@@ -299,7 +299,7 @@ func (c *CanvasNode) CreateRequest(tx *gorm.DB, reqType string, spec NodeExecuti
 		Type:          reqType,
 		Spec:          datatypes.NewJSONType(spec),
 		RetryStrategy: datatypes.NewJSONType(*retryStrategy),
-		Attempts:      1,
+		Attempts:      0,
 		RunAt:         *runAt,
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),

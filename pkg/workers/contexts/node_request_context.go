@@ -72,7 +72,7 @@ func (c *NodeRequestContext) ScheduleActionWithRetry(actionName string, paramete
 func (c *NodeRequestContext) completeCurrentRequestForNode() error {
 	request, err := models.FindPendingRequestForNode(c.tx, c.node.WorkflowID, c.node.NodeID)
 	if err == nil {
-		return request.Complete(c.tx)
+		return request.Pass(c.tx)
 	}
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {

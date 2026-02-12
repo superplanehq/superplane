@@ -17,6 +17,9 @@ const (
 	NodeExecutionRequestStatePending   = "pending"
 	NodeExecutionRequestStateCompleted = "completed"
 
+	NodeExecutionRequestResultPassed = "passed"
+	NodeExecutionRequestResultFailed = "failed"
+
 	RetryStrategyTypeConstant = "constant"
 )
 
@@ -26,6 +29,8 @@ type CanvasNodeRequest struct {
 	NodeID        string
 	ExecutionID   *uuid.UUID
 	State         string
+	Result        string
+	ResultMessage string
 	Type          string
 	Spec          datatypes.JSONType[NodeExecutionRequestSpec]
 	RetryStrategy datatypes.JSONType[RetryStrategy]
@@ -109,6 +114,15 @@ func ListNodeRequests() ([]CanvasNodeRequest, error) {
 	return requests, nil
 }
 
+func FindNodeRequest(id uuid.UUID) (*CanvasNodeRequest, error) {
+	var request CanvasNodeRequest
+	err := database.Conn().Where("id = ?", id).First(&request).Error
+	if err != nil {
+		return nil, err
+	}
+	return &request, nil
+}
+
 func FindPendingRequestForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (*CanvasNodeRequest, error) {
 	var request CanvasNodeRequest
 
@@ -127,9 +141,21 @@ func FindPendingRequestForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string)
 	return &request, nil
 }
 
-func (r *CanvasNodeRequest) Complete(tx *gorm.DB) error {
+func (r *CanvasNodeRequest) Pass(tx *gorm.DB) error {
 	return tx.Model(r).
+		Update("attempts", r.Attempts+1).
 		Update("state", NodeExecutionRequestStateCompleted).
+		Update("result", NodeExecutionRequestResultPassed).
+		Update("updated_at", time.Now()).
+		Error
+}
+
+func (r *CanvasNodeRequest) Fail(tx *gorm.DB, message string) error {
+	return tx.Model(r).
+		Update("attempts", r.Attempts+1).
+		Update("state", NodeExecutionRequestStateCompleted).
+		Update("result", NodeExecutionRequestResultFailed).
+		Update("result_message", message).
 		Update("updated_at", time.Now()).
 		Error
 }

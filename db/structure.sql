@@ -473,7 +473,11 @@ CREATE TABLE public.workflow_node_requests (
     run_at timestamp without time zone NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    node_id character varying(128) NOT NULL
+    node_id character varying(128) NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    retry_strategy jsonb DEFAULT '{}'::jsonb NOT NULL,
+    result character varying(32),
+    result_message text
 );
 
 
@@ -1515,7 +1519,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260212033945	f
+20260212213444	f
 \.
 
 
