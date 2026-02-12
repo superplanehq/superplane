@@ -1,15 +1,13 @@
 {
     "type": "rootly.incident",
     "data": {
-        "incident": {
-            "id": "abc123-def456",
-            "title": "Database connection issues",
-            "summary": "Users are experiencing slow database queries and connection timeouts.",
-            "status": "started",
-            "severity": "sev1",
-            "started_at": "2026-01-19T12:00:00Z",
-            "url": "https://app.rootly.com/incidents/abc123-def456"
-        }
+        "id": "abc123-def456",
+        "title": "Database connection issues",
+        "summary": "Users are experiencing slow database queries and connection timeouts.",
+        "status": "started",
+        "severity": "sev1",
+        "started_at": "2026-01-19T12:00:00Z",
+        "url": "https://app.rootly.com/incidents/abc123-def456"
     },
     "timestamp": "2026-01-19T12:00:00Z"
 }
