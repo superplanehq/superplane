@@ -112,7 +112,7 @@ import {
   customFieldRenderers as railwayCustomFieldRenderers,
   eventStateRegistry as railwayEventStateRegistry,
 } from "./railway/index";
-import{
+import {
   componentMappers as cursorComponentMappers,
   triggerRenderers as cursorTriggerRenderers,
   eventStateRegistry as cursorEventStateRegistry,
