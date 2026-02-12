@@ -15,9 +15,8 @@ import (
 type OnMergeRequest struct{}
 
 type OnMergeRequestConfiguration struct {
-	Project string                    `json:"project" mapstructure:"project"`
-	Actions []string                  `json:"actions" mapstructure:"actions"`
-	Labels  []configuration.Predicate `json:"labels" mapstructure:"labels"`
+	Project string   `json:"project" mapstructure:"project"`
+	Actions []string `json:"actions" mapstructure:"actions"`
 }
 
 func (m *OnMergeRequest) Name() string {
@@ -39,11 +38,10 @@ func (m *OnMergeRequest) Documentation() string {
 
 - **Project** (required): GitLab project to monitor
 - **Actions** (required): Select which merge request actions to listen for (open, close, merge, etc.). Default: open.
-- **Labels** (optional): Only trigger for merge requests with specific labels
 
 ## Outputs
 
-- **Default channel**: Emits merge request payload data with action, project, labels, and object attributes`
+- **Default channel**: Emits merge request payload data with action, project, and object attributes`
 }
 
 func (m *OnMergeRequest) Icon() string {
@@ -86,17 +84,6 @@ func (m *OnMergeRequest) Configuration() []configuration.Field {
 						{Label: "Unapproved", Value: "unapproved"},
 						{Label: "Merged", Value: "merge"},
 					},
-				},
-			},
-		},
-		{
-			Name:     "labels",
-			Label:    "Labels",
-			Type:     configuration.FieldTypeAnyPredicateList,
-			Required: false,
-			TypeOptions: &configuration.TypeOptions{
-				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
-					Operators: configuration.AllPredicateOperators,
 				},
 			},
 		},
@@ -156,10 +143,6 @@ func (m *OnMergeRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 		return http.StatusOK, nil
 	}
 
-	if len(config.Labels) > 0 && !m.hasWhitelistedLabel(ctx.Logger, data, config.Labels) {
-		return http.StatusOK, nil
-	}
-
 	if err := ctx.Events.Emit("gitlab.mergeRequest", data); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
 	}
@@ -188,45 +171,4 @@ func (m *OnMergeRequest) whitelistedAction(logger *log.Entry, data map[string]an
 	}
 
 	return true
-}
-
-func parseWebhookLabelNames(labels any) []string {
-	rawLabels, ok := labels.([]any)
-	if !ok {
-		return []string{}
-	}
-
-	names := make([]string, 0, len(rawLabels))
-	for _, label := range rawLabels {
-		switch l := label.(type) {
-		case string:
-			names = append(names, l)
-		case map[string]any:
-			if title, ok := l["title"].(string); ok {
-				names = append(names, title)
-			}
-		}
-	}
-
-	return names
-}
-
-func (m *OnMergeRequest) hasWhitelistedLabel(logger *log.Entry, data map[string]any, allowedLabels []configuration.Predicate) bool {
-	labelNames := parseWebhookLabelNames(data["labels"])
-
-	if len(labelNames) == 0 {
-		attrs, ok := data["object_attributes"].(map[string]any)
-		if ok {
-			labelNames = parseWebhookLabelNames(attrs["labels"])
-		}
-	}
-
-	for _, labelName := range labelNames {
-		if configuration.MatchesAnyPredicate(allowedLabels, labelName) {
-			return true
-		}
-	}
-
-	logger.Infof("Labels do not match the allowed list: Received: %v, Allowed: %v", labelNames, allowedLabels)
-	return false
 }

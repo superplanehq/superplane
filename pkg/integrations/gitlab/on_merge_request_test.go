@@ -7,7 +7,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -58,16 +57,13 @@ func Test__OnMergeRequest__HandleWebhook__InvalidToken(t *testing.T) {
 	assert.ErrorContains(t, err, "invalid webhook token")
 }
 
-func Test__OnMergeRequest__HandleWebhook__ActionAndLabelMatch(t *testing.T) {
+func Test__OnMergeRequest__HandleWebhook__ActionMatch(t *testing.T) {
 	trigger := &OnMergeRequest{}
 
 	body, _ := json.Marshal(map[string]any{
 		"object_attributes": map[string]any{
 			"action": "open",
 			"title":  "New MR",
-		},
-		"labels": []map[string]any{
-			{"title": "backend"},
 		},
 	})
 
@@ -78,9 +74,6 @@ func Test__OnMergeRequest__HandleWebhook__ActionAndLabelMatch(t *testing.T) {
 		Configuration: map[string]any{
 			"project": "123",
 			"actions": []string{"open"},
-			"labels": []configuration.Predicate{
-				{Type: configuration.PredicateTypeEquals, Value: "backend"},
-			},
 		},
 		Webhook: &contexts.WebhookContext{Secret: "token"},
 		Events:  events,
