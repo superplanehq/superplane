@@ -39,7 +39,8 @@ export const onDeploymentEventTriggerRenderer: TriggerRenderer = {
     const serviceName = eventData?.resource?.service?.name || "Service";
     const status = eventData?.details?.status || "";
     const timeAgo = context.event?.createdAt ? formatTimeAgo(new Date(context.event?.createdAt)) : "";
-    const subtitle = status && timeAgo ? `${status.toLowerCase()} · ${timeAgo}` : status.toLowerCase() || timeAgo;
+    const subtitle =
+      status && timeAgo ? `${status.toLowerCase()} · ${timeAgo}` : status.toLowerCase() || timeAgo;
 
     return {
       title: `${serviceName} deployment`,
@@ -50,9 +51,7 @@ export const onDeploymentEventTriggerRenderer: TriggerRenderer = {
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as OnDeploymentEventData;
     const resource = eventData?.resource;
-    const receivedAt = context.event?.createdAt
-      ? new Date(context.event?.createdAt).toLocaleString()
-      : "";
+    const receivedAt = context.event?.createdAt ? new Date(context.event?.createdAt).toLocaleString() : "";
 
     // Build Railway deployment URL
     const projectId = resource?.project?.id;
@@ -108,7 +107,8 @@ export const onDeploymentEventTriggerRenderer: TriggerRenderer = {
       const serviceName = eventData?.resource?.service?.name || "Service";
       const status = eventData?.details?.status || "";
       const timeAgo = lastEvent.createdAt ? formatTimeAgo(new Date(lastEvent.createdAt)) : "";
-      const subtitle = status && timeAgo ? `${status.toLowerCase()} · ${timeAgo}` : status.toLowerCase() || timeAgo;
+      const subtitle =
+        status && timeAgo ? `${status.toLowerCase()} · ${timeAgo}` : status.toLowerCase() || timeAgo;
 
       props.lastEventData = {
         title: `${serviceName} deployment`,
