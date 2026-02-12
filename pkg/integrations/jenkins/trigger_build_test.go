@@ -1,6 +1,7 @@
 package jenkins
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -133,6 +134,7 @@ func Test__TriggerBuild__Setup(t *testing.T) {
 			HTTP:        httpContext,
 			Integration: appCtx,
 			Metadata:    metadataCtx,
+			Webhook:     &contexts.WebhookContext{},
 			Configuration: map[string]any{
 				"job": "my-job",
 			},
@@ -143,6 +145,7 @@ func Test__TriggerBuild__Setup(t *testing.T) {
 		metadata, ok := metadataCtx.Metadata.(TriggerBuildNodeMetadata)
 		require.True(t, ok)
 		assert.Equal(t, "my-job", metadata.Job.Name)
+		assert.NotEmpty(t, metadata.WebhookURL)
 	})
 
 	t.Run("already set up for same job -> no-op", func(t *testing.T) {
@@ -156,7 +159,8 @@ func Test__TriggerBuild__Setup(t *testing.T) {
 
 		metadataCtx := &contexts.MetadataContext{
 			Metadata: TriggerBuildNodeMetadata{
-				Job: &JobInfo{Name: "my-job", URL: "https://jenkins.example.com/job/my-job/"},
+				Job:        &JobInfo{Name: "my-job", URL: "https://jenkins.example.com/job/my-job/"},
+				WebhookURL: "http://localhost:3000/api/v1/webhooks/test-id",
 			},
 		}
 
@@ -223,6 +227,7 @@ func Test__TriggerBuild__Execute(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, int64(42), metadata.QueueItemID)
 		assert.Equal(t, "42", execState.KVs["queueItem"])
+		assert.Equal(t, "my-job", execState.KVs["buildJob"])
 		assert.Equal(t, "poll", reqCtx.Action)
 	})
 
@@ -479,6 +484,171 @@ func Test__TriggerBuild__Poll(t *testing.T) {
 			Requests:       &contexts.RequestContext{},
 		})
 
+		require.NoError(t, err)
+		assert.True(t, execState.Finished)
+		assert.Equal(t, FailedOutputChannel, execState.Channel)
+	})
+}
+
+func Test__TriggerBuild__HandleWebhook(t *testing.T) {
+	component := TriggerBuild{}
+
+	buildWebhookBody := func(name, phase, status string, number int64) []byte {
+		payload := map[string]any{
+			"name": name,
+			"url":  "job/" + name + "/",
+			"build": map[string]any{
+				"full_url": "http://jenkins.example.com/job/" + name + "/1/",
+				"number":   number,
+				"phase":    phase,
+				"status":   status,
+				"url":      "job/" + name + "/1/",
+			},
+		}
+		body, _ := json.Marshal(payload)
+		return body
+	}
+
+	t.Run("invalid json -> bad request", func(t *testing.T) {
+		status, err := component.HandleWebhook(core.WebhookRequestContext{
+			Body: []byte("not json"),
+		})
+
+		assert.Equal(t, http.StatusBadRequest, status)
+		require.Error(t, err)
+	})
+
+	t.Run("no build field -> ok ignored", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]any{"name": "my-job"})
+		status, err := component.HandleWebhook(core.WebhookRequestContext{
+			Body: body,
+		})
+
+		assert.Equal(t, http.StatusOK, status)
+		require.NoError(t, err)
+	})
+
+	t.Run("non-terminal phase -> ok ignored", func(t *testing.T) {
+		body := buildWebhookBody("my-job", "STARTED", "", 1)
+		status, err := component.HandleWebhook(core.WebhookRequestContext{
+			Body: body,
+		})
+
+		assert.Equal(t, http.StatusOK, status)
+		require.NoError(t, err)
+	})
+
+	t.Run("no matching execution -> ok ignored", func(t *testing.T) {
+		body := buildWebhookBody("my-job", "COMPLETED", "SUCCESS", 1)
+		status, err := component.HandleWebhook(core.WebhookRequestContext{
+			Body: body,
+			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+				return nil, nil
+			},
+		})
+
+		assert.Equal(t, http.StatusOK, status)
+		require.NoError(t, err)
+	})
+
+	t.Run("already finished execution -> ok ignored", func(t *testing.T) {
+		body := buildWebhookBody("my-job", "COMPLETED", "SUCCESS", 1)
+		status, err := component.HandleWebhook(core.WebhookRequestContext{
+			Body: body,
+			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+				return &core.ExecutionContext{
+					ExecutionState: &contexts.ExecutionStateContext{Finished: true},
+				}, nil
+			},
+		})
+
+		assert.Equal(t, http.StatusOK, status)
+		require.NoError(t, err)
+	})
+
+	t.Run("build succeeded -> emit passed", func(t *testing.T) {
+		body := buildWebhookBody("my-job", "COMPLETED", "SUCCESS", 5)
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: TriggerBuildExecutionMetadata{
+				Job:         &JobInfo{Name: "my-job", URL: "https://jenkins.example.com/job/my-job/"},
+				QueueItemID: 42,
+			},
+		}
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+		status, err := component.HandleWebhook(core.WebhookRequestContext{
+			Body: body,
+			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+				assert.Equal(t, buildJobKey, key)
+				assert.Equal(t, "my-job", value)
+				return &core.ExecutionContext{
+					Metadata:       metadataCtx,
+					ExecutionState: execState,
+				}, nil
+			},
+		})
+
+		assert.Equal(t, http.StatusOK, status)
+		require.NoError(t, err)
+		assert.True(t, execState.Finished)
+		assert.Equal(t, PassedOutputChannel, execState.Channel)
+		assert.Equal(t, PayloadType, execState.Type)
+
+		updatedMetadata, ok := metadataCtx.Metadata.(TriggerBuildExecutionMetadata)
+		require.True(t, ok)
+		require.NotNil(t, updatedMetadata.Build)
+		assert.Equal(t, int64(5), updatedMetadata.Build.Number)
+		assert.Equal(t, "SUCCESS", updatedMetadata.Build.Result)
+		assert.False(t, updatedMetadata.Build.Building)
+	})
+
+	t.Run("build failed -> emit failed", func(t *testing.T) {
+		body := buildWebhookBody("my-job", "COMPLETED", "FAILURE", 6)
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: TriggerBuildExecutionMetadata{
+				Job:         &JobInfo{Name: "my-job", URL: "https://jenkins.example.com/job/my-job/"},
+				QueueItemID: 42,
+			},
+		}
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+		status, err := component.HandleWebhook(core.WebhookRequestContext{
+			Body: body,
+			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+				return &core.ExecutionContext{
+					Metadata:       metadataCtx,
+					ExecutionState: execState,
+				}, nil
+			},
+		})
+
+		assert.Equal(t, http.StatusOK, status)
+		require.NoError(t, err)
+		assert.True(t, execState.Finished)
+		assert.Equal(t, FailedOutputChannel, execState.Channel)
+	})
+
+	t.Run("build unstable -> emit failed", func(t *testing.T) {
+		body := buildWebhookBody("my-job", "FINALIZED", "UNSTABLE", 7)
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: TriggerBuildExecutionMetadata{
+				Job:         &JobInfo{Name: "my-job", URL: "https://jenkins.example.com/job/my-job/"},
+				QueueItemID: 42,
+			},
+		}
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+		status, err := component.HandleWebhook(core.WebhookRequestContext{
+			Body: body,
+			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+				return &core.ExecutionContext{
+					Metadata:       metadataCtx,
+					ExecutionState: execState,
+				}, nil
+			},
+		})
+
+		assert.Equal(t, http.StatusOK, status)
 		require.NoError(t, err)
 		assert.True(t, execState.Finished)
 		assert.Equal(t, FailedOutputChannel, execState.Channel)

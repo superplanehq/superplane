@@ -1,6 +1,7 @@
 package jenkins
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -18,6 +19,7 @@ const (
 	BuildResultSuccess  = "SUCCESS"
 	PollInterval        = 1 * time.Minute
 	QueuePollInterval   = 15 * time.Second
+	buildJobKey         = "buildJob"
 )
 
 type TriggerBuild struct{}
@@ -33,7 +35,8 @@ type Parameter struct {
 }
 
 type TriggerBuildNodeMetadata struct {
-	Job *JobInfo `json:"job" mapstructure:"job"`
+	Job        *JobInfo `json:"job" mapstructure:"job"`
+	WebhookURL string   `json:"webhookUrl,omitempty" mapstructure:"webhookUrl"`
 }
 
 type TriggerBuildExecutionMetadata struct {
@@ -52,6 +55,21 @@ type BuildInfo struct {
 	URL      string `json:"url"`
 	Result   string `json:"result"`
 	Building bool   `json:"building"`
+}
+
+// webhookPayload represents the Jenkins Notification Plugin payload.
+type webhookPayload struct {
+	Name  string        `json:"name"`
+	URL   string        `json:"url"`
+	Build *webhookBuild `json:"build"`
+}
+
+type webhookBuild struct {
+	FullURL string `json:"full_url"`
+	Number  int64  `json:"number"`
+	Phase   string `json:"phase"`
+	Status  string `json:"status"`
+	URL     string `json:"url"`
 }
 
 func (t *TriggerBuild) Name() string {
@@ -78,7 +96,7 @@ func (t *TriggerBuild) Documentation() string {
 ## How It Works
 
 1. Triggers the specified Jenkins job with optional parameters
-2. Waits for the build to complete (monitored via polling)
+2. Waits for the build to complete (via webhook from Jenkins Notification Plugin, with polling as fallback)
 3. Routes execution based on build result:
    - **Passed channel**: Build completed with SUCCESS
    - **Failed channel**: Build failed, was unstable, or was aborted
@@ -179,8 +197,8 @@ func (t *TriggerBuild) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	// If already set up for the same job, nothing to do.
-	if metadata.Job != nil && metadata.Job.Name == spec.Job {
+	// If already set up for the same job, skip re-setup.
+	if metadata.Job != nil && metadata.Job.Name == spec.Job && metadata.WebhookURL != "" {
 		return nil
 	}
 
@@ -194,11 +212,17 @@ func (t *TriggerBuild) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error finding job %s: %v", spec.Job, err)
 	}
 
+	webhookURL, err := ctx.Webhook.Setup()
+	if err != nil {
+		return err
+	}
+
 	return ctx.Metadata.Set(TriggerBuildNodeMetadata{
 		Job: &JobInfo{
 			Name: job.FullName,
 			URL:  job.URL,
 		},
+		WebhookURL: webhookURL,
 	})
 }
 
@@ -241,6 +265,11 @@ func (t *TriggerBuild) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	if err := ctx.ExecutionState.SetKV(buildJobKey, spec.Job); err != nil {
+		return err
+	}
+
+	// Wait for webhook from Jenkins Notification Plugin; poll as fallback.
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, QueuePollInterval)
 }
 
@@ -249,6 +278,74 @@ func (t *TriggerBuild) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (t *TriggerBuild) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	payload := webhookPayload{}
+	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
+		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %w", err)
+	}
+
+	if payload.Build == nil {
+		return http.StatusOK, nil
+	}
+
+	if payload.Build.Phase != "COMPLETED" && payload.Build.Phase != "FINALIZED" {
+		return http.StatusOK, nil
+	}
+
+	if payload.Name == "" || ctx.FindExecutionByKV == nil {
+		return http.StatusOK, nil
+	}
+
+	executionCtx, err := ctx.FindExecutionByKV(buildJobKey, payload.Name)
+	if err != nil {
+		return http.StatusOK, nil
+	}
+	if executionCtx == nil {
+		return http.StatusOK, nil
+	}
+
+	if executionCtx.ExecutionState.IsFinished() {
+		return http.StatusOK, nil
+	}
+
+	metadata := TriggerBuildExecutionMetadata{}
+	if err := mapstructure.Decode(executionCtx.Metadata.Get(), &metadata); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error decoding metadata: %w", err)
+	}
+
+	metadata.Build = &BuildInfo{
+		Number:   payload.Build.Number,
+		URL:      payload.Build.FullURL,
+		Result:   payload.Build.Status,
+		Building: false,
+	}
+
+	if err := executionCtx.Metadata.Set(metadata); err != nil {
+		return http.StatusInternalServerError, err
+	}
+
+	emitPayload := map[string]any{
+		"job": map[string]any{
+			"name": payload.Name,
+			"url":  metadata.Job.URL,
+		},
+		"build": map[string]any{
+			"number": payload.Build.Number,
+			"url":    payload.Build.FullURL,
+			"result": payload.Build.Status,
+		},
+	}
+
+	if payload.Build.Status == BuildResultSuccess {
+		if err := executionCtx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{emitPayload}); err != nil {
+			return http.StatusInternalServerError, err
+		}
+		return http.StatusOK, nil
+	}
+
+	if err := executionCtx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{emitPayload}); err != nil {
+		return http.StatusInternalServerError, err
+	}
+
 	return http.StatusOK, nil
 }
 

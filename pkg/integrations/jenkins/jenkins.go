@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegration("jenkins", &Jenkins{})
+	registry.RegisterIntegrationWithWebhookHandler("jenkins", &Jenkins{}, &JenkinsWebhookHandler{})
 }
 
 type Jenkins struct{}
@@ -105,6 +105,18 @@ func (j *Jenkins) Sync(ctx core.SyncContext) error {
 	_, err = client.GetServerInfo()
 	if err != nil {
 		return fmt.Errorf("error verifying credentials: %v", err)
+	}
+
+	// Store the webhooks base URL in integration metadata so that
+	// the integration details page can display the webhook URL
+	// once a component requests a webhook.
+	if ctx.WebhooksBaseURL != "" {
+		metadata, _ := ctx.Integration.GetMetadata().(map[string]any)
+		if metadata == nil {
+			metadata = map[string]any{}
+		}
+		metadata["webhooksBaseURL"] = ctx.WebhooksBaseURL
+		ctx.Integration.SetMetadata(metadata)
 	}
 
 	ctx.Integration.Ready()

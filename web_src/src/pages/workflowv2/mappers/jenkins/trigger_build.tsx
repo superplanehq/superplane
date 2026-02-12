@@ -1,6 +1,8 @@
+import { useState } from "react";
 import {
   ComponentBaseContext,
   ComponentBaseMapper,
+  CustomFieldRenderer,
   EventStateRegistry,
   ExecutionDetailsContext,
   ExecutionInfo,
@@ -20,10 +22,16 @@ import {
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
 import { getTriggerRenderer } from "..";
+import { Icon } from "@/components/Icon";
+import { showErrorToast } from "@/utils/toast";
 import jenkinsIcon from "@/assets/icons/integrations/jenkins.svg";
 import { formatTimeAgo } from "@/utils/date";
 import { CanvasesCanvasNodeExecution } from "@/api-client";
 
+interface NodeMetadata {
+  job?: { name: string; url: string };
+  webhookUrl?: string;
+}
 interface ExecutionMetadata {
   job?: {
     name: string;
@@ -188,12 +196,12 @@ function triggerBuildSpecs(node: NodeInfo): ComponentBaseSpec[] {
       values: parameters.map((param) => ({
         badges: [
           {
-            label: param.name,
+            label: param.name || "",
             bgColor: "bg-purple-100",
             textColor: "text-purple-800",
           },
           {
-            label: param.value,
+            label: param.value || "",
             bgColor: "bg-gray-100",
             textColor: "text-gray-800",
           },
@@ -204,6 +212,76 @@ function triggerBuildSpecs(node: NodeInfo): ComponentBaseSpec[] {
 
   return specs;
 }
+
+const CopyCodeButton: React.FC<{ code: string }> = ({ code }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (_err) {
+      showErrorToast("Failed to copy text");
+    }
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity p-1 bg-white outline-1 outline-black/20 hover:outline-black/30 rounded text-gray-600 dark:text-gray-400"
+      title={copied ? "Copied!" : "Copy to clipboard"}
+    >
+      <Icon name={copied ? "check" : "copy"} size="sm" />
+    </button>
+  );
+};
+
+export const triggerBuildCustomFieldRenderer: CustomFieldRenderer = {
+  render: (node: NodeInfo) => {
+    const metadata = node.metadata as NodeMetadata | undefined;
+    const webhookUrl = metadata?.webhookUrl;
+
+    if (!webhookUrl) {
+      return (
+        <div className="border-t-1 border-gray-200 pt-4">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Save the canvas to generate the webhook URL.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="border-t-1 border-gray-200 pt-4">
+        <div className="space-y-3">
+          <div>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Jenkins Notification Plugin
+            </span>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Configure the Jenkins Notification Plugin to POST build events to this URL.
+            </p>
+            <div className="mt-3">
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                Webhook URL
+              </label>
+              <div className="relative group mt-1">
+                <input
+                  type="text"
+                  value={webhookUrl}
+                  readOnly
+                  className="w-full text-xs text-gray-800 dark:text-gray-100 mt-1 border-1 border-orange-950/20 px-2.5 py-2 bg-orange-50 dark:bg-amber-800 rounded-md font-mono"
+                />
+                <CopyCodeButton code={webhookUrl} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  },
+};
 
 function triggerBuildEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] | undefined {
   if (!execution) {
