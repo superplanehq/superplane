@@ -19,10 +19,21 @@ var exampleOutputListIssuesBytes []byte
 var exampleOutputListIssuesOnce sync.Once
 var exampleOutputListIssues map[string]any
 
+//go:embed example_output_send_log_event.json
+var exampleOutputSendLogEventBytes []byte
+
+var exampleOutputSendLogEventOnce sync.Once
+var exampleOutputSendLogEvent map[string]any
+
 func (c *QueryPrometheus) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryPrometheusOnce, exampleOutputQueryPrometheusBytes, &exampleOutputQueryPrometheus)
 }
 
 func (c *ListIssues) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputListIssuesOnce, exampleOutputListIssuesBytes, &exampleOutputListIssues)
+}
+
+// ExampleOutput returns sample output data for Send Log Event.
+func (c *SendLogEvent) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputSendLogEventOnce, exampleOutputSendLogEventBytes, &exampleOutputSendLogEvent)
 }
