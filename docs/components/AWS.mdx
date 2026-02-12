@@ -18,6 +18,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="CloudWatch • Query Metrics Insights" href="#cloud-watch-•-query-metrics-insights" description="Run a CloudWatch Metrics Insights query against AWS metrics" />
   <LinkCard title="CodeArtifact • Copy Package Versions" href="#code-artifact-•-copy-package-versions" description="Copy package versions from one repository to another in the same domain" />
   <LinkCard title="CodeArtifact • Create Repository" href="#code-artifact-•-create-repository" description="Create an AWS CodeArtifact repository in a domain" />
   <LinkCard title="CodeArtifact • Delete Package Versions" href="#code-artifact-•-delete-package-versions" description="Permanently delete one or more package versions from a repository" />
@@ -259,6 +260,57 @@ Each image scan event includes:
   },
   "timestamp": "2026-03-10T14:25:30.31254162Z",
   "type": "aws.ecr.image.scan"
+}
+```
+
+<a id="cloud-watch-•-query-metrics-insights"></a>
+
+## CloudWatch • Query Metrics Insights
+
+The Query Metrics Insights component runs a CloudWatch Metrics Insights query using the GetMetricData API.
+
+### Use Cases
+
+- **Observability automation**: Query current metric trends during workflows
+- **SLO checks**: Evaluate key service metrics before progressing a deployment
+- **Incident response**: Pull grouped metric views to enrich notifications
+
+### Configuration
+
+- **Region**: AWS region where the metrics are stored
+- **Metrics Insights Query**: SQL-like query in CloudWatch Metrics Insights syntax
+- **Lookback Window (minutes)**: Relative time window ending at execution time
+- **Max Datapoints**: Maximum datapoints returned by CloudWatch
+- **Result Order**: Timestamp ascending or descending order
+
+### Example Output
+
+```json
+{
+  "endTime": "2026-02-12T10:15:00Z",
+  "maxDatapoints": 1000,
+  "messages": [],
+  "query": "SELECT AVG(CPUUtilization) FROM SCHEMA(\"AWS/EC2\", InstanceId) GROUP BY InstanceId",
+  "region": "us-east-1",
+  "requestId": "0f0a2432-ef2b-4ff2-a89f-021f6d77fbde",
+  "results": [
+    {
+      "id": "q1",
+      "label": "CPUUtilization",
+      "messages": [],
+      "statusCode": "Complete",
+      "timestamps": [
+        "2026-02-12T10:10:00Z",
+        "2026-02-12T10:05:00Z"
+      ],
+      "values": [
+        14.2,
+        11.8
+      ]
+    }
+  ],
+  "scanBy": "TimestampDescending",
+  "startTime": "2026-02-12T10:00:00Z"
 }
 ```
 

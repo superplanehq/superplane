@@ -1,0 +1,26 @@
+{
+  "endTime": "2026-02-12T10:15:00Z",
+  "maxDatapoints": 1000,
+  "messages": [],
+  "query": "SELECT AVG(CPUUtilization) FROM SCHEMA(\"AWS/EC2\", InstanceId) GROUP BY InstanceId",
+  "region": "us-east-1",
+  "requestId": "0f0a2432-ef2b-4ff2-a89f-021f6d77fbde",
+  "results": [
+    {
+      "id": "q1",
+      "label": "CPUUtilization",
+      "messages": [],
+      "statusCode": "Complete",
+      "timestamps": [
+        "2026-02-12T10:10:00Z",
+        "2026-02-12T10:05:00Z"
+      ],
+      "values": [
+        14.2,
+        11.8
+      ]
+    }
+  ],
+  "scanBy": "TimestampDescending",
+  "startTime": "2026-02-12T10:00:00Z"
+}
