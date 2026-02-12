@@ -44,7 +44,7 @@ func Test__OnDeploymentEvent__HandleWebhook(t *testing.T) {
 
 	t.Run("deployment event with no status filter -> event is emitted", func(t *testing.T) {
 		body := []byte(`{
-			"type": "Deployment.succeeded",
+			"type": "Deployment.deployed",
 			"details": {
 				"status": "SUCCESS"
 			},
@@ -73,7 +73,7 @@ func Test__OnDeploymentEvent__HandleWebhook(t *testing.T) {
 
 	t.Run("deployment event matching status filter -> event is emitted", func(t *testing.T) {
 		body := []byte(`{
-			"type": "Deployment.succeeded",
+			"type": "Deployment.deployed",
 			"details": {
 				"status": "SUCCESS"
 			},
@@ -90,7 +90,7 @@ func Test__OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			Headers: http.Header{},
 			Configuration: map[string]any{
 				"project":  "proj-123",
-				"statuses": []string{"succeeded", "failed"},
+				"statuses": []string{"deployed", "failed"},
 			},
 			Events: eventContext,
 		})
@@ -119,7 +119,7 @@ func Test__OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			Headers: http.Header{},
 			Configuration: map[string]any{
 				"project":  "proj-123",
-				"statuses": []string{"succeeded", "failed"},
+				"statuses": []string{"deployed", "failed"},
 			},
 			Events: eventContext,
 		})
@@ -233,7 +233,7 @@ func Test__OnDeploymentEvent__HandleWebhook(t *testing.T) {
 			Headers: http.Header{},
 			Configuration: map[string]any{
 				"project":  "proj-123",
-				"statuses": []string{"succeeded", "failed"},
+				"statuses": []string{"deployed", "failed"},
 			},
 			Events: eventContext,
 		})
@@ -264,8 +264,8 @@ func Test__OnDeploymentEvent__Setup(t *testing.T) {
 }
 
 func Test__ExtractEventAction(t *testing.T) {
-	t.Run("extracts action from valid event type", func(t *testing.T) {
-		assert.Equal(t, "succeeded", extractEventAction("Deployment.succeeded"))
+	t.Run("extracts action from deployed event type", func(t *testing.T) {
+		assert.Equal(t, "deployed", extractEventAction("Deployment.deployed"))
 	})
 
 	t.Run("extracts action from failed event type", func(t *testing.T) {
@@ -289,6 +289,6 @@ func Test__ExtractEventAction(t *testing.T) {
 	})
 
 	t.Run("handles event type with multiple dots", func(t *testing.T) {
-		assert.Equal(t, "succeeded.extra", extractEventAction("Deployment.succeeded.extra"))
+		assert.Equal(t, "deployed.extra", extractEventAction("Deployment.deployed.extra"))
 	})
 }
