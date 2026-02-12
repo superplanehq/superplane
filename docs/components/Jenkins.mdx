@@ -27,7 +27,7 @@ The Trigger Build component triggers a Jenkins job and waits for it to complete.
 ### How It Works
 
 1. Triggers the specified Jenkins job with optional parameters
-2. Waits for the build to complete (monitored via polling)
+2. Waits for the build to complete (via webhook from Jenkins Notification Plugin, with polling as fallback)
 3. Routes execution based on build result:
    - **Passed channel**: Build completed with SUCCESS
    - **Failed channel**: Build failed, was unstable, or was aborted
