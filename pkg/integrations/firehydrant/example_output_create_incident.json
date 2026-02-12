@@ -1,0 +1,18 @@
+{
+    "type": "firehydrant.incident",
+    "data": {
+        "incident": {
+            "id": "abc123-def456-ghi789",
+            "name": "Database connection issues",
+            "description": "Users are experiencing slow database queries and connection timeouts.",
+            "severity": "sev1",
+            "status": "started",
+            "created_at": "2026-01-19T12:00:00Z",
+            "started_at": "2026-01-19T12:00:00Z",
+            "resolved_at": null,
+            "archived_at": null,
+            "html_url": "https://app.firehydrant.io/incidents/abc123-def456-ghi789"
+        }
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}

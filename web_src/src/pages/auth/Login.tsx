@@ -473,7 +473,7 @@ export const Login: React.FC = () => {
             </div>
           )}
 
-          {!configLoading && !isSignupMode && canSignup && (
+          {!configLoading && !isSignupMode && canSignup && (canSignupWithPassword || hasProviders) && (
             <div className="mt-6 text-sm text-gray-500">
               {"Don't have an account? "}
               <button
