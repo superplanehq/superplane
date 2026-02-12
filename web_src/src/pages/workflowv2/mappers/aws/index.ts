@@ -14,6 +14,7 @@ import { deletePackageVersionsMapper } from "./codeartifact/delete_package_versi
 import { deleteRepositoryMapper } from "./codeartifact/delete_repository";
 import { disposePackageVersionsMapper } from "./codeartifact/dispose_package_versions";
 import { updatePackageVersionsStatusMapper } from "./codeartifact/update_package_versions_status";
+import { onAlarmTriggerRenderer } from "./cloudwatch/on_alarm";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   "lambda.runFunction": runFunctionMapper,
@@ -30,6 +31,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
+  "cloudwatch.onAlarm": onAlarmTriggerRenderer,
   "codeArtifact.onPackageVersion": onPackageVersionTriggerRenderer,
   "ecr.onImagePush": onImagePushTriggerRenderer,
   "ecr.onImageScan": onImageScanTriggerRenderer,

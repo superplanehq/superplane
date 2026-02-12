@@ -7,6 +7,7 @@ Manage resources and execute AWS commands in workflows
 ## Triggers
 
 <CardGrid>
+  <LinkCard title="CloudWatch • On Alarm" href="#cloud-watch-•-on-alarm" description="Listen to AWS CloudWatch alarm state change events" />
   <LinkCard title="CodeArtifact • On Package Version" href="#code-artifact-•-on-package-version" description="Listen to AWS CodeArtifact package version events" />
   <LinkCard title="ECR • On Image Push" href="#ecr-•-on-image-push" description="Listen to AWS ECR image push events" />
   <LinkCard title="ECR • On Image Scan" href="#ecr-•-on-image-scan" description="Listen to AWS ECR image scan events" />
@@ -33,6 +34,65 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Instructions
 
 Initially, you can leave the **"IAM Role ARN"** field empty, as you will be guided through the identity provider and IAM role creation process.
+
+<a id="cloud-watch-•-on-alarm"></a>
+
+## CloudWatch • On Alarm
+
+The On Alarm trigger starts a workflow execution when a CloudWatch alarm transitions to the ALARM state.
+
+### Use Cases
+
+- **Incident response**: Notify responders and open incidents when alarms fire
+- **Auto-remediation**: Execute rollback or recovery workflows immediately
+- **Audit and reporting**: Track alarm transitions over time
+
+### Configuration
+
+- **Region**: AWS region where alarms are evaluated
+- **Alarms**: Optional alarm name filters (supports equals, not-equals, and regex matches)
+- **State**: Only trigger for alarms in the specified state (OK, ALARM, or INSUFFICIENT_DATA)
+
+### Event Data
+
+Each alarm event includes:
+- **detail.alarmName**: CloudWatch alarm name
+- **detail.state.value**: Current alarm state
+- **detail.previousState.value**: Previous alarm state
+
+### Example Data
+
+```json
+{
+  "data": {
+    "account": "123456789012",
+    "detail": {
+      "alarmName": "HighCPUUtilization",
+      "previousState": {
+        "reason": "Threshold Crossed: 1 datapoint [35.0 (20/11/24 20:29:00)] was not greater than or equal to the threshold (90.0).",
+        "timestamp": "2024-11-20T20:30:33.000+0000",
+        "value": "OK"
+      },
+      "state": {
+        "reason": "Threshold Crossed: 1 datapoint [95.0 (20/11/24 20:34:00)] was greater than or equal to the threshold (90.0).",
+        "timestamp": "2024-11-20T20:35:33.000+0000",
+        "value": "ALARM"
+      }
+    },
+    "detail-type": "CloudWatch Alarm State Change",
+    "id": "2f1ecf5c-8bc9-4b7d-9e76-8df420e8e1a7",
+    "region": "us-east-1",
+    "resources": [
+      "arn:aws:cloudwatch:us-east-1:123456789012:alarm:HighCPUUtilization"
+    ],
+    "source": "aws.cloudwatch",
+    "time": "2024-11-20T20:35:33Z",
+    "version": "0"
+  },
+  "timestamp": "2026-02-10T12:00:00Z",
+  "type": "aws.cloudwatch.alarm"
+}
+```
 
 <a id="code-artifact-•-on-package-version"></a>
 
