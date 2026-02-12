@@ -1,0 +1,68 @@
+---
+title: "Statuspage"
+---
+
+Create and manage incidents on your Atlassian Statuspage
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident or scheduled maintenance on your Statuspage." />
+</CardGrid>
+
+<a id="create-incident"></a>
+
+## Create Incident
+
+The Create Incident component creates a new realtime or scheduled incident on your Atlassian Statuspage.
+
+### Use Cases
+
+- **Realtime incidents**: Create and notify subscribers when an unexpected outage occurs
+- **Scheduled maintenance**: Schedule maintenance windows with optional reminders and auto-transitions
+- **Integration workflows**: Create incidents from monitoring alerts or other workflow events
+
+### Configuration
+
+- **Page** (required): The Statuspage to create the incident on
+- **Incident type**: Realtime (active incident) or Scheduled (planned maintenance)
+- **Name** (required): Short title for the incident
+- **Body** (optional): Initial message shown as the first incident update
+- **Status** (realtime): investigating, identified, monitoring, or resolved
+- **Impact override** (realtime): none, minor, major, or critical
+- **Components** (optional): Select one or more components to associate with the incident
+- **Component status** (optional): Status to set for all selected components (e.g. degraded_performance, under_maintenance)
+- **Scheduled For / Until** (scheduled): Start and end time for scheduled maintenance
+- **Scheduled options** (scheduled): Remind prior, auto in-progress, auto completed
+- **Deliver notifications** (optional): Whether to send notifications for the initial update (default: true)
+
+### Output
+
+Returns the full Statuspage Incident object from the API. Common expression paths:
+- incident.id, incident.name, incident.status, incident.impact
+- incident.shortlink — link to the incident
+- incident.created_at, incident.updated_at
+- incident.components — array of affected components
+- incident.incident_updates — array of update messages
+
+### Example Output
+
+```json
+{
+  "affected_components": [
+    "API"
+  ],
+  "component_count": 1,
+  "created_at": "2026-02-12T10:30:00.000Z",
+  "id": "p31zjtct2jer",
+  "impact": "major",
+  "latest_update": "We are investigating reports of slow database queries.",
+  "name": "Database Connection Issues",
+  "page_id": "kctbh9vrtdwd",
+  "shortlink": "http://stspg.io/p31zjtct2jer",
+  "status": "investigating"
+}
+```
+

@@ -102,6 +102,11 @@ import {
   eventStateRegistry as claudeEventStateRegistry,
 } from "./claude/index";
 import {
+  componentMappers as statuspageComponentMappers,
+  triggerRenderers as statuspageTriggerRenderers,
+  eventStateRegistry as statuspageEventStateRegistry,
+} from "./statuspage";
+import {
   componentMappers as dockerhubComponentMappers,
   customFieldRenderers as dockerhubCustomFieldRenderers,
   triggerRenderers as dockerhubTriggerRenderers,
@@ -157,6 +162,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   discord: discordComponentMappers,
   openai: openaiComponentMappers,
   claude: claudeComponentMappers,
+  statuspage: statuspageComponentMappers,
   dockerhub: dockerhubComponentMappers,
 };
 
@@ -178,6 +184,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   discord: discordTriggerRenderers,
   openai: openaiTriggerRenderers,
   claude: claudeTriggerRenderers,
+  statuspage: statuspageTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
 };
 
@@ -197,6 +204,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   rootly: rootlyEventStateRegistry,
   openai: openaiEventStateRegistry,
   claude: claudeEventStateRegistry,
+  statuspage: statuspageEventStateRegistry,
   aws: awsEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
