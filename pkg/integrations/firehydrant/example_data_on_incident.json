@@ -1,0 +1,21 @@
+{
+    "type": "firehydrant.onIncident",
+    "data": {
+        "event": "incident.created",
+        "event_id": "evt-123-456",
+        "created_at": "2026-01-19T12:00:00Z",
+        "incident": {
+            "id": "abc123-def456-ghi789",
+            "name": "API latency spike detected",
+            "description": "The API response times have increased significantly across all endpoints.",
+            "severity": "sev2",
+            "status": "started",
+            "created_at": "2026-01-19T12:00:00Z",
+            "started_at": "2026-01-19T12:00:00Z",
+            "resolved_at": null,
+            "archived_at": null,
+            "html_url": "https://app.firehydrant.io/incidents/abc123-def456-ghi789"
+        }
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}
