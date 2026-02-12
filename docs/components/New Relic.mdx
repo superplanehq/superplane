@@ -64,14 +64,12 @@ This trigger generates a webhook URL. You must configure a **Workflow** in New R
 
 ```json
 {
-  "issue_id": "{{ issueId }}",
-  "title": "{{ annotations.title }}",
-  "priority": "{{ priority }}",
-  "state": "{{ state }}",
-  "issue_url": "{{ issuePageUrl }}",
-  "owner": "{{ owner }}",
-  "impacted_entities": {{ json entitiesData.names }},
-  "total_incidents": {{ totalIncidents }}
+  "issue_id": "{{issueId}}",
+  "title": "{{annotations.title.[0]}}",
+  "priority": "{{priority}}",
+  "issue_url": "{{issuePageUrl}}",
+  "state": "{{state}}",
+  "owner": "{{owner}}"
 }
 ```
 
@@ -164,28 +162,4 @@ Returns query results including:
 - Requires a valid New Relic API key with query permissions
 - Queries are subject to New Relic's NRQL query limits
 - Invalid NRQL syntax will return an error from the API
-
-### Example Output
-
-```json
-{
-  "accountId": 1234567,
-  "metadata": {
-    "eventTypes": [
-      "Transaction"
-    ],
-    "messages": [],
-    "timeWindow": {
-      "begin": 1707559740000,
-      "end": 1707563340000
-    }
-  },
-  "query": "SELECT count(*) FROM Transaction SINCE 1 hour ago",
-  "results": [
-    {
-      "count": 1523
-    }
-  ]
-}
-```
 
