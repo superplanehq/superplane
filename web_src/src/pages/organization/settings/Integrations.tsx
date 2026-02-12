@@ -219,7 +219,9 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                     <div>
                       <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{item.providerLabel}</h3>
                       {item.integrationDef.description ? (
-                        <p className="mt-1 text-sm text-gray-800 dark:text-gray-400">{item.integrationDef.description}</p>
+                        <p className="mt-0.5 text-sm text-gray-800 dark:text-gray-400">
+                          {item.integrationDef.description}
+                        </p>
                       ) : null}
                     </div>
                   </div>
@@ -255,30 +257,30 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                       return (
                         <div
                           key={integration.metadata?.id}
-                          className={`flex items-center gap-3 py-1.5 border-t border-gray-200 dark:border-gray-700 ${index === 0 ? "mt-1" : ""}`}
+                          className={`flex items-center gap-2 py-1.5 border-t border-gray-200 dark:border-gray-700 ${index === 0 ? "mt-1" : ""}`}
                         >
                           <Plug
                             className={`w-4 h-4 shrink-0 ${
                               integration.status?.state === "ready"
-                                ? "text-green-700 dark:text-green-400"
+                                ? "text-green-500"
                                 : integration.status?.state === "error"
-                                  ? "text-red-700 dark:text-red-400"
-                                  : "text-yellow-700 dark:text-yellow-400"
+                                  ? "text-red-500"
+                                  : "text-amber-600"
                             }`}
                           />
+                          <span
+                            className={`inline-flex w-16 items-center justify-start rounded text-xs font-medium ${
+                              integration.status?.state === "ready"
+                                ? "bg-white text-green-500"
+                                : integration.status?.state === "error"
+                                  ? "bg-white text-red-500"
+                                  : "bg-white text-amber-600"
+                            }`}
+                          >
+                            {statusLabel}
+                          </span>
                           <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{integrationDisplayName}</p>
                           <div className="ml-auto flex items-center gap-4">
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                                integration.status?.state === "ready"
-                                  ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                                  : integration.status?.state === "error"
-                                    ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                                    : "bg-orange-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-                              }`}
-                            >
-                              {statusLabel}
-                            </span>
                             <PermissionTooltip
                               allowed={canUpdateIntegrations || permissionsLoading}
                               message="You don't have permission to update integrations."
