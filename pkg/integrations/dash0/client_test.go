@@ -54,6 +54,7 @@ func Test__NewClient(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "token123", client.Token)
 		assert.Equal(t, "https://api.us-west-2.aws.dash0.com", client.BaseURL)
+		assert.Equal(t, "default", client.Dataset)
 	})
 
 	t.Run("baseURL with /api/prometheus suffix -> strips suffix", func(t *testing.T) {
@@ -69,6 +70,22 @@ func Test__NewClient(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, "https://api.us-west-2.aws.dash0.com", client.BaseURL)
+	})
+
+	t.Run("dataset override -> stores configured dataset", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken": "token123",
+				"baseURL":  "https://api.us-west-2.aws.dash0.com",
+				"dataset":  "custom-dataset",
+			},
+		}
+
+		httpCtx := &contexts.HTTPContext{}
+		client, err := NewClient(httpCtx, integrationCtx)
+
+		require.NoError(t, err)
+		assert.Equal(t, "custom-dataset", client.Dataset)
 	})
 }
 
@@ -208,5 +225,39 @@ func Test__Client__ExecutePrometheusRangeQuery(t *testing.T) {
 		assert.Equal(t, "success", response["status"])
 		require.Len(t, httpContext.Requests, 1)
 		assert.Contains(t, httpContext.Requests[0].URL.String(), "/api/prometheus/api/v1/query_range")
+	})
+}
+
+func Test__Client__UpsertCheckRule(t *testing.T) {
+	t.Run("successful upsert", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"status":"ok"}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken": "token123",
+				"baseURL":  "https://api.us-west-2.aws.dash0.com",
+			},
+		}
+
+		client, err := NewClient(httpContext, integrationCtx)
+		require.NoError(t, err)
+
+		response, err := client.UpsertCheckRule("checkout-errors", map[string]any{
+			"name":       "CheckoutErrors",
+			"expression": "vector(1)",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "ok", response["status"])
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, http.MethodPut, httpContext.Requests[0].Method)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/api/alerting/check-rules/checkout-errors")
+		assert.Equal(t, "default", httpContext.Requests[0].URL.Query().Get("dataset"))
 	})
 }
