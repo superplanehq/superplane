@@ -50,14 +50,42 @@ func Test__CreateIncident__Setup(t *testing.T) {
 		}
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"page":         "kctbh9vrtdwd",
-				"incidentType": "scheduled",
-				"name":         "Scheduled Maintenance",
+				"page":           "kctbh9vrtdwd",
+				"incidentType":   "scheduled",
+				"name":           "Scheduled Maintenance",
+				"scheduledFor":   "2026-02-15T02:00:00Z",
+				"scheduledUntil": "2026-02-15T04:00:00Z",
 			},
 			Integration: integrationCtx,
 			Metadata:    &contexts.MetadataContext{},
 		})
 		require.NoError(t, err)
+	})
+
+	t.Run("scheduled missing scheduledFor returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"page":           "kctbh9vrtdwd",
+				"incidentType":   "scheduled",
+				"name":           "Scheduled Maintenance",
+				"scheduledUntil": "2026-02-15T04:00:00Z",
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "scheduledFor is required for scheduled incidents")
+	})
+
+	t.Run("scheduled missing scheduledUntil returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"page":         "kctbh9vrtdwd",
+				"incidentType": "scheduled",
+				"name":         "Scheduled Maintenance",
+				"scheduledFor": "2026-02-15T02:00:00Z",
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "scheduledUntil is required for scheduled incidents")
 	})
 
 	t.Run("missing page returns error", func(t *testing.T) {

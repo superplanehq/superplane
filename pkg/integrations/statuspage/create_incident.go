@@ -69,12 +69,12 @@ func (c *CreateIncident) Documentation() string {
 
 ## Output
 
-Returns the full Statuspage Incident object from the API. Common expression paths:
-- incident.id, incident.name, incident.status, incident.impact
-- incident.shortlink — link to the incident
-- incident.created_at, incident.updated_at
-- incident.components — array of affected components
-- incident.incident_updates — array of update messages`
+Returns the full Statuspage Incident object from the API. The payload has structure { type, timestamp, data } where data is the incident. Common expression paths (use $['Node Name'].data. as prefix):
+- data.id, data.name, data.status, data.impact
+- data.shortlink — link to the incident
+- data.created_at, data.updated_at
+- data.components — array of affected components
+- data.incident_updates — array of update messages`
 }
 
 func (c *CreateIncident) Icon() string {
@@ -290,6 +290,7 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			Label:       "Deliver notifications",
 			Type:        configuration.FieldTypeBool,
 			Required:    false,
+			Default:     true,
 			Description: "Send notifications for the initial incident update (default: true)",
 		},
 	}
@@ -316,6 +317,15 @@ func (c *CreateIncident) Setup(ctx core.SetupContext) error {
 
 	if spec.Name == "" {
 		return errors.New("name is required")
+	}
+
+	if spec.IncidentType == "scheduled" {
+		if spec.ScheduledFor == "" {
+			return errors.New("scheduledFor is required for scheduled incidents")
+		}
+		if spec.ScheduledUntil == "" {
+			return errors.New("scheduledUntil is required for scheduled incidents")
+		}
 	}
 
 	return nil

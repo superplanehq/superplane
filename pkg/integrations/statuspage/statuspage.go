@@ -36,7 +36,7 @@ func (s *Statuspage) Description() string {
 }
 
 func (s *Statuspage) Instructions() string {
-	return ""
+	return "To get your API key: Open your Statuspage, click the icon in the top-right corner, select API info, then create an API key."
 }
 
 func (s *Statuspage) Configuration() []configuration.Field {

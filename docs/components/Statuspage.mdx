@@ -12,6 +12,10 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident or scheduled maintenance on your Statuspage." />
 </CardGrid>
 
+## Instructions
+
+To get your API key: Open your Statuspage, click the icon in the top-right corner, select API info, then create an API key.
+
 <a id="create-incident"></a>
 
 ## Create Incident
@@ -40,12 +44,12 @@ The Create Incident component creates a new realtime or scheduled incident on yo
 
 ### Output
 
-Returns the full Statuspage Incident object from the API. Common expression paths:
-- incident.id, incident.name, incident.status, incident.impact
-- incident.shortlink — link to the incident
-- incident.created_at, incident.updated_at
-- incident.components — array of affected components
-- incident.incident_updates — array of update messages
+Returns the full Statuspage Incident object from the API. The payload has structure { type, timestamp, data } where data is the incident. Common expression paths (use $['Node Name'].data. as prefix):
+- data.id, data.name, data.status, data.impact
+- data.shortlink — link to the incident
+- data.created_at, data.updated_at
+- data.components — array of affected components
+- data.incident_updates — array of update messages
 
 ### Example Output
 

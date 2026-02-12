@@ -73,6 +73,9 @@ export const createIncidentMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] };
     if (!outputs?.default || outputs.default.length === 0) {
+      if (context.execution.createdAt) {
+        return { "Started At": new Date(context.execution.createdAt).toLocaleString() };
+      }
       return {};
     }
     const incident = outputs.default[0].data as StatuspageIncident;
@@ -87,8 +90,11 @@ export const createIncidentMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as { name?: string; incidentType?: string };
+  const configuration = node.configuration as { page?: string; name?: string; incidentType?: string };
 
+  if (configuration?.page) {
+    metadata.push({ icon: "globe", label: "Page: " + configuration.page });
+  }
   if (configuration?.name) {
     metadata.push({ icon: "document", label: configuration.name });
   }
@@ -101,8 +107,30 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
+  if (!rootTriggerNode || !execution.rootEvent?.id) {
+    return [
+      {
+        receivedAt: new Date(execution.createdAt!),
+        eventTitle: "Execution",
+        eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+        eventState: getState(componentName)(execution),
+        eventId: execution.id ?? "",
+      },
+    ];
+  }
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode.componentName);
+  if (!rootTriggerRenderer) {
+    return [
+      {
+        receivedAt: new Date(execution.createdAt!),
+        eventTitle: "Execution",
+        eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+        eventState: getState(componentName)(execution),
+        eventId: execution.rootEvent.id,
+      },
+    ];
+  }
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [
     {
@@ -110,7 +138,7 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
       eventTitle: title,
       eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent!.id!,
+      eventId: execution.rootEvent.id,
     },
   ];
 }
