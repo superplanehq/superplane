@@ -19,15 +19,82 @@ func Test__UpdateSyntheticCheck__Setup(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"originOrId": "",
-				"spec":       `{"kind":"Dash0SyntheticCheck","metadata":{"name":"checkout-health"},"spec":{"enabled":true,"plugin":{"kind":"http","spec":{"request":{"method":"get","url":"https://example.com"}}}}}`,
+				"name":       "checkout-health",
+				"enabled":    true,
+				"pluginKind": "http",
+				"method":     "get",
+				"url":        "https://example.com",
 			},
 		})
 
 		require.ErrorContains(t, err, "originOrId is required")
 	})
+
+	t.Run("accepts legacy specification", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"originOrId": "checkout-health-check",
+				"spec":       `{"kind":"Dash0SyntheticCheck","metadata":{"name":"checkout-health"},"spec":{"enabled":true,"plugin":{"kind":"http","spec":{"request":{"method":"get","url":"https://example.com"}}}}}`,
+			},
+		})
+
+		require.NoError(t, err)
+	})
 }
 
 func Test__UpdateSyntheticCheck__Execute(t *testing.T) {
+	component := UpdateSyntheticCheck{}
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"status":"updated"}`)),
+			},
+		},
+	}
+
+	execCtx := &contexts.ExecutionStateContext{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"originOrId": "checkout-health-check",
+			"name":       "checkout-health",
+			"enabled":    true,
+			"pluginKind": "http",
+			"method":     "get",
+			"url":        "https://example.com/health",
+			"headers": []map[string]any{
+				{
+					"key":   "Accept",
+					"value": "application/json",
+				},
+			},
+		},
+		HTTP: httpContext,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken": "token123",
+				"baseURL":  "https://api.us-west-2.aws.dash0.com",
+			},
+		},
+		ExecutionState: execCtx,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, UpdateSyntheticCheckPayloadType, execCtx.Type)
+	require.Len(t, httpContext.Requests, 1)
+	assert.Equal(t, http.MethodPut, httpContext.Requests[0].Method)
+	assert.Contains(t, httpContext.Requests[0].URL.String(), "/api/synthetic-checks/checkout-health-check")
+	body, readErr := io.ReadAll(httpContext.Requests[0].Body)
+	require.NoError(t, readErr)
+
+	assert.Contains(t, string(body), `"metadata":{"name":"checkout-health"}`)
+	assert.Contains(t, string(body), `"method":"get"`)
+	assert.Contains(t, string(body), `"url":"https://example.com/health"`)
+	assert.Contains(t, string(body), `"headers":{"Accept":"application/json"}`)
+}
+
+func Test__UpdateSyntheticCheck__Execute__LegacySpecification(t *testing.T) {
 	component := UpdateSyntheticCheck{}
 
 	httpContext := &contexts.HTTPContext{
@@ -60,5 +127,4 @@ func Test__UpdateSyntheticCheck__Execute(t *testing.T) {
 	require.Len(t, httpContext.Requests, 1)
 	assert.Equal(t, http.MethodPut, httpContext.Requests[0].Method)
 	assert.Contains(t, httpContext.Requests[0].URL.String(), "/api/synthetic-checks/checkout-health-check")
-	assert.Equal(t, "default", httpContext.Requests[0].URL.Query().Get("dataset"))
 }

@@ -14,66 +14,6 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Update Synthetic Check" href="#update-synthetic-check" description="Update an existing synthetic check in Dash0 configuration API" />
 </CardGrid>
 
-<a id="update-synthetic-check"></a>
-
-## Update Synthetic Check
-
-The Update Synthetic Check component updates an existing Dash0 synthetic check.
-
-### Use Cases
-
-- **Change monitoring target**: Update URLs, probes, or assertions after infrastructure changes
-- **Tune schedules**: Adjust check intervals as traffic and SLOs evolve
-- **Workflow-driven changes**: Roll out check updates as part of deployment workflows
-
-### Configuration
-
-- **Synthetic Check**: Existing synthetic check origin/ID
-- **Specification (JSON)**: Updated synthetic check payload as JSON object
-
-Example specification:
-```json
-{
-  "kind": "Dash0SyntheticCheck",
-  "metadata": {
-    "name": "checkout-health"
-  },
-  "spec": {
-    "enabled": true,
-    "plugin": {
-      "kind": "http",
-      "spec": {
-        "request": {
-          "method": "get",
-          "url": "https://www.example.com/health"
-        }
-      }
-    }
-  }
-}
-```
-
-### Output
-
-Emits:
-- **originOrId**: Synthetic check identifier used for the API request
-- **response**: Raw Dash0 API response
-
-### Example Output
-
-```json
-{
-  "data": {
-    "originOrId": "superplane-synthetic-ab12cd34",
-    "response": {
-      "id": "superplane-synthetic-ab12cd34",
-      "status": "updated"
-    }
-  },
-  "timestamp": "2026-02-09T12:00:00Z",
-  "type": "dash0.synthetic.check.updated"
-}
-```
 <a id="list-issues"></a>
 
 ## List Issues
@@ -210,3 +150,49 @@ Returns the Prometheus query response including:
   "type": "dash0.prometheus.response"
 }
 ```
+
+<a id="update-synthetic-check"></a>
+
+## Update Synthetic Check
+
+The Update Synthetic Check component updates an existing Dash0 synthetic check.
+
+### Use Cases
+
+- **Change monitoring target**: Update URLs, probes, or assertions after infrastructure changes
+- **Tune schedules**: Adjust check intervals as traffic and SLOs evolve
+- **Workflow-driven changes**: Roll out check updates as part of deployment workflows
+
+### Configuration
+
+- **Synthetic Check**: Existing synthetic check origin/ID
+- **Name**: Human-readable synthetic check name
+- **Enabled**: Whether the synthetic check is enabled
+- **Plugin Kind**: Synthetic check plugin type (currently HTTP)
+- **Method**: HTTP method for request checks
+- **URL**: Target URL for the synthetic check
+- **Headers (Optional)**: Request header key/value pairs
+- **Request Body (Optional)**: HTTP request body (useful for POST/PUT/PATCH)
+
+### Output
+
+Emits:
+- **originOrId**: Synthetic check identifier used for the API request
+- **response**: Raw Dash0 API response
+
+### Example Output
+
+```json
+{
+  "data": {
+    "originOrId": "checkout-health-check",
+    "response": {
+      "id": "checkout-health-check",
+      "status": "updated"
+    }
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.synthetic.check.updated"
+}
+```
+
