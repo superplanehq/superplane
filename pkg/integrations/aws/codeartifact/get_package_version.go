@@ -136,15 +136,14 @@ func (c *GetPackageVersion) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "package",
-			Label:    "Package",
-			Type:     configuration.FieldTypeString,
-			Required: true,
+			Name:        "package",
+			Label:       "Package name",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Placeholder: "e.g. lodash, @my-scope/package (npm), my-python-package (pypi)",
+			Description: "Name of the package in the repository (format-specific, e.g. npm scope/name)",
 			VisibilityConditions: []configuration.VisibilityCondition{
-				{
-					Field:  "repository",
-					Values: []string{"*"},
-				},
+				{Field: "repository", Values: []string{"*"}},
 			},
 		},
 		{
@@ -153,22 +152,19 @@ func (c *GetPackageVersion) Configuration() []configuration.Field {
 			Type:     configuration.FieldTypeString,
 			Required: true,
 			VisibilityConditions: []configuration.VisibilityCondition{
-				{
-					Field:  "repository",
-					Values: []string{"*"},
-				},
+				{Field: "repository", Values: []string{"*"}},
 			},
 		},
 		{
 			Name:     "format",
-			Label:    "Format",
-			Type:     configuration.FieldTypeString,
+			Label:    "Package format",
+			Type:     configuration.FieldTypeSelect,
 			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{Options: PackageFormatOptions},
+			},
 			VisibilityConditions: []configuration.VisibilityCondition{
-				{
-					Field:  "repository",
-					Values: []string{"*"},
-				},
+				{Field: "repository", Values: []string{"*"}},
 			},
 		},
 		{

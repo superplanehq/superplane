@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
+import circleciIcon from "@/assets/icons/integrations/circleci.svg";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
@@ -34,6 +35,7 @@ import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
+import dockerIcon from "@/assets/icons/integrations/docker.svg";
 
 export interface BuildingBlock {
   name: string;
@@ -393,6 +395,7 @@ function CategorySection({
 
   // Determine category icon
   const appLogoMap: Record<string, string | Record<string, string>> = {
+    circleci: circleciIcon,
     cloudflare: cloudflareIcon,
     dash0: dash0Icon,
     datadog: datadogIcon,
@@ -411,6 +414,7 @@ function CategorySection({
     slack: slackIcon,
     sendgrid: sendgridIcon,
     render: renderIcon,
+    dockerhub: dockerIcon,
     aws: {
       codeArtifact: awsIcon,
       lambda: awsLambdaIcon,
@@ -467,6 +471,7 @@ function CategorySection({
 
           // Use SVG icons for application components/triggers (SMTP uses resolveIcon("mail"), same as core)
           const appLogoMap: Record<string, string | Record<string, string>> = {
+            circleci: circleciIcon,
             cloudflare: cloudflareIcon,
             dash0: dash0Icon,
             daytona: daytonaIcon,
@@ -484,6 +489,7 @@ function CategorySection({
             slack: slackIcon,
             sendgrid: sendgridIcon,
             render: renderIcon,
+            dockerhub: dockerIcon,
             aws: {
               codeArtifact: awsCodeArtifactIcon,
               ecr: awsEcrIcon,
