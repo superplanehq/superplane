@@ -250,3 +250,18 @@ func (c *Client) UpdateIncident(pageID, incidentID string, req UpdateIncidentReq
 	return incident, nil
 }
 
+// GetIncident fetches a single incident by ID and returns the full response including incident_updates (timeline).
+// incident_updates ordering is preserved as returned by the Statuspage API.
+func (c *Client) GetIncident(pageID, incidentID string) (map[string]any, error) {
+	path := fmt.Sprintf("/pages/%s/incidents/%s", url.PathEscape(pageID), url.PathEscape(incidentID))
+	resBody, err := c.do(http.MethodGet, path, nil, "")
+	if err != nil {
+		return nil, err
+	}
+	var incident map[string]any
+	if err := json.Unmarshal(resBody, &incident); err != nil {
+		return nil, fmt.Errorf("parsing incident response: %w", err)
+	}
+	return incident, nil
+}
+
