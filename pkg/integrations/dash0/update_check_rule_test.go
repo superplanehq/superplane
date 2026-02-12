@@ -20,11 +20,34 @@ func Test__UpdateCheckRule__Setup(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"originOrId": "",
-				"spec":       `{"groups":[]}`,
+				"name":       "Checkout errors",
+				"expression": `sum(rate(http_requests_total{service="checkout",status=~"5.."}[5m])) > 1`,
 			},
 		})
 
 		require.ErrorContains(t, err, "originOrId is required")
+	})
+
+	t.Run("name is required", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"originOrId": "checkout-errors",
+				"expression": `sum(rate(http_requests_total{service="checkout",status=~"5.."}[5m])) > 1`,
+			},
+		})
+
+		require.ErrorContains(t, err, "name is required")
+	})
+
+	t.Run("legacy spec remains supported", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"originOrId": "checkout-errors",
+				"spec":       `{"alert":"CheckoutErrors","expr":"sum(rate(http_requests_total{service=\"checkout\",status=~\"5..\"}[5m])) > 1"}`,
+			},
+		})
+
+		require.NoError(t, err)
 	})
 }
 
@@ -44,7 +67,16 @@ func Test__UpdateCheckRule__Execute(t *testing.T) {
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
 			"originOrId": "checkout-errors",
-			"spec":       `{"name":"CheckoutErrors","expression":"sum(rate(http_requests_total{service=\"checkout\",status=~\"5..\"}[5m])) > 1","for":"10m","labels":{"severity":"critical"},"annotations":{"summary":"Checkout errors are critical"}}`,
+			"name":       "CheckoutErrors",
+			"expression": `sum(rate(http_requests_total{service="checkout",status=~"5.."}[5m])) > 1`,
+			"for":        "10m",
+			"interval":   "1m",
+			"labels": []map[string]any{
+				{"key": "severity", "value": "critical"},
+			},
+			"annotations": []map[string]any{
+				{"key": "summary", "value": "Checkout errors are critical"},
+			},
 		},
 		HTTP: httpContext,
 		Integration: &contexts.IntegrationContext{
@@ -71,4 +103,7 @@ func Test__UpdateCheckRule__Execute(t *testing.T) {
 	assert.Equal(t, "CheckoutErrors", payload["name"])
 	assert.Equal(t, "sum(rate(http_requests_total{service=\"checkout\",status=~\"5..\"}[5m])) > 1", payload["expression"])
 	assert.Equal(t, "10m", payload["for"])
+	assert.Equal(t, "1m", payload["interval"])
+	assert.Equal(t, map[string]any{"severity": "critical"}, payload["labels"])
+	assert.Equal(t, map[string]any{"summary": "Checkout errors are critical"}, payload["annotations"])
 }

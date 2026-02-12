@@ -1,16 +1,17 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
-import { getStateMap } from "..";
+import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import { getState, getStateMap, getTriggerRenderer } from "..";
 import {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
+  ExecutionInfo,
   NodeInfo,
+  OutputPayload,
   SubtitleContext,
 } from "../types";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import { MetadataItem } from "@/ui/metadataList";
 import { formatTimeAgo } from "@/utils/date";
-import { buildDash0EventSections, buildDash0ExecutionDetails } from "./base";
 import { UpsertCheckRuleConfiguration } from "./types";
 
 export const updateCheckRuleMapper: ComponentBaseMapper = {
@@ -23,7 +24,7 @@ export const updateCheckRuleMapper: ComponentBaseMapper = {
       collapsedBackground: "bg-white",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Update Check Rule",
-      eventSections: lastExecution ? buildDash0EventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
       metadata: metadataList(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
@@ -31,7 +32,29 @@ export const updateCheckRuleMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    return buildDash0ExecutionDetails(context.execution, "Update Response");
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+    if (!outputs || !outputs.default || outputs.default.length === 0) {
+      return { Response: "No data returned" };
+    }
+
+    const payload = outputs.default[0];
+    const responseData = payload?.data as Record<string, unknown> | undefined;
+    if (!responseData) {
+      return { Response: "No data returned" };
+    }
+
+    const details: Record<string, string> = {};
+    if (payload?.timestamp) {
+      details["Updated At"] = new Date(payload.timestamp).toLocaleString();
+    }
+
+    try {
+      details["Update Response"] = JSON.stringify(responseData, null, 2);
+    } catch {
+      details["Update Response"] = String(responseData);
+    }
+
+    return details;
   },
 
   subtitle(context: SubtitleContext): string {
@@ -51,4 +74,20 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   }
 
   return metadata;
+}
+
+function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+  const rootTriggerNode = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+
+  return [
+    {
+      receivedAt: new Date(execution.createdAt!),
+      eventTitle: title,
+      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventState: getState(componentName)(execution),
+      eventId: execution.rootEvent!.id!,
+    },
+  ];
 }

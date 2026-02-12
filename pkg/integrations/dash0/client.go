@@ -1,6 +1,7 @@
 package dash0
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -86,6 +87,20 @@ func (c *Client) execRequest(method, url string, body io.Reader, contentType str
 	return responseBody, nil
 }
 
+// withDefaultDatasetQuery appends dataset=default to Dash0 configuration API requests.
+func withDefaultDatasetQuery(requestURL string) (string, error) {
+	parsedURL, err := url.Parse(requestURL)
+	if err != nil {
+		return "", fmt.Errorf("error parsing request URL: %v", err)
+	}
+
+	query := parsedURL.Query()
+	query.Set("dataset", "default")
+	parsedURL.RawQuery = query.Encode()
+
+	return parsedURL.String(), nil
+}
+
 type PrometheusResponse struct {
 	Status string                 `json:"status"`
 	Data   PrometheusResponseData `json:"data"`
@@ -168,8 +183,12 @@ type CheckRule struct {
 
 func (c *Client) ListCheckRules() ([]CheckRule, error) {
 	apiURL := fmt.Sprintf("%s/api/alerting/check-rules", c.BaseURL)
+	requestURL, err := withDefaultDatasetQuery(apiURL)
+	if err != nil {
+		return nil, fmt.Errorf("error setting check rules dataset query: %v", err)
+	}
 
-	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil, "")
+	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil, "")
 	if err != nil {
 		return nil, err
 	}
@@ -206,4 +225,43 @@ func (c *Client) ListCheckRules() ([]CheckRule, error) {
 	}
 
 	return checkRules, nil
+}
+
+// UpsertCheckRule creates or updates a Dash0 check rule by origin/ID.
+func (c *Client) UpsertCheckRule(originOrID string, specification map[string]any) (map[string]any, error) {
+	trimmedOriginOrID := strings.TrimSpace(originOrID)
+	if trimmedOriginOrID == "" {
+		return nil, fmt.Errorf("check rule originOrId is required")
+	}
+
+	if len(specification) == 0 {
+		return nil, fmt.Errorf("check rule specification is required")
+	}
+
+	requestBody, err := json.Marshal(specification)
+	if err != nil {
+		return nil, fmt.Errorf("error serializing check rule specification: %v", err)
+	}
+
+	apiURL := fmt.Sprintf("%s/api/alerting/check-rules/%s", c.BaseURL, url.PathEscape(trimmedOriginOrID))
+	requestURL, err := withDefaultDatasetQuery(apiURL)
+	if err != nil {
+		return nil, fmt.Errorf("error setting check rule dataset query: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPut, requestURL, bytes.NewReader(requestBody), "application/json")
+	if err != nil {
+		return nil, err
+	}
+
+	if len(responseBody) == 0 {
+		return map[string]any{}, nil
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing check rule upsert response: %v", err)
+	}
+
+	return response, nil
 }

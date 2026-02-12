@@ -43,9 +43,13 @@ func (c *UpdateCheckRule) Documentation() string {
 ## Configuration
 
 - **Check Rule**: Existing check rule origin/ID
-- **Rule Specification (JSON)**: Updated check rule payload as JSON object.
-  Accepts Dash0 check rule shape (name + expression) or Prometheus-style
-  groups/rules shape with exactly one alert rule.
+- **Name**: Human-readable rule name
+- **Expression**: Prometheus expression used by the rule
+- **For (Optional)**: How long expression must remain true before firing
+- **Interval (Optional)**: Evaluation interval override
+- **Keep Firing For (Optional)**: Additional duration to keep firing after recovery
+- **Labels (Optional)**: Label key/value pairs
+- **Annotations (Optional)**: Annotation key/value pairs
 
 ## Output
 
@@ -86,12 +90,109 @@ func (c *UpdateCheckRule) Configuration() []configuration.Field {
 			Description: "Check rule origin/ID to update",
 		},
 		{
-			Name:        "spec",
-			Label:       "Rule Specification (JSON)",
+			Name:        "name",
+			Label:       "Rule Name",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Description: "Name of the check rule",
+			Placeholder: "Checkout errors",
+		},
+		{
+			Name:        "expression",
+			Label:       "Expression",
 			Type:        configuration.FieldTypeText,
 			Required:    true,
-			Description: "Updated check rule specification as a JSON object",
-			Placeholder: "{\"name\":\"Checkout errors\",\"expression\":\"sum(rate(http_requests_total{service=\\\"checkout\\\",status=~\\\"5..\\\"}[5m])) > 1\",\"for\":\"10m\",\"labels\":{\"severity\":\"critical\"},\"annotations\":{\"summary\":\"Checkout 5xx errors are critical\"}}",
+			Description: "Prometheus expression evaluated by the rule",
+			Placeholder: "sum(rate(http_requests_total{service=\"checkout\",status=~\"5..\"}[5m])) > 1",
+		},
+		{
+			Name:        "for",
+			Label:       "For",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Togglable:   true,
+			Description: "Optional firing delay duration (for example: 5m)",
+			Placeholder: "5m",
+		},
+		{
+			Name:        "interval",
+			Label:       "Interval",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Togglable:   true,
+			Description: "Optional evaluation interval override (for example: 1m)",
+			Placeholder: "1m",
+		},
+		{
+			Name:        "keepFiringFor",
+			Label:       "Keep Firing For",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Togglable:   true,
+			Description: "Optional extra duration to keep alert firing after recovery",
+			Placeholder: "10m",
+		},
+		{
+			Name:        "labels",
+			Label:       "Labels",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Togglable:   true,
+			Description: "Optional label key/value pairs",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Label",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:               "key",
+								Label:              "Key",
+								Type:               configuration.FieldTypeString,
+								Required:           true,
+								DisallowExpression: true,
+							},
+							{
+								Name:     "value",
+								Label:    "Value",
+								Type:     configuration.FieldTypeString,
+								Required: true,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:        "annotations",
+			Label:       "Annotations",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Togglable:   true,
+			Description: "Optional annotation key/value pairs",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Annotation",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:               "key",
+								Label:              "Key",
+								Type:               configuration.FieldTypeString,
+								Required:           true,
+								DisallowExpression: true,
+							},
+							{
+								Name:     "value",
+								Label:    "Value",
+								Type:     configuration.FieldTypeString,
+								Required: true,
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -108,7 +209,7 @@ func (c *UpdateCheckRule) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	if _, err := parseCheckRuleSpecification(config.Spec, "spec", scope); err != nil {
+	if _, err := buildCheckRuleSpecification(config, scope); err != nil {
 		return err
 	}
 
@@ -133,7 +234,7 @@ func (c *UpdateCheckRule) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	specification, err := parseCheckRuleSpecification(config.Spec, "spec", scope)
+	specification, err := buildCheckRuleSpecification(config, scope)
 	if err != nil {
 		return err
 	}
