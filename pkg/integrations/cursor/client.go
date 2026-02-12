@@ -52,17 +52,6 @@ type ModelsResponse struct {
 	Models []string `json:"models"`
 }
 
-type ConversationMessage struct {
-	ID   string `json:"id"`
-	Type string `json:"type"`
-	Text string `json:"text"`
-}
-
-type ConversationResponse struct {
-	ID       string                `json:"id"`
-	Messages []ConversationMessage `json:"messages"`
-}
-
 func (c *Client) ListModels() ([]string, error) {
 	if c.LaunchAgentKey == "" {
 		return nil, fmt.Errorf("Cloud Agent API key is not configured")
@@ -172,25 +161,6 @@ func (c *Client) CancelAgent(agentID string) error {
 	url := fmt.Sprintf("%s/v0/agents/%s/cancel", c.BaseURL, agentID)
 	_, err := c.execRequest(http.MethodPost, url, nil, c.LaunchAgentKey)
 	return err
-}
-
-func (c *Client) GetAgentConversation(agentID string) (*ConversationResponse, error) {
-	if c.LaunchAgentKey == "" {
-		return nil, fmt.Errorf("Cloud Agent API key is not configured")
-	}
-
-	url := fmt.Sprintf("%s/v0/agents/%s/conversation", c.BaseURL, agentID)
-	responseBody, err := c.execRequest(http.MethodGet, url, nil, c.LaunchAgentKey)
-	if err != nil {
-		return nil, err
-	}
-
-	var response ConversationResponse
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal conversation response: %w", err)
-	}
-
-	return &response, nil
 }
 
 func (c *Client) execRequest(method, URL string, body io.Reader, apiKey string) ([]byte, error) {
