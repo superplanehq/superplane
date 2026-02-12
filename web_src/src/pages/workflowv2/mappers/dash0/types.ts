@@ -15,6 +15,17 @@ export interface ListIssuesConfiguration {
   checkRules?: string[];
 }
 
+export interface UpsertCheckRuleConfiguration {
+  originOrId?: string;
+  name?: string;
+  expression?: string;
+  for?: string;
+  interval?: string;
+  keepFiringFor?: string;
+  labels?: Array<{ key: string; value: string }>;
+  annotations?: Array<{ key: string; value: string }>;
+}
+
 export interface PrometheusResponse {
   status: string;
   data: {

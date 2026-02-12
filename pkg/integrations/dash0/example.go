@@ -19,10 +19,21 @@ var exampleOutputListIssuesBytes []byte
 var exampleOutputListIssuesOnce sync.Once
 var exampleOutputListIssues map[string]any
 
+//go:embed example_output_create_check_rule.json
+var exampleOutputCreateCheckRuleBytes []byte
+
+var exampleOutputCreateCheckRuleOnce sync.Once
+var exampleOutputCreateCheckRule map[string]any
+
 func (c *QueryPrometheus) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryPrometheusOnce, exampleOutputQueryPrometheusBytes, &exampleOutputQueryPrometheus)
 }
 
 func (c *ListIssues) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputListIssuesOnce, exampleOutputListIssuesBytes, &exampleOutputListIssues)
+}
+
+// ExampleOutput returns sample output data for Create Check Rule.
+func (c *CreateCheckRule) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateCheckRuleOnce, exampleOutputCreateCheckRuleBytes, &exampleOutputCreateCheckRule)
 }
