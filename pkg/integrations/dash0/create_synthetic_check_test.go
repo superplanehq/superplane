@@ -15,17 +15,18 @@ import (
 func Test__CreateSyntheticCheck__Setup(t *testing.T) {
 	component := CreateSyntheticCheck{}
 
-	t.Run("invalid spec fails setup", func(t *testing.T) {
+	t.Run("name is required", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"spec": "not-json",
+				"method": "get",
+				"url":    "https://example.com/health",
 			},
 		})
 
-		require.ErrorContains(t, err, "parse spec as JSON object")
+		require.ErrorContains(t, err, "name is required")
 	})
 
-	t.Run("single-item array spec passes setup", func(t *testing.T) {
+	t.Run("legacy spec remains supported", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"spec": `[{"kind":"Dash0SyntheticCheck","metadata":{"name":"checkout-health"},"spec":{"enabled":true,"plugin":{"kind":"http","spec":{"request":{"method":"get","url":"https://example.com"}}}}}]`,
@@ -51,7 +52,14 @@ func Test__CreateSyntheticCheck__Execute(t *testing.T) {
 	execCtx := &contexts.ExecutionStateContext{}
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"spec": `{"kind":"Dash0SyntheticCheck","metadata":{"name":"checkout-health"},"spec":{"enabled":true,"plugin":{"kind":"http","spec":{"request":{"method":"get","url":"https://example.com"}}}}}`,
+			"name":       "checkout-health",
+			"enabled":    true,
+			"pluginKind": "http",
+			"method":     "get",
+			"url":        "https://example.com/health",
+			"headers": []map[string]any{
+				{"key": "x-test", "value": "superplane"},
+			},
 		},
 		HTTP: httpContext,
 		Integration: &contexts.IntegrationContext{
@@ -69,4 +77,11 @@ func Test__CreateSyntheticCheck__Execute(t *testing.T) {
 	assert.Equal(t, http.MethodPut, httpContext.Requests[0].Method)
 	assert.Contains(t, httpContext.Requests[0].URL.String(), "/api/synthetic-checks/superplane-synthetic-")
 	assert.Equal(t, "default", httpContext.Requests[0].URL.Query().Get("dataset"))
+
+	requestBody, readErr := io.ReadAll(httpContext.Requests[0].Body)
+	require.NoError(t, readErr)
+	assert.Contains(t, string(requestBody), `"kind":"Dash0SyntheticCheck"`)
+	assert.Contains(t, string(requestBody), `"name":"checkout-health"`)
+	assert.Contains(t, string(requestBody), `"method":"get"`)
+	assert.Contains(t, string(requestBody), `"url":"https://example.com/health"`)
 }

@@ -34,6 +34,13 @@ export interface GetCheckDetailsConfiguration {
 
 export interface UpsertSyntheticCheckConfiguration {
   originOrId?: string;
+  name?: string;
+  enabled?: boolean;
+  pluginKind?: string;
+  method?: string;
+  url?: string;
+  headers?: Array<{ key: string; value: string }>;
+  requestBody?: string;
   spec?: string;
 }
 
