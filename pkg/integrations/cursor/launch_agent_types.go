@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"strings"
 	"time"
 )
 
@@ -26,7 +27,7 @@ const (
 	LaunchAgentMaxPollInterval        = 10 * time.Minute
 	LaunchAgentMaxPollAttempts        = 100
 	LaunchAgentMaxPollErrors          = 5
-	LaunchAgentWebhookSignatureHeader = "X-Cursor-Signature"
+	LaunchAgentWebhookSignatureHeader = "X-Webhook-Signature"
 )
 
 // --- CONFIGURATION STRUCTS ---
@@ -171,8 +172,19 @@ func verifyWebhookSignature(body []byte, signature, secret string) bool {
 	if signature == "" || secret == "" {
 		return false
 	}
+	
+	// Cursor sends signature in format "sha256=<hex_digest>"
+	// Strip the "sha256=" prefix if present
+	signature = strings.TrimPrefix(signature, "sha256=")
+	if signature == "" {
+		return false
+	}
+	
+	// Compute expected signature
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write(body)
 	expectedSig := hex.EncodeToString(mac.Sum(nil))
+	
+	// Compare signatures using constant-time comparison
 	return hmac.Equal([]byte(signature), []byte(expectedSig))
 }

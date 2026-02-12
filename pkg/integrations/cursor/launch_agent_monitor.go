@@ -12,7 +12,6 @@ import (
 
 // HandleWebhook processes incoming updates from Cursor
 func (c *LaunchAgent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	// 1. Verify webhook signature using the platform-managed secret
 	signature := ctx.Headers.Get(LaunchAgentWebhookSignatureHeader)
 	if signature == "" {
 		return http.StatusUnauthorized, fmt.Errorf("missing signature header")

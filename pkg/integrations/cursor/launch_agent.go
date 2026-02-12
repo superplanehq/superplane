@@ -111,6 +111,7 @@ func (c *LaunchAgent) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("PR URL is required when using PR mode")
 	}
 
+	// Set up webhook so it's associated with the node and saved
 	_, err := ctx.Webhook.Setup()
 	return err
 }
@@ -118,8 +119,6 @@ func (c *LaunchAgent) Setup(ctx core.SetupContext) error {
 func (c *LaunchAgent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
-
-func ptrFromBool(b bool) *bool { return &b }
 
 func (c *LaunchAgent) Execute(ctx core.ExecutionContext) error {
 	spec := LaunchAgentSpec{}
@@ -145,10 +144,10 @@ func (c *LaunchAgent) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("cloud agent API key is not configured")
 	}
 
-	// 2. Get webhook URL and secret from the platform-managed webhook
+	// Get webhook URL and secret (webhook should already be set up in Setup)
 	webhookURL, err := ctx.Webhook.Setup()
 	if err != nil {
-		return fmt.Errorf("failed to setup webhook: %w", err)
+		return fmt.Errorf("failed to get webhook URL: %w", err)
 	}
 
 	webhookSecret, err := ctx.Webhook.GetSecret()
@@ -226,3 +225,5 @@ func (c *LaunchAgent) Execute(ctx core.ExecutionContext) error {
 	// 6. Start Monitoring (Fallback Polling)
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1, "errors": 0}, LaunchAgentInitialPollInterval)
 }
+
+func ptrFromBool(b bool) *bool { return &b }
