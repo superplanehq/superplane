@@ -107,6 +107,12 @@ import {
   eventStateRegistry as claudeEventStateRegistry,
 } from "./claude/index";
 import {
+  componentMappers as prometheusComponentMappers,
+  customFieldRenderers as prometheusCustomFieldRenderers,
+  triggerRenderers as prometheusTriggerRenderers,
+  eventStateRegistry as prometheusEventStateRegistry,
+} from "./prometheus/index";
+import {
   componentMappers as cursorComponentMappers,
   triggerRenderers as cursorTriggerRenderers,
   eventStateRegistry as cursorEventStateRegistry,
@@ -172,6 +178,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   openai: openaiComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
+  prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
   dockerhub: dockerhubComponentMappers,
   grafana: grafanaComponentMappers,
@@ -196,6 +203,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   openai: openaiTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
+  prometheus: prometheusTriggerRenderers,
   cursor: cursorTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
   grafana: grafanaTriggerRenderers,
@@ -219,6 +227,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
   aws: awsEventStateRegistry,
+  prometheus: prometheusEventStateRegistry,
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
@@ -248,6 +257,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
+  prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
 };
 

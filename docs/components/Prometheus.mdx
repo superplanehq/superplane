@@ -1,0 +1,137 @@
+---
+title: "Prometheus"
+---
+
+Monitor alerts from Prometheus and Alertmanager
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Alert" href="#on-alert" description="Listen to Alertmanager webhook alert events" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Get Alert" href="#get-alert" description="Get a Prometheus alert by name" />
+</CardGrid>
+
+## Instructions
+
+### Connection
+
+Configure this integration with:
+- **Prometheus Base URL**: URL of your Prometheus server (e.g., `https://prometheus.example.com`)
+- **API Auth**: `none`, `basic`, or `bearer` for Prometheus API requests
+- **Webhook Secret** (recommended): If set, Alertmanager must send `Authorization: Bearer <token>` on webhook requests
+
+### Alertmanager Setup (manual)
+
+The trigger setup panel in SuperPlane shows the generated webhook URL.
+Use the On Alert trigger setup instructions in the workflow sidebar for the exact `alertmanager.yml` snippet.
+
+After editing config, reload Alertmanager (for example `POST /-/reload` when lifecycle reload is enabled).
+
+<a id="on-alert"></a>
+
+## On Alert
+
+The On Alert trigger starts a workflow execution when Alertmanager sends alerts to SuperPlane.
+
+### What this trigger does
+
+- Receives Alertmanager webhook payloads
+- Optionally validates bearer auth when **Webhook Secret** is configured
+- Emits one event per matching alert as `prometheus.alert`
+- Filters by selected statuses (`firing` and/or `resolved`)
+
+### Configuration
+
+- **Statuses**: Required list of alert statuses to emit
+- **Alert Names**: Optional exact `alertname` filters
+
+### Alertmanager setup (manual)
+
+When the node is saved, SuperPlane generates a webhook URL shown in the trigger setup panel. Copy that URL into your Alertmanager receiver.
+
+Receiver registration in upstream Alertmanager is config-based (not API-created by SuperPlane). Use the setup instructions shown in the workflow sidebar for the exact `alertmanager.yml` snippet.
+
+After updating Alertmanager config, reload it (for example `POST /-/reload` when lifecycle reload is enabled).
+
+### Example Data
+
+```json
+{
+  "data": {
+    "annotations": {
+      "description": "Demo alert from local Prometheus setup",
+      "summary": "SuperPlane test alert is firing"
+    },
+    "commonAnnotations": {
+      "description": "Demo alert from local Prometheus setup",
+      "summary": "SuperPlane test alert is firing"
+    },
+    "commonLabels": {
+      "alertname": "SuperplaneTestAlert",
+      "severity": "warning"
+    },
+    "endsAt": "0001-01-01T00:00:00Z",
+    "externalURL": "http://localhost:9093",
+    "fingerprint": "aac3b474e2c0658c",
+    "generatorURL": "http://fd66aa456472:9090/graph?g0.expr=vector%281%29\u0026g0.tab=1",
+    "groupKey": "{}:{alertname=\"SuperplaneTestAlert\"}",
+    "groupLabels": {
+      "alertname": "SuperplaneTestAlert"
+    },
+    "labels": {
+      "alertname": "SuperplaneTestAlert",
+      "severity": "warning"
+    },
+    "receiver": "superplane",
+    "startsAt": "2026-02-12T16:08:39Z",
+    "status": "firing"
+  },
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "type": "prometheus.alert"
+}
+```
+
+<a id="get-alert"></a>
+
+## Get Alert
+
+The Get Alert component fetches active alerts from Prometheus (`/api/v1/alerts`) and returns the first alert that matches.
+
+### Configuration
+
+- **Alert Name**: Required `labels.alertname` value to search for (supports expressions)
+- **State**: Optional filter (`any`, `firing`, `pending`, `inactive`)
+
+### Output
+
+Emits one `prometheus.alert` payload with labels, annotations, state, and timing fields.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "annotations": {
+      "description": "Demo alert from local Prometheus setup",
+      "summary": "SuperPlane test alert is firing"
+    },
+    "labels": {
+      "alertname": "SuperplaneTestAlert",
+      "severity": "warning"
+    },
+    "startsAt": "2026-02-12T16:08:09.000517289Z",
+    "status": "firing",
+    "value": "1e+00"
+  },
+  "timestamp": "2026-02-12T16:18:05.943610583Z",
+  "type": "prometheus.alert"
+}
+```
+
