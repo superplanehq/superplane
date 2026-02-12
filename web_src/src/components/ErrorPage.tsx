@@ -16,7 +16,7 @@ export function ErrorPage() {
       <EmptyState
         icon={AlertCircle}
         title="Something went wrong"
-        description="We encountered an unexpected error. Our team has been notified and is working on it."
+        description="We encountered an unexpected error. Please try again or contact support if the issue persists."
       />
       <div className="flex gap-2 mt-6">
         <Button onClick={handleTryAgain}>Try Again</Button>
