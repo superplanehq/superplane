@@ -18,8 +18,7 @@ func Test__Prometheus__Sync(t *testing.T) {
 	t.Run("missing baseURL returns error", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"authType":        AuthTypeNone,
-				"webhookAuthType": AuthTypeNone,
+				"authType": AuthTypeNone,
 			},
 		}
 
@@ -34,9 +33,8 @@ func Test__Prometheus__Sync(t *testing.T) {
 	t.Run("missing basic auth values returns error", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"baseURL":         "https://prometheus.example.com",
-				"authType":        AuthTypeBasic,
-				"webhookAuthType": AuthTypeNone,
+				"baseURL":  "https://prometheus.example.com",
+				"authType": AuthTypeBasic,
 			},
 		}
 
@@ -46,23 +44,6 @@ func Test__Prometheus__Sync(t *testing.T) {
 		})
 
 		require.ErrorContains(t, err, "username is required when authType is basic")
-	})
-
-	t.Run("missing webhook basic values returns error", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"baseURL":         "https://prometheus.example.com",
-				"authType":        AuthTypeNone,
-				"webhookAuthType": AuthTypeBasic,
-			},
-		}
-
-		err := integration.Sync(core.SyncContext{
-			Configuration: integrationCtx.Configuration,
-			Integration:   integrationCtx,
-		})
-
-		require.ErrorContains(t, err, "webhookUsername is required when webhookAuthType is basic")
 	})
 
 	t.Run("successful sync sets ready state", func(t *testing.T) {
@@ -82,7 +63,6 @@ func Test__Prometheus__Sync(t *testing.T) {
 				"baseURL":            "https://prometheus.example.com",
 				"authType":           AuthTypeBearer,
 				"bearerToken":        "token-123",
-				"webhookAuthType":    AuthTypeBearer,
 				"webhookBearerToken": "wh-token",
 			},
 		}
@@ -116,9 +96,8 @@ func Test__Prometheus__Sync(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"baseURL":         "https://prometheus.example.com",
-				"authType":        AuthTypeNone,
-				"webhookAuthType": AuthTypeNone,
+				"baseURL":  "https://prometheus.example.com",
+				"authType": AuthTypeNone,
 			},
 		}
 

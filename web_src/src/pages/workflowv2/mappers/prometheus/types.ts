@@ -20,6 +20,11 @@ export interface OnAlertConfiguration {
   alertNames?: string[];
 }
 
+export interface OnAlertMetadata {
+  webhookUrl?: string;
+  webhookAuthEnabled?: boolean;
+}
+
 export interface GetAlertConfiguration {
   alertName?: string;
   state?: string;

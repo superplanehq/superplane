@@ -1,7 +1,6 @@
 package prometheus
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -37,21 +36,14 @@ func Test__PrometheusWebhookHandler__CompareConfig(t *testing.T) {
 func Test__PrometheusWebhookHandler__Setup(t *testing.T) {
 	handler := &PrometheusWebhookHandler{}
 	webhookCtx := &testWebhookContext{configuration: struct{}{}}
-	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{
-		"webhookAuthType":    AuthTypeBearer,
-		"webhookBearerToken": "token-1",
-	}}
+	integrationCtx := &contexts.IntegrationContext{}
 
 	_, err := handler.Setup(core.WebhookHandlerContext{
 		Webhook:     webhookCtx,
 		Integration: integrationCtx,
 	})
 	require.NoError(t, err)
-
-	config := webhookRuntimeConfiguration{}
-	require.NoError(t, json.Unmarshal(webhookCtx.secret, &config))
-	assert.Equal(t, AuthTypeBearer, config.AuthType)
-	assert.Equal(t, "token-1", config.BearerToken)
+	assert.Empty(t, webhookCtx.secret)
 }
 
 func Test__PrometheusWebhookHandler__Cleanup(t *testing.T) {

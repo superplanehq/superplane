@@ -35,10 +35,7 @@ type Configuration struct {
 	Username           string `json:"username,omitempty" mapstructure:"username"`
 	Password           string `json:"password,omitempty" mapstructure:"password"`
 	BearerToken        string `json:"bearerToken,omitempty" mapstructure:"bearerToken"`
-	WebhookAuthType    string `json:"webhookAuthType" mapstructure:"webhookAuthType"`
 	WebhookBearerToken string `json:"webhookBearerToken,omitempty" mapstructure:"webhookBearerToken"`
-	WebhookUsername    string `json:"webhookUsername,omitempty" mapstructure:"webhookUsername"`
-	WebhookPassword    string `json:"webhookPassword,omitempty" mapstructure:"webhookPassword"`
 }
 
 type Metadata struct{}
@@ -65,34 +62,12 @@ func (p *Prometheus) Instructions() string {
 Configure this integration with:
 - **Prometheus Base URL**: URL of your Prometheus server (e.g., ` + "`https://prometheus.example.com`" + `)
 - **API Auth**: ` + "`none`" + `, ` + "`basic`" + `, or ` + "`bearer`" + ` for Prometheus API requests
-- **Webhook Auth**: Authentication Alertmanager must send to SuperPlane webhook endpoints
+- **Webhook Secret** (recommended): If set, Alertmanager must send ` + "`Authorization: Bearer <token>`" + ` on webhook requests
 
 ### Alertmanager Setup (manual)
 
-Alertmanager receiver registration is **configuration-based** in upstream Alertmanager. SuperPlane creates/reuses an internal webhook record, but it does not create receivers via API.
-
-Add a receiver and route in ` + "`alertmanager.yml`" + `:
-
-` + "```yaml" + `
-receivers:
-  - name: superplane
-    webhook_configs:
-      - url: https://<superplane-host>/api/v1/webhooks/<webhook-id>
-        send_resolved: true
-        # Optional bearer auth
-        # http_config:
-        #   authorization:
-        #     type: Bearer
-        #     credentials: <webhook-bearer-token>
-        # Optional basic auth
-        # http_config:
-        #   basic_auth:
-        #     username: <webhook-username>
-        #     password: <webhook-password>
-
-route:
-  receiver: superplane
-` + "```" + `
+The trigger setup panel in SuperPlane shows the generated webhook URL.
+Use the On Alert trigger setup instructions in the workflow sidebar for the exact ` + "`alertmanager.yml`" + ` snippet.
 
 After editing config, reload Alertmanager (for example ` + "`POST /-/reload`" + ` when lifecycle reload is enabled).`
 }
@@ -153,49 +128,12 @@ func (p *Prometheus) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "webhookAuthType",
-			Label:    "Webhook Auth Type",
-			Type:     configuration.FieldTypeSelect,
-			Required: true,
-			Default:  AuthTypeNone,
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "None", Value: AuthTypeNone},
-						{Label: "Bearer", Value: AuthTypeBearer},
-						{Label: "Basic", Value: AuthTypeBasic},
-					},
-				},
-			},
-		},
-		{
-			Name:      "webhookBearerToken",
-			Label:     "Webhook Bearer Token",
-			Type:      configuration.FieldTypeString,
-			Required:  false,
-			Sensitive: true,
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "webhookAuthType", Values: []string{AuthTypeBearer}},
-			},
-		},
-		{
-			Name:     "webhookUsername",
-			Label:    "Webhook Username",
-			Type:     configuration.FieldTypeString,
-			Required: false,
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "webhookAuthType", Values: []string{AuthTypeBasic}},
-			},
-		},
-		{
-			Name:      "webhookPassword",
-			Label:     "Webhook Password",
-			Type:      configuration.FieldTypeString,
-			Required:  false,
-			Sensitive: true,
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "webhookAuthType", Values: []string{AuthTypeBasic}},
-			},
+			Name:        "webhookBearerToken",
+			Label:       "Webhook Secret",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Sensitive:   true,
+			Description: "Secret required by incoming Alertmanager webhooks. Recommended for production environments.",
 		},
 	}
 }
@@ -259,24 +197,6 @@ func validateIntegrationConfiguration(config Configuration) error {
 		}
 	default:
 		return fmt.Errorf("authType must be one of: none, basic, bearer")
-	}
-
-	webhookAuthType := config.WebhookAuthType
-	switch webhookAuthType {
-	case AuthTypeNone:
-	case AuthTypeBearer:
-		if config.WebhookBearerToken == "" {
-			return fmt.Errorf("webhookBearerToken is required when webhookAuthType is bearer")
-		}
-	case AuthTypeBasic:
-		if config.WebhookUsername == "" {
-			return fmt.Errorf("webhookUsername is required when webhookAuthType is basic")
-		}
-		if config.WebhookPassword == "" {
-			return fmt.Errorf("webhookPassword is required when webhookAuthType is basic")
-		}
-	default:
-		return fmt.Errorf("webhookAuthType must be one of: none, bearer, basic")
 	}
 
 	return nil

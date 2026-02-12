@@ -20,6 +20,11 @@ type OnAlertConfiguration struct {
 	AlertNames []string `json:"alertNames" mapstructure:"alertNames"`
 }
 
+type OnAlertMetadata struct {
+	WebhookURL         string `json:"webhookUrl" mapstructure:"webhookUrl"`
+	WebhookAuthEnabled bool   `json:"webhookAuthEnabled,omitempty" mapstructure:"webhookAuthEnabled"`
+}
+
 type AlertmanagerWebhookPayload struct {
 	Version           string              `json:"version"`
 	GroupKey          string              `json:"groupKey"`
@@ -61,7 +66,7 @@ func (t *OnAlert) Documentation() string {
 ## What this trigger does
 
 - Receives Alertmanager webhook payloads
-- Validates optional webhook authentication (` + "`none`" + `, ` + "`bearer`" + `, ` + "`basic`" + `)
+- Optionally validates bearer auth when **Webhook Secret** is configured
 - Emits one event per matching alert as ` + "`prometheus.alert`" + `
 - Filters by selected statuses (` + "`firing`" + ` and/or ` + "`resolved`" + `)
 
@@ -72,28 +77,9 @@ func (t *OnAlert) Documentation() string {
 
 ## Alertmanager setup (manual)
 
-Receiver registration in upstream Alertmanager is config-based (not API-created by SuperPlane).
+When the node is saved, SuperPlane generates a webhook URL shown in the trigger setup panel. Copy that URL into your Alertmanager receiver.
 
-` + "```yaml" + `
-receivers:
-  - name: superplane
-    webhook_configs:
-      - url: https://<superplane-host>/api/v1/webhooks/<webhook-id>
-        send_resolved: true
-        # Optional bearer auth
-        # http_config:
-        #   authorization:
-        #     type: Bearer
-        #     credentials: <webhook-bearer-token>
-        # Optional basic auth
-        # http_config:
-        #   basic_auth:
-        #     username: <webhook-username>
-        #     password: <webhook-password>
-
-route:
-  receiver: superplane
-` + "```" + `
+Receiver registration in upstream Alertmanager is config-based (not API-created by SuperPlane). Use the setup instructions shown in the workflow sidebar for the exact ` + "`alertmanager.yml`" + ` snippet.
 
 After updating Alertmanager config, reload it (for example ` + "`POST /-/reload`" + ` when lifecycle reload is enabled).`
 }
@@ -143,6 +129,13 @@ func (t *OnAlert) Configuration() []configuration.Field {
 }
 
 func (t *OnAlert) Setup(ctx core.TriggerContext) error {
+	metadata := OnAlertMetadata{}
+	if ctx.Metadata != nil && ctx.Metadata.Get() != nil {
+		if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+			return fmt.Errorf("failed to decode metadata: %w", err)
+		}
+	}
+
 	config := OnAlertConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
@@ -153,7 +146,28 @@ func (t *OnAlert) Setup(ctx core.TriggerContext) error {
 		return err
 	}
 
-	return ctx.Integration.RequestWebhook(struct{}{})
+	if err := ctx.Integration.RequestWebhook(struct{}{}); err != nil {
+		return err
+	}
+
+	if ctx.Webhook == nil {
+		return fmt.Errorf("missing webhook context")
+	}
+
+	webhookURL, err := ctx.Webhook.Setup()
+	if err != nil {
+		return fmt.Errorf("failed to setup webhook URL: %w", err)
+	}
+
+	metadata.WebhookURL = webhookURL
+	webhookBearerToken, _ := optionalIntegrationConfig(ctx.Integration, "webhookBearerToken")
+	metadata.WebhookAuthEnabled = webhookBearerToken != ""
+
+	if ctx.Metadata == nil {
+		return nil
+	}
+
+	return ctx.Metadata.Set(metadata)
 }
 
 func (t *OnAlert) Actions() []core.Action {
@@ -256,41 +270,43 @@ func filterEmpty(values []string) []string {
 }
 
 func validateWebhookAuth(ctx core.WebhookRequestContext) error {
-	authConfig, err := getWebhookRuntimeConfiguration(ctx.Webhook)
+	if ctx.Integration == nil {
+		return nil
+	}
+
+	webhookBearerToken, err := optionalIntegrationConfig(ctx.Integration, "webhookBearerToken")
 	if err != nil {
 		return err
 	}
 
-	authorization := ctx.Headers.Get("Authorization")
-	switch authConfig.AuthType {
-	case AuthTypeNone:
+	if webhookBearerToken == "" {
 		return nil
-	case AuthTypeBearer:
-		if !strings.HasPrefix(authorization, "Bearer ") {
-			return fmt.Errorf("missing bearer authorization")
-		}
-
-		token := authorization[len("Bearer "):]
-		if subtle.ConstantTimeCompare([]byte(token), []byte(authConfig.BearerToken)) != 1 {
-			return fmt.Errorf("invalid bearer token")
-		}
-		return nil
-	case AuthTypeBasic:
-		username, password, err := decodeBasicAuthHeader(authorization)
-		if err != nil {
-			return err
-		}
-
-		if subtle.ConstantTimeCompare([]byte(username), []byte(authConfig.Username)) != 1 {
-			return fmt.Errorf("invalid basic auth credentials")
-		}
-		if subtle.ConstantTimeCompare([]byte(password), []byte(authConfig.Password)) != 1 {
-			return fmt.Errorf("invalid basic auth credentials")
-		}
-		return nil
-	default:
-		return fmt.Errorf("unsupported webhook authType %q", authConfig.AuthType)
 	}
+
+	authorization := ctx.Headers.Get("Authorization")
+	if !strings.HasPrefix(authorization, "Bearer ") {
+		return fmt.Errorf("missing bearer authorization")
+	}
+
+	token := authorization[len("Bearer "):]
+	if subtle.ConstantTimeCompare([]byte(token), []byte(webhookBearerToken)) != 1 {
+		return fmt.Errorf("invalid bearer token")
+	}
+
+	return nil
+}
+
+func optionalIntegrationConfig(integration core.IntegrationContext, name string) (string, error) {
+	if integration == nil {
+		return "", nil
+	}
+
+	value, err := integration.GetConfig(name)
+	if err != nil {
+		return "", nil
+	}
+
+	return string(value), nil
 }
 
 func buildAlertPayloadFromAlertmanager(alert AlertmanagerAlert, payload AlertmanagerWebhookPayload) map[string]any {

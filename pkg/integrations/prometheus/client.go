@@ -1,7 +1,6 @@
 package prometheus
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -233,27 +232,4 @@ func formatPrometheusError(errorType string, errorMessage string) error {
 	}
 
 	return fmt.Errorf("prometheus API error (%s): %s", errorType, errorMessage)
-}
-
-func decodeBasicAuthHeader(header string) (string, string, error) {
-	if !strings.HasPrefix(header, "Basic ") {
-		return "", "", fmt.Errorf("authorization header must be Basic")
-	}
-
-	encoded := header[len("Basic "):]
-	if encoded == "" {
-		return "", "", fmt.Errorf("missing basic auth credentials")
-	}
-
-	decoded, err := base64.StdEncoding.DecodeString(encoded)
-	if err != nil {
-		return "", "", fmt.Errorf("invalid basic auth encoding")
-	}
-
-	username, password, ok := strings.Cut(string(decoded), ":")
-	if !ok {
-		return "", "", fmt.Errorf("invalid basic auth format")
-	}
-
-	return username, password, nil
 }

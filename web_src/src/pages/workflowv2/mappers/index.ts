@@ -108,6 +108,7 @@ import {
 } from "./claude/index";
 import {
   componentMappers as prometheusComponentMappers,
+  customFieldRenderers as prometheusCustomFieldRenderers,
   triggerRenderers as prometheusTriggerRenderers,
   eventStateRegistry as prometheusEventStateRegistry,
 } from "./prometheus/index";
@@ -240,6 +241,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
+  prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
 };
 

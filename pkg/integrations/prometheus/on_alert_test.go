@@ -1,8 +1,6 @@
 package prometheus
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -19,21 +17,35 @@ func Test__OnAlert__Setup(t *testing.T) {
 		err := trigger.Setup(core.TriggerContext{
 			Configuration: map[string]any{"statuses": []string{}},
 			Integration:   &contexts.IntegrationContext{},
+			Webhook:       &contexts.WebhookContext{},
 		})
 
 		require.ErrorContains(t, err, "at least one status")
 	})
 
-	t.Run("valid setup requests shared webhook", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{}
+	t.Run("valid setup requests shared webhook and stores setup metadata", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"webhookBearerToken": "token-1",
+			},
+		}
+		metadataCtx := &contexts.MetadataContext{}
+
 		err := trigger.Setup(core.TriggerContext{
 			Configuration: map[string]any{"statuses": []string{AlertStateFiring}},
 			Integration:   integrationCtx,
+			Metadata:      metadataCtx,
+			Webhook:       &setupWebhookContext{url: "https://superplane.example.com/api/v1/webhooks/wh_123"},
 		})
 
 		require.NoError(t, err)
 		require.Len(t, integrationCtx.WebhookRequests, 1)
 		assert.IsType(t, struct{}{}, integrationCtx.WebhookRequests[0])
+
+		metadata, ok := metadataCtx.Metadata.(OnAlertMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "https://superplane.example.com/api/v1/webhooks/wh_123", metadata.WebhookURL)
+		assert.True(t, metadata.WebhookAuthEnabled)
 	})
 }
 
@@ -73,14 +85,15 @@ func Test__OnAlert__HandleWebhook(t *testing.T) {
 
 	t.Run("missing bearer auth returns 403", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
-		secret := mustSecret(t, webhookRuntimeConfiguration{AuthType: AuthTypeBearer, BearerToken: "token-1"})
 
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{AlertStateFiring}},
-			Webhook:       &contexts.WebhookContext{Secret: string(secret)},
-			Events:        eventsCtx,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{
+				"webhookBearerToken": "token-1",
+			}},
+			Events: eventsCtx,
 		})
 
 		assert.Equal(t, http.StatusForbidden, code)
@@ -90,13 +103,12 @@ func Test__OnAlert__HandleWebhook(t *testing.T) {
 
 	t.Run("invalid body returns 400", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
-		secret := mustSecret(t, webhookRuntimeConfiguration{AuthType: AuthTypeNone})
 
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          []byte("not-json"),
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{AlertStateFiring}},
-			Webhook:       &contexts.WebhookContext{Secret: string(secret)},
+			Integration:   &contexts.IntegrationContext{},
 			Events:        eventsCtx,
 		})
 
@@ -107,13 +119,12 @@ func Test__OnAlert__HandleWebhook(t *testing.T) {
 
 	t.Run("status filtered out returns 200 and no events", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
-		secret := mustSecret(t, webhookRuntimeConfiguration{AuthType: AuthTypeNone})
 
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       http.Header{},
 			Configuration: map[string]any{"statuses": []string{AlertStateResolved}, "alertNames": []string{"OnlyOther"}},
-			Webhook:       &contexts.WebhookContext{Secret: string(secret)},
+			Integration:   &contexts.IntegrationContext{},
 			Events:        eventsCtx,
 		})
 
@@ -122,18 +133,19 @@ func Test__OnAlert__HandleWebhook(t *testing.T) {
 		assert.Len(t, eventsCtx.Payloads, 0)
 	})
 
-	t.Run("valid firing and resolved alerts are emitted", func(t *testing.T) {
+	t.Run("valid firing and resolved alerts are emitted with bearer auth", func(t *testing.T) {
 		eventsCtx := &contexts.EventContext{}
-		secret := mustSecret(t, webhookRuntimeConfiguration{AuthType: AuthTypeBasic, Username: "user", Password: "pass"})
 		headers := http.Header{}
-		headers.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte("user:pass")))
+		headers.Set("Authorization", "Bearer token-1")
 
 		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:          payload,
 			Headers:       headers,
 			Configuration: map[string]any{"statuses": []string{AlertStateFiring, AlertStateResolved}},
-			Webhook:       &contexts.WebhookContext{Secret: string(secret)},
-			Events:        eventsCtx,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{
+				"webhookBearerToken": "token-1",
+			}},
+			Events: eventsCtx,
 		})
 
 		assert.Equal(t, http.StatusOK, code)
@@ -145,9 +157,22 @@ func Test__OnAlert__HandleWebhook(t *testing.T) {
 	})
 }
 
-func mustSecret(t *testing.T, config webhookRuntimeConfiguration) []byte {
-	t.Helper()
-	raw, err := json.Marshal(config)
-	require.NoError(t, err)
-	return raw
+type setupWebhookContext struct {
+	url string
+}
+
+func (s *setupWebhookContext) GetSecret() ([]byte, error) {
+	return nil, nil
+}
+
+func (s *setupWebhookContext) ResetSecret() ([]byte, []byte, error) {
+	return nil, nil, nil
+}
+
+func (s *setupWebhookContext) Setup() (string, error) {
+	return s.url, nil
+}
+
+func (s *setupWebhookContext) GetBaseURL() string {
+	return "https://superplane.example.com/api/v1"
 }
