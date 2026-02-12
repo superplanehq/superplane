@@ -81,7 +81,8 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 	if os.Getenv("START_WORKFLOW_NODE_EXECUTOR") == "yes" || os.Getenv("START_NODE_EXECUTOR") == "yes" {
 		log.Println("Starting Node Executor")
 
-		w := workers.NewNodeExecutor(encryptor, registry, baseURL)
+		webhookBaseURL := getWebhookBaseURL(baseURL)
+		w := workers.NewNodeExecutor(encryptor, registry, baseURL, webhookBaseURL)
 		go w.Start(context.Background())
 	}
 
