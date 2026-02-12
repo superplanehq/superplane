@@ -1,11 +1,15 @@
 {
-  "object_kind": "release",
-  "action": "create",
-  "name": "v1.1",
-  "tag": "v1.1",
-  "url": "https://gitlab.example.com/group/example/-/releases/v1.1",
-  "project": {
-    "id": 1,
-    "path_with_namespace": "group/example"
-  }
+  "data": {
+    "object_kind": "release",
+    "action": "create",
+    "name": "v1.1",
+    "tag": "v1.1",
+    "url": "https://gitlab.example.com/group/example/-/releases/v1.1",
+    "project": {
+      "id": 1,
+      "path_with_namespace": "group/example"
+    }
+  },
+  "timestamp": "2026-02-12T20:40:00.000000000Z",
+  "type": "gitlab.release"
 }

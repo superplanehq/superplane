@@ -1,19 +1,23 @@
 {
-  "object_kind": "merge_request",
-  "event_type": "merge_request",
-  "project": {
-    "id": 1,
-    "path_with_namespace": "group/example"
+  "data": {
+    "object_kind": "merge_request",
+    "event_type": "merge_request",
+    "project": {
+      "id": 1,
+      "path_with_namespace": "group/example"
+    },
+    "object_attributes": {
+      "iid": 12,
+      "title": "Add merge request trigger",
+      "state": "opened",
+      "action": "open"
+    },
+    "labels": [
+      {
+        "title": "backend"
+      }
+    ]
   },
-  "object_attributes": {
-    "iid": 12,
-    "title": "Add merge request trigger",
-    "state": "opened",
-    "action": "open"
-  },
-  "labels": [
-    {
-      "title": "backend"
-    }
-  ]
+  "timestamp": "2026-02-12T20:40:00.000000000Z",
+  "type": "gitlab.mergeRequest"
 }
