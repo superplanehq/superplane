@@ -1,0 +1,12 @@
+{
+  "data": {
+    "deployId": "dep-cukouhrtq21c73e9scng",
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "status": "canceled",
+    "trigger": "api",
+    "createdAt": "2026-02-05T16:10:00.000000Z",
+    "finishedAt": "2026-02-05T16:12:00.000000Z"
+  },
+  "timestamp": "2026-02-05T16:12:00.000000Z",
+  "type": "render.deploy"
+}

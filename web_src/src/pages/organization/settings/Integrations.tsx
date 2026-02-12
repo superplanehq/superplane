@@ -305,9 +305,6 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                         Integration Name
                         <span className="text-gray-800 ml-1">*</span>
                       </Label>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                        A unique name for this integration
-                      </p>
                       <Input
                         type="text"
                         value={integrationName}
@@ -316,11 +313,14 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                         required
                         disabled={!canCreateIntegrations}
                       />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        A unique name for this integration
+                      </p>
                     </div>
 
                     {/* Configuration Fields */}
                     {selectedIntegration.configuration && selectedIntegration.configuration.length > 0 && (
-                      <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
+                      <div className="space-y-4">
                         {selectedIntegration.configuration.map((field) => {
                           if (!field.name) return null;
                           return (
