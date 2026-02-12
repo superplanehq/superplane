@@ -24,7 +24,6 @@ export interface UpsertSyntheticCheckConfiguration {
   url?: string;
   headers?: Array<{ key: string; value: string }>;
   requestBody?: string;
-  spec?: string;
 }
 
 export interface PrometheusResponse {
