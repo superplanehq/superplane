@@ -68,11 +68,11 @@ func normalizeCheckRuleKeyValuePairs(pairs []CheckRuleKeyValue, fieldName, scope
 			return nil, fmt.Errorf("%s: %s[%d].key is required", scope, fieldName, index)
 		}
 
-		normalized[key] = strings.TrimSpace(pair.Value)
-	}
+		if _, exists := normalized[key]; exists {
+			return nil, fmt.Errorf("%s: %s[%d].key %q is duplicated", scope, fieldName, index, key)
+		}
 
-	if len(normalized) == 0 {
-		return nil, nil
+		normalized[key] = strings.TrimSpace(pair.Value)
 	}
 
 	return normalized, nil

@@ -282,6 +282,10 @@ func parseJSONResponse(responseBody []byte) (map[string]any, error) {
 
 	var parsed map[string]any
 	if err := json.Unmarshal(responseBody, &parsed); err == nil {
+		if parsed == nil {
+			return map[string]any{}, nil
+		}
+
 		return parsed, nil
 	}
 

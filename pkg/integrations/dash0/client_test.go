@@ -260,4 +260,32 @@ func Test__Client__UpsertCheckRule(t *testing.T) {
 		assert.Contains(t, httpContext.Requests[0].URL.String(), "/api/alerting/check-rules/checkout-errors")
 		assert.Equal(t, "default", httpContext.Requests[0].URL.Query().Get("dataset"))
 	})
+
+	t.Run("null response body does not panic", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`null`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken": "token123",
+				"baseURL":  "https://api.us-west-2.aws.dash0.com",
+			},
+		}
+
+		client, err := NewClient(httpContext, integrationCtx)
+		require.NoError(t, err)
+
+		response, err := client.UpsertCheckRule("checkout-errors", map[string]any{
+			"name":       "CheckoutErrors",
+			"expression": "vector(1)",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "checkout-errors", response["originOrId"])
+	})
 }

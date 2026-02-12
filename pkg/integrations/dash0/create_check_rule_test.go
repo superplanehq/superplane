@@ -33,6 +33,34 @@ func Test__CreateCheckRule__Setup(t *testing.T) {
 		})
 		require.ErrorContains(t, err, "expression is required")
 	})
+
+	t.Run("duplicate label keys fail setup", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"name":       "CheckoutErrors",
+				"expression": "vector(1)",
+				"labels": []map[string]any{
+					{"key": "severity", "value": "warning"},
+					{"key": "severity", "value": "critical"},
+				},
+			},
+		})
+		require.ErrorContains(t, err, `labels[1].key "severity" is duplicated`)
+	})
+
+	t.Run("duplicate annotation keys fail setup", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"name":       "CheckoutErrors",
+				"expression": "vector(1)",
+				"annotations": []map[string]any{
+					{"key": "summary", "value": "Checkout warning"},
+					{"key": "summary", "value": "Checkout critical"},
+				},
+			},
+		})
+		require.ErrorContains(t, err, `annotations[1].key "summary" is duplicated`)
+	})
 }
 
 func Test__CreateCheckRule__Execute(t *testing.T) {
