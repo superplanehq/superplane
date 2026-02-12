@@ -7,6 +7,7 @@ import (
 	"maps"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -45,12 +46,14 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 	installationID := uuid.New()
 	configuration, err := encryptConfigurationIfNeeded(ctx, registry, integration, appConfig.AsMap(), installationID, nil)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to encrypt sensitive configuration: %v", err)
+		log.Errorf("failed to encrypt sensitive configuration: %v", err)
+		return nil, status.Error(codes.Internal, "failed to encrypt sensitive configuration")
 	}
 
 	newIntegration, err := models.CreateIntegration(installationID, uuid.MustParse(orgID), integrationName, name, configuration)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create integration: %v", err)
+		log.Errorf("failed to create integration: %v", err)
+		return nil, status.Error(codes.Internal, "failed to create integration")
 	}
 
 	integrationCtx := contexts.NewIntegrationContext(
