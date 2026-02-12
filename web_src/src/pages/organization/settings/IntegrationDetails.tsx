@@ -28,7 +28,6 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
   const navigate = useNavigate();
   const { integrationId } = useParams<{ integrationId: string }>();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const [configValues, setConfigValues] = useState<Record<string, unknown>>({});
   const [integrationName, setIntegrationName] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const canUpdateIntegrations = canAct("integrations", "update");
@@ -44,16 +43,21 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
   const updateMutation = useUpdateIntegration(organizationId, integrationId || "");
   const deleteMutation = useDeleteIntegration(organizationId, integrationId || "");
 
-  // Initialize config values when installation loads
+  // Track if user has made changes to config
+  const [configOverrides, setConfigOverrides] = useState<Record<string, unknown> | null>(null);
+
+  // Reset overrides when integration changes (e.g., navigating to different integration)
   useEffect(() => {
-    if (integration?.spec?.configuration) {
-      setConfigValues(integration.spec.configuration);
-    }
-  }, [integration]);
+    setConfigOverrides(null);
+  }, [integrationId]);
 
   useEffect(() => {
     setIntegrationName(integration?.metadata?.name || integration?.spec?.integrationName || "");
   }, [integration?.metadata?.name, integration?.spec?.integrationName]);
+
+  // Use saved config as base, with user overrides on top
+  const configValues = configOverrides ?? integration?.spec?.configuration ?? {};
+  const setConfigValues = (newValues: Record<string, unknown>) => setConfigOverrides(newValues);
 
   // Group usedIn nodes by workflow
   const workflowGroups = useMemo(() => {

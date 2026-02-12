@@ -97,6 +97,11 @@ import {
   eventStateRegistry as openaiEventStateRegistry,
 } from "./openai/index";
 import {
+  componentMappers as jiraComponentMappers,
+  triggerRenderers as jiraTriggerRenderers,
+  eventStateRegistry as jiraEventStateRegistry,
+} from "./jira/index";
+import {
   componentMappers as circleCIComponentMappers,
   triggerRenderers as circleCITriggerRenderers,
   eventStateRegistry as circleCIEventStateRegistry,
@@ -160,6 +165,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   aws: awsComponentMappers,
   discord: discordComponentMappers,
   openai: openaiComponentMappers,
+  jira: jiraComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
   dockerhub: dockerhubComponentMappers,
@@ -182,6 +188,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
   openai: openaiTriggerRenderers,
+  jira: jiraTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
@@ -205,6 +212,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
   aws: awsEventStateRegistry,
+  jira: jiraEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
 };
