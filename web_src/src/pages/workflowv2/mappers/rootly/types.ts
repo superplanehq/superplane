@@ -33,3 +33,14 @@ export interface IncidentEvent {
   occurred_at?: string;
   created_at?: string;
 }
+
+export interface IncidentEvent {
+  id?: string;
+  event?: string;
+  kind?: string;
+  source?: string;
+  visibility?: string;
+  occurred_at?: string;
+  created_at?: string;
+  user_display_name?: string;
+}
