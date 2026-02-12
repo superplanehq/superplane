@@ -253,8 +253,40 @@ func (c *Client) GetProject(projectID string) (*Project, error) {
 	return project, nil
 }
 
-func (c *Client) TriggerDeploy(serviceID, environmentID string) error {
-	// serviceInstanceDeployV2 returns a String! (deployment ID), not an object
+// Deployment represents a Railway deployment with its current status
+type Deployment struct {
+	ID     string `json:"id"`
+	Status string `json:"status"` // BUILDING, DEPLOYING, SUCCESS, FAILED, CRASHED, REMOVED, SLEEPING, SKIPPED, WAITING, QUEUED
+	URL    string `json:"url"`
+}
+
+// DeploymentStatus constants
+const (
+	DeploymentStatusQueued    = "QUEUED"
+	DeploymentStatusWaiting   = "WAITING"
+	DeploymentStatusBuilding  = "BUILDING"
+	DeploymentStatusDeploying = "DEPLOYING"
+	DeploymentStatusSuccess   = "SUCCESS"
+	DeploymentStatusFailed    = "FAILED"
+	DeploymentStatusCrashed   = "CRASHED"
+	DeploymentStatusRemoved   = "REMOVED"
+	DeploymentStatusSleeping  = "SLEEPING"
+	DeploymentStatusSkipped   = "SKIPPED"
+)
+
+// IsDeploymentFinalStatus returns true if the status is a final/terminal status
+func IsDeploymentFinalStatus(status string) bool {
+	switch status {
+	case DeploymentStatusSuccess, DeploymentStatusFailed, DeploymentStatusCrashed,
+		DeploymentStatusRemoved, DeploymentStatusSkipped:
+		return true
+	default:
+		return false
+	}
+}
+
+func (c *Client) TriggerDeploy(serviceID, environmentID string) (string, error) {
+	// serviceInstanceDeployV2 returns a String! (deployment ID)
 	mutation := `
 		mutation serviceInstanceDeployV2($serviceId: String!, $environmentId: String!) {
 			serviceInstanceDeployV2(serviceId: $serviceId, environmentId: $environmentId)
@@ -266,8 +298,46 @@ func (c *Client) TriggerDeploy(serviceID, environmentID string) error {
 		"environmentId": environmentID,
 	}
 
-	_, err := c.graphql(mutation, variables)
-	return err
+	data, err := c.graphql(mutation, variables)
+	if err != nil {
+		return "", err
+	}
+
+	deploymentID, ok := data["serviceInstanceDeployV2"].(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected response format: deployment ID not found")
+	}
+
+	return deploymentID, nil
+}
+
+// GetDeployment retrieves the current status of a deployment
+func (c *Client) GetDeployment(deploymentID string) (*Deployment, error) {
+	query := `
+		query deployment($id: String!) {
+			deployment(id: $id) {
+				id
+				status
+				url
+			}
+		}
+	`
+
+	data, err := c.graphql(query, map[string]any{"id": deploymentID})
+	if err != nil {
+		return nil, err
+	}
+
+	deploymentData, ok := data["deployment"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("deployment not found")
+	}
+
+	return &Deployment{
+		ID:     getString(deploymentData, "id"),
+		Status: getString(deploymentData, "status"),
+		URL:    getString(deploymentData, "url"),
+	}, nil
 }
 
 // Helper function to safely get string from map

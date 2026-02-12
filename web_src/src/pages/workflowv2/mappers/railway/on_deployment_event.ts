@@ -50,14 +50,26 @@ export const onDeploymentEventTriggerRenderer: TriggerRenderer = {
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as OnDeploymentEventData;
     const resource = eventData?.resource;
-    const timestamp = eventData?.timestamp ? new Date(eventData.timestamp).toLocaleString() : "";
+    const receivedAt = context.event?.createdAt
+      ? new Date(context.event?.createdAt).toLocaleString()
+      : "";
+
+    // Build Railway deployment URL
+    const projectId = resource?.project?.id;
+    const serviceId = resource?.service?.id;
+    const deploymentId = resource?.deployment?.id;
+    const deploymentLink =
+      projectId && serviceId
+        ? `https://railway.com/project/${projectId}/service/${serviceId}${deploymentId ? `?deploymentId=${deploymentId}` : ""}`
+        : "";
 
     return {
-      Service: resource?.service?.name || "",
+      "Received at": receivedAt,
       Status: eventData?.details?.status || "",
+      Service: resource?.service?.name || "",
       Environment: resource?.environment?.name || "",
       Project: resource?.project?.name || "",
-      Timestamp: timestamp,
+      "Deployment link": deploymentLink,
     };
   },
 

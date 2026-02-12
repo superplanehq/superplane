@@ -20,8 +20,9 @@ type OnDeploymentEventConfiguration struct {
 }
 
 type OnDeploymentEventMetadata struct {
-	Project    *ProjectInfo `json:"project"              mapstructure:"project"`
-	WebhookURL string       `json:"webhookUrl,omitempty" mapstructure:"webhookUrl,omitempty"`
+	Project          *ProjectInfo `json:"project"              mapstructure:"project"`
+	WebhookURL       string       `json:"webhookUrl,omitempty" mapstructure:"webhookUrl,omitempty"`
+	WebhookConfigURL string       `json:"webhookConfigUrl,omitempty" mapstructure:"webhookConfigUrl,omitempty"`
 }
 
 type ProjectInfo struct {
@@ -171,13 +172,17 @@ func (t *OnDeploymentEvent) Setup(ctx core.TriggerContext) error {
 		}
 	}
 
-	// Store metadata with webhook URL
+	// Build direct link to Railway webhook configuration page
+	webhookConfigURL := fmt.Sprintf("https://railway.com/project/%s/settings/webhooks/new", project.ID)
+
+	// Store metadata with webhook URL and config link
 	if err := ctx.Metadata.Set(OnDeploymentEventMetadata{
 		Project: &ProjectInfo{
 			ID:   project.ID,
 			Name: project.Name,
 		},
-		WebhookURL: webhookURL,
+		WebhookURL:       webhookURL,
+		WebhookConfigURL: webhookConfigURL,
 	}); err != nil {
 		return fmt.Errorf("failed to set metadata: %w", err)
 	}

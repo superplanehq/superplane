@@ -2,6 +2,7 @@ package railway
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -9,7 +10,20 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-// TriggerDeploy is a stub for now - will be fully implemented in the next phase
+const (
+	// Output channel names
+	DeployedOutputChannel = "deployed"
+	FailedOutputChannel   = "failed"
+	CrashedOutputChannel  = "crashed"
+
+	// Event type
+	DeploymentPayloadType = "railway.deployment.finished"
+
+	// Poll interval for checking deployment status
+	DeploymentPollInterval = 15 * time.Second
+)
+
+// TriggerDeploy triggers a deployment and tracks its status until completion
 type TriggerDeploy struct{}
 
 type TriggerDeployConfiguration struct {
@@ -22,6 +36,13 @@ type TriggerDeployMetadata struct {
 	Project     *ProjectInfo     `json:"project"     mapstructure:"project"`
 	Service     *ServiceInfo     `json:"service"     mapstructure:"service"`
 	Environment *EnvironmentInfo `json:"environment" mapstructure:"environment"`
+}
+
+// TriggerDeployExecutionMetadata tracks the deployment state during execution
+type TriggerDeployExecutionMetadata struct {
+	DeploymentID string `json:"deploymentId" mapstructure:"deploymentId"`
+	Status       string `json:"status"       mapstructure:"status"`
+	URL          string `json:"url"          mapstructure:"url"`
 }
 
 type ServiceInfo struct {
@@ -47,7 +68,7 @@ func (c *TriggerDeploy) Description() string {
 }
 
 func (c *TriggerDeploy) Documentation() string {
-	return `The Trigger Deploy component starts a new deployment for a Railway service in a specific environment.
+	return `The Trigger Deploy component starts a new deployment for a Railway service and waits for it to complete.
 
 ## Use Cases
 
@@ -56,25 +77,26 @@ func (c *TriggerDeploy) Documentation() string {
 - **Manual approval**: Deploy after approval in the workflow
 - **Cross-service orchestration**: Deploy services in sequence
 
+## How It Works
+
+1. Triggers a new deployment via Railway's API
+2. Polls for deployment status updates (Queued → Building → Deploying → Success/Failed)
+3. Routes execution based on final deployment status:
+   - **Deployed channel**: Deployment succeeded
+   - **Failed channel**: Deployment failed
+   - **Crashed channel**: Deployment crashed
+
 ## Configuration
 
 - **Project**: Select the Railway project
 - **Service**: Select the service to deploy
 - **Environment**: Select the target environment (e.g., production, staging)
 
-## How It Works
+## Output Channels
 
-1. Calls Railway's ` + "`environmentTriggersDeploy`" + ` API
-2. Railway queues a new deployment for the service
-3. Component emits the deployment trigger result
-
-## Output
-
-The component emits:
-- ` + "`project`" + `: Project ID
-- ` + "`service`" + `: Service ID
-- ` + "`environment`" + `: Environment ID
-- ` + "`triggered`" + `: Whether the deployment was triggered`
+- **Deployed**: Emitted when deployment succeeds
+- **Failed**: Emitted when deployment fails
+- **Crashed**: Emitted when deployment crashes`
 }
 
 func (c *TriggerDeploy) Icon() string {
@@ -140,7 +162,18 @@ func (c *TriggerDeploy) Configuration() []configuration.Field {
 
 func (c *TriggerDeploy) OutputChannels(config any) []core.OutputChannel {
 	return []core.OutputChannel{
-		core.DefaultOutputChannel,
+		{
+			Name:  DeployedOutputChannel,
+			Label: "Deployed",
+		},
+		{
+			Name:  FailedOutputChannel,
+			Label: "Failed",
+		},
+		{
+			Name:  CrashedOutputChannel,
+			Label: "Crashed",
+		},
 	}
 }
 
@@ -212,28 +245,36 @@ func (c *TriggerDeploy) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	// Call environmentTriggersDeploy mutation
-	if err := client.TriggerDeploy(config.Service, config.Environment); err != nil {
+	// Trigger the deployment and get the deployment ID
+	deploymentID, err := client.TriggerDeploy(config.Service, config.Environment)
+	if err != nil {
 		return fmt.Errorf("failed to trigger deployment: %w", err)
 	}
 
 	ctx.Logger.Infof(
-		"Triggered deployment for service %s in environment %s",
+		"Triggered deployment %s for service %s in environment %s",
+		deploymentID,
 		config.Service,
 		config.Environment,
 	)
 
-	// Emit result
-	return ctx.ExecutionState.Emit(
-		core.DefaultOutputChannel.Name,
-		"railway.deployment.triggered",
-		[]any{map[string]any{
-			"project":     config.Project,
-			"service":     config.Service,
-			"environment": config.Environment,
-			"triggered":   true,
-		}},
-	)
+	// Store deployment ID in execution metadata
+	err = ctx.Metadata.Set(TriggerDeployExecutionMetadata{
+		DeploymentID: deploymentID,
+		Status:       DeploymentStatusQueued,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to set execution metadata: %w", err)
+	}
+
+	// Store deployment ID in KV for later retrieval
+	err = ctx.ExecutionState.SetKV("deployment_id", deploymentID)
+	if err != nil {
+		return fmt.Errorf("failed to store deployment ID: %w", err)
+	}
+
+	// Schedule the first poll to check deployment status
+	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, DeploymentPollInterval)
 }
 
 func (c *TriggerDeploy) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -241,14 +282,99 @@ func (c *TriggerDeploy) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UU
 }
 
 func (c *TriggerDeploy) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		{
+			Name:           "poll",
+			UserAccessible: false,
+		},
+	}
 }
 
 func (c *TriggerDeploy) HandleAction(ctx core.ActionContext) error {
-	return nil
+	switch ctx.Name {
+	case "poll":
+		return c.poll(ctx)
+	}
+	return fmt.Errorf("unknown action: %s", ctx.Name)
+}
+
+func (c *TriggerDeploy) poll(ctx core.ActionContext) error {
+	// Check if execution is already finished
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
+	// Get current execution metadata
+	execMetadata := TriggerDeployExecutionMetadata{}
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &execMetadata); err != nil {
+		return fmt.Errorf("failed to decode execution metadata: %w", err)
+	}
+
+	// If already in final state, nothing to do
+	if IsDeploymentFinalStatus(execMetadata.Status) {
+		return nil
+	}
+
+	// Create client to check deployment status
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	// Get the latest deployment status
+	deployment, err := client.GetDeployment(execMetadata.DeploymentID)
+	if err != nil {
+		ctx.Logger.WithError(err).Warn("Failed to get deployment status, will retry")
+		// Schedule another poll - don't fail on transient errors
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, DeploymentPollInterval)
+	}
+
+	ctx.Logger.Infof("Deployment %s status: %s", deployment.ID, deployment.Status)
+
+	// Update metadata with current status
+	execMetadata.Status = deployment.Status
+	execMetadata.URL = deployment.URL
+	if err := ctx.Metadata.Set(execMetadata); err != nil {
+		return fmt.Errorf("failed to update metadata: %w", err)
+	}
+
+	// If not in final state, schedule another poll
+	if !IsDeploymentFinalStatus(deployment.Status) {
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, DeploymentPollInterval)
+	}
+
+	// Deployment reached final state - emit to appropriate channel
+	config := TriggerDeployConfiguration{}
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	eventData := map[string]any{
+		"deploymentId": deployment.ID,
+		"status":       deployment.Status,
+		"url":          deployment.URL,
+		"project":      config.Project,
+		"service":      config.Service,
+		"environment":  config.Environment,
+	}
+
+	switch deployment.Status {
+	case DeploymentStatusSuccess:
+		ctx.Logger.Info("Deployment succeeded")
+		return ctx.ExecutionState.Emit(DeployedOutputChannel, DeploymentPayloadType, []any{eventData})
+	case DeploymentStatusCrashed:
+		ctx.Logger.Info("Deployment crashed")
+		return ctx.ExecutionState.Emit(CrashedOutputChannel, DeploymentPayloadType, []any{eventData})
+	default:
+		// FAILED, REMOVED, SKIPPED all go to failed channel
+		ctx.Logger.Infof("Deployment ended with status: %s", deployment.Status)
+		return ctx.ExecutionState.Emit(FailedOutputChannel, DeploymentPayloadType, []any{eventData})
+	}
 }
 
 func (c *TriggerDeploy) Cancel(ctx core.ExecutionContext) error {
+	// Railway doesn't have a cancel deployment API, so we just log and return
+	ctx.Logger.Info("Cancel requested - Railway deployments cannot be cancelled via API")
 	return nil
 }
 

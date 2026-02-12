@@ -9,6 +9,7 @@ interface OnDeploymentEventMetadata {
     name: string;
   };
   webhookUrl?: string;
+  webhookConfigUrl?: string;
 }
 
 /**
@@ -49,7 +50,7 @@ export const onDeploymentEventCustomFieldRenderer: CustomFieldRenderer = {
 
     const curlExample = `curl -X POST \\
   -H "Content-Type: application/json" \\
-  --data '{"type":"Deployment.succeeded","details":{"status":"SUCCESS"},"resource":{"deployment":{"id":"test-123"}}}' \\
+  --data '{"type":"Deployment.deployed","details":{"status":"SUCCESS"},"resource":{"deployment":{"id":"test-123"}}}' \\
   ${webhookUrl}`;
 
     return (
@@ -77,23 +78,23 @@ export const onDeploymentEventCustomFieldRenderer: CustomFieldRenderer = {
               </div>
             </div>
 
-            {/* Setup Instructions */}
-            <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md">
-              <div className="flex items-start gap-2">
-                <Icon name="info" size="sm" className="text-gray-500 dark:text-gray-400 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Setup Instructions</p>
-                  <ol className="text-xs text-gray-600 dark:text-gray-400 mt-1 list-decimal list-inside space-y-1">
-                    <li>Go to your Railway project</li>
-                    <li>Navigate to Settings → Webhooks</li>
-                    <li>Click "Add Webhook"</li>
-                    <li>Paste the webhook URL above</li>
-                    <li>Select "Deploy" events</li>
-                    <li>Save the webhook</li>
-                  </ol>
-                </div>
+            {/* Configure Webhook Button */}
+            {metadata?.webhookConfigUrl && (
+              <div className="mt-4">
+                <a
+                  href={metadata.webhookConfigUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-md transition-colors"
+                >
+                  <Icon name="external-link" size="sm" />
+                  Configure Webhook in Railway
+                </a>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  Paste the webhook URL above and select "Deploy" events.
+                </p>
               </div>
-            </div>
+            )}
 
             {/* Test Command */}
             {metadata?.webhookUrl && (
