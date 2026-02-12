@@ -2,6 +2,7 @@ import { resolveIcon } from "@/lib/utils";
 import React from "react";
 import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
+import circleciIcon from "@/assets/icons/integrations/circleci.svg";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
@@ -19,10 +20,12 @@ import smtpIcon from "@/assets/icons/integrations/smtp.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
+import dockerIcon from "@/assets/icons/integrations/docker.svg";
 
 /** Integration type name (e.g. "github") → logo src. Used for Settings tab and header. */
 export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   aws: awsIcon,
+  circleci: circleciIcon,
   cloudflare: cloudflareIcon,
   dash0: dash0Icon,
   datadog: datadogIcon,
@@ -41,10 +44,12 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   smtp: smtpIcon,
   sendgrid: sendgridIcon,
   render: renderIcon,
+  dockerhub: dockerIcon,
 };
 
 /** Block name first part (e.g. "github") or compound (e.g. aws.lambda) → logo src for header. */
 export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
+  circleci: circleciIcon,
   cloudflare: cloudflareIcon,
   dash0: dash0Icon,
   datadog: datadogIcon,
@@ -62,6 +67,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   slack: slackIcon,
   sendgrid: sendgridIcon,
   render: renderIcon,
+  dockerhub: dockerIcon,
   aws: {
     lambda: awsLambdaIcon,
   },

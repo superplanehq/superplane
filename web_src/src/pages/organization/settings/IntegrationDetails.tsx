@@ -8,9 +8,12 @@ import {
   useUpdateIntegration,
 } from "@/hooks/useIntegrations";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import type { ConfigurationField } from "@/api-client";
 import { showErrorToast } from "@/utils/toast";
+import { getApiErrorMessage } from "@/utils/errors";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
@@ -25,6 +28,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
   const navigate = useNavigate();
   const { integrationId } = useParams<{ integrationId: string }>();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const [integrationName, setIntegrationName] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const canUpdateIntegrations = canAct("integrations", "update");
   const canDeleteIntegrations = canAct("integrations", "delete");
@@ -46,6 +50,10 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
   useEffect(() => {
     setConfigOverrides(null);
   }, [integrationId]);
+
+  useEffect(() => {
+    setIntegrationName(integration?.metadata?.name || integration?.spec?.integrationName || "");
+  }, [integration?.metadata?.name, integration?.spec?.integrationName]);
 
   // Use saved config as base, with user overrides on top
   const configValues = configOverrides ?? integration?.spec?.configuration ?? {};
@@ -78,10 +86,20 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
   const handleConfigSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canUpdateIntegrations) return;
+
+    const nextName = integrationName.trim();
+    if (!nextName) {
+      showErrorToast("Integration name is required");
+      return;
+    }
+
     try {
-      await updateMutation.mutateAsync(configValues);
+      await updateMutation.mutateAsync({
+        name: nextName,
+        configuration: configValues,
+      });
     } catch (_error) {
-      showErrorToast("Failed to update configuration");
+      showErrorToast("Failed to update integration");
     }
   };
 
@@ -246,6 +264,21 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
                 className="w-full"
               >
                 <form onSubmit={handleConfigSubmit} className="space-y-4">
+                  <div>
+                    <Label className="text-gray-800 dark:text-gray-100 mb-2">
+                      Integration Name
+                      <span className="text-gray-800 ml-1">*</span>
+                    </Label>
+                    <Input
+                      type="text"
+                      value={integrationName}
+                      onChange={(e) => setIntegrationName(e.target.value)}
+                      placeholder="e.g., my-app-integration"
+                      disabled={!canUpdateIntegrations}
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
+                  </div>
+
                   {integrationDef.configuration.map((field: ConfigurationField) => (
                     <ConfigurationFieldRenderer
                       key={field.name}
@@ -261,18 +294,24 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
                   ))}
 
                   <div className="flex items-center gap-3 pt-4">
-                    <Button type="submit" color="blue" disabled={updateMutation.isPending || !canUpdateIntegrations}>
+                    <Button
+                      type="submit"
+                      color="blue"
+                      disabled={updateMutation.isPending || !integrationName.trim() || !canUpdateIntegrations}
+                    >
                       {updateMutation.isPending ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                           Saving...
                         </>
                       ) : (
-                        "Save Configuration"
+                        "Save"
                       )}
                     </Button>
                     {updateMutation.isError && (
-                      <span className="text-sm text-red-600 dark:text-red-400">Failed to update configuration</span>
+                      <span className="text-sm text-red-600 dark:text-red-400">
+                        Failed to update integration: {getApiErrorMessage(updateMutation.error)}
+                      </span>
                     )}
                   </div>
                 </form>
