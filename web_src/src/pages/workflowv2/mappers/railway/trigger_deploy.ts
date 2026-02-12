@@ -94,6 +94,8 @@ function mapDeploymentStatusToState(status: string | undefined): EventState {
     case DeploymentStatus.DEPLOYING:
       return "deploying";
     case DeploymentStatus.SUCCESS:
+    case DeploymentStatus.SLEEPING:
+      // SLEEPING means deployment succeeded but app went to sleep due to inactivity
       return "passed";
     case DeploymentStatus.CRASHED:
       return "crashed";
@@ -226,6 +228,8 @@ export const triggerDeployMapper: ComponentBaseMapper = {
 
       switch (status) {
         case DeploymentStatus.SUCCESS:
+        case DeploymentStatus.SLEEPING:
+          // SLEEPING means deployment succeeded but app went to sleep
           return timeAgo ? `Deployed ${timeAgo}` : "Deployed";
         case DeploymentStatus.CRASHED:
           return timeAgo ? `Crashed ${timeAgo}` : "Crashed";

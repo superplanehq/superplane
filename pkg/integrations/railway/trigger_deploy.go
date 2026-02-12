@@ -359,8 +359,9 @@ func (c *TriggerDeploy) poll(ctx core.ActionContext) error {
 	}
 
 	switch deployment.Status {
-	case DeploymentStatusSuccess:
-		ctx.Logger.Info("Deployment succeeded")
+	case DeploymentStatusSuccess, DeploymentStatusSleeping:
+		// SLEEPING means the deployment succeeded but the app went to sleep due to inactivity
+		ctx.Logger.Infof("Deployment succeeded (status: %s)", deployment.Status)
 		return ctx.ExecutionState.Emit(DeployedOutputChannel, DeploymentPayloadType, []any{eventData})
 	case DeploymentStatusCrashed:
 		ctx.Logger.Info("Deployment crashed")

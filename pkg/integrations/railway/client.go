@@ -278,7 +278,7 @@ const (
 func IsDeploymentFinalStatus(status string) bool {
 	switch status {
 	case DeploymentStatusSuccess, DeploymentStatusFailed, DeploymentStatusCrashed,
-		DeploymentStatusRemoved, DeploymentStatusSkipped:
+		DeploymentStatusRemoved, DeploymentStatusSkipped, DeploymentStatusSleeping:
 		return true
 	default:
 		return false
