@@ -20,7 +20,7 @@ type GetLastMessageSpec struct {
 }
 
 type GetLastMessageOutput struct {
-	AgentID string             `json:"agentId"`
+	AgentID string               `json:"agentId"`
 	Message *ConversationMessage `json:"message"`
 }
 
@@ -100,8 +100,8 @@ func (c *GetLastMessage) Configuration() []configuration.Field {
 			Name:        "agentId",
 			Label:       "Agent ID",
 			Type:        configuration.FieldTypeString,
-			Description: "Unique identifier for the cloud agent (e.g., bc_abc123)",
 			Required:    true,
+			Placeholder: `{{ $["cursor.launchAgent"].data.agentId }}`,
 		},
 	}
 }

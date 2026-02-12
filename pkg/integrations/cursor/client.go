@@ -59,7 +59,7 @@ type ConversationMessage struct {
 }
 
 type ConversationResponse struct {
-	ID       string               `json:"id"`
+	ID       string                `json:"id"`
 	Messages []ConversationMessage `json:"messages"`
 }
 
