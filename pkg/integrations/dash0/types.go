@@ -10,7 +10,6 @@ type UpsertSyntheticCheckConfiguration struct {
 	URL         string                `json:"url" mapstructure:"url"`
 	Headers     []SyntheticCheckField `json:"headers" mapstructure:"headers"`
 	RequestBody string                `json:"requestBody" mapstructure:"requestBody"`
-	Spec        string                `json:"spec" mapstructure:"spec"`
 }
 
 // SyntheticCheckField stores one key/value pair for synthetic check request maps.
