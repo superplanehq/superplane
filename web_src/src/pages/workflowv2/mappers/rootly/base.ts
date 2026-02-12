@@ -27,7 +27,7 @@ export function getDetailsForIncident(incident: Incident): Record<string, string
   details.Title = incident?.title || "-";
   details.Summary = incident?.summary || "-";
   details.Status = incident?.status || "-";
-  details.Severity = incident?.severity?.name || "-";
+  details.Severity = incident?.severity || "-";
 
   if (incident?.started_at) {
     details["Started At"] = new Date(incident.started_at).toLocaleString();
