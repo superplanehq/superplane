@@ -17,6 +17,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Create Event" href="#create-event" description="Add a timeline event to a Rootly incident" />
   <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in Rootly" />
+  <LinkCard title="Update Incident" href="#update-incident" description="Update an existing incident in Rootly" />
 </CardGrid>
 
 <a id="on-incident"></a>
@@ -161,3 +162,57 @@ Returns the created incident object including:
 }
 ```
 
+<a id="update-incident"></a>
+
+## Update Incident
+
+The Update Incident component updates an existing incident in Rootly with new details.
+
+### Use Cases
+
+- **Status transitions**: Update incident status as investigation progresses (started → mitigated → resolved)
+- **Severity adjustments**: Escalate or de-escalate incident severity based on impact assessment
+- **Incident enrichment**: Add or update title and summary with investigation findings
+- **Automated workflows**: Automatically update incidents based on monitoring data or workflow outcomes
+
+### Configuration
+
+- **Incident ID**: The Rootly incident UUID to update (required, supports expressions)
+- **Title**: Updated incident title (optional, supports expressions)
+- **Summary**: Updated incident summary (optional, supports expressions)
+- **Severity**: Updated severity level (optional, uses integration resource selector)
+- **Status**: Updated incident status, e.g. mitigated, resolved (optional, supports expressions)
+
+All fields except Incident ID are optional, allowing partial updates.
+
+### Output
+
+Returns the updated incident object including:
+- **id**: Incident ID
+- **title**: Incident title
+- **status**: Current incident status
+- **severity**: Incident severity
+- **started_at**: Incident creation timestamp
+- **resolved_at**: Resolution timestamp (if resolved)
+- **mitigated_at**: Mitigation timestamp (if mitigated)
+- **url**: Link to the incident in Rootly
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "abc123-def456",
+    "mitigated_at": "2026-01-19T13:30:00Z",
+    "resolved_at": null,
+    "severity": "sev1",
+    "started_at": "2026-01-19T12:00:00Z",
+    "status": "mitigated",
+    "summary": "Database connection pool exhausted due to connection leak in payment service.",
+    "title": "Database connection issues - payment service",
+    "url": "https://app.rootly.com/incidents/abc123-def456"
+  },
+  "timestamp": "2026-01-19T13:30:00Z",
+  "type": "rootly.incident"
+}
+```
