@@ -17,6 +17,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Create Event" href="#create-event" description="Add a timeline event to a Rootly incident" />
   <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in Rootly" />
+  <LinkCard title="Get Incident" href="#get-incident" description="Retrieve an incident from Rootly by ID" />
 </CardGrid>
 
 <a id="on-incident"></a>
@@ -161,3 +162,52 @@ Returns the created incident object including:
 }
 ```
 
+<a id="get-incident"></a>
+
+## Get Incident
+
+The Get Incident component retrieves a single incident from Rootly by its ID.
+
+### Use Cases
+
+- **Incident status checks**: Fetch current incident details to drive workflow decisions
+- **Data enrichment**: Retrieve incident information to enrich notifications or reports
+- **Conditional workflows**: Check incident severity or status before taking further action
+- **Cross-system sync**: Pull incident data to sync with external tools
+
+### Configuration
+
+- **Incident ID**: The Rootly incident UUID to retrieve (required, supports expressions)
+
+### Output
+
+Returns the incident object including:
+- **id**: Incident ID
+- **title**: Incident title
+- **summary**: Incident summary
+- **status**: Current incident status
+- **severity**: Incident severity
+- **started_at**: Incident creation timestamp
+- **resolved_at**: Resolution timestamp (if resolved)
+- **mitigated_at**: Mitigation timestamp (if mitigated)
+- **url**: Link to the incident in Rootly
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "abc123-def456",
+    "mitigated_at": null,
+    "resolved_at": null,
+    "severity": "sev2",
+    "started_at": "2026-01-19T12:00:00Z",
+    "status": "started",
+    "summary": "Users are experiencing slow database queries and connection timeouts.",
+    "title": "Database connection issues",
+    "url": "https://app.rootly.com/incidents/abc123-def456"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "rootly.incident"
+}
+```
