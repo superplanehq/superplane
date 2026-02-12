@@ -93,57 +93,6 @@ func Test__ListResources__Component_empty_page_id(t *testing.T) {
 	assert.Empty(t, resources)
 }
 
-func Test__ListResources__Incident_with_page_id(t *testing.T) {
-	s := &Statuspage{}
-	incidentsJSON := `[
-		{"id":"inc1","name":"Database Connection Issues"},
-		{"id":"inc2","name":"API Latency"}
-	]`
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{
-				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader(incidentsJSON)),
-			},
-		},
-	}
-	integrationCtx := &contexts.IntegrationContext{
-		Configuration: map[string]any{"apiKey": "test-key"},
-	}
-	ctx := core.ListResourcesContext{
-		HTTP:        httpContext,
-		Integration: integrationCtx,
-		Parameters:  map[string]string{"page_id": "page1"},
-	}
-
-	resources, err := s.ListResources(ResourceTypeIncident, ctx)
-	require.NoError(t, err)
-	require.Len(t, resources, 2)
-	assert.Equal(t, ResourceTypeIncident, resources[0].Type)
-	assert.Equal(t, "Database Connection Issues", resources[0].Name)
-	assert.Equal(t, "inc1", resources[0].ID)
-	assert.Equal(t, "API Latency", resources[1].Name)
-	assert.Equal(t, "inc2", resources[1].ID)
-	require.Len(t, httpContext.Requests, 1)
-	assert.Contains(t, httpContext.Requests[0].URL.String(), "/pages/page1/incidents")
-}
-
-func Test__ListResources__Incident_empty_page_id(t *testing.T) {
-	s := &Statuspage{}
-	integrationCtx := &contexts.IntegrationContext{
-		Configuration: map[string]any{"apiKey": "test-key"},
-	}
-	ctx := core.ListResourcesContext{
-		HTTP:        nil,
-		Integration: integrationCtx,
-		Parameters:  map[string]string{},
-	}
-
-	resources, err := s.ListResources(ResourceTypeIncident, ctx)
-	require.NoError(t, err)
-	assert.Empty(t, resources)
-}
-
 func Test__ListResources__Unknown_type(t *testing.T) {
 	s := &Statuspage{}
 	integrationCtx := &contexts.IntegrationContext{

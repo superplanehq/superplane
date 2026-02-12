@@ -46,8 +46,8 @@ func (c *UpdateIncident) Documentation() string {
 
 ## Configuration
 
-- **Page** (required): The Statuspage containing the incident
-- **Incident** (required): The incident to update
+- **Page** (required): Page ID containing the incident. Supports expressions for dynamic values from upstream nodes (e.g. Create Incident).
+- **Incident** (required): Incident ID to update. Supports expressions for dynamic values from upstream nodes (e.g. Create Incident).
 - **Status** (optional): New status (investigating, identified, monitoring, resolved, scheduled, in_progress, completed)
 - **Body** (optional): Update message shown as the latest incident update
 - **Components** (optional): Components to associate with this update
@@ -97,35 +97,19 @@ func (c *UpdateIncident) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "page",
-			Label:       "Page",
-			Type:        configuration.FieldTypeIntegrationResource,
+			Label:       "Page ID",
+			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "The Statuspage containing the incident",
-			Placeholder: "Select a page",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: ResourceTypePage,
-				},
-			},
+			Description: "Page ID containing the incident (supports expressions)",
+			Placeholder: "e.g., kctbh9vrtdwd or {{ $['Create Incident'].data.page_id }}",
 		},
 		{
 			Name:        "incident",
-			Label:       "Incident",
-			Type:        configuration.FieldTypeIntegrationResource,
+			Label:       "Incident ID",
+			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "The incident to update",
-			Placeholder: "Select an incident",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: ResourceTypeIncident,
-					Parameters: []configuration.ParameterRef{
-						{
-							Name:      "page_id",
-							ValueFrom: &configuration.ParameterValueFrom{Field: "page"},
-						},
-					},
-				},
-			},
+			Description: "Incident ID to update (supports expressions)",
+			Placeholder: "e.g., p31zjtct2jer or {{ $['Create Incident'].data.id }}",
 		},
 		{
 			Name:        "status",

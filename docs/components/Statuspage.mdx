@@ -87,8 +87,8 @@ The Get Incident component fetches the full details of an existing incident on y
 
 ### Configuration
 
-- **Page** (required): The Statuspage containing the incident
-- **Incident** (required): The incident to fetch
+- **Page ID** (required): Page ID containing the incident. Supports expressions for dynamic values from upstream nodes (e.g. Create Incident: `{{ $['Create Incident'].data.page_id }}`).
+- **Incident ID** (required): Incident ID to fetch. Supports expressions for dynamic values from upstream nodes (e.g. Create Incident: `{{ $['Create Incident'].data.id }}`).
 
 ### Output
 
@@ -140,8 +140,8 @@ The Update Incident component updates an existing incident on your Atlassian Sta
 
 ### Configuration
 
-- **Page** (required): The Statuspage containing the incident
-- **Incident** (required): The incident to update
+- **Page ID** (required): Page ID containing the incident. Supports expressions for dynamic values from upstream nodes (e.g. Create Incident: `{{ $['Create Incident'].data.page_id }}`).
+- **Incident ID** (required): Incident ID to update. Supports expressions for dynamic values from upstream nodes (e.g. Create Incident: `{{ $['Create Incident'].data.id }}`).
 - **Status** (optional): New status (investigating, identified, monitoring, resolved, scheduled, in_progress, completed)
 - **Body** (optional): Update message shown as the latest incident update
 - **Components** (optional): Components to associate with this update
