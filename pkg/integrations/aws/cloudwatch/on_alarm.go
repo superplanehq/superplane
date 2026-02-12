@@ -23,6 +23,7 @@ type OnAlarm struct{}
 type OnAlarmConfiguration struct {
 	Region string                    `json:"region" mapstructure:"region"`
 	Alarms []configuration.Predicate `json:"alarms" mapstructure:"alarms"`
+	State  string                    `json:"state" mapstructure:"state"`
 }
 
 type OnAlarmMetadata struct {
@@ -96,6 +97,18 @@ func (p *OnAlarm) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: common.AllRegions,
+				},
+			},
+		},
+		{
+			Name:     "state",
+			Label:    "Alarm State",
+			Type:     configuration.FieldTypeSelect,
+			Required: true,
+			Default:  AlarmStateAlarm,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: AllAlarmStates,
 				},
 			},
 		},
@@ -293,7 +306,7 @@ func (p *OnAlarm) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 		return fmt.Errorf("missing alarm state in event")
 	}
 
-	if state != AlarmStateAlarm {
+	if state != config.State {
 		ctx.Logger.Infof("Skipping event for alarm %s with state %s", alarmName, state)
 		return nil
 	}

@@ -1,15 +1,3 @@
-import { Predicate } from "../../utils";
-
-export interface CloudWatchAlarmTriggerConfiguration {
-  region?: string;
-  alarms?: Predicate[];
-}
-
-export interface CloudWatchAlarmTriggerMetadata {
-  region?: string;
-  subscriptionId?: string;
-}
-
 export interface CloudWatchAlarmState {
   value?: string;
   reason?: string;

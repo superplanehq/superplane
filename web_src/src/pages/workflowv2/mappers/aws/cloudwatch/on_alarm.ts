@@ -1,39 +1,21 @@
 import { TriggerProps } from "@/ui/trigger";
 import { MetadataItem } from "@/ui/metadataList";
-import awsIcon from "@/assets/icons/integrations/aws.svg";
+import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import { formatTimeAgo } from "@/utils/date";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
-import { Predicate, stringOrDash } from "../../utils";
-import { CloudWatchAlarmEvent, CloudWatchAlarmTriggerConfiguration, CloudWatchAlarmTriggerMetadata } from "./types";
+import { Predicate, formatPredicate, stringOrDash } from "../../utils";
+import { CloudWatchAlarmEvent } from "./types";
 
-function formatAlarmFilterLabel(alarms?: Predicate[]): string | undefined {
-  if (!alarms || alarms.length === 0) {
-    return undefined;
-  }
-
-  if (alarms.length === 1 && alarms[0]?.type === "matches" && alarms[0]?.value === ".*") {
-    return undefined;
-  }
-
-  if (alarms.length === 1) {
-    return alarms[0]?.value || undefined;
-  }
-
-  const firstValue = alarms[0]?.value;
-  if (!firstValue) {
-    return `${alarms.length} filters`;
-  }
-
-  return `${firstValue} +${alarms.length - 1}`;
+interface Configuration {
+  region?: string;
+  state?: string;
+  alarms?: Predicate[];
 }
 
-function buildMetadataItems(
-  metadata?: CloudWatchAlarmTriggerMetadata,
-  configuration?: CloudWatchAlarmTriggerConfiguration,
-): MetadataItem[] {
+function buildMetadataItems(configuration?: Configuration): MetadataItem[] {
   const items: MetadataItem[] = [];
-  const region = metadata?.region || configuration?.region;
+  const region = configuration?.region;
   if (region) {
     items.push({
       icon: "globe",
@@ -41,11 +23,17 @@ function buildMetadataItems(
     });
   }
 
-  const alarmFilterLabel = formatAlarmFilterLabel(configuration?.alarms);
-  if (alarmFilterLabel) {
+  if (configuration?.state) {
     items.push({
       icon: "bell",
-      label: alarmFilterLabel,
+      label: configuration.state,
+    });
+  }
+
+  if (configuration?.alarms && configuration.alarms?.length > 0) {
+    items.push({
+      icon: "funnel",
+      label: configuration.alarms?.map(formatPredicate).join(", "),
     });
   }
 
@@ -61,10 +49,11 @@ export const onAlarmTriggerRenderer: TriggerRenderer = {
     const detail = eventData?.detail;
     const alarmName = detail?.alarmName;
     const state = detail?.state?.value;
+    const previousState = detail?.previousState?.value;
 
     let title = "CloudWatch alarm";
-    if (alarmName && state) {
-      title = `${alarmName} (${state})`;
+    if (alarmName && state && previousState) {
+      title = `${alarmName} - ${previousState} → ${state}`;
     } else if (alarmName) {
       title = alarmName;
     }
@@ -88,13 +77,12 @@ export const onAlarmTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
-    const metadata = node.metadata as CloudWatchAlarmTriggerMetadata | undefined;
-    const configuration = node.configuration as CloudWatchAlarmTriggerConfiguration | undefined;
-    const metadataItems = buildMetadataItems(metadata, configuration);
+    const configuration = node.configuration as Configuration | undefined;
+    const metadataItems = buildMetadataItems(configuration);
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
-      iconSrc: awsIcon,
+      iconSrc: awsCloudwatchIcon,
       collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: metadataItems,
     };
