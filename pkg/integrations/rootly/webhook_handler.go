@@ -79,6 +79,8 @@ func (h *RootlyWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error
 		return nil, err
 	}
 
+	webhookName := fmt.Sprintf("SuperPlane %s", ctx.Webhook.GetID())
+
 	config := WebhookConfiguration{}
 	err = mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config)
 	if err != nil {
@@ -94,12 +96,12 @@ func (h *RootlyWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error
 
 	var endpoint *WebhookEndpoint
 	if metadata.EndpointID != "" {
-		endpoint, err = client.UpdateWebhookEndpoint(metadata.EndpointID, config.Events)
+		endpoint, err = client.UpdateWebhookEndpoint(metadata.EndpointID, webhookName, config.Events)
 		if err != nil {
 			return nil, fmt.Errorf("error updating webhook endpoint: %v", err)
 		}
 	} else {
-		endpoint, err = client.CreateWebhookEndpoint(ctx.Webhook.GetURL(), config.Events)
+		endpoint, err = client.CreateWebhookEndpoint(webhookName, ctx.Webhook.GetURL(), config.Events)
 		if err != nil {
 			return nil, fmt.Errorf("error creating webhook endpoint: %v", err)
 		}

@@ -583,12 +583,12 @@ type UpdateWebhookEndpointAttributes struct {
 	Enabled    bool     `json:"enabled"`
 }
 
-func (c *Client) CreateWebhookEndpoint(url string, events []string) (*WebhookEndpoint, error) {
+func (c *Client) CreateWebhookEndpoint(name, url string, events []string) (*WebhookEndpoint, error) {
 	request := CreateWebhookEndpointRequest{
 		Data: CreateWebhookEndpointData{
 			Type: "webhooks_endpoints",
 			Attributes: CreateWebhookEndpointAttributes{
-				Name:           "SuperPlane",
+				Name:           name,
 				URL:            url,
 				EventTypes:     events,
 				Enabled:        true,
@@ -627,12 +627,12 @@ func (c *Client) DeleteWebhookEndpoint(id string) error {
 	return err
 }
 
-func (c *Client) UpdateWebhookEndpoint(id string, events []string) (*WebhookEndpoint, error) {
+func (c *Client) UpdateWebhookEndpoint(id, name string, events []string) (*WebhookEndpoint, error) {
 	request := UpdateWebhookEndpointRequest{
 		Data: UpdateWebhookEndpointData{
 			Type: "webhooks_endpoints",
 			Attributes: UpdateWebhookEndpointAttributes{
-				Name:       "SuperPlane",
+				Name:       name,
 				EventTypes: events,
 				Enabled:    true,
 			},

@@ -102,8 +102,6 @@ func Test__OnEvent__HandleWebhook(t *testing.T) {
 			Body:    payloadBody,
 			Headers: headers,
 			Configuration: map[string]any{
-				"eventKinds":   []string{"note"},
-				"eventSources": []string{"api"},
 				"visibilities": []string{"external"},
 			},
 			Webhook: &contexts.WebhookContext{Secret: secret},

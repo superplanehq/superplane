@@ -11,9 +11,7 @@ interface OnEventConfiguration {
   severities?: string[];
   services?: string[];
   teams?: string[];
-  eventSources?: string[];
   visibilities?: string[];
-  eventKinds?: string[];
 }
 
 interface OnEventEventData extends IncidentEvent {
@@ -31,14 +29,6 @@ export const onEventTriggerRenderer: TriggerRenderer = {
 
     if (eventData?.kind) {
       contentParts.push(eventData.kind);
-    }
-
-    if (eventData?.user_display_name) {
-      contentParts.push(`by ${eventData.user_display_name}`);
-    }
-
-    if (eventData?.event) {
-      contentParts.push(eventData.event);
     }
 
     const subtitle = buildSubtitle(contentParts.filter(Boolean).join(" · "), context.event?.createdAt);
@@ -67,9 +57,7 @@ export const onEventTriggerRenderer: TriggerRenderer = {
     addMetadata(metadataItems, "Severity", configuration?.severities);
     addMetadata(metadataItems, "Service", configuration?.services);
     addMetadata(metadataItems, "Team", configuration?.teams);
-    addMetadata(metadataItems, "Event Source", configuration?.eventSources);
     addMetadata(metadataItems, "Visibility", configuration?.visibilities);
-    addMetadata(metadataItems, "Event Kind", configuration?.eventKinds);
 
     const props: TriggerProps = {
       title: node.name!,
@@ -85,14 +73,6 @@ export const onEventTriggerRenderer: TriggerRenderer = {
 
       if (eventData?.kind) {
         contentParts.push(eventData.kind);
-      }
-
-      if (eventData?.user_display_name) {
-        contentParts.push(`by ${eventData.user_display_name}`);
-      }
-
-      if (eventData?.event) {
-        contentParts.push(eventData.event);
       }
 
       const subtitle = buildSubtitle(contentParts.filter(Boolean).join(" · "), lastEvent.createdAt);

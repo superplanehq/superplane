@@ -20,9 +20,7 @@ type OnEventConfiguration struct {
 	Severities       []string `json:"severities"`
 	Services         []string `json:"services"`
 	Teams            []string `json:"teams"`
-	EventSources     []string `json:"eventSources"`
 	Visibilities     []string `json:"visibilities"`
-	EventKinds       []string `json:"eventKinds"`
 }
 
 var onEventWebhookEvents = []string{"incident.created", "incident.updated"}
@@ -54,9 +52,7 @@ func (t *OnEvent) Documentation() string {
 - **Severity** (optional): Filter by incident severity
 - **Service** (optional): Filter by service name
 - **Team** (optional): Filter by team name
-- **Event Source** (optional): Filter by event source
 - **Visibility** (optional): Filter by visibility (internal/external)
-- **Event Kind** (optional): Filter by event kind (e.g. note, annotation)
 
 ## Event Data
 
@@ -144,21 +140,6 @@ func (t *OnEvent) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "eventSources",
-			Label:       "Event Source",
-			Type:        configuration.FieldTypeList,
-			Required:    false,
-			Description: "Filter by event source values (e.g. web, api)",
-			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel: "Source",
-					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeString,
-					},
-				},
-			},
-		},
-		{
 			Name:        "visibilities",
 			Label:       "Visibility",
 			Type:        configuration.FieldTypeSelect,
@@ -169,21 +150,6 @@ func (t *OnEvent) Configuration() []configuration.Field {
 					Options: []configuration.FieldOption{
 						{Label: "Internal", Value: "internal"},
 						{Label: "External", Value: "external"},
-					},
-				},
-			},
-		},
-		{
-			Name:        "eventKinds",
-			Label:       "Event Kind",
-			Type:        configuration.FieldTypeList,
-			Required:    false,
-			Description: "Filter by event kind values (e.g. note, annotation)",
-			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel: "Kind",
-					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeString,
 					},
 				},
 			},
@@ -302,23 +268,9 @@ func matchesIncidentFilters(incident map[string]any, config OnEventConfiguration
 func filterEvents(events []map[string]any, config OnEventConfiguration) []map[string]any {
 	filtered := make([]map[string]any, 0, len(events))
 	for _, event := range events {
-		if len(config.EventSources) > 0 {
-			source := stringFromAny(event["source"])
-			if !containsString(config.EventSources, source) {
-				continue
-			}
-		}
-
 		if len(config.Visibilities) > 0 {
 			visibility := stringFromAny(event["visibility"])
 			if !containsString(config.Visibilities, visibility) {
-				continue
-			}
-		}
-
-		if len(config.EventKinds) > 0 {
-			kind := stringFromAny(event["kind"])
-			if !containsString(config.EventKinds, kind) {
 				continue
 			}
 		}
