@@ -10,7 +10,10 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegrationWithWebhookHandler("railway", &Railway{}, &RailwayWebhookHandler{})
+	// Railway webhooks are manually configured by users via Railway UI
+	// (Railway doesn't have an API for creating webhooks)
+	// So we use RegisterIntegration without a webhook handler, like DockerHub
+	registry.RegisterIntegration("railway", &Railway{})
 }
 
 type Railway struct{}
