@@ -1,6 +1,7 @@
 package dash0
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -206,4 +207,105 @@ func (c *Client) ListCheckRules() ([]CheckRule, error) {
 	}
 
 	return checkRules, nil
+}
+
+// ListSyntheticChecks lists Dash0 synthetic checks for resource pickers and lookups.
+func (c *Client) ListSyntheticChecks() ([]SyntheticCheck, error) {
+	apiURL := fmt.Sprintf("%s/api/synthetic-checks", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil, "")
+	if err != nil {
+		return nil, err
+	}
+
+	var checks []SyntheticCheck
+
+	var stringList []string
+	if err := json.Unmarshal(responseBody, &stringList); err == nil {
+		checks = make([]SyntheticCheck, 0, len(stringList))
+		for _, id := range stringList {
+			trimmed := strings.TrimSpace(id)
+			if trimmed == "" {
+				continue
+			}
+			checks = append(checks, SyntheticCheck{
+				ID:     trimmed,
+				Name:   trimmed,
+				Origin: trimmed,
+			})
+		}
+		return checks, nil
+	}
+
+	if err := json.Unmarshal(responseBody, &checks); err != nil {
+		return nil, fmt.Errorf("error parsing synthetic checks response: %v", err)
+	}
+
+	for index := range checks {
+		if checks[index].ID == "" {
+			checks[index].ID = checks[index].Origin
+		}
+		if checks[index].Origin == "" {
+			checks[index].Origin = checks[index].ID
+		}
+		if checks[index].Name == "" {
+			if checks[index].ID != "" {
+				checks[index].Name = checks[index].ID
+			} else {
+				checks[index].Name = checks[index].Origin
+			}
+		}
+	}
+
+	return checks, nil
+}
+
+// UpsertSyntheticCheck creates or updates a synthetic check by origin/id.
+func (c *Client) UpsertSyntheticCheck(originOrID string, specification map[string]any) (map[string]any, error) {
+	trimmedOriginOrID := strings.TrimSpace(originOrID)
+	if trimmedOriginOrID == "" {
+		return nil, fmt.Errorf("origin/id is required")
+	}
+
+	requestURL := fmt.Sprintf("%s/api/synthetic-checks/%s", c.BaseURL, url.PathEscape(trimmedOriginOrID))
+
+	body, err := json.Marshal(specification)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPut, requestURL, bytes.NewReader(body), "application/json")
+	if err != nil {
+		return nil, err
+	}
+
+	parsed, err := parseJSONResponse(responseBody)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing upsert synthetic check response: %v", err)
+	}
+
+	if _, ok := parsed["originOrId"]; !ok {
+		parsed["originOrId"] = trimmedOriginOrID
+	}
+
+	return parsed, nil
+}
+
+// parseJSONResponse normalizes object or array JSON responses into a map.
+func parseJSONResponse(responseBody []byte) (map[string]any, error) {
+	trimmedBody := strings.TrimSpace(string(responseBody))
+	if trimmedBody == "" {
+		return map[string]any{}, nil
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(responseBody, &parsed); err == nil {
+		return parsed, nil
+	}
+
+	var parsedArray []any
+	if err := json.Unmarshal(responseBody, &parsedArray); err == nil {
+		return map[string]any{"items": parsedArray}, nil
+	}
+
+	return nil, fmt.Errorf("unexpected response payload shape")
 }

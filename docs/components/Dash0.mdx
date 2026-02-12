@@ -11,6 +11,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="List Issues" href="#list-issues" description="Query Dash0 to get a list of all current issues using the metric dash0.issue.status" />
   <LinkCard title="Query Prometheus" href="#query-prometheus" description="Execute a PromQL query against Dash0 Prometheus API and return the response data" />
+  <LinkCard title="Update Synthetic Check" href="#update-synthetic-check" description="Update an existing synthetic check in Dash0 configuration API" />
 </CardGrid>
 
 <a id="list-issues"></a>
@@ -147,6 +148,51 @@ Returns the Prometheus query response including:
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "dash0.prometheus.response"
+}
+```
+
+<a id="update-synthetic-check"></a>
+
+## Update Synthetic Check
+
+The Update Synthetic Check component updates an existing Dash0 synthetic check.
+
+### Use Cases
+
+- **Change monitoring target**: Update URLs, probes, or assertions after infrastructure changes
+- **Tune schedules**: Adjust check intervals as traffic and SLOs evolve
+- **Workflow-driven changes**: Roll out check updates as part of deployment workflows
+
+### Configuration
+
+- **Synthetic Check**: Existing synthetic check origin/ID
+- **Name**: Human-readable synthetic check name
+- **Enabled**: Whether the synthetic check is enabled
+- **Plugin Kind**: Synthetic check plugin type (currently HTTP)
+- **Method**: HTTP method for request checks
+- **URL**: Target URL for the synthetic check
+- **Headers (Optional)**: Request header key/value pairs
+- **Request Body (Optional)**: HTTP request body (useful for POST/PUT/PATCH)
+
+### Output
+
+Emits:
+- **originOrId**: Synthetic check identifier used for the API request
+- **response**: Raw Dash0 API response
+
+### Example Output
+
+```json
+{
+  "data": {
+    "originOrId": "checkout-health-check",
+    "response": {
+      "id": "checkout-health-check",
+      "status": "updated"
+    }
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.synthetic.check.updated"
 }
 ```
 
