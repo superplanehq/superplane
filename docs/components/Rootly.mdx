@@ -17,6 +17,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Create Event" href="#create-event" description="Add a timeline event to a Rootly incident" />
   <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in Rootly" />
+  <LinkCard title="Update Incident" href="#update-incident" description="Update an existing incident in Rootly" />
 </CardGrid>
 
 <a id="on-incident"></a>
@@ -146,17 +147,73 @@ Returns the created incident object including:
 ```json
 {
   "data": {
-    "incident": {
-      "id": "abc123-def456",
-      "severity": "sev1",
-      "started_at": "2026-01-19T12:00:00Z",
-      "status": "started",
-      "summary": "Users are experiencing slow database queries and connection timeouts.",
-      "title": "Database connection issues",
-      "url": "https://app.rootly.com/incidents/abc123-def456"
-    }
+    "id": "abc123-def456",
+    "severity": "sev1",
+    "started_at": "2026-01-19T12:00:00Z",
+    "status": "started",
+    "summary": "Users are experiencing slow database queries and connection timeouts.",
+    "title": "Database connection issues",
+    "url": "https://app.rootly.com/incidents/abc123-def456"
   },
   "timestamp": "2026-01-19T12:00:00Z",
+  "type": "rootly.incident"
+}
+```
+
+<a id="update-incident"></a>
+
+## Update Incident
+
+The Update Incident component updates an existing incident in Rootly.
+
+### Use Cases
+
+- **Status updates**: Update incident status when new information arrives
+- **Severity changes**: Adjust severity based on impact assessment
+- **Service association**: Attach affected services to an incident
+- **Team assignment**: Assign teams to respond to an incident
+- **Metadata updates**: Add labels to categorize incidents
+
+### Configuration
+
+- **Incident ID**: The UUID of the incident to update (required, supports expressions)
+- **Title**: Update the incident title (optional, supports expressions)
+- **Summary**: Update the incident summary (optional, supports expressions)
+- **Status**: Update the incident status (optional)
+- **Sub-Status**: Update the incident sub-status (optional, required by some Rootly accounts when changing status)
+- **Severity**: Update the incident severity level (optional)
+- **Services**: Services to attach to the incident (optional)
+- **Teams**: Teams to attach to the incident (optional)
+- **Labels**: Key-value labels for the incident (optional)
+
+### Output
+
+Returns the updated incident object including:
+- **id**: Incident UUID
+- **sequential_id**: Sequential incident number
+- **title**: Incident title
+- **slug**: URL-friendly slug
+- **status**: Current incident status
+- **updated_at**: Last update timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "abc123-def456",
+    "mitigated_at": "2026-01-19T13:30:00Z",
+    "sequential_id": 42,
+    "severity": "sev1",
+    "slug": "database-connection-issues",
+    "started_at": "2026-01-19T12:00:00Z",
+    "status": "mitigated",
+    "summary": "Root cause identified. Connection pool exhausted.",
+    "title": "Database connection issues - Updated",
+    "updated_at": "2026-01-19T13:30:00Z",
+    "url": "https://app.rootly.com/incidents/abc123-def456"
+  },
+  "timestamp": "2026-01-19T13:30:00Z",
   "type": "rootly.incident"
 }
 ```
