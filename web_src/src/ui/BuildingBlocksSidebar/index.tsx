@@ -29,6 +29,7 @@ import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
+import azureIcon from "@/assets/icons/integrations/azure.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
@@ -411,6 +412,7 @@ function CategorySection({
     sendgrid: sendgridIcon,
     render: renderIcon,
     dockerhub: dockerIcon,
+    azure: azureIcon,
     aws: {
       codeArtifact: awsIcon,
       lambda: awsLambdaIcon,
@@ -484,6 +486,7 @@ function CategorySection({
             sendgrid: sendgridIcon,
             render: renderIcon,
             dockerhub: dockerIcon,
+            azure: azureIcon,
             aws: {
               codeArtifact: awsCodeArtifactIcon,
               ecr: awsEcrIcon,
