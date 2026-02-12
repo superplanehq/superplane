@@ -68,12 +68,13 @@ func (p *OnAlarm) Documentation() string {
 
 - **Region**: AWS region where alarms are evaluated
 - **Alarms**: Optional alarm name filters (supports equals, not-equals, and regex matches)
+- **State**: Only trigger for alarms in the specified state (OK, ALARM, or INSUFFICIENT_DATA)
 
 ## Event Data
 
 Each alarm event includes:
 - **detail.alarmName**: CloudWatch alarm name
-- **detail.state.value**: Current alarm state (triggered state is ` + "`ALARM`" + `)
+- **detail.state.value**: Current alarm state
 - **detail.previousState.value**: Previous alarm state
 `
 }
@@ -141,7 +142,7 @@ func (p *OnAlarm) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("region is required")
 	}
 
-	if metadata.SubscriptionID != "" && metadata.Region == config.Region {
+	if metadata.SubscriptionID != "" {
 		return nil
 	}
 

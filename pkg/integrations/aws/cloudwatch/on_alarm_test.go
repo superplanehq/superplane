@@ -180,7 +180,7 @@ func Test__OnAlarm__OnIntegrationMessage(t *testing.T) {
 		assert.Equal(t, 0, eventContext.Count())
 	})
 
-	t.Run("state is not ALARM -> no event", func(t *testing.T) {
+	t.Run("state mismatch -> no event", func(t *testing.T) {
 		eventContext := &contexts.EventContext{}
 		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
 			Logger: logrus.NewEntry(logrus.New()),
@@ -189,6 +189,7 @@ func Test__OnAlarm__OnIntegrationMessage(t *testing.T) {
 				Metadata: OnAlarmMetadata{Region: "us-east-1"},
 			},
 			Configuration: OnAlarmConfiguration{
+				State: AlarmStateAlarm,
 				Alarms: []configuration.Predicate{
 					{
 						Type:  configuration.PredicateTypeMatches,
@@ -242,7 +243,7 @@ func Test__OnAlarm__OnIntegrationMessage(t *testing.T) {
 		assert.Equal(t, 0, eventContext.Count())
 	})
 
-	t.Run("ALARM state and matching alarm -> emits event", func(t *testing.T) {
+	t.Run("matching alarm -> emits event", func(t *testing.T) {
 		eventContext := &contexts.EventContext{}
 		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
 			Logger: logrus.NewEntry(logrus.New()),
@@ -251,6 +252,7 @@ func Test__OnAlarm__OnIntegrationMessage(t *testing.T) {
 				Metadata: OnAlarmMetadata{Region: "us-east-1"},
 			},
 			Configuration: OnAlarmConfiguration{
+				State: AlarmStateAlarm,
 				Alarms: []configuration.Predicate{
 					{
 						Type:  configuration.PredicateTypeEquals,
