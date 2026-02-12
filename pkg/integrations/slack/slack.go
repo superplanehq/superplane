@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,10 +15,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"gorm.io/gorm"
 )
 
 const (
@@ -106,6 +111,7 @@ func (s *Slack) HandleAction(ctx core.IntegrationActionContext) error {
 func (s *Slack) Components() []core.Component {
 	return []core.Component{
 		&SendTextMessage{},
+		&SendAndWaitForResponse{},
 	}
 }
 
@@ -357,7 +363,144 @@ func (s *Slack) handleChallenge(ctx core.HTTPRequestContext, payload EventPayloa
 }
 
 func (s *Slack) handleInteractivity(ctx core.HTTPRequestContext, body []byte) {
-	// TODO
+	formValues, err := url.ParseQuery(string(body))
+	if err != nil {
+		ctx.Logger.Errorf("error parsing interactivity payload as form data: %v", err)
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	payloadJSON := formValues.Get("payload")
+	if payloadJSON == "" {
+		ctx.Logger.Errorf("missing payload field in interactivity request")
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	payload := InteractionPayload{}
+	if err := json.Unmarshal([]byte(payloadJSON), &payload); err != nil {
+		ctx.Logger.Errorf("error unmarshaling interactivity payload: %v", err)
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if payload.Type != "block_actions" {
+		ctx.Logger.Infof("ignoring interaction type: %s", payload.Type)
+		ctx.Response.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if len(payload.Actions) == 0 {
+		ctx.Logger.Errorf("interaction payload does not include actions")
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	action := payload.Actions[0]
+	if action.Type != "button" {
+		ctx.Logger.Infof("ignoring interaction action type: %s", action.Type)
+		ctx.Response.WriteHeader(http.StatusOK)
+		return
+	}
+
+	messageTS, err := payload.MessageTS()
+	if err != nil {
+		ctx.Logger.Errorf("failed to resolve message timestamp from interaction payload: %v", err)
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	subscription, err := models.FindIntegrationSubscriptionByMessageTS(
+		database.Conn(),
+		ctx.Integration.ID(),
+		messageTS,
+	)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			ctx.Logger.Infof("no interaction subscription found for message_ts %s", messageTS)
+			ctx.Response.WriteHeader(http.StatusOK)
+			return
+		}
+
+		ctx.Logger.Errorf("failed to find interaction subscription for message_ts %s: %v", messageTS, err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	executionID, err := subscription.ExecutionID()
+	if err != nil {
+		ctx.Logger.Errorf("failed to parse execution ID from interaction subscription %s: %v", subscription.ID.String(), err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if err := s.createButtonClickAction(executionID, action.Value); err != nil {
+		ctx.Logger.Errorf("failed to create button click action for execution %s: %v", executionID.String(), err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if err := ctx.Integration.Unsubscribe(subscription.ID); err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		ctx.Logger.Warnf("failed to remove consumed interaction subscription %s: %v", subscription.ID.String(), err)
+	}
+
+	ctx.Response.WriteHeader(http.StatusOK)
+}
+
+type InteractionPayload struct {
+	Type      string              `json:"type"`
+	Container map[string]any      `json:"container"`
+	Message   map[string]any      `json:"message"`
+	Actions   []InteractionAction `json:"actions"`
+}
+
+type InteractionAction struct {
+	Type     string `json:"type"`
+	ActionID string `json:"action_id"`
+	Value    string `json:"value"`
+}
+
+func (p *InteractionPayload) MessageTS() (string, error) {
+	if messageTS, ok := p.Container["message_ts"].(string); ok && messageTS != "" {
+		return messageTS, nil
+	}
+
+	if messageTS, ok := p.Message["ts"].(string); ok && messageTS != "" {
+		return messageTS, nil
+	}
+
+	return "", errors.New("message_ts not found")
+}
+
+func (s *Slack) createButtonClickAction(executionID uuid.UUID, buttonValue string) error {
+	if buttonValue == "" {
+		return fmt.Errorf("button value is required")
+	}
+
+	execution := models.CanvasNodeExecution{}
+	err := database.Conn().Where("id = ?", executionID).First(&execution).Error
+	if err != nil {
+		return fmt.Errorf("failed to find execution: %w", err)
+	}
+
+	if execution.State == models.CanvasNodeExecutionStateFinished {
+		return nil
+	}
+
+	runAt := time.Now()
+	return execution.CreateRequest(
+		database.Conn(),
+		models.NodeRequestTypeInvokeAction,
+		models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: sendAndWaitActionButtonClick,
+				Parameters: map[string]any{
+					"value": buttonValue,
+				},
+			},
+		},
+		&runAt,
+	)
 }
 
 func (s *Slack) parseEventCallback(eventPayload EventPayload) (string, any, error) {

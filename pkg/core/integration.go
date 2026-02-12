@@ -243,6 +243,11 @@ type IntegrationContext interface {
 	Subscribe(any) (*uuid.UUID, error)
 
 	/*
+	 * Remove an existing integration subscription.
+	 */
+	Unsubscribe(subscriptionID uuid.UUID) error
+
+	/*
 	 * Schedule actions for the integration.
 	 */
 	ScheduleResync(interval time.Duration) error
