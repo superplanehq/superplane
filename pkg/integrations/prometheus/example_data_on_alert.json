@@ -1,33 +1,33 @@
 {
-  "type": "prometheus.alert",
   "data": {
-    "status": "firing",
-    "labels": {
-      "alertname": "HighRequestLatency",
-      "instance": "api-1:9090",
-      "job": "api"
-    },
     "annotations": {
-      "summary": "API latency is above threshold",
-      "description": "95th percentile latency is above 500ms"
-    },
-    "startsAt": "2026-01-19T12:00:00Z",
-    "endsAt": "0001-01-01T00:00:00Z",
-    "generatorURL": "http://prometheus.example.com/graph?g0.expr=...",
-    "fingerprint": "f8f1d8a0b7de3f0a",
-    "receiver": "superplane",
-    "groupKey": "{}:{alertname=\"HighRequestLatency\"}",
-    "groupLabels": {
-      "alertname": "HighRequestLatency"
-    },
-    "commonLabels": {
-      "alertname": "HighRequestLatency",
-      "severity": "critical"
+      "description": "Demo alert from local Prometheus setup",
+      "summary": "SuperPlane test alert is firing"
     },
     "commonAnnotations": {
-      "summary": "API latency is above threshold"
+      "description": "Demo alert from local Prometheus setup",
+      "summary": "SuperPlane test alert is firing"
     },
-    "externalURL": "http://alertmanager.example.com"
+    "commonLabels": {
+      "alertname": "SuperplaneTestAlert",
+      "severity": "warning"
+    },
+    "endsAt": "0001-01-01T00:00:00Z",
+    "externalURL": "http://localhost:9093",
+    "fingerprint": "aac3b474e2c0658c",
+    "generatorURL": "http://fd66aa456472:9090/graph?g0.expr=vector%281%29&g0.tab=1",
+    "groupKey": "{}:{alertname=\"SuperplaneTestAlert\"}",
+    "groupLabels": {
+      "alertname": "SuperplaneTestAlert"
+    },
+    "labels": {
+      "alertname": "SuperplaneTestAlert",
+      "severity": "warning"
+    },
+    "receiver": "superplane",
+    "startsAt": "2026-02-12T16:08:39Z",
+    "status": "firing"
   },
-  "timestamp": "2026-01-19T12:00:00Z"
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "type": "prometheus.alert"
 }

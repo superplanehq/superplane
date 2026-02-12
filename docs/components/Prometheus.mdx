@@ -66,34 +66,34 @@ After updating Alertmanager config, reload it (for example `POST /-/reload` when
 {
   "data": {
     "annotations": {
-      "description": "95th percentile latency is above 500ms",
-      "summary": "API latency is above threshold"
+      "description": "Demo alert from local Prometheus setup",
+      "summary": "SuperPlane test alert is firing"
     },
     "commonAnnotations": {
-      "summary": "API latency is above threshold"
+      "description": "Demo alert from local Prometheus setup",
+      "summary": "SuperPlane test alert is firing"
     },
     "commonLabels": {
-      "alertname": "HighRequestLatency",
-      "severity": "critical"
+      "alertname": "SuperplaneTestAlert",
+      "severity": "warning"
     },
     "endsAt": "0001-01-01T00:00:00Z",
-    "externalURL": "http://alertmanager.example.com",
-    "fingerprint": "f8f1d8a0b7de3f0a",
-    "generatorURL": "http://prometheus.example.com/graph?g0.expr=...",
-    "groupKey": "{}:{alertname=\"HighRequestLatency\"}",
+    "externalURL": "http://localhost:9093",
+    "fingerprint": "aac3b474e2c0658c",
+    "generatorURL": "http://fd66aa456472:9090/graph?g0.expr=vector%281%29\u0026g0.tab=1",
+    "groupKey": "{}:{alertname=\"SuperplaneTestAlert\"}",
     "groupLabels": {
-      "alertname": "HighRequestLatency"
+      "alertname": "SuperplaneTestAlert"
     },
     "labels": {
-      "alertname": "HighRequestLatency",
-      "instance": "api-1:9090",
-      "job": "api"
+      "alertname": "SuperplaneTestAlert",
+      "severity": "warning"
     },
     "receiver": "superplane",
-    "startsAt": "2026-01-19T12:00:00Z",
+    "startsAt": "2026-02-12T16:08:39Z",
     "status": "firing"
   },
-  "timestamp": "2026-01-19T12:00:00Z",
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
   "type": "prometheus.alert"
 }
 ```
@@ -119,19 +119,18 @@ Emits one `prometheus.alert` payload with labels, annotations, state, and timing
 {
   "data": {
     "annotations": {
-      "description": "95th percentile latency is above 500ms",
-      "summary": "API latency is above threshold"
+      "description": "Demo alert from local Prometheus setup",
+      "summary": "SuperPlane test alert is firing"
     },
     "labels": {
-      "alertname": "HighRequestLatency",
-      "instance": "api-1:9090",
-      "job": "api"
+      "alertname": "SuperplaneTestAlert",
+      "severity": "warning"
     },
-    "startsAt": "2026-01-19T12:00:00Z",
+    "startsAt": "2026-02-12T16:08:09.000517289Z",
     "status": "firing",
-    "value": "1"
+    "value": "1e+00"
   },
-  "timestamp": "2026-01-19T12:00:00Z",
+  "timestamp": "2026-02-12T16:18:05.943610583Z",
   "type": "prometheus.alert"
 }
 ```

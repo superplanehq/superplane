@@ -126,6 +126,7 @@ func (t *OnAlert) Configuration() []configuration.Field {
 					},
 				},
 			},
+			Default:     []string{"MyAlert"},
 			Description: "Optional exact alertname filters",
 		},
 	}

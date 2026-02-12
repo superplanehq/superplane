@@ -1,18 +1,17 @@
 {
-  "type": "prometheus.alert",
   "data": {
-    "status": "firing",
-    "labels": {
-      "alertname": "HighRequestLatency",
-      "instance": "api-1:9090",
-      "job": "api"
-    },
     "annotations": {
-      "summary": "API latency is above threshold",
-      "description": "95th percentile latency is above 500ms"
+      "description": "Demo alert from local Prometheus setup",
+      "summary": "SuperPlane test alert is firing"
     },
-    "startsAt": "2026-01-19T12:00:00Z",
-    "value": "1"
+    "labels": {
+      "alertname": "SuperplaneTestAlert",
+      "severity": "warning"
+    },
+    "startsAt": "2026-02-12T16:08:09.000517289Z",
+    "status": "firing",
+    "value": "1e+00"
   },
-  "timestamp": "2026-01-19T12:00:00Z"
+  "timestamp": "2026-02-12T16:18:05.943610583Z",
+  "type": "prometheus.alert"
 }
