@@ -3,6 +3,7 @@ import React from "react";
 import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 import circleciIcon from "@/assets/icons/integrations/circleci.svg";
+import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
@@ -13,6 +14,7 @@ import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
+import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
@@ -38,6 +40,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   openai: openAiIcon,
   "open-ai": openAiIcon,
   claude: claudeIcon,
+  cursor: cursorIcon,
   pagerduty: pagerDutyIcon,
   rootly: rootlyIcon,
   semaphore: SemaphoreLogo,
@@ -63,6 +66,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   openai: openAiIcon,
   "open-ai": openAiIcon,
   claude: claudeIcon,
+  cursor: cursorIcon,
   pagerduty: pagerDutyIcon,
   rootly: rootlyIcon,
   semaphore: SemaphoreLogo,
@@ -72,6 +76,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   render: renderIcon,
   dockerhub: dockerIcon,
   aws: {
+    cloudwatch: awsCloudwatchIcon,
     lambda: awsLambdaIcon,
   },
 };
