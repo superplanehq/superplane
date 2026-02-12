@@ -15,6 +15,17 @@ export interface ListIssuesConfiguration {
   checkRules?: string[];
 }
 
+export interface UpsertSyntheticCheckConfiguration {
+  originOrId?: string;
+  name?: string;
+  enabled?: boolean;
+  pluginKind?: string;
+  method?: string;
+  url?: string;
+  headers?: Array<{ key: string; value: string }>;
+  requestBody?: string;
+}
+
 export interface PrometheusResponse {
   status: string;
   data: {
