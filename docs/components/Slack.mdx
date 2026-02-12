@@ -16,6 +16,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Send Text Message" href="#send-text-message" description="Send a text message to a Slack channel" />
+  <LinkCard title="Send and Wait for Response" href="#send-and-wait-for-response" description="Send a Slack message with buttons and wait for a click" />
 </CardGrid>
 
 ## Instructions
@@ -124,3 +125,39 @@ Returns metadata about the sent message including channel information.
 }
 ```
 
+<a id="send-and-wait-for-response"></a>
+
+## Send and Wait for Response
+
+The Send and Wait for Response component sends a message with buttons and waits for one button click.
+
+### Use Cases
+
+- **Approvals**: Ask someone to approve/reject before continuing
+- **Human confirmation**: Pause automation until a person selects an option
+- **Structured decisions**: Collect one predefined response instead of free text
+
+### Configuration
+
+- **Channel**: Slack channel or DM channel ID
+- **Message**: Message text to post
+- **Timeout (seconds)**: Optional maximum wait time
+- **Buttons**: List of 1 to 4 buttons; each button has a `name` and a `value`
+
+### Output Channels
+
+- **Received**: Emitted when a button is clicked (payload includes selected `value`)
+- **Timeout**: Emitted when the timeout is reached before any click
+
+### Example Output (Received)
+
+```json
+{
+  "data": {
+    "clicked_at": "2026-02-12T00:00:00Z",
+    "value": "approve"
+  },
+  "timestamp": "2026-02-12T00:00:00Z",
+  "type": "slack.button.clicked"
+}
+```

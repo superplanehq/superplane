@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -78,4 +79,34 @@ func ListIntegrationSubscriptions(tx *gorm.DB, installationID uuid.UUID) ([]Node
 	}
 
 	return subscriptions, nil
+}
+
+func FindIntegrationSubscriptionByMessageTS(tx *gorm.DB, installationID uuid.UUID, messageTS string) (*IntegrationSubscription, error) {
+	subscription := IntegrationSubscription{}
+
+	err := tx.
+		Where("installation_id = ?", installationID).
+		Where("configuration->>'message_ts' = ?", messageTS).
+		Where("configuration->>'type' = ?", "button_click").
+		First(&subscription).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &subscription, nil
+}
+
+func (s *IntegrationSubscription) ExecutionID() (uuid.UUID, error) {
+	config, ok := s.Configuration.Data().(map[string]any)
+	if !ok {
+		return uuid.Nil, fmt.Errorf("invalid subscription configuration type: %T", s.Configuration.Data())
+	}
+
+	rawExecutionID, ok := config["execution_id"].(string)
+	if !ok || rawExecutionID == "" {
+		return uuid.Nil, fmt.Errorf("execution_id not found in subscription configuration")
+	}
+
+	return uuid.Parse(rawExecutionID)
 }

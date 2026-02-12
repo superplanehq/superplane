@@ -200,3 +200,130 @@ func Test__Slack__HandleEvent__Challenge(t *testing.T) {
 		assert.Equal(t, "challenge-token", recorder.Body.String())
 	})
 }
+
+func Test__Slack__HandleInteractivity(t *testing.T) {
+	s := &Slack{}
+	logger := logrus.NewEntry(logrus.New())
+
+	t.Run("missing payload field -> 400", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+
+		s.handleInteractivity(core.HTTPRequestContext{
+			Logger:      logger,
+			Response:    recorder,
+			Integration: &contexts.IntegrationContext{},
+		}, []byte("foo=bar"))
+
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	})
+
+	t.Run("invalid payload JSON -> 400", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		values := url.Values{}
+		values.Set("payload", "{invalid")
+
+		s.handleInteractivity(core.HTTPRequestContext{
+			Logger:      logger,
+			Response:    recorder,
+			Integration: &contexts.IntegrationContext{},
+		}, []byte(values.Encode()))
+
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	})
+
+	t.Run("non block action payload -> 200", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		payload := map[string]any{
+			"type": "view_submission",
+		}
+		rawPayload, err := json.Marshal(payload)
+		require.NoError(t, err)
+
+		values := url.Values{}
+		values.Set("payload", string(rawPayload))
+
+		s.handleInteractivity(core.HTTPRequestContext{
+			Logger:      logger,
+			Response:    recorder,
+			Integration: &contexts.IntegrationContext{},
+		}, []byte(values.Encode()))
+
+		assert.Equal(t, http.StatusOK, recorder.Code)
+	})
+
+	t.Run("block action payload without actions -> 400", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		payload := map[string]any{
+			"type":    "block_actions",
+			"actions": []any{},
+		}
+		rawPayload, err := json.Marshal(payload)
+		require.NoError(t, err)
+
+		values := url.Values{}
+		values.Set("payload", string(rawPayload))
+
+		s.handleInteractivity(core.HTTPRequestContext{
+			Logger:      logger,
+			Response:    recorder,
+			Integration: &contexts.IntegrationContext{},
+		}, []byte(values.Encode()))
+
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	})
+
+	t.Run("block action payload with non-button action -> 200", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		payload := map[string]any{
+			"type": "block_actions",
+			"actions": []any{
+				map[string]any{
+					"type":  "select",
+					"value": "approve",
+				},
+			},
+			"container": map[string]any{
+				"message_ts": "1700000000.000100",
+			},
+		}
+		rawPayload, err := json.Marshal(payload)
+		require.NoError(t, err)
+
+		values := url.Values{}
+		values.Set("payload", string(rawPayload))
+
+		s.handleInteractivity(core.HTTPRequestContext{
+			Logger:      logger,
+			Response:    recorder,
+			Integration: &contexts.IntegrationContext{},
+		}, []byte(values.Encode()))
+
+		assert.Equal(t, http.StatusOK, recorder.Code)
+	})
+
+	t.Run("button action without message timestamp -> 400", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		payload := map[string]any{
+			"type": "block_actions",
+			"actions": []any{
+				map[string]any{
+					"type":  "button",
+					"value": "approve",
+				},
+			},
+		}
+		rawPayload, err := json.Marshal(payload)
+		require.NoError(t, err)
+
+		values := url.Values{}
+		values.Set("payload", string(rawPayload))
+
+		s.handleInteractivity(core.HTTPRequestContext{
+			Logger:      logger,
+			Response:    recorder,
+			Integration: &contexts.IntegrationContext{},
+		}, []byte(values.Encode()))
+
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	})
+}
