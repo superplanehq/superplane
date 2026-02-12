@@ -1,0 +1,4608 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Statuspage API",
+    "description": "# Code of Conduct\nPlease don't abuse the API, and please report all feature requests and issues to\nhttps://support.atlassian.com/contact\n\n# Rate Limiting\nEach API token is limited to 1 request / second as measured on a 60 second rolling window.\nTo get this limit increased, please contact us at https://support.atlassian.com/contact\n\nError codes 420 or 429 indicate that you have exceeded the rate limit and the request has been rejected.\n\n# Basics\n\n## HTTPS\nIt's required\n\n## URL Prefix\nIn order to maintain version integrity into the future, the API is versioned. All calls\ncurrently begin with the following prefix:\n\n  https://api.statuspage.io/v1/\n\n## RESTful Interface\nWherever possible, the API seeks to implement repeatable patterns with logical,\nrepresentative URLs and descriptive HTTP verbs. Below are some examples and conventions\nyou will see throughout the documentation.\n\n* Collections are buckets: https://api.statuspage.io/v1/pages/asdf123/incidents.json\n* Elements have unique IDs: https://api.statuspage.io/v1/pages/asdf123/incidents/jklm456.json\n* GET will retrieve information about a collection/element\n* POST will create an element in a collection\n* PATCH will update a single element\n* PUT will replace a single element in a collection (rarely used)\n* DELETE will destroy a single element\n\n## Sending Data\nInformation can be sent in the body as form urlencoded or JSON, but make sure the\nContent-Type header matches the body structure or the server gremlins will be angry.\n\nAll examples are provided in JSON format, however they can easily be converted to form encoding\nif required.  Some examples of how to convert things are below:\n\n    // JSON\n    {\n      \"incident\": {\n        \"name\": \"test incident\",\n        \"components\": [\"8kbf7d35c070\", \"vtnh60py4yd7\"]\n      }\n    }\n\n    // Form Encoded (using curl as an example):\n    curl -X POST https://api.statuspage.io/v1/example \\\n      -d \"incident[name]=test incident\" \\\n      -d \"incident[components][]=8kbf7d35c070\" \\\n      -d \"incident[components][]=vtnh60py4yd7\"\n\n# Authentication\n\n<!-- ReDoc-Inject: <security-definitions> -->",
+    "contact": {
+      "name": "Statuspage Support",
+      "url": "https://support.atlassian.com/contact"
+    },
+    "version": "1.0.0",
+    "x-logo": {
+      "url": "https://d1ykxpo828xni0.cloudfront.net/Statuspage-logo-padding.svg"
+    }
+  },
+  "security": [
+    {
+      "api_key": []
+    }
+  ],
+  "servers": [
+    {
+      "url": "https://api.statuspage.io/v1",
+      "description": "Production API"
+    }
+  ],
+  "tags": [
+    {
+      "name": "pages",
+      "description": "Status page management"
+    },
+    {
+      "name": "incidents",
+      "description": "Incident creation and updates"
+    },
+    {
+      "name": "incident updates",
+      "description": "Post updates to incidents"
+    },
+    {
+      "name": "components",
+      "description": "Infrastructure component status"
+    },
+    {
+      "name": "component groups",
+      "description": "Component organization"
+    },
+    {
+      "name": "subscribers",
+      "description": "Notification subscribers"
+    },
+    {
+      "name": "metrics",
+      "description": "Custom metrics data"
+    },
+    {
+      "name": "templates",
+      "description": "Incident/maintenance templates"
+    },
+    {
+      "name": "incident postmortem",
+      "description": "Post-incident analysis"
+    }
+  ],
+  "paths": {
+    "/pages": {
+      "get": {
+        "summary": "Get a list of pages",
+        "description": "Get a list of pages",
+        "responses": {
+          "200": {
+            "description": "Get a list of pages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Page"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "operationId": "getPages",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X GET\n"
+          }
+        ]
+      }
+    },
+    "/pages/{page_id}": {
+      "patch": {
+        "summary": "Update a page",
+        "description": "Update a page",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/patchPages"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Update a page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You are not authorized to access this resource.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "operationId": "patchPagesPageId",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id} \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X PATCH \\\n  -d \"page[name]=string\" \\\n  -d \"page[domain]=string\" \\\n  -d \"page[url]=string\""
+          }
+        ]
+      },
+      "put": {
+        "summary": "Update a page",
+        "description": "Update a page",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/putPages"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Update a page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You are not authorized to access this resource.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "operationId": "putPagesPageId",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id} \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X PATCH \\\n  -d \"page[name]=string\" \\\n  -d \"page[domain]=string\" \\\n  -d \"page[url]=string\""
+          }
+        ]
+      },
+      "get": {
+        "summary": "Get a page",
+        "description": "Get a page",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get a page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You are not authorized to access this resource.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "operationId": "getPagesPageId",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id} \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X GET\n"
+          }
+        ]
+      }
+    },
+    "/pages/{page_id}/incidents": {
+      "post": {
+        "summary": "Create an incident",
+        "description": "Create an incident",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/postPagesPageIdIncidents"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Create an incident",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Incident"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "incidents"
+        ],
+        "operationId": "postPagesPageIdIncidents",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/incidents \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X POST \\\n  -d \"incident[name]=string\" \\\n  -d \"incident[status]=string\" \\\n  -d \"incident[body]=string\""
+          }
+        ]
+      },
+      "get": {
+        "summary": "Get a list of incidents",
+        "description": "Get a list of incidents",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "description": "If this is specified, search for the text query string in the incidents' name, status, postmortem_body, and incident_updates fields.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "description": "The maximum number of rows to return per page. The default and maximum limit is 100.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "description": "Page offset to fetch.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get a list of incidents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Incident"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "incidents"
+        ],
+        "operationId": "getPagesPageIdIncidents",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/incidents \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X GET\n"
+          }
+        ]
+      }
+    },
+    "/pages/{page_id}/incidents/unresolved": {
+      "get": {
+        "summary": "Get a list of unresolved incidents",
+        "description": "Get a list of unresolved incidents",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "description": "Page offset to fetch.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "per_page",
+            "description": "Number of results to return per page.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get a list of unresolved incidents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Incident"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "incidents"
+        ],
+        "operationId": "getPagesPageIdIncidentsUnresolved",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/incidents/unresolved \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X GET\n"
+          }
+        ]
+      }
+    },
+    "/pages/{page_id}/incidents/scheduled": {
+      "get": {
+        "summary": "Get a list of scheduled incidents",
+        "description": "Get a list of scheduled incidents",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "description": "Page offset to fetch.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "per_page",
+            "description": "Number of results to return per page.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get a list of scheduled incidents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Incident"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "incidents"
+        ],
+        "operationId": "getPagesPageIdIncidentsScheduled",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/incidents/scheduled \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X GET\n"
+          }
+        ]
+      }
+    },
+    "/pages/{page_id}/incidents/active_maintenance": {
+      "get": {
+        "summary": "Get a list of active maintenances",
+        "description": "Get a list of active maintenances",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "description": "Page offset to fetch.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "per_page",
+            "description": "Number of results to return per page.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get a list of active maintenances",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Incident"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "incidents"
+        ],
+        "operationId": "getPagesPageIdIncidentsActiveMaintenance",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/incidents/active_maintenance \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X GET\n"
+          }
+        ]
+      }
+    },
+    "/pages/{page_id}/incidents/{incident_id}": {
+      "delete": {
+        "summary": "Delete an incident",
+        "description": "Delete an incident",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "incident_id",
+            "description": "Incident Identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete an incident",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Incident"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "incidents"
+        ],
+        "operationId": "deletePagesPageIdIncidentsIncidentId",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/incidents/{incident_id} \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X DELETE\n"
+          }
+        ]
+      },
+      "patch": {
+        "summary": "Update an incident",
+        "description": "Update an incident",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "incident_id",
+            "description": "Incident Identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/patchPagesPageIdIncidents"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Update an incident",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Incident"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "incidents"
+        ],
+        "operationId": "patchPagesPageIdIncidentsIncidentId",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/incidents/{incident_id} \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X PATCH \\\n  -d \"incident[name]=string\" \\\n  -d \"incident[status]=string\" \\\n  -d \"incident[body]=string\""
+          }
+        ]
+      },
+      "put": {
+        "summary": "Update an incident",
+        "description": "Update an incident",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "incident_id",
+            "description": "Incident Identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/putPagesPageIdIncidents"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Update an incident",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Incident"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "incidents"
+        ],
+        "operationId": "putPagesPageIdIncidentsIncidentId",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/incidents/{incident_id} \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X PATCH \\\n  -d \"incident[name]=string\" \\\n  -d \"incident[status]=string\" \\\n  -d \"incident[body]=string\""
+          }
+        ]
+      },
+      "get": {
+        "summary": "Get an incident",
+        "description": "Get an incident",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "incident_id",
+            "description": "Incident Identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get an incident",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Incident"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "incidents"
+        ],
+        "operationId": "getPagesPageIdIncidentsIncidentId",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/incidents/{incident_id} \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X GET\n"
+          }
+        ]
+      }
+    },
+    "/pages/{page_id}/incidents/{incident_id}/incident_updates/{incident_update_id}": {
+      "patch": {
+        "summary": "Update a previous incident update",
+        "description": "Update a previous incident update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "incident_id",
+            "description": "Incident Identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "incident_update_id",
+            "description": "Incident Update Identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/patchPagesPageIdIncidentsIncidentIdIncidentUpdates"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Update a previous incident update",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentUpdate"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "incident updates"
+        ],
+        "operationId": "patchPagesPageIdIncidentsIncidentIdIncidentUpdatesIncidentUpdateId",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/incidents/{incident_id}/incident_updates/{incident_update_id} \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X PATCH \\\n  -d \"incident_update[wants_twitter_update]=true\" \\\n  -d \"incident_update[body]=string\""
+          }
+        ]
+      },
+      "put": {
+        "summary": "Update a previous incident update",
+        "description": "Update a previous incident update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "incident_id",
+            "description": "Incident Identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "incident_update_id",
+            "description": "Incident Update Identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/putPagesPageIdIncidentsIncidentIdIncidentUpdates"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Update a previous incident update",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentUpdate"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "incident updates"
+        ],
+        "operationId": "putPagesPageIdIncidentsIncidentIdIncidentUpdatesIncidentUpdateId",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/incidents/{incident_id}/incident_updates/{incident_update_id} \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X PATCH \\\n  -d \"incident_update[wants_twitter_update]=true\" \\\n  -d \"incident_update[body]=string\""
+          }
+        ]
+      }
+    },
+    "/pages/{page_id}/components": {
+      "post": {
+        "summary": "Create a component",
+        "description": "Create a component",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/postPagesPageIdComponents"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Create a component",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Component"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "components"
+        ],
+        "operationId": "postPagesPageIdComponents",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/components \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X POST \\\n  -d \"component[description]=string\" \\\n  -d \"component[status]=string\" \\\n  -d \"component[name]=string\""
+          }
+        ]
+      },
+      "get": {
+        "summary": "Get a list of components",
+        "description": "Get a list of components",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "description": "Page offset to fetch. Beginning February 28, 2023, this endpoint will return paginated data even if this query parameter is not provided.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "in": "query",
+            "name": "per_page",
+            "description": "Number of results to return per page. Beginning February 28, 2023, a default and maximum limit of 100 will be imposed and this endpoint will return paginated data even if this query parameter is not provided.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 1100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get a list of components",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Component"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "components"
+        ],
+        "operationId": "getPagesPageIdComponents",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/components \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X GET\n"
+          }
+        ]
+      }
+    },
+    "/pages/{page_id}/components/{component_id}": {
+      "patch": {
+        "summary": "Update a component",
+        "description": "If group_id is \"null\" then the component will be removed from a group.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "component_id",
+            "description": "Component identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/patchPagesPageIdComponents"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Update a component",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Component"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "components"
+        ],
+        "operationId": "patchPagesPageIdComponentsComponentId",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/components/{component_id} \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X PATCH \\\n  -d \"component[description]=string\" \\\n  -d \"component[status]=string\" \\\n  -d \"component[name]=string\""
+          }
+        ]
+      },
+      "put": {
+        "summary": "Update a component",
+        "description": "If group_id is \"null\" then the component will be removed from a group.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "component_id",
+            "description": "Component identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/putPagesPageIdComponents"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Update a component",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Component"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "components"
+        ],
+        "operationId": "putPagesPageIdComponentsComponentId",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/components/{component_id} \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X PATCH \\\n  -d \"component[description]=string\" \\\n  -d \"component[status]=string\" \\\n  -d \"component[name]=string\""
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Delete a component",
+        "description": "Delete a component",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "component_id",
+            "description": "Component identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Delete a component"
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "components"
+        ],
+        "operationId": "deletePagesPageIdComponentsComponentId",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/components/{component_id} \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X DELETE\n"
+          }
+        ]
+      },
+      "get": {
+        "summary": "Get a component",
+        "description": "Get a component",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "component_id",
+            "description": "Component identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get a component",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Component"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "components"
+        ],
+        "operationId": "getPagesPageIdComponentsComponentId",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/components/{component_id} \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X GET\n"
+          }
+        ]
+      }
+    },
+    "/pages/{page_id}/component-groups": {
+      "post": {
+        "summary": "Create a component group",
+        "description": "Create a component group",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/postPagesPageIdComponentGroups"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Create a component group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupComponent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "component groups"
+        ],
+        "operationId": "postPagesPageIdComponentGroups",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/component-groups \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X POST \\\n  -d \"component_group[components][]=your-id\" \\\n  -d \"component_group[name]=string\""
+          }
+        ]
+      },
+      "get": {
+        "summary": "Get a list of component groups",
+        "description": "Get a list of component groups",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "description": "Page offset to fetch. Beginning February 28, 2023, this endpoint will return paginated data even if this query parameter is not provided.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "in": "query",
+            "name": "per_page",
+            "description": "Number of results to return per page. Beginning February 28, 2023, a default and maximum limit of 100 will be imposed and this endpoint will return paginated data even if this query parameter is not provided.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get a list of component groups",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GroupComponent"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "component groups"
+        ],
+        "operationId": "getPagesPageIdComponentGroups",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/component-groups \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X GET\n"
+          }
+        ]
+      }
+    },
+    "/pages/{page_id}/component-groups/{id}": {
+      "patch": {
+        "summary": "Update a component group",
+        "description": "Update a component group",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "description": "Component group identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/patchPagesPageIdComponentGroups"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Update a component group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupComponent"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "component groups"
+        ],
+        "operationId": "patchPagesPageIdComponentGroupsId",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/component-groups/{id} \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X PATCH \\\n  -d \"component_group[components][]=your-id\" \\\n  -d \"component_group[name]=string\""
+          }
+        ]
+      },
+      "put": {
+        "summary": "Update a component group",
+        "description": "Update a component group",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "description": "Component group identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/putPagesPageIdComponentGroups"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Update a component group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupComponent"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "component groups"
+        ],
+        "operationId": "putPagesPageIdComponentGroupsId",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/component-groups/{id} \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X PATCH \\\n  -d \"component_group[components][]=your-id\" \\\n  -d \"component_group[name]=string\""
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Delete a component group",
+        "description": "Delete a component group",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "description": "Component group identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete a component group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupComponent"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "component groups"
+        ],
+        "operationId": "deletePagesPageIdComponentGroupsId",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/component-groups/{id} \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X DELETE\n"
+          }
+        ]
+      },
+      "get": {
+        "summary": "Get a component group",
+        "description": "Get a component group",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "description": "Component group identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get a component group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupComponent"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "component groups"
+        ],
+        "operationId": "getPagesPageIdComponentGroupsId",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/component-groups/{id} \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X GET\n"
+          }
+        ]
+      }
+    },
+    "/pages/{page_id}/subscribers": {
+      "post": {
+        "summary": "Create a subscriber",
+        "description": "Create a subscriber. Not applicable for Slack subscribers.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/postPagesPageIdSubscribers"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Create a subscriber. Not applicable for Slack subscribers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Subscriber"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You are not authorized to access this resource.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "subscribers"
+        ],
+        "operationId": "postPagesPageIdSubscribers",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/subscribers \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X POST \\\n  -d \"subscriber[email]=string\""
+          }
+        ]
+      },
+      "get": {
+        "summary": "Get a list of subscribers",
+        "description": "Get a list of subscribers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "description": "If this is specified, search the contact information (email, endpoint, or phone number) for the provided value. This parameter doesn\u2019t support searching for Slack subscribers.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "description": "If specified, only return subscribers of the indicated type.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "email",
+                "sms",
+                "webhook",
+                "slack",
+                "teams",
+                "integration_partner"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "description": "If this is present, only return subscribers in this state. Specify state \"all\" to find subscribers in any states.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "unconfirmed",
+                "quarantined",
+                "all"
+              ],
+              "default": "active"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "description": "The maximum number of rows to return. If a text query string is specified (q=), the default and maximum limit is 100. If the text query string is not specified, the default and maximum limit are not set, and not providing a limit will return all the subscribers. Beginning February 28, 2023, a default limit of 100 will be imposed and this endpoint will return paginated data (i.e. will no longer return all subscribers) even if this query parameter is not provided.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "description": "The page offset of subscribers. The first page is page 0, the second page 1, etc. This skips page * limit subscribers. Beginning February 28, 2023, this endpoint will return paginated data even if this query parameter is not provided.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort_field",
+            "description": "The field on which to sort: 'primary' to indicate sorting by the identifying field, 'created_at' for sorting by creation timestamp, 'quarantined_at' for sorting by quarantine timestamp, and 'relevance' which sorts by the relevancy of the search text. 'relevance' is not a valid parameter if no search text is supplied.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "primary",
+                "created_at",
+                "quarantined_at",
+                "relevance"
+              ],
+              "default": "primary"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort_direction",
+            "description": "The sort direction of the listing.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "asc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get a list of subscribers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Subscriber"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You are not authorized to access this resource.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "subscribers"
+        ],
+        "operationId": "getPagesPageIdSubscribers",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/subscribers \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X GET\n"
+          }
+        ]
+      }
+    },
+    "/pages/{page_id}/subscribers/{subscriber_id}": {
+      "delete": {
+        "summary": "Unsubscribe a subscriber",
+        "description": "Unsubscribe a subscriber",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "subscriber_id",
+            "description": "Subscriber Identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "skip_unsubscription_notification",
+            "description": "If skip_unsubscription_notification is true, the subscriber does not receive any notifications when they are unsubscribed.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unsubscribe a subscriber",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Subscriber"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "subscribers"
+        ],
+        "operationId": "deletePagesPageIdSubscribersSubscriberId",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/subscribers/{subscriber_id} \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X DELETE\n"
+          }
+        ]
+      },
+      "patch": {
+        "summary": "Update a subscriber",
+        "description": "Update a subscriber",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "subscriber_id",
+            "description": "Subscriber Identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/patchPagesPageIdSubscribers"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Update a subscriber",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Subscriber"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "subscribers"
+        ],
+        "operationId": "patchPagesPageIdSubscribersSubscriberId",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/subscribers/{subscriber_id} \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X PATCH \\\n  -d \"component_ids[]=your-id\""
+          }
+        ]
+      },
+      "get": {
+        "summary": "Get a subscriber",
+        "description": "Get a subscriber",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "subscriber_id",
+            "description": "Subscriber Identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get a subscriber",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Subscriber"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "subscribers"
+        ],
+        "operationId": "getPagesPageIdSubscribersSubscriberId",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/subscribers/{subscriber_id} \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X GET\n"
+          }
+        ]
+      }
+    },
+    "/pages/{page_id}/subscribers/unsubscribe": {
+      "post": {
+        "summary": "Unsubscribe a list of subscribers",
+        "description": "Unsubscribe a list of subscribers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/postPagesPageIdSubscribersUnsubscribe"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Unsubscribe a list of subscribers"
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "subscribers"
+        ],
+        "operationId": "postPagesPageIdSubscribersUnsubscribe",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/subscribers/unsubscribe \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X POST \\\n  -d \"subscribers[]=your-id\""
+          }
+        ]
+      }
+    },
+    "/pages/{page_id}/subscribers/reactivate": {
+      "post": {
+        "summary": "Reactivate a list of subscribers",
+        "description": "Reactivate a list of quarantined subscribers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/postPagesPageIdSubscribersReactivate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Reactivate a list of quarantined subscribers"
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "subscribers"
+        ],
+        "operationId": "postPagesPageIdSubscribersReactivate",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/subscribers/reactivate \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X POST \\\n  -d \"subscribers[]=your-id\""
+          }
+        ]
+      }
+    },
+    "/pages/{page_id}/metrics": {
+      "get": {
+        "summary": "Get a list of metrics",
+        "description": "Get a list of metrics",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "description": "Page offset to fetch. Beginning February 28, 2023, this endpoint will return paginated data even if this query parameter is not provided.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "in": "query",
+            "name": "per_page",
+            "description": "Number of results to return per page. Beginning February 28, 2023, a default and maximum limit of 100 will be imposed and this endpoint will return paginated data even if this query parameter is not provided.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get a list of metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Metric"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "metrics"
+        ],
+        "operationId": "getPagesPageIdMetrics",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/metrics \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X GET\n"
+          }
+        ]
+      }
+    },
+    "/pages/{page_id}/metrics/{metric_id}/data": {
+      "delete": {
+        "summary": "Reset data for a metric",
+        "description": "Reset data for a metric",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "metric_id",
+            "description": "Metric Identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reset data for a metric",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Metric"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "metrics"
+        ],
+        "operationId": "deletePagesPageIdMetricsMetricIdData",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/metrics/{metric_id}/data \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X DELETE\n"
+          }
+        ]
+      },
+      "post": {
+        "summary": "Add data to a metric",
+        "description": "Add data to a metric",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "metric_id",
+            "description": "Metric Identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/postPagesPageIdMetricsMetricIdData"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Add data to a metric",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SingleMetricAddResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "metrics"
+        ],
+        "operationId": "postPagesPageIdMetricsMetricIdData",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/metrics/{metric_id}/data \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X POST \\\n  -d \"data[timestamp]=0\" \\\n  -d \"data[value]=0\""
+          }
+        ]
+      }
+    },
+    "/pages/{page_id}/incident_templates": {
+      "post": {
+        "summary": "Create a template",
+        "description": "Create a template",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/postPagesPageIdIncidentTemplates"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Create a template",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentTemplate"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "operationId": "postPagesPageIdIncidentTemplates",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/incident_templates \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X POST \\\n  -d \"template[name]=string\" \\\n  -d \"template[title]=string\" \\\n  -d \"template[body]=string\""
+          }
+        ]
+      },
+      "get": {
+        "summary": "Get a list of templates",
+        "description": "Get a list of templates",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "description": "Page offset to fetch.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "per_page",
+            "description": "Number of results to return per page.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get a list of templates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IncidentTemplate"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "operationId": "getPagesPageIdIncidentTemplates",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/incident_templates \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X GET\n"
+          }
+        ]
+      }
+    },
+    "/pages/{page_id}/incidents/{incident_id}/postmortem": {
+      "get": {
+        "summary": "Get Postmortem",
+        "description": "Get Postmortem",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "incident_id",
+            "description": "Incident Identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get Postmortem",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Postmortem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "incident postmortem"
+        ],
+        "operationId": "getPagesPageIdIncidentsIncidentIdPostmortem",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/incidents/{incident_id}/postmortem \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X GET\n"
+          }
+        ]
+      },
+      "put": {
+        "summary": "Create Postmortem",
+        "description": "Create Postmortem",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "incident_id",
+            "description": "Incident Identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/putPagesPageIdIncidentsIncidentIdPostmortem"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Create Postmortem",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Postmortem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "incident postmortem"
+        ],
+        "operationId": "putPagesPageIdIncidentsIncidentIdPostmortem",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/incidents/{incident_id}/postmortem \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X PUT \\\n  -d \"postmortem[body_draft]=string\""
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Delete Postmortem",
+        "description": "Delete Postmortem",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "incident_id",
+            "description": "Incident Identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Delete Postmortem"
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "incident postmortem"
+        ],
+        "operationId": "deletePagesPageIdIncidentsIncidentIdPostmortem",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/incidents/{incident_id}/postmortem \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X DELETE\n"
+          }
+        ]
+      }
+    },
+    "/pages/{page_id}/incidents/{incident_id}/postmortem/publish": {
+      "put": {
+        "summary": "Publish Postmortem",
+        "description": "Publish Postmortem",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_id",
+            "description": "Page identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "incident_id",
+            "description": "Incident Identifier",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/putPagesPageIdIncidentsIncidentIdPostmortemPublish"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Publish Postmortem",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Postmortem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Could not authenticate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested resource could not be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEntity"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "incident postmortem"
+        ],
+        "operationId": "putPagesPageIdIncidentsIncidentIdPostmortemPublish",
+        "x-code-samples": [
+          {
+            "lang": "Curl",
+            "source": "curl https://api.statuspage.io/v1/pages/{page_id}/incidents/{incident_id}/postmortem/publish \\\n  -H \"Authorization: OAuth your-api-key-goes-here\" \\\n  -X PUT \\\n  -d \"postmortem[notify_tweets]=true\" \\\n  -d \"postmortem[notify_subscribers]=true\""
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "api_key": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "#### Obtaining your API Key\n\nAuthentication is done via an API token provided in the Statuspage management interface.\n\n  1. Log in to your account at https://manage.statuspage.io/login.\n  2. Click on your avatar in the bottom left of your screen to access the user menu.\n  3. Click **API info**.\n\n### Passing your API key in an authorization header\n\nThe following example authenticates you with the Statuspage API.  Along with the Page ID\nlisted on the API page, we can fetch your page profile.\n\n    curl -H \"Authorization: OAuth 89a229ce1a8dbcf9ff30430fbe35eb4c0426574bca932061892cefd2138aa4b1\" \\\n      https://api.statuspage.io/v1/pages/gytm4qzbx9t6.json\n\n### Passing your API key in a query param\n\n    curl \"https://api.statuspage.io/v1/pages/gytm4qzbx9t6.json?api_key=89a229ce1a8dbcf9ff30430fbe35eb4c0426574bca932061892cefd2138aa4b1\"\n"
+      }
+    },
+    "schemas": {
+      "Page": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "2vw9vnfhbll9",
+            "description": "Page identifier"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp the record was created"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp the record was last updated"
+          },
+          "name": {
+            "type": "string",
+            "example": "My Company Status",
+            "description": "Name of your page to be displayed"
+          },
+          "page_description": {
+            "type": "string"
+          },
+          "headline": {
+            "type": "string"
+          },
+          "branding": {
+            "type": "string",
+            "description": "The main template your statuspage will use"
+          },
+          "subdomain": {
+            "type": "string",
+            "example": "your-subdomain.statuspage.io",
+            "description": "Subdomain at which to access your status page"
+          },
+          "domain": {
+            "type": "string",
+            "example": "status.mycompany.com",
+            "description": "CNAME alias for your status page"
+          },
+          "url": {
+            "type": "string",
+            "example": "https://www.mycompany.com",
+            "description": "Website of your page.  Clicking on your statuspage image will link here."
+          },
+          "support_url": {
+            "type": "string"
+          },
+          "hidden_from_search": {
+            "type": "boolean",
+            "description": "Should your page hide itself from search engines"
+          },
+          "allow_page_subscribers": {
+            "type": "boolean",
+            "description": "Can your users subscribe to all notifications on the page"
+          },
+          "allow_incident_subscribers": {
+            "type": "boolean",
+            "description": "Can your users subscribe to notifications for a single incident"
+          },
+          "allow_email_subscribers": {
+            "type": "boolean",
+            "description": "Can your users choose to receive notifications via email"
+          },
+          "allow_sms_subscribers": {
+            "type": "boolean",
+            "description": "Can your users choose to receive notifications via SMS"
+          },
+          "allow_rss_atom_feeds": {
+            "type": "boolean",
+            "description": "Can your users choose to access incident feeds via RSS/Atom (not functional on Audience-Specific pages)"
+          },
+          "allow_webhook_subscribers": {
+            "type": "boolean",
+            "description": "Can your users choose to receive notifications via Webhooks"
+          },
+          "notifications_from_email": {
+            "type": "string",
+            "example": "no-reply@status.mycompany.com",
+            "description": "Allows you to customize the email address your page notifications come from"
+          },
+          "notifications_email_footer": {
+            "type": "string",
+            "description": "Allows you to customize the footer appearing on your notification emails.  Accepts Markdown for formatting"
+          },
+          "activity_score": {
+            "type": "number",
+            "format": "float"
+          },
+          "twitter_username": {
+            "type": "string"
+          },
+          "viewers_must_be_team_members": {
+            "type": "boolean"
+          },
+          "ip_restrictions": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          },
+          "time_zone": {
+            "type": "string",
+            "example": "UTC",
+            "description": "Timezone configured for your page"
+          },
+          "css_body_background_color": {
+            "type": "string",
+            "description": "CSS Color"
+          },
+          "css_font_color": {
+            "type": "string",
+            "description": "CSS Color"
+          },
+          "css_light_font_color": {
+            "type": "string",
+            "description": "CSS Color"
+          },
+          "css_greens": {
+            "type": "string",
+            "description": "CSS Color"
+          },
+          "css_yellows": {
+            "type": "string",
+            "description": "CSS Color"
+          },
+          "css_oranges": {
+            "type": "string",
+            "description": "CSS Color"
+          },
+          "css_blues": {
+            "type": "string",
+            "description": "CSS Color"
+          },
+          "css_reds": {
+            "type": "string",
+            "description": "CSS Color"
+          },
+          "css_border_color": {
+            "type": "string",
+            "description": "CSS Color"
+          },
+          "css_graph_color": {
+            "type": "string",
+            "description": "CSS Color"
+          },
+          "css_link_color": {
+            "type": "string",
+            "description": "CSS Color"
+          },
+          "css_no_data": {
+            "type": "string",
+            "description": "CSS Color"
+          },
+          "favicon_logo": {
+            "type": "string"
+          },
+          "transactional_logo": {
+            "type": "string"
+          },
+          "hero_cover": {
+            "type": "string"
+          },
+          "email_logo": {
+            "type": "string"
+          },
+          "twitter_logo": {
+            "type": "string"
+          }
+        },
+        "description": "Get a page"
+      },
+      "Incident": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "p31zjtct2jer",
+            "description": "Incident Identifier"
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Component"
+            },
+            "description": "Incident components"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp when the incident was created at."
+          },
+          "impact": {
+            "type": "string",
+            "example": "critical",
+            "enum": [
+              "none",
+              "maintenance",
+              "minor",
+              "major",
+              "critical"
+            ],
+            "description": "The impact of the incident."
+          },
+          "impact_override": {
+            "type": "string",
+            "example": "minor",
+            "enum": [
+              "none",
+              "maintenance",
+              "minor",
+              "major",
+              "critical"
+            ],
+            "description": "value to override calculated impact value"
+          },
+          "incident_updates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IncidentUpdate"
+            },
+            "description": "The incident updates for incident."
+          },
+          "incident_impacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IncidentImpact"
+            },
+            "description": "The incident impacts for the incident (limited to 500)."
+          },
+          "metadata": {
+            "type": "Object",
+            "example": {
+              "jira": {
+                "issue_id": "value"
+              }
+            },
+            "description": "Metadata attached to the incident. Top level values must be objects."
+          },
+          "monitoring_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp when incident entered monitoring state."
+          },
+          "name": {
+            "type": "string",
+            "example": "Data Layer Migration",
+            "description": "Incident Name. There is a maximum limit of 255 characters."
+          },
+          "page_id": {
+            "type": "string",
+            "description": "Incident Page Identifier"
+          },
+          "postmortem_body": {
+            "type": "string",
+            "example": "##### Issue\nAt approximately 17:02 UTC on 2013-04-21, our master database server unexpectedly went unresponsive to all network.\nA reboot of the machine at 17:05 UTC resulted in a failed mount of a corrupted EBS volume, and we made the decision\nat that time to fail over the slave database.\n\n##### Resolution\nAt 17:12 UTC, the slave database had been successfully promoted to master and the application recovered enough to\naccept web traffic again. A new slave database node was created and placed into the rotation to guard against future\nmaster failures. The promoted slave database performed slowly for the next couple of hours as the query cache began\nto warm up, and eventually settled into a reasonable performance profile around 20:00 UTC.\n\n##### Future Mitigation Plans\nOver the past few months, we have been working on an overhaul to our data storage layer with a migration from a Postgres\nsetup to a distributed, fault-tolerant, multi-region data layer using Riak. This initiative has been prioritized, and\nthe migration will be performed in the coming weeks. We will notify our clients of the scheduled downtime via an\nincident on this status site, and via a blog post.\n",
+            "description": "Body of the Postmortem."
+          },
+          "postmortem_body_last_updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp when the incident postmortem body was last updated at."
+          },
+          "postmortem_ignored": {
+            "type": "boolean",
+            "description": "Controls whether the incident will have postmortem."
+          },
+          "postmortem_notified_subscribers": {
+            "type": "boolean",
+            "description": "Indicates whether subscribers are already notificed about postmortem."
+          },
+          "postmortem_notified_twitter": {
+            "type": "boolean",
+            "description": "Controls whether to decide if notify postmortem on twitter."
+          },
+          "postmortem_published_at": {
+            "type": "boolean",
+            "description": "The timestamp when the postmortem was published."
+          },
+          "resolved_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp when incident was resolved."
+          },
+          "scheduled_auto_completed": {
+            "type": "boolean",
+            "description": "Controls whether the incident is scheduled to automatically change to complete."
+          },
+          "scheduled_auto_in_progress": {
+            "type": "boolean",
+            "description": "Controls whether the incident is scheduled to automatically change to in progress."
+          },
+          "scheduled_for": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2013-05-07T03:00:00.007Z",
+            "description": "The timestamp the incident is scheduled for."
+          },
+          "auto_transition_deliver_notifications_at_end": {
+            "type": "boolean",
+            "description": "Controls whether send notification when scheduled maintenances auto transition to completed."
+          },
+          "auto_transition_deliver_notifications_at_start": {
+            "type": "boolean",
+            "description": "Controls whether send notification when scheduled maintenances auto transition to started."
+          },
+          "auto_transition_to_maintenance_state": {
+            "type": "boolean",
+            "description": "Controls whether change components status to under_maintenance once scheduled maintenance is in progress."
+          },
+          "auto_transition_to_operational_state": {
+            "type": "boolean",
+            "description": "Controls whether change components status to operational once scheduled maintenance completes."
+          },
+          "scheduled_remind_prior": {
+            "type": "boolean",
+            "description": "Controls whether to remind subscribers prior to scheduled incidents."
+          },
+          "scheduled_reminded_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp when the scheduled incident reminder was sent at."
+          },
+          "scheduled_until": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2013-05-07T06:00:00.007Z",
+            "description": "The timestamp the incident is scheduled until."
+          },
+          "shortlink": {
+            "type": "string",
+            "example": "http://stspg.io/803310a12",
+            "description": "Incident Shortlink."
+          },
+          "status": {
+            "type": "string",
+            "example": "scheduled",
+            "enum": [
+              "investigating",
+              "identified",
+              "monitoring",
+              "resolved",
+              "scheduled",
+              "in_progress",
+              "verifying",
+              "completed"
+            ],
+            "description": "The incident status. For realtime incidents, valid values are investigating, identified, monitoring, and resolved. For scheduled incidents, valid values are scheduled, in_progress, verifying, and completed."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp when the incident was updated at."
+          },
+          "reminder_intervals": {
+            "type": "string",
+            "example": "[3, 6, 12, 24]",
+            "description": "Custom reminder intervals for unresolved/open incidents. Not applicable for <strong>Scheduled maintenance</strong><br>There are 4 possible states for reminder_intervals:<br><strong>DEFAULT:</strong> NULL, representing a default behavior with intervals [3, 6, 12, 24].<br><strong>AFTER:</strong> A serialized array of strictly increasing intervals, each integer ranges from [1-24] (inclusive). Ex \"[1, 5, 7, 10]\"<br><strong>EVERY:</strong> An integer in the range [1-24] as a string, representing equal intervals. Ex \"4\" for [4, 8, 12, 16, 20, 24]<br><strong>OFF:</strong> A serialized empty array, for example, \"[]\", meaning no reminder notifications will be sent."
+          }
+        },
+        "description": "Get an incident"
+      },
+      "IncidentUpdate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Incident Update Identifier."
+          },
+          "incident_id": {
+            "type": "string",
+            "description": "Incident Identifier."
+          },
+          "affected_components": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "example": {
+                "code": "string",
+                "name": "string",
+                "old_status": "operational",
+                "new_status": "operational"
+              }
+            },
+            "description": "Affected components associated with the incident update."
+          },
+          "body": {
+            "type": "string",
+            "description": "Incident update body."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp when the incident update was created at."
+          },
+          "custom_tweet": {
+            "type": "string",
+            "description": "An optional customized tweet message for incident postmortem."
+          },
+          "deliver_notifications": {
+            "type": "boolean",
+            "description": "Controls whether to delivery notifications."
+          },
+          "display_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when incident update is happened."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "investigating",
+              "identified",
+              "monitoring",
+              "resolved",
+              "scheduled",
+              "in_progress",
+              "verifying",
+              "completed"
+            ],
+            "description": "The incident status. For realtime incidents, valid values are investigating, identified, monitoring, and resolved. For scheduled incidents, valid values are scheduled, in_progress, verifying, and completed."
+          },
+          "tweet_id": {
+            "type": "string",
+            "description": "Tweet identifier associated to this incident update."
+          },
+          "twitter_updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp when twitter updated at."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp when the incident update is updated."
+          },
+          "wants_twitter_update": {
+            "type": "boolean",
+            "description": "Controls whether to create twitter update."
+          }
+        },
+        "description": "Update a previous incident update"
+      },
+      "Component": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identifier for component"
+          },
+          "page_id": {
+            "type": "string",
+            "description": "Page identifier"
+          },
+          "group_id": {
+            "type": "string",
+            "description": "Component Group identifier"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "group": {
+            "type": "boolean",
+            "description": "Is this component a group"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name for component"
+          },
+          "description": {
+            "type": "string",
+            "description": "More detailed description for component"
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Order the component will appear on the page"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "operational",
+              "under_maintenance",
+              "degraded_performance",
+              "partial_outage",
+              "major_outage",
+              ""
+            ],
+            "description": "Status of component"
+          },
+          "showcase": {
+            "type": "boolean",
+            "description": "Should this component be showcased"
+          },
+          "only_show_if_degraded": {
+            "type": "boolean",
+            "description": "Requires a special feature flag to be enabled"
+          },
+          "automation_email": {
+            "type": "string",
+            "description": "Requires a special feature flag to be enabled"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "description": "The date this component started being used"
+          }
+        },
+        "description": "Add page access groups to a component"
+      },
+      "Subscriber": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "wyr07hygppkj",
+            "description": "Subscriber Identifier"
+          },
+          "skip_confirmation_notification": {
+            "type": "boolean",
+            "description": "If this is true, do not notify the user with changes to their subscription."
+          },
+          "mode": {
+            "type": "string",
+            "example": "email",
+            "description": "The communication mode of the subscriber."
+          },
+          "email": {
+            "type": "string",
+            "example": "foo@example2.com",
+            "description": "The email address to use to contact the subscriber. Used for Email and Webhook subscribers."
+          },
+          "endpoint": {
+            "type": "string",
+            "example": "http://example.com/",
+            "description": "The URL where a webhook subscriber elects to receive updates."
+          },
+          "phone_number": {
+            "type": "string",
+            "example": "202-555-0105",
+            "description": "The phone number used to contact an SMS subscriber"
+          },
+          "phone_country": {
+            "type": "string",
+            "example": "US",
+            "description": "The two-character country code representing the country of which the phone_number is a part."
+          },
+          "display_phone_number": {
+            "type": "string",
+            "example": "+1 (202) 555-0105",
+            "description": "A formatted version of the phone_number and phone_country pair, nicely formatted for display."
+          },
+          "obfuscated_channel_name": {
+            "type": "string",
+            "example": "#*******an",
+            "description": "Obfuscated slack channel name"
+          },
+          "workspace_name": {
+            "type": "string",
+            "example": "Atlassian",
+            "description": "The workspace name of the slack subscriber."
+          },
+          "quarantined_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp when the subscriber was quarantined due to an issue reaching them."
+          },
+          "purge_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The timestamp when a quarantined subscriber will be purged (unsubscribed)."
+          },
+          "components": {
+            "type": "string",
+            "example": [
+              "t7pt3zrg7456"
+            ],
+            "description": "The components for which the subscriber has elected to receive updates."
+          },
+          "page_access_user_id": {
+            "type": "string",
+            "example": "t1vx39rt0g0x",
+            "description": "The Page Access user this subscriber belongs to (only for audience-specific pages)."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "Get an incident subscriber"
+      },
+      "Metric": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Metric identifier"
+          },
+          "metrics_provider_id": {
+            "type": "string",
+            "description": "Metric Provider identifier"
+          },
+          "metric_identifier": {
+            "type": "string",
+            "description": "Metric Display identifier used to look up the metric data from the provider"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of metric"
+          },
+          "display": {
+            "type": "boolean",
+            "description": "Should the metric be displayed"
+          },
+          "tooltip_description": {
+            "type": "string"
+          },
+          "backfilled": {
+            "type": "boolean"
+          },
+          "y_axis_min": {
+            "type": "number",
+            "format": "float"
+          },
+          "y_axis_max": {
+            "type": "number",
+            "format": "float"
+          },
+          "y_axis_hidden": {
+            "type": "boolean",
+            "description": "Should the values on the y axis be hidden on render"
+          },
+          "suffix": {
+            "type": "string",
+            "description": "Suffix to describe the units on the graph"
+          },
+          "decimal_places": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "most_recent_data_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_fetched_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "backfill_percentage": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reference_name": {
+            "type": "string"
+          }
+        },
+        "description": "Create a metric for a metric provider"
+      },
+      "IncidentTemplate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "mpqjphkdh2m8",
+            "description": "Incident Template Identifier"
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Component"
+            },
+            "description": "Affected components"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the template, as shown in the list on the \"Templates\" tab of the \"Incidents\" page"
+          },
+          "title": {
+            "type": "string",
+            "description": "Title to be applied to the incident or maintenance when selecting this template"
+          },
+          "body": {
+            "type": "string",
+            "description": "Body of the incident or maintenance update to be applied when selecting this template"
+          },
+          "group_id": {
+            "type": "string",
+            "example": "k9k5d7prhzb3",
+            "description": "Identifier of Template Group this template belongs to"
+          },
+          "update_status": {
+            "type": "string",
+            "enum": [
+              "investigating",
+              "identified",
+              "monitoring",
+              "resolved",
+              "scheduled",
+              "in_progress",
+              "verifying",
+              "completed"
+            ],
+            "description": "The status the incident or maintenance should transition to when selecting this template"
+          },
+          "should_tweet": {
+            "type": "boolean",
+            "description": "Whether the \"tweet update\" checkbox should be selected when selecting this template"
+          },
+          "should_send_notifications": {
+            "type": "boolean",
+            "description": "Whether the \"deliver notifications\" checkbox should be selected when selecting this template"
+          }
+        },
+        "description": "Get a list of templates"
+      },
+      "Postmortem": {
+        "type": "object",
+        "properties": {
+          "preview_key": {
+            "type": "string",
+            "description": "Preview Key"
+          },
+          "body": {
+            "type": "string",
+            "description": "Postmortem body"
+          },
+          "body_updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "body_draft": {
+            "type": "string",
+            "description": "Body draft"
+          },
+          "body_draft_updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "notify_subscribers": {
+            "type": "boolean",
+            "description": "Should email subscribers be notified."
+          },
+          "notify_twitter": {
+            "type": "boolean",
+            "description": "Should Twitter followers be notified."
+          },
+          "custom_tweet": {
+            "type": "string",
+            "description": "Custom tweet for Incident Postmortem"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "Revert Postmortem"
+      },
+      "ErrorEntity": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "description": "Get a list of users"
+      },
+      "postPagesPageIdIncidents": {
+        "type": "object",
+        "properties": {
+          "incident": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Incident Name. There is a maximum limit of 255 characters."
+              },
+              "status": {
+                "type": "string",
+                "description": "The incident status. For realtime incidents, valid values are investigating, identified, monitoring, and resolved. For scheduled incidents, valid values are scheduled, in_progress, verifying, and completed.",
+                "enum": [
+                  "investigating",
+                  "identified",
+                  "monitoring",
+                  "resolved",
+                  "scheduled",
+                  "in_progress",
+                  "verifying",
+                  "completed"
+                ]
+              },
+              "impact_override": {
+                "type": "string",
+                "description": "value to override calculated impact value",
+                "enum": [
+                  "none",
+                  "maintenance",
+                  "minor",
+                  "major",
+                  "critical"
+                ]
+              },
+              "scheduled_for": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The timestamp the incident is scheduled for.",
+                "default": "2013-05-07T03:00:00.007Z"
+              },
+              "scheduled_until": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The timestamp the incident is scheduled until.",
+                "default": "2013-05-07T06:00:00.007Z"
+              },
+              "scheduled_remind_prior": {
+                "type": "boolean",
+                "description": "Controls whether to remind subscribers prior to scheduled incidents."
+              },
+              "auto_transition_to_maintenance_state": {
+                "type": "boolean",
+                "description": "Controls whether change components status to under_maintenance once scheduled maintenance is in progress."
+              },
+              "auto_transition_to_operational_state": {
+                "type": "boolean",
+                "description": "Controls whether change components status to operational once scheduled maintenance completes."
+              },
+              "scheduled_auto_in_progress": {
+                "type": "boolean",
+                "description": "Controls whether the incident is scheduled to automatically change to in progress."
+              },
+              "scheduled_auto_completed": {
+                "type": "boolean",
+                "description": "Controls whether the incident is scheduled to automatically change to complete."
+              },
+              "auto_transition_deliver_notifications_at_start": {
+                "type": "boolean",
+                "description": "Controls whether send notification when scheduled maintenances auto transition to started."
+              },
+              "auto_transition_deliver_notifications_at_end": {
+                "type": "boolean",
+                "description": "Controls whether send notification when scheduled maintenances auto transition to completed."
+              },
+              "reminder_intervals": {
+                "type": "string",
+                "description": "Custom reminder intervals for unresolved/open incidents. Not applicable for <strong>Scheduled maintenance</strong><br>There are 4 possible states for reminder_intervals:<br><strong>DEFAULT:</strong> NULL, representing a default behavior with intervals [3, 6, 12, 24].<br><strong>AFTER:</strong> A serialized array of strictly increasing intervals, each integer ranges from [1-24] (inclusive). Ex \"[1, 5, 7, 10]\"<br><strong>EVERY:</strong> An integer in the range [1-24] as a string, representing equal intervals. Ex \"4\" for [4, 8, 12, 16, 20, 24]<br><strong>OFF:</strong> A serialized empty array, for example, \"[]\", meaning no reminder notifications will be sent."
+              },
+              "metadata": {
+                "type": "object",
+                "description": "Attach a json object to the incident. All top-level values in the object must also be objects."
+              },
+              "deliver_notifications": {
+                "type": "boolean",
+                "description": "Deliver notifications to subscribers if this is true. If this is false, create an incident without notifying customers.",
+                "default": true
+              },
+              "auto_tweet_at_beginning": {
+                "type": "boolean",
+                "description": "Controls whether tweet automatically when scheduled maintenance starts."
+              },
+              "auto_tweet_on_completion": {
+                "type": "boolean",
+                "description": "Controls whether tweet automatically when scheduled maintenance completes."
+              },
+              "auto_tweet_on_creation": {
+                "type": "boolean",
+                "description": "Controls whether tweet automatically when scheduled maintenance is created."
+              },
+              "auto_tweet_one_hour_before": {
+                "type": "boolean",
+                "description": "Controls whether tweet automatically one hour before scheduled maintenance starts."
+              },
+              "backfill_date": {
+                "type": "string",
+                "description": "TimeStamp when incident was backfilled."
+              },
+              "backfilled": {
+                "type": "boolean",
+                "description": "Controls whether incident is backfilled. If true, components cannot be specified."
+              },
+              "body": {
+                "type": "string",
+                "description": "The initial message, created as the first incident update. There is a maximum limit of 25000 characters"
+              },
+              "components": {
+                "type": "object",
+                "description": "Map of status changes to apply to affected components",
+                "properties": {
+                  "0zmtfh80nndg": {
+                    "type": "string",
+                    "description": "Map of status changes to apply to affected components",
+                    "enum": [
+                      "operational",
+                      "under_maintenance",
+                      "degraded_performance",
+                      "partial_outage",
+                      "major_outage",
+                      ""
+                    ]
+                  }
+                }
+              },
+              "component_ids": {
+                "type": "array",
+                "description": "List of component_ids affected by this incident",
+                "items": {
+                  "type": "string",
+                  "default": "qj6n8mp1t761"
+                }
+              },
+              "scheduled_auto_transition": {
+                "type": "boolean",
+                "description": "Same as :scheduled_auto_transition_in_progress. Controls whether the incident is scheduled to automatically change to in progress."
+              }
+            },
+            "required": [
+              "name"
+            ]
+          }
+        },
+        "description": "Create an incident"
+      },
+      "postPagesPageIdComponents": {
+        "type": "object",
+        "properties": {
+          "component": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string",
+                "description": "More detailed description for component"
+              },
+              "status": {
+                "type": "string",
+                "description": "Status of component",
+                "enum": [
+                  "operational",
+                  "under_maintenance",
+                  "degraded_performance",
+                  "partial_outage",
+                  "major_outage",
+                  ""
+                ]
+              },
+              "name": {
+                "type": "string",
+                "description": "Display name for component"
+              },
+              "only_show_if_degraded": {
+                "type": "boolean",
+                "description": "Requires a special feature flag to be enabled"
+              },
+              "group_id": {
+                "type": "string",
+                "description": "Component Group identifier"
+              },
+              "showcase": {
+                "type": "boolean",
+                "description": "Should this component be showcased"
+              },
+              "start_date": {
+                "type": "string",
+                "format": "date",
+                "description": "The date this component started being used"
+              }
+            }
+          }
+        },
+        "description": "Create a component"
+      },
+      "postPagesPageIdComponentGroups": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "Description of the component group."
+          },
+          "component_group": {
+            "type": "object",
+            "properties": {
+              "components": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "components",
+              "name"
+            ]
+          }
+        },
+        "description": "Create a component group"
+      },
+      "postPagesPageIdSubscribers": {
+        "type": "object",
+        "properties": {
+          "subscriber": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "description": "The email address for creating Email and Webhook subscribers."
+              },
+              "endpoint": {
+                "type": "string",
+                "description": "The endpoint URI for creating Webhook subscribers."
+              },
+              "phone_country": {
+                "type": "string",
+                "description": "The two-character country where the phone number is located to use for the new SMS subscriber."
+              },
+              "phone_number": {
+                "type": "string",
+                "description": "The phone number (as you would dial from the phone_country) to use for the new SMS subscriber."
+              },
+              "skip_confirmation_notification": {
+                "type": "boolean",
+                "description": "If skip_confirmation_notification is true, the subscriber does not receive any notifications when their subscription changes.  Email subscribers will be automatically opted in. This option is only available for paid pages. This option has no effect for trial customers."
+              },
+              "page_access_user": {
+                "type": "string",
+                "description": "The code of the page access user to which the subscriber belongs."
+              },
+              "component_ids": {
+                "type": "array",
+                "description": "A list of component ids for which the subscriber should recieve updates for. Components must be an array with at least one element if it is passed at all. Each component must belong to the page indicated in the path.",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "description": "Create a subscriber. Not applicable for Slack subscribers."
+      },
+      "postPagesPageIdMetricsMetricIdData": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "type": "integer",
+                "format": "int32",
+                "description": "Time to store the metric against"
+              },
+              "value": {
+                "type": "number",
+                "format": "float"
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "description": "Add data to a metric"
+      },
+      "postPagesPageIdIncidentTemplates": {
+        "type": "object",
+        "properties": {
+          "template": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Name of the template, as shown in the list on the \"Templates\" tab of the \"Incidents\" page"
+              },
+              "title": {
+                "type": "string",
+                "description": "Title to be applied to the incident or maintenance when selecting this template"
+              },
+              "body": {
+                "type": "string",
+                "description": "The initial message, created as the first incident or maintenance update."
+              },
+              "group_id": {
+                "type": "string",
+                "description": "Identifier of Template Group this template belongs to"
+              },
+              "update_status": {
+                "type": "string",
+                "description": "The status the incident or maintenance should transition to when selecting this template",
+                "enum": [
+                  "investigating",
+                  "identified",
+                  "monitoring",
+                  "resolved",
+                  "scheduled",
+                  "in_progress",
+                  "verifying",
+                  "completed"
+                ]
+              },
+              "should_tweet": {
+                "type": "boolean",
+                "description": "Whether the \"tweet update\" checkbox should be selected when selecting this template"
+              },
+              "should_send_notifications": {
+                "type": "boolean",
+                "description": "Whether the \"deliver notifications\" checkbox should be selected when selecting this template"
+              },
+              "component_ids": {
+                "type": "array",
+                "description": "List of component_ids affected by this incident",
+                "items": {
+                  "type": "string",
+                  "default": "vtc7p77fj8t2"
+                }
+              }
+            },
+            "required": [
+              "name",
+              "title",
+              "body"
+            ]
+          }
+        },
+        "description": "Create a template"
+      }
+    }
+  }
+}
