@@ -20,7 +20,7 @@ const (
 	DeploymentPayloadType = "railway.deployment.finished"
 
 	// Poll interval for checking deployment status
-	DeploymentPollInterval = 15 * time.Second
+	DeploymentPollInterval = 30 * time.Second
 )
 
 // TriggerDeploy triggers a deployment and tracks its status until completion
@@ -362,10 +362,18 @@ func (c *TriggerDeploy) poll(ctx core.ActionContext) error {
 	case DeploymentStatusSuccess, DeploymentStatusSleeping:
 		// SLEEPING means the deployment succeeded but the app went to sleep due to inactivity
 		ctx.Logger.Infof("Deployment succeeded (status: %s)", deployment.Status)
-		return ctx.ExecutionState.Emit(DeployedOutputChannel, DeploymentPayloadType, []any{eventData})
+		return ctx.ExecutionState.Emit(
+			DeployedOutputChannel,
+			DeploymentPayloadType,
+			[]any{eventData},
+		)
 	case DeploymentStatusCrashed:
 		ctx.Logger.Info("Deployment crashed")
-		return ctx.ExecutionState.Emit(CrashedOutputChannel, DeploymentPayloadType, []any{eventData})
+		return ctx.ExecutionState.Emit(
+			CrashedOutputChannel,
+			DeploymentPayloadType,
+			[]any{eventData},
+		)
 	default:
 		// FAILED, REMOVED, SKIPPED all go to failed channel
 		ctx.Logger.Infof("Deployment ended with status: %s", deployment.Status)
