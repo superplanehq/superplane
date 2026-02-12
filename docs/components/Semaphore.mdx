@@ -15,6 +15,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Get Pipeline" href="#get-pipeline" description="Retrieve a pipeline from Semaphore by ID" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run Semaphore workflow" />
 </CardGrid>
 
@@ -246,3 +247,79 @@ The Run Workflow component triggers a Semaphore CI/CD workflow and waits for it 
 }
 ```
 
+<a id="get-pipeline"></a>
+
+## Get Pipeline
+
+The Get Pipeline component retrieves a single pipeline from Semaphore by its ID, returning detailed information about the pipeline status, jobs, and results.
+
+### Use Cases
+
+- **Pipeline status checks**: Fetch current pipeline details to drive workflow decisions
+- **Result verification**: Check if a specific pipeline passed or failed before proceeding
+- **Job-level analysis**: Inspect individual job results within a pipeline
+- **Cross-system reporting**: Pull pipeline data for external dashboards or notifications
+
+### Configuration
+
+- **Pipeline ID**: The Semaphore pipeline UUID to retrieve (required, supports expressions)
+
+### Output
+
+Returns the pipeline object including:
+- **id**: Pipeline ID
+- **name**: Pipeline name
+- **state**: Pipeline state (e.g. done, running, queuing)
+- **result**: Pipeline result (passed, failed, stopped)
+- **created_at**: Pipeline creation timestamp
+- **done_at**: Pipeline completion timestamp
+- **blocks**: Array of blocks with their jobs and results
+- **workflow**: Associated workflow information
+- **project**: Project details
+
+### Example Output
+
+```json
+{
+  "data": {
+    "blocks": [
+      {
+        "jobs": [
+          {
+            "id": "00000-00000-00000-00000-00000",
+            "index": 0,
+            "name": "Build & Test",
+            "result": "passed",
+            "status": "finished"
+          }
+        ],
+        "name": "CI Block",
+        "result": "passed",
+        "result_reason": "test",
+        "state": "done"
+      }
+    ],
+    "pipeline": {
+      "created_at": "2026-01-22T15:32:47Z",
+      "done_at": "2026-01-22T15:32:55Z",
+      "error_description": "",
+      "id": "00000000-0000-0000-0000-000000000000",
+      "name": "Initial Pipeline",
+      "result": "passed",
+      "state": "done",
+      "yaml_file_name": "semaphore.yml"
+    },
+    "project": {
+      "id": "00000000-0000-0000-0000-000000000000",
+      "name": "my-project"
+    },
+    "workflow": {
+      "created_at": "2026-01-22T15:32:47Z",
+      "id": "00000000-0000-0000-0000-000000000000",
+      "initial_pipeline_id": "00000000-0000-0000-0000-000000000000"
+    }
+  },
+  "timestamp": "2026-01-22T15:32:56Z",
+  "type": "semaphore.pipeline"
+}
+```
