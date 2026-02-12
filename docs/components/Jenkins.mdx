@@ -1,0 +1,65 @@
+---
+title: "Jenkins"
+---
+
+Trigger and monitor Jenkins builds
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Trigger Build" href="#trigger-build" description="Trigger a Jenkins build and wait for completion" />
+</CardGrid>
+
+<a id="trigger-build"></a>
+
+## Trigger Build
+
+The Trigger Build component triggers a Jenkins job and waits for it to complete.
+
+### Use Cases
+
+- **CI/CD orchestration**: Trigger builds and deployments from SuperPlane workflows
+- **Pipeline automation**: Run Jenkins jobs as part of workflow automation
+- **Multi-stage deployments**: Coordinate complex deployment pipelines
+
+### How It Works
+
+1. Triggers the specified Jenkins job with optional parameters
+2. Waits for the build to complete (via webhook from Jenkins Notification Plugin, with polling as fallback)
+3. Routes execution based on build result:
+   - **Passed channel**: Build completed with SUCCESS
+   - **Failed channel**: Build failed, was unstable, or was aborted
+
+### Configuration
+
+- **Job**: Select the Jenkins job to trigger
+- **Parameters**: Optional build parameters as key-value pairs (supports expressions)
+
+### Output Channels
+
+- **Passed**: Emitted when build completes with SUCCESS
+- **Failed**: Emitted when build fails, is unstable, or is aborted
+
+### Example Output
+
+```json
+{
+  "data": {
+    "build": {
+      "duration": 120000,
+      "number": 42,
+      "result": "SUCCESS",
+      "url": "https://jenkins.example.com/job/my-project/job/my-job/42/"
+    },
+    "job": {
+      "name": "my-project/my-job",
+      "url": "https://jenkins.example.com/job/my-project/job/my-job/"
+    }
+  },
+  "timestamp": "2026-01-23T12:00:00Z",
+  "type": "jenkins.build.finished"
+}
+```
+
