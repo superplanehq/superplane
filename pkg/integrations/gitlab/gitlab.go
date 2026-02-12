@@ -175,6 +175,11 @@ func (g *GitLab) Components() []core.Component {
 func (g *GitLab) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnIssue{},
+		&OnMergeRequest{},
+		&OnMilestone{},
+		&OnRelease{},
+		&OnTag{},
+		&OnVulnerability{},
 	}
 }
 
