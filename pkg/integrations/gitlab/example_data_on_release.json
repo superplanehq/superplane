@@ -1,0 +1,11 @@
+{
+  "object_kind": "release",
+  "action": "create",
+  "name": "v1.1",
+  "tag": "v1.1",
+  "url": "https://gitlab.example.com/group/example/-/releases/v1.1",
+  "project": {
+    "id": 1,
+    "path_with_namespace": "group/example"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "object_kind": "milestone",
+  "event_type": "milestone",
+  "action": "create",
+  "project": {
+    "id": 1,
+    "path_with_namespace": "group/example"
+  },
+  "object_attributes": {
+    "id": 61,
+    "iid": 10,
+    "title": "v1.0",
+    "state": "active"
+  }
+}

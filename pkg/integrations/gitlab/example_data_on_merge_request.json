@@ -1,0 +1,19 @@
+{
+  "object_kind": "merge_request",
+  "event_type": "merge_request",
+  "project": {
+    "id": 1,
+    "path_with_namespace": "group/example"
+  },
+  "object_attributes": {
+    "iid": 12,
+    "title": "Add merge request trigger",
+    "state": "opened",
+    "action": "open"
+  },
+  "labels": [
+    {
+      "title": "backend"
+    }
+  ]
+}
