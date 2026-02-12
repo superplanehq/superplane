@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -15,18 +17,20 @@ const RunNRQLQueryPayloadType = "newrelic.nrqlQuery"
 
 type RunNRQLQuery struct{}
 
+// RunNRQLQuerySpec defines the configuration for the Run NRQL Query component.
 type RunNRQLQuerySpec struct {
-	AccountID string `json:"accountId" yaml:"accountId"`
-	Query     string `json:"query" yaml:"query"`
-	Timeout   int    `json:"timeout" yaml:"timeout"`
+	Account         string `json:"account" mapstructure:"account"`
+	ManualAccountID string `json:"manualAccountId" mapstructure:"manualAccountId"`
+	Query           string `json:"query"   mapstructure:"query"`
+	Timeout         int    `json:"timeout" mapstructure:"timeout"`
 }
 
 type RunNRQLQueryPayload struct {
-	Results     []map[string]interface{} `json:"results"`
-	TotalResult map[string]interface{}   `json:"totalResult,omitempty"`
-	Metadata    *NRQLMetadata            `json:"metadata,omitempty"`
-	Query       string                   `json:"query"`
-	AccountID   int64                    `json:"accountId"`
+	Results     []map[string]interface{} `json:"results"      mapstructure:"results"`
+	TotalResult map[string]interface{}   `json:"totalResult,omitempty" mapstructure:"totalResult"`
+	Metadata    *NRQLMetadata            `json:"metadata,omitempty"    mapstructure:"metadata"`
+	Query       string                   `json:"query"          mapstructure:"query"`
+	AccountID   string                   `json:"accountId"      mapstructure:"accountId"`
 }
 
 func (c *RunNRQLQuery) Name() string {
@@ -94,16 +98,24 @@ func (c *RunNRQLQuery) OutputChannels(configuration any) []core.OutputChannel {
 func (c *RunNRQLQuery) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "accountId",
-			Label:       "Account ID",
+			Name:        "account",
+			Label:       "Account",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
-			Description: "The New Relic account ID to query",
+			Required:    false, // Changed to false to allow manual override
+			Description: "The New Relic account to query",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "account",
 				},
 			},
+		},
+		{
+			Name:        "manualAccountId",
+			Label:       "Manual Account ID",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "Manually enter Account ID if dropdown fails",
+			Placeholder: "1234567",
 		},
 		{
 			Name:        "query",
@@ -131,12 +143,31 @@ func (c *RunNRQLQuery) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
 
-	if spec.AccountID == "" {
-		return fmt.Errorf("accountId is required")
+	// Set manual: true in metadata to ensure UI handles generic components correctly
+	if err := ctx.Metadata.Set(map[string]any{"manual": true}); err != nil {
+		return fmt.Errorf("failed to set metadata: %w", err)
+	}
+
+	accountID := spec.Account
+	if spec.ManualAccountID != "" {
+		accountID = spec.ManualAccountID
+	}
+
+	if accountID == "" {
+		return fmt.Errorf("account is required (select from dropdown or use Manual Account ID)")
+	}
+
+	// Guard: reject unresolved template tags early
+	if isUnresolvedTemplate(accountID) {
+		return fmt.Errorf("account ID contains unresolved template variable: %s — configure the upstream trigger first", accountID)
 	}
 
 	if spec.Query == "" {
 		return fmt.Errorf("query is required")
+	}
+
+	if isUnresolvedTemplate(spec.Query) {
+		return fmt.Errorf("query contains unresolved template variable: %s — configure the upstream trigger first", spec.Query)
 	}
 
 	// Validate timeout if provided
@@ -158,11 +189,42 @@ func (c *RunNRQLQuery) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create client: %v", err)
 	}
 
-	// Parse account ID
-	var accountID int64
-	_, err = fmt.Sscanf(spec.AccountID, "%d", &accountID)
+	// Extract account ID from configuration
+	accountIDStr := spec.Account
+	if spec.ManualAccountID != "" {
+		accountIDStr = spec.ManualAccountID
+	}
+
+	// Fallback: try to resolve from upstream trigger event data (ctx.Data)
+	if accountIDStr == "" {
+		accountIDStr = extractStringFromData(ctx.Data, "accountId", "account_id", "account")
+	}
+
+	query := spec.Query
+	if query == "" {
+		query = extractStringFromData(ctx.Data, "query", "nrqlQuery")
+	}
+
+	// Guard: reject unresolved template tags — don't waste an API call
+	if isUnresolvedTemplate(accountIDStr) {
+		return fmt.Errorf("account ID contains unresolved template variable: %s — ensure the upstream trigger is configured and variables are mapped", accountIDStr)
+	}
+	if isUnresolvedTemplate(query) {
+		return fmt.Errorf("query contains unresolved template variable: %s — ensure the upstream trigger is configured and variables are mapped", query)
+	}
+
+	if accountIDStr == "" {
+		return fmt.Errorf("account ID is missing — set it in configuration or connect an upstream trigger that provides it")
+	}
+
+	if query == "" {
+		return fmt.Errorf("NRQL query is missing — set it in configuration or connect an upstream trigger that provides it")
+	}
+
+	// Parse account ID to int64 for the NerdGraph API call
+	accountID, err := strconv.ParseInt(strings.TrimSpace(accountIDStr), 10, 64)
 	if err != nil {
-		return fmt.Errorf("invalid account ID: %v", err)
+		return fmt.Errorf("invalid account ID '%s': must be a numeric string (e.g. '1234567')", accountIDStr)
 	}
 
 	// Set default timeout if not provided
@@ -171,8 +233,8 @@ func (c *RunNRQLQuery) Execute(ctx core.ExecutionContext) error {
 		timeout = 10
 	}
 
-	// Execute NRQL query
-	response, err := client.RunNRQLQuery(context.Background(), accountID, spec.Query, timeout)
+	// Execute NRQL query via NerdGraph
+	response, err := client.RunNRQLQuery(context.Background(), accountID, query, timeout)
 	if err != nil {
 		return fmt.Errorf("failed to execute NRQL query: %v", err)
 	}
@@ -181,8 +243,8 @@ func (c *RunNRQLQuery) Execute(ctx core.ExecutionContext) error {
 		Results:     response.Results,
 		TotalResult: response.TotalResult,
 		Metadata:    response.Metadata,
-		Query:       spec.Query,
-		AccountID:   accountID,
+		Query:       query,
+		AccountID:   accountIDStr,
 	}
 
 	return ctx.ExecutionState.Emit(
@@ -216,23 +278,68 @@ func (c *RunNRQLQuery) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (c *RunNRQLQuery) ExampleOutput() map[string]any {
-	return map[string]any{
-		"results": []map[string]any{
-			{
-				"count": 1523,
-			},
-		},
-		"metadata": map[string]any{
-			"eventTypes": []string{"Transaction"},
-			"messages":   []string{},
-			"timeWindow": map[string]any{
-				"begin": 1707559740000,
-				"end":   1707563340000,
-			},
-		},
-		"query":     "SELECT count(*) FROM Transaction SINCE 1 hour ago",
-		"accountId": 1234567,
-	}
+// isUnresolvedTemplate detects raw template tags like {{account_id}} that
+// haven't been substituted by the platform engine. Calling the API with
+// these would always fail, so we intercept them early.
+func isUnresolvedTemplate(s string) bool {
+	return strings.Contains(s, "{{") && strings.Contains(s, "}}")
 }
 
+// extractStringFromData attempts to read a string value from upstream trigger
+// event data (ctx.Data) by trying each key in order. Returns "" if nothing found.
+func extractStringFromData(data any, keys ...string) string {
+	if data == nil {
+		return ""
+	}
+
+	m, ok := data.(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	for _, key := range keys {
+		if val, exists := m[key]; exists && val != nil {
+			return extractResourceID(val)
+		}
+	}
+
+	return ""
+}
+
+func extractResourceID(v any) string {
+	if v == nil {
+		return ""
+	}
+
+	// Handle raw string
+	if s, ok := v.(string); ok {
+		return s
+	}
+
+	// Handle raw numbers (int, float, etc.)
+	switch n := v.(type) {
+	case int:
+		return strconv.Itoa(n)
+	case int64:
+		return strconv.FormatInt(n, 10)
+	case float64:
+		return strconv.FormatFloat(n, 'f', -1, 64)
+	case float32:
+		return strconv.FormatFloat(float64(n), 'f', -1, 64)
+	}
+
+	// Handle maps
+	if m, ok := v.(map[string]any); ok {
+		// Keys to check in order of preference
+		keys := []string{"id", "ID", "value", "Value", "accountId", "account"}
+
+		for _, key := range keys {
+			if val, exists := m[key]; exists && val != nil {
+				return extractResourceID(val) // Recursively extract from the found value
+			}
+		}
+	}
+
+	// Fallback to string representation
+	return fmt.Sprintf("%v", v)
+}

@@ -26,3 +26,13 @@ var exampleOutputReportMetric map[string]any
 func (c *ReportMetric) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputReportMetricOnce, exampleOutputReportMetricBytes, &exampleOutputReportMetric)
 }
+
+//go:embed example_output_run_nrql_query.json
+var exampleOutputRunNRQLQueryBytes []byte
+
+var exampleOutputRunNRQLQueryOnce sync.Once
+var exampleOutputRunNRQLQuery map[string]any
+
+func (c *RunNRQLQuery) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputRunNRQLQueryOnce, exampleOutputRunNRQLQueryBytes, &exampleOutputRunNRQLQuery)
+}

@@ -33,7 +33,7 @@ func TestRunNRQLQuery_Configuration(t *testing.T) {
 	// Verify required fields
 	var accountIDField, queryField *bool
 	for _, field := range config {
-		if field.Name == "accountId" {
+		if field.Name == "account" {
 			accountIDField = &field.Required
 		}
 		if field.Name == "query" {
@@ -42,7 +42,7 @@ func TestRunNRQLQuery_Configuration(t *testing.T) {
 	}
 
 	require.NotNil(t, accountIDField)
-	assert.True(t, *accountIDField)
+	assert.False(t, *accountIDField)
 	require.NotNil(t, queryField)
 	assert.True(t, *queryField)
 }
@@ -403,35 +403,38 @@ func TestRunNRQLQuery_Setup(t *testing.T) {
 		component := &RunNRQLQuery{}
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
-				"accountId": "1234567",
+				"account": "1234567",
 				"query":     "SELECT count(*) FROM Transaction",
 				"timeout":   10,
 			},
+			Metadata: &contexts.MetadataContext{},
 		}
 
 		err := component.Setup(ctx)
 		assert.NoError(t, err)
 	})
 
-	t.Run("missing accountId -> returns error", func(t *testing.T) {
+	t.Run("missing account -> returns error", func(t *testing.T) {
 		component := &RunNRQLQuery{}
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"query": "SELECT count(*) FROM Transaction",
 			},
+			Metadata: &contexts.MetadataContext{},
 		}
 
 		err := component.Setup(ctx)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "accountId is required")
+		assert.Contains(t, err.Error(), "account is required")
 	})
 
 	t.Run("missing query -> returns error", func(t *testing.T) {
 		component := &RunNRQLQuery{}
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
-				"accountId": "1234567",
+				"account": "1234567",
 			},
+			Metadata: &contexts.MetadataContext{},
 		}
 
 		err := component.Setup(ctx)
@@ -443,14 +446,220 @@ func TestRunNRQLQuery_Setup(t *testing.T) {
 		component := &RunNRQLQuery{}
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
-				"accountId": "1234567",
+				"account": "1234567",
 				"query":     "SELECT count(*) FROM Transaction",
 				"timeout":   150, // exceeds max of 120
 			},
+			Metadata: &contexts.MetadataContext{},
 		}
 
 		err := component.Setup(ctx)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "timeout must be between 0 and 120")
+	})
+}
+
+func TestRunNRQLQuery_Setup_TemplateGuard(t *testing.T) {
+	component := &RunNRQLQuery{}
+
+	t.Run("unresolved account template -> error", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{
+				"account": "{{account_id}}",
+				"query":   "SELECT count(*) FROM Transaction",
+			},
+			Metadata: &contexts.MetadataContext{},
+		}
+		err := component.Setup(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unresolved template variable")
+		assert.Contains(t, err.Error(), "{{account_id}}")
+	})
+
+	t.Run("unresolved query template -> error", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{
+				"account": "1234567",
+				"query":   "{{nrql_query}}",
+			},
+			Metadata: &contexts.MetadataContext{},
+		}
+		err := component.Setup(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unresolved template variable")
+		assert.Contains(t, err.Error(), "{{nrql_query}}")
+	})
+}
+
+func TestRunNRQLQuery_Execute_TemplateGuard(t *testing.T) {
+	component := &RunNRQLQuery{}
+
+	t.Run("unresolved account_id template -> error, no API call", func(t *testing.T) {
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"account": "{{account_id}}",
+				"query":   "SELECT count(*) FROM Transaction",
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiKey": "test-key",
+					"site":   "US",
+				},
+			},
+		}
+		err := component.Execute(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unresolved template variable")
+		assert.Contains(t, err.Error(), "{{account_id}}")
+	})
+
+	t.Run("unresolved query template -> error, no API call", func(t *testing.T) {
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"account": "1234567",
+				"query":   "{{nrql_query}}",
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiKey": "test-key",
+					"site":   "US",
+				},
+			},
+		}
+		err := component.Execute(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unresolved template variable")
+	})
+}
+
+func TestRunNRQLQuery_Execute_DataFallback(t *testing.T) {
+	t.Run("account from ctx.Data fallback -> success", func(t *testing.T) {
+		component := &RunNRQLQuery{}
+
+		responseJSON := `{
+			"data": {
+				"actor": {
+					"account": {
+						"nrql": {
+							"results": [{"count": 42}]
+						}
+					}
+				}
+			}
+		}`
+
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(responseJSON)),
+					Header:     make(http.Header),
+				},
+			},
+		}
+
+		executionState := &contexts.ExecutionStateContext{}
+
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				// account is intentionally missing from config
+				"query": "SELECT count(*) FROM Transaction",
+			},
+			Data: map[string]any{
+				"accountId": "7654321",
+			},
+			HTTP: httpCtx,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiKey": "test-key",
+					"site":   "US",
+				},
+			},
+			ExecutionState: executionState,
+		}
+
+		err := component.Execute(ctx)
+		require.NoError(t, err)
+		require.Len(t, executionState.Payloads, 1)
+		payloadMap := executionState.Payloads[0].(map[string]any)
+		payload := payloadMap["data"].(RunNRQLQueryPayload)
+		assert.Equal(t, "7654321", payload.AccountID)
+	})
+}
+
+func TestRunNRQLQuery_Execute(t *testing.T) {
+	t.Run("string account ID -> success", func(t *testing.T) {
+		component := &RunNRQLQuery{}
+		
+		responseJSON := `{
+			"data": {
+				"actor": {
+					"account": {
+						"nrql": {
+							"results": [{"count": 10}]
+						}
+					}
+				}
+			}
+		}`
+
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(responseJSON)),
+					Header:     make(http.Header),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey": "test-key",
+				"site":   "US",
+			},
+		}
+
+		executionState := &contexts.ExecutionStateContext{}
+		
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"account": "1234567",
+				"query":   "SELECT count(*) FROM Transaction",
+			},
+			HTTP:           httpCtx,
+			Integration:    integrationCtx,
+			ExecutionState: executionState,
+		}
+
+		err := component.Execute(ctx)
+		require.NoError(t, err)
+
+		// Verify emission
+		require.Len(t, executionState.Payloads, 1)
+		payloadMap := executionState.Payloads[0].(map[string]any)
+		payload := payloadMap["data"].(RunNRQLQueryPayload)
+		assert.Equal(t, "1234567", payload.AccountID)
+		assert.Equal(t, "SELECT count(*) FROM Transaction", payload.Query)
+	})
+
+	t.Run("invalid account ID string -> returns error", func(t *testing.T) {
+		component := &RunNRQLQuery{}
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"account": "not-a-number",
+				"query":   "SELECT count(*) FROM Transaction",
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiKey": "test-key",
+					"site":   "US",
+				},
+			},
+		}
+
+		err := component.Execute(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid account ID 'not-a-number'")
 	})
 }

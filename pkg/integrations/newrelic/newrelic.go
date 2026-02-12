@@ -3,6 +3,7 @@ package newrelic
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -109,40 +110,40 @@ func (n *NewRelic) Triggers() []core.Trigger {
 }
 
 func (n *NewRelic) Sync(ctx core.SyncContext) error {
-	config := Configuration{}
-	err := mapstructure.Decode(ctx.Configuration, &config)
-	if err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
+    config := Configuration{}
+    if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+        return fmt.Errorf("failed to decode configuration: %w", err)
+    }
 
-	if config.APIKey == "" {
-		return fmt.Errorf("API key is required")
-	}
+    client, err := NewClient(ctx.HTTP, ctx.Integration)
+    if err != nil {
+        return fmt.Errorf("failed to create client: %w", err)
+    }
 
-	// Default to US region if not specified or not EU
-	if config.Site != "EU" {
-		config.Site = "US"
-	}
+    // 1. Validate the API Key
+    err = client.ValidateAPIKey(context.Background())
+    if err != nil {
+        return fmt.Errorf("failed to validate API key: %w", err)
+    }
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to create client: %w", err)
-	}
+    // 2. FETCH ACCOUNTS (Add this block)
+    // This allows the UI to populate the "Account" dropdowns
+    accounts, err := client.ListAccounts(context.Background())
+    if err != nil {
+        // We log the error but don't fail sync so the user can still use hardcoded IDs
+        fmt.Printf("Warning: failed to fetch accounts: %v\n", err)
+        accounts = []Account{} 
+    }
 
-	// Validate API key using NerdGraph (GraphQL) identity query
-	err = client.ValidateAPIKey(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to validate API key: %w", err)
-	}
+    // 3. Save to Metadata
+    ctx.Integration.SetMetadata(Metadata{
+        Accounts: accounts,
+    })
 
-	// Set empty metadata for now - we can fetch accounts later if needed
-	ctx.Integration.SetMetadata(Metadata{
-		Accounts: []Account{},
-	})
-
-	ctx.Integration.Ready()
-	return nil
+    ctx.Integration.Ready()
+    return nil
 }
+
 
 func (n *NewRelic) HandleRequest(ctx core.HTTPRequestContext) {
 	// Webhooks will be handled by triggers
@@ -182,14 +183,38 @@ func (n *NewRelic) ListResources(resourceType string, ctx core.ListResourcesCont
 	return resources, nil
 }
 
+
+
+// type NewRelicWebhookHandler struct{}
+
+// func (h *NewRelicWebhookHandler) CompareConfig(a, b any) (bool, error) {
+// 	return false, nil
+// }
+
+// func (h *NewRelicWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
+// 	return nil, nil
+// }
+
+// func (h *NewRelicWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
+// 	return nil
+// }
+
 type NewRelicWebhookHandler struct{}
 
 func (h *NewRelicWebhookHandler) CompareConfig(a, b any) (bool, error) {
-	return false, nil
+	if a == nil && b == nil {
+		return true, nil
+	}
+	return reflect.DeepEqual(a, b), nil
 }
 
 func (h *NewRelicWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
-	return nil, nil
+	return map[string]any{"manual": true}, nil
+}
+
+func (h *NewRelicWebhookHandler) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	trigger := &OnIssue{}
+	return trigger.HandleWebhook(ctx)
 }
 
 func (h *NewRelicWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {

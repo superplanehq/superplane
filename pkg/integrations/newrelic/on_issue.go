@@ -14,8 +14,10 @@ import (
 type OnIssue struct{}
 
 type OnIssueConfiguration struct {
-	Priorities []string `json:"priorities" yaml:"priorities"`
-	States     []string `json:"states" yaml:"states"`
+	Priorities      []string `json:"priorities" yaml:"priorities" mapstructure:"priorities"`
+	States          []string `json:"states" yaml:"states" mapstructure:"states"`
+	Account         string   `json:"account" yaml:"account" mapstructure:"account"`
+	ManualAccountID string   `json:"manualAccountId" yaml:"manualAccountId" mapstructure:"manualAccountId"`
 }
 
 func (t *OnIssue) Name() string {
@@ -51,14 +53,12 @@ This trigger generates a webhook URL. You must configure a **Workflow** in New R
 
 ` + "```json" + `
 {
-  "issue_id": "{{ issueId }}",
-  "title": "{{ annotations.title }}",
-  "priority": "{{ priority }}",
-  "state": "{{ state }}",
-  "issue_url": "{{ issuePageUrl }}",
-  "owner": "{{ owner }}",
-  "impacted_entities": {{ json entitiesData.names }},
-  "total_incidents": {{ totalIncidents }}
+  "issue_id": "{{issueId}}",
+  "title": "{{annotations.title.[0]}}",
+  "priority": "{{priority}}",
+  "issue_url": "{{issuePageUrl}}",
+  "state": "{{state}}",
+  "owner": "{{owner}}"
 }
 ` + "```" + `
 `
@@ -74,6 +74,26 @@ func (t *OnIssue) Color() string {
 
 func (t *OnIssue) Configuration() []configuration.Field {
 	return []configuration.Field{
+		{
+			Name:        "account",
+			Label:       "Account",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false, // Optional to prevent blocking
+			Description: "The New Relic account (optional for webhook)",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "account",
+				},
+			},
+		},
+		{
+			Name:        "manualAccountId",
+			Label:       "Manual Account ID",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "Manually enter Account ID if dropdown fails",
+			Placeholder: "1234567",
+		},
 		{
 			Name:        "priorities",
 			Label:       "Priorities",
@@ -110,17 +130,51 @@ func (t *OnIssue) Configuration() []configuration.Field {
 	}
 }
 
+// OnIssueMetadata holds the metadata stored on the canvas node for the UI.
+type OnIssueMetadata struct {
+	URL    string `json:"url" mapstructure:"url"`
+	Manual bool   `json:"manual" mapstructure:"manual"`
+}
+
 func (t *OnIssue) Setup(ctx core.TriggerContext) error {
+	// 1. Always ensure manual: true in metadata so the UI refreshes correctly
+	//    to show the webhook URL once set up.
+	var metadata OnIssueMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		// If decode fails, start fresh
+		metadata = OnIssueMetadata{}
+	}
+	
+	metadata.Manual = true
+	if err := ctx.Metadata.Set(metadata); err != nil {
+		return fmt.Errorf("failed to set metadata: %w", err)
+	}
+
+	// 2. Check if URL is already set (idempotency guard)
+	if metadata.URL != "" {
+		return nil
+	}
+
+	// 3. Decode configuration
 	config := OnIssueConfiguration{}
-	err := mapstructure.Decode(ctx.Configuration, &config)
-	if err != nil {
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	// We simply request a webhook. The user will manually configure it in New Relic
-	// or we implement the WebhookHandler to do it automatically via NerdGraph.
-	// For now, consistent with "minimally viable" and manual setup expectation if automation isn't trivial.
-	return ctx.Integration.RequestWebhook(nil)
+	// 4. Create the webhook and get the URL
+	webhookURL, err := ctx.Webhook.Setup()
+	if err != nil {
+		return fmt.Errorf("failed to setup webhook: %w", err)
+	}
+
+	// 5. Store the URL in node metadata
+	metadata.URL = webhookURL
+	if err := ctx.Metadata.Set(metadata); err != nil {
+		return fmt.Errorf("failed to set metadata: %w", err)
+	}
+
+	ctx.Logger.Infof("New Relic OnIssue webhook URL: %s", webhookURL)
+	return nil
 }
 
 func (t *OnIssue) Actions() []core.Action {
@@ -131,50 +185,77 @@ func (t *OnIssue) HandleAction(ctx core.TriggerActionContext) (map[string]any, e
 	return nil, nil
 }
 
-type WebhookPayload struct {
-	IssueID          string   `json:"issue_id"`
-	Title            string   `json:"title"`
-	Priority         string   `json:"priority"`
-	State            string   `json:"state"`
-	Owner            string   `json:"owner"`
-	IssueURL         string   `json:"issue_url"`
-	ImpactedEntities []string `json:"impacted_entities"`
-	TotalIncidents   int      `json:"total_incidents"`
+type NewRelicIssue struct {
+	IssueID  string `json:"issue_id"`
+	Title    string `json:"title"`
+	Priority string `json:"priority"`
+	State    string `json:"state"`
+	Owner    string `json:"owner"`
+	URL      string `json:"issue_url"`
 }
 
+// HandleWebhook processes incoming New Relic webhook requests
+//
+// Represents the "Azure Pattern" adapted for New Relic:
+// 1. Handshake/Validation check (Test notification)
+// 2. Mapstructure decoding
+// 3. Event processing
 func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	// 1. Decode Configuration
 	config := OnIssueConfiguration{}
-	err := mapstructure.Decode(ctx.Configuration, &config)
-	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	var payload WebhookPayload
-	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
-		return http.StatusBadRequest, fmt.Errorf("failed to parse webhook body: %w", err)
-	}
-
-	// Validate required fields
-	if payload.IssueID == "" {
-		return http.StatusBadRequest, fmt.Errorf("missing issue_id in payload")
-	}
-
-	// Normalize Priority and State to match New Relic values usually sent as uppercase or capitalized
-	// We assume the user uses the template which usually outputs standard New Relic values.
-	// We'll trust the payload but maybe do case-insensitive comparison if needed.
-
-	// Filter by Priority
-	if len(config.Priorities) > 0 && !slices.Contains(config.Priorities, payload.Priority) {
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		fmt.Printf("Error decoding configuration: %v\n", err)
+		// Azure Pattern: Return 200 OK on malformed config to avoid retries/disable
 		return http.StatusOK, nil
 	}
 
-	// Filter by State
-	if len(config.States) > 0 && !slices.Contains(config.States, payload.State) {
+	// 2. Parse Payload into Map (Handshake Check)
+	var rawPayload map[string]any
+	if len(ctx.Body) == 0 {
+		fmt.Println("New Relic Validation Ping Received (Empty Body)")
+		return http.StatusOK, nil
+	}
+	if err := json.Unmarshal(ctx.Body, &rawPayload); err != nil {
+		fmt.Printf("Error parsing webhook body: %v\n", err)
+		return http.StatusOK, nil
+	}
+
+	// 3. Handshake Logic (Mirroring Azure SubscriptionValidation)
+	// If the payload is missing issue_id (indicating a New Relic "Test Connection" ping)
+	_, hasIssueID := rawPayload["issue_id"]
+
+	if !hasIssueID {
+		fmt.Println("New Relic Validation Ping Received")
+		return http.StatusOK, nil
+	}
+
+	// 4. Decode Payload (Mapstructure)
+	var issue NewRelicIssue
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Metadata: nil,
+		Result:   &issue,
+		TagName:  "json",
+	})
+	if err != nil {
+		fmt.Printf("Error creating decoder: %v\n", err)
+		return http.StatusOK, nil
+	}
+
+	if err := decoder.Decode(rawPayload); err != nil {
+		fmt.Printf("Error decoding payload: %v\n", err)
+		return http.StatusOK, nil
+	}
+
+	// 5. Filter Logic
+	if !allowedPriority(issue.Priority, config.Priorities) {
+		return http.StatusOK, nil
+	}
+	if !allowedState(issue.State, config.States) {
 		return http.StatusOK, nil
 	}
 
 	var eventName string
-	switch payload.State {
+	switch issue.State {
 	case "ACTIVATED":
 		eventName = "newrelic.issue_activated"
 	case "CLOSED":
@@ -183,11 +264,14 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		eventName = "newrelic.issue_updated"
 	}
 
-	// Convert payload back to map for event emission or use struct if emitter supports it
-	// Using map for flexibility
-	var eventData map[string]any
-	if err := json.Unmarshal(ctx.Body, &eventData); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to re-marshal payload: %w", err)
+	// 6. Emit Event
+	eventData := map[string]any{
+		"issueId":  issue.IssueID,
+		"title":    issue.Title,
+		"priority": issue.Priority,
+		"state":    issue.State,
+		"issueUrl": issue.URL,
+		"owner":    issue.Owner,
 	}
 
 	if err := ctx.Events.Emit(eventName, eventData); err != nil {
@@ -195,6 +279,20 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	}
 
 	return http.StatusOK, nil
+}
+
+func allowedPriority(priority string, allowed []string) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+	return slices.Contains(allowed, priority)
+}
+
+func allowedState(state string, allowed []string) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+	return slices.Contains(allowed, state)
 }
 
 func (t *OnIssue) Cleanup(ctx core.TriggerContext) error {

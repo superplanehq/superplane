@@ -167,11 +167,25 @@ func (c *ReportMetric) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to report metric: %v", err)
 	}
 
-	return ctx.ExecutionState.Emit(
-		core.DefaultOutputChannel.Name,
-		ReportMetricPayloadType,
-		[]any{batch},
-	)
+    output := map[string]any{
+        "name":      metric.Name,
+        "value":     metric.Value,
+        "type":      metric.Type,
+        "timestamp": metric.Timestamp,
+        "status":    "202 Accepted",
+    }
+
+    return ctx.ExecutionState.Emit(
+        core.DefaultOutputChannel.Name,
+        ReportMetricPayloadType,
+        []any{output},
+    )
+
+	// return ctx.ExecutionState.Emit(
+	// 	core.DefaultOutputChannel.Name,
+	// 	ReportMetricPayloadType,
+	// 	[]any{batch},
+	// )
 }
 
 func (c *ReportMetric) Cancel(ctx core.ExecutionContext) error {
@@ -196,4 +210,14 @@ func (c *ReportMetric) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 
 func (c *ReportMetric) Cleanup(ctx core.SetupContext) error {
 	return nil
+}
+
+func (c *ReportMetric) SampleOutput() any {
+    return map[string]any{
+        "name":      "server.cpu.usage",
+        "value":     95.5,
+        "type":      "gauge",
+        "timestamp": 1707584119000,
+        "status":    "202 Accepted",
+    }
 }

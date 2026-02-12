@@ -104,6 +104,15 @@ func Test__NewRelic__Sync(t *testing.T) {
 						}
 					}
 				}`),
+				jsonResponse(http.StatusOK, `{
+					"data": {
+						"actor": {
+							"accounts": [
+								{"id": 123456, "name": "Test Account"}
+							]
+						}
+					}
+				}`),
 			},
 		}
 
@@ -123,7 +132,7 @@ func Test__NewRelic__Sync(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, "ready", integrationCtx.State)
-		require.Len(t, httpCtx.Requests, 1)
+		require.Len(t, httpCtx.Requests, 2)
 		assert.Equal(t, "https://api.newrelic.com/graphql", httpCtx.Requests[0].URL.String())
 		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
 		assert.Equal(t, "test-api-key", httpCtx.Requests[0].Header.Get("Api-Key"))
@@ -216,7 +225,7 @@ func Test__Client__NewClient(t *testing.T) {
 		_, err := NewClient(&contexts.HTTPContext{}, integrationCtx)
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to get API key")
+		assert.Contains(t, err.Error(), "API key is required")
 	})
 
 	t.Run("empty API key -> error", func(t *testing.T) {

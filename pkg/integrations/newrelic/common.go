@@ -18,8 +18,8 @@ const (
 )
 
 type Account struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
+	ID   int64  `json:"id" mapstructure:"id"`
+	Name string `json:"name" mapstructure:"name"`
 }
 
 type APIError struct {
