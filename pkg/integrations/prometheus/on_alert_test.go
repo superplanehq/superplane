@@ -192,6 +192,15 @@ func Test__OnAlert__HandleWebhook(t *testing.T) {
 	})
 }
 
+func Test__parseAndValidateOnAlertConfiguration__NormalizesStatuses(t *testing.T) {
+	config, err := parseAndValidateOnAlertConfiguration(map[string]any{
+		"statuses": []string{" firing ", "", "firing", "resolved"},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{AlertStateFiring, AlertStateResolved}, config.Statuses)
+}
+
 type setupWebhookContext struct {
 	url string
 }

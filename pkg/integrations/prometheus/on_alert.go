@@ -177,43 +177,22 @@ func (t *OnAlert) HandleAction(ctx core.TriggerActionContext) (map[string]any, e
 }
 
 func (t *OnAlert) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	config, err := parseAndValidateOnAlertConfiguration(ctx.Configuration)
+	config, statusCode, err := parseOnAlertWebhookConfiguration(ctx.Configuration)
 	if err != nil {
+		return statusCode, err
+	}
+
+	if statusCode, err = authorizeOnAlertWebhook(ctx); err != nil {
+		return statusCode, err
+	}
+
+	payload, statusCode, err := parseAlertmanagerWebhookPayload(ctx.Body)
+	if err != nil {
+		return statusCode, err
+	}
+
+	if err := emitMatchingAlerts(ctx.Events, config, payload); err != nil {
 		return http.StatusInternalServerError, err
-	}
-
-	if err := validateWebhookAuth(ctx); err != nil {
-		if errors.Is(err, errWebhookAuthConfig) {
-			return http.StatusInternalServerError, err
-		}
-		return http.StatusForbidden, err
-	}
-
-	payload := AlertmanagerWebhookPayload{}
-	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
-		return http.StatusBadRequest, fmt.Errorf("failed to parse request body: %w", err)
-	}
-
-	filteredNames := filterEmpty(config.AlertNames)
-
-	for _, alert := range payload.Alerts {
-		alertStatus := alert.Status
-		if alertStatus == "" {
-			alertStatus = payload.Status
-		}
-
-		if !containsStatus(config.Statuses, alertStatus) {
-			continue
-		}
-
-		alertName := alert.Labels["alertname"]
-		if len(filteredNames) > 0 && !slices.Contains(filteredNames, alertName) {
-			continue
-		}
-
-		if err := ctx.Events.Emit(PrometheusAlertPayloadType, buildAlertPayloadFromAlertmanager(alert, payload)); err != nil {
-			return http.StatusInternalServerError, fmt.Errorf("failed to emit alert event: %w", err)
-		}
 	}
 
 	return http.StatusOK, nil
@@ -358,6 +337,61 @@ func sanitizeOnAlertConfiguration(config OnAlertConfiguration) OnAlertConfigurat
 	return config
 }
 
+func parseOnAlertWebhookConfiguration(configuration any) (OnAlertConfiguration, int, error) {
+	config, err := parseAndValidateOnAlertConfiguration(configuration)
+	if err != nil {
+		return OnAlertConfiguration{}, http.StatusInternalServerError, err
+	}
+
+	return config, http.StatusOK, nil
+}
+
+func authorizeOnAlertWebhook(ctx core.WebhookRequestContext) (int, error) {
+	if err := validateWebhookAuth(ctx); err != nil {
+		if errors.Is(err, errWebhookAuthConfig) {
+			return http.StatusInternalServerError, err
+		}
+		return http.StatusForbidden, err
+	}
+
+	return http.StatusOK, nil
+}
+
+func parseAlertmanagerWebhookPayload(body []byte) (AlertmanagerWebhookPayload, int, error) {
+	payload := AlertmanagerWebhookPayload{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return AlertmanagerWebhookPayload{}, http.StatusBadRequest, fmt.Errorf("failed to parse request body: %w", err)
+	}
+
+	return payload, http.StatusOK, nil
+}
+
+func emitMatchingAlerts(events core.EventContext, config OnAlertConfiguration, payload AlertmanagerWebhookPayload) error {
+	filteredNames := filterEmpty(config.AlertNames)
+
+	for _, alert := range payload.Alerts {
+		alertStatus := alert.Status
+		if alertStatus == "" {
+			alertStatus = payload.Status
+		}
+
+		if !containsStatus(config.Statuses, alertStatus) {
+			continue
+		}
+
+		alertName := alert.Labels["alertname"]
+		if len(filteredNames) > 0 && !slices.Contains(filteredNames, alertName) {
+			continue
+		}
+
+		if err := events.Emit(PrometheusAlertPayloadType, buildAlertPayloadFromAlertmanager(alert, payload)); err != nil {
+			return fmt.Errorf("failed to emit alert event: %w", err)
+		}
+	}
+
+	return nil
+}
+
 func parseAndValidateOnAlertConfiguration(configuration any) (OnAlertConfiguration, error) {
 	config := OnAlertConfiguration{}
 	if err := mapstructure.Decode(configuration, &config); err != nil {
@@ -368,6 +402,7 @@ func parseAndValidateOnAlertConfiguration(configuration any) (OnAlertConfigurati
 	if err := validateOnAlertConfiguration(config); err != nil {
 		return OnAlertConfiguration{}, err
 	}
+	config.Statuses = normalizeStatuses(config.Statuses)
 
 	return config, nil
 }
