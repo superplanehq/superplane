@@ -1,12 +1,167 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { ComponentBaseMapper, ComponentBaseContext, SubtitleContext, ExecutionDetailsContext } from "../types";
+import {
+  ComponentBaseMapper,
+  ComponentBaseContext,
+  SubtitleContext,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  StateFunction,
+  EventStateRegistry,
+} from "../types";
 import RailwayLogo from "@/assets/icons/integrations/railway.svg";
 import { formatTimeAgo } from "@/utils/date";
+import { DEFAULT_EVENT_STATE_MAP, EventState, EventStateMap } from "@/ui/componentBase";
 
 interface TriggerDeployMetadata {
   project?: { id?: string; name?: string };
   service?: { id?: string; name?: string };
   environment?: { id?: string; name?: string };
+}
+
+interface TriggerDeployExecutionMetadata {
+  deploymentId?: string;
+  status?: string;
+  url?: string;
+}
+
+// Railway deployment status constants (matching backend)
+const DeploymentStatus = {
+  QUEUED: "QUEUED",
+  WAITING: "WAITING",
+  BUILDING: "BUILDING",
+  DEPLOYING: "DEPLOYING",
+  SUCCESS: "SUCCESS",
+  FAILED: "FAILED",
+  CRASHED: "CRASHED",
+  REMOVED: "REMOVED",
+  SLEEPING: "SLEEPING",
+  SKIPPED: "SKIPPED",
+} as const;
+
+/**
+ * Custom state map for Railway deployment statuses
+ */
+export const TRIGGER_DEPLOY_STATE_MAP: EventStateMap = {
+  ...DEFAULT_EVENT_STATE_MAP,
+  queued: {
+    icon: "clock",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-gray-100",
+    badgeColor: "bg-gray-500",
+  },
+  building: {
+    icon: "hammer",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-blue-100",
+    badgeColor: "bg-blue-500",
+  },
+  deploying: {
+    icon: "loader-circle",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-purple-100",
+    badgeColor: "bg-purple-500",
+  },
+  passed: {
+    icon: "circle-check",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-green-100",
+    badgeColor: "bg-emerald-500",
+  },
+  failed: {
+    icon: "circle-x",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-red-100",
+    badgeColor: "bg-red-400",
+  },
+  crashed: {
+    icon: "alert-triangle",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-orange-100",
+    badgeColor: "bg-orange-500",
+  },
+};
+
+/**
+ * Maps Railway deployment status to UI event state
+ */
+function mapDeploymentStatusToState(status: string | undefined): EventState {
+  switch (status) {
+    case DeploymentStatus.QUEUED:
+    case DeploymentStatus.WAITING:
+      return "queued";
+    case DeploymentStatus.BUILDING:
+      return "building";
+    case DeploymentStatus.DEPLOYING:
+      return "deploying";
+    case DeploymentStatus.SUCCESS:
+      return "passed";
+    case DeploymentStatus.CRASHED:
+      return "crashed";
+    case DeploymentStatus.FAILED:
+    case DeploymentStatus.REMOVED:
+    case DeploymentStatus.SKIPPED:
+      return "failed";
+    default:
+      return "neutral";
+  }
+}
+
+/**
+ * State function for Railway TriggerDeploy component
+ */
+export const triggerDeployStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
+  if (!execution) return "neutral";
+
+  // Check for errors first
+  if (
+    execution.resultMessage &&
+    (execution.resultReason === "RESULT_REASON_ERROR" ||
+      (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
+  ) {
+    return "error";
+  }
+
+  if (execution.result === "RESULT_CANCELLED") {
+    return "cancelled";
+  }
+
+  // If execution is finished, map based on final status
+  if (execution.state === "STATE_FINISHED") {
+    const metadata = execution.metadata as TriggerDeployExecutionMetadata;
+    if (metadata?.status) {
+      return mapDeploymentStatusToState(metadata.status);
+    }
+    // Fallback based on result
+    return execution.result === "RESULT_PASSED" ? "passed" : "failed";
+  }
+
+  // If still running, show the current deployment status from metadata
+  if (execution.state === "STATE_STARTED" || execution.state === "STATE_PENDING") {
+    const metadata = execution.metadata as TriggerDeployExecutionMetadata;
+    if (metadata?.status) {
+      return mapDeploymentStatusToState(metadata.status);
+    }
+    return "queued"; // Default to queued if no status yet
+  }
+
+  return "neutral";
+};
+
+/**
+ * State registry for Railway TriggerDeploy component
+ */
+export const TRIGGER_DEPLOY_STATE_REGISTRY: EventStateRegistry = {
+  stateMap: TRIGGER_DEPLOY_STATE_MAP,
+  getState: triggerDeployStateFunction,
+};
+
+/**
+ * Formats the deployment status for display
+ */
+function formatDeploymentStatus(status: string | undefined): string {
+  if (!status) return "";
+  // Convert SCREAMING_CASE to Title Case
+  return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
 }
 
 /**
@@ -40,24 +195,51 @@ export const triggerDeployMapper: ComponentBaseMapper = {
       collapsedBackground: getBackgroundColorClass(componentDefinition.color),
       title: node.name || componentDefinition.label || "Trigger Deploy",
       metadata: metadataItems,
+      eventStateMap: TRIGGER_DEPLOY_STATE_MAP,
     };
   },
 
   subtitle(context: SubtitleContext): string {
     const { execution } = context;
+    const execMetadata = execution.metadata as TriggerDeployExecutionMetadata;
+    const status = execMetadata?.status;
 
-    if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
-      const updatedAt = execution.updatedAt ? new Date(execution.updatedAt) : null;
-      return updatedAt ? `Triggered ${formatTimeAgo(updatedAt)}` : "Triggered";
+    // Show current deployment status while running
+    if (execution.state === "STATE_STARTED" || execution.state === "STATE_PENDING") {
+      switch (status) {
+        case DeploymentStatus.QUEUED:
+        case DeploymentStatus.WAITING:
+          return "Queued...";
+        case DeploymentStatus.BUILDING:
+          return "Building...";
+        case DeploymentStatus.DEPLOYING:
+          return "Deploying...";
+        default:
+          return "Starting...";
+      }
     }
 
-    if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED") {
+    // Finished states
+    if (execution.state === "STATE_FINISHED") {
       const updatedAt = execution.updatedAt ? new Date(execution.updatedAt) : null;
-      return updatedAt ? `Failed ${formatTimeAgo(updatedAt)}` : "Failed";
-    }
+      const timeAgo = updatedAt ? formatTimeAgo(updatedAt) : "";
 
-    if (execution.state === "STATE_STARTED") {
-      return "Deploying...";
+      switch (status) {
+        case DeploymentStatus.SUCCESS:
+          return timeAgo ? `Deployed ${timeAgo}` : "Deployed";
+        case DeploymentStatus.CRASHED:
+          return timeAgo ? `Crashed ${timeAgo}` : "Crashed";
+        case DeploymentStatus.FAILED:
+        case DeploymentStatus.REMOVED:
+        case DeploymentStatus.SKIPPED:
+          return timeAgo ? `Failed ${timeAgo}` : "Failed";
+        default:
+          // Fallback to result-based status
+          if (execution.result === "RESULT_PASSED") {
+            return timeAgo ? `Deployed ${timeAgo}` : "Deployed";
+          }
+          return timeAgo ? `Failed ${timeAgo}` : "Failed";
+      }
     }
 
     const createdAt = execution.createdAt ? new Date(execution.createdAt) : null;
@@ -76,16 +258,28 @@ export const triggerDeployMapper: ComponentBaseMapper = {
       details["Finished At"] = new Date(execution.updatedAt).toLocaleString();
     }
 
-    // Add metadata info
-    const metadata = node.metadata as unknown as TriggerDeployMetadata;
-    if (metadata?.project?.name) {
-      details["Project"] = metadata.project.name;
+    // Add execution metadata info (deployment status, ID, URL)
+    const execMetadata = execution.metadata as TriggerDeployExecutionMetadata;
+    if (execMetadata?.status) {
+      details["Deployment Status"] = formatDeploymentStatus(execMetadata.status);
     }
-    if (metadata?.service?.name) {
-      details["Service"] = metadata.service.name;
+    if (execMetadata?.deploymentId) {
+      details["Deployment ID"] = execMetadata.deploymentId;
     }
-    if (metadata?.environment?.name) {
-      details["Environment"] = metadata.environment.name;
+    if (execMetadata?.url) {
+      details["Deployment URL"] = execMetadata.url;
+    }
+
+    // Add node metadata info (project, service, environment)
+    const nodeMetadata = node.metadata as unknown as TriggerDeployMetadata;
+    if (nodeMetadata?.project?.name) {
+      details["Project"] = nodeMetadata.project.name;
+    }
+    if (nodeMetadata?.service?.name) {
+      details["Service"] = nodeMetadata.service.name;
+    }
+    if (nodeMetadata?.environment?.name) {
+      details["Environment"] = nodeMetadata.environment.name;
     }
 
     return details;
