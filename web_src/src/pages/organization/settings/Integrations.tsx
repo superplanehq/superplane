@@ -59,26 +59,54 @@ export function Integrations({ organizationId }: IntegrationsProps) {
     return groups;
   }, [organizationIntegrations]);
   const integrationCatalog = useMemo(() => {
-    return [...availableIntegrations]
-      .sort((a, b) => (a.label || a.name || "").localeCompare(b.label || b.name || ""))
-      .map((integrationDef) => {
-        const providerName = integrationDef.name || "";
-        const providerLabel =
-          integrationDef.label ||
-          getIntegrationTypeDisplayName(undefined, integrationDef.name) ||
-          integrationDef.name ||
-          "Integration";
-        const instances = [...(connectedInstancesByProvider.get(providerName) || [])].sort((a, b) =>
-          (a.metadata?.name || providerLabel).localeCompare(b.metadata?.name || providerLabel),
-        );
+    const catalogByProvider = new Map<
+      string,
+      {
+        providerName: string;
+        providerLabel: string;
+        integrationDef: IntegrationsIntegrationDefinition | null;
+        instances: typeof organizationIntegrations;
+      }
+    >();
 
-        return {
-          providerName,
-          providerLabel,
-          integrationDef,
-          instances,
-        };
+    availableIntegrations.forEach((integrationDef) => {
+      const providerName = integrationDef.name || "";
+      const providerLabel =
+        integrationDef.label ||
+        getIntegrationTypeDisplayName(undefined, integrationDef.name) ||
+        integrationDef.name ||
+        "Integration";
+      const instances = [...(connectedInstancesByProvider.get(providerName) || [])].sort((a, b) =>
+        (a.metadata?.name || providerLabel).localeCompare(b.metadata?.name || providerLabel),
+      );
+
+      catalogByProvider.set(providerName, {
+        providerName,
+        providerLabel,
+        integrationDef,
+        instances,
       });
+    });
+
+    connectedInstancesByProvider.forEach((instances, providerName) => {
+      if (catalogByProvider.has(providerName)) {
+        return;
+      }
+
+      const providerLabel = getIntegrationTypeDisplayName(undefined, providerName) || providerName || "Integration";
+      const sortedInstances = [...instances].sort((a, b) =>
+        (a.metadata?.name || providerLabel).localeCompare(b.metadata?.name || providerLabel),
+      );
+
+      catalogByProvider.set(providerName, {
+        providerName,
+        providerLabel,
+        integrationDef: null,
+        instances: sortedInstances,
+      });
+    });
+
+    return [...catalogByProvider.values()].sort((a, b) => a.providerLabel.localeCompare(b.providerLabel));
   }, [availableIntegrations, connectedInstancesByProvider]);
   const filteredIntegrationCatalog = useMemo(() => {
     const normalizedQuery = filterQuery.trim().toLowerCase();
@@ -87,7 +115,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
     }
 
     return integrationCatalog.filter((item) => {
-      const providerText = [item.providerLabel, item.providerName, item.integrationDef.description]
+      const providerText = [item.providerLabel, item.providerName, item.integrationDef?.description]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -212,31 +240,38 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                     <div className="mt-0.5 flex h-8 w-8 items-center justify-center">
                       <IntegrationIcon
                         integrationName={item.providerName}
-                        iconSlug={item.integrationDef.icon}
+                        iconSlug={item.integrationDef?.icon}
                         className="w-8 h-8 text-gray-500 dark:text-gray-400"
                       />
                     </div>
                     <div>
                       <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{item.providerLabel}</h3>
-                      {item.integrationDef.description ? (
+                      {item.integrationDef?.description ? (
                         <p className="mt-0.5 text-sm text-gray-800 dark:text-gray-400">
-                          {item.integrationDef.description}
+                          {item.integrationDef?.description}
                         </p>
                       ) : null}
                     </div>
                   </div>
                   <PermissionTooltip
-                    allowed={canCreateIntegrations || permissionsLoading}
-                    message="You don't have permission to connect integrations."
+                    allowed={Boolean(item.integrationDef) && (canCreateIntegrations || permissionsLoading)}
+                    message={
+                      item.integrationDef
+                        ? "You don't have permission to connect integrations."
+                        : "This integration provider is no longer available for new connections."
+                    }
                   >
                     <Button
                       variant="default"
                       size="sm"
-                      onClick={() => handleConnectClick(item.integrationDef)}
+                      onClick={() => {
+                        if (!item.integrationDef) return;
+                        handleConnectClick(item.integrationDef);
+                      }}
                       className="self-start"
-                      disabled={!canCreateIntegrations}
+                      disabled={!item.integrationDef || !canCreateIntegrations}
                     >
-                      Connect
+                      {item.integrationDef ? "Connect" : "Unavailable"}
                     </Button>
                   </PermissionTooltip>
                 </div>
