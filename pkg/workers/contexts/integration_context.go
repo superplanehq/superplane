@@ -375,6 +375,19 @@ func (c *IntegrationContext) Subscribe(configuration any) (*uuid.UUID, error) {
 	return &subscription.ID, nil
 }
 
+func (c *IntegrationContext) Unsubscribe(subscriptionID uuid.UUID) error {
+	result := c.tx.
+		Where("id = ? AND installation_id = ?", subscriptionID, c.integration.ID).
+		Delete(&models.IntegrationSubscription{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 func (c *IntegrationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
 	subscriptions, err := models.ListIntegrationSubscriptions(c.tx, c.integration.ID)
 	if err != nil {
