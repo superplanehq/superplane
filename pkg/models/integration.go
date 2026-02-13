@@ -78,14 +78,6 @@ func CreateIntegration(id, orgID uuid.UUID, appName string, installationName str
 	return &integration, nil
 }
 
-func FindSentryIntegrationByInstallationID(installationID string) (*Integration, error) {
-	return FindSentryIntegrationByInstallationIDInTransaction(database.Conn(), installationID)
-}
-
-func ListSentryIntegrationsByInstallationID(installationID string) ([]Integration, error) {
-	return ListSentryIntegrationsByInstallationIDInTransaction(database.Conn(), installationID)
-}
-
 func ListSentryIntegrationsByInstallationIDInTransaction(tx *gorm.DB, installationID string) ([]Integration, error) {
 	var integrations []Integration
 	err := tx.
