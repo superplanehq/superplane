@@ -25,8 +25,8 @@ services:
       # Ensure Go build cache initializes in a writable, persisted location
       # This fixes: "failed to initialize build cache at /.cache/go-build: permission denied"
       # and keeps the cache across container restarts (since /app is bind-mounted)
-      GOMODCACHE: "/app/tmp/go/pkg/mod"
-      GOCACHE: "/app/tmp/go-build"
+      GOMODCACHE: "/app/tmp/.go/pkg/mod"
+      GOCACHE: "/app/tmp/.go-build"
       XDG_CACHE_HOME: "/app/tmp"
       # Lock Playwright browsers location so install and runtime match
       PLAYWRIGHT_BROWSERS_PATH: "/app/tmp/ms-playwright"
