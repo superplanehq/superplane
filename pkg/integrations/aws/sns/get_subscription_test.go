@@ -15,33 +15,32 @@ import (
 func Test__GetSubscription__Setup(t *testing.T) {
 	component := &GetSubscription{}
 
-	t.Run("missing subscription arn -> error", func(t *testing.T) {
+	t.Run("missing region -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"subscriptionArn": "arn:aws:sns:us-east-1:123456789012:orders-events:sub-123",
+			},
+		})
+		require.ErrorContains(t, err, "region is required")
+	})
+
+	t.Run("missing topic arn -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"region": "us-east-1",
 			},
 		})
+		require.ErrorContains(t, err, "topic ARN is required")
+	})
+
+	t.Run("missing subscription arn -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"region":   "us-east-1",
+				"topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
+			},
+		})
 		require.ErrorContains(t, err, "subscription ARN is required")
-	})
-
-	t.Run("invalid subscription arn format -> error", func(t *testing.T) {
-		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{
-				"region":          "us-east-1",
-				"subscriptionArn": "invalid-subscription-arn",
-			},
-		})
-		require.ErrorContains(t, err, "invalid subscription ARN format")
-	})
-
-	t.Run("valid china partition subscription arn -> success", func(t *testing.T) {
-		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{
-				"region":          "cn-northwest-1",
-				"subscriptionArn": "arn:aws-cn:sns:cn-northwest-1:123456789012:orders-events:sub-123",
-			},
-		})
-		require.NoError(t, err)
 	})
 }
 

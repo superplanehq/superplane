@@ -99,19 +99,19 @@ func (c *GetSubscription) Configuration() []configuration.Field {
 func (c *GetSubscription) Setup(ctx core.SetupContext) error {
 	var config GetSubscriptionConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("%s: failed to decode setup configuration: %w", c.Name(), err)
+		return fmt.Errorf("failed to decode setup configuration: %w", err)
 	}
 
-	if _, err := requireRegion(config.Region); err != nil {
-		return fmt.Errorf("%s: invalid region: %w", c.Name(), err)
+	if config.Region == "" {
+		return fmt.Errorf("region is required")
 	}
 
-	if _, err := requireTopicArn(config.TopicArn); err != nil {
-		return fmt.Errorf("%s: invalid topic ARN: %w", c.Name(), err)
+	if config.TopicArn == "" {
+		return fmt.Errorf("topic ARN is required")
 	}
 
-	if _, err := requireSubscriptionArn(config.SubscriptionArn); err != nil {
-		return fmt.Errorf("%s: invalid subscription ARN: %w", c.Name(), err)
+	if config.SubscriptionArn == "" {
+		return fmt.Errorf("subscription ARN is required")
 	}
 
 	return nil
@@ -127,25 +127,15 @@ func (c *GetSubscription) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("%s: failed to decode execution configuration: %w", c.Name(), err)
 	}
 
-	region, err := requireRegion(config.Region)
-	if err != nil {
-		return fmt.Errorf("%s: invalid region: %w", c.Name(), err)
-	}
-
-	subscriptionArn, err := requireSubscriptionArn(config.SubscriptionArn)
-	if err != nil {
-		return fmt.Errorf("%s: invalid subscription ARN: %w", c.Name(), err)
-	}
-
 	credentials, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("%s: failed to load AWS credentials from integration: %w", c.Name(), err)
 	}
 
-	client := NewClient(ctx.HTTP, credentials, region)
-	subscription, err := client.GetSubscription(subscriptionArn)
+	client := NewClient(ctx.HTTP, credentials, config.Region)
+	subscription, err := client.GetSubscription(config.SubscriptionArn)
 	if err != nil {
-		return fmt.Errorf("%s: failed to get subscription %q: %w", c.Name(), subscriptionArn, err)
+		return fmt.Errorf("failed to get subscription %q: %w", config.SubscriptionArn, err)
 	}
 
 	if err := ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "aws.sns.subscription", []any{subscription}); err != nil {

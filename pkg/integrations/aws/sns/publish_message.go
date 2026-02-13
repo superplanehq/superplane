@@ -126,6 +126,10 @@ func (c *PublishMessage) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("invalid topic ARN: %w", err)
 	}
 
+	if config.Format == "" {
+		return fmt.Errorf("format is required")
+	}
+
 	if config.Format == PublishMessageFormatJSON && config.JSON == nil {
 		return fmt.Errorf("JSON message is required")
 	}
