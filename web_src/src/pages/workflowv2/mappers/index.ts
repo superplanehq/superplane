@@ -123,6 +123,13 @@ import {
   triggerRenderers as dockerhubTriggerRenderers,
   eventStateRegistry as dockerhubEventStateRegistry,
 } from "./dockerhub";
+import {
+  componentMappers as servicenowComponentMappers,
+  customFieldRenderers as servicenowCustomFieldRenderers,
+  triggerRenderers as servicenowTriggerRenderers,
+  eventStateRegistry as servicenowEventStateRegistry,
+} from "./servicenow/index";
+
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
@@ -176,6 +183,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
   dockerhub: dockerhubComponentMappers,
+  servicenow: servicenowComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -200,6 +208,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   prometheus: prometheusTriggerRenderers,
   cursor: cursorTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
+  servicenow: servicenowTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -224,6 +233,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
+  servicenow: servicenowEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
@@ -251,6 +261,7 @@ const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer
   github: githubCustomFieldRenderers,
   prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
+  servicenow: servicenowCustomFieldRenderers,
 };
 
 /**
