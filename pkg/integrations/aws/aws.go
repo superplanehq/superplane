@@ -141,6 +141,7 @@ func (a *AWS) Components() []core.Component {
 		&ecr.GetImage{},
 		&ecr.GetImageScanFindings{},
 		&ecr.ScanImage{},
+		&cloudwatch.QueryMetricsInsights{},
 		&lambda.RunFunction{},
 	}
 }
