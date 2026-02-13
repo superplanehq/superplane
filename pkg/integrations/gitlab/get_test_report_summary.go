@@ -78,21 +78,12 @@ func (c *GetTestReportSummary) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "pipeline",
-			Label:    "Pipeline",
-			Type:     configuration.FieldTypeIntegrationResource,
-			Required: true,
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: ResourceTypePipeline,
-					Parameters: []configuration.ParameterRef{
-						{
-							Name:      "project",
-							ValueFrom: &configuration.ParameterValueFrom{Field: "project"},
-						},
-					},
-				},
-			},
+			Name:        "pipeline",
+			Label:       "Pipeline",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Placeholder: "e.g. 1234567890",
+			Description: "The ID of the pipeline",
 		},
 	}
 }

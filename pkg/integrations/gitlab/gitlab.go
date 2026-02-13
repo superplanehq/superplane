@@ -169,7 +169,6 @@ func (g *GitLab) Configuration() []configuration.Field {
 func (g *GitLab) Components() []core.Component {
 	return []core.Component{
 		&CreateIssue{},
-		&RunPipeline{},
 		&GetPipeline{},
 		&GetLatestPipeline{},
 		&GetTestReportSummary{},
@@ -181,7 +180,6 @@ func (g *GitLab) Triggers() []core.Trigger {
 		&OnIssue{},
 		&OnMergeRequest{},
 		&OnMilestone{},
-		&OnPipeline{},
 		&OnRelease{},
 		&OnTag{},
 		&OnVulnerability{},

@@ -20,8 +20,6 @@ func (g *GitLab) ListResources(resourceType string, ctx core.ListResourcesContex
 		return ListMembers(ctx)
 	case ResourceTypeMilestone:
 		return ListMilestones(ctx)
-	case ResourceTypePipeline:
-		return ListPipelines(ctx)
 	case ResourceTypeProject:
 		return ListProjects(ctx)
 	default:
@@ -93,34 +91,5 @@ func ListMilestones(ctx core.ListResourcesContext) ([]core.IntegrationResource, 
 			ID:   fmt.Sprintf("%d", m.ID),
 		})
 	}
-	return resources, nil
-}
-
-func ListPipelines(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	projectID := ctx.Parameters["project"]
-	if projectID == "" {
-		return []core.IntegrationResource{}, nil
-	}
-
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create client: %v", err)
-	}
-
-	pipelines, err := client.ListPipelines(projectID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list pipelines: %v", err)
-	}
-
-	resources := make([]core.IntegrationResource, 0, len(pipelines))
-	for _, pipeline := range pipelines {
-		label := fmt.Sprintf("#%d - %s - %s", pipeline.ID, pipeline.Status, pipeline.Ref)
-		resources = append(resources, core.IntegrationResource{
-			Type: ResourceTypePipeline,
-			Name: label,
-			ID:   fmt.Sprintf("%d", pipeline.ID),
-		})
-	}
-
 	return resources, nil
 }
