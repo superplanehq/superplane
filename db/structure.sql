@@ -176,8 +176,8 @@ CREATE TABLE public.blueprints (
 --
 
 CREATE TABLE public.casbin_rule (
-    id integer NOT NULL,
-    ptype character varying(100) NOT NULL,
+    id bigint NOT NULL,
+    ptype character varying(100),
     v0 character varying(100),
     v1 character varying(100),
     v2 character varying(100),
@@ -192,7 +192,6 @@ CREATE TABLE public.casbin_rule (
 --
 
 CREATE SEQUENCE public.casbin_rule_id_seq
-    AS integer
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -968,6 +967,13 @@ CREATE INDEX idx_app_installations_organization_id ON public.app_installations U
 --
 
 CREATE INDEX idx_blueprints_organization_id ON public.blueprints USING btree (organization_id);
+
+
+--
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
 
 
 --

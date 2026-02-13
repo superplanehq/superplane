@@ -15,10 +15,8 @@ import (
 type OnIssue struct{}
 
 type OnIssueConfiguration struct {
-	Priorities      []string `json:"priorities" yaml:"priorities" mapstructure:"priorities"`
-	States          []string `json:"states" yaml:"states" mapstructure:"states"`
-	Account         string   `json:"account" yaml:"account" mapstructure:"account"`
-	ManualAccountID string   `json:"manualAccountId" yaml:"manualAccountId" mapstructure:"manualAccountId"`
+	Priorities []string `json:"priorities" yaml:"priorities" mapstructure:"priorities"`
+	States     []string `json:"states" yaml:"states" mapstructure:"states"`
 }
 
 func (t *OnIssue) Name() string {
@@ -76,26 +74,6 @@ func (t *OnIssue) Color() string {
 func (t *OnIssue) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "account",
-			Label:       "Account",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false, // Optional to prevent blocking
-			Description: "The New Relic account (optional for webhook)",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: "account",
-				},
-			},
-		},
-		{
-			Name:        "manualAccountId",
-			Label:       "Manual Account ID",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Manually enter Account ID if dropdown fails",
-			Placeholder: "1234567",
-		},
-		{
 			Name:        "priorities",
 			Label:       "Priorities",
 			Type:        configuration.FieldTypeMultiSelect,
@@ -138,6 +116,12 @@ type OnIssueMetadata struct {
 }
 
 func (t *OnIssue) Setup(ctx core.TriggerContext) error {
+	userAPIKey, err := ctx.Integration.GetConfig("userApiKey")
+	if err != nil || len(userAPIKey) == 0 {
+		msg := "User API Key is required for this component. Please configure it in the Integration settings."
+		return fmt.Errorf("%s", msg)
+	}
+
 	// 1. Always ensure manual: true in metadata so the UI refreshes correctly
 	//    to show the webhook URL once set up.
 	var metadata OnIssueMetadata
@@ -145,7 +129,7 @@ func (t *OnIssue) Setup(ctx core.TriggerContext) error {
 		// If decode fails, start fresh
 		metadata = OnIssueMetadata{}
 	}
-	
+
 	metadata.Manual = true
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return fmt.Errorf("failed to set metadata: %w", err)
@@ -186,7 +170,7 @@ func (t *OnIssue) HandleAction(ctx core.TriggerActionContext) (map[string]any, e
 	return nil, nil
 }
 
-type NewRelicIssue struct {
+type NewrelicIssue struct {
 	IssueID  string `json:"issue_id"`
 	Title    string `json:"title"`
 	Priority string `json:"priority"`
@@ -221,7 +205,7 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	}
 
 	// 3. Handshake Logic (Mirroring Azure SubscriptionValidation)
-	// If the payload is missing issue_id (indicating a New Relic "Test Connection" ping)
+	// If the payload is missing issue_id (indicating a Newrelic "Test Connection" ping)
 	_, hasIssueID := rawPayload["issue_id"]
 
 	if !hasIssueID {
@@ -230,7 +214,7 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	}
 
 	// 4. Decode Payload (Mapstructure)
-	var issue NewRelicIssue
+	var issue NewrelicIssue
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		Metadata: nil,
 		Result:   &issue,
