@@ -257,9 +257,8 @@ type PipelineVariable struct {
 }
 
 type CreatePipelineRequest struct {
-	Ref       string             `json:"ref"`
-	Variables []PipelineVariable `json:"variables,omitempty"`
-	Inputs    []PipelineInput    `json:"inputs,omitempty"`
+	Ref    string            `json:"ref"`
+	Inputs map[string]string `json:"inputs,omitempty"`
 }
 
 type PipelineInput struct {
@@ -360,6 +359,27 @@ func (c *Client) GetPipeline(projectID string, pipelineID int) (*Pipeline, error
 	}
 
 	return &pipeline, nil
+}
+
+func (c *Client) CancelPipeline(ctx context.Context, projectID string, pipelineID int) error {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/pipelines/%d/cancel", c.baseURL, apiVersion, url.PathEscape(projectID), pipelineID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK, http.StatusCreated, http.StatusAccepted, http.StatusNoContent:
+		return nil
+	default:
+		return fmt.Errorf("failed to cancel pipeline: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
 }
 
 func (c *Client) GetLatestPipeline(projectID, ref string) (*Pipeline, error) {
