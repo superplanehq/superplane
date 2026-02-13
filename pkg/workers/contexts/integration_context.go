@@ -196,12 +196,6 @@ func (c *IntegrationContext) completeCurrentRequestForInstallation() error {
 }
 
 func (c *IntegrationContext) GetConfig(name string) ([]byte, error) {
-	config := c.integration.Configuration.Data()
-	v, ok := config[name]
-	if !ok {
-		return nil, fmt.Errorf("config %s not found", name)
-	}
-
 	impl, err := c.registry.GetIntegration(c.integration.AppName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get integration %s: %w", c.integration.AppName, err)
@@ -210,6 +204,15 @@ func (c *IntegrationContext) GetConfig(name string) ([]byte, error) {
 	configDef, err := findConfigDef(impl.Configuration(), name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find config %s: %w", name, err)
+	}
+
+	config := c.integration.Configuration.Data()
+	v, ok := config[name]
+	if !ok {
+		if !configDef.Required {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("config %s not found", name)
 	}
 
 	if configDef.Type != configuration.FieldTypeString && configDef.Type != configuration.FieldTypeSelect {

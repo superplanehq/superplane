@@ -1,0 +1,32 @@
+{
+  "type": "grafana.query.result",
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "data": {
+    "results": {
+      "A": {
+        "frames": [
+          {
+            "schema": {
+              "fields": [
+                {
+                  "name": "time",
+                  "type": "time"
+                },
+                {
+                  "name": "value",
+                  "type": "number"
+                }
+              ]
+            },
+            "data": {
+              "values": [
+                ["2026-02-07T08:00:00Z", "2026-02-07T08:01:00Z"],
+                [1, 1]
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}
