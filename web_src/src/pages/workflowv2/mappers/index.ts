@@ -97,6 +97,11 @@ import {
   eventStateRegistry as openaiEventStateRegistry,
 } from "./openai/index";
 import {
+  componentMappers as grafanaComponentMappers,
+  triggerRenderers as grafanaTriggerRenderers,
+  eventStateRegistry as grafanaEventStateRegistry,
+} from "./grafana/index";
+import {
   componentMappers as circleCIComponentMappers,
   triggerRenderers as circleCITriggerRenderers,
   eventStateRegistry as circleCIEventStateRegistry,
