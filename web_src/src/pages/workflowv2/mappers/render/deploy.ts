@@ -28,6 +28,7 @@ interface DeployOutput {
   status?: string;
   createdAt?: string;
   finishedAt?: string;
+  rollbackToDeployId?: string;
 }
 
 export const DEPLOY_STATE_MAP: EventStateMap = {
@@ -44,23 +45,42 @@ export const DEPLOY_STATE_MAP: EventStateMap = {
     backgroundColor: "bg-gray-100",
     badgeColor: "bg-gray-500",
   },
+  rollback: {
+    icon: "rotate-ccw",
+    textColor: "text-amber-800",
+    backgroundColor: "bg-amber-100",
+    badgeColor: "bg-amber-500",
+  },
 };
 
 export const deployStateFunction: StateFunction = (execution) => {
   if (!execution) return "neutral";
 
-  const outputs = execution.outputs as { failed?: OutputPayload[] } | undefined;
+  const outputs = execution.outputs as { failed?: OutputPayload[]; success?: OutputPayload[] } | undefined;
   if (outputs?.failed?.length) {
     const failedOutput = outputs.failed[0]?.data as DeployOutput | undefined;
     const failedStatus = failedOutput?.status?.toLowerCase();
     if (failedStatus === "cancelled" || failedStatus === "canceled") {
       return "cancelled";
     }
+
     return "failed";
   }
 
-  const state = defaultStateFunction(execution);
-  return state === "success" ? "triggered" : state;
+  if (outputs?.success?.length) {
+    const successOutput = outputs.success[0]?.data as DeployOutput | undefined;
+    const successStatus = successOutput?.status?.toLowerCase();
+
+    if (successStatus === "cancelled" || successStatus === "canceled") {
+      return "cancelled";
+    }
+
+    if (successOutput?.rollbackToDeployId) {
+      return "rollback";
+    }
+  }
+
+  return defaultStateFunction(execution);
 };
 
 export const DEPLOY_STATE_REGISTRY: EventStateRegistry = {

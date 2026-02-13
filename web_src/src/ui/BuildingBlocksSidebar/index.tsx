@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
+import circleciIcon from "@/assets/icons/integrations/circleci.svg";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
@@ -23,16 +24,20 @@ import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
+import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
+import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
+import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
+import dockerIcon from "@/assets/icons/integrations/docker.svg";
 
 export interface BuildingBlock {
   name: string;
@@ -392,6 +397,7 @@ function CategorySection({
 
   // Determine category icon
   const appLogoMap: Record<string, string | Record<string, string>> = {
+    circleci: circleciIcon,
     cloudflare: cloudflareIcon,
     dash0: dash0Icon,
     datadog: datadogIcon,
@@ -403,14 +409,18 @@ function CategorySection({
     openai: openAiIcon,
     "open-ai": openAiIcon,
     claude: claudeIcon,
+    cursor: cursorIcon,
     pagerduty: pagerDutyIcon,
     rootly: rootlyIcon,
     semaphore: SemaphoreLogo,
     slack: slackIcon,
     sendgrid: sendgridIcon,
+    prometheus: prometheusIcon,
     render: renderIcon,
+    dockerhub: dockerIcon,
     aws: {
       codeArtifact: awsIcon,
+      cloudwatch: awsCloudwatchIcon,
       lambda: awsLambdaIcon,
       ecr: awsEcrIcon,
     },
@@ -465,6 +475,7 @@ function CategorySection({
 
           // Use SVG icons for application components/triggers (SMTP uses resolveIcon("mail"), same as core)
           const appLogoMap: Record<string, string | Record<string, string>> = {
+            circleci: circleciIcon,
             cloudflare: cloudflareIcon,
             dash0: dash0Icon,
             daytona: daytonaIcon,
@@ -475,14 +486,18 @@ function CategorySection({
             openai: openAiIcon,
             "open-ai": openAiIcon,
             claude: claudeIcon,
+            cursor: cursorIcon,
             pagerduty: pagerDutyIcon,
             rootly: rootlyIcon,
             semaphore: SemaphoreLogo,
             slack: slackIcon,
             sendgrid: sendgridIcon,
+            prometheus: prometheusIcon,
             render: renderIcon,
+            dockerhub: dockerIcon,
             aws: {
               codeArtifact: awsCodeArtifactIcon,
+              cloudwatch: awsCloudwatchIcon,
               ecr: awsEcrIcon,
               lambda: awsLambdaIcon,
             },
