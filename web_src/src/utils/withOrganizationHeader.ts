@@ -40,7 +40,7 @@ export function withOrganizationHeader(options: any = {}): any {
     }
   }
 
-  if (organizationId) {
+  if (organizationId && !headers["x-organization-id"]) {
     headers["x-organization-id"] = organizationId;
   }
 
