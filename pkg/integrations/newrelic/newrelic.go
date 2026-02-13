@@ -110,10 +110,14 @@ func (n *NewRelic) Triggers() []core.Trigger {
 }
 
 func (n *NewRelic) Sync(ctx core.SyncContext) error {
-    config := Configuration{}
-    if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-        return fmt.Errorf("failed to decode configuration: %w", err)
-    }
+	config := Configuration{}
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	if config.APIKey == "" {
+		return fmt.Errorf("API key is required")
+	}
 
     client, err := NewClient(ctx.HTTP, ctx.Integration)
     if err != nil {

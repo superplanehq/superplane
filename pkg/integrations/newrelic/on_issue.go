@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/mitchellh/mapstructure"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -204,20 +205,19 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	// 1. Decode Configuration
 	config := OnIssueConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		fmt.Printf("Error decoding configuration: %v\n", err)
-		// Azure Pattern: Return 200 OK on malformed config to avoid retries/disable
-		return http.StatusOK, nil
+		log.Errorf("Error decoding configuration: %v", err)
+		return http.StatusBadRequest, fmt.Errorf("error decoding configuration: %w", err)
 	}
 
 	// 2. Parse Payload into Map (Handshake Check)
 	var rawPayload map[string]any
 	if len(ctx.Body) == 0 {
-		fmt.Println("New Relic Validation Ping Received (Empty Body)")
+		log.Infof("New Relic Validation Ping Received (Empty Body)")
 		return http.StatusOK, nil
 	}
 	if err := json.Unmarshal(ctx.Body, &rawPayload); err != nil {
-		fmt.Printf("Error parsing webhook body: %v\n", err)
-		return http.StatusOK, nil
+		log.Errorf("Error parsing webhook body: %v", err)
+		return http.StatusBadRequest, fmt.Errorf("error parsing webhook body: %w", err)
 	}
 
 	// 3. Handshake Logic (Mirroring Azure SubscriptionValidation)
@@ -225,7 +225,7 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	_, hasIssueID := rawPayload["issue_id"]
 
 	if !hasIssueID {
-		fmt.Println("New Relic Validation Ping Received")
+		log.Infof("New Relic Validation Ping Received")
 		return http.StatusOK, nil
 	}
 
@@ -237,13 +237,13 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		TagName:  "json",
 	})
 	if err != nil {
-		fmt.Printf("Error creating decoder: %v\n", err)
-		return http.StatusOK, nil
+		log.Errorf("Error creating decoder: %v", err)
+		return http.StatusInternalServerError, fmt.Errorf("error creating decoder: %w", err)
 	}
 
 	if err := decoder.Decode(rawPayload); err != nil {
-		fmt.Printf("Error decoding payload: %v\n", err)
-		return http.StatusOK, nil
+		log.Errorf("Error decoding payload: %v", err)
+		return http.StatusBadRequest, fmt.Errorf("error decoding payload: %w", err)
 	}
 
 	// 5. Filter Logic
@@ -260,6 +260,8 @@ func (t *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 		eventName = "newrelic.issue_activated"
 	case "CLOSED":
 		eventName = "newrelic.issue_closed"
+	case "CREATED":
+		eventName = "newrelic.issue_created"
 	default:
 		eventName = "newrelic.issue_updated"
 	}

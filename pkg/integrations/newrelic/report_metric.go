@@ -66,6 +66,8 @@ func (c *ReportMetric) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
+
+
 func (c *ReportMetric) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
@@ -230,14 +232,4 @@ func (c *ReportMetric) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 
 func (c *ReportMetric) Cleanup(ctx core.SetupContext) error {
 	return nil
-}
-
-func (c *ReportMetric) SampleOutput() any {
-    return map[string]any{
-        "name":      "server.cpu.usage",
-        "value":     95.5,
-        "type":      "gauge",
-        "timestamp": 1707584119000,
-        "status":    "202 Accepted",
-    }
 }
