@@ -101,6 +101,7 @@ import {
   triggerRenderers as grafanaTriggerRenderers,
   eventStateRegistry as grafanaEventStateRegistry,
 } from "./grafana/index";
+import {
   componentMappers as circleCIComponentMappers,
   triggerRenderers as circleCITriggerRenderers,
   eventStateRegistry as circleCIEventStateRegistry,
