@@ -104,4 +104,3 @@ func decodeAzureWebhookConfiguration(raw any) (AzureWebhookConfiguration, error)
 
 	return config, nil
 }
-

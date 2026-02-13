@@ -185,4 +185,3 @@ const (
 	// ProvisioningStateDeleting indicates the resource is being deleted
 	ProvisioningStateDeleting = "Deleting"
 )
-
