@@ -11,6 +11,7 @@ Manage resources and execute AWS commands in workflows
   <LinkCard title="CodeArtifact • On Package Version" href="#code-artifact-•-on-package-version" description="Listen to AWS CodeArtifact package version events" />
   <LinkCard title="ECR • On Image Push" href="#ecr-•-on-image-push" description="Listen to AWS ECR image push events" />
   <LinkCard title="ECR • On Image Scan" href="#ecr-•-on-image-scan" description="Listen to AWS ECR image scan events" />
+  <LinkCard title="SNS • On Topic Message" href="#sns-•-on-topic-message" description="Listen to AWS SNS topic notifications" />
 </CardGrid>
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
@@ -29,6 +30,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
   <LinkCard title="ECR • Scan Image" href="#ecr-•-scan-image" description="Scan an ECR image for vulnerabilities" />
   <LinkCard title="Lambda • Run Function" href="#lambda-•-run-function" description="Invoke a Lambda function, optionally creating it from inline JavaScript" />
+  <LinkCard title="SNS • Create Topic" href="#sns-•-create-topic" description="Create an AWS SNS topic" />
+  <LinkCard title="SNS • Delete Topic" href="#sns-•-delete-topic" description="Delete an AWS SNS topic" />
+  <LinkCard title="SNS • Get Subscription" href="#sns-•-get-subscription" description="Get an AWS SNS subscription by ARN" />
+  <LinkCard title="SNS • Get Topic" href="#sns-•-get-topic" description="Get an AWS SNS topic by ARN" />
+  <LinkCard title="SNS • Publish Message" href="#sns-•-publish-message" description="Publish a message to an AWS SNS topic" />
 </CardGrid>
 
 ## Instructions
@@ -259,6 +265,54 @@ Each image scan event includes:
   },
   "timestamp": "2026-03-10T14:25:30.31254162Z",
   "type": "aws.ecr.image.scan"
+}
+```
+
+<a id="sns-•-on-topic-message"></a>
+
+## SNS • On Topic Message
+
+The On Topic Message trigger starts a workflow execution when a message is published to an AWS SNS topic.
+
+### Use Cases
+
+- **Event-driven automation**: React to messages published by external systems
+- **Notification processing**: Handle SNS payloads in workflow steps
+- **Routing and enrichment**: Trigger downstream workflows based on topic activity
+
+### How it works
+
+During setup, SuperPlane creates a webhook endpoint for this trigger and subscribes it to the selected SNS topic using HTTPS. SNS sends notification payloads to the webhook endpoint, which then emits workflow events.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "account": "123456789012",
+    "detail": {
+      "message": "{\"orderId\":\"ord_123\",\"status\":\"created\"}",
+      "messageId": "95df01b4-ee98-5cb9-9903-4c221d41eb5e",
+      "subject": "order.created",
+      "timestamp": "2026-01-10T10:00:00Z",
+      "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
+    },
+    "message": "{\"orderId\":\"ord_123\",\"status\":\"created\"}",
+    "messageAttributes": {
+      "eventType": {
+        "Type": "String",
+        "Value": "order.created"
+      }
+    },
+    "messageId": "95df01b4-ee98-5cb9-9903-4c221d41eb5e",
+    "region": "us-east-1",
+    "subject": "order.created",
+    "timestamp": "2026-01-10T10:00:00Z",
+    "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
+    "type": "Notification"
+  },
+  "timestamp": "2026-01-10T10:00:02.000000000Z",
+  "type": "aws.sns.topic.message"
 }
 ```
 
@@ -698,6 +752,160 @@ The Run Lambda component invokes a Lambda function.
     "memorySize": "128 MB"
   },
   "requestId": "9f8d2b5e-1c7a-4d62-8f1a-0f8b8e4f3a12"
+}
+```
+
+<a id="sns-•-create-topic"></a>
+
+## SNS • Create Topic
+
+The Create Topic component creates an AWS SNS topic and returns its metadata.
+
+### Use Cases
+
+- **Provisioning workflows**: Create topics as part of environment setup
+- **Automation bootstrap**: Prepare topics before publishing messages
+- **Self-service operations**: Provision messaging resources on demand
+
+### Example Output
+
+```json
+{
+  "data": {
+    "attributes": {
+      "DisplayName": "Orders Events",
+      "Owner": "123456789012",
+      "TopicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
+    },
+    "contentBasedDeduplication": false,
+    "displayName": "Orders Events",
+    "fifoTopic": false,
+    "name": "orders-events",
+    "owner": "123456789012",
+    "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
+  },
+  "timestamp": "2026-01-10T10:00:02.000000000Z",
+  "type": "aws.sns.topic"
+}
+```
+
+<a id="sns-•-delete-topic"></a>
+
+## SNS • Delete Topic
+
+The Delete Topic component deletes an AWS SNS topic.
+
+### Use Cases
+
+- **Cleanup workflows**: Remove temporary topics after execution
+- **Lifecycle management**: Decommission unused messaging resources
+- **Rollback automation**: Remove topics created in failed provisioning runs
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
+  },
+  "timestamp": "2026-01-10T10:00:02.000000000Z",
+  "type": "aws.sns.topic.deleted"
+}
+```
+
+<a id="sns-•-get-subscription"></a>
+
+## SNS • Get Subscription
+
+The Get Subscription component retrieves metadata and attributes for an AWS SNS subscription.
+
+### Use Cases
+
+- **Subscription audits**: Inspect endpoint and delivery configuration
+- **Workflow enrichment**: Load subscription metadata before downstream actions
+- **Validation**: Confirm subscription existence and protocol
+
+### Example Output
+
+```json
+{
+  "data": {
+    "attributes": {
+      "Endpoint": "https://example.com/sns/events",
+      "Protocol": "https",
+      "RawMessageDelivery": "true",
+      "TopicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
+    },
+    "endpoint": "https://example.com/sns/events",
+    "owner": "123456789012",
+    "pendingConfirmation": false,
+    "protocol": "https",
+    "rawMessageDelivery": true,
+    "subscriptionArn": "arn:aws:sns:us-east-1:123456789012:orders-events:7f8a3d50-f160-4d2d-8f8a-fb95d7f86a51",
+    "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
+  },
+  "timestamp": "2026-01-10T10:00:02.000000000Z",
+  "type": "aws.sns.subscription"
+}
+```
+
+<a id="sns-•-get-topic"></a>
+
+## SNS • Get Topic
+
+The Get Topic component retrieves metadata and attributes for an AWS SNS topic.
+
+### Use Cases
+
+- **Configuration audits**: Verify topic settings and attributes
+- **Workflow enrichment**: Load topic metadata before downstream actions
+- **Validation**: Confirm topic existence and ownership
+
+### Example Output
+
+```json
+{
+  "data": {
+    "attributes": {
+      "DisplayName": "Orders Events",
+      "Owner": "123456789012",
+      "TopicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
+    },
+    "contentBasedDeduplication": false,
+    "displayName": "Orders Events",
+    "fifoTopic": false,
+    "name": "orders-events",
+    "owner": "123456789012",
+    "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
+  },
+  "timestamp": "2026-01-10T10:00:02.000000000Z",
+  "type": "aws.sns.topic"
+}
+```
+
+<a id="sns-•-publish-message"></a>
+
+## SNS • Publish Message
+
+The Publish Message component sends a message to an AWS SNS topic.
+
+### Use Cases
+
+- **Event fan-out**: Broadcast workflow results to multiple subscribers
+- **Notifications**: Send operational updates to users and systems
+- **Automation**: Trigger downstream subscribers through SNS delivery
+
+### Example Output
+
+```json
+{
+  "data": {
+    "messageId": "a730a53a-a86d-5fcb-9ad1-ff72b8d0f104",
+    "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
+  },
+  "timestamp": "2026-01-10T10:00:02.000000000Z",
+  "type": "aws.sns.message.published"
 }
 ```
 
