@@ -106,6 +106,7 @@ func (s *Slack) HandleAction(ctx core.IntegrationActionContext) error {
 func (s *Slack) Components() []core.Component {
 	return []core.Component{
 		&SendTextMessage{},
+		&SendAndWait{},
 	}
 }
 
@@ -357,7 +358,66 @@ func (s *Slack) handleChallenge(ctx core.HTTPRequestContext, payload EventPayloa
 }
 
 func (s *Slack) handleInteractivity(ctx core.HTTPRequestContext, body []byte) {
-	// TODO
+	// Slack sends interactivity payloads as form-urlencoded with a "payload" field
+	values, err := url.ParseQuery(string(body))
+	if err != nil {
+		ctx.Logger.Errorf("error parsing interaction form data: %v", err)
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	payloadStr := values.Get("payload")
+	if payloadStr == "" {
+		ctx.Logger.Warnf("missing payload in interaction request")
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var interaction map[string]any
+	err = json.Unmarshal([]byte(payloadStr), &interaction)
+	if err != nil {
+		ctx.Logger.Errorf("error unmarshaling interaction payload: %v", err)
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	interactionType, _ := interaction["type"].(string)
+	if interactionType == "" {
+		ctx.Logger.Warnf("missing type in interaction payload")
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	subscriptions, err := ctx.Integration.ListSubscriptions()
+	if err != nil {
+		ctx.Logger.Errorf("error listing subscriptions: %v", err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	for _, subscription := range subscriptions {
+		if !s.interactivitySubscriptionApplies(ctx, subscription, interactionType) {
+			continue
+		}
+
+		err = subscription.SendMessage(interaction)
+		if err != nil {
+			ctx.Logger.Errorf("error sending interaction to subscription: %v", err)
+		}
+	}
+}
+
+func (s *Slack) interactivitySubscriptionApplies(ctx core.HTTPRequestContext, subscription core.IntegrationSubscriptionContext, interactionType string) bool {
+	c := SubscriptionConfiguration{}
+	err := mapstructure.Decode(subscription.Configuration(), &c)
+	if err != nil {
+		ctx.Logger.Errorf("error decoding subscription configuration: %v", err)
+		return false
+	}
+
+	return slices.ContainsFunc(c.InteractivityTypes, func(t string) bool {
+		return t == interactionType
+	})
 }
 
 func (s *Slack) parseEventCallback(eventPayload EventPayload) (string, any, error) {
@@ -375,7 +435,8 @@ func (s *Slack) parseEventCallback(eventPayload EventPayload) (string, any, erro
 }
 
 type SubscriptionConfiguration struct {
-	EventTypes []string `json:"eventTypes"`
+	EventTypes         []string `json:"eventTypes" mapstructure:"eventTypes"`
+	InteractivityTypes []string `json:"interactivityTypes" mapstructure:"interactivityTypes"`
 }
 
 func (s *Slack) subscriptionApplies(ctx core.HTTPRequestContext, subscription core.IntegrationSubscriptionContext, eventType string) bool {
