@@ -715,7 +715,19 @@ func (s *Server) HandleSentryPublicIntegrationWebhook(w http.ResponseWriter, r *
 			ref.Trigger.Name,
 			bodyHash,
 		)
-		_, _ = s.executeTriggerNode(r.Context(), body, r.Header, node)
+		code, execErr := s.executeTriggerNode(r.Context(), body, r.Header, node)
+		if execErr != nil {
+			log.Errorf(
+				"Sentry webhook: trigger execution failed: node_id=%s trigger=%s status=%d body_sha256=%x err=%v",
+				node.NodeID,
+				ref.Trigger.Name,
+				code,
+				bodyHash,
+				execErr,
+			)
+			http.Error(w, "trigger execution failed", code)
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusOK)
