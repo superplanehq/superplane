@@ -1,0 +1,29 @@
+{
+  "data": {
+    "version": "0",
+    "id": "2f1ecf5c-8bc9-4b7d-9e76-8df420e8e1a7",
+    "detail-type": "CloudWatch Alarm State Change",
+    "source": "aws.cloudwatch",
+    "account": "123456789012",
+    "time": "2024-11-20T20:35:33Z",
+    "region": "us-east-1",
+    "resources": [
+      "arn:aws:cloudwatch:us-east-1:123456789012:alarm:HighCPUUtilization"
+    ],
+    "detail": {
+      "alarmName": "HighCPUUtilization",
+      "state": {
+        "value": "ALARM",
+        "reason": "Threshold Crossed: 1 datapoint [95.0 (20/11/24 20:34:00)] was greater than or equal to the threshold (90.0).",
+        "timestamp": "2024-11-20T20:35:33.000+0000"
+      },
+      "previousState": {
+        "value": "OK",
+        "reason": "Threshold Crossed: 1 datapoint [35.0 (20/11/24 20:29:00)] was not greater than or equal to the threshold (90.0).",
+        "timestamp": "2024-11-20T20:30:33.000+0000"
+      }
+    }
+  },
+  "timestamp": "2026-02-10T12:00:00Z",
+  "type": "aws.cloudwatch.alarm"
+}

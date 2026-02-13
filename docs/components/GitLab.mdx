@@ -1,0 +1,635 @@
+---
+title: "GitLab"
+---
+
+Manage and react to changes in your GitLab repositories
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events from GitLab" />
+  <LinkCard title="On Merge Request" href="#on-merge-request" description="Listen to merge request events from GitLab" />
+  <LinkCard title="On Milestone" href="#on-milestone" description="Listen to milestone events from GitLab" />
+  <LinkCard title="On Release" href="#on-release" description="Listen to release events from GitLab" />
+  <LinkCard title="On Tag" href="#on-tag" description="Listen to tag events from GitLab" />
+  <LinkCard title="On Vulnerability" href="#on-vulnerability" description="Listen to vulnerability events from GitLab" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitLab project" />
+</CardGrid>
+
+## Instructions
+
+When connecting using App OAuth:
+- Leave **Client ID** and **Secret** empty to start the setup wizard.
+
+When connecting using Personal Access Token:
+- Go to Preferences → Personal Access Token → Add New token
+- Use **Scopes**: api, read_user, read_api, write_repository, read_repository
+- Copy the token and paste it into the **Access Token** configuration field, then click **Save**.
+
+<a id="on-issue"></a>
+
+## On Issue
+
+The On Issue trigger starts a workflow execution when issue events occur in a GitLab project.
+
+### Use Cases
+
+- **Notify Slack** when an issue is created or assigned for triage
+- **Create a Jira issue** when a GitLab issue is created for traceability
+- **Update external dashboards** or close linked tickets when an issue is closed
+
+### Configuration
+
+- **Project** (required): GitLab project to monitor
+- **Actions** (required): Select which issue actions to listen for (opened, closed, reopened, etc.). Default: opened.
+- **Labels** (optional): Only trigger for issues with specific labels
+
+### Outputs
+
+- **Default channel**: Emits issue payload including issue IID, title, state, labels, assignees, author, and action type
+
+### Webhook Setup
+
+This trigger automatically sets up a GitLab webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "assignees": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/abc123",
+        "id": 1,
+        "name": "John Doe",
+        "username": "johndoe"
+      }
+    ],
+    "event_type": "issue",
+    "labels": [
+      {
+        "color": "#dc3545",
+        "created_at": "2026-01-01T00:00:00Z",
+        "description": "Bug reports",
+        "group_id": null,
+        "id": 206,
+        "project_id": 15,
+        "template": false,
+        "title": "bug",
+        "type": "ProjectLabel",
+        "updated_at": "2026-01-01T00:00:00Z"
+      }
+    ],
+    "object_attributes": {
+      "action": "open",
+      "created_at": "2026-02-05T14:00:00Z",
+      "description": "This is an example issue description for testing the webhook",
+      "id": 301,
+      "iid": 1,
+      "state": "opened",
+      "title": "Example Issue",
+      "updated_at": "2026-02-05T14:00:00Z",
+      "url": "https://gitlab.com/group/my-project/-/issues/1"
+    },
+    "object_kind": "issue",
+    "project": {
+      "avatar_url": null,
+      "default_branch": "main",
+      "description": "Example project",
+      "git_http_url": "https://gitlab.com/group/my-project.git",
+      "git_ssh_url": "git@gitlab.com:group/my-project.git",
+      "id": 15,
+      "name": "my-project",
+      "namespace": "group",
+      "path_with_namespace": "group/my-project",
+      "visibility_level": 20,
+      "web_url": "https://gitlab.com/group/my-project"
+    },
+    "repository": {
+      "description": "Example project",
+      "homepage": "https://gitlab.com/group/my-project",
+      "name": "my-project",
+      "url": "git@gitlab.com:group/my-project.git"
+    },
+    "user": {
+      "avatar_url": "https://www.gravatar.com/avatar/abc123",
+      "email": "johndoe@example.com",
+      "id": 1,
+      "name": "John Doe",
+      "username": "johndoe"
+    }
+  },
+  "timestamp": "2026-02-05T14:00:00.000000000Z",
+  "type": "gitlab.issue"
+}
+```
+
+<a id="on-merge-request"></a>
+
+## On Merge Request
+
+The On Merge Request trigger starts a workflow execution when merge request events occur in a GitLab project.
+
+### Configuration
+
+- **Project** (required): GitLab project to monitor
+- **Actions** (required): Select which merge request actions to listen for (open, close, merge, etc.). Default: open.
+
+### Outputs
+
+- **Default channel**: Emits merge request payload data with action, project, and object attributes
+
+### Example Data
+
+```json
+{
+  "data": {
+    "assignees": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/ab12cd34?s=80\u0026d=identicon",
+        "email": "jrivera@example.com",
+        "id": 4,
+        "name": "Jamie Rivera",
+        "username": "jrivera"
+      }
+    ],
+    "changes": {
+      "title": {
+        "current": "Add merge request trigger",
+        "previous": "Add trigger"
+      }
+    },
+    "event_type": "merge_request",
+    "labels": [
+      {
+        "id": 101,
+        "title": "backend"
+      }
+    ],
+    "object_attributes": {
+      "action": "open",
+      "description": "Adds support for additional GitLab webhook trigger types.",
+      "id": 93,
+      "iid": 12,
+      "state": "opened",
+      "title": "Add merge request trigger"
+    },
+    "object_kind": "merge_request",
+    "project": {
+      "avatar_url": null,
+      "ci_config_path": null,
+      "default_branch": "main",
+      "description": "Project used to demonstrate merge request webhook payloads.",
+      "git_http_url": "https://gitlab.example.com/group/example.git",
+      "git_ssh_url": "ssh://git@gitlab.example.com:group/example.git",
+      "id": 1,
+      "name": "Example Project",
+      "namespace": "group",
+      "path_with_namespace": "group/example",
+      "visibility_level": 20,
+      "web_url": "https://gitlab.example.com/group/example"
+    },
+    "repository": {
+      "description": "Project used to demonstrate merge request webhook payloads.",
+      "git_http_url": "https://gitlab.example.com/group/example.git",
+      "git_ssh_url": "ssh://git@gitlab.example.com:group/example.git",
+      "homepage": "https://gitlab.example.com/group/example",
+      "name": "Example Project",
+      "url": "ssh://git@gitlab.example.com/group/example.git",
+      "visibility_level": 20
+    },
+    "reviewers": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/ef56gh78?s=80\u0026d=identicon",
+        "email": "mlee@example.com",
+        "id": 6,
+        "name": "Morgan Lee",
+        "state": "unreviewed",
+        "username": "mlee"
+      }
+    ],
+    "user": {
+      "avatar_url": "https://www.gravatar.com/avatar/1a29da0ccd099482194440fac762f5ccb4ec53227761d1859979367644a889a5?s=80\u0026d=identicon",
+      "email": "agarcia@example.com",
+      "id": 1,
+      "name": "Alex Garcia",
+      "username": "agarcia"
+    }
+  },
+  "timestamp": "2026-02-12T20:40:00.000000000Z",
+  "type": "gitlab.mergeRequest"
+}
+```
+
+<a id="on-milestone"></a>
+
+## On Milestone
+
+The On Milestone trigger starts a workflow execution when milestone events occur in a GitLab project.
+
+### Configuration
+
+- **Project** (required): GitLab project to monitor
+- **Actions** (required): Select which milestone actions to listen for. Default: create.
+
+### Outputs
+
+- **Default channel**: Emits milestone payload data with action, project, and object attributes
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "create",
+    "event_type": "milestone",
+    "object_attributes": {
+      "created_at": "2025-06-16 14:10:57 UTC",
+      "description": "First stable release",
+      "due_date": "2025-06-30",
+      "group_id": null,
+      "id": 61,
+      "iid": 10,
+      "project_id": 1,
+      "start_date": "2025-06-16",
+      "state": "active",
+      "title": "v1.0",
+      "updated_at": "2025-06-16 14:10:57 UTC"
+    },
+    "object_kind": "milestone",
+    "project": {
+      "avatar_url": null,
+      "ci_config_path": null,
+      "default_branch": "master",
+      "description": "Aut reprehenderit ut est.",
+      "git_http_url": "http://example.com/gitlabhq/gitlab-test.git",
+      "git_ssh_url": "git@example.com:gitlabhq/gitlab-test.git",
+      "homepage": "http://example.com/gitlabhq/gitlab-test",
+      "http_url": "http://example.com/gitlabhq/gitlab-test.git",
+      "id": 1,
+      "name": "Gitlab Test",
+      "namespace": "GitlabHQ",
+      "path_with_namespace": "gitlabhq/gitlab-test",
+      "ssh_url": "git@example.com:gitlabhq/gitlab-test.git",
+      "url": "http://example.com/gitlabhq/gitlab-test.git",
+      "visibility_level": 20,
+      "web_url": "http://example.com/gitlabhq/gitlab-test"
+    }
+  },
+  "timestamp": "2026-02-12T20:40:00.000000000Z",
+  "type": "gitlab.milestone"
+}
+```
+
+<a id="on-release"></a>
+
+## On Release
+
+The On Release trigger starts a workflow execution when release events occur in a GitLab project.
+
+### Configuration
+
+- **Project** (required): GitLab project to monitor
+- **Actions** (required): Select which release actions to listen for. Default: create.
+
+### Outputs
+
+- **Default channel**: Emits release payload data with action and release metadata
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "create",
+    "assets": {
+      "count": 2,
+      "links": [
+        {
+          "id": 1,
+          "link_type": "other",
+          "name": "Changelog",
+          "url": "https://example.net/changelog"
+        }
+      ],
+      "sources": [
+        {
+          "format": "zip",
+          "url": "https://example.com/gitlab-org/release-webhook-example/-/archive/v1.1/release-webhook-example-v1.1.zip"
+        },
+        {
+          "format": "tar.gz",
+          "url": "https://example.com/gitlab-org/release-webhook-example/-/archive/v1.1/release-webhook-example-v1.1.tar.gz"
+        }
+      ]
+    },
+    "commit": {
+      "author": {
+        "email": "user@example.com",
+        "name": "Example User"
+      },
+      "id": "ee0a3fb31ac16e11b9dbb596ad16d4af654d08f8",
+      "message": "Release v1.1",
+      "timestamp": "2020-10-31T14:58:32+11:00",
+      "title": "Release v1.1",
+      "url": "https://example.com/gitlab-org/release-webhook-example/-/commit/ee0a3fb31ac16e11b9dbb596ad16d4af654d08f8"
+    },
+    "created_at": "2020-11-02 12:55:12 UTC",
+    "description": "v1.1 has been released",
+    "id": 1,
+    "name": "v1.1",
+    "object_kind": "release",
+    "project": {
+      "avatar_url": null,
+      "ci_config_path": null,
+      "default_branch": "master",
+      "description": "",
+      "git_http_url": "https://example.com/gitlab-org/release-webhook-example.git",
+      "git_ssh_url": "ssh://git@example.com/gitlab-org/release-webhook-example.git",
+      "id": 1,
+      "name": "release-webhook-example",
+      "namespace": "Gitlab",
+      "path_with_namespace": "gitlab-org/release-webhook-example",
+      "visibility_level": 0,
+      "web_url": "https://example.com/gitlab-org/release-webhook-example"
+    },
+    "released_at": "2020-11-02 12:55:12 UTC",
+    "tag": "v1.1",
+    "url": "https://example.com/gitlab-org/release-webhook-example/-/releases/v1.1"
+  },
+  "timestamp": "2026-02-12T20:40:00.000000000Z",
+  "type": "gitlab.release"
+}
+```
+
+<a id="on-tag"></a>
+
+## On Tag
+
+The On Tag trigger starts a workflow execution when tag push events occur in a GitLab project.
+
+### Configuration
+
+- **Project** (required): GitLab project to monitor
+- **Tags** (required): Configure tag filters using predicates. You can match full refs (refs/tags/v1.0.0) or tag names (v1.0.0).
+
+### Outputs
+
+- **Default channel**: Emits tag push payload data including ref, before/after SHA, and project information
+
+### Example Data
+
+```json
+{
+  "data": {
+    "after": "82b3d5ae55f7080f1e6022629cdb57bfae7cccc7",
+    "before": "0000000000000000000000000000000000000000",
+    "checkout_sha": "82b3d5ae55f7080f1e6022629cdb57bfae7cccc7",
+    "commits": [],
+    "event_name": "tag_push",
+    "message": "Tag message",
+    "object_kind": "tag_push",
+    "project": {
+      "avatar_url": null,
+      "ci_config_path": null,
+      "default_branch": "master",
+      "description": "",
+      "git_http_url": "http://example.com/jsmith/example.git",
+      "git_ssh_url": "git@example.com:jsmith/example.git",
+      "id": 1,
+      "name": "Example",
+      "namespace": "Jsmith",
+      "path_with_namespace": "jsmith/example",
+      "visibility_level": 0,
+      "web_url": "http://example.com/jsmith/example"
+    },
+    "push_options": {},
+    "ref": "refs/tags/v1.0.0",
+    "ref_protected": true,
+    "repository": {
+      "description": "",
+      "git_http_url": "http://example.com/jsmith/example.git",
+      "git_ssh_url": "git@example.com:jsmith/example.git",
+      "homepage": "http://example.com/jsmith/example",
+      "name": "Example",
+      "url": "ssh://git@example.com/jsmith/example.git",
+      "visibility_level": 0
+    },
+    "total_commits_count": 0,
+    "user_email": "john@example.com",
+    "user_id": 1,
+    "user_name": "John Smith",
+    "user_username": "jsmith"
+  },
+  "timestamp": "2026-02-12T20:40:00.000000000Z",
+  "type": "gitlab.tag"
+}
+```
+
+<a id="on-vulnerability"></a>
+
+## On Vulnerability
+
+The On Vulnerability trigger starts a workflow execution when vulnerability events occur in a GitLab project.
+
+### Configuration
+
+- **Project** (required): GitLab project to monitor
+
+### Outputs
+
+- **Default channel**: Emits vulnerability payload data including severity, state, location, and linked issues
+
+### Example Data
+
+```json
+{
+  "data": {
+    "object_attributes": {
+      "auto_resolved": false,
+      "confidence": "unknown",
+      "confidence_overridden": false,
+      "confirmed_at": "2025-01-08T00:46:14.413Z",
+      "confirmed_by_id": 1,
+      "created_at": "2025-01-08T00:46:14.413Z",
+      "cvss": [
+        {
+          "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+          "vendor": "NVD"
+        }
+      ],
+      "dismissed_at": null,
+      "dismissed_by_id": null,
+      "identifiers": [
+        {
+          "external_id": "29dce398-220a-4315-8c84-16cd8b6d9b05",
+          "external_type": "gemnasium",
+          "name": "Gemnasium-29dce398-220a-4315-8c84-16cd8b6d9b05",
+          "url": "https://gitlab.com/gitlab-org/security-products/gemnasium-db/-/blob/master/gem/rexml/CVE-2024-41123.yml"
+        },
+        {
+          "external_id": "CVE-2024-41123",
+          "external_type": "cve",
+          "name": "CVE-2024-41123",
+          "url": "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-41123"
+        }
+      ],
+      "issues": [
+        {
+          "created_at": "2025-01-08T00:46:14.429Z",
+          "title": "REXML ReDoS vulnerability",
+          "updated_at": "2025-01-08T00:46:14.429Z",
+          "url": "https://example.com/flightjs/Flight/-/issues/1"
+        }
+      ],
+      "location": {
+        "dependency": {
+          "package": {
+            "name": "rexml"
+          },
+          "version": "3.3.1"
+        },
+        "file": "Gemfile.lock"
+      },
+      "project_id": 1,
+      "report_type": "dependency_scanning",
+      "resolved_at": null,
+      "resolved_by_id": null,
+      "resolved_on_default_branch": false,
+      "severity": "high",
+      "severity_overridden": false,
+      "state": "confirmed",
+      "title": "REXML DoS vulnerability",
+      "updated_at": "2025-01-08T00:46:14.413Z",
+      "url": "https://example.com/flightjs/Flight/-/security/vulnerabilities/1"
+    },
+    "object_kind": "vulnerability"
+  },
+  "timestamp": "2026-02-12T20:40:00.000000000Z",
+  "type": "gitlab.vulnerability"
+}
+```
+
+<a id="create-issue"></a>
+
+## Create Issue
+
+The Create Issue component creates a new issue in a specified GitLab project.
+
+### Use Cases
+
+- **Automated Bug Reporting**: Create issues when a monitoring system detects an error
+- **Task Management**: Automatically create tasks for new employee onboarding
+- **Feedback Loop**: Turn customer feedback into actionable issues
+
+### Configuration
+
+- **Project** (required): The GitLab project where the issue will be created
+- **Title** (required): The title of the new issue
+- **Description** (optional): The description/body of the issue
+- **Assignees** (optional): Users to assign the issue to
+- **Labels** (optional): Labels to apply to the issue (e.g., bug, enhancement)
+- **Milestone** (optional): Milestone to associate with the issue
+- **Due Date** (optional): Date when the issue is due
+
+### Output
+
+The component outputs the created issue object, including:
+- **id**: The internal ID of the issue
+- **iid**: The project-relative ID of the issue
+- **web_url**: The URL to view the issue in GitLab
+- **state**: The current state of the issue (opened/closed)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "_links": {
+      "award_emoji": "http://gitlab.example.com/api/v4/projects/1/issues/1/award_emoji",
+      "notes": "http://gitlab.example.com/api/v4/projects/1/issues/1/notes",
+      "project": "http://gitlab.example.com/api/v4/projects/1",
+      "self": "http://gitlab.example.com/api/v4/projects/1/issues/1"
+    },
+    "assignee": {
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "http://gitlab.example.com/root"
+    },
+    "assignees": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+        "id": 1,
+        "name": "Administrator",
+        "state": "active",
+        "username": "root",
+        "web_url": "http://gitlab.example.com/root"
+      }
+    ],
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "http://gitlab.example.com/root"
+    },
+    "blocking_issues_count": 0,
+    "closed_at": null,
+    "closed_by": null,
+    "confidential": false,
+    "created_at": "2023-01-01T10:00:00.000Z",
+    "description": "This is an example issue created via SuperPlane",
+    "discussion_locked": null,
+    "downvotes": 0,
+    "due_date": null,
+    "has_tasks": false,
+    "id": 1,
+    "iid": 1,
+    "issue_type": "issue",
+    "labels": [
+      "bug",
+      "urgent"
+    ],
+    "merge_requests_count": 0,
+    "milestone": null,
+    "project_id": 3,
+    "references": {
+      "full": "gitlab-org/gitlab-test#1",
+      "relative": "#1",
+      "short": "#1"
+    },
+    "state": "opened",
+    "task_completion_status": {
+      "completed_count": 0,
+      "count": 0
+    },
+    "time_stats": {
+      "human_time_estimate": null,
+      "human_total_time_spent": null,
+      "time_estimate": 0,
+      "total_time_spent": 0
+    },
+    "title": "Example Issue",
+    "type": "ISSUE",
+    "updated_at": "2023-01-01T10:00:00.000Z",
+    "upvotes": 0,
+    "user_notes_count": 0,
+    "web_url": "http://gitlab.example.com/gitlab-org/gitlab-test/issues/1",
+    "weight": null
+  },
+  "timestamp": "2023-01-01T10:00:00.000Z",
+  "type": "gitlab.issue"
+}
+```
+
