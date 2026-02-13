@@ -1,0 +1,77 @@
+{
+  "data": {
+    "object_kind": "merge_request",
+    "event_type": "merge_request",
+    "user": {
+      "id": 1,
+      "name": "Alex Garcia",
+      "username": "agarcia",
+      "avatar_url": "https://www.gravatar.com/avatar/1a29da0ccd099482194440fac762f5ccb4ec53227761d1859979367644a889a5?s=80&d=identicon",
+      "email": "agarcia@example.com"
+    },
+    "project": {
+      "id": 1,
+      "name": "Example Project",
+      "description": "Project used to demonstrate merge request webhook payloads.",
+      "web_url": "https://gitlab.example.com/group/example",
+      "avatar_url": null,
+      "git_ssh_url": "ssh://git@gitlab.example.com:group/example.git",
+      "git_http_url": "https://gitlab.example.com/group/example.git",
+      "namespace": "group",
+      "visibility_level": 20,
+      "path_with_namespace": "group/example",
+      "default_branch": "main",
+      "ci_config_path": null
+    },
+    "object_attributes": {
+      "id": 93,
+      "iid": 12,
+      "title": "Add merge request trigger",
+      "description": "Adds support for additional GitLab webhook trigger types.",
+      "state": "opened",
+      "action": "open"
+    },
+    "changes": {
+      "title": {
+        "previous": "Add trigger",
+        "current": "Add merge request trigger"
+      }
+    },
+    "assignees": [
+      {
+        "id": 4,
+        "name": "Jamie Rivera",
+        "username": "jrivera",
+        "avatar_url": "https://www.gravatar.com/avatar/ab12cd34?s=80&d=identicon",
+        "email": "jrivera@example.com"
+      }
+    ],
+    "reviewers": [
+      {
+        "id": 6,
+        "name": "Morgan Lee",
+        "username": "mlee",
+        "state": "unreviewed",
+        "avatar_url": "https://www.gravatar.com/avatar/ef56gh78?s=80&d=identicon",
+        "email": "mlee@example.com"
+      }
+    ],
+    "labels": [
+      {
+        "id": 101,
+        "title": "backend"
+      }
+    ],
+    "repository": {
+      "name": "Example Project",
+      "url": "ssh://git@gitlab.example.com/group/example.git",
+      "description": "Project used to demonstrate merge request webhook payloads.",
+      "homepage": "https://gitlab.example.com/group/example",
+      "git_http_url": "https://gitlab.example.com/group/example.git",
+      "git_ssh_url": "ssh://git@gitlab.example.com:group/example.git",
+      "visibility_level": 20
+    }
+  },
+  "timestamp": "2026-02-12T20:40:00.000000000Z",
+  "type": "gitlab.mergeRequest"
+}
