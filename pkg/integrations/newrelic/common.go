@@ -7,12 +7,10 @@ import (
 
 const (
 	// US Region
-	restAPIBaseUS      = "https://api.newrelic.com/v2"
 	nerdGraphAPIBaseUS = "https://api.newrelic.com/graphql"
 	metricsAPIBaseUS   = "https://metric-api.newrelic.com/metric/v1"
 
 	// EU Region
-	restAPIBaseEU      = "https://api.eu.newrelic.com/v2"
 	nerdGraphAPIBaseEU = "https://api.eu.newrelic.com/graphql"
 	metricsAPIBaseEU   = "https://metric-api.eu.newrelic.com/metric/v1"
 )

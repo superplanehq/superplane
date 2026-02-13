@@ -104,7 +104,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 		eventCtx := ctx.Events.(*contexts.EventContext)
 		require.Equal(t, 1, eventCtx.Count())
 		assert.Equal(t, "newrelic.issue_activated", eventCtx.Payloads[0].Type)
-		
+
 		data, ok := eventCtx.Payloads[0].Data.(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "123", data["issueId"])
