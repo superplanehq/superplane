@@ -15,18 +15,10 @@ import { formatTimeAgo } from "@/utils/date";
 import { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../../utils";
 
-interface RunTaskConfiguration {
+interface StopTaskConfiguration {
   region?: string;
   cluster?: string;
-  taskDefinition?: string;
-  count?: number;
-  launchType?: string;
-}
-
-interface EcsFailure {
-  arn?: string;
-  reason?: string;
-  detail?: string;
+  task?: string;
 }
 
 interface EcsTask {
@@ -35,18 +27,18 @@ interface EcsTask {
   taskDefinitionArn?: string;
   lastStatus?: string;
   desiredStatus?: string;
+  stoppedReason?: string;
   launchType?: string;
   platformVersion?: string;
   group?: string;
   startedBy?: string;
 }
 
-interface RunTaskOutput {
-  tasks?: EcsTask[];
-  failures?: EcsFailure[];
+interface StopTaskOutput {
+  task?: EcsTask;
 }
 
-export const runTaskMapper: ComponentBaseMapper = {
+export const stopTaskMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition.name || "unknown";
@@ -61,34 +53,33 @@ export const runTaskMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? runTaskEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? stopTaskEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
-      metadata: runTaskMetadataList(context.node),
+      metadata: stopTaskMetadataList(context.node),
       eventStateMap: getStateMap(componentName),
     };
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const data = outputs?.default?.[0]?.data as RunTaskOutput | undefined;
+    const data = outputs?.default?.[0]?.data as StopTaskOutput | undefined;
+    const task = data?.task;
 
-    if (!data) {
+    if (!task) {
       return {};
     }
 
-    const firstTask = data.tasks?.[0];
     return {
-      "Tasks Started": String(data.tasks?.length || 0),
-      Failures: String(data.failures?.length || 0),
-      "Task ARN": stringOrDash(firstTask?.taskArn),
-      "Task Definition": stringOrDash(firstTask?.taskDefinitionArn),
-      "Cluster ARN": stringOrDash(firstTask?.clusterArn),
-      "Last Status": stringOrDash(firstTask?.lastStatus),
-      "Desired Status": stringOrDash(firstTask?.desiredStatus),
-      "Launch Type": stringOrDash(firstTask?.launchType),
-      "Platform Version": stringOrDash(firstTask?.platformVersion),
-      Group: stringOrDash(firstTask?.group),
-      "Started By": stringOrDash(firstTask?.startedBy),
+      "Task ARN": stringOrDash(task.taskArn),
+      "Task Definition": stringOrDash(task.taskDefinitionArn),
+      "Cluster ARN": stringOrDash(task.clusterArn),
+      "Last Status": stringOrDash(task.lastStatus),
+      "Desired Status": stringOrDash(task.desiredStatus),
+      "Stopped Reason": stringOrDash(task.stoppedReason),
+      "Launch Type": stringOrDash(task.launchType),
+      "Platform Version": stringOrDash(task.platformVersion),
+      Group: stringOrDash(task.group),
+      "Started By": stringOrDash(task.startedBy),
     };
   },
 
@@ -100,8 +91,8 @@ export const runTaskMapper: ComponentBaseMapper = {
   },
 };
 
-function runTaskMetadataList(node: NodeInfo): MetadataItem[] {
-  const config = node.configuration as RunTaskConfiguration | undefined;
+function stopTaskMetadataList(node: NodeInfo): MetadataItem[] {
+  const config = node.configuration as StopTaskConfiguration | undefined;
   const items: MetadataItem[] = [];
 
   if (config?.region) {
@@ -110,22 +101,14 @@ function runTaskMetadataList(node: NodeInfo): MetadataItem[] {
   if (config?.cluster) {
     items.push({ icon: "server", label: config.cluster });
   }
-  if (config?.taskDefinition) {
-    items.push({ icon: "package", label: config.taskDefinition });
-  }
-  if (config?.count && config.count > 1) {
-    items.push({ icon: "hash", label: `count: ${config.count}` });
-  }
-  if (config?.launchType) {
-    if (config.launchType !== "AUTO") {
-      items.push({ icon: "rocket", label: config.launchType });
-    }
+  if (config?.task) {
+    items.push({ icon: "square", label: config.task });
   }
 
   return items;
 }
 
-function runTaskEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function stopTaskEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });

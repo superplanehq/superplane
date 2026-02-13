@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 
@@ -81,12 +82,18 @@ type DescribeServicesResponse struct {
 	Failures []Failure `json:"failures"`
 }
 
+type DescribeTasksResponse struct {
+	Tasks    []Task    `json:"tasks"`
+	Failures []Failure `json:"failures"`
+}
+
 type Task struct {
 	TaskArn           string           `json:"taskArn"`
 	ClusterArn        string           `json:"clusterArn"`
 	TaskDefinitionArn string           `json:"taskDefinitionArn"`
 	LastStatus        string           `json:"lastStatus"`
 	DesiredStatus     string           `json:"desiredStatus"`
+	StoppedReason     string           `json:"stoppedReason"`
 	LaunchType        string           `json:"launchType"`
 	PlatformVersion   string           `json:"platformVersion"`
 	Group             string           `json:"group"`
@@ -110,6 +117,10 @@ type RunTaskInput struct {
 type RunTaskResponse struct {
 	Tasks    []Task    `json:"tasks"`
 	Failures []Failure `json:"failures"`
+}
+
+type StopTaskResponse struct {
+	Task Task `json:"task"`
 }
 
 func NewClient(httpCtx core.HTTPContext, credentials *aws.Credentials, region string) *Client {
@@ -159,6 +170,17 @@ func (c *Client) ListTaskDefinitions() ([]string, error) {
 	)
 }
 
+func (c *Client) ListTasks(cluster string) ([]string, error) {
+	return c.listPaginatedStrings(
+		"ListTasks",
+		map[string]any{
+			"cluster":       strings.TrimSpace(cluster),
+			"desiredStatus": "RUNNING",
+		},
+		"taskArns",
+	)
+}
+
 func (c *Client) DescribeServices(cluster string, services []string) (*DescribeServicesResponse, error) {
 	payload := map[string]any{
 		"cluster":  strings.TrimSpace(cluster),
@@ -167,6 +189,20 @@ func (c *Client) DescribeServices(cluster string, services []string) (*DescribeS
 
 	response := DescribeServicesResponse{}
 	if err := c.postJSON("DescribeServices", payload, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
+func (c *Client) DescribeTasks(cluster string, tasks []string) (*DescribeTasksResponse, error) {
+	payload := map[string]any{
+		"cluster": strings.TrimSpace(cluster),
+		"tasks":   tasks,
+	}
+
+	response := DescribeTasksResponse{}
+	if err := c.postJSON("DescribeTasks", payload, &response); err != nil {
 		return nil, err
 	}
 
@@ -200,15 +236,34 @@ func (c *Client) RunTask(input RunTaskInput) (*RunTaskResponse, error) {
 	if input.EnableExecuteCommand {
 		payload["enableExecuteCommand"] = true
 	}
-	if input.NetworkConfiguration != nil {
+	if !isEmptyObject(input.NetworkConfiguration) && !isNetworkConfigurationTemplate(input.NetworkConfiguration) {
 		payload["networkConfiguration"] = input.NetworkConfiguration
 	}
-	if input.Overrides != nil {
+	if !isEmptyObject(input.Overrides) && !isOverridesTemplate(input.Overrides) {
 		payload["overrides"] = input.Overrides
 	}
 
 	response := RunTaskResponse{}
 	if err := c.postJSON("RunTask", payload, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
+func (c *Client) StopTask(cluster string, task string, reason string) (*StopTaskResponse, error) {
+	payload := map[string]any{
+		"cluster": strings.TrimSpace(cluster),
+		"task":    strings.TrimSpace(task),
+	}
+
+	reason = strings.TrimSpace(reason)
+	if reason != "" {
+		payload["reason"] = reason
+	}
+
+	response := StopTaskResponse{}
+	if err := c.postJSON("StopTask", payload, &response); err != nil {
 		return nil, err
 	}
 
@@ -324,6 +379,94 @@ func clonePayload(base map[string]any) map[string]any {
 	return cloned
 }
 
+func isEmptyObject(value any) bool {
+	if value == nil {
+		return true
+	}
+
+	parsedValue := reflect.ValueOf(value)
+	if parsedValue.Kind() != reflect.Map {
+		return false
+	}
+
+	if parsedValue.IsNil() {
+		return true
+	}
+
+	return parsedValue.Len() == 0
+}
+
+func isNetworkConfigurationTemplate(value any) bool {
+	object, ok := toStringAnyMap(value)
+	if !ok || len(object) != 1 {
+		return false
+	}
+
+	rawConfig, ok := object["awsvpcConfiguration"]
+	if !ok {
+		return false
+	}
+
+	config, ok := toStringAnyMap(rawConfig)
+	if !ok || len(config) != 3 {
+		return false
+	}
+
+	assignPublicIP, _ := config["assignPublicIp"].(string)
+	if strings.ToUpper(strings.TrimSpace(assignPublicIP)) != "DISABLED" {
+		return false
+	}
+
+	return isEmptyArray(config["subnets"]) && isEmptyArray(config["securityGroups"])
+}
+
+func isOverridesTemplate(value any) bool {
+	object, ok := toStringAnyMap(value)
+	if !ok || len(object) != 1 {
+		return false
+	}
+
+	containerOverrides, ok := object["containerOverrides"]
+	if !ok {
+		return false
+	}
+
+	return isEmptyArray(containerOverrides)
+}
+
+func isEmptyArray(value any) bool {
+	if value == nil {
+		return false
+	}
+
+	parsedValue := reflect.ValueOf(value)
+	switch parsedValue.Kind() {
+	case reflect.Slice, reflect.Array:
+		return parsedValue.Len() == 0
+	default:
+		return false
+	}
+}
+
+func toStringAnyMap(value any) (map[string]any, bool) {
+	parsedValue := reflect.ValueOf(value)
+	if parsedValue.Kind() != reflect.Map {
+		return nil, false
+	}
+
+	if parsedValue.IsNil() {
+		return nil, false
+	}
+
+	converted := make(map[string]any, parsedValue.Len())
+	iterator := parsedValue.MapRange()
+	for iterator.Next() {
+		converted[fmt.Sprintf("%v", iterator.Key().Interface())] = iterator.Value().Interface()
+	}
+
+	return converted, true
+}
+
 func clusterNameFromArn(arn string) string {
 	parts := strings.SplitN(strings.TrimSpace(arn), "cluster/", 2)
 	if len(parts) != 2 {
@@ -351,4 +494,18 @@ func taskDefinitionNameFromArn(arn string) string {
 		return strings.TrimSpace(arn)
 	}
 	return strings.TrimSpace(parts[1])
+}
+
+func taskNameFromArn(arn string) string {
+	parts := strings.SplitN(strings.TrimSpace(arn), "task/", 2)
+	if len(parts) != 2 {
+		return strings.TrimSpace(arn)
+	}
+
+	segments := strings.Split(parts[1], "/")
+	if len(segments) == 0 {
+		return strings.TrimSpace(arn)
+	}
+
+	return strings.TrimSpace(segments[len(segments)-1])
 }

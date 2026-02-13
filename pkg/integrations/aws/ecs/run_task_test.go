@@ -84,6 +84,19 @@ func Test__RunTask__Setup(t *testing.T) {
 
 		require.NoError(t, err)
 	})
+
+	t.Run("auto launch type -> ok", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"region":         "us-east-1",
+				"cluster":        "demo",
+				"taskDefinition": "worker:1",
+				"launchType":     "AUTO",
+			},
+		})
+
+		require.NoError(t, err)
+	})
 }
 
 func Test__RunTask__Execute(t *testing.T) {
@@ -227,5 +240,129 @@ func Test__RunTask__Execute(t *testing.T) {
 		assert.Equal(t, float64(2), payloadSent["count"])
 		assert.Equal(t, "FARGATE", payloadSent["launchType"])
 		assert.Equal(t, "superplane-test", payloadSent["startedBy"])
+	})
+
+	t.Run("empty optional objects -> not sent to ECS API", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"tasks": [
+								{
+									"taskArn": "arn:aws:ecs:us-east-1:123456789012:task/demo/abc",
+									"clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/demo",
+									"taskDefinitionArn": "arn:aws:ecs:us-east-1:123456789012:task-definition/worker:1",
+									"lastStatus": "PENDING",
+									"desiredStatus": "RUNNING"
+								}
+							],
+							"failures": []
+						}
+					`)),
+				},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":               "us-east-1",
+				"cluster":              "demo",
+				"taskDefinition":       "worker:1",
+				"networkConfiguration": map[string]any{},
+				"overrides":            map[string]any{},
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+			Integration: &contexts.IntegrationContext{
+				Secrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+
+		requestBody, err := io.ReadAll(httpContext.Requests[0].Body)
+		require.NoError(t, err)
+
+		payloadSent := map[string]any{}
+		err = json.Unmarshal(requestBody, &payloadSent)
+		require.NoError(t, err)
+
+		_, hasNetworkConfiguration := payloadSent["networkConfiguration"]
+		assert.False(t, hasNetworkConfiguration)
+		_, hasOverrides := payloadSent["overrides"]
+		assert.False(t, hasOverrides)
+	})
+
+	t.Run("default templates -> not sent to ECS API", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"tasks": [
+								{
+									"taskArn": "arn:aws:ecs:us-east-1:123456789012:task/demo/abc",
+									"clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/demo",
+									"taskDefinitionArn": "arn:aws:ecs:us-east-1:123456789012:task-definition/worker:1",
+									"lastStatus": "PENDING",
+									"desiredStatus": "RUNNING"
+								}
+							],
+							"failures": []
+						}
+					`)),
+				},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":         "us-east-1",
+				"cluster":        "demo",
+				"taskDefinition": "worker:1",
+				"networkConfiguration": map[string]any{
+					"awsvpcConfiguration": map[string]any{
+						"subnets":        []any{},
+						"securityGroups": []any{},
+						"assignPublicIp": "DISABLED",
+					},
+				},
+				"overrides": map[string]any{
+					"containerOverrides": []any{},
+				},
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+			Integration: &contexts.IntegrationContext{
+				Secrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+
+		requestBody, err := io.ReadAll(httpContext.Requests[0].Body)
+		require.NoError(t, err)
+
+		payloadSent := map[string]any{}
+		err = json.Unmarshal(requestBody, &payloadSent)
+		require.NoError(t, err)
+
+		_, hasNetworkConfiguration := payloadSent["networkConfiguration"]
+		assert.False(t, hasNetworkConfiguration)
+		_, hasOverrides := payloadSent["overrides"]
+		assert.False(t, hasOverrides)
 	})
 }

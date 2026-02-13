@@ -25,6 +25,9 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	case "ecs.taskDefinition":
 		return ecs.ListTaskDefinitions(ctx, resourceType)
 
+	case "ecs.task":
+		return ecs.ListTasks(ctx, resourceType)
+
 	case "codeartifact.repository":
 		return codeartifact.ListRepositories(ctx, resourceType)
 

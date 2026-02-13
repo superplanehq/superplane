@@ -14,7 +14,7 @@ import (
 )
 
 var launchTypeOptions = []configuration.FieldOption{
-	{Label: "Auto", Value: ""},
+	{Label: "Auto", Value: "AUTO"},
 	{Label: "FARGATE", Value: "FARGATE"},
 	{Label: "EC2", Value: "EC2"},
 	{Label: "EXTERNAL", Value: "EXTERNAL"},
@@ -148,7 +148,7 @@ func (c *RunTask) Configuration() []configuration.Field {
 			Name:     "count",
 			Label:    "Count",
 			Type:     configuration.FieldTypeNumber,
-			Required: false,
+			Required: true,
 			Default:  "1",
 			TypeOptions: &configuration.TypeOptions{
 				Number: &configuration.NumberTypeOptions{
@@ -160,8 +160,8 @@ func (c *RunTask) Configuration() []configuration.Field {
 			Name:     "launchType",
 			Label:    "Launch Type",
 			Type:     configuration.FieldTypeSelect,
-			Required: false,
-			Default:  "",
+			Required: true,
+			Default:  "AUTO",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: launchTypeOptions,
@@ -173,6 +173,8 @@ func (c *RunTask) Configuration() []configuration.Field {
 			Label:       "Group",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
+			Default:     "",
+			Togglable:   true,
 			Description: "Optional ECS task group",
 		},
 		{
@@ -180,6 +182,8 @@ func (c *RunTask) Configuration() []configuration.Field {
 			Label:       "Started By",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
+			Default:     "",
+			Togglable:   true,
 			Description: "Optional identifier for who started the task",
 		},
 		{
@@ -187,6 +191,8 @@ func (c *RunTask) Configuration() []configuration.Field {
 			Label:       "Platform Version",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
+			Default:     "",
+			Togglable:   true,
 			Description: "Optional platform version (for example, for Fargate tasks)",
 		},
 		{
@@ -194,6 +200,8 @@ func (c *RunTask) Configuration() []configuration.Field {
 			Label:       "Enable Execute Command",
 			Type:        configuration.FieldTypeBool,
 			Required:    false,
+			Default:     false,
+			Togglable:   true,
 			Description: "Enable ECS Exec support for the task",
 		},
 		{
@@ -201,6 +209,8 @@ func (c *RunTask) Configuration() []configuration.Field {
 			Label:       "Network Configuration",
 			Type:        configuration.FieldTypeObject,
 			Required:    false,
+			Default:     "{\"awsvpcConfiguration\":{\"subnets\":[],\"securityGroups\":[],\"assignPublicIp\":\"DISABLED\"}}",
+			Togglable:   true,
 			Description: "Optional ECS networkConfiguration object (for example, awsvpcConfiguration)",
 		},
 		{
@@ -208,6 +218,8 @@ func (c *RunTask) Configuration() []configuration.Field {
 			Label:       "Overrides",
 			Type:        configuration.FieldTypeObject,
 			Required:    false,
+			Default:     "{\"containerOverrides\":[]}",
+			Togglable:   true,
 			Description: "Optional ECS task overrides object",
 		},
 	}
@@ -314,6 +326,9 @@ func (c *RunTask) normalizeConfig(config RunTaskConfiguration) RunTaskConfigurat
 	config.Cluster = strings.TrimSpace(config.Cluster)
 	config.TaskDefinition = strings.TrimSpace(config.TaskDefinition)
 	config.LaunchType = strings.ToUpper(strings.TrimSpace(config.LaunchType))
+	if config.LaunchType == "AUTO" {
+		config.LaunchType = ""
+	}
 	config.Group = strings.TrimSpace(config.Group)
 	config.StartedBy = strings.TrimSpace(config.StartedBy)
 	config.PlatformVersion = strings.TrimSpace(config.PlatformVersion)

@@ -17,11 +17,13 @@ import { updatePackageVersionsStatusMapper } from "./codeartifact/update_package
 import { onAlarmTriggerRenderer } from "./cloudwatch/on_alarm";
 import { describeServiceMapper } from "./ecs/describe_service";
 import { runTaskMapper } from "./ecs/run_task";
+import { stopTaskMapper } from "./ecs/stop_task";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   "lambda.runFunction": runFunctionMapper,
   "ecs.describeService": describeServiceMapper,
   "ecs.runTask": runTaskMapper,
+  "ecs.stopTask": stopTaskMapper,
   "ecr.getImage": getImageMapper,
   "ecr.getImageScanFindings": getImageScanFindingsMapper,
   "ecr.scanImage": scanImageMapper,
@@ -44,6 +46,7 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "ecs.describeService": buildActionStateRegistry("described"),
   "ecs.runTask": buildActionStateRegistry("started"),
+  "ecs.stopTask": buildActionStateRegistry("stopped"),
   "ecr.getImage": buildActionStateRegistry("retrieved"),
   "ecr.getImageScanFindings": buildActionStateRegistry("retrieved"),
   "ecr.scanImage": buildActionStateRegistry("scanned"),

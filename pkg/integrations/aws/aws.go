@@ -141,6 +141,7 @@ func (a *AWS) Components() []core.Component {
 		&codeartifact.UpdatePackageVersionsStatus{},
 		&ecs.DescribeService{},
 		&ecs.RunTask{},
+		&ecs.StopTask{},
 		&ecr.GetImage{},
 		&ecr.GetImageScanFindings{},
 		&ecr.ScanImage{},

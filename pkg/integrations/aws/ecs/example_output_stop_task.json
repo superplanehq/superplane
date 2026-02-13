@@ -1,0 +1,14 @@
+{
+  "data": {
+    "task": {
+      "taskArn": "arn:aws:ecs:us-east-1:123456789012:task/demo/abc123",
+      "clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/demo",
+      "taskDefinitionArn": "arn:aws:ecs:us-east-1:123456789012:task-definition/worker:7",
+      "lastStatus": "DEACTIVATING",
+      "desiredStatus": "STOPPED",
+      "stoppedReason": "manual test stop"
+    }
+  },
+  "timestamp": "2026-02-13T10:02:00Z",
+  "type": "aws.ecs.task"
+}
