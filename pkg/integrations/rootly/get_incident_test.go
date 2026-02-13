@@ -256,9 +256,9 @@ func Test__GetIncident__Execute(t *testing.T) {
 		data := payload["data"].(map[string]any)
 
 		// These attribute values must NOT be overwritten by the null-data relationships
-		severityMap, ok := data["severity"].(map[string]any)
-		require.True(t, ok, "severity should remain a map from attributes, not nil")
-		assert.Equal(t, "sev-001", severityMap["id"])
+		severity, ok := data["severity"].(string)
+		require.True(t, ok, "severity should remain a string from attributes, not nil")
+		assert.Equal(t, "sev1", severity)
 
 		userMap, ok := data["user"].(map[string]any)
 		require.True(t, ok, "user should remain a map from attributes, not nil")

@@ -6,12 +6,7 @@
         "slug": "api-latency-spike-detected",
         "status": "mitigated",
         "summary": "The API response times have increased significantly across all endpoints.",
-        "severity": {
-            "id": "sev-001",
-            "name": "sev1",
-            "slug": "sev1",
-            "color": "#FF0000"
-        },
+        "severity": "sev1",
         "url": "https://app.rootly.com/incidents/abc123-def456",
         "started_at": "2026-01-19T12:00:00Z",
         "mitigated_at": "2026-01-19T12:30:00Z",

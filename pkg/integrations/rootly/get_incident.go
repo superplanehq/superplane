@@ -52,7 +52,7 @@ Returns the incident object including:
 - **slug**: URL-friendly incident identifier
 - **status**: Current incident status
 - **summary**: Incident summary
-- **severity**: Incident severity object (id, name, slug, color)
+- **severity**: Incident severity slug
 - **url**: Link to the incident in Rootly
 - **started_at**: When the incident started
 - **mitigated_at**: When the incident was mitigated

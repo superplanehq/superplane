@@ -445,6 +445,11 @@ func (c *Client) GetIncidentDetailed(id string) (map[string]any, error) {
 	// Set the top-level ID from data
 	result["id"] = data["id"]
 
+	// Normalize severity to string for consistency with other components
+	if sev, ok := result["severity"]; ok {
+		result["severity"] = severityString(sev)
+	}
+
 	// Build an index from the "included" array: "type:id" -> resolved object
 	includedIndex := map[string]map[string]any{}
 	if included, ok := raw["included"].([]any); ok {
