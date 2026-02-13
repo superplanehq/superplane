@@ -434,6 +434,12 @@ func (c *WaitForButtonClick) unsubscribe(integration core.IntegrationContext, me
 }
 
 func (c *WaitForButtonClick) Cancel(ctx core.ExecutionContext) error {
+	var metadata WaitForButtonClickMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	c.unsubscribe(ctx.Integration, metadata)
 	return nil
 }
 

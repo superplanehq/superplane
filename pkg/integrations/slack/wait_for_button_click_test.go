@@ -324,3 +324,65 @@ func Test__WaitForButtonClick__HandleAction(t *testing.T) {
 		assert.Empty(t, execState.Payloads)
 	})
 }
+
+func Test__WaitForButtonClick__Cancel(t *testing.T) {
+	component := &WaitForButtonClick{}
+
+	t.Run("with active subscription -> cleans up subscription", func(t *testing.T) {
+		subscriptionID := uuid.New()
+		subscriptionIDStr := subscriptionID.String()
+		integrationCtx := &contexts.IntegrationContext{
+			Subscriptions: []contexts.Subscription{
+				{ID: subscriptionID, Configuration: map[string]any{"type": "button_click"}},
+			},
+		}
+		metadata := &contexts.MetadataContext{
+			Metadata: WaitForButtonClickMetadata{
+				AppSubscriptionID: &subscriptionIDStr,
+			},
+		}
+
+		err := component.Cancel(core.ExecutionContext{
+			Integration: integrationCtx,
+			Metadata:    metadata,
+		})
+
+		require.NoError(t, err)
+		// Verify subscription was cleaned up
+		assert.Empty(t, integrationCtx.Subscriptions)
+	})
+
+	t.Run("without subscription -> no error", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Subscriptions: []contexts.Subscription{},
+		}
+		metadata := &contexts.MetadataContext{
+			Metadata: WaitForButtonClickMetadata{
+				AppSubscriptionID: nil,
+			},
+		}
+
+		err := component.Cancel(core.ExecutionContext{
+			Integration: integrationCtx,
+			Metadata:    metadata,
+		})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("with invalid metadata -> returns error", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Subscriptions: []contexts.Subscription{},
+		}
+		metadata := &contexts.MetadataContext{
+			Metadata: "invalid",
+		}
+
+		err := component.Cancel(core.ExecutionContext{
+			Integration: integrationCtx,
+			Metadata:    metadata,
+		})
+
+		require.ErrorContains(t, err, "failed to decode metadata")
+	})
+}
