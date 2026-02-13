@@ -156,8 +156,10 @@ func (c *Client) ListProjects(orgID string) ([]SnykProject, error) {
 }
 
 type IgnoreIssueRequest struct {
-	Reason    string `json:"reason"`
-	ExpiresAt string `json:"expires_at,omitempty"`
+	Reason             string `json:"reason"`
+	ReasonType         string `json:"reasonType,omitempty"`
+	DisregardIfFixable bool   `json:"disregardIfFixable"`
+	Expires            string `json:"expires,omitempty"`
 }
 
 type IgnoreIssueResponse struct {

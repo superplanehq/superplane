@@ -155,8 +155,9 @@ func (c *IgnoreIssue) Execute(ctx core.ExecutionContext) error {
 	}
 
 	ignoreReq := IgnoreIssueRequest{
-		Reason:    config.Reason,
-		ExpiresAt: config.ExpiresAt,
+		Reason:     config.Reason,
+		ReasonType: "temporary-ignore",
+		Expires:    config.ExpiresAt,
 	}
 
 	response, err := client.IgnoreIssue(string(orgID), config.ProjectID, config.IssueID, ignoreReq)

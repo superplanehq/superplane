@@ -224,14 +224,20 @@ func (t *OnNewIssueDetected) matchesFilters(payload map[string]any, config OnNew
 	}
 
 	if len(config.Severity) > 0 {
-		issueData, ok := payload["issue"].(map[string]any)
+		issueRaw, ok := payload["issue"].(map[string]any)
 		if !ok {
 			return false
 		}
 
-		severityStr, isString := issueData["severity"].(string)
+		// Support both flat (severity at top level) and nested (issueData.severity) formats.
+		severityStr, isString := issueRaw["severity"].(string)
 		if !isString {
-			return false
+			if issueData, ok := issueRaw["issueData"].(map[string]any); ok {
+				severityStr, isString = issueData["severity"].(string)
+			}
+			if !isString {
+				return false
+			}
 		}
 
 		matched := false
