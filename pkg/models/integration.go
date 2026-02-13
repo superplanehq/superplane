@@ -78,6 +78,30 @@ func CreateIntegration(id, orgID uuid.UUID, appName string, installationName str
 	return &integration, nil
 }
 
+func ListSentryIntegrationsByInstallationIDInTransaction(tx *gorm.DB, installationID string) ([]Integration, error) {
+	var integrations []Integration
+	err := tx.
+		Where("app_name = ?", "sentry").
+		Where("(metadata ->> 'sentryInstallationUUID' = ?) OR (metadata ->> 'sentryInstallationID' = ?)", installationID, installationID).
+		Find(&integrations).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	if len(integrations) == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return integrations, nil
+}
+
+func FindSentryIntegrationByInstallationIDInTransaction(tx *gorm.DB, installationID string) (*Integration, error) {
+	integrations, err := ListSentryIntegrationsByInstallationIDInTransaction(tx, installationID)
+	if err != nil {
+		return nil, err
+	}
+	return &integrations[0], nil
+}
+
 func ListIntegrations(orgID uuid.UUID) ([]Integration, error) {
 	var integrations []Integration
 	err := database.Conn().Where("organization_id = ?", orgID).Find(&integrations).Error

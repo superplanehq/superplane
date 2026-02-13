@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import superplaneLogo from "@/assets/superplane.svg";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +49,7 @@ const getProviderLabel = (provider: string) => {
 };
 
 export const Login: React.FC = () => {
+  const navigate = useNavigate();
   const [authConfig, setAuthConfig] = useState<AuthConfig>({
     providers: [],
     passwordLoginEnabled: false,
@@ -83,9 +84,14 @@ export const Login: React.FC = () => {
 
   useEffect(() => {
     if (!accountLoading && account) {
-      window.location.href = safeRedirect || "/";
+      const target = safeRedirect || "/";
+      const current = `${window.location.pathname}${window.location.search}`;
+      if (target === current) {
+        return;
+      }
+      navigate(target, { replace: true });
     }
-  }, [account, accountLoading, safeRedirect]);
+  }, [account, accountLoading, navigate, safeRedirect]);
 
   useEffect(() => {
     let canceled = false;
