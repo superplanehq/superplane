@@ -2,6 +2,7 @@ package grafana
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -99,8 +100,20 @@ func (g *Grafana) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("error reading baseURL: %v", err)
 	}
 
-	if baseURL == nil || strings.TrimSpace(string(baseURL)) == "" {
+	baseURLRaw := strings.TrimSpace(string(baseURL))
+	if baseURL == nil || baseURLRaw == "" {
 		return fmt.Errorf("baseURL is required")
+	}
+
+	parsed, err := url.Parse(baseURLRaw)
+	if err != nil {
+		return fmt.Errorf("invalid baseURL: %v", err)
+	}
+	if parsed.Scheme == "" || parsed.Host == "" {
+		return fmt.Errorf("invalid baseURL: must include scheme and host (e.g. https://grafana.example.com)")
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("invalid baseURL: unsupported scheme %q (expected http or https)", parsed.Scheme)
 	}
 
 	metadata := IntegrationMetadata{}
@@ -108,7 +121,7 @@ func (g *Grafana) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to decode metadata: %v", err)
 	}
 
-	metadata.BaseURL = strings.TrimSuffix(strings.TrimSpace(string(baseURL)), "/")
+	metadata.BaseURL = strings.TrimSuffix(baseURLRaw, "/")
 	ctx.Integration.SetMetadata(metadata)
 
 	ctx.Integration.Ready()
