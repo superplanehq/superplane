@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -113,4 +114,16 @@ func ensureProjectInMetadata(ctx core.MetadataContext, app core.IntegrationConte
 	return ctx.Set(NodeMetadata{
 		Project: &appMetadata.Projects[repoIndex],
 	})
+}
+
+func normalizePipelineRef(ref string) string {
+	if strings.HasPrefix(ref, "refs/heads/") {
+		return strings.TrimPrefix(ref, "refs/heads/")
+	}
+
+	if strings.HasPrefix(ref, "refs/tags/") {
+		return strings.TrimPrefix(ref, "refs/tags/")
+	}
+
+	return ref
 }
