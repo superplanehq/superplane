@@ -10,6 +10,7 @@ import (
 const (
 	ResourceTypeMember    = "member"
 	ResourceTypeMilestone = "milestone"
+	ResourceTypePipeline  = "pipeline"
 	ResourceTypeProject   = "project"
 )
 
