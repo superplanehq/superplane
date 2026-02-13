@@ -14,22 +14,26 @@ import (
 )
 
 type Client struct {
-	APIKey        string
-	BaseURL       string
+	UserAPIKey    string
+	LicenseKey    string
 	NerdGraphURL  string
 	MetricBaseURL string
 	http          core.HTTPContext
 }
 
 func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
-	apiKey, err := ctx.GetConfig("apiKey")
-	if err != nil {
-		return nil, fmt.Errorf("API key is required: %w", err)
+	userAPIKey := ""
+	if raw, err := ctx.GetConfig("userApiKey"); err == nil {
+		userAPIKey = strings.TrimSpace(string(raw))
 	}
 
-	key := strings.TrimSpace(string(apiKey))
-	if key == "" {
-		return nil, fmt.Errorf("API key is required")
+	licenseKey := ""
+	if raw, err := ctx.GetConfig("licenseKey"); err == nil {
+		licenseKey = strings.TrimSpace(string(raw))
+	}
+
+	if userAPIKey == "" && licenseKey == "" {
+		return nil, fmt.Errorf("at least one API key is required: provide a User API Key and/or a License Key")
 	}
 
 	site, err := ctx.GetConfig("site")
@@ -37,20 +41,20 @@ func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, 
 		return nil, fmt.Errorf("failed to get site: %w", err)
 	}
 
-	var baseURL, nerdGraphURL, metricBaseURL string
-	if string(site) == "EU" {
-		baseURL = restAPIBaseEU
+	siteStr := strings.TrimSpace(string(site))
+
+	var nerdGraphURL, metricBaseURL string
+	if siteStr == "EU" {
 		nerdGraphURL = nerdGraphAPIBaseEU
 		metricBaseURL = metricsAPIBaseEU
 	} else {
-		baseURL = restAPIBaseUS
 		nerdGraphURL = nerdGraphAPIBaseUS
 		metricBaseURL = metricsAPIBaseUS
 	}
 
 	return &Client{
-		APIKey:        key,
-		BaseURL:       baseURL,
+		UserAPIKey:    userAPIKey,
+		LicenseKey:    licenseKey,
 		NerdGraphURL:  nerdGraphURL,
 		MetricBaseURL: metricBaseURL,
 		http:          httpCtx,
@@ -79,10 +83,6 @@ type MetricBatch struct {
 	Metrics []Metric        `json:"metrics"`
 }
 
-func isUserAPIKey(apiKey string) bool {
-	return strings.HasPrefix(apiKey, "NRAK-")
-}
-
 func (c *Client) ReportMetric(ctx context.Context, batch []MetricBatch) error {
 	url := c.MetricBaseURL
 
@@ -96,10 +96,11 @@ func (c *Client) ReportMetric(ctx context.Context, batch []MetricBatch) error {
 		return fmt.Errorf("failed to create metric request: %w", err)
 	}
 
-	if isUserAPIKey(c.APIKey) {
-		req.Header.Set("Api-Key", c.APIKey)
+	// Use License Key with X-License-Key header; fall back to User API Key
+	if c.LicenseKey != "" {
+		req.Header.Set("X-License-Key", c.LicenseKey)
 	} else {
-		req.Header.Set("X-License-Key", c.APIKey)
+		req.Header.Set("Api-Key", c.UserAPIKey)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
@@ -117,11 +118,12 @@ func (c *Client) ReportMetric(ctx context.Context, batch []MetricBatch) error {
 
 	return nil
 }
-func (c *Client) ValidateAPIKey(ctx context.Context) error {
-	graphqlQuery := `{ actor { user { name email } } }`
 
+// doNerdGraphRequest handles the shared boilerplate for all GraphQL calls to Newrelic
+func (c *Client) doNerdGraphRequest(ctx context.Context, query string, variables map[string]any, outData any) error {
 	gqlRequest := GraphQLRequest{
-		Query: graphqlQuery,
+		Query:     query,
+		Variables: variables,
 	}
 
 	bodyBytes, err := json.Marshal(gqlRequest)
@@ -134,7 +136,7 @@ func (c *Client) ValidateAPIKey(ctx context.Context) error {
 		return fmt.Errorf("failed to create NerdGraph request: %w", err)
 	}
 
-	req.Header.Set("Api-Key", c.APIKey)
+	req.Header.Set("Api-Key", c.UserAPIKey)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
@@ -166,104 +168,35 @@ func (c *Client) ValidateAPIKey(ctx context.Context) error {
 		return fmt.Errorf("GraphQL errors: %s", strings.Join(errMessages, "; "))
 	}
 
-	if gqlResponse.Data == nil {
-		return fmt.Errorf("no data returned from identity query")
+	// Marshal the map back to JSON and Unmarshal into the specific struct 'outData'
+	// This is the cleanest way to map a map[string]any to a specific struct
+	dataBytes, err := json.Marshal(gqlResponse.Data)
+	if err != nil {
+		return fmt.Errorf("failed to re-marshal data: %w", err)
 	}
 
-	return nil
+	return json.Unmarshal(dataBytes, outData)
+}
+
+func (c *Client) ValidateAPIKey(ctx context.Context) error {
+	query := `{ actor { user { name email } } }`
+	var out any // We don't actually need the data for validation, just the error check
+	return c.doNerdGraphRequest(ctx, query, nil, &out)
 }
 
 // ListAccounts fetches the list of accounts the API key has access to
 func (c *Client) ListAccounts(ctx context.Context) ([]Account, error) {
-	graphqlQuery := `{ actor { accounts { id name } } }`
-
-	gqlRequest := GraphQLRequest{
-		Query: graphqlQuery,
+	query := `{ actor { accounts { id name } } }`
+	var response struct {
+		Actor struct {
+			Accounts []Account `json:"accounts"`
+		} `json:"actor"`
 	}
 
-	bodyBytes, err := json.Marshal(gqlRequest)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal GraphQL request: %w", err)
+	if err := c.doNerdGraphRequest(ctx, query, nil, &response); err != nil {
+		return nil, err
 	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.NerdGraphURL, bytes.NewBuffer(bodyBytes))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create NerdGraph request: %w", err)
-	}
-
-	req.Header.Set("Api-Key", c.APIKey)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute NerdGraph request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	responseBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, parseErrorResponse(c.NerdGraphURL, responseBody, resp.StatusCode)
-	}
-
-	var gqlResponse GraphQLResponse
-	if err := json.Unmarshal(responseBody, &gqlResponse); err != nil {
-		return nil, fmt.Errorf("failed to decode GraphQL response: %w", err)
-	}
-
-	if len(gqlResponse.Errors) > 0 {
-		var errMessages []string
-		for _, gqlErr := range gqlResponse.Errors {
-			errMessages = append(errMessages, gqlErr.Message)
-		}
-		return nil, fmt.Errorf("GraphQL errors: %s", strings.Join(errMessages, "; "))
-	}
-
-	actor, ok := gqlResponse.Data["actor"].(map[string]interface{})
-	if !ok || actor == nil {
-		return nil, fmt.Errorf("invalid GraphQL response: missing actor")
-	}
-
-	accountsData, ok := actor["accounts"].([]interface{})
-	if !ok {
-		return []Account{}, nil
-	}
-
-	accounts := make([]Account, 0, len(accountsData))
-	for _, accData := range accountsData {
-		m, ok := accData.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		var id int64
-		switch v := m["id"].(type) {
-		case float64:
-			id = int64(v)
-		case int64:
-			id = v
-		case string:
-			id, _ = strconv.ParseInt(v, 10, 64)
-		}
-
-		name, _ := m["name"].(string)
-
-        // FIXED: Added filter to skip invalid or empty accounts
-        if id == 0 || name == "" {
-            continue
-        }
-
-		accounts = append(accounts, Account{
-			ID:   id,
-			Name: name,
-		})
-	}
-
-	return accounts, nil
+	return response.Actor.Accounts, nil
 }
 
 type GraphQLRequest struct {
@@ -282,9 +215,18 @@ type GraphQLError struct {
 }
 
 type NRQLQueryResponse struct {
-	Results     []map[string]interface{} `json:"results"`
-	TotalResult map[string]interface{}   `json:"totalResult,omitempty"`
-	Metadata    *NRQLMetadata            `json:"metadata,omitempty"`
+	Results       []map[string]interface{} `json:"results"`
+	TotalResult   map[string]interface{}   `json:"totalResult,omitempty"`
+	Metadata      *NRQLMetadata            `json:"metadata,omitempty"`
+	QueryProgress *QueryProgress           `json:"queryProgress,omitempty"`
+}
+
+type QueryProgress struct {
+	QueryId          string `json:"queryId"`
+	Completed        bool   `json:"completed"`
+	RetryAfter       int    `json:"retryAfter"`
+	RetryDeadline    int64  `json:"retryDeadline"`
+	ResultExpiration int64  `json:"resultExpiration"`
 }
 
 type NRQLMetadata struct {
@@ -299,11 +241,14 @@ type TimeWindow struct {
 	End   int64 `json:"end"`
 }
 
-func (c *Client) RunNRQLQuery(ctx context.Context, accountID int64, query string, timeout int) (*NRQLQueryResponse, error) {
+// RunNRQLQuery executes an async NRQL query via NerdGraph with a fixed 10s timeout.
+// If the query completes within 10s, results are returned directly.
+// Otherwise, QueryProgress is populated with a queryId for polling.
+func (c *Client) RunNRQLQuery(ctx context.Context, accountID int64, query string) (*NRQLQueryResponse, error) {
 	graphqlQuery := fmt.Sprintf(`{
         actor {
             account(id: %d) {
-                nrql(query: %s, timeout: %d) {
+                nrql(query: %s, timeout: 10, async: true) {
                     results
                     totalResult
                     metadata {
@@ -315,81 +260,78 @@ func (c *Client) RunNRQLQuery(ctx context.Context, accountID int64, query string
                             end
                         }
                     }
+                    queryProgress {
+                        queryId
+                        completed
+                        retryAfter
+                        retryDeadline
+                        resultExpiration
+                    }
                 }
             }
         }
-    }`, accountID, strconv.Quote(query), timeout)
+    }`, accountID, strconv.Quote(query))
 
-	gqlRequest := GraphQLRequest{
-		Query: graphqlQuery,
+	return c.executeNRQLGraphQL(ctx, graphqlQuery)
+}
+
+// PollNRQLQuery polls for the result of an async NRQL query using the queryId.
+func (c *Client) PollNRQLQuery(ctx context.Context, accountID int64, queryId string) (*NRQLQueryResponse, error) {
+	graphqlQuery := fmt.Sprintf(`{
+        actor {
+            account(id: %d) {
+                nrqlQueryProgress(queryId: %s) {
+                    results
+                    totalResult
+                    metadata {
+                        eventTypes
+                        facets
+                        messages
+                        timeWindow {
+                            begin
+                            end
+                        }
+                    }
+                    queryProgress {
+                        queryId
+                        completed
+                        retryAfter
+                        retryDeadline
+                        resultExpiration
+                    }
+                }
+            }
+        }
+    }`, accountID, strconv.Quote(queryId))
+
+	return c.executeNRQLGraphQL(ctx, graphqlQuery)
+}
+
+// nrqlGraphQLData is used to deserialize the GraphQL response from doNerdGraphRequest.
+type nrqlGraphQLData struct {
+	Actor struct {
+		Account struct {
+			NRQL              *NRQLQueryResponse `json:"nrql,omitempty"`
+			NRQLQueryProgress *NRQLQueryResponse `json:"nrqlQueryProgress,omitempty"`
+		} `json:"account"`
+	} `json:"actor"`
+}
+
+// executeNRQLGraphQL is a shared helper for NRQL query and poll requests.
+// It delegates HTTP/GraphQL boilerplate to doNerdGraphRequest.
+func (c *Client) executeNRQLGraphQL(ctx context.Context, graphqlQuery string) (*NRQLQueryResponse, error) {
+	var data nrqlGraphQLData
+	if err := c.doNerdGraphRequest(ctx, graphqlQuery, nil, &data); err != nil {
+		return nil, err
 	}
 
-	bodyBytes, err := json.Marshal(gqlRequest)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal GraphQL request: %w", err)
+	// Try nrql first (initial query), then nrqlQueryProgress (poll)
+	if data.Actor.Account.NRQL != nil {
+		return data.Actor.Account.NRQL, nil
+	}
+	if data.Actor.Account.NRQLQueryProgress != nil {
+		return data.Actor.Account.NRQLQueryProgress, nil
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.NerdGraphURL, bytes.NewBuffer(bodyBytes))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create NerdGraph request: %w", err)
-	}
-
-	req.Header.Set("Api-Key", c.APIKey)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute NerdGraph request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	responseBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, parseErrorResponse(c.NerdGraphURL, responseBody, resp.StatusCode)
-	}
-
-	var gqlResponse GraphQLResponse
-	if err := json.Unmarshal(responseBody, &gqlResponse); err != nil {
-		return nil, fmt.Errorf("failed to decode GraphQL response: %w", err)
-	}
-
-	if len(gqlResponse.Errors) > 0 {
-		var errMessages []string
-		for _, gqlErr := range gqlResponse.Errors {
-			errMessages = append(errMessages, gqlErr.Message)
-		}
-		return nil, fmt.Errorf("GraphQL errors: %s", strings.Join(errMessages, "; "))
-	}
-
-	actor, ok := gqlResponse.Data["actor"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid GraphQL response: missing actor")
-	}
-
-	account, ok := actor["account"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid GraphQL response: missing account")
-	}
-
-	nrqlData, ok := account["nrql"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid GraphQL response: missing nrql")
-	}
-
-	nrqlBytes, err := json.Marshal(nrqlData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal NRQL data: %w", err)
-	}
-
-	var nrqlResponse NRQLQueryResponse
-	if err := json.Unmarshal(nrqlBytes, &nrqlResponse); err != nil {
-		return nil, fmt.Errorf("failed to decode NRQL response: %w", err)
-	}
-
-	return &nrqlResponse, nil
+	return nil, fmt.Errorf("invalid GraphQL response: missing nrql or nrqlQueryProgress")
 }
