@@ -140,7 +140,7 @@ CREATE TABLE public.app_installations (
     app_name character varying(255) NOT NULL,
     installation_name character varying(255) NOT NULL,
     state character varying(32) NOT NULL,
-    state_description character varying(255),
+    state_description character varying(1024),
     configuration jsonb DEFAULT '{}'::jsonb NOT NULL,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     browser_action jsonb,
@@ -1515,7 +1515,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260131134819	f
+20260212033945	f
 \.
 
 
