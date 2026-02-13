@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -18,11 +17,6 @@ func init() {
 }
 
 type Sentry struct{}
-
-type Configuration struct {
-	AuthToken string `json:"authToken"`
-	BaseURL   string `json:"baseURL"`
-}
 
 func (s *Sentry) Name() string {
 	return "sentry"
@@ -65,27 +59,24 @@ func (s *Sentry) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (s *Sentry) Sync(ctx core.SyncContext) error {
-	config := Configuration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("decode config: %w", err)
+	// Public Integration OAuth flow stores tokens in integration secrets.
+	// When the integration is first created, it may not have OAuth tokens yet
+	// (waiting for /sentry/setup attach). In that case, don't fail Sync.
+	secrets, err := ctx.Integration.GetSecrets()
+	if err != nil {
+		return err
 	}
 
-	// Public Integration OAuth flow stores tokens in integration secrets.
-	// When the integration is first created, it may not have either a personal
-	// token or OAuth tokens yet (waiting for /sentry/setup attach). In that case,
-	// don't fail Sync and don't mark the integration as errored.
-	if strings.TrimSpace(config.AuthToken) == "" {
-		if secrets, err := ctx.Integration.GetSecrets(); err == nil {
-			for _, secret := range secrets {
-				if secret.Name == "sentryPublicAccessToken" && strings.TrimSpace(string(secret.Value)) != "" {
-					goto hasToken
-				}
-			}
+	hasToken := false
+	for _, secret := range secrets {
+		if secret.Name == "sentryPublicAccessToken" && strings.TrimSpace(string(secret.Value)) != "" {
+			hasToken = true
+			break
 		}
+	}
+	if !hasToken {
 		return nil
 	}
-
-hasToken:
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
