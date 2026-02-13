@@ -7,6 +7,7 @@ Manage and react to incidents in Rootly
 ## Triggers
 
 <CardGrid>
+  <LinkCard title="On Event" href="#on-event" description="Listen to incident timeline events" />
   <LinkCard title="On Incident" href="#on-incident" description="Listen to incident events" />
 </CardGrid>
 
@@ -19,6 +20,88 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in Rootly" />
   <LinkCard title="Update Incident" href="#update-incident" description="Update an existing incident in Rootly" />
 </CardGrid>
+
+<a id="on-event"></a>
+
+## On Event
+
+The On Event trigger starts a workflow execution when an incident timeline event is created or updated in Rootly.
+
+### Use Cases
+
+- **Note tracking**: Run a workflow when someone adds a note to an incident (e.g. notify channel, update Jira)
+- **Timeline sync**: Sync timeline events to Slack or external systems
+- **Investigation automation**: Run automation when investigation notes are added
+
+### Configuration
+
+- **Events**: Select which incident events to listen for (created, updated, mitigated, resolved, cancelled, deleted)
+- **Incident status**: Filter by incident status (e.g. started, mitigated, resolved)
+- **Severity**: Filter by incident severity
+- **Service**: Filter by service name
+- **Team**: Filter by team name
+- **Event source**: Filter by event source (e.g. web, api, slack)
+- **Visibility**: Filter by event visibility (internal or external)
+- **Event kind**: Filter by event kind (e.g. event, trail)
+
+### Event Data
+
+Each event includes:
+- **event**: Event type (incident.created, incident.updated, etc.)
+- **event_id**: Unique event identifier
+- **issued_at**: Timestamp of the event
+- **incident**: Complete incident information including timeline events
+
+### Webhook Setup
+
+This trigger automatically sets up a Rootly webhook endpoint when configured. The endpoint is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "event": "incident.updated",
+    "event_id": "evt-abc123",
+    "incident": {
+      "events": [
+        {
+          "created_at": "2026-01-19T12:30:00Z",
+          "event": "Investigation note added by on-call engineer",
+          "kind": "event",
+          "occurred_at": "2026-01-19T12:30:00Z",
+          "source": "web",
+          "visibility": "internal"
+        }
+      ],
+      "id": "abc123-def456",
+      "mitigated_at": null,
+      "resolved_at": null,
+      "services": [
+        {
+          "name": "Production API",
+          "slug": "production-api"
+        }
+      ],
+      "severity": "sev2",
+      "started_at": "2026-01-19T12:00:00Z",
+      "status": "started",
+      "summary": "The API response times have increased significantly across all endpoints.",
+      "teams": [
+        {
+          "name": "Platform",
+          "slug": "platform"
+        }
+      ],
+      "title": "API latency spike detected",
+      "url": "https://app.rootly.com/incidents/abc123-def456"
+    },
+    "issued_at": "2026-01-19T12:30:00Z"
+  },
+  "timestamp": "2026-01-19T12:30:00Z",
+  "type": "rootly.onEvent"
+}
+```
 
 <a id="on-incident"></a>
 
