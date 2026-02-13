@@ -3,13 +3,13 @@ import { useAccount } from "@/contexts/AccountContext";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { cn } from "@/lib/utils";
 import {
-  AppWindow,
   ArrowRightLeft,
   ChevronDown,
   CircleUser,
   Key,
   Lock,
   LogOut,
+  Plug,
   Settings,
   Shield,
   User as UserIcon,
@@ -112,7 +112,7 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
     {
       label: "Integrations",
       href: organizationId ? `/${organizationId}/settings/integrations` : "#",
-      Icon: AppWindow,
+      Icon: Plug,
       permission: { resource: "integrations", action: "read" },
     },
     {
