@@ -89,6 +89,11 @@ type ServicesResponse struct {
 	Data []ServiceData `json:"data"`
 }
 
+// TeamResponse represents the JSON:API response for a team
+type TeamResponse struct {
+	Data TeamData `json:"data"`
+}
+
 func (c *Client) ListServices() ([]Service, error) {
 	url := fmt.Sprintf("%s/services", c.BaseURL)
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
@@ -187,6 +192,56 @@ func (c *Client) ListSeverities() ([]Severity, error) {
 	}
 
 	return severities, nil
+}
+
+// Status represents a Rootly incident status.
+type Status struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Slug    string `json:"slug"`
+	Enabled bool   `json:"enabled"`
+}
+
+type StatusData struct {
+	ID         string           `json:"id"`
+	Type       string           `json:"type"`
+	Attributes StatusAttributes `json:"attributes"`
+}
+
+type StatusAttributes struct {
+	Name    string `json:"name"`
+	Slug    string `json:"slug"`
+	Enabled bool   `json:"enabled"`
+}
+
+type StatusesResponse struct {
+	Data []StatusData `json:"data"`
+}
+
+func (c *Client) ListStatuses() ([]Status, error) {
+	url := fmt.Sprintf("%s/statuses", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response StatusesResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	statuses := make([]Status, 0, len(response.Data))
+	for _, data := range response.Data {
+		statuses = append(statuses, Status{
+			ID:      data.ID,
+			Name:    data.Attributes.Name,
+			Slug:    data.Attributes.Slug,
+			Enabled: data.Attributes.Enabled,
+		})
+	}
+
+	return statuses, nil
 }
 
 // Incident represents a Rootly incident
@@ -625,12 +680,27 @@ type CreateWebhookEndpointAttributes struct {
 	SigningEnabled bool     `json:"signing_enabled"`
 }
 
-func (c *Client) CreateWebhookEndpoint(url string, events []string) (*WebhookEndpoint, error) {
+type UpdateWebhookEndpointRequest struct {
+	Data UpdateWebhookEndpointData `json:"data"`
+}
+
+type UpdateWebhookEndpointData struct {
+	Type       string                          `json:"type"`
+	Attributes UpdateWebhookEndpointAttributes `json:"attributes"`
+}
+
+type UpdateWebhookEndpointAttributes struct {
+	Name       string   `json:"name"`
+	EventTypes []string `json:"event_types"`
+	Enabled    bool     `json:"enabled"`
+}
+
+func (c *Client) CreateWebhookEndpoint(name, url string, events []string) (*WebhookEndpoint, error) {
 	request := CreateWebhookEndpointRequest{
 		Data: CreateWebhookEndpointData{
 			Type: "webhooks_endpoints",
 			Attributes: CreateWebhookEndpointAttributes{
-				Name:           "SuperPlane",
+				Name:           name,
 				URL:            url,
 				EventTypes:     events,
 				Enabled:        true,
@@ -667,4 +737,40 @@ func (c *Client) DeleteWebhookEndpoint(id string) error {
 	url := fmt.Sprintf("%s/webhooks/endpoints/%s", c.BaseURL, id)
 	_, err := c.execRequest(http.MethodDelete, url, nil)
 	return err
+}
+
+func (c *Client) UpdateWebhookEndpoint(id, name string, events []string) (*WebhookEndpoint, error) {
+	request := UpdateWebhookEndpointRequest{
+		Data: UpdateWebhookEndpointData{
+			Type: "webhooks_endpoints",
+			Attributes: UpdateWebhookEndpointAttributes{
+				Name:       name,
+				EventTypes: events,
+				Enabled:    true,
+			},
+		},
+	}
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	apiURL := fmt.Sprintf("%s/webhooks/endpoints/%s", c.BaseURL, id)
+	responseBody, err := c.execRequest(http.MethodPut, apiURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response WebhookEndpointResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &WebhookEndpoint{
+		ID:     response.Data.ID,
+		URL:    response.Data.Attributes.URL,
+		Secret: response.Data.Attributes.Secret,
+	}, nil
 }
