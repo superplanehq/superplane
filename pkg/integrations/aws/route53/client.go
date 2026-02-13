@@ -112,6 +112,57 @@ func (c *Client) ChangeResourceRecordSets(hostedZoneID, action string, recordSet
 	}, nil
 }
 
+// GetChange returns the current status of a change request.
+// changeID is the ID returned by ChangeResourceRecordSets (e.g. /change/C0123456789ABCDEF).
+func (c *Client) GetChange(changeID string) (*ChangeInfo, error) {
+	changeID = strings.TrimSpace(changeID)
+	if changeID == "" {
+		return nil, fmt.Errorf("change ID is required")
+	}
+	if !strings.HasPrefix(changeID, "/") {
+		changeID = "/" + changeID
+	}
+	url := endpoint + changeID
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build get change request: %w", err)
+	}
+
+	if err := c.signRequest(req, []byte{}); err != nil {
+		return nil, err
+	}
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("get change request failed: %w", err)
+	}
+
+	body, err := io.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read get change response: %w", err)
+	}
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		if awsErr := parseError(body); awsErr != nil {
+			return nil, awsErr
+		}
+		return nil, fmt.Errorf("get change failed with %d: %s", res.StatusCode, string(body))
+	}
+
+	var response getChangeResponse
+	if err := xml.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("failed to decode get change response: %w", err)
+	}
+
+	return &ChangeInfo{
+		ID:          response.ChangeInfo.ID,
+		Status:      response.ChangeInfo.Status,
+		SubmittedAt: response.ChangeInfo.SubmittedAt,
+	}, nil
+}
+
 // ListHostedZones returns all hosted zones in the account.
 func (c *Client) ListHostedZones() ([]HostedZoneSummary, error) {
 	var zones []HostedZoneSummary
@@ -177,26 +228,37 @@ func (c *Client) signRequest(req *http.Request, payload []byte) error {
 	return c.signer.SignHTTP(context.Background(), *c.credentials, req, payloadHash, serviceName, region, time.Now())
 }
 
+// parseError extracts a user-facing error from Route53 API error responses.
+// It handles both the standard ErrorResponse > Error > Code/Message format and
+// the InvalidChangeBatch format (root <InvalidChangeBatch> with <Messages><Message>).
 func parseError(body []byte) *common.Error {
-	var payload struct {
+	// Standard ErrorResponse format (e.g. AccessDenied, InvalidInput).
+	var errResp struct {
 		Error struct {
 			Code    string `xml:"Code"`
 			Message string `xml:"Message"`
 		} `xml:"Error"`
 	}
-
-	if err := xml.Unmarshal(body, &payload); err != nil {
-		return nil
+	if err := xml.Unmarshal(body, &errResp); err == nil && (errResp.Error.Code != "" || errResp.Error.Message != "") {
+		return &common.Error{
+			Code:    strings.TrimSpace(errResp.Error.Code),
+			Message: strings.TrimSpace(errResp.Error.Message),
+		}
 	}
 
-	if payload.Error.Code == "" && payload.Error.Message == "" {
-		return nil
+	// InvalidChangeBatch format (e.g. "RRSet with DNS name X is not permitted in zone Y").
+	var invalidBatch struct {
+		Messages []string `xml:"Messages>Message"`
+	}
+	if err := xml.Unmarshal(body, &invalidBatch); err == nil && len(invalidBatch.Messages) > 0 {
+		msg := strings.TrimSpace(strings.Join(invalidBatch.Messages, "; "))
+		return &common.Error{
+			Code:    "InvalidChangeBatch",
+			Message: msg,
+		}
 	}
 
-	return &common.Error{
-		Code:    strings.TrimSpace(payload.Error.Code),
-		Message: strings.TrimSpace(payload.Error.Message),
-	}
+	return nil
 }
 
 /*
@@ -261,4 +323,10 @@ type listHostedZonesResponse struct {
 type xmlHostedZone struct {
 	ID   string `xml:"Id"`
 	Name string `xml:"Name"`
+}
+
+// XML response type for GetChange.
+type getChangeResponse struct {
+	XMLName    xml.Name      `xml:"GetChangeResponse"`
+	ChangeInfo xmlChangeInfo `xml:"ChangeInfo"`
 }

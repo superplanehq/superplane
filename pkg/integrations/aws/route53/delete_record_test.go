@@ -109,12 +109,66 @@ func TestDeleteRecord_Execute(t *testing.T) {
 		require.Contains(t, err.Error(), "credentials")
 	})
 
-	t.Run("success -> emits record change", func(t *testing.T) {
+	t.Run("status PENDING -> schedules poll and does not emit", func(t *testing.T) {
 		xmlResponse := `<?xml version="1.0" encoding="UTF-8"?>
 <ChangeResourceRecordSetsResponse xmlns="https://route53.amazonaws.com/doc/2013-04-01/">
   <ChangeInfo>
     <Id>/change/C5555555555</Id>
     <Status>PENDING</Status>
+    <SubmittedAt>2026-02-13T15:00:00.000Z</SubmittedAt>
+  </ChangeInfo>
+</ChangeResourceRecordSetsResponse>`
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(xmlResponse)),
+				},
+			},
+		}
+
+		metadata := &contexts.MetadataContext{}
+		requests := &contexts.RequestContext{}
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"hostedZoneId": "Z123",
+				"recordName":   "old.example.com",
+				"recordType":   "A",
+				"ttl":          300,
+				"values":       []string{"1.2.3.4"},
+			},
+			ExecutionState: execState,
+			HTTP:           httpContext,
+			Metadata:       metadata,
+			Requests:       requests,
+			Integration: &contexts.IntegrationContext{
+				Secrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, execState.Payloads, 0, "should not emit until INSYNC")
+		assert.Equal(t, pollChangeActionName, requests.Action)
+		assert.Equal(t, pollInterval, requests.Duration)
+		stored, ok := metadata.Metadata.(RecordChangePollMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "/change/C5555555555", stored.ChangeID)
+		assert.Equal(t, "old.example.com", stored.RecordName)
+		assert.Equal(t, "A", stored.RecordType)
+	})
+
+	t.Run("status INSYNC -> emits record change immediately", func(t *testing.T) {
+		xmlResponse := `<?xml version="1.0" encoding="UTF-8"?>
+<ChangeResourceRecordSetsResponse xmlns="https://route53.amazonaws.com/doc/2013-04-01/">
+  <ChangeInfo>
+    <Id>/change/C5555555555</Id>
+    <Status>INSYNC</Status>
     <SubmittedAt>2026-02-13T15:00:00.000Z</SubmittedAt>
   </ChangeInfo>
 </ChangeResourceRecordSetsResponse>`
@@ -152,12 +206,11 @@ func TestDeleteRecord_Execute(t *testing.T) {
 		require.Len(t, execState.Payloads, 1)
 		require.True(t, execState.Passed)
 		require.Equal(t, "aws.route53.record", execState.Type)
-
 		payload := execState.Payloads[0].(map[string]any)
 		data, ok := payload["data"].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "/change/C5555555555", data["changeId"])
-		assert.Equal(t, "PENDING", data["status"])
+		assert.Equal(t, "INSYNC", data["status"])
 		assert.Equal(t, "old.example.com", data["recordName"])
 		assert.Equal(t, "A", data["recordType"])
 	})
