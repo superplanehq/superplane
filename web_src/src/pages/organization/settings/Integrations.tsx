@@ -279,7 +279,9 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                           >
                             {statusLabel}
                           </span>
-                          <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{integrationDisplayName}</p>
+                          <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
+                            {integrationDisplayName}
+                          </p>
                           <div className="ml-auto flex items-center gap-4">
                             <PermissionTooltip
                               allowed={canUpdateIntegrations || permissionsLoading}
