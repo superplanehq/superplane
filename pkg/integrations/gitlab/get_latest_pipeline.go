@@ -40,11 +40,7 @@ func (c *GetLatestPipeline) Documentation() string {
 ## Configuration
 
 - **Project** (required): The GitLab project to query
-- **Ref** (optional): Branch or tag to scope the latest pipeline search
-
-## Output
-
-Returns pipeline data for the latest matching pipeline.`
+- **Ref** (optional): Branch or tag to scope the latest pipeline search`
 }
 
 func (c *GetLatestPipeline) Icon() string {

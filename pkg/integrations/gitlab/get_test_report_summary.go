@@ -19,8 +19,8 @@ var exampleOutputGetTestReportSummary []byte
 type GetTestReportSummary struct{}
 
 type GetTestReportSummaryConfiguration struct {
-	Project    string `json:"project" mapstructure:"project"`
-	PipelineID string `json:"pipelineId" mapstructure:"pipelineId"`
+	Project  string `json:"project" mapstructure:"project"`
+	Pipeline string `json:"pipeline" mapstructure:"pipeline"`
 }
 
 func (c *GetTestReportSummary) Name() string {
@@ -41,11 +41,7 @@ func (c *GetTestReportSummary) Documentation() string {
 ## Configuration
 
 - **Project** (required): The GitLab project containing the pipeline
-- **Pipeline** (required): Select a pipeline from the selected project
-
-## Output
-
-Returns aggregate test statistics and per-suite summary data for the pipeline.`
+- **Pipeline** (required): Select a pipeline from the selected project`
 }
 
 func (c *GetTestReportSummary) Icon() string {
@@ -82,7 +78,7 @@ func (c *GetTestReportSummary) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "pipelineId",
+			Name:     "pipeline",
 			Label:    "Pipeline",
 			Type:     configuration.FieldTypeIntegrationResource,
 			Required: true,
@@ -107,12 +103,8 @@ func (c *GetTestReportSummary) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if config.PipelineID == "" {
-		return fmt.Errorf("pipeline ID is required")
-	}
-
-	if _, err := strconv.Atoi(config.PipelineID); err != nil {
-		return fmt.Errorf("pipeline ID must be a number")
+	if config.Pipeline == "" {
+		return fmt.Errorf("pipeline is required")
 	}
 
 	return ensureProjectInMetadata(ctx.Metadata, ctx.Integration, config.Project)
@@ -124,9 +116,9 @@ func (c *GetTestReportSummary) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	pipelineID, err := strconv.Atoi(config.PipelineID)
+	p, err := strconv.ParseFloat(config.Pipeline, 64)
 	if err != nil {
-		return fmt.Errorf("pipeline ID must be a number")
+		return fmt.Errorf("pipeline ID must be a number: %v", err)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -134,7 +126,7 @@ func (c *GetTestReportSummary) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	summary, err := client.GetPipelineTestReportSummary(config.Project, pipelineID)
+	summary, err := client.GetPipelineTestReportSummary(config.Project, int(p))
 	if err != nil {
 		return fmt.Errorf("failed to get test report summary: %w", err)
 	}

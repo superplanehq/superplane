@@ -19,8 +19,8 @@ var exampleOutputGetPipeline []byte
 type GetPipeline struct{}
 
 type GetPipelineConfiguration struct {
-	Project    string `json:"project" mapstructure:"project"`
-	PipelineID string `json:"pipelineId" mapstructure:"pipelineId"`
+	Project  string `json:"project" mapstructure:"project"`
+	Pipeline string `json:"pipeline" mapstructure:"pipeline"`
 }
 
 func (c *GetPipeline) Name() string {
@@ -32,7 +32,7 @@ func (c *GetPipeline) Label() string {
 }
 
 func (c *GetPipeline) Description() string {
-	return "Get a GitLab pipeline by ID"
+	return "Get a GitLab pipeline"
 }
 
 func (c *GetPipeline) Documentation() string {
@@ -82,7 +82,7 @@ func (c *GetPipeline) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "pipelineId",
+			Name:     "pipeline",
 			Label:    "Pipeline",
 			Type:     configuration.FieldTypeIntegrationResource,
 			Required: true,
@@ -107,12 +107,8 @@ func (c *GetPipeline) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if config.PipelineID == "" {
-		return fmt.Errorf("pipeline ID is required")
-	}
-
-	if _, err := strconv.Atoi(config.PipelineID); err != nil {
-		return fmt.Errorf("pipeline ID must be a number")
+	if config.Pipeline == "" {
+		return fmt.Errorf("pipeline is required")
 	}
 
 	return ensureProjectInMetadata(ctx.Metadata, ctx.Integration, config.Project)
@@ -124,9 +120,9 @@ func (c *GetPipeline) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	pipelineID, err := strconv.Atoi(config.PipelineID)
+	p, err := strconv.ParseFloat(config.Pipeline, 64)
 	if err != nil {
-		return fmt.Errorf("pipeline ID must be a number")
+		return fmt.Errorf("pipeline ID must be a number: %v", err)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -134,7 +130,7 @@ func (c *GetPipeline) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	pipeline, err := client.GetPipeline(config.Project, pipelineID)
+	pipeline, err := client.GetPipeline(config.Project, int(p))
 	if err != nil {
 		return fmt.Errorf("failed to get pipeline: %w", err)
 	}
