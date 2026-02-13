@@ -17,6 +17,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Create Event" href="#create-event" description="Add a timeline event to a Rootly incident" />
   <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in Rootly" />
+  <LinkCard title="Get Incident" href="#get-incident" description="Retrieve a single incident from Rootly by ID" />
   <LinkCard title="Update Incident" href="#update-incident" description="Update an existing incident in Rootly" />
 </CardGrid>
 
@@ -153,6 +154,59 @@ Returns the created incident object including:
     "status": "started",
     "summary": "Users are experiencing slow database queries and connection timeouts.",
     "title": "Database connection issues",
+    "url": "https://app.rootly.com/incidents/abc123-def456"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "rootly.incident"
+}
+```
+
+<a id="get-incident"></a>
+
+## Get Incident
+
+The Get Incident component retrieves a single incident from Rootly by its ID.
+
+### Use Cases
+
+- **Incident enrichment**: Fetch current incident details to use in downstream workflow steps
+- **Status checks**: Check the current status of an incident before taking action
+- **Data retrieval**: Pull incident information for reporting or notifications
+
+### Configuration
+
+- **Incident ID**: The UUID of the incident to retrieve (required, supports expressions)
+
+### Output
+
+Returns the incident object including:
+- **id**: Incident UUID
+- **sequential_id**: Sequential incident number
+- **title**: Incident title
+- **slug**: URL-friendly slug
+- **summary**: Incident summary
+- **status**: Current incident status
+- **severity**: Incident severity level
+- **started_at**: When the incident started
+- **mitigated_at**: When the incident was mitigated
+- **resolved_at**: When the incident was resolved
+- **updated_at**: Last update timestamp
+- **url**: Link to the incident in Rootly
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "abc123-def456",
+    "sequential_id": 42,
+    "title": "Database connection issues",
+    "slug": "database-connection-issues",
+    "summary": "Users are experiencing slow database queries and connection timeouts.",
+    "status": "started",
+    "severity": "sev1",
+    "started_at": "2026-01-19T12:00:00Z",
+    "updated_at": "2026-01-19T12:00:00Z",
     "url": "https://app.rootly.com/incidents/abc123-def456"
   },
   "timestamp": "2026-01-19T12:00:00Z",

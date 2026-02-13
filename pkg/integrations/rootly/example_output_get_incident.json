@@ -1,0 +1,16 @@
+{
+    "type": "rootly.incident",
+    "data": {
+        "id": "abc123-def456",
+        "sequential_id": 42,
+        "title": "Database connection issues",
+        "slug": "database-connection-issues",
+        "summary": "Users are experiencing slow database queries and connection timeouts.",
+        "status": "started",
+        "severity": "sev1",
+        "started_at": "2026-01-19T12:00:00Z",
+        "updated_at": "2026-01-19T12:00:00Z",
+        "url": "https://app.rootly.com/incidents/abc123-def456"
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}
