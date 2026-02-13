@@ -1667,7 +1667,18 @@ export function WorkflowPageV2() {
       // Save snapshot before making changes
       saveWorkflowSnapshot(canvas);
 
-      const { buildingBlock, configuration, position, sourceConnection, integrationRef } = newNodeData;
+      let { buildingBlock, configuration, position, sourceConnection, integrationRef } = newNodeData;
+
+      // For integration components/triggers, use first connected integration if none selected
+      if (buildingBlock.integrationName && !integrationRef?.id) {
+        const firstIntegration = integrations.find((i) => i.spec?.integrationName === buildingBlock.integrationName);
+        if (firstIntegration?.metadata?.id) {
+          integrationRef = {
+            id: firstIntegration.metadata.id,
+            name: firstIntegration.metadata.name,
+          };
+        }
+      }
 
       // Filter configuration to only include visible fields
       const filteredConfiguration = filterVisibleConfiguration(configuration, buildingBlock.configuration || []);
@@ -1759,6 +1770,7 @@ export function WorkflowPageV2() {
       organizationId,
       canvasId,
       queryClient,
+      integrations,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
       canAutoSave,
@@ -1885,6 +1897,18 @@ export function WorkflowPageV2() {
         updatedNode.blueprint = { id: data.buildingBlock.id };
       }
 
+      // For integration components/triggers, set the integration ref (required for validation)
+      const integrationName = data.buildingBlock.integrationName;
+      if (integrationName) {
+        const firstIntegration = integrations.find((i) => i.spec?.integrationName === integrationName);
+        if (firstIntegration?.metadata?.id) {
+          updatedNode.integration = {
+            id: firstIntegration.metadata.id,
+            name: firstIntegration.metadata.name,
+          };
+        }
+      }
+
       const updatedNodes = [...(canvas.spec?.nodes || [])];
       updatedNodes[nodeIndex] = updatedNode;
 
@@ -1936,6 +1960,7 @@ export function WorkflowPageV2() {
       organizationId,
       canvasId,
       queryClient,
+      integrations,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
       canAutoSave,
