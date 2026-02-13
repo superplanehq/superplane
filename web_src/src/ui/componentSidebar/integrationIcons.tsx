@@ -13,6 +13,7 @@ import discordIcon from "@/assets/icons/integrations/discord.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
+import linearIcon from "@/assets/icons/integrations/linear.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
@@ -38,6 +39,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   github: githubIcon,
   gitlab: gitlabIcon,
   jira: jiraIcon,
+  linear: linearIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
   claude: claudeIcon,
@@ -64,6 +66,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   github: githubIcon,
   gitlab: gitlabIcon,
   jira: jiraIcon,
+  linear: linearIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
   claude: claudeIcon,
