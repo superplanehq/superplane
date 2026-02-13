@@ -11,7 +11,7 @@ import {
 } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
-import { StatuspageIncident } from "./types";
+import { StatuspageIncident, StatuspageNodeMetadata } from "./types";
 import { formatTimeAgo } from "@/utils/date";
 import { baseEventSections, getDetailsForIncident } from "./utils";
 
@@ -60,12 +60,11 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     page?: string;
     incident?: string;
   };
+  const nodeMetadata = node.metadata as StatuspageNodeMetadata | undefined;
 
-  if (configuration?.page) {
-    metadata.push({ icon: "globe", label: "Page: " + configuration.page });
-  }
-  if (configuration?.incident) {
-    metadata.push({ icon: "activity", label: "Incident: " + configuration.incident });
+  const pageLabel = nodeMetadata?.pageName || configuration?.page;
+  if (pageLabel) {
+    metadata.push({ icon: "globe", label: "Page: " + pageLabel });
   }
 
   return metadata;

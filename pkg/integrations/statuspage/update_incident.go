@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -15,13 +16,14 @@ type UpdateIncident struct{}
 
 // UpdateIncidentSpec is the strongly typed configuration for the Update Incident component.
 type UpdateIncidentSpec struct {
-	Page            string   `mapstructure:"page"`
-	Incident        string   `mapstructure:"incident"`
-	Status          string   `mapstructure:"status"`
-	Body            string   `mapstructure:"body"`
-	ImpactOverride  string   `mapstructure:"impactOverride"`
-	ComponentIDs    []string `mapstructure:"componentIds"`
-	ComponentStatus string   `mapstructure:"componentStatus"`
+	Page                 string   `json:"page"`
+	Incident             string   `json:"incident"`
+	Status               string   `json:"status"`
+	Body                 string   `json:"body"`
+	ImpactOverride       string   `json:"impactOverride"`
+	ComponentIDs         []string `json:"componentIds"`
+	ComponentStatus      string   `json:"componentStatus"`
+	DeliverNotifications *bool    `json:"deliverNotifications,omitempty"`
 }
 
 func (c *UpdateIncident) Name() string {
@@ -54,8 +56,9 @@ func (c *UpdateIncident) Documentation() string {
 - **Impact override** (optional): Override displayed severity (none, maintenance, minor, major, critical)
 - **Components** (optional): Components to associate with this update
 - **Component status** (optional): Status to set for selected components
+- **Deliver notifications** (optional): Whether to send notifications for this update (default: true)
 
-At least one of Status, Body, or Impact override must be provided.
+At least one of Status, Body, Impact override, or Components must be provided.
 
 ## Output
 
@@ -203,6 +206,14 @@ func (c *UpdateIncident) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "deliverNotifications",
+			Label:       "Deliver notifications",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     true,
+			Description: "Send notifications for this update (default: true)",
+		},
 	}
 }
 
@@ -230,7 +241,23 @@ func (c *UpdateIncident) Setup(ctx core.SetupContext) error {
 		return errors.New("at least one of status, body, impact override, or components must be provided")
 	}
 
-	return nil
+	// Resolve page name for metadata when Page is a static ID (no expression)
+	metadata := NodeMetadata{}
+	if spec.Page != "" && !strings.Contains(spec.Page, "{{") {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err == nil {
+			pages, err := client.ListPages()
+			if err == nil {
+				for _, p := range pages {
+					if p.ID == spec.Page {
+						metadata.PageName = p.Name
+						break
+					}
+				}
+			}
+		}
+	}
+	return ctx.Metadata.Set(metadata)
 }
 
 func (c *UpdateIncident) Execute(ctx core.ExecutionContext) error {
@@ -260,11 +287,12 @@ func (c *UpdateIncident) Execute(ctx core.ExecutionContext) error {
 	}
 
 	req := UpdateIncidentRequest{
-		Status:         spec.Status,
-		Body:           spec.Body,
-		ImpactOverride: impactOverride,
-		ComponentIDs:   spec.ComponentIDs,
-		Components:     components,
+		Status:               spec.Status,
+		Body:                 spec.Body,
+		ImpactOverride:       impactOverride,
+		ComponentIDs:         spec.ComponentIDs,
+		Components:           components,
+		DeliverNotifications: spec.DeliverNotifications,
 	}
 
 	incident, err := client.UpdateIncident(spec.Page, spec.Incident, req)

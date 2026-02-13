@@ -132,6 +132,34 @@ func Test__CreateIncident__Setup(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incidentType must be realtime or scheduled")
 	})
+
+	t.Run("scheduled with scheduledFor after scheduledUntil returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"page":           "kctbh9vrtdwd",
+				"incidentType":   "scheduled",
+				"name":           "Scheduled Maintenance",
+				"scheduledFor":   "2026-02-15T06:00",
+				"scheduledUntil": "2026-02-15T04:00",
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "scheduledFor must be before scheduledUntil")
+	})
+
+	t.Run("scheduled with equal scheduledFor and scheduledUntil returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"page":           "kctbh9vrtdwd",
+				"incidentType":   "scheduled",
+				"name":           "Scheduled Maintenance",
+				"scheduledFor":   "2026-02-15T04:00",
+				"scheduledUntil": "2026-02-15T04:00",
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "scheduledFor must be before scheduledUntil")
+	})
 }
 
 func Test__CreateIncident__Execute(t *testing.T) {

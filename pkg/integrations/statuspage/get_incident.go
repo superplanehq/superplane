@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -15,8 +16,8 @@ type GetIncident struct{}
 
 // GetIncidentSpec is the strongly typed configuration for the Get Incident component.
 type GetIncidentSpec struct {
-	Page     string `mapstructure:"page"`
-	Incident string `mapstructure:"incident"`
+	Page     string `json:"page"`
+	Incident string `json:"incident"`
 }
 
 func (c *GetIncident) Name() string {
@@ -126,7 +127,23 @@ func (c *GetIncident) Setup(ctx core.SetupContext) error {
 		return errors.New("incident is required")
 	}
 
-	return nil
+	// Resolve page name for metadata when Page is a static ID (no expression)
+	metadata := NodeMetadata{}
+	if spec.Page != "" && !strings.Contains(spec.Page, "{{") {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err == nil {
+			pages, err := client.ListPages()
+			if err == nil {
+				for _, p := range pages {
+					if p.ID == spec.Page {
+						metadata.PageName = p.Name
+						break
+					}
+				}
+			}
+		}
+	}
+	return ctx.Metadata.Set(metadata)
 }
 
 func (c *GetIncident) Execute(ctx core.ExecutionContext) error {

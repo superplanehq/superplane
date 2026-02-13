@@ -18,21 +18,37 @@ type CreateIncident struct{}
 // CreateIncidentSpec is the strongly typed configuration for the Create Incident component.
 // Conditionally visible fields use pointers so they can be nil when not shown.
 type CreateIncidentSpec struct {
-	Page                    string   `mapstructure:"page"`
-	IncidentType            string   `mapstructure:"incidentType"`
-	Name                    string   `mapstructure:"name"`
-	Body                    string   `mapstructure:"body"`
-	Status                  string   `mapstructure:"status"`
-	ImpactOverride          string   `mapstructure:"impactOverride"`
-	ComponentIDs            []string `mapstructure:"componentIds"`
-	ComponentStatus         string   `mapstructure:"componentStatus"`
-	ScheduledFor            string   `mapstructure:"scheduledFor"`
-	ScheduledUntil          string   `mapstructure:"scheduledUntil"`
-	ScheduledTimezone       string   `mapstructure:"scheduledTimezone"`
-	ScheduledRemindPrior    bool     `mapstructure:"scheduledRemindPrior"`
-	ScheduledAutoInProgress bool     `mapstructure:"scheduledAutoInProgress"`
-	ScheduledAutoCompleted  bool     `mapstructure:"scheduledAutoCompleted"`
-	DeliverNotifications    *bool    `mapstructure:"deliverNotifications"`
+	Page                    string   `json:"page"`
+	IncidentType            string   `json:"incidentType"`
+	Name                    string   `json:"name"`
+	Body                    string   `json:"body"`
+	Status                  *string  `json:"status,omitempty"`
+	ImpactOverride          *string  `json:"impactOverride,omitempty"`
+	ComponentIDs            []string `json:"componentIds"`
+	ComponentStatus         string   `json:"componentStatus"`
+	ScheduledFor            *string  `json:"scheduledFor,omitempty"`
+	ScheduledUntil          *string  `json:"scheduledUntil,omitempty"`
+	ScheduledTimezone       *string  `json:"scheduledTimezone,omitempty"`
+	ScheduledRemindPrior    *bool    `json:"scheduledRemindPrior,omitempty"`
+	ScheduledAutoInProgress *bool    `json:"scheduledAutoInProgress,omitempty"`
+	ScheduledAutoCompleted  *bool    `json:"scheduledAutoCompleted,omitempty"`
+	DeliverNotifications    *bool    `json:"deliverNotifications,omitempty"`
+}
+
+// derefStr safely dereferences a *string, returning "" if nil.
+func derefStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+// derefBool safely dereferences a *bool, returning false if nil.
+func derefBool(b *bool) bool {
+	if b == nil {
+		return false
+	}
+	return *b
 }
 
 func (c *CreateIncident) Name() string {
@@ -355,11 +371,22 @@ func (c *CreateIncident) Setup(ctx core.SetupContext) error {
 	}
 
 	if spec.IncidentType == "scheduled" {
-		if spec.ScheduledFor == "" {
+		if spec.ScheduledFor == nil || *spec.ScheduledFor == "" {
 			return errors.New("scheduledFor is required for scheduled incidents")
 		}
-		if spec.ScheduledUntil == "" {
+		if spec.ScheduledUntil == nil || *spec.ScheduledUntil == "" {
 			return errors.New("scheduledUntil is required for scheduled incidents")
+		}
+
+		// Validate scheduledFor is before scheduledUntil
+		tz := "UTC"
+		if spec.ScheduledTimezone != nil && *spec.ScheduledTimezone != "" {
+			tz = *spec.ScheduledTimezone
+		}
+		parsedFor, errFor := toUTCISO8601(derefStr(spec.ScheduledFor), tz)
+		parsedUntil, errUntil := toUTCISO8601(derefStr(spec.ScheduledUntil), tz)
+		if errFor == nil && errUntil == nil && parsedFor >= parsedUntil {
+			return errors.New("scheduledFor must be before scheduledUntil")
 		}
 	}
 
@@ -419,32 +446,29 @@ func (c *CreateIncident) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if spec.IncidentType == "realtime" {
-		req.Status = spec.Status
+		req.Status = derefStr(spec.Status)
 		if req.Status == "" {
 			req.Status = "investigating"
 		}
-		req.ImpactOverride = spec.ImpactOverride
-		if req.ImpactOverride == "" {
-			req.ImpactOverride = "major"
-		}
+		req.ImpactOverride = derefStr(spec.ImpactOverride)
 	} else {
-		tz := spec.ScheduledTimezone
+		tz := derefStr(spec.ScheduledTimezone)
 		if tz == "" {
 			tz = "UTC"
 		}
-		scheduledFor, err := toUTCISO8601(spec.ScheduledFor, tz)
+		scheduledFor, err := toUTCISO8601(derefStr(spec.ScheduledFor), tz)
 		if err != nil {
 			return fmt.Errorf("invalid scheduledFor: %w", err)
 		}
-		scheduledUntil, err := toUTCISO8601(spec.ScheduledUntil, tz)
+		scheduledUntil, err := toUTCISO8601(derefStr(spec.ScheduledUntil), tz)
 		if err != nil {
 			return fmt.Errorf("invalid scheduledUntil: %w", err)
 		}
 		req.ScheduledFor = scheduledFor
 		req.ScheduledUntil = scheduledUntil
-		req.ScheduledRemindPrior = spec.ScheduledRemindPrior
-		req.ScheduledAutoInProgress = spec.ScheduledAutoInProgress
-		req.ScheduledAutoCompleted = spec.ScheduledAutoCompleted
+		req.ScheduledRemindPrior = derefBool(spec.ScheduledRemindPrior)
+		req.ScheduledAutoInProgress = derefBool(spec.ScheduledAutoInProgress)
+		req.ScheduledAutoCompleted = derefBool(spec.ScheduledAutoCompleted)
 	}
 
 	incident, err := client.CreateIncident(spec.Page, req)

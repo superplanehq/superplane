@@ -11,7 +11,7 @@ import {
 } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
-import { StatuspageIncident } from "./types";
+import { StatuspageIncident, StatuspageNodeMetadata } from "./types";
 import { formatTimeAgo } from "@/utils/date";
 import { baseEventSections, getDetailsForIncident } from "./utils";
 
@@ -60,24 +60,15 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     page?: string;
     incident?: string;
     status?: string;
-    body?: string;
-    impactOverride?: string;
   };
+  const nodeMetadata = node.metadata as StatuspageNodeMetadata | undefined;
 
-  if (configuration?.page) {
-    metadata.push({ icon: "globe", label: "Page: " + configuration.page });
-  }
-  if (configuration?.incident) {
-    metadata.push({ icon: "activity", label: "Incident: " + configuration.incident });
+  const pageLabel = nodeMetadata?.pageName || configuration?.page;
+  if (pageLabel) {
+    metadata.push({ icon: "globe", label: "Page: " + pageLabel });
   }
   if (configuration?.status) {
     metadata.push({ icon: "arrow-right-circle", label: "Status: " + configuration.status });
-  }
-  if (configuration?.impactOverride) {
-    metadata.push({ icon: "alert-triangle", label: "Impact: " + configuration.impactOverride });
-  }
-  if (!configuration?.status && configuration?.body) {
-    metadata.push({ icon: "message-square", label: "Message updated" });
   }
 
   return metadata;

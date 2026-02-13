@@ -222,11 +222,12 @@ func (c *Client) ListIncidents(pageID string, q string, limit int) ([]Incident, 
 
 // UpdateIncidentRequest holds the payload for PATCH /pages/{page_id}/incidents/{incident_id}.
 type UpdateIncidentRequest struct {
-	Status         string            `json:"status,omitempty"`
-	Body           string            `json:"body,omitempty"`
-	ImpactOverride string            `json:"impact_override,omitempty"`
-	ComponentIDs   []string          `json:"component_ids,omitempty"`
-	Components     map[string]string `json:"components,omitempty"`
+	Status               string            `json:"status,omitempty"`
+	Body                 string            `json:"body,omitempty"`
+	ImpactOverride       string            `json:"impact_override,omitempty"`
+	ComponentIDs         []string          `json:"component_ids,omitempty"`
+	Components           map[string]string `json:"components,omitempty"`
+	DeliverNotifications *bool             `json:"deliver_notifications,omitempty"`
 }
 
 // UpdateIncident updates an incident and returns the full response as map[string]any.
@@ -250,6 +251,9 @@ func (c *Client) UpdateIncident(pageID, incidentID string, req UpdateIncidentReq
 	}
 	if len(req.Components) > 0 {
 		payload["components"] = req.Components
+	}
+	if req.DeliverNotifications != nil {
+		payload["deliver_notifications"] = *req.DeliverNotifications
 	}
 
 	body := map[string]any{"incident": payload}
