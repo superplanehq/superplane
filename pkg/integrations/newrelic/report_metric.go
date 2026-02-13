@@ -16,13 +16,15 @@ const ReportMetricPayloadType = "newrelic.metric"
 type ReportMetric struct{}
 
 type ReportMetricSpec struct {
-	MetricName string         `json:"metricName" yaml:"metricName"`
-	MetricType string         `json:"metricType" yaml:"metricType"`
-	Value      float64        `json:"value" yaml:"value"`
-	Timestamp  int64          `json:"timestamp" yaml:"timestamp"`
-	IntervalMs int64          `json:"intervalMs" yaml:"intervalMs"`
-	Attributes map[string]any `json:"attributes" yaml:"attributes"`
+	MetricName string         `json:"metricName" yaml:"metricName" mapstructure:"metricName"`
+	MetricType string         `json:"metricType" yaml:"metricType" mapstructure:"metricType"`
+	Value      float64        `json:"value" yaml:"value" mapstructure:"value"`
+	Timestamp  int64          `json:"timestamp" yaml:"timestamp" mapstructure:"timestamp"`
+	IntervalMs int64          `json:"intervalMs" yaml:"intervalMs" mapstructure:"intervalMs"`
+	Attributes map[string]any `json:"attributes" yaml:"attributes" mapstructure:"attributes"`
 }
+
+
 
 func (c *ReportMetric) Name() string {
 	return "newrelic.reportMetric"
@@ -65,8 +67,6 @@ func (c *ReportMetric) Color() string {
 func (c *ReportMetric) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
-
-
 
 func (c *ReportMetric) Configuration() []configuration.Field {
 	return []configuration.Field{
@@ -194,20 +194,20 @@ func (c *ReportMetric) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to report metric: %v", err)
 	}
 
-    output := map[string]any{
-        "name":      metric.Name,
-        "value":     metric.Value,
-        "type":      metric.Type,
-        "timestamp": metric.Timestamp,
-        "intervalMs": metric.IntervalMs,
-        "status":    "202 Accepted",
-    }
+	output := map[string]any{
+		"name":       metric.Name,
+		"value":      metric.Value,
+		"type":       metric.Type,
+		"timestamp":  metric.Timestamp,
+		"intervalMs": metric.IntervalMs,
+		"status":     "202 Accepted",
+	}
 
-    return ctx.ExecutionState.Emit(
-        core.DefaultOutputChannel.Name,
-        ReportMetricPayloadType,
-        []any{output},
-    )
+	return ctx.ExecutionState.Emit(
+		core.DefaultOutputChannel.Name,
+		ReportMetricPayloadType,
+		[]any{output},
+	)
 }
 
 func (c *ReportMetric) Cancel(ctx core.ExecutionContext) error {
