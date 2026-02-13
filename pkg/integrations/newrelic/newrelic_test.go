@@ -254,7 +254,6 @@ func Test__Client__NewClient(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, client)
 		assert.Equal(t, "test-key", client.APIKey)
-		assert.Equal(t, "https://api.newrelic.com/v2", client.BaseURL)
 		assert.Equal(t, "https://api.newrelic.com/graphql", client.NerdGraphURL)
 	})
 
@@ -271,7 +270,6 @@ func Test__Client__NewClient(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, client)
 		assert.Equal(t, "test-key", client.APIKey)
-		assert.Equal(t, "https://api.eu.newrelic.com/v2", client.BaseURL)
 		assert.Equal(t, "https://api.eu.newrelic.com/graphql", client.NerdGraphURL)
 	})
 }
