@@ -78,6 +78,12 @@ type ConnectionRetryState struct {
 	IntervalSeconds int `json:"intervalSeconds" mapstructure:"intervalSeconds"` // seconds between attempts
 }
 
+type ConnectionRetryState struct {
+	Attempt         int `json:"attempt" mapstructure:"attempt"`                 // retries done so far (1 = first retry)
+	MaxRetries      int `json:"maxRetries" mapstructure:"maxRetries"`           // max retries from config
+	IntervalSeconds int `json:"intervalSeconds" mapstructure:"intervalSeconds"` // seconds between attempts
+}
+
 func (c *SSHCommand) Name() string  { return "ssh" }
 func (c *SSHCommand) Label() string { return "SSH Command" }
 func (c *SSHCommand) Description() string {
@@ -333,116 +339,58 @@ func (c *SSHCommand) Setup(ctx core.SetupContext) error {
 }
 
 func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
-	spec := Spec{}
-	err := mapstructure.Decode(ctx.Configuration, &spec)
-	if err != nil {
-		return err
-	}
-
-	metadata := ExecutionMetadata{
-		Host:             spec.Host,
-		Port:             spec.Port,
-		User:             spec.User,
-		Command:          spec.Command,
-		WorkingDirectory: spec.WorkingDirectory,
-		Timeout:          spec.Timeout,
-		ConnectionRetry:  spec.ConnectionRetry,
-		Attempt:          0,
-		MaxRetries:       spec.ConnectionRetry.Retries,
-		IntervalSeconds:  spec.ConnectionRetry.IntervalSeconds,
-		Authentication:   spec.Authentication,
-	}
-
-	err = ctx.Metadata.Set(metadata)
-	if err != nil {
-		return err
-	}
-
-	execCtx := ExecuteSSHContext{
-		secretsCtx:   ctx.Secrets,
-		requestsCtx:  ctx.Requests,
-		stateCtx:     ctx.ExecutionState,
-		metadataCtx:  ctx.Metadata,
-		execMetadata: metadata,
-	}
-
-	return c.executeSSH(execCtx)
+	return c.executeSSH(ctx.Configuration, ctx.Secrets, ctx.Metadata, ctx.Requests, ctx.ExecutionState)
 }
 
 func (c *SSHCommand) HandleAction(ctx core.ActionContext) error {
 	if ctx.Name == "connectionRetry" {
-		if ctx.ExecutionState.IsFinished() {
-			return nil
-		}
-
-		metadata := ExecutionMetadata{}
-		err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
-		if err != nil {
-			return err
-		}
-
-		execCtx := ExecuteSSHContext{
-			secretsCtx:   ctx.Secrets,
-			requestsCtx:  ctx.Requests,
-			stateCtx:     ctx.ExecutionState,
-			metadataCtx:  ctx.Metadata,
-			execMetadata: metadata,
-		}
-
-		return c.executeSSH(execCtx)
+		return c.executeSSH(ctx.Configuration, ctx.Secrets, ctx.Metadata, ctx.Requests, ctx.ExecutionState)
 	}
 
 	return fmt.Errorf("unknown action: %s", ctx.Name)
 }
 
-type ExecuteSSHContext struct {
-	secretsCtx  core.SecretsContext
-	requestsCtx core.RequestContext
-	stateCtx    core.ExecutionStateContext
-	metadataCtx core.MetadataContext
+func (c *SSHCommand) executeSSH(config any, secrets core.SecretsContext, metadata core.MetadataContext, req core.RequestContext, state core.ExecutionStateContext) error {
+	spec, err := c.decodeSpec(config)
+	if err != nil {
+		return err
+	}
 
-	execMetadata ExecutionMetadata
-}
-
-func (c *SSHCommand) executeSSH(ctx ExecuteSSHContext) error {
-	client, err := c.createClient(ctx.secretsCtx, ctx.execMetadata)
+	client, err := c.createClient(secrets, spec)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
 
-	result, err := client.ExecuteCommand(ctx.execMetadata.Command, time.Duration(ctx.execMetadata.Timeout)*time.Second)
+	result, err := client.ExecuteCommand(spec.Command, time.Duration(spec.Timeout)*time.Second)
 	if c.isConnectError(err) {
-		if c.shouldRetry(ctx.execMetadata.ConnectionRetry, ctx.metadataCtx) {
-			err = c.incrementRetryCount(ctx.metadataCtx)
+		if c.shouldRetry(spec.ConnectionRetry, metadata) {
+			err = c.incrementRetryCount(metadata)
 			if err != nil {
 				return err
 			}
 
-			return ctx.requestsCtx.ScheduleActionCall("connectionRetry", map[string]any{}, time.Duration(ctx.execMetadata.ConnectionRetry.IntervalSeconds)*time.Second)
+			return req.ScheduleActionCall("connectionRetry", map[string]any{}, time.Duration(spec.ConnectionRetry.IntervalSeconds)*time.Second)
 		}
 
 		// Retries exhausted — emit on the failed channel with the connection error.
-		attempt := c.getRetryAttempt(ctx.metadataCtx)
+		attempt := c.getRetryAttempt(metadata)
 		failResult := &CommandResult{
 			Stdout:   "",
 			Stderr:   fmt.Sprintf("connection failed after %d retries: %s", attempt, err.Error()),
 			ExitCode: -1,
 		}
 
-		err = c.setResultMetadata(ctx.metadataCtx, failResult)
-		if err != nil {
-			return err
-		}
+		c.setResultMetadata(metadata, failResult)
 
-		return ctx.stateCtx.Emit(channelFailed, "ssh.connection.failed", []any{failResult})
+		return state.Emit(channelFailed, "ssh.connection.failed", []any{failResult})
 	}
 
 	if err != nil {
 		return err
 	}
 
-	err = c.setResultMetadata(ctx.metadataCtx, result)
+	err = c.setResultMetadata(metadata, result)
 	if err != nil {
 		return err
 	}
@@ -452,7 +400,7 @@ func (c *SSHCommand) executeSSH(ctx ExecuteSSHContext) error {
 		channel = channelSuccess
 	}
 
-	return ctx.stateCtx.Emit(channel, "ssh.command.executed", []any{result})
+	return state.Emit(channel, "ssh.command.executed", []any{result})
 }
 
 func (c *SSHCommand) shouldRetry(retrySpec *ConnectionRetrySpec, metadata core.MetadataContext) bool {
@@ -505,8 +453,24 @@ func (c *SSHCommand) setResultMetadata(metadata core.MetadataContext, result *Co
 		"stdout":   result.Stdout,
 		"stderr":   result.Stderr,
 	}
+}
 
 	return metadata.Set(current)
+}
+
+func (c *SSHCommand) decodeSpec(cfg any) (Spec, error) {
+	var spec Spec
+
+	config, ok := cfg.(map[string]any)
+	if !ok || config == nil {
+		return spec, fmt.Errorf("decode configuration: invalid configuration type")
+	}
+
+	if err := mapstructure.Decode(config, &spec); err != nil {
+		return spec, fmt.Errorf("decode configuration: %w", err)
+	}
+
+	return spec, nil
 }
 
 func (c *SSHCommand) isConnectError(err error) bool {
@@ -546,30 +510,30 @@ func (c *SSHCommand) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (c *SSHCommand) createClient(secrets core.SecretsContext, metadata ExecutionMetadata) (*Client, error) {
-	switch metadata.Authentication.Method {
+func (c *SSHCommand) createClient(secrets core.SecretsContext, spec Spec) (*Client, error) {
+	switch spec.Authentication.Method {
 	case AuthMethodSSHKey:
-		return c.createClientSSHKey(secrets, metadata)
+		return c.createClientSSHKey(secrets, spec)
 	case AuthMethodPassword:
-		return c.createClientForPassword(secrets, metadata)
+		return c.createClientForPassword(secrets, spec)
 	default:
-		return nil, fmt.Errorf("unsupported authentication method: %s", metadata.Authentication.Method)
+		return nil, fmt.Errorf("unsupported authentication method: %s", spec.Authentication.Method)
 	}
 }
 
-func (c *SSHCommand) createClientForPassword(secrets core.SecretsContext, metadata ExecutionMetadata) (*Client, error) {
-	password, err := secrets.GetKey(metadata.Authentication.Password.Secret, metadata.Authentication.Password.Key)
+func (c *SSHCommand) createClientForPassword(secrets core.SecretsContext, spec Spec) (*Client, error) {
+	password, err := secrets.GetKey(spec.Authentication.Password.Secret, spec.Authentication.Password.Key)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get password: %w", err)
 	}
-	return NewClientPassword(metadata.Host, metadata.Port, metadata.User, password), nil
+	return NewClientPassword(spec.Host, spec.Port, spec.User, password), nil
 }
 
-func (c *SSHCommand) createClientSSHKey(secrets core.SecretsContext, metadata ExecutionMetadata) (*Client, error) {
-	privateKey, err := secrets.GetKey(metadata.Authentication.PrivateKey.Secret, metadata.Authentication.PrivateKey.Key)
+func (c *SSHCommand) createClientSSHKey(secrets core.SecretsContext, spec Spec) (*Client, error) {
+	privateKey, err := secrets.GetKey(spec.Authentication.PrivateKey.Secret, spec.Authentication.PrivateKey.Key)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get private key: %w", err)
 	}
 
-	return NewClientKey(metadata.Host, metadata.Port, metadata.User, privateKey, nil), nil
+	return NewClientKey(spec.Host, spec.Port, spec.User, privateKey, nil), nil
 }
