@@ -102,8 +102,9 @@ export const sshMapper: ComponentBaseMapper = {
 
     // Show connection retry progress
     const retryAttempt = typeof metadata?.attempt === "number" ? metadata.attempt : 0;
-    const retryConfig = (context.node.configuration as SSHConfiguration & { connectionRetry?: { enabled?: boolean; retries?: number } })
-      ?.connectionRetry;
+    const retryConfig = (
+      context.node.configuration as SSHConfiguration & { connectionRetry?: { enabled?: boolean; retries?: number } }
+    )?.connectionRetry;
     if (retryConfig?.enabled && retryAttempt > 0) {
       details["Connection retry"] = `${retryAttempt} / ${retryConfig.retries ?? "?"}`;
     }
