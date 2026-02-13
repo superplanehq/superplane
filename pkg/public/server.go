@@ -85,6 +85,48 @@ type Server struct {
 	isDev                 bool
 }
 
+func (s *Server) fetchSentryInstallationUUID(ctx context.Context, baseURL string, installationID string, accessToken string) (string, error) {
+	URL, err := url.Parse(baseURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid base URL: %w", err)
+	}
+	basePath := strings.TrimRight(URL.Path, "/")
+	URL.Path = basePath + fmt.Sprintf("/api/0/sentry-app-installations/%s/", installationID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, URL.String(), nil)
+	if err != nil {
+		return "", fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	if strings.TrimSpace(accessToken) != "" {
+		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
+	}
+
+	res, err := s.registry.HTTPContext().Do(req)
+	if err != nil {
+		return "", fmt.Errorf("request failed: %w", err)
+	}
+	defer res.Body.Close()
+
+	resBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", fmt.Errorf("read response: %w", err)
+	}
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return "", fmt.Errorf("fetch installation failed: %d %s", res.StatusCode, string(resBody))
+	}
+
+	var out sentryAppInstallationResponse
+	if err := json.Unmarshal(resBody, &out); err != nil {
+		return "", fmt.Errorf("parse response: %w", err)
+	}
+	if strings.TrimSpace(out.UUID) == "" {
+		return "", fmt.Errorf("missing uuid in response")
+	}
+
+	return strings.TrimSpace(out.UUID), nil
+}
+
 // WebsocketHub returns the websocket hub for this server
 func (s *Server) WebsocketHub() *ws.Hub {
 	return s.wsHub
@@ -468,6 +510,10 @@ type sentryAuthorizationResponse struct {
 	ExpiresAt    string `json:"expiresAt"`
 }
 
+type sentryAppInstallationResponse struct {
+	UUID string `json:"uuid"`
+}
+
 func (s *Server) HandleSentryPublicIntegrationSetup(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
 	installationID := r.URL.Query().Get("installationId")
@@ -558,6 +604,13 @@ func (s *Server) HandleSentryPublicIntegrationAttach(w http.ResponseWriter, r *h
 		http.Error(w, fmt.Sprintf("Failed to exchange authorization code: %v", err), http.StatusBadRequest)
 		return
 	}
+
+	installationUUID, err := s.fetchSentryInstallationUUID(r.Context(), baseURL, req.InstallationID, auth.Token)
+	if err != nil {
+		log.Errorf("Sentry attach: failed to fetch installation details: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to fetch Sentry installation details: %v", err), http.StatusBadRequest)
+		return
+	}
 	if err := s.verifySentryInstallation(r.Context(), baseURL, req.InstallationID, auth.Token); err != nil {
 		log.Errorf("Sentry attach: failed to verify installation: %v", err)
 		http.Error(w, fmt.Sprintf("Failed to verify Sentry installation: %v", err), http.StatusBadRequest)
@@ -565,11 +618,6 @@ func (s *Server) HandleSentryPublicIntegrationAttach(w http.ResponseWriter, r *h
 	}
 
 	integrationCtx := contexts.NewIntegrationContext(tx, nil, integrationInstance, s.encryptor, s.registry)
-
-	installationUUID := strings.TrimSpace(auth.ID)
-	if installationUUID == "" {
-		installationUUID = strings.TrimSpace(req.InstallationID)
-	}
 	if installationUUID != "" {
 		existing, existingErr := models.ListSentryIntegrationsByInstallationIDInTransaction(tx, installationUUID)
 		if existingErr == nil {
