@@ -36,6 +36,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/circleci"
 	_ "github.com/superplanehq/superplane/pkg/integrations/claude"
 	_ "github.com/superplanehq/superplane/pkg/integrations/cloudflare"
+	_ "github.com/superplanehq/superplane/pkg/integrations/cursor"
 	_ "github.com/superplanehq/superplane/pkg/integrations/dash0"
 	_ "github.com/superplanehq/superplane/pkg/integrations/datadog"
 	_ "github.com/superplanehq/superplane/pkg/integrations/daytona"
@@ -46,6 +47,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/jira"
 	_ "github.com/superplanehq/superplane/pkg/integrations/openai"
 	_ "github.com/superplanehq/superplane/pkg/integrations/pagerduty"
+	_ "github.com/superplanehq/superplane/pkg/integrations/prometheus"
 	_ "github.com/superplanehq/superplane/pkg/integrations/render"
 	_ "github.com/superplanehq/superplane/pkg/integrations/rootly"
 	_ "github.com/superplanehq/superplane/pkg/integrations/semaphore"
@@ -80,7 +82,8 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 	if os.Getenv("START_WORKFLOW_NODE_EXECUTOR") == "yes" || os.Getenv("START_NODE_EXECUTOR") == "yes" {
 		log.Println("Starting Node Executor")
 
-		w := workers.NewNodeExecutor(encryptor, registry, baseURL)
+		webhookBaseURL := getWebhookBaseURL(baseURL)
+		w := workers.NewNodeExecutor(encryptor, registry, baseURL, webhookBaseURL)
 		go w.Start(context.Background())
 	}
 
