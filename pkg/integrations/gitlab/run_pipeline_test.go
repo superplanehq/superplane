@@ -65,19 +65,16 @@ func Test__RunPipeline__Execute(t *testing.T) {
 	require.NotNil(t, metadata.Pipeline)
 	assert.Equal(t, 1001, metadata.Pipeline.ID)
 	assert.Equal(t, "pending", metadata.Pipeline.Status)
-	assert.Equal(t, "main", metadata.Pipeline.Ref)
-
-	assert.Equal(t, "1001", executionState.KVs[GitLabRunPipelineKVPipelineID])
-
-	assert.Equal(t, GitLabRunPipelinePollAction, requestsCtx.Action)
-	assert.Equal(t, GitLabRunPipelinePollInterval, requestsCtx.Duration)
+	assert.Equal(t, "1001", executionState.KVs[RunPipelineKVPipelineID])
+	assert.Equal(t, RunPipelinePollAction, requestsCtx.Action)
+	assert.Equal(t, RunPipelinePollInterval, requestsCtx.Duration)
 }
 
 func Test__RunPipeline__HandleWebhook__FinishedPipeline(t *testing.T) {
 	component := &RunPipeline{}
 	metadataCtx := &contexts.MetadataContext{
 		Metadata: RunPipelineExecutionMetadata{
-			Pipeline: &Pipeline{
+			Pipeline: &PipelineMetadata{
 				ID:     1001,
 				Status: "running",
 			},
@@ -103,8 +100,28 @@ func Test__RunPipeline__HandleWebhook__FinishedPipeline(t *testing.T) {
 		Webhook: &contexts.WebhookContext{
 			Secret: "token",
 		},
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"authType":    AuthTypePersonalAccessToken,
+				"groupId":     "123",
+				"accessToken": "pat",
+				"baseUrl":     "https://gitlab.com",
+			},
+		},
+		HTTP: &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{
+					"id": 1001,
+					"iid": 73,
+					"project_id": 123,
+					"status": "success",
+					"ref": "main",
+					"url": "https://gitlab.com/group/project/-/pipelines/1001"
+				}`),
+			},
+		},
 		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
-			if key == GitLabRunPipelineKVPipelineID && value == "1001" {
+			if key == RunPipelineKVPipelineID && value == "1001" {
 				return &core.ExecutionContext{
 					Metadata:       metadataCtx,
 					ExecutionState: executionState,
@@ -116,10 +133,10 @@ func Test__RunPipeline__HandleWebhook__FinishedPipeline(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, code)
 	require.NoError(t, err)
-	assert.Equal(t, GitLabPipelinePassedOutputChannel, executionState.Channel)
-	assert.Equal(t, GitLabPipelinePayloadType, executionState.Type)
+	assert.Equal(t, PipelinePassedOutputChannel, executionState.Channel)
+	assert.Equal(t, PipelinePayloadType, executionState.Type)
 
-	metadata, ok := metadataCtx.Metadata.(RunPipelineExecutionMetadata)
+	metadata, ok := metadataCtx.Metadata.(*RunPipelineExecutionMetadata)
 	require.True(t, ok)
 	require.NotNil(t, metadata.Pipeline)
 	assert.Equal(t, "success", metadata.Pipeline.Status)
@@ -129,10 +146,9 @@ func Test__RunPipeline__Poll__SchedulesNextWhenRunning(t *testing.T) {
 	component := &RunPipeline{}
 	metadataCtx := &contexts.MetadataContext{
 		Metadata: RunPipelineExecutionMetadata{
-			Pipeline: &Pipeline{
+			Pipeline: &PipelineMetadata{
 				ID:     1001,
 				Status: "running",
-				Ref:    "main",
 			},
 		},
 	}
@@ -142,7 +158,7 @@ func Test__RunPipeline__Poll__SchedulesNextWhenRunning(t *testing.T) {
 	}
 
 	err := component.HandleAction(core.ActionContext{
-		Name: GitLabRunPipelinePollAction,
+		Name: RunPipelinePollAction,
 		Configuration: map[string]any{
 			"project": "123",
 			"ref":     "main",
@@ -173,7 +189,7 @@ func Test__RunPipeline__Poll__SchedulesNextWhenRunning(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, GitLabRunPipelinePollAction, requestsCtx.Action)
-	assert.Equal(t, GitLabRunPipelinePollInterval, requestsCtx.Duration)
+	assert.Equal(t, RunPipelinePollAction, requestsCtx.Action)
+	assert.Equal(t, RunPipelinePollInterval, requestsCtx.Duration)
 	assert.Empty(t, executionState.Channel)
 }

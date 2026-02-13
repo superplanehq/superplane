@@ -879,17 +879,8 @@ The Run Pipeline component triggers a GitLab pipeline and waits for it to comple
 ### Use Cases
 
 - **CI/CD orchestration**: Trigger GitLab pipelines from SuperPlane workflows
-- **Deployment automation**: Run deployment pipelines with custom variables
+- **Deployment automation**: Run deployment pipelines with inputs
 - **Pipeline chaining**: Coordinate follow-up actions after pipeline completion
-
-### How It Works
-
-1. Creates a new pipeline using the selected project, ref, inputs, and variables
-2. Waits for pipeline completion, primarily via webhook updates
-3. Falls back to polling if webhook updates are delayed or unavailable
-4. Routes execution to:
-   - **Passed** channel when pipeline succeeds
-   - **Failed** channel for failed, canceled, skipped, manual, or blocked outcomes
 
 ### Example Output
 

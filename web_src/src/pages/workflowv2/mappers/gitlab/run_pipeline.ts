@@ -17,17 +17,23 @@ import {
 } from "../types";
 import { baseProps } from "./base";
 import { buildGitlabExecutionSubtitle } from "./utils";
+import { MetadataItem } from "@/ui/metadataList";
 
 interface PipelineMetadata {
   id?: number;
   iid?: number;
   status?: string;
-  ref?: string;
   url?: string;
 }
 
 interface ExecutionMetadata {
   pipeline?: PipelineMetadata;
+}
+
+interface RunPipelineConfiguration {
+  project: string;
+  ref: string;
+  inputs: Array<{ name: string; value: string }>;
 }
 
 export const RUN_PIPELINE_STATE_MAP: EventStateMap = {
@@ -103,16 +109,23 @@ export const RUN_PIPELINE_STATE_REGISTRY: EventStateRegistry = {
 export const runPipelineMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const base = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
+    const config = context.node.configuration as RunPipelineConfiguration;
+    const metadata = base.metadata as MetadataItem[];
+    if (config.ref) {
+      metadata.push({ icon: "git-branch", label: config.ref });
+    }
+
     return {
       ...base,
       specs: runPipelineSpecs(context.node.configuration),
       eventStateMap: RUN_PIPELINE_STATE_MAP,
+      metadata: metadata,
     };
   },
 
   subtitle(context: SubtitleContext): string {
     const metadata = context.execution.metadata as ExecutionMetadata | undefined;
-    const status = metadata?.pipeline?.status ? `Pipeline ${metadata.pipeline.status}` : "Pipeline Run";
+    const status = metadata?.pipeline?.status ? metadata.pipeline.status : "Pipeline Run";
     return buildGitlabExecutionSubtitle(context.execution, status);
   },
 
@@ -122,19 +135,16 @@ export const runPipelineMapper: ComponentBaseMapper = {
     const pipeline = metadata?.pipeline;
 
     if (pipeline?.id) {
-      details["Pipeline ID"] = pipeline.id.toString();
+      details["ID"] = pipeline.id.toString();
     }
     if (pipeline?.iid) {
-      details["Pipeline IID"] = pipeline.iid.toString();
+      details["IID"] = pipeline.iid.toString();
     }
     if (pipeline?.status) {
       details["Status"] = pipeline.status;
     }
-    if (pipeline?.ref) {
-      details["Ref"] = pipeline.ref;
-    }
     if (pipeline?.url) {
-      details["Pipeline URL"] = pipeline.url;
+      details["URL"] = pipeline.url;
     }
     if (context.execution.createdAt) {
       details["Started At"] = new Date(context.execution.createdAt).toLocaleString();
@@ -149,14 +159,8 @@ export const runPipelineMapper: ComponentBaseMapper = {
 
 function runPipelineSpecs(configuration: unknown): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
-  const config = configuration as
-    | {
-        inputs?: Array<{ name: string; value: string }>;
-        variables?: Array<{ name: string; value: string }>;
-      }
-    | undefined;
+  const config = configuration as RunPipelineConfiguration;
   const inputs = config?.inputs;
-  const variables = config?.variables;
 
   if (inputs && inputs.length > 0) {
     specs.push({
@@ -172,28 +176,6 @@ function runPipelineSpecs(configuration: unknown): ComponentBaseSpec[] {
           },
           {
             label: input.value,
-            bgColor: "bg-gray-100",
-            textColor: "text-gray-800",
-          },
-        ],
-      })),
-    });
-  }
-
-  if (variables && variables.length > 0) {
-    specs.push({
-      title: "variable",
-      tooltipTitle: "pipeline variables",
-      iconSlug: "settings",
-      values: variables.map((variable) => ({
-        badges: [
-          {
-            label: variable.name,
-            bgColor: "bg-purple-100",
-            textColor: "text-purple-800",
-          },
-          {
-            label: variable.value,
             bgColor: "bg-gray-100",
             textColor: "text-gray-800",
           },

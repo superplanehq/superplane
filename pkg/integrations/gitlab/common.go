@@ -11,6 +11,16 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+const (
+	PipelineStatusSuccess   = "success"
+	PipelineStatusFailed    = "failed"
+	PipelineStatusCanceled  = "canceled"
+	PipelineStatusCancelled = "cancelled"
+	PipelineStatusSkipped   = "skipped"
+	PipelineStatusManual    = "manual"
+	PipelineStatusBlocked   = "blocked"
+)
+
 type WebhookConfiguration struct {
 	EventType string `json:"eventType" mapstructure:"eventType"`
 	ProjectID string `json:"projectId" mapstructure:"projectId"`

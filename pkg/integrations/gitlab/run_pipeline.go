@@ -20,28 +20,21 @@ import (
 var exampleOutputRunPipeline []byte
 
 const (
-	GitLabPipelinePayloadType         = "gitlab.pipeline.finished"
-	GitLabPipelinePassedOutputChannel = "passed"
-	GitLabPipelineFailedOutputChannel = "failed"
-	GitLabPipelineStatusSuccess       = "success"
-	GitLabPipelineStatusFailed        = "failed"
-	GitLabPipelineStatusCanceled      = "canceled"
-	GitLabPipelineStatusCancelled     = "cancelled"
-	GitLabPipelineStatusSkipped       = "skipped"
-	GitLabPipelineStatusManual        = "manual"
-	GitLabPipelineStatusBlocked       = "blocked"
-	GitLabRunPipelinePollInterval     = 5 * time.Minute
-	GitLabRunPipelinePollAction       = "poll"
-	GitLabRunPipelineKVPipelineID     = "pipeline_id"
+	PipelinePayloadType         = "gitlab.pipeline.finished"
+	PipelinePassedOutputChannel = "passed"
+	PipelineFailedOutputChannel = "failed"
+
+	RunPipelinePollInterval = 5 * time.Minute
+	RunPipelinePollAction   = "poll"
+	RunPipelineKVPipelineID = "pipeline_id"
 )
 
 type RunPipeline struct{}
 
 type RunPipelineSpec struct {
-	Project   string                    `json:"project" mapstructure:"project"`
-	Ref       string                    `json:"ref" mapstructure:"ref"`
-	Inputs    []RunPipelineInputSpec    `json:"inputs" mapstructure:"inputs"`
-	Variables []RunPipelineVariableSpec `json:"variables" mapstructure:"variables"`
+	Project string                 `json:"project" mapstructure:"project"`
+	Ref     string                 `json:"ref" mapstructure:"ref"`
+	Inputs  []RunPipelineInputSpec `json:"inputs" mapstructure:"inputs"`
 }
 
 type RunPipelineInputSpec struct {
@@ -49,14 +42,15 @@ type RunPipelineInputSpec struct {
 	Value string `json:"value" mapstructure:"value"`
 }
 
-type RunPipelineVariableSpec struct {
-	Name         string `json:"name" mapstructure:"name"`
-	Value        string `json:"value" mapstructure:"value"`
-	VariableType string `json:"variableType" mapstructure:"variableType"`
+type RunPipelineExecutionMetadata struct {
+	Pipeline *PipelineMetadata `json:"pipeline" mapstructure:"pipeline"`
 }
 
-type RunPipelineExecutionMetadata struct {
-	Pipeline *Pipeline `json:"pipeline" mapstructure:"pipeline"`
+type PipelineMetadata struct {
+	ID     int    `json:"id"`
+	IID    int    `json:"iid"`
+	Status string `json:"status"`
+	URL    string `json:"url,omitempty"`
 }
 
 func (r *RunPipeline) Name() string {
@@ -77,17 +71,8 @@ func (r *RunPipeline) Documentation() string {
 ## Use Cases
 
 - **CI/CD orchestration**: Trigger GitLab pipelines from SuperPlane workflows
-- **Deployment automation**: Run deployment pipelines with custom variables
-- **Pipeline chaining**: Coordinate follow-up actions after pipeline completion
-
-## How It Works
-
-1. Creates a new pipeline using the selected project, ref, inputs, and variables
-2. Waits for pipeline completion, primarily via webhook updates
-3. Falls back to polling if webhook updates are delayed or unavailable
-4. Routes execution to:
-   - **Passed** channel when pipeline succeeds
-   - **Failed** channel for failed, canceled, skipped, manual, or blocked outcomes`
+- **Deployment automation**: Run deployment pipelines with inputs
+- **Pipeline chaining**: Coordinate follow-up actions after pipeline completion`
 }
 
 func (r *RunPipeline) Icon() string {
@@ -109,11 +94,11 @@ func (r *RunPipeline) ExampleOutput() map[string]any {
 func (r *RunPipeline) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{
 		{
-			Name:  GitLabPipelinePassedOutputChannel,
+			Name:  PipelinePassedOutputChannel,
 			Label: "Passed",
 		},
 		{
-			Name:  GitLabPipelineFailedOutputChannel,
+			Name:  PipelineFailedOutputChannel,
 			Label: "Failed",
 		},
 	}
@@ -167,48 +152,6 @@ func (r *RunPipeline) Configuration() []configuration.Field {
 				},
 			},
 		},
-		{
-			Name:  "variables",
-			Label: "Variables",
-			Type:  configuration.FieldTypeList,
-			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel: "Variable",
-					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeObject,
-						Schema: []configuration.Field{
-							{
-								Name:               "name",
-								Label:              "Name",
-								Type:               configuration.FieldTypeString,
-								Required:           true,
-								DisallowExpression: true,
-							},
-							{
-								Name:     "value",
-								Label:    "Value",
-								Type:     configuration.FieldTypeString,
-								Required: true,
-							},
-							{
-								Name:    "variableType",
-								Label:   "Variable Type",
-								Type:    configuration.FieldTypeSelect,
-								Default: "env_var",
-								TypeOptions: &configuration.TypeOptions{
-									Select: &configuration.SelectTypeOptions{
-										Options: []configuration.FieldOption{
-											{Label: "Environment variable", Value: "env_var"},
-											{Label: "File", Value: "file"},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
 	}
 }
 
@@ -246,51 +189,95 @@ func (r *RunPipeline) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	nodeMetadata := NodeMetadata{}
+	if err := mapstructure.Decode(ctx.NodeMetadata.Get(), &nodeMetadata); err != nil {
+		return fmt.Errorf("failed to decode node metadata: %w", err)
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}
 
 	pipeline, err := client.CreatePipeline(context.Background(), spec.Project, &CreatePipelineRequest{
-		Ref:       normalizePipelineRef(spec.Ref),
-		Inputs:    r.buildInputs(spec.Inputs),
-		Variables: r.buildVariables(spec.Variables),
+		Ref:    normalizePipelineRef(spec.Ref),
+		Inputs: r.buildInputs(spec.Inputs),
 	})
+
 	if err != nil {
 		return fmt.Errorf("failed to create pipeline: %w", err)
 	}
 
-	var rawNodeMetadata any
-	if ctx.NodeMetadata != nil {
-		rawNodeMetadata = ctx.NodeMetadata.Get()
-	}
-
-	if pipeline.WebURL == "" {
-		pipeline.WebURL = r.resolvePipelineURL(pipeline, rawNodeMetadata)
-	}
-	if pipeline.URL == "" {
-		pipeline.URL = pipeline.WebURL
-	}
-
-	metadata := RunPipelineExecutionMetadata{Pipeline: pipeline}
+	metadata := RunPipelineExecutionMetadata{Pipeline: &PipelineMetadata{
+		ID:     pipeline.ID,
+		IID:    pipeline.IID,
+		Status: pipeline.Status,
+		URL:    pipeline.WebURL,
+	}}
 
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return err
 	}
 
-	if err := ctx.ExecutionState.SetKV(GitLabRunPipelineKVPipelineID, strconv.Itoa(pipeline.ID)); err != nil {
+	if err := ctx.ExecutionState.SetKV(RunPipelineKVPipelineID, strconv.Itoa(pipeline.ID)); err != nil {
 		return err
 	}
 
 	ctx.Logger.Infof("Started GitLab pipeline %d on project %s (ref=%s)", pipeline.ID, spec.Project, spec.Ref)
-	return ctx.Requests.ScheduleActionCall(GitLabRunPipelinePollAction, map[string]any{}, GitLabRunPipelinePollInterval)
+	return ctx.Requests.ScheduleActionCall(RunPipelinePollAction, map[string]any{}, RunPipelinePollInterval)
 }
 
 func (r *RunPipeline) Cancel(ctx core.ExecutionContext) error {
+	metadata := RunPipelineExecutionMetadata{}
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	if metadata.Pipeline == nil || metadata.Pipeline.ID == 0 {
+		ctx.Logger.Info("No pipeline to cancel")
+		return nil
+	}
+
+	if isPipelineDone(metadata.Pipeline.Status) {
+		ctx.Logger.Infof("Pipeline %d already done - %s", metadata.Pipeline.ID, metadata.Pipeline.Status)
+		return nil
+	}
+
+	spec := RunPipelineSpec{}
+	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	if err := client.CancelPipeline(context.Background(), spec.Project, metadata.Pipeline.ID); err != nil {
+		return fmt.Errorf("failed to cancel pipeline: %w", err)
+	}
+
+	err = ctx.Metadata.Set(RunPipelineExecutionMetadata{Pipeline: &PipelineMetadata{
+		ID:     metadata.Pipeline.ID,
+		IID:    metadata.Pipeline.IID,
+		URL:    metadata.Pipeline.URL,
+		Status: PipelineStatusCanceled,
+	}})
+
+	if err != nil {
+		return err
+	}
+
+	ctx.Logger.Infof("Cancel request sent for pipeline %d", metadata.Pipeline.ID)
 	return nil
 }
 
 func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
+	spec := RunPipelineSpec{}
+	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
 	eventType := ctx.Headers.Get("X-Gitlab-Event")
 	if eventType == "" {
 		return http.StatusBadRequest, fmt.Errorf("missing X-Gitlab-Event header")
@@ -310,14 +297,17 @@ func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	pipeline, err := metadataFromPipelineWebhookPayload(payload)
+	newMetadata, err := metadataFromWebhook(payload)
 	if err != nil {
 		return http.StatusBadRequest, err
 	}
 
-	executionCtx, err := ctx.FindExecutionByKV(GitLabRunPipelineKVPipelineID, strconv.Itoa(pipeline.ID))
+	executionCtx, err := ctx.FindExecutionByKV(RunPipelineKVPipelineID, strconv.Itoa(newMetadata.Pipeline.ID))
+
+	//
+	// Ignore hooks for pipelines not started by SuperPlane
+	//
 	if err != nil {
-		// Ignore hooks for pipelines not started by SuperPlane
 		return http.StatusOK, nil
 	}
 
@@ -326,34 +316,69 @@ func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 		return http.StatusInternalServerError, fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	if metadata.Pipeline != nil && isGitLabPipelineDone(metadata.Pipeline.Status) {
+	//
+	// If pipeline is already done, do nothing.
+	//
+	if metadata.Pipeline != nil && isPipelineDone(metadata.Pipeline.Status) {
+		ctx.Logger.Infof("Pipeline %d is already done - %s", newMetadata.Pipeline.ID, metadata.Pipeline.Status)
 		return http.StatusOK, nil
 	}
 
-	if metadata.Pipeline == nil {
-		metadata.Pipeline = &Pipeline{}
-	}
-	mergePipelineMetadata(metadata.Pipeline, pipeline)
-
-	if err := executionCtx.Metadata.Set(metadata); err != nil {
+	//
+	// Set new metadata
+	//
+	if err := executionCtx.Metadata.Set(newMetadata); err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("failed to set metadata: %w", err)
 	}
 
-	if !isGitLabPipelineDone(pipeline.Status) {
+	//
+	// If pipeline is not done, do not complete execution and emit yet.
+	//
+	if !isPipelineDone(newMetadata.Pipeline.Status) {
+		ctx.Logger.Infof("Pipeline %d is not done - %s", newMetadata.Pipeline.ID, newMetadata.Pipeline.Status)
 		return http.StatusOK, nil
 	}
 
-	if err := r.emitPipelineResult(executionCtx, metadata); err != nil {
-		return http.StatusInternalServerError, err
+	//
+	// Fetch pipeline from API so we have the latest status,
+	// and so the data emitted by webhook update and by polling is the same.
+	//
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to create client: %w", err)
 	}
 
+	pipeline, err := client.GetPipeline(spec.Project, newMetadata.Pipeline.ID)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to get pipeline: %w", err)
+	}
+
+	//
+	// Emit on proper channel
+	//
+	channel := PipelineFailedOutputChannel
+	if pipeline.Status == PipelineStatusSuccess {
+		channel = PipelinePassedOutputChannel
+	}
+
+	err = executionCtx.ExecutionState.Emit(channel, PipelinePayloadType, []any{
+		map[string]any{
+			"pipeline": pipeline,
+		},
+	})
+
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to emit pipeline result: %w", err)
+	}
+
+	ctx.Logger.Infof("Pipeline %d completed - %s", pipeline.ID, pipeline.Status)
 	return http.StatusOK, nil
 }
 
 func (r *RunPipeline) Actions() []core.Action {
 	return []core.Action{
 		{
-			Name:           GitLabRunPipelinePollAction,
+			Name:           RunPipelinePollAction,
 			UserAccessible: false,
 		},
 	}
@@ -361,7 +386,7 @@ func (r *RunPipeline) Actions() []core.Action {
 
 func (r *RunPipeline) HandleAction(ctx core.ActionContext) error {
 	switch ctx.Name {
-	case GitLabRunPipelinePollAction:
+	case RunPipelinePollAction:
 		return r.poll(ctx)
 	}
 
@@ -387,10 +412,16 @@ func (r *RunPipeline) poll(ctx core.ActionContext) error {
 		return fmt.Errorf("pipeline metadata is missing")
 	}
 
-	if isGitLabPipelineDone(metadata.Pipeline.Status) {
+	//
+	// If pipeline is already done, do nothing.
+	//
+	if isPipelineDone(metadata.Pipeline.Status) {
 		return nil
 	}
 
+	//
+	// Otherwise, poll, update metadata and emit result if pipeline is done.
+	//
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
@@ -401,109 +432,51 @@ func (r *RunPipeline) poll(ctx core.ActionContext) error {
 		return err
 	}
 
-	mergePipelineMetadata(metadata.Pipeline, pipeline)
-	if metadata.Pipeline.WebURL == "" && metadata.Pipeline.URL != "" {
-		metadata.Pipeline.WebURL = metadata.Pipeline.URL
-	}
-	if metadata.Pipeline.URL == "" && metadata.Pipeline.WebURL != "" {
-		metadata.Pipeline.URL = metadata.Pipeline.WebURL
-	}
+	newMetadata := RunPipelineExecutionMetadata{Pipeline: &PipelineMetadata{
+		ID:     pipeline.ID,
+		IID:    pipeline.IID,
+		Status: pipeline.Status,
+		URL:    pipeline.URL,
+	}}
 
-	if err := ctx.Metadata.Set(metadata); err != nil {
+	if err := ctx.Metadata.Set(newMetadata); err != nil {
 		return err
 	}
 
-	if !isGitLabPipelineDone(pipeline.Status) {
-		return ctx.Requests.ScheduleActionCall(GitLabRunPipelinePollAction, map[string]any{}, GitLabRunPipelinePollInterval)
+	if !isPipelineDone(pipeline.Status) {
+		return ctx.Requests.ScheduleActionCall(RunPipelinePollAction, map[string]any{}, RunPipelinePollInterval)
 	}
 
-	return r.emitPipelineResultInActionContext(ctx, metadata)
+	channel := PipelineFailedOutputChannel
+	if metadata.Pipeline != nil && metadata.Pipeline.Status == PipelineStatusSuccess {
+		channel = PipelinePassedOutputChannel
+	}
+
+	return ctx.ExecutionState.Emit(channel, PipelinePayloadType, []any{
+		map[string]any{
+			"pipeline": pipeline,
+		},
+	})
 }
 
 func (r *RunPipeline) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (r *RunPipeline) buildInputs(inputs []RunPipelineInputSpec) []PipelineInput {
-	result := make([]PipelineInput, 0, len(inputs))
+func (r *RunPipeline) buildInputs(inputs []RunPipelineInputSpec) map[string]string {
+	result := make(map[string]string, len(inputs))
 	for _, input := range inputs {
 		if strings.TrimSpace(input.Name) == "" {
 			continue
 		}
 
-		result = append(result, PipelineInput{
-			Name:  input.Name,
-			Value: input.Value,
-		})
+		result[input.Name] = input.Value
 	}
 
 	return result
 }
 
-func (r *RunPipeline) buildVariables(variables []RunPipelineVariableSpec) []PipelineVariable {
-	result := make([]PipelineVariable, 0, len(variables))
-	for _, variable := range variables {
-		if strings.TrimSpace(variable.Name) == "" {
-			continue
-		}
-		result = append(result, PipelineVariable{
-			Key:          variable.Name,
-			Value:        variable.Value,
-			VariableType: defaultPipelineVariableType(variable.VariableType),
-		})
-	}
-
-	return result
-}
-
-func (r *RunPipeline) resolvePipelineURL(pipeline *Pipeline, rawNodeMetadata any) string {
-	if pipeline.WebURL != "" {
-		return pipeline.WebURL
-	}
-
-	if pipeline.URL != "" {
-		return pipeline.URL
-	}
-
-	nodeMetadata := NodeMetadata{}
-	if err := mapstructure.Decode(rawNodeMetadata, &nodeMetadata); err != nil {
-		return ""
-	}
-
-	if nodeMetadata.Project == nil || nodeMetadata.Project.URL == "" {
-		return ""
-	}
-
-	return fmt.Sprintf("%s/-/pipelines/%d", strings.TrimSuffix(nodeMetadata.Project.URL, "/"), pipeline.ID)
-}
-
-func (r *RunPipeline) emitPipelineResult(ctx *core.ExecutionContext, metadata RunPipelineExecutionMetadata) error {
-	channel := GitLabPipelineFailedOutputChannel
-	if metadata.Pipeline != nil && metadata.Pipeline.Status == GitLabPipelineStatusSuccess {
-		channel = GitLabPipelinePassedOutputChannel
-	}
-
-	return ctx.ExecutionState.Emit(channel, GitLabPipelinePayloadType, []any{
-		map[string]any{
-			"pipeline": metadata.Pipeline,
-		},
-	})
-}
-
-func (r *RunPipeline) emitPipelineResultInActionContext(ctx core.ActionContext, metadata RunPipelineExecutionMetadata) error {
-	channel := GitLabPipelineFailedOutputChannel
-	if metadata.Pipeline != nil && metadata.Pipeline.Status == GitLabPipelineStatusSuccess {
-		channel = GitLabPipelinePassedOutputChannel
-	}
-
-	return ctx.ExecutionState.Emit(channel, GitLabPipelinePayloadType, []any{
-		map[string]any{
-			"pipeline": metadata.Pipeline,
-		},
-	})
-}
-
-func metadataFromPipelineWebhookPayload(payload map[string]any) (*Pipeline, error) {
+func metadataFromWebhook(payload map[string]any) (*RunPipelineExecutionMetadata, error) {
 	attrs, ok := payload["object_attributes"].(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("pipeline attributes missing from webhook payload")
@@ -520,145 +493,30 @@ func metadataFromPipelineWebhookPayload(payload map[string]any) (*Pipeline, erro
 	}
 
 	pipelineIID, _ := intFromAny(attrs["iid"])
-	ref, _ := attrs["ref"].(string)
 	url, _ := attrs["url"].(string)
-	sha, _ := attrs["sha"].(string)
-	source, _ := attrs["source"].(string)
-	createdAt, _ := attrs["created_at"].(string)
-	updatedAt, _ := attrs["updated_at"].(string)
-	finishedAt, _ := attrs["finished_at"].(string)
-	duration, _ := floatFromAny(attrs["duration"])
-	projectID := projectIDFromPayload(payload)
 
-	return &Pipeline{
-		ID:         pipelineID,
-		IID:        pipelineIID,
-		ProjectID:  projectID,
-		Status:     status,
-		Source:     source,
-		Ref:        ref,
-		SHA:        sha,
-		WebURL:     url,
-		URL:        url,
-		CreatedAt:  createdAt,
-		UpdatedAt:  updatedAt,
-		FinishedAt: finishedAt,
-		Duration:   duration,
+	return &RunPipelineExecutionMetadata{
+		Pipeline: &PipelineMetadata{
+			ID:     pipelineID,
+			IID:    pipelineIID,
+			Status: status,
+			URL:    url,
+		},
 	}, nil
 }
 
-func projectIDFromPayload(payload map[string]any) int {
-	project, ok := payload["project"].(map[string]any)
-	if !ok {
-		return 0
-	}
-
-	projectID, _ := intFromAny(project["id"])
-	return projectID
-}
-
-func isGitLabPipelineDone(status string) bool {
+func isPipelineDone(status string) bool {
 	switch status {
-	case GitLabPipelineStatusSuccess,
-		GitLabPipelineStatusFailed,
-		GitLabPipelineStatusCanceled,
-		GitLabPipelineStatusCancelled,
-		GitLabPipelineStatusSkipped,
-		GitLabPipelineStatusManual,
-		GitLabPipelineStatusBlocked:
+	case PipelineStatusSuccess,
+		PipelineStatusFailed,
+		PipelineStatusCanceled,
+		PipelineStatusCancelled,
+		PipelineStatusSkipped,
+		PipelineStatusManual,
+		PipelineStatusBlocked:
 		return true
 	default:
 		return false
-	}
-}
-
-func floatFromAny(value any) (float64, bool) {
-	switch typed := value.(type) {
-	case float64:
-		return typed, true
-	case float32:
-		return float64(typed), true
-	case int:
-		return float64(typed), true
-	case int32:
-		return float64(typed), true
-	case int64:
-		return float64(typed), true
-	default:
-		return 0, false
-	}
-}
-
-func mergePipelineMetadata(target, incoming *Pipeline) {
-	if target == nil || incoming == nil {
-		return
-	}
-
-	if incoming.ID != 0 {
-		target.ID = incoming.ID
-	}
-	if incoming.IID != 0 {
-		target.IID = incoming.IID
-	}
-	if incoming.ProjectID != 0 {
-		target.ProjectID = incoming.ProjectID
-	}
-	if incoming.Status != "" {
-		target.Status = incoming.Status
-	}
-	if incoming.Source != "" {
-		target.Source = incoming.Source
-	}
-	if incoming.Ref != "" {
-		target.Ref = incoming.Ref
-	}
-	if incoming.SHA != "" {
-		target.SHA = incoming.SHA
-	}
-	if incoming.BeforeSHA != "" {
-		target.BeforeSHA = incoming.BeforeSHA
-	}
-	if incoming.WebURL != "" {
-		target.WebURL = incoming.WebURL
-	}
-	if incoming.URL != "" {
-		target.URL = incoming.URL
-	}
-	if incoming.CreatedAt != "" {
-		target.CreatedAt = incoming.CreatedAt
-	}
-	if incoming.UpdatedAt != "" {
-		target.UpdatedAt = incoming.UpdatedAt
-	}
-	if incoming.StartedAt != "" {
-		target.StartedAt = incoming.StartedAt
-	}
-	if incoming.FinishedAt != "" {
-		target.FinishedAt = incoming.FinishedAt
-	}
-	if incoming.CommittedAt != "" {
-		target.CommittedAt = incoming.CommittedAt
-	}
-	if incoming.Duration != 0 {
-		target.Duration = incoming.Duration
-	}
-	if incoming.QueuedDuration != 0 {
-		target.QueuedDuration = incoming.QueuedDuration
-	}
-	if incoming.Coverage != "" {
-		target.Coverage = incoming.Coverage
-	}
-	if incoming.User != nil {
-		target.User = incoming.User
-	}
-	if incoming.DetailedStatus != nil {
-		target.DetailedStatus = incoming.DetailedStatus
-	}
-	if incoming.YamlErrors != nil {
-		target.YamlErrors = incoming.YamlErrors
-	}
-	if incoming.Tag {
-		target.Tag = true
 	}
 }
 
@@ -681,11 +539,4 @@ func intFromAny(value any) (int, bool) {
 	default:
 		return 0, false
 	}
-}
-
-func defaultPipelineVariableType(variableType string) string {
-	if variableType == "file" {
-		return "file"
-	}
-	return "env_var"
 }
