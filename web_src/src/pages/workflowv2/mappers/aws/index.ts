@@ -15,6 +15,12 @@ import { deleteRepositoryMapper } from "./codeartifact/delete_repository";
 import { disposePackageVersionsMapper } from "./codeartifact/dispose_package_versions";
 import { updatePackageVersionsStatusMapper } from "./codeartifact/update_package_versions_status";
 import { onAlarmTriggerRenderer } from "./cloudwatch/on_alarm";
+import { onTopicMessageTriggerRenderer } from "./sns/on_topic_message";
+import { createTopicMapper } from "./sns/create_topic";
+import { deleteTopicMapper } from "./sns/delete_topic";
+import { getSubscriptionMapper } from "./sns/get_subscription";
+import { getTopicMapper } from "./sns/get_topic";
+import { publishMessageMapper } from "./sns/publish_message";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   "lambda.runFunction": runFunctionMapper,
@@ -28,6 +34,11 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "codeArtifact.disposePackageVersions": disposePackageVersionsMapper,
   "codeArtifact.getPackageVersion": getPackageVersionMapper,
   "codeArtifact.updatePackageVersionsStatus": updatePackageVersionsStatusMapper,
+  "sns.getTopic": getTopicMapper,
+  "sns.getSubscription": getSubscriptionMapper,
+  "sns.createTopic": createTopicMapper,
+  "sns.deleteTopic": deleteTopicMapper,
+  "sns.publishMessage": publishMessageMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -35,6 +46,7 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
   "codeArtifact.onPackageVersion": onPackageVersionTriggerRenderer,
   "ecr.onImagePush": onImagePushTriggerRenderer,
   "ecr.onImageScan": onImageScanTriggerRenderer,
+  "sns.onTopicMessage": onTopicMessageTriggerRenderer,
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
@@ -48,4 +60,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "codeArtifact.disposePackageVersions": buildActionStateRegistry("disposed"),
   "codeArtifact.getPackageVersion": buildActionStateRegistry("retrieved"),
   "codeArtifact.updatePackageVersionsStatus": buildActionStateRegistry("updated"),
+  "sns.getTopic": buildActionStateRegistry("retrieved"),
+  "sns.getSubscription": buildActionStateRegistry("retrieved"),
+  "sns.createTopic": buildActionStateRegistry("created"),
+  "sns.deleteTopic": buildActionStateRegistry("deleted"),
+  "sns.publishMessage": buildActionStateRegistry("published"),
 };
