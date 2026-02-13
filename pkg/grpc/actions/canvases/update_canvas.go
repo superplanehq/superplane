@@ -360,6 +360,17 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 		return fmt.Errorf("error setting up node %s: %v", node.NodeID, err)
 	}
 
+	if node.WebhookID != nil {
+		metadata := node.Metadata.Data()
+		if metadata == nil {
+			metadata = map[string]any{}
+		}
+		if _, ok := metadata["url"]; !ok {
+			metadata["url"] = fmt.Sprintf("%s/webhooks/%s", webhookBaseURL, node.WebhookID.String())
+			node.Metadata = datatypes.NewJSONType(metadata)
+		}
+	}
+
 	return tx.Save(node).Error
 }
 

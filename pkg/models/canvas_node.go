@@ -180,6 +180,21 @@ func FindCanvasNodesByIDs(tx *gorm.DB, canvasID uuid.UUID, nodeIDs []string) ([]
 	return nodes, nil
 }
 
+func ListReadyTriggersForIntegrationInTransaction(tx *gorm.DB, integrationID uuid.UUID) ([]CanvasNode, error) {
+	var nodes []CanvasNode
+	err := tx.
+		Where("state = ?", CanvasNodeStateReady).
+		Where("type = ?", NodeTypeTrigger).
+		Where("app_installation_id = ?", integrationID).
+		Where("deleted_at IS NULL").
+		Find(&nodes).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return nodes, nil
+}
+
 func ListCanvasNodesReady() ([]CanvasNode, error) {
 	var nodes []CanvasNode
 	err := database.Conn().
