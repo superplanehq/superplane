@@ -2,6 +2,7 @@ package dash0
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,6 +22,16 @@ type Client struct {
 	Token   string
 	BaseURL string
 	http    core.HTTPContext
+}
+
+// Dash0APIError wraps non-2xx HTTP responses returned by Dash0 APIs.
+type Dash0APIError struct {
+	StatusCode int
+	Body       []byte
+}
+
+func (e *Dash0APIError) Error() string {
+	return fmt.Sprintf("request got %d code: %s", e.StatusCode, string(e.Body))
 }
 
 func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
@@ -80,7 +91,10 @@ func (c *Client) execRequest(method, url string, body io.Reader, contentType str
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+		return nil, &Dash0APIError{
+			StatusCode: res.StatusCode,
+			Body:       responseBody,
+		}
 	}
 
 	return responseBody, nil
@@ -206,4 +220,69 @@ func (c *Client) ListCheckRules() ([]CheckRule, error) {
 	}
 
 	return checkRules, nil
+}
+
+// GetCheckDetails fetches check context by failed-check ID with check-rules fallback.
+func (c *Client) GetCheckDetails(checkID string, includeHistory bool) (map[string]any, error) {
+	trimmedCheckID := strings.TrimSpace(checkID)
+	if trimmedCheckID == "" {
+		return nil, fmt.Errorf("check id is required")
+	}
+
+	querySuffix := ""
+	if includeHistory {
+		querySuffix = "?include_history=true"
+	}
+
+	escapedID := url.PathEscape(trimmedCheckID)
+	requestURL := fmt.Sprintf("%s/api/alerting/failed-checks/%s%s", c.BaseURL, escapedID, querySuffix)
+
+	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil, "")
+	if err != nil {
+		apiErr := (*Dash0APIError)(nil)
+		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
+			fallbackURL := fmt.Sprintf("%s/api/alerting/check-rules/%s%s", c.BaseURL, escapedID, querySuffix)
+			responseBody, err = c.execRequest(http.MethodGet, fallbackURL, nil, "")
+			if err != nil {
+				return nil, fmt.Errorf("fallback check-rules lookup failed: %w", err)
+			}
+		} else {
+			return nil, err
+		}
+	}
+
+	parsed, err := parseJSONResponse(responseBody)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing check details response: %v", err)
+	}
+
+	if _, ok := parsed["checkId"]; !ok {
+		parsed["checkId"] = trimmedCheckID
+	}
+
+	return parsed, nil
+}
+
+// parseJSONResponse normalizes object or array JSON responses into a map.
+func parseJSONResponse(responseBody []byte) (map[string]any, error) {
+	trimmedBody := strings.TrimSpace(string(responseBody))
+	if trimmedBody == "" {
+		return map[string]any{}, nil
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(responseBody, &parsed); err == nil {
+		if parsed == nil {
+			return map[string]any{}, nil
+		}
+
+		return parsed, nil
+	}
+
+	var parsedArray []any
+	if err := json.Unmarshal(responseBody, &parsedArray); err == nil {
+		return map[string]any{"items": parsedArray}, nil
+	}
+
+	return nil, fmt.Errorf("unexpected response payload shape")
 }
