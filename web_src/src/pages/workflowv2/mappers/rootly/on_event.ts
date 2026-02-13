@@ -92,7 +92,12 @@ export const onEventTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
-    const configuration = node.configuration as { events?: string[]; status?: string[]; severity?: string[]; visibility?: string[] };
+    const configuration = node.configuration as {
+      events?: string[];
+      status?: string[];
+      severity?: string[];
+      visibility?: string[];
+    };
     const metadataItems = [];
 
     if (configuration?.events) {
