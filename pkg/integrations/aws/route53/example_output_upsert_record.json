@@ -1,0 +1,7 @@
+{
+  "changeId": "/change/C9876543210DEF",
+  "status": "PENDING",
+  "submittedAt": "2026-01-28T10:30:00.000Z",
+  "recordName": "app.example.com",
+  "recordType": "CNAME"
+}
