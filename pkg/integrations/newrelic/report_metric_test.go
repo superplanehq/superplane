@@ -60,6 +60,13 @@ func TestReportMetric_Configuration(t *testing.T) {
 func TestReportMetric_Setup_IntervalValidation(t *testing.T) {
 	component := &ReportMetric{}
 
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"licenseKey": "license-key-12345",
+			"site":       "US",
+		},
+	}
+
 	t.Run("gauge does not require intervalMs", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
@@ -67,6 +74,7 @@ func TestReportMetric_Setup_IntervalValidation(t *testing.T) {
 				"metricType": "gauge",
 				"value":      1.0,
 			},
+			Integration: integrationCtx,
 		})
 
 		require.NoError(t, err)
@@ -80,6 +88,7 @@ func TestReportMetric_Setup_IntervalValidation(t *testing.T) {
 				"value":      1.0,
 				// intervalMs missing
 			},
+			Integration: integrationCtx,
 		})
 
 		require.Error(t, err)
@@ -94,6 +103,7 @@ func TestReportMetric_Setup_IntervalValidation(t *testing.T) {
 				"value":      1.0,
 				// intervalMs missing
 			},
+			Integration: integrationCtx,
 		})
 
 		require.Error(t, err)
@@ -108,9 +118,29 @@ func TestReportMetric_Setup_IntervalValidation(t *testing.T) {
 				"value":      1.0,
 				"intervalMs": 60000,
 			},
+			Integration: integrationCtx,
 		})
 
 		require.NoError(t, err)
+	})
+
+	t.Run("no keys provided -> error", func(t *testing.T) {
+		emptyCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"site": "US",
+			},
+		}
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"metricName": "test.metric",
+				"metricType": "gauge",
+				"value":      1.0,
+			},
+			Integration: emptyCtx,
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "License Key is required")
 	})
 }
 
@@ -127,8 +157,7 @@ func TestClient_ReportMetric(t *testing.T) {
 		}
 
 		client := &Client{
-			APIKey:        "test-key",
-			BaseURL:       "https://api.newrelic.com/v2",
+			LicenseKey:    "test-key",
 			MetricBaseURL: "https://metric-api.newrelic.com/metric/v1",
 			http:          httpCtx,
 		}
@@ -171,7 +200,7 @@ func TestClient_ReportMetric(t *testing.T) {
 		assert.Equal(t, float64(42.5), sentBatch[0].Metrics[0].Value)
 	})
 
-	t.Run("User API Key (NRAK) request -> uses Api-Key header", func(t *testing.T) {
+	t.Run("fallback to UserAPIKey when no LicenseKey -> uses Api-Key header", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -183,8 +212,7 @@ func TestClient_ReportMetric(t *testing.T) {
 		}
 
 		client := &Client{
-			APIKey:        "NRAK-test-key",
-			BaseURL:       "https://api.newrelic.com/v2",
+			UserAPIKey:    "NRAK-test-key",
 			MetricBaseURL: "https://metric-api.newrelic.com/metric/v1",
 			http:          httpCtx,
 		}
@@ -224,8 +252,7 @@ func TestClient_ReportMetric(t *testing.T) {
 		}
 
 		client := &Client{
-			APIKey:        "test-key",
-			BaseURL:       "https://api.newrelic.com/v2",
+			LicenseKey:    "test-key",
 			MetricBaseURL: "https://metric-api.newrelic.com/metric/v1",
 			http:          httpCtx,
 		}
@@ -247,7 +274,7 @@ func TestClient_ReportMetric(t *testing.T) {
 		err := client.ReportMetric(context.Background(), batch)
 
 		require.NoError(t, err)
-		
+
 		// Verify request body contains common attributes
 		bodyBytes, _ := io.ReadAll(httpCtx.Requests[0].Body)
 		var sentBatch []MetricBatch
@@ -269,8 +296,7 @@ func TestClient_ReportMetric(t *testing.T) {
 		}
 
 		client := &Client{
-			APIKey:        "test-key",
-			BaseURL:       "https://api.newrelic.com/v2",
+			LicenseKey:    "test-key",
 			MetricBaseURL: "https://metric-api.newrelic.com/metric/v1",
 			http:          httpCtx,
 		}
@@ -305,8 +331,7 @@ func TestClient_ReportMetric(t *testing.T) {
 		}
 
 		client := &Client{
-			APIKey:        "eu-test-key",
-			BaseURL:       "https://api.eu.newrelic.com/v2",
+			LicenseKey:    "eu-test-key",
 			MetricBaseURL: "https://metric-api.eu.newrelic.com/metric/v1",
 			http:          httpCtx,
 		}
@@ -347,7 +372,7 @@ func TestReportMetric_Execute_SetsIntervalMsForCountAndSummary(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiKey": "test-key",
+				"licenseKey": "test-key",
 				"site":   "US",
 			},
 		}
@@ -393,7 +418,7 @@ func TestReportMetric_Execute_SetsIntervalMsForCountAndSummary(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiKey": "test-key",
+				"licenseKey": "test-key",
 				"site":   "US",
 			},
 		}
@@ -420,7 +445,7 @@ func TestNewClient_MetricBaseURL(t *testing.T) {
 	t.Run("US region -> sets US metric URL", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiKey": "test-key",
+				"licenseKey": "test-key",
 				"site":   "US",
 			},
 		}
@@ -434,7 +459,7 @@ func TestNewClient_MetricBaseURL(t *testing.T) {
 	t.Run("EU region -> sets EU metric URL", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiKey": "test-key",
+				"licenseKey": "test-key",
 				"site":   "EU",
 			},
 		}

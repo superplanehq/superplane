@@ -24,7 +24,7 @@ func jsonResponse(statusCode int, body string) *http.Response {
 func Test__NewRelic__Sync(t *testing.T) {
 	n := &NewRelic{}
 
-	t.Run("missing API key -> error", func(t *testing.T) {
+	t.Run("no keys provided -> error", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"site": "US",
@@ -32,33 +32,35 @@ func Test__NewRelic__Sync(t *testing.T) {
 		}
 
 		err := n.Sync(core.SyncContext{
-			Configuration: map[string]any{},
+			Configuration: map[string]any{"site": "US"},
 			Integration:   integrationCtx,
 			HTTP:          &contexts.HTTPContext{},
 		})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "API key is required")
+		assert.Contains(t, err.Error(), "at least one API key is required")
 	})
 
-	t.Run("empty API key -> error", func(t *testing.T) {
+	t.Run("empty keys -> error", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiKey": "",
+				"userApiKey": "",
+				"licenseKey": "",
+				"site":       "US",
 			},
 		}
 
 		err := n.Sync(core.SyncContext{
-			Configuration: map[string]any{"apiKey": "", "site": "US"},
+			Configuration: map[string]any{"userApiKey": "", "licenseKey": "", "site": "US"},
 			Integration:   integrationCtx,
 			HTTP:          &contexts.HTTPContext{},
 		})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "API key is required")
+		assert.Contains(t, err.Error(), "at least one API key is required")
 	})
 
-	t.Run("invalid API key -> error", func(t *testing.T) {
+	t.Run("invalid user API key -> error", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				jsonResponse(http.StatusUnauthorized, `{
@@ -72,26 +74,26 @@ func Test__NewRelic__Sync(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiKey": "invalid-key",
-				"site":   "US",
+				"userApiKey": "NRAK-invalid-key",
+				"site":       "US",
 			},
 		}
 
 		err := n.Sync(core.SyncContext{
-			Configuration: map[string]any{"apiKey": "invalid-key", "site": "US"},
+			Configuration: map[string]any{"userApiKey": "NRAK-invalid-key", "site": "US"},
 			Integration:   integrationCtx,
 			HTTP:          httpCtx,
 		})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to validate API key")
+		assert.Contains(t, err.Error(), "failed to validate User API Key")
 		require.Len(t, httpCtx.Requests, 1)
 		assert.Equal(t, "https://api.newrelic.com/graphql", httpCtx.Requests[0].URL.String())
 		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
-		assert.Equal(t, "invalid-key", httpCtx.Requests[0].Header.Get("Api-Key"))
+		assert.Equal(t, "NRAK-invalid-key", httpCtx.Requests[0].Header.Get("Api-Key"))
 	})
 
-	t.Run("valid API key -> sets ready", func(t *testing.T) {
+	t.Run("valid user API key -> validates and sets ready", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				jsonResponse(http.StatusOK, `{
@@ -116,16 +118,16 @@ func Test__NewRelic__Sync(t *testing.T) {
 			},
 		}
 
-		apiKey := "test-api-key"
+		userApiKey := "NRAK-test-api-key"
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiKey": apiKey,
-				"site":   "US",
+				"userApiKey": userApiKey,
+				"site":       "US",
 			},
 		}
 
 		err := n.Sync(core.SyncContext{
-			Configuration: map[string]any{"apiKey": apiKey, "site": "US"},
+			Configuration: map[string]any{"userApiKey": userApiKey, "site": "US"},
 			Integration:   integrationCtx,
 			HTTP:          httpCtx,
 		})
@@ -135,29 +137,104 @@ func Test__NewRelic__Sync(t *testing.T) {
 		require.Len(t, httpCtx.Requests, 2)
 		assert.Equal(t, "https://api.newrelic.com/graphql", httpCtx.Requests[0].URL.String())
 		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
-		assert.Equal(t, "test-api-key", httpCtx.Requests[0].Header.Get("Api-Key"))
+		assert.Equal(t, "NRAK-test-api-key", httpCtx.Requests[0].Header.Get("Api-Key"))
 	})
 
-	t.Run("network error -> error", func(t *testing.T) {
+	t.Run("network error with user API key -> error", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{},
 		}
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiKey": "test-key",
-				"site":   "US",
+				"userApiKey": "NRAK-test-key",
+				"site":       "US",
 			},
 		}
 
 		err := n.Sync(core.SyncContext{
-			Configuration: map[string]any{"apiKey": "test-key", "site": "US"},
+			Configuration: map[string]any{"userApiKey": "NRAK-test-key", "site": "US"},
 			Integration:   integrationCtx,
 			HTTP:          httpCtx,
 		})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to validate API key")
+		assert.Contains(t, err.Error(), "failed to validate User API Key")
+	})
+
+	t.Run("only license key -> skips validation and sets ready", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"licenseKey": "license-key-1234567890",
+				"site":       "US",
+			},
+		}
+
+		err := n.Sync(core.SyncContext{
+			Configuration: map[string]any{"licenseKey": "license-key-1234567890", "site": "US"},
+			Integration:   integrationCtx,
+			HTTP:          httpCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "ready", integrationCtx.State)
+		require.Len(t, httpCtx.Requests, 0)
+
+		metadata, ok := integrationCtx.Metadata.(Metadata)
+		require.True(t, ok)
+		assert.Empty(t, metadata.Accounts)
+	})
+
+	t.Run("both keys -> validates user API key and sets ready", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				jsonResponse(http.StatusOK, `{
+					"data": {
+						"actor": {
+							"user": {
+								"name": "Test User",
+								"email": "test@example.com"
+							}
+						}
+					}
+				}`),
+				jsonResponse(http.StatusOK, `{
+					"data": {
+						"actor": {
+							"accounts": [
+								{"id": 123456, "name": "Test Account"}
+							]
+						}
+					}
+				}`),
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"userApiKey": "NRAK-test-api-key",
+				"licenseKey": "license-key-12345",
+				"site":       "US",
+			},
+		}
+
+		err := n.Sync(core.SyncContext{
+			Configuration: map[string]any{
+				"userApiKey": "NRAK-test-api-key",
+				"licenseKey": "license-key-12345",
+				"site":       "US",
+			},
+			Integration: integrationCtx,
+			HTTP:        httpCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "ready", integrationCtx.State)
+		require.Len(t, httpCtx.Requests, 2)
 	})
 }
 
@@ -215,7 +292,7 @@ func Test__NewRelic__ListResources(t *testing.T) {
 }
 
 func Test__Client__NewClient(t *testing.T) {
-	t.Run("missing API key -> error", func(t *testing.T) {
+	t.Run("no keys -> error", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"site": "US",
@@ -225,27 +302,29 @@ func Test__Client__NewClient(t *testing.T) {
 		_, err := NewClient(&contexts.HTTPContext{}, integrationCtx)
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "API key is required")
+		assert.Contains(t, err.Error(), "at least one API key is required")
 	})
 
-	t.Run("empty API key -> error", func(t *testing.T) {
+	t.Run("empty keys -> error", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiKey": "",
+				"userApiKey": "",
+				"licenseKey": "",
+				"site":       "US",
 			},
 		}
 
 		_, err := NewClient(&contexts.HTTPContext{}, integrationCtx)
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "API key is required")
+		assert.Contains(t, err.Error(), "at least one API key is required")
 	})
 
-	t.Run("valid API key -> success", func(t *testing.T) {
+	t.Run("user API key only -> success", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiKey": "test-key",
-				"site":   "US",
+				"userApiKey": "NRAK-test-key",
+				"site":       "US",
 			},
 		}
 
@@ -253,16 +332,35 @@ func Test__Client__NewClient(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.NotNil(t, client)
-		assert.Equal(t, "test-key", client.APIKey)
-		assert.Equal(t, "https://api.newrelic.com/v2", client.BaseURL)
+		assert.Equal(t, "NRAK-test-key", client.UserAPIKey)
+		assert.Equal(t, "", client.LicenseKey)
+		assert.Equal(t, "https://api.newrelic.com/graphql", client.NerdGraphURL)
+		assert.Equal(t, "https://metric-api.newrelic.com/metric/v1", client.MetricBaseURL)
+	})
+
+	t.Run("license key only -> success", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"licenseKey": "license-key-12345",
+				"site":       "US",
+			},
+		}
+
+		client, err := NewClient(&contexts.HTTPContext{}, integrationCtx)
+
+		require.NoError(t, err)
+		assert.NotNil(t, client)
+		assert.Equal(t, "", client.UserAPIKey)
+		assert.Equal(t, "license-key-12345", client.LicenseKey)
 		assert.Equal(t, "https://api.newrelic.com/graphql", client.NerdGraphURL)
 	})
 
-	t.Run("valid EU API key -> success", func(t *testing.T) {
+	t.Run("both keys -> success", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiKey": "test-key",
-				"site":   "EU",
+				"userApiKey": "NRAK-test-key",
+				"licenseKey": "license-key-12345",
+				"site":       "US",
 			},
 		}
 
@@ -270,9 +368,24 @@ func Test__Client__NewClient(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.NotNil(t, client)
-		assert.Equal(t, "test-key", client.APIKey)
-		assert.Equal(t, "https://api.eu.newrelic.com/v2", client.BaseURL)
+		assert.Equal(t, "NRAK-test-key", client.UserAPIKey)
+		assert.Equal(t, "license-key-12345", client.LicenseKey)
+	})
+
+	t.Run("EU region -> correct URLs", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"userApiKey": "NRAK-test-key",
+				"site":       "EU",
+			},
+		}
+
+		client, err := NewClient(&contexts.HTTPContext{}, integrationCtx)
+
+		require.NoError(t, err)
+		assert.NotNil(t, client)
 		assert.Equal(t, "https://api.eu.newrelic.com/graphql", client.NerdGraphURL)
+		assert.Equal(t, "https://metric-api.eu.newrelic.com/metric/v1", client.MetricBaseURL)
 	})
 }
 
@@ -294,7 +407,7 @@ func Test__Client__ValidateAPIKey(t *testing.T) {
 		}
 
 		client := &Client{
-			APIKey:       "test-key",
+			UserAPIKey:   "NRAK-test-key",
 			NerdGraphURL: "https://api.newrelic.com/graphql",
 			http:         httpCtx,
 		}
@@ -305,7 +418,7 @@ func Test__Client__ValidateAPIKey(t *testing.T) {
 		require.Len(t, httpCtx.Requests, 1)
 		assert.Equal(t, "https://api.newrelic.com/graphql", httpCtx.Requests[0].URL.String())
 		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
-		assert.Equal(t, "test-key", httpCtx.Requests[0].Header.Get("Api-Key"))
+		assert.Equal(t, "NRAK-test-key", httpCtx.Requests[0].Header.Get("Api-Key"))
 	})
 
 	t.Run("successful request with missing actor -> validates successfully", func(t *testing.T) {
@@ -320,7 +433,7 @@ func Test__Client__ValidateAPIKey(t *testing.T) {
 		}
 
 		client := &Client{
-			APIKey:       "license-key",
+			UserAPIKey:   "NRAK-test-key",
 			NerdGraphURL: "https://api.newrelic.com/graphql",
 			http:         httpCtx,
 		}
@@ -343,7 +456,7 @@ func Test__Client__ValidateAPIKey(t *testing.T) {
 		}
 
 		client := &Client{
-			APIKey:       strings.Repeat("x", 40),
+			UserAPIKey:   strings.Repeat("x", 40),
 			NerdGraphURL: "https://api.newrelic.com/graphql",
 			http:         httpCtx,
 		}
@@ -368,7 +481,7 @@ func Test__Client__ValidateAPIKey(t *testing.T) {
 		}
 
 		client := &Client{
-			APIKey:       "invalid-key",
+			UserAPIKey:   "invalid-key",
 			NerdGraphURL: "https://api.newrelic.com/graphql",
 			http:         httpCtx,
 		}
@@ -391,7 +504,7 @@ func Test__Client__ValidateAPIKey(t *testing.T) {
 		}
 
 		client := &Client{
-			APIKey:       "test-key",
+			UserAPIKey:   "NRAK-test-key",
 			NerdGraphURL: "https://api.newrelic.com/graphql",
 			http:         httpCtx,
 		}
@@ -418,9 +531,13 @@ func Test__NewRelic__Configuration(t *testing.T) {
 	integration := &NewRelic{}
 	config := integration.Configuration()
 	assert.NotEmpty(t, config)
+	assert.Len(t, config, 3)
 	assert.Equal(t, "site", config[0].Name)
 	assert.True(t, config[0].Required)
-	assert.Equal(t, "apiKey", config[1].Name)
-	assert.True(t, config[1].Required)
+	assert.Equal(t, "userApiKey", config[1].Name)
+	assert.False(t, config[1].Required)
 	assert.True(t, config[1].Sensitive)
+	assert.Equal(t, "licenseKey", config[2].Name)
+	assert.False(t, config[2].Required)
+	assert.True(t, config[2].Sensitive)
 }
