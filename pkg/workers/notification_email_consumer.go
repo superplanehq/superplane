@@ -22,6 +22,7 @@ const NotificationEmailConnectionName = "superplane"
 type NotificationEmailConsumer struct {
 	Consumer     *tackle.Consumer
 	RabbitMQURL  string
+	ServiceName  string
 	EmailService services.EmailService
 	AuthService  authorization.Authorization
 }
@@ -30,6 +31,15 @@ func NewNotificationEmailConsumer(
 	rabbitMQURL string,
 	emailService services.EmailService,
 	authService authorization.Authorization,
+) *NotificationEmailConsumer {
+	return NewNotificationEmailConsumerWithServiceName(rabbitMQURL, emailService, authService, NotificationEmailServiceName)
+}
+
+func NewNotificationEmailConsumerWithServiceName(
+	rabbitMQURL string,
+	emailService services.EmailService,
+	authService authorization.Authorization,
+	serviceName string,
 ) *NotificationEmailConsumer {
 	logger := logging.NewTackleLogger(log.StandardLogger().WithFields(log.Fields{
 		"consumer": "notification_email",
@@ -41,6 +51,7 @@ func NewNotificationEmailConsumer(
 	return &NotificationEmailConsumer{
 		RabbitMQURL:  rabbitMQURL,
 		Consumer:     consumer,
+		ServiceName:  serviceName,
 		EmailService: emailService,
 		AuthService:  authService,
 	}
@@ -50,7 +61,7 @@ func (c *NotificationEmailConsumer) Start() error {
 	options := tackle.Options{
 		URL:            c.RabbitMQURL,
 		ConnectionName: NotificationEmailConnectionName,
-		Service:        NotificationEmailServiceName,
+		Service:        c.ServiceName,
 		RemoteExchange: messages.WorkflowExchange,
 		RoutingKey:     messages.NotificationEmailRequestedRoutingKey,
 	}

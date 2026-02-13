@@ -20,6 +20,7 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   aws: "AWS",
   smtp: "SMTP",
   sendgrid: "SendGrid",
+  sentry: "Sentry",
   dockerhub: "DockerHub",
 };
 

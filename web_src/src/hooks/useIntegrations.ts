@@ -64,6 +64,9 @@ export const useConnectedIntegrations = (organizationId: string, options?: { ena
       const response = await organizationsListIntegrations(
         withOrganizationHeader({
           path: { id: organizationId },
+          headers: {
+            "x-organization-id": organizationId,
+          },
         }),
       );
       return response.data?.integrations || [];

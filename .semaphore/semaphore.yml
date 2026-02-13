@@ -40,7 +40,7 @@ blocks:
             - make lint
         - name: Unit Tests
           commands:
-            - make test
+            - make test PKG_TEST_PACKAGES=./pkg/...
         - name: E2E Tests
           parallelism: 10
           commands:
