@@ -46,9 +46,7 @@ export const sendAndWaitMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution
-        ? sendAndWaitEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? sendAndWaitEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: sendAndWaitMetadataList(context.node),
       specs: sendAndWaitSpecs(context.node),
@@ -64,9 +62,7 @@ export const sendAndWaitMapper: ComponentBaseMapper = {
     return {
       Status: metadata?.state || "-",
       "Button Value": response?.value ? String(response.value) : "-",
-      User: response?.user
-        ? String((response.user as Record<string, unknown>)?.username || "-")
-        : "-",
+      User: response?.user ? String((response.user as Record<string, unknown>)?.username || "-") : "-",
       Channel: metadata?.channel?.name || "-",
     };
   },
@@ -127,11 +123,7 @@ function sendAndWaitSpecs(node: NodeInfo): ComponentBaseSpec[] {
   return specs;
 }
 
-function sendAndWaitEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+function sendAndWaitEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
