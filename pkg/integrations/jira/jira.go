@@ -66,7 +66,32 @@ func (j *Jira) Description() string {
 }
 
 func (j *Jira) Instructions() string {
-	return ""
+	return `Jira supports two authentication methods. Choose the one that fits your use case:
+
+## API Token
+
+Use this method for simple setups that only need issue management (no webhooks).
+
+1. Go to **Atlassian API Tokens** (https://id.atlassian.com/manage-profile/security/api-tokens)
+2. Click **Create API token** and copy the token
+3. Select **API Token** as auth type below and enter your Jira base URL, email, and token
+
+## OAuth 2.0
+
+Use this method if you need webhook support (e.g. On Issue Created trigger).
+
+1. Go to **Atlassian Developer Console** (https://developer.atlassian.com/console/myapps/)
+2. Click **Create** > **OAuth 2.0 integration**, name your app and agree to the terms
+3. Go to **Permissions** and add these scopes under **Jira API**:
+   - read:jira-work - Read issues and projects
+   - write:jira-work - Create issues
+   - read:jira-user - Read user info
+   - manage:jira-webhook - Register and delete webhooks
+4. Go to **Distribution**, click **Edit**, and set the status to **Sharing** to allow other users in your organization to connect
+5. Go to **Settings** to find the **Client ID** and create a **Secret**
+6. Select **OAuth 2.0** as auth type below and enter the Client ID and Client Secret
+7. After creating the integration, go to the Atlassian app **Authorization** > **OAuth 2.0 (3LO)** and set the callback URL to your SuperPlane integration callback URL
+8. Click **Connect** to authorize with Atlassian`
 }
 
 func (j *Jira) Configuration() []configuration.Field {
