@@ -66,8 +66,6 @@ func (c *ReportMetric) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-
-
 func (c *ReportMetric) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
@@ -194,20 +192,20 @@ func (c *ReportMetric) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to report metric: %v", err)
 	}
 
-    output := map[string]any{
-        "name":      metric.Name,
-        "value":     metric.Value,
-        "type":      metric.Type,
-        "timestamp": metric.Timestamp,
-        "intervalMs": metric.IntervalMs,
-        "status":    "202 Accepted",
-    }
+	output := map[string]any{
+		"name":       metric.Name,
+		"value":      metric.Value,
+		"type":       metric.Type,
+		"timestamp":  metric.Timestamp,
+		"intervalMs": metric.IntervalMs,
+		"status":     "202 Accepted",
+	}
 
-    return ctx.ExecutionState.Emit(
-        core.DefaultOutputChannel.Name,
-        ReportMetricPayloadType,
-        []any{output},
-    )
+	return ctx.ExecutionState.Emit(
+		core.DefaultOutputChannel.Name,
+		ReportMetricPayloadType,
+		[]any{output},
+	)
 }
 
 func (c *ReportMetric) Cancel(ctx core.ExecutionContext) error {

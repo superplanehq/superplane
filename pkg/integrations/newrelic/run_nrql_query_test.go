@@ -404,8 +404,8 @@ func TestRunNRQLQuery_Setup(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"account": "1234567",
-				"query":     "SELECT count(*) FROM Transaction",
-				"timeout":   10,
+				"query":   "SELECT count(*) FROM Transaction",
+				"timeout": 10,
 			},
 			Metadata: &contexts.MetadataContext{},
 		}
@@ -447,8 +447,8 @@ func TestRunNRQLQuery_Setup(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"account": "1234567",
-				"query":     "SELECT count(*) FROM Transaction",
-				"timeout":   150, // exceeds max of 120
+				"query":   "SELECT count(*) FROM Transaction",
+				"timeout": 150, // exceeds max of 120
 			},
 			Metadata: &contexts.MetadataContext{},
 		}
@@ -590,7 +590,7 @@ func TestRunNRQLQuery_Execute_DataFallback(t *testing.T) {
 func TestRunNRQLQuery_Execute(t *testing.T) {
 	t.Run("string account ID -> success", func(t *testing.T) {
 		component := &RunNRQLQuery{}
-		
+
 		responseJSON := `{
 			"data": {
 				"actor": {
@@ -621,7 +621,7 @@ func TestRunNRQLQuery_Execute(t *testing.T) {
 		}
 
 		executionState := &contexts.ExecutionStateContext{}
-		
+
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
 				"account": "1234567",

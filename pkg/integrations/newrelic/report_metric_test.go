@@ -128,7 +128,6 @@ func TestClient_ReportMetric(t *testing.T) {
 
 		client := &Client{
 			APIKey:        "test-key",
-			BaseURL:       "https://api.newrelic.com/v2",
 			MetricBaseURL: "https://metric-api.newrelic.com/metric/v1",
 			http:          httpCtx,
 		}
@@ -184,7 +183,6 @@ func TestClient_ReportMetric(t *testing.T) {
 
 		client := &Client{
 			APIKey:        "NRAK-test-key",
-			BaseURL:       "https://api.newrelic.com/v2",
 			MetricBaseURL: "https://metric-api.newrelic.com/metric/v1",
 			http:          httpCtx,
 		}
@@ -225,7 +223,6 @@ func TestClient_ReportMetric(t *testing.T) {
 
 		client := &Client{
 			APIKey:        "test-key",
-			BaseURL:       "https://api.newrelic.com/v2",
 			MetricBaseURL: "https://metric-api.newrelic.com/metric/v1",
 			http:          httpCtx,
 		}
@@ -247,7 +244,7 @@ func TestClient_ReportMetric(t *testing.T) {
 		err := client.ReportMetric(context.Background(), batch)
 
 		require.NoError(t, err)
-		
+
 		// Verify request body contains common attributes
 		bodyBytes, _ := io.ReadAll(httpCtx.Requests[0].Body)
 		var sentBatch []MetricBatch
@@ -270,7 +267,6 @@ func TestClient_ReportMetric(t *testing.T) {
 
 		client := &Client{
 			APIKey:        "test-key",
-			BaseURL:       "https://api.newrelic.com/v2",
 			MetricBaseURL: "https://metric-api.newrelic.com/metric/v1",
 			http:          httpCtx,
 		}
@@ -306,7 +302,6 @@ func TestClient_ReportMetric(t *testing.T) {
 
 		client := &Client{
 			APIKey:        "eu-test-key",
-			BaseURL:       "https://api.eu.newrelic.com/v2",
 			MetricBaseURL: "https://metric-api.eu.newrelic.com/metric/v1",
 			http:          httpCtx,
 		}
