@@ -119,33 +119,44 @@ func (n *NewRelic) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("API key is required")
 	}
 
-    client, err := NewClient(ctx.HTTP, ctx.Integration)
-    if err != nil {
-        return fmt.Errorf("failed to create client: %w", err)
-    }
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
 
-    // 1. Validate the API Key
-    err = client.ValidateAPIKey(context.Background())
-    if err != nil {
-        return fmt.Errorf("failed to validate API key: %w", err)
-    }
+	// 1. Validate the API Key (Only if it's a User API Key)
+	if IsUserAPIKey(config.APIKey) {
+		err = client.ValidateAPIKey(context.Background())
+		if err != nil {
+			return fmt.Errorf("failed to validate API key: %w", err)
+		}
 
-    // 2. Fetch accounts so the UI can populate the \"Account\" dropdowns
-    accounts, err := client.ListAccounts(context.Background())
-    if err != nil {
-        if ctx.Logger != nil {
-            ctx.Logger.Warnf("New Relic: failed to fetch accounts: %v", err)
-        }
-        accounts = []Account{}
-    }
+		// 2. Fetch accounts so the UI can populate the "Account" dropdowns
+		accounts, err := client.ListAccounts(context.Background())
+		if err != nil {
+			if ctx.Logger != nil {
+				ctx.Logger.Warnf("New Relic: failed to fetch accounts: %v", err)
+			}
+			accounts = []Account{}
+		}
 
-    // 3. Save to Metadata
-    ctx.Integration.SetMetadata(Metadata{
-        Accounts: accounts,
-    })
+		// 3. Save to Metadata
+		ctx.Integration.SetMetadata(Metadata{
+			Accounts: accounts,
+		})
+	} else {
+		// For License Keys, we skip validation and account fetching as they don't support NerdGraph
+		if ctx.Logger != nil {
+			ctx.Logger.Info("New Relic: License Key detected, skipping NerdGraph validation and account fetching")
+		}
+		// Save empty metadata to ensure structure exists
+		ctx.Integration.SetMetadata(Metadata{
+			Accounts: []Account{},
+		})
+	}
 
-    ctx.Integration.Ready()
-    return nil
+	ctx.Integration.Ready()
+	return nil
 }
 
 

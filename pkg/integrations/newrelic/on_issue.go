@@ -15,10 +15,8 @@ import (
 type OnIssue struct{}
 
 type OnIssueConfiguration struct {
-	Priorities      []string `json:"priorities" yaml:"priorities" mapstructure:"priorities"`
-	States          []string `json:"states" yaml:"states" mapstructure:"states"`
-	Account         string   `json:"account" yaml:"account" mapstructure:"account"`
-	ManualAccountID string   `json:"manualAccountId" yaml:"manualAccountId" mapstructure:"manualAccountId"`
+	Priorities []string `json:"priorities" yaml:"priorities" mapstructure:"priorities"`
+	States     []string `json:"states" yaml:"states" mapstructure:"states"`
 }
 
 func (t *OnIssue) Name() string {
@@ -75,26 +73,6 @@ func (t *OnIssue) Color() string {
 
 func (t *OnIssue) Configuration() []configuration.Field {
 	return []configuration.Field{
-		{
-			Name:        "account",
-			Label:       "Account",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false, // Optional to prevent blocking
-			Description: "The New Relic account (optional for webhook)",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: "account",
-				},
-			},
-		},
-		{
-			Name:        "manualAccountId",
-			Label:       "Manual Account ID",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Manually enter Account ID if dropdown fails",
-			Placeholder: "1234567",
-		},
 		{
 			Name:        "priorities",
 			Label:       "Priorities",

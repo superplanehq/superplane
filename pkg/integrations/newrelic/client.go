@@ -15,7 +15,6 @@ import (
 
 type Client struct {
 	APIKey        string
-	BaseURL       string
 	NerdGraphURL  string
 	MetricBaseURL string
 	http          core.HTTPContext
@@ -37,20 +36,17 @@ func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, 
 		return nil, fmt.Errorf("failed to get site: %w", err)
 	}
 
-	var baseURL, nerdGraphURL, metricBaseURL string
+	var nerdGraphURL, metricBaseURL string
 	if string(site) == "EU" {
-		baseURL = restAPIBaseEU
 		nerdGraphURL = nerdGraphAPIBaseEU
 		metricBaseURL = metricsAPIBaseEU
 	} else {
-		baseURL = restAPIBaseUS
 		nerdGraphURL = nerdGraphAPIBaseUS
 		metricBaseURL = metricsAPIBaseUS
 	}
 
 	return &Client{
 		APIKey:        key,
-		BaseURL:       baseURL,
 		NerdGraphURL:  nerdGraphURL,
 		MetricBaseURL: metricBaseURL,
 		http:          httpCtx,
@@ -79,7 +75,7 @@ type MetricBatch struct {
 	Metrics []Metric        `json:"metrics"`
 }
 
-func isUserAPIKey(apiKey string) bool {
+func IsUserAPIKey(apiKey string) bool {
 	return strings.HasPrefix(apiKey, "NRAK-")
 }
 
@@ -96,7 +92,7 @@ func (c *Client) ReportMetric(ctx context.Context, batch []MetricBatch) error {
 		return fmt.Errorf("failed to create metric request: %w", err)
 	}
 
-	if isUserAPIKey(c.APIKey) {
+	if IsUserAPIKey(c.APIKey) {
 		req.Header.Set("Api-Key", c.APIKey)
 	} else {
 		req.Header.Set("X-License-Key", c.APIKey)
