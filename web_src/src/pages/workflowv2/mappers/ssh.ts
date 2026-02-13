@@ -96,9 +96,18 @@ export const sshMapper: ComponentBaseMapper = {
     if (context.execution.createdAt) {
       details["Started at"] = new Date(context.execution.createdAt).toLocaleString();
     }
-    if (context.execution.updatedAt) {
+    if (context.execution.updatedAt && context.execution.state === "STATE_FINISHED") {
       details["Finished at"] = new Date(context.execution.updatedAt).toLocaleString();
     }
+
+    // Show connection retry progress
+    const retryAttempt = typeof metadata?.attempt === "number" ? metadata.attempt : 0;
+    const retryConfig = (context.node.configuration as SSHConfiguration & { connectionRetry?: { enabled?: boolean; retries?: number } })
+      ?.connectionRetry;
+    if (retryConfig?.enabled && retryAttempt > 0) {
+      details["Connection retry"] = `${retryAttempt} / ${retryConfig.retries ?? "?"}`;
+    }
+
     if (result?.exitCode !== undefined) {
       details["Exit code"] = String(result.exitCode);
     }

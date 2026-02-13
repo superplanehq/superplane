@@ -372,21 +372,35 @@ func (c *SSHCommand) shouldRetry(retrySpec *ConnectionRetrySpec, metadata core.M
 		return false
 	}
 
-	attempt, ok := metadata.Get().(int)
-	if !ok {
-		attempt = 0
-	}
-
-	return attempt < retrySpec.Retries
+	return c.getRetryAttempt(metadata) < retrySpec.Retries
 }
 
 func (c *SSHCommand) incrementRetryCount(metadata core.MetadataContext) error {
-	attempt, ok := metadata.Get().(int)
+	attempt := c.getRetryAttempt(metadata)
+
+	return metadata.Set(map[string]any{"attempt": attempt + 1})
+}
+
+func (c *SSHCommand) getRetryAttempt(metadata core.MetadataContext) int {
+	meta, ok := metadata.Get().(map[string]any)
 	if !ok {
-		attempt = 0
+		return 0
 	}
 
-	return metadata.Set(attempt + 1)
+	attempt, ok := meta["attempt"]
+	if !ok {
+		return 0
+	}
+
+	// JSON numbers deserialize as float64
+	switch v := attempt.(type) {
+	case float64:
+		return int(v)
+	case int:
+		return v
+	default:
+		return 0
+	}
 }
 
 func (c *SSHCommand) decodeSpec(cfg any) (Spec, error) {
