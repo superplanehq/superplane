@@ -89,11 +89,6 @@ type ServicesResponse struct {
 	Data []ServiceData `json:"data"`
 }
 
-// TeamResponse represents the JSON:API response for a team
-type TeamResponse struct {
-	Data TeamData `json:"data"`
-}
-
 func (c *Client) ListServices() ([]Service, error) {
 	url := fmt.Sprintf("%s/services", c.BaseURL)
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
