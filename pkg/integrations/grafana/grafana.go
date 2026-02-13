@@ -119,18 +119,6 @@ func (g *Grafana) HandleRequest(ctx core.HTTPRequestContext) {
 	ctx.Response.WriteHeader(404)
 }
 
-func (g *Grafana) CompareWebhookConfig(a, b any) (bool, error) {
-	return true, nil
-}
-
 func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	return []core.IntegrationResource{}, nil
-}
-
-func (g *Grafana) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	return nil, nil
-}
-
-func (g *Grafana) CleanupWebhook(ctx core.CleanupWebhookContext) error {
-	return nil
 }
