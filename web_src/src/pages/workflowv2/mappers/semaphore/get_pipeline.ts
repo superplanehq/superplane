@@ -6,10 +6,7 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import {
-  ComponentBaseProps,
-  EventSection,
-} from "@/ui/componentBase";
+import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
 import { getState, getStateMap, getTriggerRenderer } from "..";
@@ -83,9 +80,7 @@ export const getPipelineMapper: ComponentBaseMapper = {
         : (payload as GetPipelineOutput | undefined);
 
     return {
-      "Retrieved At": context.execution.createdAt
-        ? new Date(context.execution.createdAt).toLocaleString()
-        : "-",
+      "Retrieved At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",
       Name: stringOrDash(result?.name),
       "Pipeline ID": stringOrDash(result?.ppl_id),
       "Workflow ID": stringOrDash(result?.wf_id),
