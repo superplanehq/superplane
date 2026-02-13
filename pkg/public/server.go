@@ -3,8 +3,11 @@ package public
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"hash"
 	"io"
 	"net/http"
 	"net/http/httputil"
@@ -13,6 +16,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mitchellh/mapstructure"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -52,6 +57,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/web/assets"
 	grpcLib "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"gorm.io/datatypes"
 )
 
 const (
@@ -242,6 +248,14 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
 
+	// IMPORTANT: Custom HTTP endpoints under /api/v1/integrations/* must be registered
+	// before the gRPC gateway PathPrefix("/api/v1/integrations") handler, otherwise the
+	// request may be routed to grpc-gateway (which would return 404 for unknown paths).
+	s.Router.Handle(
+		"/api/v1/integrations/sentry/attach",
+		orgAuthMiddleware.Middleware(http.HandlerFunc(s.HandleSentryPublicIntegrationAttach)),
+	).Methods(http.MethodPost)
+
 	accountAuthMiddleware := middleware.AccountAuthMiddleware(s.jwt)
 	protectedAccountGRPCHandler := accountAuthMiddleware(s.grpcGatewayAccountHandler(grpcGatewayMux))
 
@@ -387,6 +401,14 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.HandleFunc("/health", s.HealthCheck).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/setup-owner", s.setupOwner).Methods("POST")
 
+	// Sentry public integration endpoints
+	publicRoute.HandleFunc("/api/v1/integrations/sentry/setup", s.HandleSentryPublicIntegrationSetup).Methods("GET")
+	publicRoute.HandleFunc("/api/v1/integrations/sentry/webhook", s.HandleSentryPublicIntegrationWebhook).Methods("POST")
+
+	orgRoute := r.NewRoute().Subrouter()
+	orgRoute.Use(middleware.OrganizationAuthMiddleware(s.jwt))
+	orgRoute.HandleFunc("/api/v1/integrations/sentry/attach", s.HandleSentryPublicIntegrationAttach).Methods("POST")
+
 	// OIDC discovery endpoints
 	publicRoute.HandleFunc("/.well-known/openid-configuration", s.handleOIDCConfiguration).Methods("GET")
 	publicRoute.HandleFunc("/.well-known/jwks.json", s.handleOIDCJWKS).Methods("GET")
@@ -432,6 +454,399 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	}
 
 	s.Router = r
+}
+
+type sentryPublicIntegrationAttachRequest struct {
+	IntegrationID  string `json:"integrationId"`
+	InstallationID string `json:"installationId"`
+	Code           string `json:"code"`
+}
+
+type sentryAuthorizationResponse struct {
+	ID           string `json:"id"`
+	Token        string `json:"token"`
+	RefreshToken string `json:"refreshToken"`
+	ExpiresAt    string `json:"expiresAt"`
+}
+
+func (s *Server) HandleSentryPublicIntegrationSetup(w http.ResponseWriter, r *http.Request) {
+	code := r.URL.Query().Get("code")
+	installationID := r.URL.Query().Get("installationId")
+	if code == "" || installationID == "" {
+		http.Error(w, "missing code or installationId", http.StatusBadRequest)
+		return
+	}
+
+	// Redirect to a UI route (frontend finalize). The frontend must call /api/v1/integrations/sentry/attach.
+	redirectPath := "/sentry/setup"
+	redirectURL := redirectPath + "?code=" + url.QueryEscape(code) + "&installationId=" + url.QueryEscape(installationID)
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+}
+
+func (s *Server) HandleSentryPublicIntegrationAttach(w http.ResponseWriter, r *http.Request) {
+	user, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	var req sentryPublicIntegrationAttachRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.IntegrationID == "" || req.InstallationID == "" || req.Code == "" {
+		http.Error(w, "integrationId, installationId and code are required", http.StatusBadRequest)
+		return
+	}
+
+	integrationID, err := uuid.Parse(req.IntegrationID)
+	if err != nil {
+		http.Error(w, "Invalid integrationId", http.StatusBadRequest)
+		return
+	}
+
+	tx := database.Conn()
+	integrationInstance, err := models.FindIntegration(user.OrganizationID, integrationID)
+	if err != nil {
+		// Help distinguish whether the integration doesn't exist at all or belongs to a different organization.
+		if unscoped, unscopedErr := models.FindUnscopedIntegration(integrationID); unscopedErr == nil {
+			log.Errorf(
+				"Sentry attach: integration org mismatch: integration_id=%s integration_org_id=%s request_org_id=%s",
+				integrationID.String(),
+				unscoped.OrganizationID.String(),
+				user.OrganizationID.String(),
+			)
+			http.Error(w, "integration not found in this organization", http.StatusNotFound)
+			return
+		}
+		log.Errorf(
+			"Sentry attach: integration not found: integration_id=%s request_org_id=%s err=%v",
+			integrationID.String(),
+			user.OrganizationID.String(),
+			err,
+		)
+		http.Error(w, "integration not found", http.StatusNotFound)
+		return
+	}
+	if integrationInstance.AppName != "sentry" {
+		http.Error(w, "integration is not a sentry integration", http.StatusBadRequest)
+		return
+	}
+
+	clientID := strings.TrimSpace(os.Getenv("SENTRY_PUBLIC_CLIENT_ID"))
+	clientSecret := strings.TrimSpace(os.Getenv("SENTRY_PUBLIC_CLIENT_SECRET"))
+	if clientID == "" || clientSecret == "" {
+		http.Error(w, "SENTRY_PUBLIC_CLIENT_ID and SENTRY_PUBLIC_CLIENT_SECRET must be set", http.StatusInternalServerError)
+		return
+	}
+
+	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("SENTRY_PUBLIC_BASE_URL")), "/")
+	if baseURL == "" {
+		baseURL = "https://sentry.io"
+	}
+
+	auth, err := s.exchangeSentryAuthorizationCode(r.Context(), baseURL, req.InstallationID, req.Code, clientID, clientSecret)
+	if err != nil {
+		log.Errorf("Sentry attach: failed token exchange: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to exchange authorization code: %v", err), http.StatusBadRequest)
+		return
+	}
+	if err := s.verifySentryInstallation(r.Context(), baseURL, req.InstallationID, auth.Token); err != nil {
+		log.Errorf("Sentry attach: failed to verify installation: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to verify Sentry installation: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	integrationCtx := contexts.NewIntegrationContext(tx, nil, integrationInstance, s.encryptor, s.registry)
+	if err := integrationCtx.SetSecret("sentryPublicAccessToken", []byte(auth.Token)); err != nil {
+		http.Error(w, "Failed to store token", http.StatusInternalServerError)
+		return
+	}
+	if err := integrationCtx.SetSecret("sentryPublicRefreshToken", []byte(auth.RefreshToken)); err != nil {
+		http.Error(w, "Failed to store refresh token", http.StatusInternalServerError)
+		return
+	}
+
+	metadata := map[string]any{}
+	if err := mapstructure.Decode(integrationInstance.Metadata.Data(), &metadata); err != nil {
+		metadata = map[string]any{}
+	}
+	if metadata == nil {
+		metadata = map[string]any{}
+	}
+	metadata["sentryInstallationID"] = req.InstallationID
+	metadata["sentryBaseURL"] = baseURL
+	installationUUID := strings.TrimSpace(auth.ID)
+	if installationUUID == "" {
+		installationUUID = strings.TrimSpace(req.InstallationID)
+	}
+	if installationUUID != "" {
+		metadata["sentryInstallationUUID"] = installationUUID
+	}
+	integrationInstance.Metadata = datatypes.NewJSONType(metadata)
+
+	// Schedule a resync so Sync can refresh the token before expiry.
+	// Sentry tokens expire after 8 hours.
+	_ = integrationCtx.ScheduleResync(7 * time.Hour)
+	integrationCtx.Ready()
+
+	if err := tx.Save(integrationInstance).Error; err != nil {
+		http.Error(w, "Failed to save integration", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) HandleSentryPublicIntegrationWebhook(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, MaxEventSize)
+	defer r.Body.Close()
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		if _, ok := err.(*http.MaxBytesError); ok {
+			http.Error(w, fmt.Sprintf("Request body is too large - must be up to %d bytes", MaxEventSize), http.StatusRequestEntityTooLarge)
+			return
+		}
+		http.Error(w, "Error reading request body", http.StatusBadRequest)
+		return
+	}
+	bodyHash := sha256.Sum256(body)
+	log.Infof(
+		"Sentry webhook: received: content_length=%d signature_present=%t body_sha256=%x",
+		len(body),
+		strings.TrimSpace(r.Header.Get("Sentry-Hook-Signature")) != "",
+		bodyHash,
+	)
+
+	// Sentry Integration Platform signs webhook payloads using the integration's
+	// Client Secret (Sentry-Hook-Signature = HMAC-SHA256(client_secret, raw_body)).
+	// Keep SENTRY_PUBLIC_WEBHOOK_SECRET as an optional override for compatibility.
+	secret := strings.TrimSpace(os.Getenv("SENTRY_PUBLIC_WEBHOOK_SECRET"))
+	if secret == "" {
+		secret = strings.TrimSpace(os.Getenv("SENTRY_PUBLIC_CLIENT_SECRET"))
+	}
+	if secret == "" {
+		http.Error(w, "SENTRY_PUBLIC_CLIENT_SECRET must be set", http.StatusInternalServerError)
+		return
+	}
+
+	if !verifySentryWebhookSignature(body, r.Header.Get("Sentry-Hook-Signature"), secret) {
+		log.Warnf("Sentry webhook: invalid signature: body_sha256=%x", bodyHash)
+		http.Error(w, "invalid signature", http.StatusForbidden)
+		return
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		log.Warnf("Sentry webhook: invalid JSON: body_sha256=%x err=%v", bodyHash, err)
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	log.Infof(
+		"Sentry webhook: parsed: body_sha256=%x keys=%v",
+		bodyHash,
+		func() []string {
+			keys := make([]string, 0, len(payload))
+			for k := range payload {
+				keys = append(keys, k)
+			}
+			return keys
+		}(),
+	)
+
+	installation, _ := payload["installation"].(map[string]any)
+	installationUUID, _ := installation["uuid"].(string)
+	installationUUID = strings.TrimSpace(installationUUID)
+	if installationUUID == "" {
+		log.Warnf("Sentry webhook: missing installation.uuid: body_sha256=%x", bodyHash)
+		http.Error(w, "missing installation.uuid", http.StatusBadRequest)
+		return
+	}
+
+	tx := database.Conn()
+	integrationInstance, err := models.FindSentryIntegrationByInstallationIDInTransaction(tx, installationUUID)
+	if err != nil {
+		log.Warnf(
+			"Sentry webhook: unknown installation: installation_uuid=%s body_sha256=%x err=%v",
+			installationUUID,
+			bodyHash,
+			err,
+		)
+		// Unknown installation: ack to avoid retries until user attaches it in SuperPlane.
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	log.Infof(
+		"Sentry webhook: matched integration: integration_id=%s installation_uuid=%s body_sha256=%x",
+		integrationInstance.ID.String(),
+		installationUUID,
+		bodyHash,
+	)
+
+	nodes, err := models.ListReadyTriggersForIntegrationInTransaction(tx, integrationInstance.ID)
+	if err != nil {
+		http.Error(w, "failed to list nodes", http.StatusInternalServerError)
+		return
+	}
+	log.Infof(
+		"Sentry webhook: ready nodes: integration_id=%s count=%d body_sha256=%x",
+		integrationInstance.ID.String(),
+		len(nodes),
+		bodyHash,
+	)
+
+	for _, node := range nodes {
+		ref := node.Ref.Data()
+		if ref.Trigger == nil || ref.Trigger.Name != "sentry.onIssueEvent" {
+			continue
+		}
+		log.Infof(
+			"Sentry webhook: executing trigger node: node_id=%s trigger=%s body_sha256=%x",
+			node.NodeID,
+			ref.Trigger.Name,
+			bodyHash,
+		)
+		code, execErr := s.executeTriggerNode(r.Context(), body, r.Header, node)
+		if execErr != nil {
+			log.Errorf(
+				"Sentry webhook: trigger execution failed: node_id=%s trigger=%s status=%d body_sha256=%x err=%v",
+				node.NodeID,
+				ref.Trigger.Name,
+				code,
+				bodyHash,
+				execErr,
+			)
+			http.Error(w, "trigger execution failed", code)
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func verifySentryWebhookSignature(body []byte, signature string, secret string) bool {
+	signature = strings.TrimSpace(signature)
+	if signature == "" {
+		log.Warnf("Sentry webhook: missing signature: body_sha256=%x", sha256.Sum256(body))
+		return false
+	}
+
+	var mac hash.Hash = hmac.New(sha256.New, []byte(secret))
+	mac.Write(body)
+	expected := fmt.Sprintf("%x", mac.Sum(nil))
+
+	return hmac.Equal([]byte(expected), []byte(signature))
+}
+
+func (s *Server) verifySentryInstallation(ctx context.Context, baseURL string, installationID string, accessToken string) error {
+	URL, err := url.Parse(baseURL)
+	if err != nil {
+		return fmt.Errorf("invalid base URL: %w", err)
+	}
+
+	basePath := strings.TrimRight(URL.Path, "/")
+	URL.Path = basePath + fmt.Sprintf("/api/0/sentry-app-installations/%s/", installationID)
+
+	requestBody, err := json.Marshal(map[string]any{
+		"status": "installed",
+	})
+	if err != nil {
+		return fmt.Errorf("marshal body: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, URL.String(), bytes.NewReader(requestBody))
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	if strings.TrimSpace(accessToken) != "" {
+		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
+	}
+
+	res, err := s.registry.HTTPContext().Do(req)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer res.Body.Close()
+
+	resBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return fmt.Errorf("read response: %w", err)
+	}
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return fmt.Errorf("verify installation failed: %d %s", res.StatusCode, string(resBody))
+	}
+
+	return nil
+}
+
+func (s *Server) exchangeSentryAuthorizationCode(
+	ctx context.Context,
+	baseURL string,
+	installationID string,
+	code string,
+	clientID string,
+	clientSecret string,
+) (*sentryAuthorizationResponse, error) {
+	URL, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid base URL: %w", err)
+	}
+	// NOTE: Sentry's authorizations endpoint requires a trailing slash.
+	// Do not use path.Join here because it strips trailing slashes.
+	basePath := strings.TrimRight(URL.Path, "/")
+	URL.Path = basePath + fmt.Sprintf("/api/0/sentry-app-installations/%s/authorizations/", installationID)
+
+	requestBody, err := json.Marshal(map[string]any{
+		"grant_type":    "authorization_code",
+		"code":          code,
+		"client_id":     clientID,
+		"client_secret": clientSecret,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal body: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, URL.String(), bytes.NewReader(requestBody))
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	res, err := s.registry.HTTPContext().Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer res.Body.Close()
+
+	resBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return nil, fmt.Errorf("sentry token exchange failed: %d %s", res.StatusCode, string(resBody))
+	}
+
+	var out sentryAuthorizationResponse
+	if err := json.Unmarshal(resBody, &out); err != nil {
+		return nil, fmt.Errorf("parse response: %w", err)
+	}
+	if strings.TrimSpace(out.Token) == "" {
+		return nil, fmt.Errorf("missing token in response")
+	}
+
+	return &out, nil
 }
 
 type oidcDiscoveryResponse struct {
