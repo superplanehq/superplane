@@ -390,9 +390,10 @@ func (c *CreateIncident) Setup(ctx core.SetupContext) error {
 		}
 	}
 
-	// Resolve page name for metadata when Page is a static ID (no expression)
+	// Resolve page name for metadata when Page is a static ID (no expression).
+	// Skip API call if HTTP context is not available (e.g. in tests without HTTP mock).
 	metadata := NodeMetadata{}
-	if spec.Page != "" && !strings.Contains(spec.Page, "{{") {
+	if spec.Page != "" && !strings.Contains(spec.Page, "{{") && ctx.HTTP != nil {
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
 		if err == nil {
 			pages, err := client.ListPages()

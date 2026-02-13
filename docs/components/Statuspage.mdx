@@ -94,7 +94,7 @@ The Get Incident component fetches the full details of an existing incident on y
 
 ### Configuration
 
-- **Page** (required): Page ID containing the incident. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.page_id }}).
+- **Page** (required): The Statuspage containing the incident. Select from the dropdown, or switch to expression mode for workflow chaining (e.g. {{ $['Create Incident'].data.page_id }}).
 - **Incident** (required): Incident ID to fetch. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.id }}).
 
 ### Output
@@ -146,15 +146,16 @@ The Update Incident component updates an existing incident on your Atlassian Sta
 
 ### Configuration
 
-- **Page** (required): Page ID containing the incident. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.page_id }}).
+- **Page** (required): The Statuspage containing the incident. Select from the dropdown, or switch to expression mode for workflow chaining (e.g. {{ $['Create Incident'].data.page_id }}).
 - **Incident** (required): Incident ID to update. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.id }}).
 - **Status** (optional): New status (investigating, identified, monitoring, resolved, scheduled, in_progress, completed)
 - **Body** (optional): Update message shown as the latest incident update
 - **Impact override** (optional): Override displayed severity (none, maintenance, minor, major, critical)
 - **Components** (optional): Components to associate with this update
 - **Component status** (optional): Status to set for selected components
+- **Deliver notifications** (optional): Whether to send notifications for this update (default: true)
 
-At least one of Status, Body, or Impact override must be provided.
+At least one of Status, Body, Impact override, or Components must be provided.
 
 ### Output
 

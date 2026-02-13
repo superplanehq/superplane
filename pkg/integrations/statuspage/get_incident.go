@@ -44,7 +44,7 @@ func (c *GetIncident) Documentation() string {
 
 ## Configuration
 
-- **Page** (required): Page ID containing the incident. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.page_id }}).
+- **Page** (required): The Statuspage containing the incident. Select from the dropdown, or switch to expression mode for workflow chaining (e.g. {{ $['Create Incident'].data.page_id }}).
 - **Incident** (required): Incident ID to fetch. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.id }}).
 
 ## Output
@@ -95,11 +95,16 @@ func (c *GetIncident) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "page",
-			Label:       "Page ID",
-			Type:        configuration.FieldTypeString,
+			Label:       "Page",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "Page ID containing the incident (supports expressions)",
-			Placeholder: "e.g., kctbh9vrtdwd or {{ $['Create Incident'].data.page_id }}",
+			Description: "The Statuspage containing the incident",
+			Placeholder: "Select a page",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypePage,
+				},
+			},
 		},
 		{
 			Name:        "incident",
@@ -127,9 +132,10 @@ func (c *GetIncident) Setup(ctx core.SetupContext) error {
 		return errors.New("incident is required")
 	}
 
-	// Resolve page name for metadata when Page is a static ID (no expression)
+	// Resolve page name for metadata when Page is a static ID (no expression).
+	// Skip API call if HTTP context is not available (e.g. in tests without HTTP mock).
 	metadata := NodeMetadata{}
-	if spec.Page != "" && !strings.Contains(spec.Page, "{{") {
+	if spec.Page != "" && !strings.Contains(spec.Page, "{{") && ctx.HTTP != nil {
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
 		if err == nil {
 			pages, err := client.ListPages()
