@@ -20,7 +20,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-To get a Snyk API token, go to your [Snyk account settings](https://app.snyk.io/account).
+To get a Snyk API token, go to your [Snyk Personal Access Tokens](https://app.snyk.io/account/personal-access-tokens) page.
 
 <a id="on-new-issue-detected"></a>
 
@@ -37,9 +37,8 @@ The On New Issue Detected trigger starts a workflow execution when Snyk detects 
 
 ### Configuration
 
-- **Organization ID**: The Snyk organization to monitor
-- **Project ID**: Optional project filter - if specified, only issues from this project will trigger
-- **Severity**: Optional severity filter - only issues of this severity or higher will trigger (low, medium, high, critical)
+- **Project**: Optional project filter - select a project to only trigger on issues from that project
+- **Severity**: Optional severity filter - select one or more severities to trigger on (low, medium, high, critical)
 
 ### Event Data
 
@@ -94,7 +93,6 @@ The Ignore Issue component ignores a specific Snyk security issue via the Snyk A
 
 ### Configuration
 
-- **Organization ID**: The Snyk organization ID containing the issue
 - **Project ID**: The project ID where the issue exists
 - **Issue ID**: The specific issue ID to ignore
 - **Reason**: The reason for ignoring the issue
@@ -105,7 +103,6 @@ The Ignore Issue component ignores a specific Snyk security issue via the Snyk A
 Returns information about the ignored issue including:
 - **success**: Whether the operation succeeded
 - **message**: Status message from the API
-- **organizationId**: The organization ID
 - **projectId**: The project ID
 - **issueId**: The issue that was ignored
 - **reason**: The reason provided
@@ -123,7 +120,6 @@ Returns information about the ignored issue including:
   "data": {
     "success": true,
     "message": "Issue SNYK-JS-12345 ignored successfully",
-    "organizationId": "3a3dac70-cfeb-4648-9471-4f398bdf0f31",
     "projectId": "project-123",
     "issueId": "SNYK-JS-12345",
     "reason": "Acceptable risk for this dependency"

@@ -112,6 +112,12 @@ import {
   eventStateRegistry as snykEventStateRegistry,
 } from "./snyk/index";
 import {
+  componentMappers as prometheusComponentMappers,
+  customFieldRenderers as prometheusCustomFieldRenderers,
+  triggerRenderers as prometheusTriggerRenderers,
+  eventStateRegistry as prometheusEventStateRegistry,
+} from "./prometheus/index";
+import {
   componentMappers as cursorComponentMappers,
   triggerRenderers as cursorTriggerRenderers,
   eventStateRegistry as cursorEventStateRegistry,
@@ -173,6 +179,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
   snyk: snykComponentMappers,
+  prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
   dockerhub: dockerhubComponentMappers,
 };
@@ -197,6 +204,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
   snyk: snykTriggerRenderers,
+  prometheus: prometheusTriggerRenderers,
   cursor: cursorTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
 };
@@ -220,6 +228,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   claude: claudeEventStateRegistry,
   aws: awsEventStateRegistry,
   snyk: snykEventStateRegistry,
+  prometheus: prometheusEventStateRegistry,
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
@@ -248,6 +257,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
+  prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
 };
 

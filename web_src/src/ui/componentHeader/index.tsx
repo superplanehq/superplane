@@ -39,7 +39,7 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
         <div className="flex items-center">
           <div className="mr-2 flex h-4 w-4 items-center justify-center overflow-hidden">
             {iconSrc ? (
-              <img src={iconSrc} alt={title} className="max-w-5 max-h-5 object-contain" />
+              <img src={iconSrc} alt={title} className="h-4 w-4 shrink-0 object-contain" />
             ) : (
               <Icon size={16} className={iconColor} />
             )}
