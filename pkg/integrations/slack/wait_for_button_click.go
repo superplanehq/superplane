@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 const (
@@ -141,7 +142,7 @@ func (c *WaitForButtonClick) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Button",
-					MaxItems:  intPtr(4),
+					MaxItems:  openapi_client.PtrInt(4),
 					ItemDefinition: &configuration.ListItemDefinition{
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{
@@ -458,8 +459,4 @@ func (c *WaitForButtonClick) Cancel(ctx core.ExecutionContext) error {
 
 func (c *WaitForButtonClick) Cleanup(ctx core.SetupContext) error {
 	return nil
-}
-
-func intPtr(i int) *int {
-	return &i
 }
