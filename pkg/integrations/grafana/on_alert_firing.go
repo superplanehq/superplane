@@ -1,6 +1,7 @@
 package grafana
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -109,7 +110,7 @@ func (t *OnAlertFiring) HandleWebhook(ctx core.WebhookRequestContext) (int, erro
 		}
 
 		token := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
-		if token != sharedSecret {
+		if subtle.ConstantTimeCompare([]byte(token), []byte(sharedSecret)) != 1 {
 			return http.StatusUnauthorized, fmt.Errorf("invalid Authorization token")
 		}
 	}
