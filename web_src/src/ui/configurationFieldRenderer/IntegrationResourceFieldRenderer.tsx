@@ -42,6 +42,38 @@ function isExpressionValue(value: string | string[] | undefined): boolean {
   return /\{\{[\s\S]*?\}\}/.test(trimmed);
 }
 
+const RESOURCE_TYPE_ERROR_MESSAGES: Record<string, string> = {
+  member: "Could not get list of team members",
+  state: "Could not get list of status",
+  label: "Could not get list of labels",
+  team: "Could not get list of teams",
+};
+
+/** User-facing label for resource type; aligned with Linear's UX (members, teammates). */
+const RESOURCE_TYPE_DISPLAY_LABEL: Record<string, string> = {
+  member: "team members",
+  state: "status",
+  label: "labels",
+  team: "teams",
+};
+
+function getResourceDisplayLabel(resourceType: string | undefined): string {
+  if (resourceType && RESOURCE_TYPE_DISPLAY_LABEL[resourceType]) {
+    return RESOURCE_TYPE_DISPLAY_LABEL[resourceType];
+  }
+  return resourceType ?? "resources";
+}
+
+function getLoadErrorMessage(resourceType: string | undefined, fieldLabel?: string): string {
+  if (resourceType && RESOURCE_TYPE_ERROR_MESSAGES[resourceType]) {
+    return RESOURCE_TYPE_ERROR_MESSAGES[resourceType];
+  }
+  if (fieldLabel) {
+    return `Could not get list of ${fieldLabel.toLowerCase()}`;
+  }
+  return "Could not load resources";
+}
+
 export const IntegrationResourceFieldRenderer = ({
   field,
   value,
@@ -104,11 +136,18 @@ export const IntegrationResourceFieldRenderer = ({
     return parameters;
   }, [resourceParameters, allValues]);
 
+  // When this field depends on other fields (e.g. Assignee/Status depend on Team), only fetch when those params are present
+  const hasRequiredParameters =
+    resourceParameters.length === 0 ||
+    (additionalQueryParameters !== undefined && Object.keys(additionalQueryParameters).length > 0);
+
   const {
     data: resources,
     isLoading: isLoadingResources,
     error: resourcesError,
-  } = useIntegrationResources(organizationId ?? "", integrationId ?? "", resourceType ?? "", additionalQueryParameters);
+  } = useIntegrationResources(organizationId ?? "", integrationId ?? "", resourceType ?? "", additionalQueryParameters, {
+    enabled: hasRequiredParameters,
+  });
 
   // All hooks must be called before any early returns
   // Multi-select options (always compute, even if not used)
@@ -168,12 +207,25 @@ export const IntegrationResourceFieldRenderer = ({
     );
   }
 
+  const resourceDisplayLabel = getResourceDisplayLabel(resourceType);
+
+  if (!hasRequiredParameters) {
+    const paramNames = resourceParameters.map((p) => p.valueFrom?.field || p.name).filter(Boolean);
+    const hint = paramNames.length > 0 ? `Select ${paramNames.join(" and ")} first` : "Complete the required fields above";
+    return (
+      <div className="text-sm text-gray-500 dark:text-gray-400">
+        {hint}
+      </div>
+    );
+  }
+
   if (isLoadingResources) {
-    return <div className="text-sm text-gray-500 dark:text-gray-400">Loading {resourceType} resources...</div>;
+    return <div className="text-sm text-gray-500 dark:text-gray-400">Loading {resourceDisplayLabel}...</div>;
   }
 
   if (resourcesError) {
-    return <div className="text-sm text-red-500 dark:text-red-400">Failed to load resources</div>;
+    const loadErrorMessage = getLoadErrorMessage(resourceType, field.label);
+    return <div className="text-sm text-red-500 dark:text-red-400">{loadErrorMessage}</div>;
   }
 
   if (!resources || resources.length === 0) {
@@ -188,7 +240,7 @@ export const IntegrationResourceFieldRenderer = ({
 
   // Single select mode
   if (!isMulti) {
-    const options: AutoCompleteOption[] = resources
+    const resourceOptions: AutoCompleteOption[] = resources
       .map((resource) => {
         const optionValue = useNameAsValue
           ? (resource.name ?? resource.id ?? "")
@@ -198,6 +250,12 @@ export const IntegrationResourceFieldRenderer = ({
         return { value: optionValue, label: optionLabel };
       })
       .filter((option): option is AutoCompleteOption => option !== null);
+
+    // Match Linear UX: "No assignee | Andrew Gonzales" for optional member (assignee) fields
+    const options: AutoCompleteOption[] =
+      resourceType === "member"
+        ? [{ value: "", label: "No assignee" }, ...resourceOptions]
+        : resourceOptions;
 
     const selectedValue =
       useNameAsValue && typeof value === "string" && value
@@ -213,7 +271,7 @@ export const IntegrationResourceFieldRenderer = ({
         options={options}
         value={selectedValue}
         onChange={(val) => onChange(val || undefined)}
-        placeholder={field.placeholder ?? `Select ${resourceType}`}
+        placeholder={field.placeholder ?? `Select ${resourceDisplayLabel}`}
       />
     );
 
@@ -288,7 +346,7 @@ export const IntegrationResourceFieldRenderer = ({
       <MultiCombobox<SelectOption>
         options={multiSelectOptions}
         displayValue={(option) => option.label}
-        placeholder={`Select ${resourceType}...`}
+        placeholder={`Select ${resourceDisplayLabel}...`}
         value={selectedOptions}
         onChange={handleChange}
         showButton={false}
