@@ -370,6 +370,7 @@ export function SettingsTab({
                 </div>
                 {selectedIntegrationFull && (
                   <>
+                    <p className="py-2 text-xs text-gray-500">Connection</p>
                     {(() => {
                       const hasIntegrationError =
                         selectedIntegrationFull.status?.state === "error" &&
@@ -377,7 +378,7 @@ export function SettingsTab({
 
                       const integrationStatusCard = (
                         <div
-                          className={`mt-3 border border-gray-300 dark:border-gray-700 rounded-md bg-stripe-diagonal p-3 flex items-center justify-between gap-4 ${
+                          className={`border border-gray-300 dark:border-gray-700 rounded-md bg-stripe-diagonal p-3 flex items-center justify-between gap-4 ${
                             selectedIntegrationFull.status?.state === "ready"
                               ? "bg-green-100 dark:bg-green-950/30"
                               : selectedIntegrationFull.status?.state === "error"
