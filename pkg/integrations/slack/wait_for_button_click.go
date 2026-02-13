@@ -307,10 +307,32 @@ func (c *WaitForButtonClick) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	// Get channel ID from metadata
+	// Get channel ID from metadata; fall back to configured channel if missing
 	var channelID string
 	if metadata.Channel != nil {
 		channelID = metadata.Channel.ID
+	}
+
+	// If we don't have a channel ID yet, try to resolve it from the configured channel name/id
+	if channelID == "" {
+		if config.Channel == "" {
+			return errors.New("channel is required")
+		}
+
+		// Attempt to resolve channel info using the Slack client so we can store a real channel ID
+		channelInfo, err := client.GetChannelInfo(config.Channel)
+		if err != nil {
+			return fmt.Errorf("failed to resolve channel id for '%s': %w", config.Channel, err)
+		}
+
+		if channelInfo != nil {
+			channelID = channelInfo.ID
+			// update metadata with resolved channel info
+			metadata.Channel = &ChannelMetadata{ID: channelInfo.ID, Name: channelInfo.Name}
+			if err := ctx.Metadata.Set(metadata); err != nil {
+				return fmt.Errorf("failed to persist metadata with resolved channel info: %w", err)
+			}
+		}
 	}
 
 	// Create subscription for button clicks with execution ID, message TS, and channel ID
