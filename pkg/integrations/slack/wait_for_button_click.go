@@ -165,6 +165,37 @@ func (c *WaitForButtonClick) Configuration() []configuration.Field {
 	}
 }
 
+// validateButtons checks button configuration for common errors
+func validateButtons(buttons []Button) error {
+	if len(buttons) == 0 {
+		return errors.New("at least one button is required")
+	}
+
+	if len(buttons) > 4 {
+		return errors.New("maximum of 4 buttons allowed")
+	}
+
+	for i, button := range buttons {
+		if button.Name == "" {
+			return fmt.Errorf("button %d: name is required", i)
+		}
+		if button.Value == "" {
+			return fmt.Errorf("button %d: value is required", i)
+		}
+	}
+
+	// Check for duplicate button values
+	buttonValues := make(map[string]bool)
+	for i, button := range buttons {
+		if buttonValues[button.Value] {
+			return fmt.Errorf("button %d: duplicate value '%s' - each button must have a unique value", i, button.Value)
+		}
+		buttonValues[button.Value] = true
+	}
+
+	return nil
+}
+
 func (c *WaitForButtonClick) Setup(ctx core.SetupContext) error {
 	var config WaitForButtonClickConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
@@ -179,21 +210,8 @@ func (c *WaitForButtonClick) Setup(ctx core.SetupContext) error {
 		return errors.New("message is required")
 	}
 
-	if len(config.Buttons) == 0 {
-		return errors.New("at least one button is required")
-	}
-
-	if len(config.Buttons) > 4 {
-		return errors.New("maximum of 4 buttons allowed")
-	}
-
-	for i, button := range config.Buttons {
-		if button.Name == "" {
-			return fmt.Errorf("button %d: name is required", i)
-		}
-		if button.Value == "" {
-			return fmt.Errorf("button %d: value is required", i)
-		}
+	if err := validateButtons(config.Buttons); err != nil {
+		return err
 	}
 
 	client, err := NewClient(ctx.Integration)
@@ -234,21 +252,8 @@ func (c *WaitForButtonClick) Execute(ctx core.ExecutionContext) error {
 		return errors.New("message is required")
 	}
 
-	if len(config.Buttons) == 0 {
-		return errors.New("at least one button is required")
-	}
-
-	if len(config.Buttons) > 4 {
-		return errors.New("maximum of 4 buttons allowed")
-	}
-
-	for i, button := range config.Buttons {
-		if button.Name == "" {
-			return fmt.Errorf("button %d: name is required", i)
-		}
-		if button.Value == "" {
-			return fmt.Errorf("button %d: value is required", i)
-		}
+	if err := validateButtons(config.Buttons); err != nil {
+		return err
 	}
 
 	client, err := NewClient(ctx.Integration)
@@ -295,10 +300,23 @@ func (c *WaitForButtonClick) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to send message: %w", err)
 	}
 
-	// Create subscription for button clicks with execution ID and message TS
+	// Load metadata to get channel ID
+	var metadata WaitForButtonClickMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	// Get channel ID from metadata
+	var channelID string
+	if metadata.Channel != nil {
+		channelID = metadata.Channel.ID
+	}
+
+	// Create subscription for button clicks with execution ID, message TS, and channel ID
 	subscriptionID, err := ctx.Integration.Subscribe(map[string]any{
 		"type":         "button_click",
 		"message_ts":   response.TS,
+		"channel_id":   channelID,
 		"execution_id": ctx.ID.String(),
 	})
 	if err != nil {
@@ -306,11 +324,6 @@ func (c *WaitForButtonClick) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Store the message timestamp and subscription in metadata
-	var metadata WaitForButtonClickMetadata
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-		return fmt.Errorf("failed to decode metadata: %w", err)
-	}
-
 	messageTS := response.TS
 	subIDStr := subscriptionID.String()
 	metadata.MessageTS = &messageTS

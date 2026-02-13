@@ -187,7 +187,7 @@ function waitForButtonClickEventSections(nodes: NodeInfo[], execution: Execution
     return [];
   }
 
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [

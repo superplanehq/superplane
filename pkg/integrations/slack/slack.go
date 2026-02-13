@@ -449,8 +449,16 @@ func (s *Slack) handleInteractivity(ctx core.HTTPRequestContext, body []byte) {
 		return
 	}
 
-	// Use lightweight query to find subscription by message_ts without loading nodes
-	subscription, err := models.FindIntegrationSubscriptionByMessageTS(database.Conn(), ctx.Integration.ID(), messageTS)
+	// Get channel ID from payload
+	channelID, ok := payload.Channel["id"].(string)
+	if !ok {
+		ctx.Logger.Errorf("channel id not found in payload")
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Use lightweight query to find subscription by message_ts and channel_id without loading nodes
+	subscription, err := models.FindIntegrationSubscriptionByMessageTS(database.Conn(), ctx.Integration.ID(), messageTS, channelID)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			ctx.Logger.Warnf("no subscription found for message_ts %s", messageTS)
