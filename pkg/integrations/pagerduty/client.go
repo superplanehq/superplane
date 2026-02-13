@@ -783,4 +783,3 @@ func (c *Client) ListIncidentLogEntries(incidentID string, limit int) ([]LogEntr
 
 	return response.LogEntries, nil
 }
-

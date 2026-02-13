@@ -7,21 +7,9 @@ Manage and react to incidents in PagerDuty
 ## Triggers
 
 <CardGrid>
-  <LinkCard
-    title="On Incident"
-    href="#on-incident"
-    description="Listen to incident events"
-  />
-  <LinkCard
-    title="On Incident Annotated"
-    href="#on-incident-annotated"
-    description="Listen to incident annotation events"
-  />
-  <LinkCard
-    title="On Incident Status Update"
-    href="#on-incident-status-update"
-    description="Listen to incident status update events"
-  />
+  <LinkCard title="On Incident" href="#on-incident" description="Listen to incident events" />
+  <LinkCard title="On Incident Annotated" href="#on-incident-annotated" description="Listen to incident annotation events" />
+  <LinkCard title="On Incident Status Update" href="#on-incident-status-update" description="Listen to incident status update events" />
 </CardGrid>
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
@@ -29,61 +17,17 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
-  <LinkCard
-    title="Acknowledge Incident"
-    href="#acknowledge-incident"
-    description="Acknowledge an incident in PagerDuty"
-  />
-  <LinkCard
-    title="Annotate Incident"
-    href="#annotate-incident"
-    description="Add a note to an existing incident in PagerDuty"
-  />
-  <LinkCard
-    title="Create Incident"
-    href="#create-incident"
-    description="Create a new incident in PagerDuty"
-  />
-  <LinkCard
-    title="Escalate Incident"
-    href="#escalate-incident"
-    description="Escalate an incident to a specific level (high-urgency only)"
-  />
-  <LinkCard
-    title="List Incidents"
-    href="#list-incidents"
-    description="Query PagerDuty to get a list of all open incidents (triggered and acknowledged)"
-  />
-  <LinkCard
-    title="List Log Entries"
-    href="#list-log-entries"
-    description="List all log entries (audit trail) for a PagerDuty incident"
-  />
-  <LinkCard
-    title="List Notes"
-    href="#list-notes"
-    description="List all notes (timeline entries) for a PagerDuty incident"
-  />
-  <LinkCard
-    title="Reassign Escalation Policy"
-    href="#reassign-escalation-policy"
-    description="Reassign an incident to a different escalation policy"
-  />
-  <LinkCard
-    title="Resolve Incident"
-    href="#resolve-incident"
-    description="Resolve an incident in PagerDuty"
-  />
-  <LinkCard
-    title="Snooze Incident"
-    href="#snooze-incident"
-    description="Snooze an acknowledged incident in PagerDuty"
-  />
-  <LinkCard
-    title="Update Incident"
-    href="#update-incident"
-    description="Update an existing incident in PagerDuty"
-  />
+  <LinkCard title="Acknowledge Incident" href="#acknowledge-incident" description="Acknowledge an incident in PagerDuty" />
+  <LinkCard title="Annotate Incident" href="#annotate-incident" description="Add a note to an existing incident in PagerDuty" />
+  <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in PagerDuty" />
+  <LinkCard title="Escalate Incident" href="#escalate-incident" description="Escalate an incident to a specific level (high-urgency only)" />
+  <LinkCard title="List Incidents" href="#list-incidents" description="Query PagerDuty to get a list of all open incidents (triggered and acknowledged)" />
+  <LinkCard title="List Log Entries" href="#list-log-entries" description="List all log entries (audit trail) for a PagerDuty incident" />
+  <LinkCard title="List Notes" href="#list-notes" description="List all notes (timeline entries) for a PagerDuty incident" />
+  <LinkCard title="Reassign Escalation Policy" href="#reassign-escalation-policy" description="Reassign an incident to a different escalation policy" />
+  <LinkCard title="Resolve Incident" href="#resolve-incident" description="Resolve an incident in PagerDuty" />
+  <LinkCard title="Snooze Incident" href="#snooze-incident" description="Snooze an acknowledged incident in PagerDuty" />
+  <LinkCard title="Update Incident" href="#update-incident" description="Update an existing incident in PagerDuty" />
 </CardGrid>
 
 <a id="on-incident"></a>
@@ -108,7 +52,6 @@ The On Incident trigger starts a workflow execution when PagerDuty incident even
 ### Event Data
 
 Each incident event includes:
-
 - **event**: Event type (incident.triggered, incident.acknowledged, incident.resolved)
 - **incident**: Complete incident information including title, description, urgency, status
 - **service**: Service information
@@ -213,7 +156,6 @@ The On Incident Annotated trigger starts a workflow execution when a note is add
 ### Event Data
 
 Each annotation event includes:
-
 - **agent**: Information about who added the note
 - **incident**: Complete incident information
 
@@ -306,7 +248,6 @@ The On Incident Status Update trigger starts a workflow execution when PagerDuty
 ### Event Data
 
 Each status update event includes:
-
 - **event**: Event type (incident.status_updated)
 - **incident**: Complete incident information including current status
 - **status**: New incident status
@@ -595,7 +536,6 @@ The Create Incident component creates a new incident in PagerDuty.
 ### Output
 
 Returns the created incident object including:
-
 - **id**: Incident ID
 - **incident_number**: Human-readable incident number
 - **status**: Current incident status
@@ -702,7 +642,6 @@ The Escalate Incident component escalates an existing PagerDuty incident to a sp
 ### What is Escalation?
 
 In PagerDuty, an escalation policy defines a chain of responders:
-
 - **Level 1**: Primary on-call (e.g., the assigned engineer)
 - **Level 2**: Secondary responder (e.g., team lead)
 - **Level 3**: Tertiary responder (e.g., manager)
@@ -835,7 +774,6 @@ The List Incidents component queries PagerDuty for open incidents and routes exe
 ### Output
 
 Returns a list of open incidents with:
-
 - **id**: Incident ID
 - **incident_number**: Human-readable incident number
 - **status**: Incident status (triggered, acknowledged)
@@ -969,7 +907,6 @@ The List Log Entries component retrieves all log entries (audit trail) for a Pag
 ### Output
 
 Returns a list of log entries with:
-
 - **id**: Log entry ID
 - **type**: The type of log entry (e.g., trigger_log_entry, acknowledge_log_entry, annotate_log_entry)
 - **summary**: A summary of what happened
@@ -1056,7 +993,6 @@ The List Notes component retrieves all notes (timeline entries) for a PagerDuty 
 ### Output
 
 Returns a list of notes with:
-
 - **id**: Note ID
 - **content**: The note content
 - **created_at**: When the note was created
