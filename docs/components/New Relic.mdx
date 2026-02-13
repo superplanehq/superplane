@@ -1,0 +1,165 @@
+---
+title: "New Relic"
+---
+
+Monitor and manage your New Relic resources
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Issue" href="#on-issue" description="Listen to New Relic issue events" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Report Metric" href="#report-metric" description="Send custom metrics to New Relic" />
+  <LinkCard title="Run NRQL Query" href="#run-nrql-query" description="Execute NRQL queries to retrieve data from New Relic" />
+</CardGrid>
+
+## Instructions
+
+To set up New Relic integration:
+
+1. **Select Region**: Choose your New Relic region (US or EU)
+2. **Get API Key**: In New Relic, go to Account Settings > API Keys
+3. **Create API Key**: Click "Create API key" and give it a name
+4. **Copy API Key**: Copy the generated API key (you won't be able to see it again)
+5. **Paste API Key**: Paste the API key in the field below
+
+## Usage
+
+- **Report Metric**: Use this action to send custom telemetry (Gauge, Count, Summary) to New Relic.
+- **Run NRQL Query**: Use this action to fetch data from New Relic for decision making or reporting.
+
+## Note
+
+The **Report Metric** action requires a **License Key** (Ingest - License) or an **API Key** (User) with ingest permissions. 
+If you use a User API Key, it must have the necessary permissions. A License Key is generally recommended for metric ingestion.
+The **Run NRQL Query** action requires a **User API Key** (NRAK-) with query permissions.
+
+<a id="on-issue"></a>
+
+## On Issue
+
+The On Issue trigger starts a workflow execution when New Relic issues are created or updated.
+
+### Use Cases
+
+- **Incident Response**: automated remediation or notification when critical issues occur.
+- **Sync**: synchronize New Relic issues with Jira or other tracking systems.
+
+### Configuration
+
+- **Priorities**: Filter by priority (CRITICAL, HIGH, MEDIUM, LOW). Leave empty for all.
+- **States**: Filter by state (ACTIVATED, CLOSED, CREATED). Leave empty for all.
+
+### Webhook Setup
+
+This trigger generates a webhook URL. You must configure a **Workflow** in New Relic to send a webhook to this URL.
+
+**IMPORTANT**: You must use the following JSON payload template in your New Relic Webhook configuration:
+
+```json
+{
+  "issue_id": "{{issueId}}",
+  "title": "{{annotations.title.[0]}}",
+  "priority": "{{priority}}",
+  "issue_url": "{{issuePageUrl}}",
+  "state": "{{state}}",
+  "owner": "{{owner}}"
+}
+```
+
+### Example Data
+
+```json
+{
+  "impacted_entities": [
+    "infra-host-1"
+  ],
+  "issue_id": "12345678-abcd-efgh-ijkl-1234567890ab",
+  "issue_url": "https://one.newrelic.com/launcher/nrai.launcher?pane=eyJuZXJkbGV0SWQiOiJhbGVydGluZy11aS1jbGFzc2ljLmluY2lkZW50cyIsInNlbGVjdGVkSW5jaWRlbnRJZCI6IjEyMzQ1Njc4In0=",
+  "owner": "Team SRE",
+  "priority": "CRITICAL",
+  "state": "ACTIVATED",
+  "title": "High CPU Usage",
+  "total_incidents": 1
+}
+```
+
+<a id="report-metric"></a>
+
+## Report Metric
+
+The Report Metric component allows you to send custom metrics (Gauge, Count, Summary) to New Relic.
+
+### Configuration
+
+- **Metric Name**: The name of the metric (e.g., "server.cpu.usage")
+- **Metric Type**: The type of metric (Gauge, Count, or Summary)
+- **Value**: The numeric value of the metric
+- **Timestamp**: Optional Unix timestamp (milliseconds). Defaults to now.
+- **Attributes**: Optional JSON object with additional attributes
+
+### Output
+
+Returns the sent metric payload.
+
+### Example Output
+
+```json
+{
+  "attributes": {
+    "environment": "production",
+    "host": "server1.example.com"
+  },
+  "metricName": "server.cpu.usage",
+  "metricType": "gauge",
+  "timestamp": 1707552000000,
+  "value": 75.5
+}
+```
+
+<a id="run-nrql-query"></a>
+
+## Run NRQL Query
+
+The Run NRQL Query component allows you to execute NRQL queries via New Relic's NerdGraph API.
+
+### Use Cases
+
+- **Data retrieval**: Query telemetry data, metrics, events, and logs
+- **Custom analytics**: Build custom analytics and reporting workflows
+- **Monitoring**: Retrieve monitoring data for downstream processing
+- **Alerting**: Query data to make decisions in workflow logic
+
+### Configuration
+
+- **Account ID**: The New Relic account ID to query against (required)
+- **Query**: The NRQL query string to execute (required)
+- **Timeout**: Query timeout in seconds (optional, default: 10, max: 120)
+
+### Output
+
+Returns query results including:
+- **results**: Array of query result objects
+- **totalResult**: Aggregated result for queries with aggregation functions
+- **metadata**: Query metadata (event types, facets, messages, time window)
+- **query**: The original NRQL query executed
+- **accountId**: The account ID queried
+
+### Example Queries
+
+- Count transactions: `SELECT count(*) FROM Transaction SINCE 1 hour ago`
+- Average response time: `SELECT average(duration) FROM Transaction SINCE 1 day ago`
+- Faceted query: `SELECT count(*) FROM Transaction FACET appName SINCE 1 hour ago`
+
+### Notes
+
+- Requires a valid New Relic API key with query permissions
+- Queries are subject to New Relic's NRQL query limits
+- Invalid NRQL syntax will return an error from the API
+
