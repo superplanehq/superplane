@@ -1,0 +1,17 @@
+{
+  "data": {
+    "service": {
+      "serviceArn": "arn:aws:ecs:us-east-1:123456789012:service/demo/web",
+      "serviceName": "web",
+      "clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/demo",
+      "status": "ACTIVE",
+      "taskDefinition": "arn:aws:ecs:us-east-1:123456789012:task-definition/web:7",
+      "desiredCount": 2,
+      "runningCount": 2,
+      "pendingCount": 0
+    },
+    "failures": []
+  },
+  "timestamp": "2026-02-13T10:00:00Z",
+  "type": "aws.ecs.service"
+}

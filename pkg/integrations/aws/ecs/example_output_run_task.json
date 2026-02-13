@@ -1,0 +1,16 @@
+{
+  "data": {
+    "tasks": [
+      {
+        "taskArn": "arn:aws:ecs:us-east-1:123456789012:task/demo/abc123",
+        "clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/demo",
+        "taskDefinitionArn": "arn:aws:ecs:us-east-1:123456789012:task-definition/worker:7",
+        "lastStatus": "PENDING",
+        "desiredStatus": "RUNNING"
+      }
+    ],
+    "failures": []
+  },
+  "timestamp": "2026-02-13T10:00:10Z",
+  "type": "aws.ecs.task"
+}

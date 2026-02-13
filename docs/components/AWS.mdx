@@ -28,6 +28,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
   <LinkCard title="ECR • Scan Image" href="#ecr-•-scan-image" description="Scan an ECR image for vulnerabilities" />
+  <LinkCard title="ECS • Describe Service" href="#ecs-•-describe-service" description="Describe an AWS ECS service" />
+  <LinkCard title="ECS • Run Task" href="#ecs-•-run-task" description="Run a task in AWS ECS" />
   <LinkCard title="Lambda • Run Function" href="#lambda-•-run-function" description="Invoke a Lambda function, optionally creating it from inline JavaScript" />
 </CardGrid>
 
@@ -661,6 +663,78 @@ At least one of **Image Digest** or **Image Tag** is required. If both are provi
   },
   "timestamp": "2026-02-03T12:05:00Z",
   "type": "aws.ecr.image.scanFindings"
+}
+```
+
+<a id="ecs-•-describe-service"></a>
+
+## ECS • Describe Service
+
+The Describe Service component fetches details about a single ECS service.
+
+### Use Cases
+
+- **Deployment checks**: Inspect running/desired task counts before or after deployment
+- **Operational visibility**: Fetch service status and task definition details in workflows
+- **Automation branching**: Route workflow execution based on ECS service state
+
+### Example Output
+
+```json
+{
+  "data": {
+    "failures": [],
+    "service": {
+      "clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/demo",
+      "desiredCount": 2,
+      "pendingCount": 0,
+      "runningCount": 2,
+      "serviceArn": "arn:aws:ecs:us-east-1:123456789012:service/demo/web",
+      "serviceName": "web",
+      "status": "ACTIVE",
+      "taskDefinition": "arn:aws:ecs:us-east-1:123456789012:task-definition/web:7"
+    }
+  },
+  "timestamp": "2026-02-13T10:00:00Z",
+  "type": "aws.ecs.service"
+}
+```
+
+<a id="ecs-•-run-task"></a>
+
+## ECS • Run Task
+
+The Run Task component starts one or more ECS tasks.
+
+### Use Cases
+
+- **One-off workloads**: Execute ad-hoc jobs on ECS
+- **Batch processing**: Trigger task runs from workflow events
+- **Operational automation**: Run remediation or maintenance tasks
+
+### Notes
+
+- For Fargate tasks, set **Network Configuration** using the ECS awsvpcConfiguration format.
+- Optional ECS API fields can be passed directly through **Overrides** and **Network Configuration**.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "failures": [],
+    "tasks": [
+      {
+        "clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/demo",
+        "desiredStatus": "RUNNING",
+        "lastStatus": "PENDING",
+        "taskArn": "arn:aws:ecs:us-east-1:123456789012:task/demo/abc123",
+        "taskDefinitionArn": "arn:aws:ecs:us-east-1:123456789012:task-definition/worker:7"
+      }
+    ]
+  },
+  "timestamp": "2026-02-13T10:00:10Z",
+  "type": "aws.ecs.task"
 }
 ```
 
