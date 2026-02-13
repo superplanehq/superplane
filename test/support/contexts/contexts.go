@@ -1,7 +1,6 @@
 package contexts
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -47,11 +46,6 @@ func (w *WebhookContext) SetSecret(secret []byte) error {
 func (w *WebhookContext) Setup() (string, error) {
 	id := uuid.New()
 	return id.String(), nil
-}
-
-func (w *WebhookContext) GetURL() (string, error) {
-	id := uuid.New()
-	return fmt.Sprintf("%s/webhooks/%s", w.GetBaseURL(), id.String()), nil
 }
 
 func (w *WebhookContext) GetBaseURL() string {
