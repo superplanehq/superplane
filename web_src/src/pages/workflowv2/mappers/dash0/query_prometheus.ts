@@ -1,10 +1,9 @@
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { ComponentBaseProps } from "@/ui/componentBase";
+import { getStateMap } from "..";
 import {
   ComponentBaseMapper,
   ExecutionDetailsContext,
   ComponentBaseContext,
-  ExecutionInfo,
   NodeInfo,
   OutputPayload,
   SubtitleContext,
@@ -13,6 +12,7 @@ import { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import { QueryPrometheusConfiguration } from "./types";
 import { formatTimeAgo } from "@/utils/date";
+import { buildDash0EventSections } from "./base";
 
 export const queryPrometheusMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -24,7 +24,7 @@ export const queryPrometheusMapper: ComponentBaseMapper = {
       collapsedBackground: "bg-white",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
-      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? buildDash0EventSections(context.nodes, lastExecution, componentName) : undefined,
       metadata: metadataList(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
@@ -85,20 +85,4 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   }
 
   return metadata;
-}
-
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
-  return [
-    {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
-      eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent!.id!,
-    },
-  ];
 }
