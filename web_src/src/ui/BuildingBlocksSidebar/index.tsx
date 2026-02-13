@@ -31,6 +31,7 @@ import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
+import azureIcon from "@/assets/icons/integrations/azure.svg";
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
@@ -418,6 +419,7 @@ function CategorySection({
     prometheus: prometheusIcon,
     render: renderIcon,
     dockerhub: dockerIcon,
+    azure: azureIcon,
     aws: {
       codeArtifact: awsIcon,
       cloudwatch: awsCloudwatchIcon,
@@ -495,6 +497,7 @@ function CategorySection({
             prometheus: prometheusIcon,
             render: renderIcon,
             dockerhub: dockerIcon,
+            azure: azureIcon,
             aws: {
               codeArtifact: awsCodeArtifactIcon,
               cloudwatch: awsCloudwatchIcon,

@@ -2,6 +2,7 @@ import { resolveIcon } from "@/lib/utils";
 import React from "react";
 import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
+import azureIcon from "@/assets/icons/integrations/azure.svg";
 import circleciIcon from "@/assets/icons/integrations/circleci.svg";
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
@@ -28,6 +29,7 @@ import dockerIcon from "@/assets/icons/integrations/docker.svg";
 /** Integration type name (e.g. "github") → logo src. Used for Settings tab and header. */
 export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   aws: awsIcon,
+  azure: azureIcon,
   circleci: circleciIcon,
   cloudflare: cloudflareIcon,
   dash0: dash0Icon,
@@ -75,6 +77,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   prometheus: prometheusIcon,
   render: renderIcon,
   dockerhub: dockerIcon,
+  azure: azureIcon,
   aws: {
     cloudwatch: awsCloudwatchIcon,
     lambda: awsLambdaIcon,
