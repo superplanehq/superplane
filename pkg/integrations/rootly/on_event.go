@@ -20,7 +20,7 @@ type OnEventConfiguration struct {
 	Severities       []string `json:"severities"`
 	Services         []string `json:"services"`
 	Teams            []string `json:"teams"`
-	Visibilities     []string `json:"visibilities"`
+	Visibility       string   `json:"visibility"`
 }
 
 var onEventWebhookEvents = []string{"incident.created", "incident.updated"}
@@ -140,7 +140,7 @@ func (t *OnEvent) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "visibilities",
+			Name:        "visibility",
 			Label:       "Visibility",
 			Type:        configuration.FieldTypeSelect,
 			Required:    false,
@@ -268,9 +268,9 @@ func matchesIncidentFilters(incident map[string]any, config OnEventConfiguration
 func filterEvents(events []map[string]any, config OnEventConfiguration) []map[string]any {
 	filtered := make([]map[string]any, 0, len(events))
 	for _, event := range events {
-		if len(config.Visibilities) > 0 {
+		if config.Visibility != "" {
 			visibility := stringFromAny(event["visibility"])
-			if !containsString(config.Visibilities, visibility) {
+			if config.Visibility != visibility {
 				continue
 			}
 		}

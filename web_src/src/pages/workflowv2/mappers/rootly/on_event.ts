@@ -11,7 +11,7 @@ interface OnEventConfiguration {
   severities?: string[];
   services?: string[];
   teams?: string[];
-  visibilities?: string[];
+  visibility?: string;
 }
 
 interface OnEventEventData extends IncidentEvent {
@@ -57,7 +57,7 @@ export const onEventTriggerRenderer: TriggerRenderer = {
     addMetadata(metadataItems, "Severity", configuration?.severities);
     addMetadata(metadataItems, "Service", configuration?.services);
     addMetadata(metadataItems, "Team", configuration?.teams);
-    addMetadata(metadataItems, "Visibility", configuration?.visibilities);
+    addMetadata(metadataItems, "Visibility", configuration?.visibility);
 
     const props: TriggerProps = {
       title: node.name!,
@@ -99,13 +99,19 @@ function buildSubtitle(content: string, createdAt?: string): string {
   return content || timeAgo;
 }
 
-function addMetadata(metadataItems: Array<{ icon: string; label: string }>, label: string, values?: string[]): void {
-  if (!values || values.length === 0) {
+function addMetadata(
+  metadataItems: Array<{ icon: string; label: string }>,
+  label: string,
+  values?: string | string[],
+): void {
+  if (!values || (Array.isArray(values) && values.length === 0)) {
     return;
   }
 
+  const list = Array.isArray(values) ? values : [values];
+
   metadataItems.push({
     icon: "funnel",
-    label: `${label}: ${values.join(", ")}`,
+    label: `${label}: ${list.join(", ")}`,
   });
 }
