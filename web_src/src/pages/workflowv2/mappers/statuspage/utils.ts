@@ -1,7 +1,7 @@
 import { EventSection } from "@/ui/componentBase";
 import { getState, getTriggerRenderer } from "..";
 import { ExecutionInfo, NodeInfo } from "../types";
-import { StatuspageIncident } from "./types";
+import { StatuspageIncident, StatuspageIncidentUpdate } from "./types";
 import { formatTimeAgo } from "@/utils/date";
 
 export function stringOrDash(value?: string | null): string {
@@ -11,12 +11,79 @@ export function stringOrDash(value?: string | null): string {
   return value;
 }
 
+/** Timeline entry format for ChainItem's isApprovalTimeline renderer. */
+export type IncidentTimelineEntry = {
+  label: string;
+  status: string;
+  timestamp?: string;
+  comment?: string;
+};
+
+/** Human-readable status labels for incident_updates. */
+const STATUS_LABELS: Record<string, string> = {
+  investigating: "Investigating",
+  identified: "Identified",
+  monitoring: "Monitoring",
+  resolved: "Resolved",
+  scheduled: "Scheduled",
+  in_progress: "In Progress",
+  verifying: "Verifying",
+  completed: "Completed",
+};
+
+/**
+ * Maps incident status to a value that ChainItem's getApprovalStatusColor recognizes,
+ * so we get colored timeline dots without modifying core UI.
+ * approved=green, degraded=yellow, rejected=red, critical=red, default=gray
+ */
+const STATUS_TO_COLOR: Record<string, string> = {
+  resolved: "Approved",
+  completed: "Approved",
+  investigating: "Degraded",
+  identified: "Degraded",
+  monitoring: "Degraded",
+  in_progress: "Degraded",
+  verifying: "Degraded",
+  scheduled: "Scheduled", // no match → gray
+};
+
+function humanizeStatus(status?: string): string {
+  if (!status) return "Update";
+  return STATUS_LABELS[status] ?? status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ");
+}
+
+/**
+ * Builds a timeline from incident_updates for the Details tab.
+ * API returns incident_updates in chronological order; first is creation.
+ * Uses status values that map to ChainItem's existing colors (Approved=green, Degraded=yellow).
+ */
+export function buildIncidentTimeline(updates: StatuspageIncidentUpdate[]): IncidentTimelineEntry[] {
+  const timeline: IncidentTimelineEntry[] = [];
+
+  for (const update of updates) {
+    const rawStatus = update.status ?? "";
+    const label = humanizeStatus(rawStatus);
+    const statusForColor = STATUS_TO_COLOR[rawStatus] ?? label;
+    const timestamp = update.created_at ? formatTimeAgo(new Date(update.created_at)) : undefined;
+    const comment = update.body?.trim() || undefined;
+
+    timeline.push({
+      label,
+      status: statusForColor,
+      timestamp,
+      comment,
+    });
+  }
+
+  return timeline;
+}
+
 /**
  * Returns human-readable execution details for a Statuspage incident.
  * API returns incident_updates in chronological order; last element is latest.
  */
-export function getDetailsForIncident(incident: StatuspageIncident): Record<string, string> {
-  const details: Record<string, string> = {};
+export function getDetailsForIncident(incident: StatuspageIncident): Record<string, string | IncidentTimelineEntry[]> {
+  const details: Record<string, string | IncidentTimelineEntry[]> = {};
 
   details["ID"] = stringOrDash(incident?.id);
   details["Name"] = stringOrDash(incident?.name);
@@ -33,11 +100,9 @@ export function getDetailsForIncident(incident: StatuspageIncident): Record<stri
 
   const updates = incident?.incident_updates;
   if (updates && updates.length > 0) {
-    // API returns chronological order; last element is latest
-    const latest = updates[updates.length - 1];
-    if (latest?.body) {
-      details["Latest Update"] = latest.body;
-    }
+    details["Timeline"] = buildIncidentTimeline(updates);
+  } else {
+    details["Updates"] = "No updates recorded";
   }
 
   return details;
