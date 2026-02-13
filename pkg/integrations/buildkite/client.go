@@ -54,33 +54,6 @@ func (c *Client) makeRequest(method, endpoint string, body any) (*http.Response,
 	return c.http.Do(req)
 }
 
-type User struct {
-	ID       string `json:"id"`
-	Username string `json:"username"`
-	Name     string `json:"name"`
-	Email    string `json:"email"`
-}
-
-func (c *Client) GetCurrentUser() (*User, error) {
-	resp, err := c.makeRequest("GET", "/user", nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API request failed with status %d", resp.StatusCode)
-	}
-
-	var user User
-	err = json.NewDecoder(resp.Body).Decode(&user)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	return &user, nil
-}
-
 type Organization struct {
 	ID     string `json:"id"`
 	Slug   string `json:"slug"`
