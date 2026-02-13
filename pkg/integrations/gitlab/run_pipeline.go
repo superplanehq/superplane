@@ -20,19 +20,19 @@ import (
 var exampleOutputRunPipeline []byte
 
 const (
-	GitLabPipelinePayloadType          = "gitlab.pipeline.finished"
-	GitLabPipelinePassedOutputChannel  = "passed"
-	GitLabPipelineFailedOutputChannel  = "failed"
-	GitLabPipelineStatusSuccess        = "success"
-	GitLabPipelineStatusFailed         = "failed"
-	GitLabPipelineStatusCanceled       = "canceled"
-	GitLabPipelineStatusCancelled      = "cancelled"
-	GitLabPipelineStatusSkipped        = "skipped"
-	GitLabPipelineStatusManual         = "manual"
-	GitLabPipelineStatusBlocked        = "blocked"
-	GitLabRunPipelinePollInterval      = 5 * time.Minute
-	GitLabRunPipelinePollAction        = "poll"
-	GitLabRunPipelineKVPipelineID      = "pipeline_id"
+	GitLabPipelinePayloadType         = "gitlab.pipeline.finished"
+	GitLabPipelinePassedOutputChannel = "passed"
+	GitLabPipelineFailedOutputChannel = "failed"
+	GitLabPipelineStatusSuccess       = "success"
+	GitLabPipelineStatusFailed        = "failed"
+	GitLabPipelineStatusCanceled      = "canceled"
+	GitLabPipelineStatusCancelled     = "cancelled"
+	GitLabPipelineStatusSkipped       = "skipped"
+	GitLabPipelineStatusManual        = "manual"
+	GitLabPipelineStatusBlocked       = "blocked"
+	GitLabRunPipelinePollInterval     = 5 * time.Minute
+	GitLabRunPipelinePollAction       = "poll"
+	GitLabRunPipelineKVPipelineID     = "pipeline_id"
 )
 
 type RunPipeline struct{}
@@ -681,18 +681,6 @@ func intFromAny(value any) (int, bool) {
 	default:
 		return 0, false
 	}
-}
-
-func normalizePipelineRef(ref string) string {
-	if strings.HasPrefix(ref, "refs/heads/") {
-		return strings.TrimPrefix(ref, "refs/heads/")
-	}
-
-	if strings.HasPrefix(ref, "refs/tags/") {
-		return strings.TrimPrefix(ref, "refs/tags/")
-	}
-
-	return ref
 }
 
 func defaultPipelineVariableType(variableType string) string {

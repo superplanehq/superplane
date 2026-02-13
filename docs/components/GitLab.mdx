@@ -22,10 +22,10 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitLab project" />
-  <LinkCard title="Run Pipeline" href="#run-pipeline" description="Run a GitLab pipeline and wait for completion" />
-  <LinkCard title="Get Pipeline" href="#get-pipeline" description="Get a GitLab pipeline by ID" />
   <LinkCard title="Get Latest Pipeline" href="#get-latest-pipeline" description="Get the latest GitLab pipeline for a project" />
-  <LinkCard title="Get Test Report Summary" href="#get-test-report-summary" description="Get test report summary for a GitLab pipeline" />
+  <LinkCard title="Get Pipeline" href="#get-pipeline" description="Get a GitLab pipeline" />
+  <LinkCard title="Get Test Report Summary" href="#get-test-report-summary" description="Get GitLab pipeline test report summary" />
+  <LinkCard title="Run Pipeline" href="#run-pipeline" description="Run a GitLab pipeline and wait for completion" />
 </CardGrid>
 
 ## Instructions
@@ -135,74 +135,6 @@ This trigger automatically sets up a GitLab webhook when configured. The webhook
   "type": "gitlab.issue"
 }
 ```
-
-<a id="run-pipeline"></a>
-
-## Run Pipeline
-
-The Run Pipeline component triggers a GitLab pipeline and waits for completion.
-
-### Configuration
-
-- **Project** (required): GitLab project where the pipeline will run
-- **Ref** (required): Branch or tag ref to run the pipeline on
-- **Inputs** (optional): Pipeline inputs (`name`/`value`) sent in the create pipeline request
-- **Variables** (optional): Pipeline variables sent to the create pipeline API
-
-### Output Channels
-
-- **Passed**: Emitted when pipeline completes with `success`
-- **Failed**: Emitted when pipeline completes with `failed`, `canceled`, `skipped`, `manual`, or `blocked`
-
-### Notes
-
-- Uses webhook updates to detect completion quickly
-- Falls back to polling if webhook updates are delayed
-
-<a id="get-pipeline"></a>
-
-## Get Pipeline
-
-The Get Pipeline component retrieves a specific pipeline from a GitLab project by pipeline ID.
-
-### Configuration
-
-- **Project** (required): GitLab project containing the pipeline
-- **Pipeline** (required): Select a pipeline from the selected project
-
-### Output
-
-Returns the pipeline object, including status, ref, SHA, and URL.
-
-<a id="get-latest-pipeline"></a>
-
-## Get Latest Pipeline
-
-The Get Latest Pipeline component retrieves the most recent pipeline for a GitLab project.
-
-### Configuration
-
-- **Project** (required): GitLab project to query
-- **Ref** (optional): Branch or tag to scope the latest pipeline lookup
-
-### Output
-
-Returns the latest matching pipeline object.
-
-<a id="get-test-report-summary"></a>
-
-## Get Test Report Summary
-
-The Get Test Report Summary component fetches test report summary data for a specific pipeline.
-
-### Configuration
-
-- **Project** (required): GitLab project containing the pipeline
-- **Pipeline** (required): Select a pipeline from the selected project
-
-### Output
-
-Returns total test statistics and per-suite summary information.
 
 <a id="on-merge-request"></a>
 
@@ -374,7 +306,11 @@ The On Pipeline trigger starts a workflow execution when pipeline events occur i
 
 ### Outputs
 
-- **Default channel**: Emits pipeline payload data including pipeline status, ref, SHA, and URL
+- **Default channel**: Emits pipeline webhook payload data including status, ref, SHA, and project information
+
+### Webhook Setup
+
+This trigger automatically sets up a GitLab webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
 
 ### Example Data
 
@@ -395,6 +331,7 @@ The On Pipeline trigger starts a workflow execution when pipeline events occur i
       "sha": "f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
       "source": "push",
       "status": "success",
+      "updated_at": "2026-02-10 12:03:10 UTC",
       "url": "https://gitlab.com/group/example-project/-/pipelines/12345"
     },
     "object_kind": "pipeline",
@@ -757,6 +694,247 @@ The component outputs the created issue object, including:
   },
   "timestamp": "2023-01-01T10:00:00.000Z",
   "type": "gitlab.issue"
+}
+```
+
+<a id="get-latest-pipeline"></a>
+
+## Get Latest Pipeline
+
+The Get Latest Pipeline component retrieves the newest pipeline for a GitLab project.
+
+### Configuration
+
+- **Project** (required): The GitLab project to query
+- **Ref** (optional): Branch or tag to scope the latest pipeline search
+
+### Example Output
+
+```json
+{
+  "data": {
+    "before_sha": "f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
+    "committed_at": "2026-02-13T19:20:45.000Z",
+    "coverage": "87.1",
+    "created_at": "2026-02-13T19:21:00.000Z",
+    "detailed_status": {
+      "group": "success",
+      "has_details": true,
+      "icon": "status_success",
+      "label": "passed",
+      "text": "passed",
+      "tooltip": "passed"
+    },
+    "duration": 268,
+    "finished_at": "2026-02-13T19:25:43.000Z",
+    "id": 457882200,
+    "iid": 9822,
+    "project_id": 123456,
+    "queued_duration": 12.6,
+    "ref": "main",
+    "sha": "afce89e8d28741d4f65ec71ad0a4174a801122cd",
+    "source": "merge_request_event",
+    "started_at": "2026-02-13T19:21:15.000Z",
+    "status": "success",
+    "tag": false,
+    "updated_at": "2026-02-13T19:25:43.000Z",
+    "user": {
+      "avatar_url": "https://www.gravatar.com/avatar/ef56gh78",
+      "id": 18,
+      "name": "Alex Garcia",
+      "username": "agarcia"
+    },
+    "web_url": "https://gitlab.com/group/example-project/-/pipelines/457882200",
+    "yaml_errors": null
+  },
+  "timestamp": "2026-02-13T19:25:43.000Z",
+  "type": "gitlab.pipeline"
+}
+```
+
+<a id="get-pipeline"></a>
+
+## Get Pipeline
+
+The Get Pipeline component retrieves details for a specific GitLab pipeline.
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the pipeline
+- **Pipeline** (required): Select a pipeline from the selected project
+
+### Output
+
+Returns pipeline data including status, ref, SHA, and pipeline URL.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "before_sha": "0000000000000000000000000000000000000000",
+    "committed_at": "2026-02-13T17:59:22.000Z",
+    "coverage": null,
+    "created_at": "2026-02-13T18:00:00.000Z",
+    "detailed_status": {
+      "group": "running",
+      "has_details": true,
+      "icon": "status_running",
+      "label": "running",
+      "text": "running",
+      "tooltip": "running"
+    },
+    "duration": 0,
+    "finished_at": null,
+    "id": 457882113,
+    "iid": 9821,
+    "project_id": 123456,
+    "queued_duration": 8.2,
+    "ref": "main",
+    "sha": "f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
+    "source": "push",
+    "started_at": "2026-02-13T18:00:12.000Z",
+    "status": "running",
+    "tag": false,
+    "updated_at": "2026-02-13T18:00:10.000Z",
+    "user": {
+      "avatar_url": "https://www.gravatar.com/avatar/abc123",
+      "id": 22,
+      "name": "Jamie Rivera",
+      "username": "jrivera"
+    },
+    "web_url": "https://gitlab.com/group/example-project/-/pipelines/457882113",
+    "yaml_errors": null
+  },
+  "timestamp": "2026-02-13T18:00:10.000Z",
+  "type": "gitlab.pipeline"
+}
+```
+
+<a id="get-test-report-summary"></a>
+
+## Get Test Report Summary
+
+The Get Test Report Summary component fetches the test report summary for a GitLab pipeline.
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the pipeline
+- **Pipeline** (required): Select a pipeline from the selected project
+
+### Example Output
+
+```json
+{
+  "data": {
+    "test_suites": [
+      {
+        "build_ids": [
+          8934210
+        ],
+        "error_count": 0,
+        "failed_count": 1,
+        "name": "backend-rspec",
+        "skipped_count": 0,
+        "success_count": 247,
+        "suite_error": null,
+        "total_count": 248,
+        "total_time": 81.27
+      },
+      {
+        "build_ids": [
+          8934211
+        ],
+        "error_count": 0,
+        "failed_count": 1,
+        "name": "frontend-jest",
+        "skipped_count": 1,
+        "success_count": 162,
+        "suite_error": null,
+        "total_count": 164,
+        "total_time": 71.19
+      }
+    ],
+    "total": {
+      "count": 412,
+      "error": 0,
+      "failed": 2,
+      "skipped": 1,
+      "success": 409,
+      "suite_error": null,
+      "time": 152.46
+    }
+  },
+  "timestamp": "2026-02-13T19:26:01.000Z",
+  "type": "gitlab.testReportSummary"
+}
+```
+
+<a id="run-pipeline"></a>
+
+## Run Pipeline
+
+The Run Pipeline component triggers a GitLab pipeline and waits for it to complete.
+
+### Use Cases
+
+- **CI/CD orchestration**: Trigger GitLab pipelines from SuperPlane workflows
+- **Deployment automation**: Run deployment pipelines with custom variables
+- **Pipeline chaining**: Coordinate follow-up actions after pipeline completion
+
+### How It Works
+
+1. Creates a new pipeline using the selected project, ref, inputs, and variables
+2. Waits for pipeline completion, primarily via webhook updates
+3. Falls back to polling if webhook updates are delayed or unavailable
+4. Routes execution to:
+   - **Passed** channel when pipeline succeeds
+   - **Failed** channel for failed, canceled, skipped, manual, or blocked outcomes
+
+### Example Output
+
+```json
+{
+  "data": {
+    "pipeline": {
+      "before_sha": "0000000000000000000000000000000000000000",
+      "committed_at": "2026-02-13T17:59:22.000Z",
+      "coverage": "86.5",
+      "created_at": "2026-02-13T18:00:00.000Z",
+      "detailed_status": {
+        "group": "success",
+        "has_details": true,
+        "icon": "status_success",
+        "label": "passed",
+        "text": "passed",
+        "tooltip": "passed"
+      },
+      "duration": 240,
+      "finished_at": "2026-02-13T18:04:12.000Z",
+      "id": 457882113,
+      "iid": 9821,
+      "project_id": 123456,
+      "queued_duration": 8.2,
+      "ref": "main",
+      "sha": "f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
+      "source": "web",
+      "started_at": "2026-02-13T18:00:12.000Z",
+      "status": "success",
+      "tag": false,
+      "updated_at": "2026-02-13T18:04:12.000Z",
+      "url": "https://gitlab.com/group/example-project/-/pipelines/457882113",
+      "user": {
+        "avatar_url": "https://www.gravatar.com/avatar/abc123",
+        "id": 22,
+        "name": "Jamie Rivera",
+        "username": "jrivera"
+      },
+      "web_url": "https://gitlab.com/group/example-project/-/pipelines/457882113",
+      "yaml_errors": null
+    }
+  },
+  "timestamp": "2026-02-13T18:04:12.000Z",
+  "type": "gitlab.pipeline.finished"
 }
 ```
 
