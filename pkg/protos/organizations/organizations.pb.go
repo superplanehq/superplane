@@ -1590,6 +1590,7 @@ type UpdateIntegrationRequest struct {
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	IntegrationId string                 `protobuf:"bytes,2,opt,name=integration_id,json=integrationId,proto3" json:"integration_id,omitempty"`
 	Configuration *_struct.Struct        `protobuf:"bytes,3,opt,name=configuration,proto3" json:"configuration,omitempty"`
+	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1643,6 +1644,13 @@ func (x *UpdateIntegrationRequest) GetConfiguration() *_struct.Struct {
 		return x.Configuration
 	}
 	return nil
+}
+
+func (x *UpdateIntegrationRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
 }
 
 type UpdateIntegrationResponse struct {
@@ -2388,8 +2396,8 @@ func (x *Integration_Status) GetUsedIn() []*Integration_NodeRef {
 
 type Integration_NodeRef struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorkflowId    string                 `protobuf:"bytes,1,opt,name=workflow_id,json=workflowId,proto3" json:"workflow_id,omitempty"`
-	WorkflowName  string                 `protobuf:"bytes,2,opt,name=workflow_name,json=workflowName,proto3" json:"workflow_name,omitempty"`
+	CanvasId      string                 `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
+	CanvasName    string                 `protobuf:"bytes,2,opt,name=canvas_name,json=canvasName,proto3" json:"canvas_name,omitempty"`
 	NodeId        string                 `protobuf:"bytes,3,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
 	NodeName      string                 `protobuf:"bytes,4,opt,name=node_name,json=nodeName,proto3" json:"node_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -2426,16 +2434,16 @@ func (*Integration_NodeRef) Descriptor() ([]byte, []int) {
 	return file_organizations_proto_rawDescGZIP(), []int{36, 3}
 }
 
-func (x *Integration_NodeRef) GetWorkflowId() string {
+func (x *Integration_NodeRef) GetCanvasId() string {
 	if x != nil {
-		return x.WorkflowId
+		return x.CanvasId
 	}
 	return ""
 }
 
-func (x *Integration_NodeRef) GetWorkflowName() string {
+func (x *Integration_NodeRef) GetCanvasName() string {
 	if x != nil {
-		return x.WorkflowName
+		return x.CanvasName
 	}
 	return ""
 }
@@ -2564,17 +2572,18 @@ const file_organizations_proto_rawDesc = "" +
 	"\x16IntegrationResourceRef\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x0e\n" +
-	"\x02id\x18\x03 \x01(\tR\x02id\"\x90\x01\n" +
+	"\x02id\x18\x03 \x01(\tR\x02id\"\xa4\x01\n" +
 	"\x18UpdateIntegrationRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12%\n" +
 	"\x0eintegration_id\x18\x02 \x01(\tR\rintegrationId\x12=\n" +
-	"\rconfiguration\x18\x03 \x01(\v2\x17.google.protobuf.StructR\rconfiguration\"d\n" +
+	"\rconfiguration\x18\x03 \x01(\v2\x17.google.protobuf.StructR\rconfiguration\x12\x12\n" +
+	"\x04name\x18\x04 \x01(\tR\x04name\"d\n" +
 	"\x19UpdateIntegrationResponse\x12G\n" +
 	"\vintegration\x18\x01 \x01(\v2%.Superplane.Organizations.IntegrationR\vintegration\"Q\n" +
 	"\x18DeleteIntegrationRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12%\n" +
 	"\x0eintegration_id\x18\x02 \x01(\tR\rintegrationId\"\x1b\n" +
-	"\x19DeleteIntegrationResponse\"\x9b\a\n" +
+	"\x19DeleteIntegrationResponse\"\x92\a\n" +
 	"\vIntegration\x12J\n" +
 	"\bmetadata\x18\x01 \x01(\v2..Superplane.Organizations.Integration.MetadataR\bmetadata\x12>\n" +
 	"\x04spec\x18\x02 \x01(\v2*.Superplane.Organizations.Integration.SpecR\x04spec\x12D\n" +
@@ -2594,11 +2603,11 @@ const file_organizations_proto_rawDesc = "" +
 	"\x11state_description\x18\x02 \x01(\tR\x10stateDescription\x123\n" +
 	"\bmetadata\x18\x03 \x01(\v2\x17.google.protobuf.StructR\bmetadata\x12N\n" +
 	"\x0ebrowser_action\x18\x04 \x01(\v2'.Superplane.Organizations.BrowserActionR\rbrowserAction\x12F\n" +
-	"\aused_in\x18\x05 \x03(\v2-.Superplane.Organizations.Integration.NodeRefR\x06usedIn\x1a\x85\x01\n" +
-	"\aNodeRef\x12\x1f\n" +
-	"\vworkflow_id\x18\x01 \x01(\tR\n" +
-	"workflowId\x12#\n" +
-	"\rworkflow_name\x18\x02 \x01(\tR\fworkflowName\x12\x17\n" +
+	"\aused_in\x18\x05 \x03(\v2-.Superplane.Organizations.Integration.NodeRefR\x06usedIn\x1a}\n" +
+	"\aNodeRef\x12\x1b\n" +
+	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x1f\n" +
+	"\vcanvas_name\x18\x02 \x01(\tR\n" +
+	"canvasName\x12\x17\n" +
 	"\anode_id\x18\x03 \x01(\tR\x06nodeId\x12\x1b\n" +
 	"\tnode_name\x18\x04 \x01(\tR\bnodeName\"\xf4\x01\n" +
 	"\rBrowserAction\x12\x10\n" +

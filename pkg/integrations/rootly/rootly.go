@@ -4,7 +4,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -14,7 +13,7 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegration("rootly", &Rootly{})
+	registry.RegisterIntegrationWithWebhookHandler("rootly", &Rootly{}, &RootlyWebhookHandler{})
 }
 
 type Rootly struct{}
@@ -63,6 +62,7 @@ func (r *Rootly) Configuration() []configuration.Field {
 func (r *Rootly) Components() []core.Component {
 	return []core.Component{
 		&CreateIncident{},
+		&CreateEvent{},
 	}
 }
 
@@ -104,85 +104,6 @@ func (r *Rootly) Sync(ctx core.SyncContext) error {
 
 func (r *Rootly) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
-}
-
-type WebhookConfiguration struct {
-	Events []string `json:"events"`
-}
-
-type WebhookMetadata struct {
-	EndpointID string `json:"endpointId"`
-}
-
-func (r *Rootly) CompareWebhookConfig(a, b any) (bool, error) {
-	configA := WebhookConfiguration{}
-	configB := WebhookConfiguration{}
-
-	err := mapstructure.Decode(a, &configA)
-	if err != nil {
-		return false, err
-	}
-
-	err = mapstructure.Decode(b, &configB)
-	if err != nil {
-		return false, err
-	}
-
-	// Check if A contains all events from B (A is superset of B)
-	for _, eventB := range configB.Events {
-		if !slices.Contains(configA.Events, eventB) {
-			return false, nil
-		}
-	}
-
-	return true, nil
-}
-
-func (r *Rootly) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return nil, err
-	}
-
-	config := WebhookConfiguration{}
-	err = mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config)
-	if err != nil {
-		return nil, fmt.Errorf("error decoding webhook configuration: %v", err)
-	}
-
-	endpoint, err := client.CreateWebhookEndpoint(ctx.Webhook.GetURL(), config.Events)
-	if err != nil {
-		return nil, fmt.Errorf("error creating webhook endpoint: %v", err)
-	}
-
-	err = ctx.Webhook.SetSecret([]byte(endpoint.Secret))
-	if err != nil {
-		return nil, fmt.Errorf("error updating webhook secret: %v", err)
-	}
-
-	return WebhookMetadata{
-		EndpointID: endpoint.ID,
-	}, nil
-}
-
-func (r *Rootly) CleanupWebhook(ctx core.CleanupWebhookContext) error {
-	metadata := WebhookMetadata{}
-	err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &metadata)
-	if err != nil {
-		return fmt.Errorf("error decoding webhook metadata: %v", err)
-	}
-
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return err
-	}
-
-	err = client.DeleteWebhookEndpoint(metadata.EndpointID)
-	if err != nil {
-		return fmt.Errorf("error deleting webhook endpoint: %v", err)
-	}
-
-	return nil
 }
 
 func (r *Rootly) Actions() []core.Action {

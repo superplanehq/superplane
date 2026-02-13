@@ -153,12 +153,13 @@ export const useUpdateIntegration = (organizationId: string, integrationId: stri
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (configuration: Record<string, unknown>) => {
+    mutationFn: async (data: { name?: string; configuration?: Record<string, unknown> }) => {
       return await organizationsUpdateIntegration(
         withOrganizationHeader({
           path: { id: organizationId, integrationId },
           body: {
-            configuration,
+            name: data.name,
+            configuration: data.configuration,
           },
         }),
       );

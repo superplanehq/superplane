@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegration("snyk", &Snyk{})
+	registry.RegisterIntegrationWithWebhookHandler("snyk", &Snyk{}, &SnykWebhookHandler{})
 }
 
 type Snyk struct{}
@@ -147,7 +147,9 @@ type WebhookConfiguration struct {
 	ProjectID string `json:"projectId,omitempty"`
 }
 
-func (s *Snyk) CompareWebhookConfig(a, b any) (bool, error) {
+type SnykWebhookHandler struct{}
+
+func (h *SnykWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	configA := WebhookConfiguration{}
 	configB := WebhookConfiguration{}
 
@@ -166,7 +168,11 @@ func (s *Snyk) CompareWebhookConfig(a, b any) (bool, error) {
 		configA.ProjectID == configB.ProjectID, nil
 }
 
-func (s *Snyk) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
+func (h *SnykWebhookHandler) Merge(current, requested any) (any, bool, error) {
+	return current, false, nil
+}
+
+func (h *SnykWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	config := WebhookConfiguration{}
 	err := mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config)
 	if err != nil {
@@ -196,7 +202,7 @@ func (s *Snyk) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
 	}, nil
 }
 
-func (s *Snyk) CleanupWebhook(ctx core.CleanupWebhookContext) error {
+func (h *SnykWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 	webhook := SnykWebhook{}
 	err := mapstructure.Decode(ctx.Webhook.GetMetadata(), &webhook)
 	if err != nil {

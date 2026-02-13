@@ -39,8 +39,8 @@ func TestSnykConfiguration(t *testing.T) {
 	assert.True(t, fieldNames["organizationId"])
 }
 
-func Test__Snyk__CompareWebhookConfig(t *testing.T) {
-	s := &Snyk{}
+func Test__SnykWebhookHandler__CompareConfig(t *testing.T) {
+	s := &SnykWebhookHandler{}
 
 	testCases := []struct {
 		name        string
@@ -159,7 +159,7 @@ func Test__Snyk__CompareWebhookConfig(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			equal, err := s.CompareWebhookConfig(tc.configA, tc.configB)
+			equal, err := s.CompareConfig(tc.configA, tc.configB)
 
 			if tc.expectError {
 				assert.Error(t, err)
