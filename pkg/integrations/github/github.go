@@ -486,6 +486,7 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 		"public": false,
 		"url":    "https://superplane.com",
 		"default_permissions": map[string]string{
+			"administration":   "read",
 			"issues":           "write",
 			"actions":          "write",
 			"contents":         "write",
