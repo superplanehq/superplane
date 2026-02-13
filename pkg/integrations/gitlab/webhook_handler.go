@@ -68,6 +68,10 @@ func (h *GitLabWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error
 		events.PipelineEvents = true
 	case "releases":
 		events.ReleasesEvents = true
+	case "milestone":
+		events.MilestoneEvents = true
+	case "vulnerability":
+		events.VulnerabilityEvents = true
 	}
 
 	hook, err := hooksClient.CreateHook(config.ProjectID, ctx.Webhook.GetURL(), string(secret), events)

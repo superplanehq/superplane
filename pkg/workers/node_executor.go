@@ -27,20 +27,22 @@ import (
 var ErrRecordLocked = errors.New("record locked")
 
 type NodeExecutor struct {
-	encryptor crypto.Encryptor
-	registry  *registry.Registry
-	baseURL   string
-	semaphore *semaphore.Weighted
-	logger    *logrus.Entry
+	encryptor      crypto.Encryptor
+	registry       *registry.Registry
+	baseURL        string
+	webhookBaseURL string
+	semaphore      *semaphore.Weighted
+	logger         *logrus.Entry
 }
 
-func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string) *NodeExecutor {
+func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, webhookBaseURL string) *NodeExecutor {
 	return &NodeExecutor{
-		encryptor: encryptor,
-		registry:  registry,
-		baseURL:   baseURL,
-		semaphore: semaphore.NewWeighted(25),
-		logger:    logrus.WithFields(logrus.Fields{"worker": "NodeExecutor"}),
+		encryptor:      encryptor,
+		registry:       registry,
+		baseURL:        baseURL,
+		webhookBaseURL: webhookBaseURL,
+		semaphore:      semaphore.NewWeighted(25),
+		logger:         logrus.WithFields(logrus.Fields{"worker": "NodeExecutor"}),
 	}
 }
 
@@ -123,7 +125,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 			Error
 
 		if err != nil {
-			w.logger.Errorf("Execution %s already being processed - skipping", id.String())
+			w.logger.Debugf("Execution %s already being processed - skipping", id.String())
 			return ErrRecordLocked
 		}
 
@@ -290,6 +292,7 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, nil, nil),
 		Notifications:  contexts.NewNotificationContext(tx, workflow.OrganizationID, execution.WorkflowID),
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
+		Webhook:        contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
 	}
 	ctx.ExpressionEnv = func(expression string) (map[string]any, error) {
 		builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).

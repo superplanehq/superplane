@@ -100,6 +100,12 @@ func (r *Render) Configuration() []configuration.Field {
 func (r *Render) Components() []core.Component {
 	return []core.Component{
 		&Deploy{},
+		&GetService{},
+		&GetDeploy{},
+		&CancelDeploy{},
+		&RollbackDeploy{},
+		&PurgeCache{},
+		&UpdateEnvVar{},
 	}
 }
 
@@ -214,34 +220,35 @@ func workspaceIDForIntegration(client *Client, integration core.IntegrationConte
 	return selectedWorkspace.ID, nil
 }
 
-func resolveWorkspace(client *Client, workspace string) (Workspace, error) {
+func resolveWorkspace(client *Client, requestedWorkspace string) (Workspace, error) {
 	workspaces, err := client.ListWorkspaces()
 	if err != nil {
 		return Workspace{}, err
 	}
 
 	if len(workspaces) == 0 {
-		return Workspace{}, fmt.Errorf("no workspaces found for this API key")
+		return Workspace{}, fmt.Errorf("no workspace available for this API key")
 	}
 
-	if workspace == "" {
+	requestedWorkspace = strings.TrimSpace(requestedWorkspace)
+	if requestedWorkspace == "" {
 		return workspaces[0], nil
 	}
 
 	selectedWorkspace := slices.IndexFunc(workspaces, func(item Workspace) bool {
-		return item.ID == workspace
+		return item.ID == requestedWorkspace
 	})
 	if selectedWorkspace < 0 {
 		selectedWorkspace = slices.IndexFunc(workspaces, func(item Workspace) bool {
-			return strings.EqualFold(item.Name, workspace)
+			return strings.EqualFold(item.Name, requestedWorkspace)
 		})
 	}
 
-	if selectedWorkspace < 0 {
-		return Workspace{}, fmt.Errorf("workspace %s is not accessible with this API key", workspace)
+	if selectedWorkspace >= 0 {
+		return workspaces[selectedWorkspace], nil
 	}
 
-	return workspaces[selectedWorkspace], nil
+	return Workspace{}, fmt.Errorf("workspace %q is not accessible with this API key", requestedWorkspace)
 }
 
 func (m Metadata) workspacePlan() string {
@@ -249,14 +256,19 @@ func (m Metadata) workspacePlan() string {
 		return workspacePlanProfessional
 	}
 
-	return m.Workspace.Plan
+	return strings.TrimSpace(m.Workspace.Plan)
 }
 
-func buildMetadata(workspaceID, workspacePlan string) Metadata {
+func buildMetadata(workspaceID string, workspacePlan string) Metadata {
+	resolvedPlan := strings.TrimSpace(workspacePlan)
+	if resolvedPlan == "" {
+		resolvedPlan = workspacePlanProfessional
+	}
+
 	return Metadata{
 		Workspace: &WorkspaceMetadata{
-			ID:   strings.TrimSpace(workspaceID),
-			Plan: strings.TrimSpace(workspacePlan),
+			ID:   workspaceID,
+			Plan: resolvedPlan,
 		},
 	}
 }
