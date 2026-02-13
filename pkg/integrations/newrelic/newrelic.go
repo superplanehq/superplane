@@ -15,59 +15,55 @@ const installationInstructions = `
 To set up New Relic integration:
 
 1. **Select Region**: Choose your New Relic region (US or EU)
-2. **Get API Key**: In New Relic, go to Account Settings > API Keys
-3. **Create API Key**: Click "Create API key" and give it a name
-4. **Copy API Key**: Copy the generated API key (you won't be able to see it again)
-5. **Paste API Key**: Paste the API key in the field below
+2. **Provide API Keys**: You can provide one or both keys depending on which components you need.
 
-## Usage
+## API Keys
 
-- **Report Metric**: Use this action to send custom telemetry (Gauge, Count, Summary) to New Relic.
-- **Run NRQL Query**: Use this action to fetch data from New Relic for decision making or reporting.
+New Relic uses two different types of API keys for different purposes:
 
-## Note
+- **User API Key** (starts with NRAK-): Required for **Run NRQL Query** and **On Issue** trigger. Get it from New Relic > Account Settings > API Keys > Create User Key.
+- **License Key** (Ingest - License): Required for **Report Metric** action. Get it from New Relic > Account Settings > API Keys > Create Ingest License Key.
 
-The **Report Metric** action requires a **License Key** (Ingest - License) or an **API Key** (User) with ingest permissions. 
-If you use a User API Key, it must have the necessary permissions. A License Key is generally recommended for metric ingestion.
-The **Run NRQL Query** action requires a **User API Key** (NRAK-) with query permissions.
+You may provide both keys to enable all components, or just the key(s) for the components you need.
 `
 
 func init() {
-	registry.RegisterIntegrationWithWebhookHandler("newrelic", &NewRelic{}, &NewRelicWebhookHandler{})
+	registry.RegisterIntegrationWithWebhookHandler("newrelic", &Newrelic{}, &NewrelicWebhookHandler{})
 }
 
-type NewRelic struct{}
+type Newrelic struct{}
 
 type Configuration struct {
-	APIKey string `json:"apiKey" mapstructure:"apiKey"`
-	Site   string `json:"site" mapstructure:"site"`
+	UserAPIKey string `json:"userApiKey" mapstructure:"userApiKey"`
+	LicenseKey string `json:"licenseKey" mapstructure:"licenseKey"`
+	Site       string `json:"site" mapstructure:"site"`
 }
 
 type Metadata struct {
 	Accounts []Account `json:"accounts" mapstructure:"accounts"`
 }
 
-func (n *NewRelic) Name() string {
+func (n *Newrelic) Name() string {
 	return "newrelic"
 }
 
-func (n *NewRelic) Label() string {
+func (n *Newrelic) Label() string {
 	return "New Relic"
 }
 
-func (n *NewRelic) Icon() string {
+func (n *Newrelic) Icon() string {
 	return "newrelic"
 }
 
-func (n *NewRelic) Description() string {
+func (n *Newrelic) Description() string {
 	return "Monitor and manage your New Relic resources"
 }
 
-func (n *NewRelic) Instructions() string {
+func (n *Newrelic) Instructions() string {
 	return installationInstructions
 }
 
-func (n *NewRelic) Configuration() []configuration.Field {
+func (n *Newrelic) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "site",
@@ -75,7 +71,7 @@ func (n *NewRelic) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeSelect,
 			Required:    true,
 			Default:     "US",
-			Description: "Your New Relic data region",
+			Description: "Your newrelic data region",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
@@ -86,86 +82,101 @@ func (n *NewRelic) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "apiKey",
-			Label:       "API Key",
+			Name:        "userApiKey",
+			Label:       "User API Key",
 			Type:        configuration.FieldTypeString,
-			Required:    true,
+			Required:    false,
 			Sensitive:   true,
-			Description: "New Relic API key from Account Settings > API Keys",
+			Description: "User API Key (NRAK-...) for NRQL queries and triggers. Get from Account Settings > API Keys.",
+		},
+		{
+			Name:        "licenseKey",
+			Label:       "License Key (Ingest)",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Sensitive:   true,
+			Description: "Ingest License Key for metric reporting. Get from Account Settings > API Keys.",
 		},
 	}
 }
 
-func (n *NewRelic) Components() []core.Component {
+func (n *Newrelic) Components() []core.Component {
 	return []core.Component{
 		&ReportMetric{},
 		&RunNRQLQuery{},
 	}
 }
 
-func (n *NewRelic) Triggers() []core.Trigger {
+func (n *Newrelic) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnIssue{},
 	}
 }
 
-func (n *NewRelic) Sync(ctx core.SyncContext) error {
+func (n *Newrelic) Sync(ctx core.SyncContext) error {
 	config := Configuration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if config.APIKey == "" {
-		return fmt.Errorf("API key is required")
+	if config.UserAPIKey == "" && config.LicenseKey == "" {
+		return fmt.Errorf("at least one API key is required: provide a User API Key (for NRQL/triggers) and/or a License Key (for metrics)")
 	}
 
-    client, err := NewClient(ctx.HTTP, ctx.Integration)
-    if err != nil {
-        return fmt.Errorf("failed to create client: %w", err)
-    }
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
 
-    // 1. Validate the API Key
-    err = client.ValidateAPIKey(context.Background())
-    if err != nil {
-        return fmt.Errorf("failed to validate API key: %w", err)
-    }
+	// Validate and fetch accounts only when a User API Key is provided
+	if config.UserAPIKey != "" {
+		err = client.ValidateAPIKey(context.Background())
+		if err != nil {
+			return fmt.Errorf("failed to validate User API Key: %w", err)
+		}
 
-    // 2. Fetch accounts so the UI can populate the \"Account\" dropdowns
-    accounts, err := client.ListAccounts(context.Background())
-    if err != nil {
-        if ctx.Logger != nil {
-            ctx.Logger.Warnf("New Relic: failed to fetch accounts: %v", err)
-        }
-        accounts = []Account{}
-    }
+		accounts, err := client.ListAccounts(context.Background())
+		if err != nil {
+			if ctx.Logger != nil {
+				ctx.Logger.Warnf("New Relic: failed to fetch accounts: %v", err)
+			}
+			accounts = []Account{}
+		}
 
-    // 3. Save to Metadata
-    ctx.Integration.SetMetadata(Metadata{
-        Accounts: accounts,
-    })
+		ctx.Integration.SetMetadata(Metadata{
+			Accounts: accounts,
+		})
+	} else {
+		// Only License Key provided — skip NerdGraph validation
+		if ctx.Logger != nil {
+			ctx.Logger.Info("New Relic: No User API Key provided, skipping NerdGraph validation and account fetching")
+		}
+		ctx.Integration.SetMetadata(Metadata{
+			Accounts: []Account{},
+		})
+	}
 
-    ctx.Integration.Ready()
-    return nil
+	ctx.Integration.Ready()
+	return nil
 }
 
-
-func (n *NewRelic) HandleRequest(ctx core.HTTPRequestContext) {
+func (n *Newrelic) HandleRequest(ctx core.HTTPRequestContext) {
 	// Webhooks will be handled by triggers
 }
 
-func (n *NewRelic) Cleanup(ctx core.IntegrationCleanupContext) error {
+func (n *Newrelic) Cleanup(ctx core.IntegrationCleanupContext) error {
 	return nil
 }
 
-func (n *NewRelic) Actions() []core.Action {
+func (n *Newrelic) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (n *NewRelic) HandleAction(ctx core.IntegrationActionContext) error {
+func (n *Newrelic) HandleAction(ctx core.IntegrationActionContext) error {
 	return nil
 }
 
-func (n *NewRelic) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+func (n *Newrelic) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	if resourceType != "account" {
 		return []core.IntegrationResource{}, nil
 	}
@@ -187,25 +198,22 @@ func (n *NewRelic) ListResources(resourceType string, ctx core.ListResourcesCont
 	return resources, nil
 }
 
+type NewrelicWebhookHandler struct{}
 
-type NewRelicWebhookHandler struct{}
-
-func (h *NewRelicWebhookHandler) CompareConfig(a, b any) (bool, error) {
+func (h *NewrelicWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	if a == nil && b == nil {
 		return true, nil
 	}
 	return reflect.DeepEqual(a, b), nil
 }
 
-func (h *NewRelicWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
+func (h *NewrelicWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
 	return map[string]any{"manual": true}, nil
 }
 
-func (h *NewRelicWebhookHandler) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	trigger := &OnIssue{}
-	return trigger.HandleWebhook(ctx)
-}
-
-func (h *NewRelicWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
+func (h *NewrelicWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 	return nil
+}
+func (h *NewrelicWebhookHandler) Merge(prev, curr any) (any, bool, error) {
+	return curr, true, nil
 }
