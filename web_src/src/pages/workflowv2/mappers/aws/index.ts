@@ -15,6 +15,7 @@ import { deleteRepositoryMapper } from "./codeartifact/delete_repository";
 import { disposePackageVersionsMapper } from "./codeartifact/dispose_package_versions";
 import { updatePackageVersionsStatusMapper } from "./codeartifact/update_package_versions_status";
 import { onAlarmTriggerRenderer } from "./cloudwatch/on_alarm";
+import { putMetricDataMapper } from "./cloudwatch/put_metric_data";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   "lambda.runFunction": runFunctionMapper,
@@ -28,6 +29,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "codeArtifact.disposePackageVersions": disposePackageVersionsMapper,
   "codeArtifact.getPackageVersion": getPackageVersionMapper,
   "codeArtifact.updatePackageVersionsStatus": updatePackageVersionsStatusMapper,
+  "cloudwatch.putMetricData": putMetricDataMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -48,4 +50,5 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "codeArtifact.disposePackageVersions": buildActionStateRegistry("disposed"),
   "codeArtifact.getPackageVersion": buildActionStateRegistry("retrieved"),
   "codeArtifact.updatePackageVersionsStatus": buildActionStateRegistry("updated"),
+  "cloudwatch.putMetricData": buildActionStateRegistry("pushed"),
 };
