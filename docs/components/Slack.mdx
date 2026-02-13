@@ -15,6 +15,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Send and Wait for Response" href="#send-and-wait-for-response" description="Send a message with buttons and wait for a user response" />
   <LinkCard title="Send Text Message" href="#send-text-message" description="Send a text message to a Slack channel" />
 </CardGrid>
 
@@ -78,6 +79,58 @@ This trigger automatically sets up a Slack event subscription when configured. T
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "slack.app.mention"
+}
+```
+
+<a id="send-and-wait-for-response"></a>
+
+## Send and Wait for Response
+
+The Send and Wait for Response component sends a message to a Slack channel with configurable buttons and pauses the workflow until a user clicks one of the buttons.
+
+### Use Cases
+
+- **Approvals**: Send approval/rejection buttons to stakeholders
+- **Decision gates**: Present options and wait for user selection
+- **Incident response**: Acknowledge or escalate incidents from Slack
+- **Deployment confirmations**: Confirm or cancel deployments
+
+### Configuration
+
+- **Channel**: Select the Slack channel to send the message to
+- **Message**: The message text (supports Slack markdown formatting)
+- **Timeout**: Optional timeout in seconds; if no response within the timeout, the workflow continues on the "Timeout" channel
+- **Buttons**: 1-4 buttons, each with a display name and a value
+
+### Output Channels
+
+- **Received**: Emitted when a user clicks a button; includes the button value and user info
+- **Timeout**: Emitted when the timeout expires without a button click
+
+### How It Works
+
+1. A message with interactive buttons is posted to the configured Slack channel
+2. The workflow pauses and waits for a user to click a button
+3. When clicked, the message is updated to show which option was selected
+4. The workflow continues on the "Received" channel with the button value
+
+### Notes
+
+- The Slack app must have interactivity enabled
+- Only button clicks are supported as responses (no free-text)
+- Each message can have 1-4 buttons
+
+### Example Output
+
+```json
+{
+  "value": "approve",
+  "user": {
+    "id": "U12345678",
+    "username": "john.doe",
+    "name": "John Doe",
+    "team_id": "T12345678"
+  }
 }
 ```
 
