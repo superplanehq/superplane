@@ -565,6 +565,23 @@ func (s *Server) HandleSentryPublicIntegrationAttach(w http.ResponseWriter, r *h
 	}
 
 	integrationCtx := contexts.NewIntegrationContext(tx, nil, integrationInstance, s.encryptor, s.registry)
+
+	installationUUID := strings.TrimSpace(auth.ID)
+	if installationUUID == "" {
+		installationUUID = strings.TrimSpace(req.InstallationID)
+	}
+	if installationUUID != "" {
+		existing, existingErr := models.ListSentryIntegrationsByInstallationIDInTransaction(tx, installationUUID)
+		if existingErr == nil {
+			for _, ex := range existing {
+				if ex.ID != integrationInstance.ID {
+					http.Error(w, "Sentry installation is already attached to another integration", http.StatusConflict)
+					return
+				}
+			}
+		}
+	}
+
 	if err := integrationCtx.SetSecret("sentryPublicAccessToken", []byte(auth.Token)); err != nil {
 		http.Error(w, "Failed to store token", http.StatusInternalServerError)
 		return
@@ -583,24 +600,8 @@ func (s *Server) HandleSentryPublicIntegrationAttach(w http.ResponseWriter, r *h
 	}
 	metadata["sentryInstallationID"] = req.InstallationID
 	metadata["sentryBaseURL"] = baseURL
-	installationUUID := strings.TrimSpace(auth.ID)
-	if installationUUID == "" {
-		installationUUID = strings.TrimSpace(req.InstallationID)
-	}
 	if installationUUID != "" {
 		metadata["sentryInstallationUUID"] = installationUUID
-	}
-
-	if installationUUID != "" {
-		existing, existingErr := models.ListSentryIntegrationsByInstallationIDInTransaction(tx, installationUUID)
-		if existingErr == nil {
-			for _, ex := range existing {
-				if ex.ID != integrationInstance.ID {
-					http.Error(w, "Sentry installation is already attached to another integration", http.StatusConflict)
-					return
-				}
-			}
-		}
 	}
 	integrationInstance.Metadata = datatypes.NewJSONType(metadata)
 
