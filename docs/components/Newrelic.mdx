@@ -1,5 +1,5 @@
 ---
-title: "New Relic"
+title: "Newrelic"
 ---
 
 Monitor and manage your New Relic resources
@@ -24,21 +24,16 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 To set up New Relic integration:
 
 1. **Select Region**: Choose your New Relic region (US or EU)
-2. **Get API Key**: In New Relic, go to Account Settings > API Keys
-3. **Create API Key**: Click "Create API key" and give it a name
-4. **Copy API Key**: Copy the generated API key (you won't be able to see it again)
-5. **Paste API Key**: Paste the API key in the field below
+2. **Provide API Keys**: You can provide one or both keys depending on which components you need.
 
-## Usage
+## API Keys
 
-- **Report Metric**: Use this action to send custom telemetry (Gauge, Count, Summary) to New Relic.
-- **Run NRQL Query**: Use this action to fetch data from New Relic for decision making or reporting.
+New Relic uses two different types of API keys for different purposes:
 
-## Note
+- **User API Key** (starts with NRAK-): Required for **Run NRQL Query** and **On Issue** trigger. Get it from New Relic > Account Settings > API Keys > Create User Key.
+- **License Key** (Ingest - License): Required for **Report Metric** action. Get it from New Relic > Account Settings > API Keys > Create Ingest License Key.
 
-The **Report Metric** action requires a **License Key** (Ingest - License) or an **API Key** (User) with ingest permissions. 
-If you use a User API Key, it must have the necessary permissions. A License Key is generally recommended for metric ingestion.
-The **Run NRQL Query** action requires a **User API Key** (NRAK-) with query permissions.
+You may provide both keys to enable all components, or just the key(s) for the components you need.
 
 <a id="on-issue"></a>
 
@@ -77,16 +72,12 @@ This trigger generates a webhook URL. You must configure a **Workflow** in New R
 
 ```json
 {
-  "impacted_entities": [
-    "infra-host-1"
-  ],
   "issue_id": "12345678-abcd-efgh-ijkl-1234567890ab",
   "issue_url": "https://one.newrelic.com/launcher/nrai.launcher?pane=eyJuZXJkbGV0SWQiOiJhbGVydGluZy11aS1jbGFzc2ljLmluY2lkZW50cyIsInNlbGVjdGVkSW5jaWRlbnRJZCI6IjEyMzQ1Njc4In0=",
   "owner": "Team SRE",
   "priority": "CRITICAL",
   "state": "ACTIVATED",
-  "title": "High CPU Usage",
-  "total_incidents": 1
+  "title": "High CPU Usage"
 }
 ```
 
@@ -102,6 +93,7 @@ The Report Metric component allows you to send custom metrics (Gauge, Count, Sum
 - **Metric Type**: The type of metric (Gauge, Count, or Summary)
 - **Value**: The numeric value of the metric
 - **Timestamp**: Optional Unix timestamp (milliseconds). Defaults to now.
+- **Interval (ms)**: Required for Count and Summary metrics. The duration of the measurement window in milliseconds.
 - **Attributes**: Optional JSON object with additional attributes
 
 ### Output
@@ -112,13 +104,12 @@ Returns the sent metric payload.
 
 ```json
 {
-  "attributes": {
-    "environment": "production",
-    "host": "server1.example.com"
-  },
-  "metricName": "server.cpu.usage",
-  "metricType": "gauge",
+  "intervalMs": 0,
+  "name": "server.cpu.usage",
+  "status": "202 Accepted",
+  "statusCode": 202,
   "timestamp": 1707552000000,
+  "type": "gauge",
   "value": 75.5
 }
 ```
@@ -138,9 +129,17 @@ The Run NRQL Query component allows you to execute NRQL queries via New Relic's 
 
 ### Configuration
 
-- **Account ID**: The New Relic account ID to query against (required)
+- **Account**: The New Relic account to query (select from dropdown)
 - **Query**: The NRQL query string to execute (required)
-- **Timeout**: Query timeout in seconds (optional, default: 10, max: 120)
+
+### How It Works
+
+Queries use New Relic's asynchronous query API:
+
+1. The query is submitted via NerdGraph.
+2. If results are available within the internal API timeout, they are emitted immediately.
+3. If the query takes longer, the component polls for results automatically.
+4. Polling intervals respect the "Retry-After" suggestion from New Relic API, falling back to 10 seconds if not provided.
 
 ### Output
 
@@ -162,4 +161,30 @@ Returns query results including:
 - Requires a valid New Relic API key with query permissions
 - Queries are subject to New Relic's NRQL query limits
 - Invalid NRQL syntax will return an error from the API
+
+### Example Output
+
+```json
+{
+  "accountId": "1234567",
+  "metadata": {
+    "eventTypes": [
+      "Transaction"
+    ],
+    "facets": null,
+    "messages": [],
+    "timeWindow": {
+      "begin": 1707559740000,
+      "end": 1707563340000
+    }
+  },
+  "query": "SELECT count(*) FROM Transaction SINCE 1 hour ago",
+  "results": [
+    {
+      "count": 1523
+    }
+  ],
+  "totalResult": null
+}
+```
 

@@ -22,10 +22,14 @@ func Test__OnIssue__Setup(t *testing.T) {
 				"priorities": []string{"CRITICAL"},
 				"states":     []string{"ACTIVATED"},
 			},
-			Integration: &contexts.IntegrationContext{},
-			Webhook:     &contexts.WebhookContext{},
-			Metadata:    metadataCtx,
-			Logger:      log.NewEntry(log.New()),
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"userApiKey": "NRAK-TEST",
+				},
+			},
+			Webhook:  &contexts.WebhookContext{},
+			Metadata: metadataCtx,
+			Logger:   log.NewEntry(log.New()),
 		}
 
 		err := trigger.Setup(ctx)
@@ -45,8 +49,13 @@ func Test__OnIssue__Setup(t *testing.T) {
 		}
 		ctx := core.TriggerContext{
 			Configuration: map[string]any{},
-			Metadata:      metadataCtx,
-			Logger:        log.NewEntry(log.New()),
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"userApiKey": "NRAK-TEST",
+				},
+			},
+			Metadata: metadataCtx,
+			Logger:   log.NewEntry(log.New()),
 		}
 
 		err := trigger.Setup(ctx)
@@ -104,7 +113,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 		eventCtx := ctx.Events.(*contexts.EventContext)
 		require.Equal(t, 1, eventCtx.Count())
 		assert.Equal(t, "newrelic.issue_activated", eventCtx.Payloads[0].Type)
-		
+
 		data, ok := eventCtx.Payloads[0].Data.(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "123", data["issueId"])
@@ -112,7 +121,7 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 	t.Run("garbage payload -> 200 OK (no error)", func(t *testing.T) {
 		ctx := core.WebhookRequestContext{
 			Configuration: map[string]any{},
-			Body:          []byte(`{"test": "notification"}`), // Simulate New Relic Test Notification
+			Body:          []byte(`{"test": "notification"}`), // Simulate Newrelic Test Notification
 			Events:        &contexts.EventContext{},
 		}
 
