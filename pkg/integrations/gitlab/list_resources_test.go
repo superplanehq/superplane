@@ -133,4 +133,5 @@ func Test__GitLab__ListResources(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, resources)
 	})
+
 }
