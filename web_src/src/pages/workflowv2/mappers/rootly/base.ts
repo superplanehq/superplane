@@ -27,7 +27,7 @@ export function getDetailsForIncident(incident: Incident): Record<string, string
   details.Title = incident?.title || "-";
   details.Summary = incident?.summary || "-";
   details.Status = incident?.status || "-";
-  details.Severity = incident?.severity || "-";
+  details.Severity = formatResourceName(incident?.severity) || "-";
 
   if (incident?.started_at) {
     details["Started At"] = new Date(incident.started_at).toLocaleString();
@@ -72,4 +72,27 @@ export function getDetailsForIncidentEvent(incidentEvent: IncidentEvent): Record
   }
 
   return details;
+}
+
+export function formatResourceName(value: unknown): string {
+  if (!value) {
+    return "";
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (typeof value !== "object") {
+    return "";
+  }
+
+  const resource = value as {
+    name?: string;
+    slug?: string;
+    severity?: string;
+    id?: string;
+  };
+
+  return resource.name || resource.slug || resource.severity || resource.id || "";
 }
