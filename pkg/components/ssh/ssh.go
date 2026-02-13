@@ -346,15 +346,34 @@ func (c *SSHCommand) executeSSH(config any, secrets core.SecretsContext, metadat
 	defer client.Close()
 
 	result, err := client.ExecuteCommand(spec.Command, time.Duration(spec.Timeout)*time.Second)
-	if c.isConnectError(err) && c.shouldRetry(spec.ConnectionRetry, metadata) {
-		err = c.incrementRetryCount(metadata)
-		if err != nil {
-			return err
+	if c.isConnectError(err) {
+		if c.shouldRetry(spec.ConnectionRetry, metadata) {
+			err = c.incrementRetryCount(metadata)
+			if err != nil {
+				return err
+			}
+
+			return req.ScheduleActionCall("connectionRetry", map[string]any{}, time.Duration(spec.ConnectionRetry.IntervalSeconds)*time.Second)
 		}
 
-		return req.ScheduleActionCall("connectionRetry", map[string]any{}, time.Duration(spec.ConnectionRetry.IntervalSeconds)*time.Second)
+		// Retries exhausted — emit on the failed channel with the connection error.
+		attempt := c.getRetryAttempt(metadata)
+		failResult := &CommandResult{
+			Stdout:   "",
+			Stderr:   fmt.Sprintf("connection failed after %d retries: %s", attempt, err.Error()),
+			ExitCode: -1,
+		}
+
+		c.setResultMetadata(metadata, failResult)
+
+		return state.Emit(channelFailed, "ssh.connection.failed", []any{failResult})
 	}
 
+	if err != nil {
+		return err
+	}
+
+	err = c.setResultMetadata(metadata, result)
 	if err != nil {
 		return err
 	}
@@ -376,16 +395,14 @@ func (c *SSHCommand) shouldRetry(retrySpec *ConnectionRetrySpec, metadata core.M
 }
 
 func (c *SSHCommand) incrementRetryCount(metadata core.MetadataContext) error {
-	attempt := c.getRetryAttempt(metadata)
+	current := c.getMetadataMap(metadata)
+	current["attempt"] = c.getRetryAttempt(metadata) + 1
 
-	return metadata.Set(map[string]any{"attempt": attempt + 1})
+	return metadata.Set(current)
 }
 
 func (c *SSHCommand) getRetryAttempt(metadata core.MetadataContext) int {
-	meta, ok := metadata.Get().(map[string]any)
-	if !ok {
-		return 0
-	}
+	meta := c.getMetadataMap(metadata)
 
 	attempt, ok := meta["attempt"]
 	if !ok {
@@ -401,6 +418,26 @@ func (c *SSHCommand) getRetryAttempt(metadata core.MetadataContext) int {
 	default:
 		return 0
 	}
+}
+
+func (c *SSHCommand) getMetadataMap(metadata core.MetadataContext) map[string]any {
+	current, ok := metadata.Get().(map[string]any)
+	if !ok || current == nil {
+		return map[string]any{}
+	}
+
+	return current
+}
+
+func (c *SSHCommand) setResultMetadata(metadata core.MetadataContext, result *CommandResult) error {
+	current := c.getMetadataMap(metadata)
+	current["result"] = map[string]any{
+		"exitCode": result.ExitCode,
+		"stdout":   result.Stdout,
+		"stderr":   result.Stderr,
+	}
+
+	return metadata.Set(current)
 }
 
 func (c *SSHCommand) decodeSpec(cfg any) (Spec, error) {
