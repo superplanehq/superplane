@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/cloudwatch"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/codeartifact"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ecr"
@@ -130,7 +131,13 @@ func (a *AWS) Configuration() []configuration.Field {
 
 func (a *AWS) Components() []core.Component {
 	return []core.Component{
+		&codeartifact.CopyPackageVersions{},
+		&codeartifact.CreateRepository{},
+		&codeartifact.DeletePackageVersions{},
+		&codeartifact.DeleteRepository{},
+		&codeartifact.DisposePackageVersions{},
 		&codeartifact.GetPackageVersion{},
+		&codeartifact.UpdatePackageVersionsStatus{},
 		&ecr.GetImage{},
 		&ecr.GetImageScanFindings{},
 		&ecr.ScanImage{},
@@ -140,6 +147,7 @@ func (a *AWS) Components() []core.Component {
 
 func (a *AWS) Triggers() []core.Trigger {
 	return []core.Trigger{
+		&cloudwatch.OnAlarm{},
 		&codeartifact.OnPackageVersion{},
 		&ecr.OnImageScan{},
 		&ecr.OnImagePush{},
@@ -300,7 +308,7 @@ func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 - Select the identity provider created in step 1
 - Add permissions for the integration to manage EventBridge connections, API destinations, and rules. To get started, you can use the **AmazonEventBridgeFullAccess** managed policy
 - Add permissions for the integration manage IAM roles needed for itself. To get started, you can use the **IAMFullAccess** managed policy
-- Depending on the SuperPlane actions and triggers you will use, different permissions will be needed. Include the ones you need
+- Depending on the SuperPlane actions and triggers you will use, different permissions will be needed. Include the ones you need.
 - Give it a name and description, and create it
 
 **3. Complete the installation setup**
@@ -708,10 +716,6 @@ func (a *AWS) subscriptionApplies(subscription core.IntegrationSubscriptionConte
 	return true
 }
 
-func (a *AWS) CompareWebhookConfig(aConfig, bConfig any) (bool, error) {
-	return false, nil
-}
-
 func (a *AWS) Actions() []core.Action {
 	return []core.Action{
 		{
@@ -935,18 +939,5 @@ func (a *AWS) createRule(
 
 	logger.Infof("Created EventBridge rule %s: %v", ruleArn, detailTypes)
 
-	return nil
-}
-
-/*
- * No additional webhook endpoints are used for AWS triggers.
- * Events from AWS are received through the API destinations configured
- * in the integration itself, using the integration HTTP URL.
- */
-func (a *AWS) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	return nil, nil
-}
-
-func (a *AWS) CleanupWebhook(ctx core.CleanupWebhookContext) error {
 	return nil
 }

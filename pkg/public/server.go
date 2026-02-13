@@ -788,15 +788,31 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		return http.StatusInternalServerError, fmt.Errorf("trigger not found: %w", err)
 	}
 
+	logger := logging.ForNode(node)
 	tx := database.Conn()
+	var integrationCtx core.IntegrationContext
+	if node.AppInstallationID != nil {
+		integration, integrationErr := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
+		if integrationErr != nil {
+			return http.StatusInternalServerError, integrationErr
+		}
+
+		logger = logging.WithIntegration(logger, *integration)
+		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry)
+	}
+
 	return trigger.HandleWebhook(core.WebhookRequestContext{
 		Body:          body,
 		Headers:       headers,
 		WorkflowID:    node.WorkflowID.String(),
 		NodeID:        node.NodeID,
 		Configuration: node.Configuration.Data(),
+		Metadata:      contexts.NewNodeMetadataContext(tx, &node),
+		Logger:        logger,
+		HTTP:          s.registry.HTTPContext(),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		Events:        contexts.NewEventContext(tx, &node),
+		Integration:   integrationCtx,
 	})
 }
 
@@ -807,15 +823,31 @@ func (s *Server) executeComponentNode(ctx context.Context, body []byte, headers 
 		return http.StatusInternalServerError, fmt.Errorf("component not found: %w", err)
 	}
 
+	logger := logging.ForNode(node)
 	tx := database.Conn()
+	var integrationCtx core.IntegrationContext
+	if node.AppInstallationID != nil {
+		integration, integrationErr := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
+		if integrationErr != nil {
+			return http.StatusInternalServerError, integrationErr
+		}
+
+		logger = logging.WithIntegration(logger, *integration)
+		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry)
+	}
+
 	return component.HandleWebhook(core.WebhookRequestContext{
 		Body:          body,
 		Headers:       headers,
 		WorkflowID:    node.WorkflowID.String(),
 		NodeID:        node.NodeID,
 		Configuration: node.Configuration.Data(),
+		Metadata:      contexts.NewNodeMetadataContext(tx, &node),
+		Logger:        logger,
+		HTTP:          s.registry.HTTPContext(),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		Events:        contexts.NewEventContext(tx, &node),
+		Integration:   integrationCtx,
 		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 			execution, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)
 			if err != nil {

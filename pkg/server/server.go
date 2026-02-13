@@ -33,16 +33,23 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/timegate"
 	_ "github.com/superplanehq/superplane/pkg/components/wait"
 	_ "github.com/superplanehq/superplane/pkg/integrations/aws"
+	_ "github.com/superplanehq/superplane/pkg/integrations/circleci"
+	_ "github.com/superplanehq/superplane/pkg/integrations/claude"
 	_ "github.com/superplanehq/superplane/pkg/integrations/cloudflare"
+	_ "github.com/superplanehq/superplane/pkg/integrations/cursor"
 	_ "github.com/superplanehq/superplane/pkg/integrations/dash0"
 	_ "github.com/superplanehq/superplane/pkg/integrations/datadog"
 	_ "github.com/superplanehq/superplane/pkg/integrations/daytona"
 	_ "github.com/superplanehq/superplane/pkg/integrations/discord"
 	_ "github.com/superplanehq/superplane/pkg/integrations/grafana"
+	_ "github.com/superplanehq/superplane/pkg/integrations/dockerhub"
 	_ "github.com/superplanehq/superplane/pkg/integrations/github"
+	_ "github.com/superplanehq/superplane/pkg/integrations/gitlab"
 	_ "github.com/superplanehq/superplane/pkg/integrations/jira"
 	_ "github.com/superplanehq/superplane/pkg/integrations/openai"
 	_ "github.com/superplanehq/superplane/pkg/integrations/pagerduty"
+	_ "github.com/superplanehq/superplane/pkg/integrations/prometheus"
+	_ "github.com/superplanehq/superplane/pkg/integrations/render"
 	_ "github.com/superplanehq/superplane/pkg/integrations/rootly"
 	_ "github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	_ "github.com/superplanehq/superplane/pkg/integrations/sendgrid"
@@ -76,7 +83,8 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 	if os.Getenv("START_WORKFLOW_NODE_EXECUTOR") == "yes" || os.Getenv("START_NODE_EXECUTOR") == "yes" {
 		log.Println("Starting Node Executor")
 
-		w := workers.NewNodeExecutor(encryptor, registry, baseURL)
+		webhookBaseURL := getWebhookBaseURL(baseURL)
+		w := workers.NewNodeExecutor(encryptor, registry, baseURL, webhookBaseURL)
 		go w.Start(context.Background())
 	}
 
@@ -340,8 +348,9 @@ func Start() {
 	}
 
 	registry, err := registry.NewRegistry(encryptorInstance, registry.HTTPOptions{
-		BlockedHosts:    getBlockedHTTPHosts(),
-		PrivateIPRanges: getPrivateIPRanges(),
+		BlockedHosts:     getBlockedHTTPHosts(),
+		PrivateIPRanges:  getPrivateIPRanges(),
+		MaxResponseBytes: DefaultMaxHTTPResponseBytes,
 	})
 
 	if err != nil {
@@ -377,6 +386,13 @@ func getWebhookBaseURL(baseURL string) string {
 	}
 	return webhookBaseURL
 }
+
+/*
+ * 512KB is the default maximum response size for HTTP responses.
+ * This prevents component/trigger implementations from using too much memory,
+ * and also from emitting large events.
+ */
+var DefaultMaxHTTPResponseBytes int64 = 512 * 1024
 
 /*
  * Default blocked HTTP hosts include:

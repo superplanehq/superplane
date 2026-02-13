@@ -153,6 +153,7 @@ type ExecutionContext struct {
 	Integration    IntegrationContext
 	Notifications  NotificationContext
 	Secrets        SecretsContext
+	Webhook        NodeWebhookContext
 }
 
 /*
@@ -178,6 +179,7 @@ type SetupContext struct {
 	Requests      RequestContext
 	Auth          AuthContext
 	Integration   IntegrationContext
+	Webhook       NodeWebhookContext
 }
 
 /*

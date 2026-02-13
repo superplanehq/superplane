@@ -29,6 +29,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/noop"
 	_ "github.com/superplanehq/superplane/pkg/components/ssh"
 	_ "github.com/superplanehq/superplane/pkg/components/wait"
+	_ "github.com/superplanehq/superplane/pkg/integrations/circleci"
 	_ "github.com/superplanehq/superplane/pkg/integrations/github"
 	_ "github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
@@ -393,6 +394,20 @@ func VerifyCanvasEventsCount(t *testing.T, canvasID uuid.UUID, expected int) {
 	err := database.Conn().
 		Model(&models.CanvasEvent{}).
 		Where("workflow_id = ?", canvasID).
+		Count(&actual).
+		Error
+
+	require.NoError(t, err)
+	require.Equal(t, expected, int(actual))
+}
+
+func VerifyCanvasNodeEventsCount(t *testing.T, canvasID uuid.UUID, nodeID string, expected int) {
+	var actual int64
+
+	err := database.Conn().
+		Model(&models.CanvasEvent{}).
+		Where("workflow_id = ?", canvasID).
+		Where("node_id = ?", nodeID).
 		Count(&actual).
 		Error
 
