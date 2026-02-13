@@ -100,6 +100,7 @@ func Test__RunPipeline__HandleWebhook__FinishedPipeline(t *testing.T) {
 		Webhook: &contexts.WebhookContext{
 			Secret: "token",
 		},
+		Logger: log.NewEntry(log.New()),
 		Integration: &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"authType":    AuthTypePersonalAccessToken,
