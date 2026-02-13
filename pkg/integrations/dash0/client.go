@@ -2,6 +2,7 @@ package dash0
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,6 +22,16 @@ type Client struct {
 	Token   string
 	BaseURL string
 	http    core.HTTPContext
+}
+
+// Dash0APIError wraps non-2xx HTTP responses returned by Dash0 APIs.
+type Dash0APIError struct {
+	StatusCode int
+	Body       []byte
+}
+
+func (e *Dash0APIError) Error() string {
+	return fmt.Sprintf("request got %d code: %s", e.StatusCode, string(e.Body))
 }
 
 func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
@@ -80,7 +91,10 @@ func (c *Client) execRequest(method, url string, body io.Reader, contentType str
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+		return nil, &Dash0APIError{
+			StatusCode: res.StatusCode,
+			Body:       responseBody,
+		}
 	}
 
 	return responseBody, nil
@@ -225,7 +239,8 @@ func (c *Client) GetCheckDetails(checkID string, includeHistory bool) (map[strin
 
 	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil, "")
 	if err != nil {
-		if strings.Contains(err.Error(), "request got 404 code") {
+		apiErr := (*Dash0APIError)(nil)
+		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
 			fallbackURL := fmt.Sprintf("%s/api/alerting/check-rules/%s%s", c.BaseURL, escapedID, querySuffix)
 			responseBody, err = c.execRequest(http.MethodGet, fallbackURL, nil, "")
 			if err != nil {
