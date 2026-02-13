@@ -14,6 +14,14 @@ type ChangeInfo struct {
 	SubmittedAt string `json:"submittedAt"`
 }
 
+// RecordChangePollMetadata is stored when a change is PENDING and we schedule a poll.
+type RecordChangePollMetadata struct {
+	ChangeID    string `json:"changeId" mapstructure:"changeId"`
+	RecordName  string `json:"recordName" mapstructure:"recordName"`
+	RecordType  string `json:"recordType" mapstructure:"recordType"`
+	SubmittedAt string `json:"submittedAt" mapstructure:"submittedAt"`
+}
+
 // HostedZoneSummary contains basic information about a hosted zone.
 type HostedZoneSummary struct {
 	ID   string `json:"id"`

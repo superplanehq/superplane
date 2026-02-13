@@ -116,27 +116,52 @@ func (c *CreateRecord) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create DNS record: %w", err)
 	}
 
-	output := map[string]any{
-		"changeId":    result.ID,
-		"status":      result.Status,
-		"submittedAt": result.SubmittedAt,
-		"recordName":  config.RecordName,
-		"recordType":  config.RecordType,
+	if result.Status == "INSYNC" {
+		output := map[string]any{
+			"changeId":    result.ID,
+			"status":      result.Status,
+			"submittedAt": result.SubmittedAt,
+			"recordName":  config.RecordName,
+			"recordType":  config.RecordType,
+		}
+		return ctx.ExecutionState.Emit(
+			core.DefaultOutputChannel.Name,
+			"aws.route53.record",
+			[]any{output},
+		)
 	}
 
-	return ctx.ExecutionState.Emit(
-		core.DefaultOutputChannel.Name,
-		"aws.route53.record",
-		[]any{output},
+	if err := ctx.Metadata.Set(RecordChangePollMetadata{
+		ChangeID:    result.ID,
+		RecordName:  config.RecordName,
+		RecordType:  config.RecordType,
+		SubmittedAt: result.SubmittedAt,
+	}); err != nil {
+		return fmt.Errorf("failed to set poll metadata: %w", err)
+	}
+	return ctx.Requests.ScheduleActionCall(
+		pollChangeActionName,
+		map[string]any{},
+		pollInterval,
 	)
 }
 
 func (c *CreateRecord) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		{
+			Name:        pollChangeActionName,
+			Description: "Poll for change status",
+		},
+	}
 }
 
 func (c *CreateRecord) HandleAction(ctx core.ActionContext) error {
-	return nil
+	switch ctx.Name {
+	case pollChangeActionName:
+		return pollChangeUntilSynced(ctx)
+	default:
+		return fmt.Errorf("unknown action: %s", ctx.Name)
+	}
 }
 
 func (c *CreateRecord) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
