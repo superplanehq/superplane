@@ -149,32 +149,58 @@ export const runPipelineMapper: ComponentBaseMapper = {
 
 function runPipelineSpecs(configuration: unknown): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
-  const config = configuration as { variables?: Array<{ name: string; value: string }> } | undefined;
+  const config = configuration as
+    | {
+        inputs?: Array<{ name: string; value: string }>;
+        variables?: Array<{ name: string; value: string }>;
+      }
+    | undefined;
+  const inputs = config?.inputs;
   const variables = config?.variables;
 
-  if (!variables || variables.length === 0) {
-    return specs;
+  if (inputs && inputs.length > 0) {
+    specs.push({
+      title: "input",
+      tooltipTitle: "pipeline inputs",
+      iconSlug: "settings",
+      values: inputs.map((input) => ({
+        badges: [
+          {
+            label: input.name,
+            bgColor: "bg-indigo-100",
+            textColor: "text-indigo-800",
+          },
+          {
+            label: input.value,
+            bgColor: "bg-gray-100",
+            textColor: "text-gray-800",
+          },
+        ],
+      })),
+    });
   }
 
-  specs.push({
-    title: "variable",
-    tooltipTitle: "pipeline variables",
-    iconSlug: "settings",
-    values: variables.map((variable) => ({
-      badges: [
-        {
-          label: variable.name,
-          bgColor: "bg-purple-100",
-          textColor: "text-purple-800",
-        },
-        {
-          label: variable.value,
-          bgColor: "bg-gray-100",
-          textColor: "text-gray-800",
-        },
-      ],
-    })),
-  });
+  if (variables && variables.length > 0) {
+    specs.push({
+      title: "variable",
+      tooltipTitle: "pipeline variables",
+      iconSlug: "settings",
+      values: variables.map((variable) => ({
+        badges: [
+          {
+            label: variable.name,
+            bgColor: "bg-purple-100",
+            textColor: "text-purple-800",
+          },
+          {
+            label: variable.value,
+            bgColor: "bg-gray-100",
+            textColor: "text-gray-800",
+          },
+        ],
+      })),
+    });
+  }
 
   return specs;
 }

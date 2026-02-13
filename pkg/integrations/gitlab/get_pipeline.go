@@ -1,6 +1,8 @@
 package gitlab
 
 import (
+	_ "embed"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -10,6 +12,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
+
+//go:embed example_output_get_pipeline.json
+var exampleOutputGetPipeline []byte
 
 type GetPipeline struct{}
 
@@ -36,7 +41,7 @@ func (c *GetPipeline) Documentation() string {
 ## Configuration
 
 - **Project** (required): The GitLab project containing the pipeline
-- **Pipeline ID** (required): Numeric pipeline ID to retrieve
+- **Pipeline** (required): Select a pipeline from the selected project
 
 ## Output
 
@@ -52,14 +57,11 @@ func (c *GetPipeline) Color() string {
 }
 
 func (c *GetPipeline) ExampleOutput() map[string]any {
-	return map[string]any{
-		"id":      12345,
-		"iid":     321,
-		"status":  "running",
-		"ref":     "main",
-		"sha":     "abc123",
-		"web_url": "https://gitlab.com/group/project/-/pipelines/12345",
+	var example map[string]any
+	if err := json.Unmarshal(exampleOutputGetPipeline, &example); err != nil {
+		return map[string]any{}
 	}
+	return example
 }
 
 func (c *GetPipeline) OutputChannels(configuration any) []core.OutputChannel {
@@ -81,9 +83,20 @@ func (c *GetPipeline) Configuration() []configuration.Field {
 		},
 		{
 			Name:     "pipelineId",
-			Label:    "Pipeline ID",
-			Type:     configuration.FieldTypeString,
+			Label:    "Pipeline",
+			Type:     configuration.FieldTypeIntegrationResource,
 			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypePipeline,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "project",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "project"},
+						},
+					},
+				},
+			},
 		},
 	}
 }

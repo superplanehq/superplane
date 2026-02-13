@@ -146,6 +146,7 @@ The Run Pipeline component triggers a GitLab pipeline and waits for completion.
 
 - **Project** (required): GitLab project where the pipeline will run
 - **Ref** (required): Branch or tag ref to run the pipeline on
+- **Inputs** (optional): Pipeline inputs (`name`/`value`) sent in the create pipeline request
 - **Variables** (optional): Pipeline variables sent to the create pipeline API
 
 ### Output Channels
@@ -167,7 +168,7 @@ The Get Pipeline component retrieves a specific pipeline from a GitLab project b
 ### Configuration
 
 - **Project** (required): GitLab project containing the pipeline
-- **Pipeline ID** (required): Numeric ID of the pipeline
+- **Pipeline** (required): Select a pipeline from the selected project
 
 ### Output
 
@@ -197,7 +198,7 @@ The Get Test Report Summary component fetches test report summary data for a spe
 ### Configuration
 
 - **Project** (required): GitLab project containing the pipeline
-- **Pipeline ID** (required): Numeric ID of the pipeline
+- **Pipeline** (required): Select a pipeline from the selected project
 
 ### Output
 

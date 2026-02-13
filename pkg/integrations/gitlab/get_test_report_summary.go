@@ -1,6 +1,8 @@
 package gitlab
 
 import (
+	_ "embed"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -10,6 +12,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
+
+//go:embed example_output_get_test_report_summary.json
+var exampleOutputGetTestReportSummary []byte
 
 type GetTestReportSummary struct{}
 
@@ -36,7 +41,7 @@ func (c *GetTestReportSummary) Documentation() string {
 ## Configuration
 
 - **Project** (required): The GitLab project containing the pipeline
-- **Pipeline ID** (required): Numeric pipeline ID to inspect
+- **Pipeline** (required): Select a pipeline from the selected project
 
 ## Output
 
@@ -52,25 +57,11 @@ func (c *GetTestReportSummary) Color() string {
 }
 
 func (c *GetTestReportSummary) ExampleOutput() map[string]any {
-	return map[string]any{
-		"total": map[string]any{
-			"time":    12.34,
-			"count":   40,
-			"success": 39,
-			"failed":  1,
-			"skipped": 0,
-			"error":   0,
-		},
-		"test_suites": []map[string]any{
-			{
-				"name":          "rspec",
-				"total_time":    12.34,
-				"total_count":   40,
-				"success_count": 39,
-				"failed_count":  1,
-			},
-		},
+	var example map[string]any
+	if err := json.Unmarshal(exampleOutputGetTestReportSummary, &example); err != nil {
+		return map[string]any{}
 	}
+	return example
 }
 
 func (c *GetTestReportSummary) OutputChannels(configuration any) []core.OutputChannel {
@@ -92,9 +83,20 @@ func (c *GetTestReportSummary) Configuration() []configuration.Field {
 		},
 		{
 			Name:     "pipelineId",
-			Label:    "Pipeline ID",
-			Type:     configuration.FieldTypeString,
+			Label:    "Pipeline",
+			Type:     configuration.FieldTypeIntegrationResource,
 			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypePipeline,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "project",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "project"},
+						},
+					},
+				},
+			},
 		},
 	}
 }

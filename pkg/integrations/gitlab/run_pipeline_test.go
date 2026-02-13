@@ -23,6 +23,9 @@ func Test__RunPipeline__Execute(t *testing.T) {
 		Configuration: map[string]any{
 			"project": "123",
 			"ref":     "refs/heads/main",
+			"inputs": []map[string]any{
+				{"name": "target_env", "value": "dev"},
+			},
 			"variables": []map[string]any{
 				{"name": "DEPLOY_ENV", "value": "dev", "variableType": "env_var"},
 			},
@@ -65,7 +68,6 @@ func Test__RunPipeline__Execute(t *testing.T) {
 	assert.Equal(t, "main", metadata.Pipeline.Ref)
 
 	assert.Equal(t, "1001", executionState.KVs[GitLabRunPipelineKVPipelineID])
-	assert.Equal(t, "123:1001", executionState.KVs[GitLabRunPipelineKVProjectPipeline])
 
 	assert.Equal(t, GitLabRunPipelinePollAction, requestsCtx.Action)
 	assert.Equal(t, GitLabRunPipelinePollInterval, requestsCtx.Duration)
@@ -75,7 +77,7 @@ func Test__RunPipeline__HandleWebhook__FinishedPipeline(t *testing.T) {
 	component := &RunPipeline{}
 	metadataCtx := &contexts.MetadataContext{
 		Metadata: RunPipelineExecutionMetadata{
-			Pipeline: &RunPipelineMetadata{
+			Pipeline: &Pipeline{
 				ID:     1001,
 				Status: "running",
 			},
@@ -102,7 +104,7 @@ func Test__RunPipeline__HandleWebhook__FinishedPipeline(t *testing.T) {
 			Secret: "token",
 		},
 		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
-			if key == GitLabRunPipelineKVProjectPipeline && value == "123:1001" {
+			if key == GitLabRunPipelineKVPipelineID && value == "1001" {
 				return &core.ExecutionContext{
 					Metadata:       metadataCtx,
 					ExecutionState: executionState,
@@ -127,7 +129,7 @@ func Test__RunPipeline__Poll__SchedulesNextWhenRunning(t *testing.T) {
 	component := &RunPipeline{}
 	metadataCtx := &contexts.MetadataContext{
 		Metadata: RunPipelineExecutionMetadata{
-			Pipeline: &RunPipelineMetadata{
+			Pipeline: &Pipeline{
 				ID:     1001,
 				Status: "running",
 				Ref:    "main",

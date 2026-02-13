@@ -1,6 +1,8 @@
 package gitlab
 
 import (
+	_ "embed"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -9,6 +11,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
+
+//go:embed example_output_get_latest_pipeline.json
+var exampleOutputGetLatestPipeline []byte
 
 type GetLatestPipeline struct{}
 
@@ -51,14 +56,11 @@ func (c *GetLatestPipeline) Color() string {
 }
 
 func (c *GetLatestPipeline) ExampleOutput() map[string]any {
-	return map[string]any{
-		"id":      12346,
-		"iid":     322,
-		"status":  "success",
-		"ref":     "main",
-		"sha":     "def456",
-		"web_url": "https://gitlab.com/group/project/-/pipelines/12346",
+	var example map[string]any
+	if err := json.Unmarshal(exampleOutputGetLatestPipeline, &example); err != nil {
+		return map[string]any{}
 	}
+	return example
 }
 
 func (c *GetLatestPipeline) OutputChannels(configuration any) []core.OutputChannel {

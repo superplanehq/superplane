@@ -133,4 +133,37 @@ func Test__GitLab__ListResources(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, resources)
 	})
+
+	t.Run("returns list of pipelines for project", func(t *testing.T) {
+		ctx := core.ListResourcesContext{
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseUrl":     "https://gitlab.com",
+					"groupId":     "123",
+					"authType":    AuthTypePersonalAccessToken,
+					"accessToken": "token",
+				},
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					GitlabMockResponse(http.StatusOK, `[
+						{"id": 1001, "status": "running", "ref": "main"},
+						{"id": 1000, "status": "success", "ref": "release/v1.0"}
+					]`),
+				},
+			},
+			Parameters: map[string]string{
+				"project": "456",
+			},
+		}
+
+		resources, err := g.ListResources(ResourceTypePipeline, ctx)
+		require.NoError(t, err)
+
+		assert.Len(t, resources, 2)
+		assert.Equal(t, "1001", resources[0].ID)
+		assert.Equal(t, "#1001 - running - main", resources[0].Name)
+		assert.Equal(t, ResourceTypePipeline, resources[0].Type)
+		assert.Equal(t, "1000", resources[1].ID)
+	})
 }

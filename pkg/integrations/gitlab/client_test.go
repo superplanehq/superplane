@@ -2,7 +2,9 @@ package gitlab
 
 import (
 	"context"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -403,6 +405,9 @@ func Test__Client__CreatePipeline(t *testing.T) {
 
 		pipeline, err := client.CreatePipeline(context.Background(), "456", &CreatePipelineRequest{
 			Ref: "main",
+			Inputs: []PipelineInput{
+				{Name: "target_env", Value: "dev"},
+			},
 			Variables: []PipelineVariable{
 				{Key: "ENV", Value: "dev"},
 			},
@@ -417,6 +422,13 @@ func Test__Client__CreatePipeline(t *testing.T) {
 		assert.Equal(t, http.MethodPost, mockClient.Requests[0].Method)
 		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/pipeline", mockClient.Requests[0].URL.String())
 		assert.Equal(t, "token", mockClient.Requests[0].Header.Get("PRIVATE-TOKEN"))
+
+		body, readErr := io.ReadAll(mockClient.Requests[0].Body)
+		require.NoError(t, readErr)
+		bodyString := string(body)
+		assert.True(t, strings.Contains(bodyString, `"ref":"main"`))
+		assert.True(t, strings.Contains(bodyString, `"inputs":[{"name":"target_env","value":"dev"}]`))
+		assert.True(t, strings.Contains(bodyString, `"variables":[{"key":"ENV","value":"dev"}]`))
 	})
 }
 
@@ -538,5 +550,37 @@ func Test__Client__GetPipelineTestReportSummary(t *testing.T) {
 		require.Len(t, mockClient.Requests, 1)
 		assert.Equal(t, http.MethodGet, mockClient.Requests[0].Method)
 		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/pipelines/12345/test_report_summary", mockClient.Requests[0].URL.String())
+	})
+}
+
+func Test__Client__ListPipelines(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `[
+					{"id": 1001, "status": "running", "ref": "main"},
+					{"id": 1000, "status": "success", "ref": "release/v1.0"}
+				]`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		pipelines, err := client.ListPipelines("456")
+		require.NoError(t, err)
+		require.Len(t, pipelines, 2)
+		assert.Equal(t, 1001, pipelines[0].ID)
+		assert.Equal(t, "running", pipelines[0].Status)
+		assert.Equal(t, "main", pipelines[0].Ref)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodGet, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/pipelines?per_page=100&page=1", mockClient.Requests[0].URL.String())
 	})
 }

@@ -259,19 +259,37 @@ type PipelineVariable struct {
 type CreatePipelineRequest struct {
 	Ref       string             `json:"ref"`
 	Variables []PipelineVariable `json:"variables,omitempty"`
+	Inputs    []PipelineInput    `json:"inputs,omitempty"`
+}
+
+type PipelineInput struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 type Pipeline struct {
-	ID        int    `json:"id"`
-	IID       int    `json:"iid"`
-	ProjectID int    `json:"project_id"`
-	Status    string `json:"status"`
-	Ref       string `json:"ref"`
-	SHA       string `json:"sha"`
-	WebURL    string `json:"web_url"`
-	URL       string `json:"url,omitempty"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	ID             int            `json:"id"`
+	IID            int            `json:"iid"`
+	ProjectID      int            `json:"project_id"`
+	Status         string         `json:"status"`
+	Source         string         `json:"source,omitempty"`
+	Ref            string         `json:"ref"`
+	SHA            string         `json:"sha"`
+	BeforeSHA      string         `json:"before_sha,omitempty"`
+	Tag            bool           `json:"tag,omitempty"`
+	YamlErrors     *string        `json:"yaml_errors,omitempty"`
+	WebURL         string         `json:"web_url"`
+	URL            string         `json:"url,omitempty"`
+	CreatedAt      string         `json:"created_at"`
+	UpdatedAt      string         `json:"updated_at"`
+	StartedAt      string         `json:"started_at,omitempty"`
+	FinishedAt     string         `json:"finished_at,omitempty"`
+	CommittedAt    string         `json:"committed_at,omitempty"`
+	Duration       float64        `json:"duration,omitempty"`
+	QueuedDuration float64        `json:"queued_duration,omitempty"`
+	Coverage       string         `json:"coverage,omitempty"`
+	User           map[string]any `json:"user,omitempty"`
+	DetailedStatus map[string]any `json:"detailed_status,omitempty"`
 }
 
 type PipelineTestReportSummary struct {
@@ -400,6 +418,12 @@ func (c *Client) GetPipelineTestReportSummary(projectID string, pipelineID int) 
 	}
 
 	return &summary, nil
+}
+
+func (c *Client) ListPipelines(projectID string) ([]Pipeline, error) {
+	return fetchAllResources[Pipeline](c, func(page int) string {
+		return fmt.Sprintf("%s/api/%s/projects/%s/pipelines?per_page=100&page=%d", c.baseURL, apiVersion, url.PathEscape(projectID), page)
+	})
 }
 
 func readResponseBody(resp *http.Response) string {
