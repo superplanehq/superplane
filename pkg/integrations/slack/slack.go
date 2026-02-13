@@ -198,17 +198,21 @@ func (s *Slack) appManifest(ctx core.SyncContext) ([]byte, error) {
 		appURL = ctx.BaseURL
 	}
 
-	// If the runtime/public API is served under a base path (e.g. /v or /v/api/v1),
-	// ensure the URL used in the Slack manifest contains that path. This helps
-	// when the externally routed URL includes an extra prefix (such as github.dev /v).
-	// However, since we also append /api/v1 when building request URLs below, we need
-	// to avoid duplicating that path segment.
-	if publicPath := os.Getenv("PUBLIC_API_BASE_PATH"); publicPath != "" {
-		// Only append the public path if it's not /api/v1 (which we add later in request URLs)
-		// and if the URL doesn't already contain it
-		if publicPath != apiBasePath && !strings.Contains(appURL, publicPath) {
-			appURL = strings.TrimRight(appURL, "/") + "/" + strings.TrimLeft(publicPath, "/")
-		}
+	// Determine the API base path to use. If PUBLIC_API_BASE_PATH ends with /api/v1,
+	// use it as-is and don't append /api/v1 again. Otherwise, use the public path
+	// as a prefix and append /api/v1.
+	publicPath := os.Getenv("PUBLIC_API_BASE_PATH")
+	var fullAPIPath string
+
+	if publicPath == "" {
+		// No public path set, use default /api/v1
+		fullAPIPath = apiBasePath
+	} else if strings.HasSuffix(publicPath, apiBasePath) {
+		// Public path already ends with /api/v1 (including the case where it equals /api/v1), use it as-is
+		fullAPIPath = publicPath
+	} else {
+		// Public path is something else (e.g. /v), append /api/v1
+		fullAPIPath = strings.TrimRight(publicPath, "/") + apiBasePath
 	}
 
 	//
@@ -265,7 +269,7 @@ func (s *Slack) appManifest(ctx core.SyncContext) ([]byte, error) {
 		},
 		"settings": map[string]any{
 			"event_subscriptions": map[string]any{
-				"request_url": fmt.Sprintf("%s%s/integrations/%s/events", appURL, apiBasePath, ctx.Integration.ID().String()),
+				"request_url": fmt.Sprintf("%s%s/integrations/%s/events", appURL, fullAPIPath, ctx.Integration.ID().String()),
 				"bot_events": []string{
 					"app_mention",
 					"reaction_added",
@@ -278,7 +282,7 @@ func (s *Slack) appManifest(ctx core.SyncContext) ([]byte, error) {
 			},
 			"interactivity": map[string]any{
 				"is_enabled":  true,
-				"request_url": fmt.Sprintf("%s%s/integrations/%s/interactions", appURL, apiBasePath, ctx.Integration.ID().String()),
+				"request_url": fmt.Sprintf("%s%s/integrations/%s/interactions", appURL, fullAPIPath, ctx.Integration.ID().String()),
 			},
 			"org_deploy_enabled":  false,
 			"socket_mode_enabled": false,

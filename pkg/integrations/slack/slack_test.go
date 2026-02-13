@@ -191,6 +191,53 @@ func Test__Slack__Sync(t *testing.T) {
 		assert.Equal(t, fmt.Sprintf("https://app.example.com/custom/api/v1/integrations/%s/events", integrationID), eventSubs["request_url"])
 		assert.Equal(t, fmt.Sprintf("https://app.example.com/custom/api/v1/integrations/%s/interactions", integrationID), interactivity["request_url"])
 	})
+
+	t.Run("PUBLIC_API_BASE_PATH ends with /api/v1 -> no duplication", func(t *testing.T) {
+		// Save original env var and restore after test
+		originalPath := os.Getenv("PUBLIC_API_BASE_PATH")
+		t.Cleanup(func() {
+			if originalPath == "" {
+				os.Unsetenv("PUBLIC_API_BASE_PATH")
+			} else {
+				os.Setenv("PUBLIC_API_BASE_PATH", originalPath)
+			}
+		})
+
+		// This is the case from the issue: PUBLIC_API_BASE_PATH=/v/api/v1
+		os.Setenv("PUBLIC_API_BASE_PATH", "/v/api/v1")
+
+		integrationID := uuid.NewString()
+		integrationCtx := &contexts.IntegrationContext{IntegrationID: integrationID}
+
+		err := s.Sync(core.SyncContext{
+			Integration: integrationCtx,
+			BaseURL:     "https://app.example.com",
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, integrationCtx.BrowserAction)
+
+		manifestURL, err := url.Parse(integrationCtx.BrowserAction.URL)
+		require.NoError(t, err)
+		manifestParam := manifestURL.Query().Get("manifest_json")
+		require.NotEmpty(t, manifestParam)
+
+		var manifest map[string]any
+		require.NoError(t, json.Unmarshal([]byte(manifestParam), &manifest))
+
+		settings := manifest["settings"].(map[string]any)
+		eventSubs := settings["event_subscriptions"].(map[string]any)
+		interactivity := settings["interactivity"].(map[string]any)
+
+		// Should not have /api/v1/api/v1 duplication
+		eventURL := eventSubs["request_url"].(string)
+		interactivityURL := interactivity["request_url"].(string)
+
+		assert.Equal(t, fmt.Sprintf("https://app.example.com/v/api/v1/integrations/%s/events", integrationID), eventURL)
+		assert.Equal(t, fmt.Sprintf("https://app.example.com/v/api/v1/integrations/%s/interactions", integrationID), interactivityURL)
+		assert.NotContains(t, eventURL, "/api/v1/api/v1", "URL should not contain /api/v1 duplication")
+		assert.NotContains(t, interactivityURL, "/api/v1/api/v1", "URL should not contain /api/v1 duplication")
+	})
 }
 
 func Test__Slack__ReadAndVerify(t *testing.T) {
