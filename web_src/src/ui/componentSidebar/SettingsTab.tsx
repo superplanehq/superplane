@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { isFieldRequired, isFieldVisible, parseDefaultValues, validateFieldForSubmission } from "@/utils/components";
 import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
@@ -68,6 +68,7 @@ export function SettingsTab({
   canCreateIntegrations,
   canUpdateIntegrations,
 }: SettingsTabProps) {
+  const CONNECT_ANOTHER_INSTANCE_VALUE = "__connect_another_instance__";
   const isReadOnly = readOnly ?? false;
   const allowIntegrations = canReadIntegrations ?? true;
   const allowCreateIntegrations = canCreateIntegrations ?? true;
@@ -321,9 +322,16 @@ export function SettingsTab({
                       <span className="text-red-500 text-xs ml-2">Required</span>
                     )}
                   </Label>
+                  <p className="text-xs text-gray-500">Instance</p>
                   <Select
                     value={selectedIntegration?.id || ""}
                     onValueChange={(value) => {
+                      if (value === CONNECT_ANOTHER_INSTANCE_VALUE) {
+                        if (!isReadOnly && allowCreateIntegrations && onOpenCreateIntegrationDialog) {
+                          onOpenCreateIntegrationDialog();
+                        }
+                        return;
+                      }
                       const integration = integrationsOfType.find((i) => i.metadata?.id === value);
                       if (integration) {
                         setSelectedIntegration({
@@ -351,11 +359,18 @@ export function SettingsTab({
                           </SelectItem>
                         );
                       })}
+                      {onOpenCreateIntegrationDialog && allowCreateIntegrations && (
+                        <>
+                          <SelectSeparator />
+                          <SelectItem value={CONNECT_ANOTHER_INSTANCE_VALUE}>+ Connect another instance</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
                 {selectedIntegrationFull && (
                   <>
+                    <p className="py-2 text-xs text-gray-500">Connection</p>
                     {(() => {
                       const hasIntegrationError =
                         selectedIntegrationFull.status?.state === "error" &&
@@ -363,7 +378,7 @@ export function SettingsTab({
 
                       const integrationStatusCard = (
                         <div
-                          className={`mt-3 border border-gray-300 dark:border-gray-700 rounded-md bg-stripe-diagonal p-3 flex items-center justify-between gap-4 ${
+                          className={`border border-gray-300 dark:border-gray-700 rounded-md bg-stripe-diagonal p-3 flex items-center justify-between gap-4 ${
                             selectedIntegrationFull.status?.state === "ready"
                               ? "bg-green-100 dark:bg-green-950/30"
                               : selectedIntegrationFull.status?.state === "error"
