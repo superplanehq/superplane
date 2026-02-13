@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
 import { CustomFieldRenderer, NodeInfo, TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import { Icon } from "@/components/Icon";
@@ -12,6 +11,7 @@ import { canvasKeys } from "@/hooks/useCanvasData";
 import { showErrorToast } from "@/utils/toast";
 import snIcon from "@/assets/icons/integrations/servicenow.svg";
 import { OnIncidentConfiguration, ServiceNowIncident, STATE_LABELS, URGENCY_LABELS, IMPACT_LABELS } from "./types";
+import { buildSubtitle } from "../utils";
 
 interface OnIncidentMetadata {
   webhookUrl?: string;
@@ -76,15 +76,6 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
-
-function buildSubtitle(content: string, createdAt?: string): string {
-  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
-  if (content && timeAgo) {
-    return `${content} · ${timeAgo}`;
-  }
-
-  return content || timeAgo;
-}
 
 function buildBusinessRuleScript(webhookUrl: string, webhookSecret: string): string {
   return `(function executeRule(current, previous) {
