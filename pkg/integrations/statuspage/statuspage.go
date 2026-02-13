@@ -16,7 +16,8 @@ func init() {
 type Statuspage struct{}
 
 type Configuration struct {
-	APIKey string `json:"apiKey"`
+	APIKey  string `json:"apiKey"`
+	BaseURL string `json:"baseURL"`
 }
 
 func (s *Statuspage) Name() string {
@@ -48,6 +49,14 @@ func (s *Statuspage) Configuration() []configuration.Field {
 			Sensitive:   true,
 			Required:    true,
 			Description: "Your Statuspage OAuth API key. Generate at your page settings in Statuspage.",
+		},
+		{
+			Name:        "baseURL",
+			Label:       "API Base URL",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Placeholder: "https://api.statuspage.io/v1",
+			Description: "Statuspage API base URL. Leave empty for the default Atlassian Statuspage (https://api.statuspage.io/v1). Use this for self-hosted or custom Statuspage instances.",
 		},
 	}
 }

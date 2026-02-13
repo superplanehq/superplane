@@ -9,15 +9,17 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const baseURL = "https://api.statuspage.io/v1"
+const defaultBaseURL = "https://api.statuspage.io/v1"
 
 type Client struct {
-	apiKey string
-	http   core.HTTPContext
+	apiKey   string
+	baseURL  string
+	http     core.HTTPContext
 }
 
 func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
@@ -25,14 +27,22 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 	if err != nil {
 		return nil, fmt.Errorf("api key not found: %w", err)
 	}
+
+	baseURL := defaultBaseURL
+	if baseURLConfig, err := ctx.GetConfig("baseURL"); err == nil && baseURLConfig != nil && len(baseURLConfig) > 0 {
+		baseURL = string(baseURLConfig)
+	}
+	baseURL = strings.TrimSuffix(baseURL, "/")
+
 	return &Client{
-		apiKey: string(apiKey),
-		http:   http,
+		apiKey:  string(apiKey),
+		baseURL: baseURL,
+		http:    http,
 	}, nil
 }
 
 func (c *Client) do(method, path string, body io.Reader, contentType string) ([]byte, error) {
-	req, err := http.NewRequest(method, baseURL+path, body)
+	req, err := http.NewRequest(method, c.baseURL+path, body)
 	if err != nil {
 		return nil, fmt.Errorf("building request: %w", err)
 	}
