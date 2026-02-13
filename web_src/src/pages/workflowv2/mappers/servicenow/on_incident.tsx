@@ -21,7 +21,7 @@ interface OnIncidentEventData extends ServiceNowIncident { }
 
 export const onIncidentTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const incident = context.event?.data?.data as OnIncidentEventData;
+    const incident = context.event?.data as OnIncidentEventData;
     const stateLabel = incident?.state ? STATE_LABELS[incident.state] || incident.state : "";
     const urgencyLabel = incident?.urgency ? URGENCY_LABELS[incident.urgency] || incident.urgency : "";
     const contentParts = [stateLabel, urgencyLabel].filter(Boolean).join(" · ");
@@ -34,7 +34,7 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const incident = context.event?.data?.data as OnIncidentEventData;
+    const incident = context.event?.data as OnIncidentEventData;
     return getDetailsForIncident(incident);
   },
 
