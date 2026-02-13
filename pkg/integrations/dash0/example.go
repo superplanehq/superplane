@@ -24,6 +24,7 @@ var exampleOutputGetCheckDetailsBytes []byte
 
 var exampleOutputGetCheckDetailsOnce sync.Once
 var exampleOutputGetCheckDetails map[string]any
+
 func (c *QueryPrometheus) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryPrometheusOnce, exampleOutputQueryPrometheusBytes, &exampleOutputQueryPrometheus)
 }
