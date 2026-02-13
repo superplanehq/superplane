@@ -141,6 +141,7 @@ func (c *ReassignEscalationPolicy) Execute(ctx core.ExecutionContext) error {
 		"",                    // title - not changing
 		"",                    // description - not changing
 		spec.EscalationPolicy, // escalation policy - changing this
+		0,                     // escalation level - not changing
 		nil,                   // assignees - not changing
 	)
 	if err != nil {

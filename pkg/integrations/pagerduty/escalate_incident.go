@@ -167,10 +167,16 @@ func (c *EscalateIncident) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	incident, err := client.EscalateIncident(
+	incident, err := client.UpdateIncident(
 		spec.IncidentID,
 		spec.FromEmail,
+		"", // status - not changing
+		"", // priority - not changing
+		"", // title - not changing
+		"", // description - not changing
+		"", // escalation policy - not changing
 		level,
+		nil, // assignees - not changing
 	)
 	if err != nil {
 		return fmt.Errorf("failed to escalate incident: %v", err)

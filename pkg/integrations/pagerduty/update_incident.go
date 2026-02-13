@@ -207,6 +207,7 @@ func (c *UpdateIncident) Execute(ctx core.ExecutionContext) error {
 		spec.Title,
 		spec.Description,
 		spec.EscalationPolicy,
+		0,
 		spec.Assignees,
 	)
 	if err != nil {

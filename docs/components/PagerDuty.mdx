@@ -976,130 +976,6 @@ Returns a list of log entries with:
 - **created_at**: When the log entry was created
 - **agent**: The agent (user or service) that caused the log entry
 - **channel**: The channel through which the action was performed
-  <a id="resolve-incident"></a>
-  <a id="reassign-escalation-policy"></a>
-
-## Reassign Escalation Policy
-
-The Reassign Escalation Policy component changes the escalation policy of an existing PagerDuty incident.
-
-### Use Cases
-
-- **Team handoff**: Reassign an incident to a different team's on-call rotation
-- **Escalation path change**: Move an incident to a more appropriate escalation policy
-- **Cross-team collaboration**: Route incidents to specialized teams based on workflow conditions
-
-### Configuration
-
-- **Incident ID**: The ID of the incident to reassign (e.g., A12BC34567...)
-- **Escalation Policy**: The escalation policy to assign the incident to (select from dropdown)
-- **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
-
-### Behavior
-
-When an incident's escalation policy is changed, it will be reassigned to the on-call responders defined in the new escalation policy. The incident will follow the new policy's escalation rules going forward.
-
-This action works for both high-urgency and low-urgency incidents.
-
-### Output
-
-Returns the updated incident object with all current information.
-
-### Example Output
-
-```json
-{
-  "data": {
-    "incident": {
-      "assigned_via": "escalation_policy",
-      "assignments": [
-        {
-          "assignee": {
-            "html_url": "https://subdomain.pagerduty.com/users/PUSER02",
-            "id": "PUSER02",
-            "self": "https://api.pagerduty.com/users/PUSER02",
-            "summary": "Manager Smith",
-            "type": "user_reference"
-          },
-          "at": "2015-10-06T21:42:00Z"
-        }
-      ],
-      "created_at": "2015-10-06T21:30:42Z",
-      "escalation_policy": {
-        "html_url": "https://subdomain.pagerduty.com/escalation_policies/PNEWPOL",
-        "id": "PNEWPOL",
-        "self": "https://api.pagerduty.com/escalation_policies/PNEWPOL",
-        "summary": "Engineering Managers On-Call",
-        "type": "escalation_policy_reference"
-      },
-      "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK",
-      "id": "PT4KHLK",
-      "incident_key": "baf7cf21b1da41b4b0221008339ff357",
-      "incident_number": 1234,
-      "last_status_change_at": "2015-10-06T21:42:00Z",
-      "last_status_change_by": {
-        "html_url": "https://subdomain.pagerduty.com/users/PXPGF42",
-        "id": "PXPGF42",
-        "self": "https://api.pagerduty.com/users/PXPGF42",
-        "summary": "Earline Greenholt",
-        "type": "user_reference"
-      },
-      "resolved_at": null,
-      "self": "https://api.pagerduty.com/incidents/PT4KHLK",
-      "service": {
-        "html_url": "https://subdomain.pagerduty.com/service-directory/PWIXJZS",
-        "id": "PWIXJZS",
-        "self": "https://api.pagerduty.com/services/PWIXJZS",
-        "summary": "My Mail Service",
-        "type": "service_reference"
-      },
-      "status": "triggered",
-      "summary": "[#1234] The server is on fire.",
-      "teams": [
-        {
-          "html_url": "https://subdomain.pagerduty.com/teams/PQ9K7I8",
-          "id": "PQ9K7I8",
-          "self": "https://api.pagerduty.com/teams/PQ9K7I8",
-          "summary": "Engineering",
-          "type": "team_reference"
-        }
-      ],
-      "title": "The server is on fire.",
-      "type": "incident",
-      "updated_at": "2015-10-06T21:42:00Z",
-      "urgency": "high"
-    }
-  },
-  "timestamp": "2026-01-19T12:00:00Z",
-  "type": "pagerduty.incident"
-}
-```
-
-<a id="resolve-incident"></a>
-
-## Resolve Incident
-
-The Resolve Incident component resolves an existing PagerDuty incident.
-
-### Use Cases
-
-- **Incident closure**: Resolve an incident when the issue has been fixed
-- **Automated resolution**: Automatically resolve incidents based on recovery signals
-- **Integration workflows**: Resolve incidents when related events occur in other systems
-
-### Configuration
-
-- **Incident ID**: The ID of the incident to resolve (e.g., A12BC34567...)
-- **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
-- **Resolution Notes**: Optional notes about the resolution (saved to incident description)
-
-### Behavior
-
-When an incident is resolved, the incident status changes to "resolved" and all escalations stop. If resolution notes are provided, they will be saved to the incident description.
-
-### Output
-
-Returns the resolved incident object with all current information.
 
 ### Example Output
 
@@ -1240,6 +1116,138 @@ Returns a list of notes with:
   },
   "timestamp": "2024-01-15T11:05:00Z",
   "type": "pagerduty.notes.list"
+}
+```
+
+<a id="reassign-escalation-policy"></a>
+
+## Reassign Escalation Policy
+
+The Reassign Escalation Policy component changes the escalation policy of an existing PagerDuty incident.
+
+### Use Cases
+
+- **Team handoff**: Reassign an incident to a different team's on-call rotation
+- **Escalation path change**: Move an incident to a more appropriate escalation policy
+- **Cross-team collaboration**: Route incidents to specialized teams based on workflow conditions
+
+### Configuration
+
+- **Incident ID**: The ID of the incident to reassign (e.g., A12BC34567...)
+- **Escalation Policy**: The escalation policy to assign the incident to (select from dropdown)
+- **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
+
+### Behavior
+
+When an incident's escalation policy is changed, it will be reassigned to the on-call responders defined in the new escalation policy. The incident will follow the new policy's escalation rules going forward.
+
+This action works for both high-urgency and low-urgency incidents.
+
+### Output
+
+Returns the updated incident object with all current information.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "incident": {
+      "assigned_via": "escalation_policy",
+      "assignments": [
+        {
+          "assignee": {
+            "html_url": "https://subdomain.pagerduty.com/users/PUSER02",
+            "id": "PUSER02",
+            "self": "https://api.pagerduty.com/users/PUSER02",
+            "summary": "Manager Smith",
+            "type": "user_reference"
+          },
+          "at": "2015-10-06T21:42:00Z"
+        }
+      ],
+      "created_at": "2015-10-06T21:30:42Z",
+      "escalation_policy": {
+        "html_url": "https://subdomain.pagerduty.com/escalation_policies/PNEWPOL",
+        "id": "PNEWPOL",
+        "self": "https://api.pagerduty.com/escalation_policies/PNEWPOL",
+        "summary": "Engineering Managers On-Call",
+        "type": "escalation_policy_reference"
+      },
+      "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK",
+      "id": "PT4KHLK",
+      "incident_key": "baf7cf21b1da41b4b0221008339ff357",
+      "incident_number": 1234,
+      "last_status_change_at": "2015-10-06T21:42:00Z",
+      "last_status_change_by": {
+        "html_url": "https://subdomain.pagerduty.com/users/PXPGF42",
+        "id": "PXPGF42",
+        "self": "https://api.pagerduty.com/users/PXPGF42",
+        "summary": "Earline Greenholt",
+        "type": "user_reference"
+      },
+      "resolved_at": null,
+      "self": "https://api.pagerduty.com/incidents/PT4KHLK",
+      "service": {
+        "html_url": "https://subdomain.pagerduty.com/service-directory/PWIXJZS",
+        "id": "PWIXJZS",
+        "self": "https://api.pagerduty.com/services/PWIXJZS",
+        "summary": "My Mail Service",
+        "type": "service_reference"
+      },
+      "status": "triggered",
+      "summary": "[#1234] The server is on fire.",
+      "teams": [
+        {
+          "html_url": "https://subdomain.pagerduty.com/teams/PQ9K7I8",
+          "id": "PQ9K7I8",
+          "self": "https://api.pagerduty.com/teams/PQ9K7I8",
+          "summary": "Engineering",
+          "type": "team_reference"
+        }
+      ],
+      "title": "The server is on fire.",
+      "type": "incident",
+      "updated_at": "2015-10-06T21:42:00Z",
+      "urgency": "high"
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "pagerduty.incident"
+}
+```
+
+<a id="resolve-incident"></a>
+
+## Resolve Incident
+
+The Resolve Incident component resolves an existing PagerDuty incident.
+
+### Use Cases
+
+- **Incident closure**: Resolve an incident when the issue has been fixed
+- **Automated resolution**: Automatically resolve incidents based on recovery signals
+- **Integration workflows**: Resolve incidents when related events occur in other systems
+
+### Configuration
+
+- **Incident ID**: The ID of the incident to resolve (e.g., A12BC34567...)
+- **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
+- **Resolution Notes**: Optional notes about the resolution (saved to incident description)
+
+### Behavior
+
+When an incident is resolved, the incident status changes to "resolved" and all escalations stop. If resolution notes are provided, they will be saved to the incident description.
+
+### Output
+
+Returns the resolved incident object with all current information.
+
+### Example Output
+
+```json
+{
+  "data": {
     "incident": {
       "assigned_via": "escalation_policy",
       "assignments": [],

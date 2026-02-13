@@ -129,6 +129,7 @@ func (c *ResolveIncident) Execute(ctx core.ExecutionContext) error {
 		"",
 		spec.Resolution,
 		"",
+		0,
 		nil,
 	)
 	if err != nil {

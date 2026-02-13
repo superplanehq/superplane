@@ -120,6 +120,7 @@ func (c *AcknowledgeIncident) Execute(ctx core.ExecutionContext) error {
 		"",
 		"",
 		"",
+		0,
 		nil,
 	)
 	if err != nil {
