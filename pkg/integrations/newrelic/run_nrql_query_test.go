@@ -84,7 +84,7 @@ func TestClient_RunNRQLQuery_Success(t *testing.T) {
 		}
 
 		client := &Client{
-			APIKey:       "test-key",
+			UserAPIKey:       "test-key",
 			NerdGraphURL: "https://api.newrelic.com/graphql",
 			http:         httpCtx,
 		}
@@ -147,7 +147,7 @@ func TestClient_RunNRQLQuery_Success(t *testing.T) {
 		}
 
 		client := &Client{
-			APIKey:       "test-key",
+			UserAPIKey:       "test-key",
 			NerdGraphURL: "https://api.newrelic.com/graphql",
 			http:         httpCtx,
 		}
@@ -184,7 +184,7 @@ func TestClient_RunNRQLQuery_Success(t *testing.T) {
 		}
 
 		client := &Client{
-			APIKey:       "test-key",
+			UserAPIKey:       "test-key",
 			NerdGraphURL: "https://api.newrelic.com/graphql",
 			http:         httpCtx,
 		}
@@ -220,7 +220,7 @@ func TestClient_RunNRQLQuery_Success(t *testing.T) {
 		}
 
 		client := &Client{
-			APIKey:       "eu-test-key",
+			UserAPIKey:       "eu-test-key",
 			NerdGraphURL: "https://api.eu.newrelic.com/graphql",
 			http:         httpCtx,
 		}
@@ -263,7 +263,7 @@ func TestClient_RunNRQLQuery_Errors(t *testing.T) {
 		}
 
 		client := &Client{
-			APIKey:       "test-key",
+			UserAPIKey:       "test-key",
 			NerdGraphURL: "https://api.newrelic.com/graphql",
 			http:         httpCtx,
 		}
@@ -295,7 +295,7 @@ func TestClient_RunNRQLQuery_Errors(t *testing.T) {
 		}
 
 		client := &Client{
-			APIKey:       "invalid-key",
+			UserAPIKey:       "invalid-key",
 			NerdGraphURL: "https://api.newrelic.com/graphql",
 			http:         httpCtx,
 		}
@@ -330,7 +330,7 @@ func TestClient_RunNRQLQuery_Errors(t *testing.T) {
 		}
 
 		client := &Client{
-			APIKey:       "test-key",
+			UserAPIKey:       "test-key",
 			NerdGraphURL: "https://api.newrelic.com/graphql",
 			http:         httpCtx,
 		}
@@ -357,7 +357,7 @@ func TestClient_RunNRQLQuery_Errors(t *testing.T) {
 		}
 
 		client := &Client{
-			APIKey:       "test-key",
+			UserAPIKey:       "test-key",
 			NerdGraphURL: "https://api.newrelic.com/graphql",
 			http:         httpCtx,
 		}
@@ -385,7 +385,7 @@ func TestClient_RunNRQLQuery_Errors(t *testing.T) {
 		}
 
 		client := &Client{
-			APIKey:       "test-key",
+			UserAPIKey:       "test-key",
 			NerdGraphURL: "https://api.newrelic.com/graphql",
 			http:         httpCtx,
 		}
@@ -401,17 +401,51 @@ func TestClient_RunNRQLQuery_Errors(t *testing.T) {
 func TestRunNRQLQuery_Setup(t *testing.T) {
 	t.Run("valid configuration -> no error", func(t *testing.T) {
 		component := &RunNRQLQuery{}
+
+		accountsJSON := `{
+			"data": {
+				"actor": {
+					"accounts": [
+						{"id": 1234567, "name": "Main Account"}
+					]
+				}
+			}
+		}`
+
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(accountsJSON)),
+					Header:     make(http.Header),
+				},
+			},
+		}
+
 		ctx := core.SetupContext{
+			HTTP: httpCtx,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"userApiKey": "test-key",
+					"site":   "US",
+				},
+			},
 			Configuration: map[string]any{
 				"account": "1234567",
-				"query":     "SELECT count(*) FROM Transaction",
-				"timeout":   10,
+				"query":   "SELECT count(*) FROM Transaction",
+				"timeout": 10,
 			},
 			Metadata: &contexts.MetadataContext{},
 		}
 
 		err := component.Setup(ctx)
 		assert.NoError(t, err)
+
+		// Verify metadata was set
+		metadata := ctx.Metadata.Get().(RunNRQLQueryNodeMetadata)
+		assert.True(t, metadata.Manual)
+		assert.NotNil(t, metadata.Account)
+		assert.Equal(t, int64(1234567), metadata.Account.ID)
 	})
 
 	t.Run("missing account -> returns error", func(t *testing.T) {
@@ -419,6 +453,12 @@ func TestRunNRQLQuery_Setup(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"query": "SELECT count(*) FROM Transaction",
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"userApiKey": "test-key",
+					"site":       "US",
+				},
 			},
 			Metadata: &contexts.MetadataContext{},
 		}
@@ -434,6 +474,12 @@ func TestRunNRQLQuery_Setup(t *testing.T) {
 			Configuration: map[string]any{
 				"account": "1234567",
 			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"userApiKey": "test-key",
+					"site":       "US",
+				},
+			},
 			Metadata: &contexts.MetadataContext{},
 		}
 
@@ -447,8 +493,14 @@ func TestRunNRQLQuery_Setup(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
 				"account": "1234567",
-				"query":     "SELECT count(*) FROM Transaction",
-				"timeout":   150, // exceeds max of 120
+				"query":   "SELECT count(*) FROM Transaction",
+				"timeout": 150, // exceeds max of 120
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"userApiKey": "test-key",
+					"site":       "US",
+				},
 			},
 			Metadata: &contexts.MetadataContext{},
 		}
@@ -457,10 +509,60 @@ func TestRunNRQLQuery_Setup(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "timeout must be between 0 and 120")
 	})
+
+	t.Run("account not found -> returns error", func(t *testing.T) {
+		component := &RunNRQLQuery{}
+
+		accountsJSON := `{
+			"data": {
+				"actor": {
+					"accounts": [
+						{"id": 9999999, "name": "Other Account"}
+					]
+				}
+			}
+		}`
+
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(accountsJSON)),
+					Header:     make(http.Header),
+				},
+			},
+		}
+
+		ctx := core.SetupContext{
+			HTTP: httpCtx,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"userApiKey": "test-key",
+					"site":   "US",
+				},
+			},
+			Configuration: map[string]any{
+				"account": "1234567",
+				"query":   "SELECT count(*) FROM Transaction",
+			},
+			Metadata: &contexts.MetadataContext{},
+		}
+
+		err := component.Setup(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "account ID 1234567 not found")
+	})
 }
 
 func TestRunNRQLQuery_Setup_TemplateGuard(t *testing.T) {
 	component := &RunNRQLQuery{}
+
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"userApiKey": "test-key",
+			"site":       "US",
+		},
+	}
 
 	t.Run("unresolved account template -> error", func(t *testing.T) {
 		ctx := core.SetupContext{
@@ -468,7 +570,8 @@ func TestRunNRQLQuery_Setup_TemplateGuard(t *testing.T) {
 				"account": "{{account_id}}",
 				"query":   "SELECT count(*) FROM Transaction",
 			},
-			Metadata: &contexts.MetadataContext{},
+			Integration: integrationCtx,
+			Metadata:    &contexts.MetadataContext{},
 		}
 		err := component.Setup(ctx)
 		require.Error(t, err)
@@ -482,7 +585,8 @@ func TestRunNRQLQuery_Setup_TemplateGuard(t *testing.T) {
 				"account": "1234567",
 				"query":   "{{nrql_query}}",
 			},
-			Metadata: &contexts.MetadataContext{},
+			Integration: integrationCtx,
+			Metadata:    &contexts.MetadataContext{},
 		}
 		err := component.Setup(ctx)
 		require.Error(t, err)
@@ -502,7 +606,7 @@ func TestRunNRQLQuery_Execute_TemplateGuard(t *testing.T) {
 			},
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{
-					"apiKey": "test-key",
+					"userApiKey": "test-key",
 					"site":   "US",
 				},
 			},
@@ -521,7 +625,7 @@ func TestRunNRQLQuery_Execute_TemplateGuard(t *testing.T) {
 			},
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{
-					"apiKey": "test-key",
+					"userApiKey": "test-key",
 					"site":   "US",
 				},
 			},
@@ -571,7 +675,7 @@ func TestRunNRQLQuery_Execute_DataFallback(t *testing.T) {
 			HTTP: httpCtx,
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{
-					"apiKey": "test-key",
+					"userApiKey": "test-key",
 					"site":   "US",
 				},
 			},
@@ -590,7 +694,7 @@ func TestRunNRQLQuery_Execute_DataFallback(t *testing.T) {
 func TestRunNRQLQuery_Execute(t *testing.T) {
 	t.Run("string account ID -> success", func(t *testing.T) {
 		component := &RunNRQLQuery{}
-		
+
 		responseJSON := `{
 			"data": {
 				"actor": {
@@ -615,13 +719,13 @@ func TestRunNRQLQuery_Execute(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiKey": "test-key",
+				"userApiKey": "test-key",
 				"site":   "US",
 			},
 		}
 
 		executionState := &contexts.ExecutionStateContext{}
-		
+
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
 				"account": "1234567",
@@ -652,7 +756,7 @@ func TestRunNRQLQuery_Execute(t *testing.T) {
 			},
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{
-					"apiKey": "test-key",
+					"userApiKey": "test-key",
 					"site":   "US",
 				},
 			},
