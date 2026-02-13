@@ -13,7 +13,7 @@ import {
 } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
-import { getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "..";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { formatTimeAgo } from "@/utils/date";
 
@@ -50,6 +50,7 @@ function stringOrDash(value?: unknown): string {
 export const getPipelineMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+    const componentName = context.componentDefinition.name || "unknown";
 
     return {
       title:
@@ -62,9 +63,10 @@ export const getPipelineMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition?.color || "gray"),
       collapsed: context.node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
-      eventSections: lastExecution ? getPipelineEventSections(context, lastExecution) : undefined,
+      eventSections: lastExecution ? getPipelineEventSections(context, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: metadataList(context.node),
+      eventStateMap: getStateMap(componentName),
     };
   },
 
@@ -97,6 +99,7 @@ export const getPipelineMapper: ComponentBaseMapper = {
 function getPipelineEventSections(
   context: ComponentBaseContext,
   execution: ComponentBaseContext["lastExecutions"][0],
+  componentName: string,
 ): EventSection[] | undefined {
   if (!execution) {
     return undefined;
@@ -114,7 +117,7 @@ function getPipelineEventSections(
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
       eventSubtitle,
-      eventState: "neutral",
+      eventState: getState(componentName)(execution),
       eventId: execution.rootEvent!.id!,
     },
   ];
