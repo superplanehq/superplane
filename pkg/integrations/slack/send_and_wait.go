@@ -255,7 +255,11 @@ func (c *SendAndWait) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 	}
 
 	executionCtx, err := ctx.FindExecutionByKV("message_ts", messageTS)
-	if err != nil || executionCtx == nil {
+	if err != nil {
+		return nil, fmt.Errorf("failed to find execution: %w", err)
+	}
+
+	if executionCtx == nil {
 		// Execution not found (already timed out or cancelled)
 		_ = ctx.DequeueItem()
 		return nil, nil
@@ -348,7 +352,7 @@ func (c *SendAndWait) Execute(ctx core.ExecutionContext) error {
 
 	// Schedule timeout if configured
 	if config.Timeout > 0 {
-		duration := time.Duration(config.Timeout) * time.Second
+		duration := time.Duration(config.Timeout * float64(time.Second))
 		if err := ctx.Requests.ScheduleActionCall("timeout", map[string]any{
 			"message_ts": response.TS,
 			"channel":    config.Channel,
