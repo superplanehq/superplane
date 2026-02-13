@@ -43,6 +43,14 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 	}
 
 	if token == "" {
+		rawToken, err := ctx.GetConfig("authToken")
+		if err != nil {
+			return nil, fmt.Errorf("sentry auth token not found: %w", err)
+		}
+		token = strings.TrimSpace(string(rawToken))
+	}
+
+	if token == "" {
 		return nil, fmt.Errorf("sentry auth token not found")
 	}
 
@@ -50,6 +58,11 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 	if md, ok := ctx.GetMetadata().(map[string]any); ok {
 		if v, ok := md["sentryBaseURL"].(string); ok {
 			baseURL = strings.TrimSpace(v)
+		}
+	}
+	if baseURL == defaultBaseURL {
+		if u, err := ctx.GetConfig("baseURL"); err == nil && len(u) > 0 {
+			baseURL = string(u)
 		}
 	}
 

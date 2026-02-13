@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"hash"
 	"io"
 	"net/http"
 	"net/http/httputil"
@@ -740,7 +739,7 @@ func verifySentryWebhookSignature(body []byte, signature string, secret string) 
 		return false
 	}
 
-	var mac hash.Hash = hmac.New(sha256.New, []byte(secret))
+	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write(body)
 	expected := fmt.Sprintf("%x", mac.Sum(nil))
 

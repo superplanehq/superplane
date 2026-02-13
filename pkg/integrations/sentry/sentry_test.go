@@ -38,14 +38,13 @@ func Test__Sentry__Triggers(t *testing.T) {
 func Test__Sentry__Sync(t *testing.T) {
 	s := &Sentry{}
 
-	t.Run("missing authToken -> error", func(t *testing.T) {
+	t.Run("missing token -> no error", func(t *testing.T) {
 		ctx := core.SyncContext{
 			Configuration: map[string]any{},
 			Integration:   &contexts.IntegrationContext{},
 		}
 		err := s.Sync(ctx)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "authToken")
+		assert.NoError(t, err)
 	})
 
 	t.Run("invalid token (API error) -> error", func(t *testing.T) {
@@ -55,12 +54,13 @@ func Test__Sentry__Sync(t *testing.T) {
 			},
 		}
 		integration := &contexts.IntegrationContext{
-			Configuration: map[string]any{"authToken": "bad", "baseURL": "https://sentry.io"},
+			Secrets: map[string]core.IntegrationSecret{
+				"sentryPublicAccessToken": {Name: "sentryPublicAccessToken", Value: []byte("bad")},
+			},
 		}
 		ctx := core.SyncContext{
-			Configuration: map[string]any{"authToken": "bad", "baseURL": "https://sentry.io"},
-			HTTP:          httpCtx,
-			Integration:   integration,
+			HTTP:        httpCtx,
+			Integration: integration,
 		}
 		err := s.Sync(ctx)
 		assert.Error(t, err)
@@ -74,12 +74,13 @@ func Test__Sentry__Sync(t *testing.T) {
 			},
 		}
 		integration := &contexts.IntegrationContext{
-			Configuration: map[string]any{"authToken": "good-token", "baseURL": "https://sentry.io"},
+			Secrets: map[string]core.IntegrationSecret{
+				"sentryPublicAccessToken": {Name: "sentryPublicAccessToken", Value: []byte("good-token")},
+			},
 		}
 		ctx := core.SyncContext{
-			Configuration: map[string]any{"authToken": "good-token", "baseURL": "https://sentry.io"},
-			HTTP:          httpCtx,
-			Integration:   integration,
+			HTTP:        httpCtx,
+			Integration: integration,
 		}
 		err := s.Sync(ctx)
 		assert.NoError(t, err)
