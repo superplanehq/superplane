@@ -597,4 +597,3 @@ func TestOnVMCreatedTrigger_HandleWebhook_InvalidConfiguration(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, http.StatusInternalServerError, code)
 }
-

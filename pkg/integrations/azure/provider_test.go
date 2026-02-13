@@ -205,4 +205,3 @@ func TestAzureProvider_GetSubscriptionID(t *testing.T) {
 	subscriptionID := provider.GetSubscriptionID()
 	assert.Equal(t, expectedSubscriptionID, subscriptionID)
 }
-
