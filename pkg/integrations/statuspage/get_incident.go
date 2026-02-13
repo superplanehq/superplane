@@ -43,8 +43,8 @@ func (c *GetIncident) Documentation() string {
 
 ## Configuration
 
-- **Page** (required): Page ID containing the incident. Supports expressions for dynamic values from upstream nodes (e.g. Create Incident).
-- **Incident** (required): Incident ID to fetch. Supports expressions for dynamic values from upstream nodes (e.g. Create Incident).
+- **Page** (required): Page ID containing the incident. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.page_id }}).
+- **Incident** (required): Incident ID to fetch. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.id }}).
 
 ## Output
 
@@ -70,16 +70,15 @@ func (c *GetIncident) OutputChannels(configuration any) []core.OutputChannel {
 
 func (c *GetIncident) ExampleOutput() map[string]any {
 	return map[string]any{
-		"id":                  "p31zjtct2jer",
-		"name":                "Database Connection Issues",
-		"status":              "investigating",
-		"impact":              "major",
-		"shortlink":           "http://stspg.io/p31zjtct2jer",
-		"created_at":          "2026-02-12T10:30:00.000Z",
-		"updated_at":          "2026-02-12T10:30:00.000Z",
-		"page_id":             "kctbh9vrtdwd",
-		"affected_components": []string{"API"},
-		"component_count":     1,
+		"id":         "p31zjtct2jer",
+		"name":       "Database Connection Issues",
+		"status":     "investigating",
+		"impact":     "major",
+		"shortlink":  "http://stspg.io/p31zjtct2jer",
+		"created_at": "2026-02-12T10:30:00.000Z",
+		"updated_at": "2026-02-12T10:30:00.000Z",
+		"page_id":    "kctbh9vrtdwd",
+		"component_ids": []string{"8kbf7d35c070"},
 		"incident_updates": []map[string]any{
 			{
 				"id":         "upd1",

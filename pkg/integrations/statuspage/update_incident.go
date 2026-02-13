@@ -19,6 +19,7 @@ type UpdateIncidentSpec struct {
 	Incident        string   `mapstructure:"incident"`
 	Status          string   `mapstructure:"status"`
 	Body            string   `mapstructure:"body"`
+	ImpactOverride  string   `mapstructure:"impactOverride"`
 	ComponentIDs    []string `mapstructure:"componentIds"`
 	ComponentStatus string   `mapstructure:"componentStatus"`
 }
@@ -46,14 +47,15 @@ func (c *UpdateIncident) Documentation() string {
 
 ## Configuration
 
-- **Page** (required): Page ID containing the incident. Supports expressions for dynamic values from upstream nodes (e.g. Create Incident).
-- **Incident** (required): Incident ID to update. Supports expressions for dynamic values from upstream nodes (e.g. Create Incident).
+- **Page** (required): Page ID containing the incident. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.page_id }}).
+- **Incident** (required): Incident ID to update. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.id }}).
 - **Status** (optional): New status (investigating, identified, monitoring, resolved, scheduled, in_progress, completed)
 - **Body** (optional): Update message shown as the latest incident update
+- **Impact override** (optional): Override displayed severity (none, maintenance, minor, major, critical)
 - **Components** (optional): Components to associate with this update
 - **Component status** (optional): Status to set for selected components
 
-At least one of Status or Body must be provided.
+At least one of Status, Body, or Impact override must be provided.
 
 ## Output
 
@@ -79,17 +81,23 @@ func (c *UpdateIncident) OutputChannels(configuration any) []core.OutputChannel 
 
 func (c *UpdateIncident) ExampleOutput() map[string]any {
 	return map[string]any{
-		"id":                  "p31zjtct2jer",
-		"name":                "Database Connection Issues",
-		"status":              "resolved",
-		"impact":              "major",
-		"shortlink":           "http://stspg.io/p31zjtct2jer",
-		"created_at":          "2026-02-12T10:30:00.000Z",
-		"updated_at":          "2026-02-12T11:00:00.000Z",
-		"page_id":             "kctbh9vrtdwd",
-		"affected_components": []string{"API"},
-		"component_count":     1,
-		"latest_update":       "All systems operational. Issue resolved.",
+		"id":         "p31zjtct2jer",
+		"name":       "Database Connection Issues",
+		"status":     "resolved",
+		"impact":     "major",
+		"shortlink":  "http://stspg.io/p31zjtct2jer",
+		"created_at": "2026-02-12T10:30:00.000Z",
+		"updated_at": "2026-02-12T11:00:00.000Z",
+		"page_id":    "kctbh9vrtdwd",
+		"component_ids": []string{"8kbf7d35c070"},
+		"incident_updates": []map[string]any{
+			{
+				"id":         "upd1",
+				"status":     "resolved",
+				"body":       "All systems operational. Issue resolved.",
+				"created_at": "2026-02-12T11:00:00.000Z",
+			},
+		},
 	}
 }
 
@@ -137,6 +145,25 @@ func (c *UpdateIncident) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeText,
 			Required:    false,
 			Description: "Update message shown as the latest incident update",
+		},
+		{
+			Name:        "impactOverride",
+			Label:       "Impact override",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Description: "Override the displayed severity for this incident",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Don't override", Value: "__none__"},
+						{Label: "None", Value: "none"},
+						{Label: "Maintenance", Value: "maintenance"},
+						{Label: "Minor", Value: "minor"},
+						{Label: "Major", Value: "major"},
+						{Label: "Critical", Value: "critical"},
+					},
+				},
+			},
 		},
 		{
 			Name:        "componentIds",
@@ -194,9 +221,13 @@ func (c *UpdateIncident) Setup(ctx core.SetupContext) error {
 		return errors.New("incident is required")
 	}
 
-	hasUpdate := spec.Status != "" || spec.Body != "" || len(spec.ComponentIDs) > 0
+	effectiveImpact := spec.ImpactOverride
+	if effectiveImpact == "__none__" {
+		effectiveImpact = ""
+	}
+	hasUpdate := spec.Status != "" || spec.Body != "" || effectiveImpact != "" || len(spec.ComponentIDs) > 0
 	if !hasUpdate {
-		return errors.New("at least one of status, message, or components must be provided")
+		return errors.New("at least one of status, body, impact override, or components must be provided")
 	}
 
 	return nil
@@ -223,11 +254,17 @@ func (c *UpdateIncident) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
+	impactOverride := spec.ImpactOverride
+	if impactOverride == "__none__" {
+		impactOverride = ""
+	}
+
 	req := UpdateIncidentRequest{
-		Status:       spec.Status,
-		Body:         spec.Body,
-		ComponentIDs: spec.ComponentIDs,
-		Components:   components,
+		Status:         spec.Status,
+		Body:           spec.Body,
+		ImpactOverride: impactOverride,
+		ComponentIDs:   spec.ComponentIDs,
+		Components:     components,
 	}
 
 	incident, err := client.UpdateIncident(spec.Page, spec.Incident, req)

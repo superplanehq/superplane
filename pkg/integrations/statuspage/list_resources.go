@@ -2,6 +2,7 @@ package statuspage
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -46,7 +47,7 @@ func listPages(ctx core.ListResourcesContext) ([]core.IntegrationResource, error
 
 func listComponents(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	pageID := ctx.Parameters["page_id"]
-	if pageID == "" {
+	if pageID == "" || strings.Contains(pageID, "{{") {
 		return []core.IntegrationResource{}, nil
 	}
 

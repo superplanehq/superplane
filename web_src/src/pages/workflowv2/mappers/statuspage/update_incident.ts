@@ -1,11 +1,10 @@
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import { ComponentBaseProps } from "@/ui/componentBase";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getStateMap } from "..";
 import {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
-  ExecutionInfo,
   NodeInfo,
   OutputPayload,
   SubtitleContext,
@@ -14,40 +13,7 @@ import { MetadataItem } from "@/ui/metadataList";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
 import { StatuspageIncident } from "./types";
 import { formatTimeAgo } from "@/utils/date";
-
-function stringOrDash(value?: string | null): string {
-  if (value === undefined || value === null || value === "") {
-    return "-";
-  }
-  return value;
-}
-
-function getDetailsForIncident(incident: StatuspageIncident): Record<string, string> {
-  const details: Record<string, string> = {};
-
-  details["ID"] = stringOrDash(incident?.id);
-  details["Name"] = stringOrDash(incident?.name);
-  details["Status"] = stringOrDash(incident?.status);
-  details["Impact"] = stringOrDash(incident?.impact);
-  details["Incident URL"] = stringOrDash(incident?.shortlink);
-
-  if (incident?.created_at) {
-    details["Created At"] = new Date(incident.created_at).toLocaleString();
-  }
-  if (incident?.updated_at) {
-    details["Updated At"] = new Date(incident.updated_at).toLocaleString();
-  }
-
-  const updates = incident?.incident_updates;
-  if (updates && updates.length > 0) {
-    const latest = updates[0];
-    if (latest?.body) {
-      details["Latest Update"] = latest.body;
-    }
-  }
-
-  return details;
-}
+import { baseEventSections, getDetailsForIncident } from "./utils";
 
 export const updateIncidentMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -94,6 +60,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     page?: string;
     incident?: string;
     status?: string;
+    body?: string;
+    impactOverride?: string;
   };
 
   if (configuration?.page) {
@@ -105,44 +73,12 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   if (configuration?.status) {
     metadata.push({ icon: "arrow-right-circle", label: "Status: " + configuration.status });
   }
+  if (configuration?.impactOverride) {
+    metadata.push({ icon: "alert-triangle", label: "Impact: " + configuration.impactOverride });
+  }
+  if (!configuration?.status && configuration?.body) {
+    metadata.push({ icon: "message-square", label: "Message updated" });
+  }
 
   return metadata;
-}
-
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  if (!rootTriggerNode || !execution.rootEvent?.id) {
-    return [
-      {
-        receivedAt: new Date(execution.createdAt!),
-        eventTitle: "Execution",
-        eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
-        eventState: getState(componentName)(execution),
-        eventId: execution.id ?? "",
-      },
-    ];
-  }
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode.componentName);
-  if (!rootTriggerRenderer) {
-    return [
-      {
-        receivedAt: new Date(execution.createdAt!),
-        eventTitle: "Execution",
-        eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
-        eventState: getState(componentName)(execution),
-        eventId: execution.rootEvent.id,
-      },
-    ];
-  }
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
-  return [
-    {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
-      eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent.id,
-    },
-  ];
 }

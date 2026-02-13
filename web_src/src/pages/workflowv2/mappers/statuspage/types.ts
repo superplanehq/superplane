@@ -1,3 +1,7 @@
+export interface StatuspageNodeMetadata {
+  pageName?: string;
+}
+
 export interface StatuspageIncidentUpdate {
   id?: string;
   status?: string;

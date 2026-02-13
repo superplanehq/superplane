@@ -14,6 +14,7 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   cloudflare: "Cloudflare",
   semaphore: "Semaphore",
   rootly: "Rootly",
+  statuspage: "Statuspage",
   daytona: "Daytona",
   dash0: "Dash0",
   aws: "AWS",

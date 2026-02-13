@@ -93,6 +93,24 @@ func Test__ListResources__Component_empty_page_id(t *testing.T) {
 	assert.Empty(t, resources)
 }
 
+func Test__ListResources__Component_expression_page_id(t *testing.T) {
+	// When page_id is an expression (e.g. {{ previous().data.page_id }}), return empty list
+	// instead of calling the Statuspage API with invalid data (which would cause 500).
+	s := &Statuspage{}
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{"apiKey": "test-key"},
+	}
+	ctx := core.ListResourcesContext{
+		HTTP:        nil,
+		Integration: integrationCtx,
+		Parameters:  map[string]string{"page_id": "{{ previous().data.page_id }}"},
+	}
+
+	resources, err := s.ListResources(ResourceTypeComponent, ctx)
+	require.NoError(t, err)
+	assert.Empty(t, resources)
+}
+
 func Test__ListResources__Unknown_type(t *testing.T) {
 	s := &Statuspage{}
 	integrationCtx := &contexts.IntegrationContext{

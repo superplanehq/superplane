@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -26,6 +28,7 @@ type CreateIncidentSpec struct {
 	ComponentStatus         string   `mapstructure:"componentStatus"`
 	ScheduledFor            string   `mapstructure:"scheduledFor"`
 	ScheduledUntil          string   `mapstructure:"scheduledUntil"`
+	ScheduledTimezone       string   `mapstructure:"scheduledTimezone"`
 	ScheduledRemindPrior    bool     `mapstructure:"scheduledRemindPrior"`
 	ScheduledAutoInProgress bool     `mapstructure:"scheduledAutoInProgress"`
 	ScheduledAutoCompleted  bool     `mapstructure:"scheduledAutoCompleted"`
@@ -55,7 +58,7 @@ func (c *CreateIncident) Documentation() string {
 
 ## Configuration
 
-- **Page** (required): The Statuspage to create the incident on
+- **Page** (required): The Statuspage to create the incident on. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.page_id }}).
 - **Incident type**: Realtime (active incident) or Scheduled (planned maintenance)
 - **Name** (required): Short title for the incident
 - **Body** (optional): Initial message shown as the first incident update
@@ -63,7 +66,8 @@ func (c *CreateIncident) Documentation() string {
 - **Impact override** (realtime): none, minor, major, or critical
 - **Components** (optional): Select one or more components to associate with the incident
 - **Component status** (optional): Status to set for all selected components (e.g. degraded_performance, under_maintenance)
-- **Scheduled For / Until** (scheduled): Start and end time for scheduled maintenance
+- **Scheduled For / Until** (scheduled): Start and end time for scheduled maintenance (ISO 8601, e.g. 2026-02-15T02:00)
+- **Scheduled timezone** (scheduled): Timezone for the scheduled times (default UTC). Output is converted to UTC for the API.
 - **Scheduled options** (scheduled): Remind prior, auto in-progress, auto completed
 - **Deliver notifications** (optional): Whether to send notifications for the initial update (default: true)
 
@@ -91,16 +95,22 @@ func (c *CreateIncident) OutputChannels(configuration any) []core.OutputChannel 
 
 func (c *CreateIncident) ExampleOutput() map[string]any {
 	return map[string]any{
-		"id":                  "p31zjtct2jer",
-		"name":                "Database Connection Issues",
-		"status":              "investigating",
-		"impact":              "major",
-		"shortlink":           "http://stspg.io/p31zjtct2jer",
-		"created_at":          "2026-02-12T10:30:00.000Z",
-		"page_id":             "kctbh9vrtdwd",
-		"affected_components": []string{"API"},
-		"component_count":     1,
-		"latest_update":       "We are investigating reports of slow database queries.",
+		"id":        "p31zjtct2jer",
+		"name":      "Database Connection Issues",
+		"status":    "investigating",
+		"impact":    "major",
+		"shortlink": "http://stspg.io/p31zjtct2jer",
+		"created_at": "2026-02-12T10:30:00.000Z",
+		"page_id":   "kctbh9vrtdwd",
+		"component_ids": []string{"8kbf7d35c070"},
+		"incident_updates": []map[string]any{
+			{
+				"id":         "upd1",
+				"status":     "investigating",
+				"body":       "We are investigating reports of slow database queries.",
+				"created_at": "2026-02-12T10:30:00.000Z",
+			},
+		},
 	}
 }
 
@@ -256,6 +266,31 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "scheduledTimezone",
+			Label:       "Timezone",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Default:     "UTC",
+			Description: "Timezone for scheduled times. Values are converted to UTC for the API.",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "UTC", Value: "UTC"},
+						{Label: "America/New_York", Value: "America/New_York"},
+						{Label: "America/Los_Angeles", Value: "America/Los_Angeles"},
+						{Label: "America/Chicago", Value: "America/Chicago"},
+						{Label: "Europe/London", Value: "Europe/London"},
+						{Label: "Europe/Paris", Value: "Europe/Paris"},
+						{Label: "Asia/Tokyo", Value: "Asia/Tokyo"},
+						{Label: "Asia/Singapore", Value: "Asia/Singapore"},
+					},
+				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "incidentType", Values: []string{"scheduled"}},
+			},
+		},
+		{
 			Name:        "scheduledRemindPrior",
 			Label:       "Remind subscribers 60 minutes before",
 			Type:        configuration.FieldTypeBool,
@@ -328,7 +363,23 @@ func (c *CreateIncident) Setup(ctx core.SetupContext) error {
 		}
 	}
 
-	return nil
+	// Resolve page name for metadata when Page is a static ID (no expression)
+	metadata := NodeMetadata{}
+	if spec.Page != "" && !strings.Contains(spec.Page, "{{") {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err == nil {
+			pages, err := client.ListPages()
+			if err == nil {
+				for _, p := range pages {
+					if p.ID == spec.Page {
+						metadata.PageName = p.Name
+						break
+					}
+				}
+			}
+		}
+	}
+	return ctx.Metadata.Set(metadata)
 }
 
 func (c *CreateIncident) Execute(ctx core.ExecutionContext) error {
@@ -352,13 +403,19 @@ func (c *CreateIncident) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
+	deliverNotifications := spec.DeliverNotifications
+	if deliverNotifications == nil {
+		t := true
+		deliverNotifications = &t
+	}
+
 	req := CreateIncidentRequest{
 		Name:             spec.Name,
 		Body:             spec.Body,
 		ComponentIDs:     spec.ComponentIDs,
 		Components:       components,
 		Realtime:         spec.IncidentType == "realtime",
-		DeliverNotifications: spec.DeliverNotifications,
+		DeliverNotifications: deliverNotifications,
 	}
 
 	if spec.IncidentType == "realtime" {
@@ -367,9 +424,24 @@ func (c *CreateIncident) Execute(ctx core.ExecutionContext) error {
 			req.Status = "investigating"
 		}
 		req.ImpactOverride = spec.ImpactOverride
+		if req.ImpactOverride == "" {
+			req.ImpactOverride = "major"
+		}
 	} else {
-		req.ScheduledFor = spec.ScheduledFor
-		req.ScheduledUntil = spec.ScheduledUntil
+		tz := spec.ScheduledTimezone
+		if tz == "" {
+			tz = "UTC"
+		}
+		scheduledFor, err := toUTCISO8601(spec.ScheduledFor, tz)
+		if err != nil {
+			return fmt.Errorf("invalid scheduledFor: %w", err)
+		}
+		scheduledUntil, err := toUTCISO8601(spec.ScheduledUntil, tz)
+		if err != nil {
+			return fmt.Errorf("invalid scheduledUntil: %w", err)
+		}
+		req.ScheduledFor = scheduledFor
+		req.ScheduledUntil = scheduledUntil
 		req.ScheduledRemindPrior = spec.ScheduledRemindPrior
 		req.ScheduledAutoInProgress = spec.ScheduledAutoInProgress
 		req.ScheduledAutoCompleted = spec.ScheduledAutoCompleted
@@ -385,6 +457,31 @@ func (c *CreateIncident) Execute(ctx core.ExecutionContext) error {
 		"statuspage.incident",
 		[]any{incident},
 	)
+}
+
+// toUTCISO8601 parses a datetime string in the given timezone and returns it as ISO 8601 UTC (e.g. 2026-02-15T02:00:00Z).
+// Input format: "2006-01-02T15:04" or "2006-01-02T15:04:05" from the datetime picker.
+func toUTCISO8601(dt, timezone string) (string, error) {
+	if dt == "" {
+		return "", nil
+	}
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		return "", fmt.Errorf("invalid timezone %q: %w", timezone, err)
+	}
+	trimmed := strings.TrimSuffix(dt, "Z")
+	formats := []string{"2006-01-02T15:04:05", "2006-01-02T15:04"}
+	var t time.Time
+	for _, f := range formats {
+		if parsed, err := time.ParseInLocation(f, trimmed, loc); err == nil {
+			t = parsed
+			break
+		}
+	}
+	if t.IsZero() {
+		return "", fmt.Errorf("could not parse datetime %q", dt)
+	}
+	return t.UTC().Format("2006-01-02T15:04:05") + "Z", nil
 }
 
 func (c *CreateIncident) Cancel(ctx core.ExecutionContext) error {

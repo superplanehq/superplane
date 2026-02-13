@@ -55,6 +55,9 @@ func (c *Client) do(method, path string, body io.Reader, contentType string) ([]
 	if res.StatusCode == 420 || res.StatusCode == 429 {
 		return nil, fmt.Errorf("rate limited (HTTP %d): %s", res.StatusCode, string(resBody))
 	}
+	if res.StatusCode == 404 {
+		return nil, fmt.Errorf("resource not found (404): %s", string(resBody))
+	}
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		return nil, fmt.Errorf("request failed with %d: %s", res.StatusCode, string(resBody))
 	}
@@ -211,18 +214,26 @@ func (c *Client) ListIncidents(pageID string, q string, limit int) ([]Incident, 
 type UpdateIncidentRequest struct {
 	Status         string            `json:"status,omitempty"`
 	Body           string            `json:"body,omitempty"`
+	ImpactOverride string            `json:"impact_override,omitempty"`
 	ComponentIDs   []string          `json:"component_ids,omitempty"`
 	Components     map[string]string `json:"components,omitempty"`
 }
 
 // UpdateIncident updates an incident and returns the full response as map[string]any.
 func (c *Client) UpdateIncident(pageID, incidentID string, req UpdateIncidentRequest) (map[string]any, error) {
+	if req.Status == "" && req.Body == "" && req.ImpactOverride == "" && len(req.ComponentIDs) == 0 && len(req.Components) == 0 {
+		return nil, fmt.Errorf("at least one of status, body, impact override, or components must be provided")
+	}
+
 	payload := map[string]any{}
 	if req.Status != "" {
 		payload["status"] = req.Status
 	}
 	if req.Body != "" {
 		payload["body"] = req.Body
+	}
+	if req.ImpactOverride != "" {
+		payload["impact_override"] = req.ImpactOverride
 	}
 	if len(req.ComponentIDs) > 0 {
 		payload["component_ids"] = req.ComponentIDs
