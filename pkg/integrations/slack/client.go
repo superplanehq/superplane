@@ -167,6 +167,44 @@ func (c *Client) PostMessage(req ChatPostMessageRequest) (*ChatPostMessageRespon
 	return &result, nil
 }
 
+type ChatUpdateMessageRequest struct {
+	Channel   string        `json:"channel"`
+	Timestamp string        `json:"ts"`
+	Text      string        `json:"text,omitempty"`
+	Blocks    []interface{} `json:"blocks,omitempty"`
+}
+
+type ChatUpdateMessageResponse struct {
+	OK    bool   `json:"ok"`
+	Error string `json:"error,omitempty"`
+}
+
+func (c *Client) UpdateMessage(req ChatUpdateMessageRequest) error {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, "https://slack.com/api/chat.update", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+
+	var result ChatUpdateMessageResponse
+	if err := json.Unmarshal(responseBody, &result); err != nil {
+		return fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	if !result.OK {
+		if result.Error != "" {
+			return fmt.Errorf("failed to update message: %s", result.Error)
+		}
+		return fmt.Errorf("failed to update message")
+	}
+
+	return nil
+}
+
 func (c *Client) execRequest(method, URL string, body io.Reader) ([]byte, error) {
 	req, err := http.NewRequest(method, URL, body)
 	if err != nil {
