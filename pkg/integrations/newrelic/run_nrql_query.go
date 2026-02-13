@@ -33,6 +33,12 @@ type RunNRQLQueryPayload struct {
 	AccountID   string                   `json:"accountId"      mapstructure:"accountId"`
 }
 
+// RunNRQLQueryNodeMetadata stores verified account details in the node metadata.
+type RunNRQLQueryNodeMetadata struct {
+	Account *Account `json:"account" mapstructure:"account"`
+	Manual  bool     `json:"manual"  mapstructure:"manual"`
+}
+
 func (c *RunNRQLQuery) Name() string {
 	return "newrelic.runNRQLQuery"
 }
@@ -57,7 +63,8 @@ func (c *RunNRQLQuery) Documentation() string {
 
 ## Configuration
 
-- **Account ID**: The New Relic account ID to query against (required)
+- **Account**: The New Relic account to query (select from dropdown)
+- **Manual Account ID**: Manually enter Account ID if dropdown fails
 - **Query**: The NRQL query string to execute (required)
 - **Timeout**: Query timeout in seconds (optional, default: 10, max: 120)
 
@@ -143,23 +150,18 @@ func (c *RunNRQLQuery) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
 
-	// Set manual: true in metadata to ensure UI handles generic components correctly
-	if err := ctx.Metadata.Set(map[string]any{"manual": true}); err != nil {
-		return fmt.Errorf("failed to set metadata: %w", err)
-	}
-
-	accountID := spec.Account
+	accountIDStr := spec.Account
 	if spec.ManualAccountID != "" {
-		accountID = spec.ManualAccountID
+		accountIDStr = spec.ManualAccountID
 	}
 
-	if accountID == "" {
+	if accountIDStr == "" {
 		return fmt.Errorf("account is required (select from dropdown or use Manual Account ID)")
 	}
 
 	// Guard: reject unresolved template tags early
-	if isUnresolvedTemplate(accountID) {
-		return fmt.Errorf("account ID contains unresolved template variable: %s — configure the upstream trigger first", accountID)
+	if isUnresolvedTemplate(accountIDStr) {
+		return fmt.Errorf("account ID contains unresolved template variable: %s — configure the upstream trigger first", accountIDStr)
 	}
 
 	if spec.Query == "" {
@@ -173,6 +175,41 @@ func (c *RunNRQLQuery) Setup(ctx core.SetupContext) error {
 	// Validate timeout if provided
 	if spec.Timeout < 0 || spec.Timeout > 120 {
 		return fmt.Errorf("timeout must be between 0 and 120 seconds")
+	}
+
+	//
+	// Integration Resource Validation
+	//
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %v", err)
+	}
+
+	accounts, err := client.ListAccounts(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to list accounts: %v", err)
+	}
+
+	var verifiedAccount *Account
+	for _, acc := range accounts {
+		if strconv.FormatInt(acc.ID, 10) == strings.TrimSpace(accountIDStr) {
+			verifiedAccount = &acc
+			break
+		}
+	}
+
+	if verifiedAccount == nil {
+		return fmt.Errorf("account ID %s not found or not accessible with the provided API key", accountIDStr)
+	}
+
+	// Persist verified details to metadata
+	metadata := RunNRQLQueryNodeMetadata{
+		Account: verifiedAccount,
+		Manual:  true,
+	}
+
+	if err := ctx.Metadata.Set(metadata); err != nil {
+		return fmt.Errorf("failed to set metadata: %w", err)
 	}
 
 	return nil
@@ -325,7 +362,7 @@ func extractResourceID(v any) string {
 	case float64:
 		return strconv.FormatFloat(n, 'f', -1, 64)
 	case float32:
-		return strconv.FormatFloat(float64(n), 'f', -1, 64)
+		return strconv.FormatFloat(float64(n), 'f', -1, 32)
 	}
 
 	// Handle maps
