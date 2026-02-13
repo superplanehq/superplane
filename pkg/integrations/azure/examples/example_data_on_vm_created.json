@@ -1,0 +1,16 @@
+{
+  "data": {
+    "vmName": "my-vm-01",
+    "vmId": "/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+    "resourceGroup": "<resource-group>",
+    "subscriptionId": "<subscription-id>",
+    "location": "",
+    "provisioningState": "Succeeded",
+    "timestamp": "2026-02-12T12:00:00Z",
+    "operationName": "Microsoft.Compute/virtualMachines/write",
+    "status": "Succeeded"
+  },
+  "timestamp": "2026-02-12T12:00:00Z",
+  "type": "azure.vm.created"
+}
+

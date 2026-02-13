@@ -1,0 +1,15 @@
+{
+  "data": {
+    "id": "/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+    "name": "my-vm-01",
+    "provisioningState": "Succeeded",
+    "location": "polandcentral",
+    "size": "Standard_B2s",
+    "publicIp": "20.10.10.10",
+    "privateIp": "10.0.0.4",
+    "adminUsername": "azureuser"
+  },
+  "timestamp": "2026-02-12T12:05:00Z",
+  "type": "azure.vm"
+}
+
