@@ -38,6 +38,7 @@ import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
+import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
 
 export interface BuildingBlock {
   name: string;
@@ -418,6 +419,7 @@ function CategorySection({
     prometheus: prometheusIcon,
     render: renderIcon,
     dockerhub: dockerIcon,
+    servicenow: servicenowIcon,
     aws: {
       codeArtifact: awsIcon,
       cloudwatch: awsCloudwatchIcon,
@@ -495,6 +497,7 @@ function CategorySection({
             prometheus: prometheusIcon,
             render: renderIcon,
             dockerhub: dockerIcon,
+            servicenow: servicenowIcon,
             aws: {
               codeArtifact: awsCodeArtifactIcon,
               cloudwatch: awsCloudwatchIcon,
