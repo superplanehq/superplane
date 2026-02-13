@@ -116,6 +116,41 @@ func Test__GetCheckDetails__Execute(t *testing.T) {
 		assert.Contains(t, httpContext.Requests[1].URL.String(), "/api/alerting/check-rules/check-123")
 	})
 
+	t.Run("does not fallback when status is not 404", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusInternalServerError,
+					Body:       io.NopCloser(strings.NewReader(`{"error":"request got 404 code from downstream"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"check-123","name":"unexpected fallback"}`)),
+				},
+			},
+		}
+
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"checkId": "check-123",
+			},
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken": "token123",
+					"baseURL":  "https://api.us-west-2.aws.dash0.com",
+				},
+			},
+			ExecutionState: execCtx,
+		})
+
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "request got 500 code")
+		require.Len(t, httpContext.Requests, 1)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/api/alerting/failed-checks/check-123")
+	})
+
 	t.Run("includeHistory adds include_history query parameter", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
