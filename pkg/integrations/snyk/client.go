@@ -93,6 +93,68 @@ func (c *Client) GetUser() (*UserResponse, error) {
 	return &userResp, nil
 }
 
+type SnykProject struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type ListProjectsResponse struct {
+	Data []struct {
+		ID         string `json:"id"`
+		Attributes struct {
+			Name string `json:"name"`
+		} `json:"attributes"`
+	} `json:"data"`
+}
+
+func (c *Client) ListProjects(orgID string) ([]SnykProject, error) {
+	url := fmt.Sprintf("%s/rest/orgs/%s/projects?version=%s&limit=100", c.baseURL, orgID, c.version)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	apiToken, err := c.integration.GetConfig("apiToken")
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("token %s", string(apiToken)))
+	req.Header.Set("Content-Type", "application/vnd.api+json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var projectsResp ListProjectsResponse
+	if err := json.Unmarshal(body, &projectsResp); err != nil {
+		return nil, err
+	}
+
+	projects := make([]SnykProject, 0, len(projectsResp.Data))
+	for _, p := range projectsResp.Data {
+		projects = append(projects, SnykProject{
+			ID:   p.ID,
+			Name: p.Attributes.Name,
+		})
+	}
+
+	return projects, nil
+}
+
 type IgnoreIssueRequest struct {
 	Reason    string `json:"reason"`
 	ExpiresAt string `json:"expires_at,omitempty"`

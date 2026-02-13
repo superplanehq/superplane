@@ -54,7 +54,12 @@ func (s *Snyk) Description() string {
 }
 
 func (s *Snyk) Instructions() string {
-	return "To get a Snyk API token, go to your Snyk account settings."
+	return `To set up the Snyk integration:
+
+1. Go to your **Snyk Personal Access Tokens** page (https://app.snyk.io/account/personal-access-tokens)
+2. Click **Generate Token** and give it a descriptive name
+3. Copy the token and paste it in the **API Token** field below
+4. Enter your **Organization ID** — you can find it in Snyk under Organization Settings > General`
 }
 
 func (s *Snyk) Configuration() []configuration.Field {
@@ -237,6 +242,33 @@ func (s *Snyk) HandleAction(ctx core.IntegrationActionContext) error {
 }
 
 func (s *Snyk) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	// For now, return empty resources - we can implement this later if needed
-	return []core.IntegrationResource{}, nil
+	if resourceType != "project" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	orgID, err := ctx.Integration.GetConfig("organizationId")
+	if err != nil {
+		return nil, fmt.Errorf("error getting organizationId: %v", err)
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("error creating client: %v", err)
+	}
+
+	projects, err := client.ListProjects(string(orgID))
+	if err != nil {
+		return nil, fmt.Errorf("error listing projects: %v", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(projects))
+	for _, p := range projects {
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: p.Name,
+			ID:   p.ID,
+		})
+	}
+
+	return resources, nil
 }

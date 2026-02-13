@@ -13,17 +13,15 @@ import (
 type IgnoreIssue struct{}
 
 type IgnoreIssueConfiguration struct {
-	OrganizationID string `json:"organizationId" mapstructure:"organizationId"`
-	ProjectID      string `json:"projectId" mapstructure:"projectId"`
-	IssueID        string `json:"issueId" mapstructure:"issueId"`
-	Reason         string `json:"reason" mapstructure:"reason"`
-	ExpiresAt      string `json:"expiresAt" mapstructure:"expiresAt"` // Optional
+	ProjectID string `json:"projectId" mapstructure:"projectId"`
+	IssueID   string `json:"issueId" mapstructure:"issueId"`
+	Reason    string `json:"reason" mapstructure:"reason"`
+	ExpiresAt string `json:"expiresAt" mapstructure:"expiresAt"` // Optional
 }
 
 type IgnoreIssueMetadata struct {
-	OrganizationID string `json:"organizationId" mapstructure:"organizationId"`
-	ProjectID      string `json:"projectId" mapstructure:"projectId"`
-	IssueID        string `json:"issueId" mapstructure:"issueId"`
+	ProjectID string `json:"projectId" mapstructure:"projectId"`
+	IssueID   string `json:"issueId" mapstructure:"issueId"`
 }
 
 func (c *IgnoreIssue) Name() string {
@@ -50,7 +48,6 @@ func (c *IgnoreIssue) Documentation() string {
 
 ## Configuration
 
-- **Organization ID**: The Snyk organization ID containing the issue
 - **Project ID**: The project ID where the issue exists
 - **Issue ID**: The specific issue ID to ignore
 - **Reason**: The reason for ignoring the issue
@@ -80,13 +77,6 @@ func (c *IgnoreIssue) OutputChannels(configuration any) []core.OutputChannel {
 
 func (c *IgnoreIssue) Configuration() []configuration.Field {
 	return []configuration.Field{
-		{
-			Name:        "organizationId",
-			Label:       "Organization ID",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "Snyk organization ID",
-		},
 		{
 			Name:        "projectId",
 			Label:       "Project ID",
@@ -124,10 +114,6 @@ func (c *IgnoreIssue) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if config.OrganizationID == "" {
-		return errors.New("organizationId is required")
-	}
-
 	if config.ProjectID == "" {
 		return errors.New("projectId is required")
 	}
@@ -141,9 +127,8 @@ func (c *IgnoreIssue) Setup(ctx core.SetupContext) error {
 	}
 
 	metadata := IgnoreIssueMetadata{
-		OrganizationID: config.OrganizationID,
-		ProjectID:      config.ProjectID,
-		IssueID:        config.IssueID,
+		ProjectID: config.ProjectID,
+		IssueID:   config.IssueID,
 	}
 
 	return ctx.Metadata.Set(metadata)
@@ -159,6 +144,11 @@ func (c *IgnoreIssue) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	orgID, err := ctx.Integration.GetConfig("organizationId")
+	if err != nil {
+		return fmt.Errorf("error getting organizationId: %v", err)
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create Snyk client: %w", err)
@@ -169,18 +159,17 @@ func (c *IgnoreIssue) Execute(ctx core.ExecutionContext) error {
 		ExpiresAt: config.ExpiresAt,
 	}
 
-	response, err := client.IgnoreIssue(config.OrganizationID, config.ProjectID, config.IssueID, ignoreReq)
+	response, err := client.IgnoreIssue(string(orgID), config.ProjectID, config.IssueID, ignoreReq)
 	if err != nil {
 		return fmt.Errorf("failed to ignore issue: %w", err)
 	}
 
 	result := map[string]any{
-		"success":        response.Success,
-		"message":        response.Message,
-		"organizationId": config.OrganizationID,
-		"projectId":      config.ProjectID,
-		"issueId":        config.IssueID,
-		"reason":         config.Reason,
+		"success":   response.Success,
+		"message":   response.Message,
+		"projectId": config.ProjectID,
+		"issueId":   config.IssueID,
+		"reason":    config.Reason,
 	}
 
 	return ctx.ExecutionState.Emit(

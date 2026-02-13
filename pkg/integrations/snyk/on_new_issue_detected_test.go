@@ -22,40 +22,16 @@ func TestOnNewIssueDetectedTrigger(t *testing.T) {
 	assert.Equal(t, "shield", trigger.Icon())
 
 	configFields := trigger.Configuration()
-	assert.Len(t, configFields, 3)
+	assert.Len(t, configFields, 2)
 
 	fieldNames := make(map[string]bool)
 	for _, field := range configFields {
 		fieldNames[field.Name] = true
 	}
 
-	expectedFields := []string{"organizationId", "projectId", "severity"}
+	expectedFields := []string{"projectId", "severity"}
 	for _, fieldName := range expectedFields {
 		assert.True(t, fieldNames[fieldName], "Missing field: %s", fieldName)
-	}
-}
-
-func TestSeverityComparison(t *testing.T) {
-	trigger := &OnNewIssueDetected{}
-
-	tests := []struct {
-		actual    string
-		threshold string
-		expected  bool
-		name      string
-	}{
-		{"critical", "high", true, "critical is higher than high"},
-		{"high", "high", true, "high equals high"},
-		{"medium", "high", false, "medium is lower than high"},
-		{"low", "critical", false, "low is lower than critical"},
-		{"critical", "critical", true, "critical equals critical"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := trigger.isSeverityEqualOrHigher(tt.actual, tt.threshold)
-			assert.Equal(t, tt.expected, result)
-		})
 	}
 }
 
@@ -234,7 +210,7 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 2, eventContext.Count())
 	})
 
-	t.Run("severity filter -> only matching issues emitted", func(t *testing.T) {
+	t.Run("severity filter -> only exact matching issues emitted", func(t *testing.T) {
 		body := []byte(`{
 			"newIssues": [
 				{"id": "SNYK-JS-001", "severity": "low"},
@@ -254,7 +230,7 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 			Body:    body,
 			Headers: headers,
 			Configuration: map[string]any{
-				"severity": "high",
+				"severity": []string{"high", "critical"},
 			},
 			Events:  eventContext,
 			Webhook: &contexts.WebhookContext{Secret: secret},
@@ -263,6 +239,63 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 		assert.Equal(t, http.StatusOK, code)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, eventContext.Count())
+	})
+
+	t.Run("severity filter -> missing severity in issue rejects", func(t *testing.T) {
+		body := []byte(`{
+			"newIssues": [
+				{"id": "SNYK-JS-001"}
+			],
+			"project": {"id": "project-123", "name": "my-web-app"},
+			"org": {"id": "org-123", "name": "my-org"}
+		}`)
+
+		headers := http.Header{}
+		headers.Set("X-Snyk-Event", "project_snapshot/v0")
+		headers.Set("X-Hub-Signature", signatureFor(secret, body))
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"severity": []string{"high"},
+			},
+			Events:  eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Zero(t, eventContext.Count())
+	})
+
+	t.Run("project filter -> missing project data rejects", func(t *testing.T) {
+		body := []byte(`{
+			"newIssues": [
+				{"id": "SNYK-JS-001", "severity": "high"}
+			],
+			"org": {"id": "org-123", "name": "my-org"}
+		}`)
+
+		headers := http.Header{}
+		headers.Set("X-Snyk-Event", "project_snapshot/v0")
+		headers.Set("X-Hub-Signature", signatureFor(secret, body))
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Configuration: map[string]any{
+				"projectId": "project-123",
+			},
+			Events:  eventContext,
+			Webhook: &contexts.WebhookContext{Secret: secret},
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Zero(t, eventContext.Count())
 	})
 
 	t.Run("project filter -> only matching project emitted", func(t *testing.T) {
@@ -354,23 +387,26 @@ func Test__OnNewIssueDetected__HandleWebhook(t *testing.T) {
 func Test__OnNewIssueDetected__Setup(t *testing.T) {
 	trigger := &OnNewIssueDetected{}
 
-	t.Run("organizationId is required", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{}
+	t.Run("organizationId is required in integration config", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"organizationId": ""},
+		}
 		err := trigger.Setup(core.TriggerContext{
 			Integration:   integrationCtx,
-			Configuration: map[string]any{"organizationId": ""},
+			Configuration: map[string]any{},
 		})
 
 		require.ErrorContains(t, err, "organizationId is required")
 	})
 
 	t.Run("webhook is requested with correct config", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"organizationId": "org-123"},
+		}
 		require.NoError(t, trigger.Setup(core.TriggerContext{
 			Integration: integrationCtx,
 			Configuration: map[string]any{
-				"organizationId": "org-123",
-				"projectId":      "project-123",
+				"projectId": "project-123",
 			},
 		}))
 

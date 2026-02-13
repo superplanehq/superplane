@@ -15,9 +15,8 @@ import (
 type OnNewIssueDetected struct{}
 
 type OnNewIssueDetectedConfiguration struct {
-	OrganizationID string `json:"organizationId" mapstructure:"organizationId"`
-	ProjectID      string `json:"projectId" mapstructure:"projectId"` // Optional - if not specified, applies to all projects
-	Severity       string `json:"severity" mapstructure:"severity"`   // Optional - filter by severity (low, medium, high, critical)
+	ProjectID string   `json:"projectId" mapstructure:"projectId"` // Optional - if not specified, applies to all projects
+	Severity  []string `json:"severity" mapstructure:"severity"`   // Optional - filter by severity (low, medium, high, critical)
 }
 
 func (t *OnNewIssueDetected) Name() string {
@@ -44,9 +43,8 @@ func (t *OnNewIssueDetected) Documentation() string {
 
 ## Configuration
 
-- **Organization ID**: The Snyk organization to monitor
-- **Project ID**: Optional project filter - if specified, only issues from this project will trigger (leave empty to listen to all projects)
-- **Severity**: Optional severity filter - if specified, only issues of this severity or higher will trigger (low, medium, high, critical)
+- **Project**: Optional project filter - select a project to only trigger on issues from that project
+- **Severity**: Optional severity filter - select one or more severities to trigger on (low, medium, high, critical)
 
 ## Event Data
 
@@ -72,27 +70,25 @@ func (t *OnNewIssueDetected) Color() string {
 func (t *OnNewIssueDetected) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "organizationId",
-			Label:       "Organization ID",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "Snyk organization ID to monitor",
-		},
-		{
-			Name:        "projectId",
-			Label:       "Project ID",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Optional project ID filter - if specified, only issues from this project will trigger",
+			Name:     "projectId",
+			Label:    "Project",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: false,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "project",
+				},
+			},
+			Description: "Optional project filter - if specified, only issues from this project will trigger",
 		},
 		{
 			Name:        "severity",
 			Label:       "Severity",
-			Type:        configuration.FieldTypeSelect,
+			Type:        configuration.FieldTypeMultiSelect,
 			Required:    false,
-			Description: "Optional severity filter - only issues of this severity or higher will trigger",
+			Description: "Optional severity filter - only issues with the selected severities will trigger",
 			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
+				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: []configuration.FieldOption{
 						{Label: "Low", Value: "low"},
 						{Label: "Medium", Value: "medium"},
@@ -111,13 +107,18 @@ func (t *OnNewIssueDetected) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if config.OrganizationID == "" {
-		return fmt.Errorf("organizationId is required")
+	orgID, err := ctx.Integration.GetConfig("organizationId")
+	if err != nil {
+		return fmt.Errorf("error getting organizationId: %v", err)
+	}
+
+	if string(orgID) == "" {
+		return fmt.Errorf("organizationId is required in integration configuration")
 	}
 
 	webhookConfig := WebhookConfiguration{
 		EventType: "issue.detected",
-		OrgID:     config.OrganizationID,
+		OrgID:     string(orgID),
 		ProjectID: config.ProjectID,
 	}
 
@@ -206,50 +207,47 @@ func (t *OnNewIssueDetected) HandleWebhook(ctx core.WebhookRequestContext) (int,
 
 func (t *OnNewIssueDetected) matchesFilters(payload map[string]any, config OnNewIssueDetectedConfiguration) bool {
 	if config.ProjectID != "" {
-		if projectData, ok := payload["project"]; ok {
-			if projectMap, isMap := projectData.(map[string]any); isMap {
-				if id, hasID := projectMap["id"]; hasID {
-					if idStr, isString := id.(string); isString {
-						if idStr != config.ProjectID {
-							return false
-						}
-					}
-				}
-			}
+		projectData, ok := payload["project"]
+		if !ok {
+			return false
+		}
+
+		projectMap, isMap := projectData.(map[string]any)
+		if !isMap {
+			return false
+		}
+
+		idStr, isString := projectMap["id"].(string)
+		if !isString || idStr != config.ProjectID {
+			return false
 		}
 	}
 
-	if config.Severity != "" {
-		if issueData, ok := payload["issue"].(map[string]any); ok {
-			if severity, ok := issueData["severity"]; ok {
-				if severityStr, isString := severity.(string); isString {
-					if !t.isSeverityEqualOrHigher(severityStr, config.Severity) {
-						return false
-					}
-				}
+	if len(config.Severity) > 0 {
+		issueData, ok := payload["issue"].(map[string]any)
+		if !ok {
+			return false
+		}
+
+		severityStr, isString := issueData["severity"].(string)
+		if !isString {
+			return false
+		}
+
+		matched := false
+		for _, s := range config.Severity {
+			if severityStr == s {
+				matched = true
+				break
 			}
+		}
+
+		if !matched {
+			return false
 		}
 	}
 
 	return true
-}
-
-func (t *OnNewIssueDetected) isSeverityEqualOrHigher(actual, threshold string) bool {
-	severityOrder := map[string]int{
-		"low":      1,
-		"medium":   2,
-		"high":     3,
-		"critical": 4,
-	}
-
-	actualLevel, hasActual := severityOrder[actual]
-	thresholdLevel, hasThreshold := severityOrder[threshold]
-
-	if !hasActual || !hasThreshold {
-		return true
-	}
-
-	return actualLevel >= thresholdLevel
 }
 
 func (t *OnNewIssueDetected) Cleanup(ctx core.TriggerContext) error {

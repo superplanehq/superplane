@@ -4,9 +4,8 @@ import snykIcon from "@/assets/icons/integrations/snyk.svg";
 import { TriggerProps } from "@/ui/trigger";
 
 interface OnNewIssueDetectedConfiguration {
-  organizationId: string;
   projectId?: string;
-  severity?: string;
+  severity?: string[];
 }
 
 interface OnNewIssueDetectedEventData {
@@ -64,28 +63,21 @@ export const onNewIssueDetectedTriggerRenderer: TriggerRenderer = {
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
     const { node, definition, lastEvent } = context;
     const configuration = node.configuration as OnNewIssueDetectedConfiguration;
-    const metadata = node.metadata as Partial<Record<string, unknown>>;
+    const metadata = node.metadata as { projectId?: { id: string; name: string } } | undefined;
 
     const metadataItems = [];
 
-    if (metadata?.organizationId) {
+    if (metadata?.projectId?.name) {
       metadataItems.push({
-        icon: "organization",
-        label: String(metadata.organizationId).substring(0, 8), // Shortened ID
+        icon: "book",
+        label: metadata.projectId.name,
       });
     }
 
-    if (metadata?.projectId) {
-      metadataItems.push({
-        icon: "project",
-        label: String(metadata.projectId).substring(0, 8), // Shortened ID
-      });
-    }
-
-    if (configuration?.severity) {
+    if (configuration?.severity && configuration.severity.length > 0) {
       metadataItems.push({
         icon: "alert-circle",
-        label: configuration.severity,
+        label: configuration.severity.join(", "),
       });
     }
 

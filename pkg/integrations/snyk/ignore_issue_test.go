@@ -21,14 +21,14 @@ func TestIgnoreIssueComponent(t *testing.T) {
 	assert.Equal(t, "shield", component.Icon())
 
 	configFields := component.Configuration()
-	assert.Len(t, configFields, 5)
+	assert.Len(t, configFields, 4)
 
 	fieldNames := make(map[string]bool)
 	for _, field := range configFields {
 		fieldNames[field.Name] = true
 	}
 
-	expectedFields := []string{"organizationId", "projectId", "issueId", "reason", "expiresAt"}
+	expectedFields := []string{"projectId", "issueId", "reason", "expiresAt"}
 	for _, fieldName := range expectedFields {
 		assert.True(t, fieldNames[fieldName], "Missing field: %s", fieldName)
 	}
@@ -51,47 +51,39 @@ func Test__IgnoreIssue__Setup(t *testing.T) {
 		errorContains string
 	}{
 		{
-			name:          "missing organizationId",
-			configuration: map[string]any{"projectId": "p1", "issueId": "i1", "reason": "test"},
-			expectError:   true,
-			errorContains: "organizationId is required",
-		},
-		{
 			name:          "missing projectId",
-			configuration: map[string]any{"organizationId": "org1", "issueId": "i1", "reason": "test"},
+			configuration: map[string]any{"issueId": "i1", "reason": "test"},
 			expectError:   true,
 			errorContains: "projectId is required",
 		},
 		{
 			name:          "missing issueId",
-			configuration: map[string]any{"organizationId": "org1", "projectId": "p1", "reason": "test"},
+			configuration: map[string]any{"projectId": "p1", "reason": "test"},
 			expectError:   true,
 			errorContains: "issueId is required",
 		},
 		{
 			name:          "missing reason",
-			configuration: map[string]any{"organizationId": "org1", "projectId": "p1", "issueId": "i1"},
+			configuration: map[string]any{"projectId": "p1", "issueId": "i1"},
 			expectError:   true,
 			errorContains: "reason is required",
 		},
 		{
 			name: "valid configuration",
 			configuration: map[string]any{
-				"organizationId": "org1",
-				"projectId":      "p1",
-				"issueId":        "SNYK-JS-123",
-				"reason":         "false positive",
+				"projectId": "p1",
+				"issueId":   "SNYK-JS-123",
+				"reason":    "false positive",
 			},
 			expectError: false,
 		},
 		{
 			name: "valid configuration with expiresAt",
 			configuration: map[string]any{
-				"organizationId": "org1",
-				"projectId":      "p1",
-				"issueId":        "SNYK-JS-123",
-				"reason":         "temporary acceptance",
-				"expiresAt":      "2026-06-01T00:00:00Z",
+				"projectId": "p1",
+				"issueId":   "SNYK-JS-123",
+				"reason":    "temporary acceptance",
+				"expiresAt": "2026-06-01T00:00:00Z",
 			},
 			expectError: false,
 		},
@@ -132,7 +124,8 @@ func Test__IgnoreIssue__Execute(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiToken": "test-token",
+				"apiToken":       "test-token",
+				"organizationId": "org-123",
 			},
 		}
 
@@ -142,10 +135,9 @@ func Test__IgnoreIssue__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"organizationId": "org-123",
-				"projectId":      "proj-456",
-				"issueId":        "SNYK-JS-789",
-				"reason":         "false positive",
+				"projectId": "proj-456",
+				"issueId":   "SNYK-JS-789",
+				"reason":    "false positive",
 			},
 			HTTP:           httpCtx,
 			Integration:    integrationCtx,
@@ -178,7 +170,8 @@ func Test__IgnoreIssue__Execute(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiToken": "test-token",
+				"apiToken":       "test-token",
+				"organizationId": "org-123",
 			},
 		}
 
@@ -188,10 +181,9 @@ func Test__IgnoreIssue__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"organizationId": "org-123",
-				"projectId":      "proj-456",
-				"issueId":        "SNYK-JS-789",
-				"reason":         "false positive",
+				"projectId": "proj-456",
+				"issueId":   "SNYK-JS-789",
+				"reason":    "false positive",
 			},
 			HTTP:           httpCtx,
 			Integration:    integrationCtx,
@@ -207,7 +199,9 @@ func Test__IgnoreIssue__Execute(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{}
 
 		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{},
+			Configuration: map[string]any{
+				"organizationId": "org-123",
+			},
 		}
 
 		execState := &contexts.ExecutionStateContext{
@@ -216,10 +210,9 @@ func Test__IgnoreIssue__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"organizationId": "org-123",
-				"projectId":      "proj-456",
-				"issueId":        "SNYK-JS-789",
-				"reason":         "false positive",
+				"projectId": "proj-456",
+				"issueId":   "SNYK-JS-789",
+				"reason":    "false positive",
 			},
 			HTTP:           httpCtx,
 			Integration:    integrationCtx,

@@ -5,6 +5,7 @@ import {
   ExecutionDetailsContext,
   ExecutionInfo,
   NodeInfo,
+  OutputPayload,
 } from "../types";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
@@ -12,7 +13,6 @@ import snykIcon from "@/assets/icons/integrations/snyk.svg";
 import { formatTimeAgo } from "@/utils/date";
 
 interface IgnoreIssueMetadata {
-  organizationId: string;
   projectId: string;
   issueId: string;
 }
@@ -20,7 +20,6 @@ interface IgnoreIssueMetadata {
 interface IgnoreIssueOutput {
   success: boolean;
   message: string;
-  organizationId: string;
   projectId: string;
   issueId: string;
   reason: string;
@@ -35,13 +34,6 @@ export const ignoreIssueMapper: ComponentBaseMapper = {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
 
     const metadataItems = [];
-
-    if (metadata?.organizationId) {
-      metadataItems.push({
-        icon: "organization",
-        label: metadata.organizationId.substring(0, 8),
-      });
-    }
 
     if (metadata?.projectId) {
       metadataItems.push({
@@ -75,7 +67,8 @@ export const ignoreIssueMapper: ComponentBaseMapper = {
 
   getExecutionDetails: (context: ExecutionDetailsContext): Record<string, unknown> => {
     const { execution } = context;
-    const output = execution.outputs?.default as IgnoreIssueOutput;
+    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+    const output = outputs?.default?.[0]?.data as IgnoreIssueOutput | undefined;
     const details: Record<string, unknown> = {};
 
     details["Started At"] = new Date(execution.createdAt).toLocaleString();
@@ -83,10 +76,6 @@ export const ignoreIssueMapper: ComponentBaseMapper = {
     if (output) {
       if (output.message) {
         details["Result"] = output.message;
-      }
-
-      if (output.organizationId) {
-        details["Organization"] = output.organizationId;
       }
 
       if (output.projectId) {
