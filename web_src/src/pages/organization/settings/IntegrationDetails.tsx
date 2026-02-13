@@ -1,4 +1,4 @@
-import { ArrowLeft, CircleCheckBig, CircleDashed, CircleX, ExternalLink, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, CircleX, ExternalLink, Loader2, Plug, Trash2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect, useMemo } from "react";
 import {
@@ -19,6 +19,7 @@ import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/PermissionsContext";
+import { Alert, AlertDescription } from "@/ui/alert";
 
 interface IntegrationDetailsProps {
   organizationId: string;
@@ -195,34 +196,29 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
           className="w-6 h-6"
         />
         <div className="flex-1 min-w-[200px]">
-          <h4 className="text-2xl font-semibold">
+          <h4 className="text-2xl font-medium">
             {integration.metadata?.name ||
               getIntegrationTypeDisplayName(undefined, integration.spec?.integrationName) ||
               integration.spec?.integrationName}
           </h4>
-          {integration.spec?.integrationName && integration.metadata?.name !== integration.spec?.integrationName && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Integration:{" "}
-              {getIntegrationTypeDisplayName(undefined, integration.spec?.integrationName) ||
-                integration.spec?.integrationName}
-            </p>
-          )}
         </div>
         <div className="flex items-center gap-2 ml-auto">
-          {integration.status?.state === "ready" ? (
-            <CircleCheckBig className="w-5 h-5 text-green-600 dark:text-green-400" />
-          ) : integration.status?.state === "error" ? (
-            <CircleX className="w-5 h-5 text-red-600 dark:text-red-400" />
-          ) : (
-            <CircleDashed className="w-5 h-5 text-orange-500 dark:text-orange-400" />
-          )}
-          <span
-            className={`text-xs font-semibold uppercase tracking-wide ${
+          <Plug
+            className={`w-4 h-4 ${
               integration.status?.state === "ready"
-                ? "text-green-600 dark:text-green-400"
+                ? "text-green-500"
                 : integration.status?.state === "error"
-                  ? "text-red-600 dark:text-red-400"
-                  : "text-orange-500 dark:text-orange-400"
+                  ? "text-red-600"
+                  : "text-amber-600"
+            }`}
+          />
+          <span
+            className={`text-sm font-medium ${
+              integration.status?.state === "ready"
+                ? "text-green-500"
+                : integration.status?.state === "error"
+                  ? "text-red-600"
+                  : "text-amber-600"
             }`}
           >
             {(integration.status?.state || "unknown").charAt(0).toUpperCase() +
@@ -233,14 +229,10 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
 
       <div className="space-y-6">
         {integration.status?.state === "error" && integration.status?.stateDescription && (
-          <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4">
-            <div className="flex items-start gap-3">
-              <CircleX className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
-              <div>
-                <p className="text-sm text-red-700 dark:text-red-200 mt-1">{integration.status.stateDescription}</p>
-              </div>
-            </div>
-          </div>
+          <Alert variant="destructive" className="[&>svg+div]:translate-y-0 [&>svg]:top-[14px]">
+            <CircleX className="h-4 w-4" />
+            <AlertDescription>{integration.status.stateDescription}</AlertDescription>
+          </Alert>
         )}
 
         {integration?.status?.browserAction && (

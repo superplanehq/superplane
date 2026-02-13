@@ -18,13 +18,13 @@ import { SecretDetail } from "./SecretDetail";
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { cn } from "@/lib/utils";
 import {
-  AppWindow,
   ArrowRightLeft,
   CircleUser,
   Home,
   Key,
   Lock,
   LogOut,
+  Plug,
   Settings,
   Shield,
   User as UserIcon,
@@ -144,7 +144,7 @@ export function OrganizationSettings() {
       id: "integrations",
       label: "Integrations",
       href: `/${organizationId}/settings/integrations`,
-      Icon: AppWindow,
+      Icon: Plug,
       permission: { resource: "integrations", action: "read" },
     },
     {
