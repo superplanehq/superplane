@@ -31,54 +31,6 @@ type PublishResult struct {
 	TopicArn       string `json:"topicArn" mapstructure:"topicArn"`
 }
 
-// GetTopicConfiguration contains user-provided settings for GetTopic.
-type GetTopicConfiguration struct {
-	Region   string `json:"region" mapstructure:"region"`
-	TopicArn string `json:"topicArn" mapstructure:"topicArn"`
-}
-
-// GetSubscriptionConfiguration contains user-provided settings for GetSubscription.
-type GetSubscriptionConfiguration struct {
-	Region          string `json:"region" mapstructure:"region"`
-	SubscriptionArn string `json:"subscriptionArn" mapstructure:"subscriptionArn"`
-}
-
-// CreateTopicConfiguration contains user-provided settings for CreateTopic.
-type CreateTopicConfiguration struct {
-	Region     string         `json:"region" mapstructure:"region"`
-	Name       string         `json:"name" mapstructure:"name"`
-	Attributes map[string]any `json:"attributes" mapstructure:"attributes"`
-}
-
-// DeleteTopicConfiguration contains user-provided settings for DeleteTopic.
-type DeleteTopicConfiguration struct {
-	Region   string `json:"region" mapstructure:"region"`
-	TopicArn string `json:"topicArn" mapstructure:"topicArn"`
-}
-
-// PublishMessageConfiguration contains user-provided settings for PublishMessage.
-type PublishMessageConfiguration struct {
-	Region            string         `json:"region" mapstructure:"region"`
-	TopicArn          string         `json:"topicArn" mapstructure:"topicArn"`
-	Message           string         `json:"message" mapstructure:"message"`
-	Subject           string         `json:"subject" mapstructure:"subject"`
-	MessageAttributes map[string]any `json:"messageAttributes" mapstructure:"messageAttributes"`
-}
-
-// OnTopicMessageConfiguration contains user-provided settings for OnTopicMessage.
-type OnTopicMessageConfiguration struct {
-	Region   string `json:"region" mapstructure:"region"`
-	TopicArn string `json:"topicArn" mapstructure:"topicArn"`
-}
-
-// OnTopicMessageMetadata stores trigger setup state for OnTopicMessage.
-type OnTopicMessageMetadata struct {
-	Region          string `json:"region" mapstructure:"region"`
-	TopicArn        string `json:"topicArn" mapstructure:"topicArn"`
-	WebhookURL      string `json:"webhookUrl" mapstructure:"webhookUrl"`
-	SubscriptionArn string `json:"subscriptionArn" mapstructure:"subscriptionArn"`
-}
-
 // PublishMessageParameters defines the arguments for a publish operation.
 type PublishMessageParameters struct {
 	TopicArn          string
@@ -94,27 +46,6 @@ type SubscribeParameters struct {
 	Endpoint              string
 	Attributes            map[string]string
 	ReturnSubscriptionARN bool
-}
-
-type snsWebhookMessage struct {
-	Type              string                         `json:"Type"`
-	MessageID         string                         `json:"MessageId"`
-	TopicArn          string                         `json:"TopicArn"`
-	Subject           string                         `json:"Subject"`
-	Message           string                         `json:"Message"`
-	Timestamp         string                         `json:"Timestamp"`
-	SignatureVersion  string                         `json:"SignatureVersion"`
-	Signature         string                         `json:"Signature"`
-	SigningCertURL    string                         `json:"SigningCertURL"`
-	UnsubscribeURL    string                         `json:"UnsubscribeURL"`
-	SubscribeURL      string                         `json:"SubscribeURL"`
-	Token             string                         `json:"Token"`
-	MessageAttributes map[string]snsMessageAttribute `json:"MessageAttributes"`
-}
-
-type snsMessageAttribute struct {
-	Type  string `json:"Type"`
-	Value string `json:"Value"`
 }
 
 type attributeEntry struct {

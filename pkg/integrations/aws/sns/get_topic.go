@@ -11,8 +11,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 )
 
-// GetTopic resolves metadata for an SNS topic.
 type GetTopic struct{}
+
+type GetTopicConfiguration struct {
+	Region   string `json:"region" mapstructure:"region"`
+	TopicArn string `json:"topicArn" mapstructure:"topicArn"`
+}
 
 func (c *GetTopic) Name() string {
 	return "aws.sns.getTopic"

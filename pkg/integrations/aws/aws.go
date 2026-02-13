@@ -34,7 +34,7 @@ const (
 )
 
 func init() {
-	registry.RegisterIntegration("aws", &AWS{})
+	registry.RegisterIntegrationWithWebhookHandler("aws", &AWS{}, &WebhookHandler{})
 }
 
 type AWS struct{}

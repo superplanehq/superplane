@@ -11,8 +11,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 )
 
-// GetSubscription resolves metadata for an SNS subscription.
 type GetSubscription struct{}
+
+type GetSubscriptionConfiguration struct {
+	Region          string `json:"region" mapstructure:"region"`
+	SubscriptionArn string `json:"subscriptionArn" mapstructure:"subscriptionArn"`
+}
 
 func (c *GetSubscription) Name() string {
 	return "aws.sns.getSubscription"

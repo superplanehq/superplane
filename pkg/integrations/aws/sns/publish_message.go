@@ -11,8 +11,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 )
 
-// PublishMessage publishes a message to an SNS topic.
 type PublishMessage struct{}
+
+type PublishMessageConfiguration struct {
+	Region            string         `json:"region" mapstructure:"region"`
+	TopicArn          string         `json:"topicArn" mapstructure:"topicArn"`
+	Message           string         `json:"message" mapstructure:"message"`
+	Subject           string         `json:"subject" mapstructure:"subject"`
+	MessageAttributes map[string]any `json:"messageAttributes" mapstructure:"messageAttributes"`
+}
 
 func (c *PublishMessage) Name() string {
 	return "aws.sns.publishMessage"

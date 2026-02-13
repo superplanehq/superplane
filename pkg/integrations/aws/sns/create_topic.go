@@ -11,8 +11,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 )
 
-// CreateTopic creates a new SNS topic.
 type CreateTopic struct{}
+
+type CreateTopicConfiguration struct {
+	Region     string         `json:"region" mapstructure:"region"`
+	Name       string         `json:"name" mapstructure:"name"`
+	Attributes map[string]any `json:"attributes" mapstructure:"attributes"`
+}
 
 func (c *CreateTopic) Name() string {
 	return "aws.sns.createTopic"

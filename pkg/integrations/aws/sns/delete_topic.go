@@ -11,8 +11,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 )
 
-// DeleteTopic deletes an existing SNS topic.
 type DeleteTopic struct{}
+
+type DeleteTopicConfiguration struct {
+	Region   string `json:"region" mapstructure:"region"`
+	TopicArn string `json:"topicArn" mapstructure:"topicArn"`
+}
 
 func (c *DeleteTopic) Name() string {
 	return "aws.sns.deleteTopic"
@@ -62,11 +66,11 @@ func (c *DeleteTopic) Setup(ctx core.SetupContext) error {
 	}
 
 	if _, err := requireRegion(config.Region); err != nil {
-		return fmt.Errorf("%s: invalid region: %w", c.Name(), err)
+		return fmt.Errorf("invalid region: %w", err)
 	}
 
 	if _, err := requireTopicArn(config.TopicArn); err != nil {
-		return fmt.Errorf("%s: invalid topic ARN: %w", c.Name(), err)
+		return fmt.Errorf("invalid topic ARN: %w", err)
 	}
 
 	return nil
@@ -84,34 +88,30 @@ func (c *DeleteTopic) Execute(ctx core.ExecutionContext) error {
 
 	region, err := requireRegion(config.Region)
 	if err != nil {
-		return fmt.Errorf("%s: invalid region: %w", c.Name(), err)
+		return fmt.Errorf("invalid region: %w", err)
 	}
 
 	topicArn, err := requireTopicArn(config.TopicArn)
 	if err != nil {
-		return fmt.Errorf("%s: invalid topic ARN: %w", c.Name(), err)
+		return fmt.Errorf("invalid topic ARN: %w", err)
 	}
 
 	credentials, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {
-		return fmt.Errorf("%s: failed to load AWS credentials from integration: %w", c.Name(), err)
+		return fmt.Errorf("failed to load AWS credentials from integration: %w", err)
 	}
 
 	client := NewClient(ctx.HTTP, credentials, region)
 	if err := client.DeleteTopic(topicArn); err != nil {
-		return fmt.Errorf("%s: failed to delete topic %q: %w", c.Name(), topicArn, err)
+		return fmt.Errorf("failed to delete topic %q: %w", topicArn, err)
 	}
 
-	if err := ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "aws.sns.topic.deleted", []any{
+	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "aws.sns.topic.deleted", []any{
 		map[string]any{
 			"topicArn": topicArn,
 			"deleted":  true,
 		},
-	}); err != nil {
-		return fmt.Errorf("%s: failed to emit topic deletion payload: %w", c.Name(), err)
-	}
-
-	return nil
+	})
 }
 
 func (c *DeleteTopic) Actions() []core.Action {
