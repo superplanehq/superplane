@@ -5,18 +5,6 @@ import { TriggerProps } from "@/ui/trigger";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { stringOrDash } from "../utils";
 
-interface WebhookMetadata {
-  url?: string;
-}
-
-function formatWebhookUrl(metadata?: WebhookMetadata): string {
-  if (!metadata?.url) {
-    return "Save the canvas to generate a webhook URL";
-  }
-
-  return metadata.url;
-}
-
 const eventLabels: Record<string, string> = {
   created: "Created",
   resolved: "Resolved",
@@ -122,13 +110,7 @@ export const onIssueEventTriggerRenderer: TriggerRenderer = {
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
     const { node, definition, lastEvent } = context;
     const configuration = node.configuration as { events?: string[] } | undefined;
-    const webhookMetadata = node.metadata as WebhookMetadata | undefined;
     const metadataItems: { icon: string; label: string }[] = [];
-
-    metadataItems.push({
-      icon: "link",
-      label: formatWebhookUrl(webhookMetadata),
-    });
 
     if (configuration?.events?.length) {
       const label =

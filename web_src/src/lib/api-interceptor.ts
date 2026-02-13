@@ -1,5 +1,6 @@
 // Setup function to add 401 redirect interceptor to the global API client
 let interceptorSetup = false;
+let redirectInProgress = false;
 
 export const setupApiInterceptor = (): void => {
   if (interceptorSetup) return;
@@ -10,10 +11,11 @@ export const setupApiInterceptor = (): void => {
     const response = await originalFetch(input, init);
 
     if (response.status === 401 && isApiRequest(input)) {
-      if (!isAuthRoute(window.location.pathname)) {
+      if (!redirectInProgress && !isAuthRoute(window.location.pathname)) {
+        redirectInProgress = true;
         const redirectTarget = `${window.location.pathname}${window.location.search}`;
         const redirectParam = encodeURIComponent(redirectTarget);
-        window.location.href = `/login?redirect=${redirectParam}`;
+        window.location.replace(`/login?redirect=${redirectParam}`);
       }
 
       throw new Error("Unauthorized");
@@ -32,5 +34,10 @@ function isApiRequest(input: RequestInfo | URL): boolean {
 }
 
 function isAuthRoute(pathname: string): boolean {
-  return pathname.startsWith("/login") || pathname.startsWith("/signup") || pathname.startsWith("/setup");
+  return (
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/signup") ||
+    pathname.startsWith("/setup") ||
+    pathname.startsWith("/sentry/setup")
+  );
 }

@@ -32,13 +32,25 @@ func (e *SentryAPIError) Error() string {
 }
 
 func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
-	token, err := ctx.GetConfig("authToken")
-	if err != nil {
-		return nil, fmt.Errorf("sentry auth token not found: %w", err)
+	token := ""
+	if secrets, err := ctx.GetSecrets(); err == nil {
+		for _, s := range secrets {
+			if s.Name == "sentryPublicAccessToken" {
+				token = strings.TrimSpace(string(s.Value))
+				break
+			}
+		}
 	}
+
+	if token == "" {
+		return nil, fmt.Errorf("sentry auth token not found")
+	}
+
 	baseURL := defaultBaseURL
-	if u, err := ctx.GetConfig("baseURL"); err == nil && len(u) > 0 {
-		baseURL = string(u)
+	if md, ok := ctx.GetMetadata().(map[string]any); ok {
+		if v, ok := md["sentryBaseURL"].(string); ok {
+			baseURL = strings.TrimSpace(v)
+		}
 	}
 
 	baseURL = strings.TrimSpace(baseURL)
@@ -46,7 +58,7 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 
 	return &Client{
 		BaseURL: baseURL,
-		Token:   strings.TrimSpace(string(token)),
+		Token:   token,
 		http:    http,
 	}, nil
 }
