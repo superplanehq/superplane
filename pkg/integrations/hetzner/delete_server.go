@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -13,8 +14,6 @@ import (
 
 const (
 	DeleteServerPayloadType   = "hetzner.server.deleted"
-	DeleteServerSuccessChannel = "success"
-	DeleteServerFailedChannel  = "failed"
 	DeleteServerPollInterval   = 5 * time.Second
 )
 
@@ -48,8 +47,7 @@ func (c *DeleteServer) Documentation() string {
 
 1. Deletes the selected server via the Hetzner API
 2. Polls the API until the delete action finishes
-3. **Success**: Emitted when the server is deleted
-4. **Failed**: Emitted when the action fails
+3. Emits on the default output when the server is deleted. If deletion fails, the execution errors.
 `
 }
 
@@ -62,10 +60,7 @@ func (c *DeleteServer) Color() string {
 }
 
 func (c *DeleteServer) OutputChannels(configuration any) []core.OutputChannel {
-	return []core.OutputChannel{
-		{Name: DeleteServerSuccessChannel, Label: "Success"},
-		{Name: DeleteServerFailedChannel, Label: "Failed"},
-	}
+	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
 func (c *DeleteServer) ExampleOutput() map[string]any {
@@ -178,22 +173,17 @@ func (c *DeleteServer) poll(ctx core.ActionContext) error {
 	case ActionStatusRunning:
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, DeleteServerPollInterval)
 	case ActionStatusError:
-		msg := "action failed"
+		msg := "delete server action failed"
 		if action.Error != nil && action.Error.Message != "" {
 			msg = action.Error.Message
 		}
-		payload := map[string]any{
-			"actionId": metadata.ActionID,
-			"serverId": metadata.ServerID,
-			"error":    msg,
-		}
-		return ctx.ExecutionState.Emit(DeleteServerFailedChannel, DeleteServerPayloadType, []any{payload})
+		return fmt.Errorf("%s", msg)
 	case ActionStatusSuccess:
 		payload := map[string]any{
 			"actionId": metadata.ActionID,
 			"serverId": metadata.ServerID,
 		}
-		return ctx.ExecutionState.Emit(DeleteServerSuccessChannel, DeleteServerPayloadType, []any{payload})
+		return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, DeleteServerPayloadType, []any{payload})
 	default:
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, DeleteServerPollInterval)
 	}

@@ -38,8 +38,7 @@ func (h *Hetzner) Description() string {
 
 func (h *Hetzner) Instructions() string {
 	return `
-1. **API Token:** Create a token in [Hetzner Cloud Console](https://console.hetzner.cloud/) → Project → Security → API Tokens. Use **Read & Write** scope.
-2. **Auth:** SuperPlane sends requests to the [Hetzner Cloud API](https://docs.hetzner.cloud/) using ` + "`Authorization: Bearer <token>`" + `.
+**API Token:** Create a token in [Hetzner Cloud Console](https://console.hetzner.cloud/) → Project → Security → API Tokens. Use **Read & Write** scope.
 `
 }
 
@@ -93,27 +92,96 @@ func (h *Hetzner) Sync(ctx core.SyncContext) error {
 func (h *Hetzner) HandleRequest(ctx core.HTTPRequestContext) {}
 
 func (h *Hetzner) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != "server" {
-		return nil, nil
-	}
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
-	servers, err := client.ListServers()
-	if err != nil {
-		return nil, err
-	}
-	resources := make([]core.IntegrationResource, 0, len(servers))
-	for _, s := range servers {
-		id := fmt.Sprintf("%d", s.ID)
-		name := s.Name
-		if name == "" {
-			name = id
+
+	switch resourceType {
+	case "server":
+		servers, err := client.ListServers()
+		if err != nil {
+			return nil, err
 		}
-		resources = append(resources, core.IntegrationResource{Type: "server", Name: name, ID: id})
+		resources := make([]core.IntegrationResource, 0, len(servers))
+		for _, s := range servers {
+			id := fmt.Sprintf("%d", s.ID)
+			name := s.Name
+			if name == "" {
+				name = id
+			}
+			resources = append(resources, core.IntegrationResource{Type: "server", Name: name, ID: id})
+		}
+		return resources, nil
+	case "server_type":
+		types, err := client.ListServerTypes()
+		if err != nil {
+			return nil, err
+		}
+		resources := make([]core.IntegrationResource, 0, len(types))
+		for _, t := range types {
+			id := t.Name
+			if id == "" {
+				id = fmt.Sprintf("%d", t.ID)
+			}
+			displayName := t.ServerTypeDisplayName()
+			if displayName == "" {
+				displayName = id
+			}
+			resources = append(resources, core.IntegrationResource{Type: "server_type", Name: displayName, ID: id})
+		}
+		return resources, nil
+	case "image":
+		images, err := client.ListImages()
+		if err != nil {
+			return nil, err
+		}
+		resources := make([]core.IntegrationResource, 0, len(images))
+		for _, img := range images {
+			id := img.Name
+			if id == "" {
+				id = fmt.Sprintf("%d", img.ID)
+			}
+			resources = append(resources, core.IntegrationResource{Type: "image", Name: img.Name, ID: id})
+		}
+		return resources, nil
+	case "location":
+		locations, err := client.ListLocations()
+		if err != nil {
+			return nil, err
+		}
+		if serverType := ctx.Parameters["serverType"]; serverType != "" {
+			allowedNames, err := client.ServerTypeLocationNames(serverType)
+			if err == nil && len(allowedNames) > 0 {
+				allowed := make(map[string]bool)
+				for _, n := range allowedNames {
+					allowed[n] = true
+				}
+				filtered := locations[:0]
+				for _, loc := range locations {
+					if allowed[loc.Name] {
+						filtered = append(filtered, loc)
+					}
+				}
+				locations = filtered
+			}
+		}
+		resources := make([]core.IntegrationResource, 0, len(locations))
+		for _, loc := range locations {
+			id := loc.Name
+			if id == "" {
+				id = fmt.Sprintf("%d", loc.ID)
+			}
+			displayName := loc.LocationDisplayName()
+			if displayName == "" {
+				displayName = id
+			}
+			resources = append(resources, core.IntegrationResource{Type: "location", Name: displayName, ID: id})
+		}
+		return resources, nil
+	default:
+		return nil, nil
 	}
-	return resources, nil
 }
 
 func (h *Hetzner) Actions() []core.Action {

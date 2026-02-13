@@ -12,10 +12,8 @@ import (
 )
 
 const (
-	CreateServerPayloadType   = "hetzner.server.created"
-	CreateServerSuccessChannel = "success"
-	CreateServerFailedChannel  = "failed"
-	CreateServerPollInterval   = 5 * time.Second
+	CreateServerPayloadType = "hetzner.server.created"
+	CreateServerPollInterval = 5 * time.Second
 )
 
 type CreateServer struct{}
@@ -53,8 +51,7 @@ func (c *CreateServer) Documentation() string {
 
 1. Creates a server with the given name, server type, image, and optional location/SSH keys/user data
 2. Polls the Hetzner API until the create action finishes
-3. **Success**: Emits the server details when the server is ready
-4. **Failed**: Emits when the action fails
+3. Emits the server details on the default output when ready. If creation fails, the execution errors.
 
 ## Configuration
 
@@ -76,20 +73,16 @@ func (c *CreateServer) Color() string {
 }
 
 func (c *CreateServer) OutputChannels(configuration any) []core.OutputChannel {
-	return []core.OutputChannel{
-		{Name: CreateServerSuccessChannel, Label: "Success"},
-		{Name: CreateServerFailedChannel, Label: "Failed"},
-	}
+	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
 func (c *CreateServer) ExampleOutput() map[string]any {
 	return map[string]any{
-		"id":     42,
-		"name":   "my-server",
-		"status": "running",
-		"public_net": map[string]any{
-			"ipv4": map[string]any{"ip": "1.2.3.4"},
-		},
+		"id":        42,
+		"name":      "my-server",
+		"status":    "running",
+		"created":   "2024-01-15T10:30:00+00:00",
+		"publicIp":  "1.2.3.4",
 	}
 }
 
@@ -105,29 +98,49 @@ func (c *CreateServer) Configuration() []configuration.Field {
 		{
 			Name:        "serverType",
 			Label:       "Server type",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "Server type (e.g. cx11, cpx11)",
+			Placeholder: "Select server type",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "server_type",
+				},
+			},
+			Description: "Server type",
 		},
 		{
-			Name:        "image",
-			Label:       "Image",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "Image name or ID (e.g. ubuntu-24.04)",
+			Name:     "image",
+			Label:    "Image",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "image",
+				},
+			},
+			Description: "Image",
 		},
 		{
-			Name:        "location",
-			Label:       "Location",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Location (e.g. fsn1, nbg1). Omit for auto.",
+			Name:     "location",
+			Label:    "Location",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: false,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "location",
+					Parameters: []configuration.ParameterRef{
+						{Name: "serverType", ValueFrom: &configuration.ParameterValueFrom{Field: "serverType"}},
+					},
+				},
+			},
+			Description: "Location (optional, omit for auto). Only locations that support the selected server type are shown.",
 		},
 		{
 			Name:     "sshKeys",
 			Label:    "SSH keys",
 			Type:     configuration.FieldTypeList,
 			Required: false,
+			Description: "Add the name or ID of each SSH key from your Hetzner Cloud project (Security → SSH Keys). The server will allow login with these keys.",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "SSH key",
@@ -239,19 +252,20 @@ func (c *CreateServer) poll(ctx core.ActionContext) error {
 	case ActionStatusRunning:
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, CreateServerPollInterval)
 	case ActionStatusError:
-		msg := "action failed"
+		msg := "create server action failed"
 		if action.Error != nil && action.Error.Message != "" {
 			msg = action.Error.Message
 		}
-		payload := map[string]any{
-			"actionId": metadata.ActionID,
-			"error":    msg,
-			"server":   metadata.Server,
-		}
-		return ctx.ExecutionState.Emit(CreateServerFailedChannel, CreateServerPayloadType, []any{payload})
+		return fmt.Errorf("%s", msg)
 	case ActionStatusSuccess:
-		payload := serverToPayload(metadata.Server)
-		return ctx.ExecutionState.Emit(CreateServerSuccessChannel, CreateServerPayloadType, []any{payload})
+		server := metadata.Server
+		if server != nil && server.ID != 0 {
+			if refreshed, err := client.GetServer(server.ID); err == nil {
+				server = refreshed
+			}
+		}
+		payload := serverToPayload(server)
+		return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateServerPayloadType, []any{payload})
 	default:
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, CreateServerPollInterval)
 	}

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -130,6 +131,9 @@ func (c *Client) parseError(resp *http.Response) error {
 	}
 	if json.Unmarshal(body, &errPayload) == nil && errPayload.Error.Message != "" {
 		apiErr.Message = errPayload.Error.Message
+		if resp.StatusCode == http.StatusUnprocessableEntity && strings.Contains(strings.ToLower(apiErr.Message), "unsupported location") {
+			apiErr.Message = "the selected location is not available for this server type. Select a server type first; the Location dropdown then shows only locations that support it."
+		}
 	}
 	return apiErr
 }
@@ -184,6 +188,26 @@ func (c *Client) GetAction(actionID int) (*ActionResponse, error) {
 	return &out.Action, nil
 }
 
+func (c *Client) GetServer(serverID int) (*ServerResponse, error) {
+	resp, err := c.do("GET", "/servers/"+strconv.Itoa(serverID), nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.parseError(resp)
+	}
+
+	var out struct {
+		Server ServerResponse `json:"server"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode get server response: %w", err)
+	}
+	return &out.Server, nil
+}
+
 func (c *Client) DeleteServer(serverID int) (*ActionResponse, error) {
 	resp, err := c.do("DELETE", "/servers/"+strconv.Itoa(serverID), nil)
 	if err != nil {
@@ -222,6 +246,152 @@ func (c *Client) ListServers() ([]ServerResponse, error) {
 		return nil, fmt.Errorf("decode list servers response: %w", err)
 	}
 	return out.Servers, nil
+}
+
+type ServerTypePrice struct {
+	Location string `json:"location"`
+}
+
+type ServerTypeResponse struct {
+	Name        string             `json:"name"`
+	ID          int                `json:"id"`
+	Description string             `json:"description"`
+	Cores       int                `json:"cores"`
+	Memory      float64            `json:"memory"`
+	Disk        int                `json:"disk"`
+	Prices      []ServerTypePrice  `json:"prices"`
+}
+
+func (c *Client) ListServerTypes() ([]ServerTypeResponse, error) {
+	resp, err := c.do("GET", "/server_types?per_page=50", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.parseError(resp)
+	}
+
+	var out struct {
+		ServerTypes []ServerTypeResponse `json:"server_types"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode list server types response: %w", err)
+	}
+	return out.ServerTypes, nil
+}
+
+// ServerTypeLocationNames returns the location names (e.g. fsn1, nbg1) where the given server type is available.
+// Prices in the API list per-location pricing, so a price entry means the type is available there.
+func (c *Client) ServerTypeLocationNames(serverTypeName string) ([]string, error) {
+	types, err := c.ListServerTypes()
+	if err != nil {
+		return nil, err
+	}
+	for _, t := range types {
+		if t.Name == serverTypeName {
+			names := make([]string, 0, len(t.Prices))
+			for _, p := range t.Prices {
+				if p.Location != "" {
+					names = append(names, p.Location)
+				}
+			}
+			return names, nil
+		}
+	}
+	return nil, fmt.Errorf("server type %q not found", serverTypeName)
+}
+
+// ServerTypeDisplayName returns a label for the server type including specs (e.g. "cpx11 — 2 vCPU, 2 GB RAM, 40 GB disk").
+func (s *ServerTypeResponse) ServerTypeDisplayName() string {
+	if s.Name == "" {
+		return ""
+	}
+	var parts []string
+	if s.Cores > 0 {
+		parts = append(parts, fmt.Sprintf("%d vCPU", s.Cores))
+	}
+	if s.Memory > 0 {
+		parts = append(parts, fmt.Sprintf("%.0f GB RAM", s.Memory))
+	}
+	if s.Disk > 0 {
+		parts = append(parts, fmt.Sprintf("%d GB disk", s.Disk))
+	}
+	if len(parts) == 0 {
+		return s.Name
+	}
+	return s.Name + " — " + strings.Join(parts, ", ")
+}
+
+type ImageResponse struct {
+	Name string `json:"name"`
+	ID   int    `json:"id"`
+}
+
+func (c *Client) ListImages() ([]ImageResponse, error) {
+	resp, err := c.do("GET", "/images?per_page=50&type=system", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.parseError(resp)
+	}
+
+	var out struct {
+		Images []ImageResponse `json:"images"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode list images response: %w", err)
+	}
+	return out.Images, nil
+}
+
+type LocationResponse struct {
+	Name        string `json:"name"`
+	ID          int    `json:"id"`
+	Description string `json:"description"`
+	City        string `json:"city"`
+	Country     string `json:"country"`
+}
+
+// LocationDisplayName returns a label for the location (e.g. "Nuremberg, DE (nbg1)").
+func (l *LocationResponse) LocationDisplayName() string {
+	if l.Name == "" {
+		return ""
+	}
+	if l.City != "" && l.Country != "" {
+		return fmt.Sprintf("%s, %s (%s)", l.City, l.Country, l.Name)
+	}
+	if l.City != "" {
+		return fmt.Sprintf("%s (%s)", l.City, l.Name)
+	}
+	if l.Description != "" {
+		return fmt.Sprintf("%s (%s)", l.Description, l.Name)
+	}
+	return l.Name
+}
+
+func (c *Client) ListLocations() ([]LocationResponse, error) {
+	resp, err := c.do("GET", "/locations?per_page=50", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.parseError(resp)
+	}
+
+	var out struct {
+		Locations []LocationResponse `json:"locations"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode list locations response: %w", err)
+	}
+	return out.Locations, nil
 }
 
 func (c *Client) Verify() error {
