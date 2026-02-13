@@ -405,8 +405,11 @@ func Test__Client__CreatePipeline(t *testing.T) {
 
 		pipeline, err := client.CreatePipeline(context.Background(), "456", &CreatePipelineRequest{
 			Ref: "main",
-			Inputs: map[string]string{
-				"target_env": "dev",
+			Inputs: []PipelineInput{
+				{Name: "target_env", Value: "dev"},
+			},
+			Variables: []PipelineVariable{
+				{Key: "ENV", Value: "dev"},
 			},
 		})
 		require.NoError(t, err)
@@ -424,7 +427,8 @@ func Test__Client__CreatePipeline(t *testing.T) {
 		require.NoError(t, readErr)
 		bodyString := string(body)
 		assert.True(t, strings.Contains(bodyString, `"ref":"main"`))
-		assert.True(t, strings.Contains(bodyString, `"inputs":{"target_env":"dev"}`))
+		assert.True(t, strings.Contains(bodyString, `"inputs":[{"name":"target_env","value":"dev"}]`))
+		assert.True(t, strings.Contains(bodyString, `"variables":[{"key":"ENV","value":"dev"}]`))
 	})
 }
 
