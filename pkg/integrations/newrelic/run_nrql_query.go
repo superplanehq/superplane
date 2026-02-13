@@ -325,7 +325,7 @@ func extractResourceID(v any) string {
 	case float64:
 		return strconv.FormatFloat(n, 'f', -1, 64)
 	case float32:
-		return strconv.FormatFloat(float64(n), 'f', -1, 64)
+		return strconv.FormatFloat(float64(n), 'f', -1, 32)
 	}
 
 	// Handle maps
