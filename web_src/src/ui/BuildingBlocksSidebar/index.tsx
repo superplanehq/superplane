@@ -32,9 +32,11 @@ import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import azureIcon from "@/assets/icons/integrations/azure.svg";
+import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
+import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 
@@ -414,11 +416,13 @@ function CategorySection({
     semaphore: SemaphoreLogo,
     slack: slackIcon,
     sendgrid: sendgridIcon,
+    prometheus: prometheusIcon,
     render: renderIcon,
     dockerhub: dockerIcon,
     azure: azureIcon,
     aws: {
       codeArtifact: awsIcon,
+      cloudwatch: awsCloudwatchIcon,
       lambda: awsLambdaIcon,
       ecr: awsEcrIcon,
     },
@@ -490,11 +494,13 @@ function CategorySection({
             semaphore: SemaphoreLogo,
             slack: slackIcon,
             sendgrid: sendgridIcon,
+            prometheus: prometheusIcon,
             render: renderIcon,
             dockerhub: dockerIcon,
             azure: azureIcon,
             aws: {
               codeArtifact: awsCodeArtifactIcon,
+              cloudwatch: awsCloudwatchIcon,
               ecr: awsEcrIcon,
               lambda: awsLambdaIcon,
             },
