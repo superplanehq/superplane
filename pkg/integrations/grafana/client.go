@@ -101,13 +101,14 @@ func (c *Client) execRequest(method, path string, body io.Reader, contentType st
 	}
 	defer res.Body.Close()
 
-	limitedReader := io.LimitReader(res.Body, maxResponseSize)
+	// Read one byte beyond the max to detect overflow without rejecting an exact-limit response.
+	limitedReader := io.LimitReader(res.Body, int64(maxResponseSize)+1)
 	responseBody, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return nil, res.StatusCode, fmt.Errorf("error reading body: %v", err)
 	}
 
-	if len(responseBody) >= maxResponseSize {
+	if len(responseBody) > maxResponseSize {
 		return nil, res.StatusCode, fmt.Errorf("response too large: exceeds maximum size of %d bytes", maxResponseSize)
 	}
 
