@@ -8,7 +8,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 )
 
-// ListTopics lists SNS topics for integration resource selectors.
 func ListTopics(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
 	region := strings.TrimSpace(ctx.Parameters["region"])
 	if region == "" {
@@ -38,42 +37,36 @@ func ListTopics(ctx core.ListResourcesContext, resourceType string) ([]core.Inte
 	return resources, nil
 }
 
-// ListSubscriptions lists SNS subscriptions for integration resource selectors.
 func ListSubscriptions(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
-	region := strings.TrimSpace(ctx.Parameters["region"])
+	region := ctx.Parameters["region"]
 	if region == "" {
-		return nil, fmt.Errorf("list SNS subscriptions: region is required")
+		return nil, fmt.Errorf("region is required")
 	}
 
-	topicArn := strings.TrimSpace(ctx.Parameters["topicArn"])
+	topicArn := ctx.Parameters["topicArn"]
 	if topicArn == "" {
-		topicArn = strings.TrimSpace(ctx.Parameters["topic"])
+		return nil, fmt.Errorf("topic ARN is required")
 	}
+
+	ctx.Logger.Infof("listing subscriptions for topic %q in region %q", topicArn, region)
 
 	credentials, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {
-		return nil, fmt.Errorf("list SNS subscriptions: failed to load AWS credentials from integration: %w", err)
+		return nil, fmt.Errorf("failed to load AWS credentials from integration: %w", err)
 	}
 
 	client := NewClient(ctx.HTTP, credentials, region)
-	subscriptions, err := client.ListSubscriptions(topicArn)
+	subscriptions, err := client.ListSubscriptionsByTopic(topicArn)
 	if err != nil {
-		return nil, fmt.Errorf("list SNS subscriptions: failed to list subscriptions in region %q: %w", region, err)
+		return nil, fmt.Errorf("failed to list subscriptions in region %q: %w", region, err)
 	}
 
 	var resources []core.IntegrationResource
 	for _, subscription := range subscriptions {
-		name := strings.TrimSpace(subscription.Endpoint)
-		if name == "" {
-			name = strings.TrimSpace(subscription.SubscriptionArn)
-		}
-		if name == "" {
-			continue
-		}
-
+		parts := strings.Split(subscription.SubscriptionArn, ":")
 		resources = append(resources, core.IntegrationResource{
 			Type: resourceType,
-			Name: name,
+			Name: parts[len(parts)-1],
 			ID:   subscription.SubscriptionArn,
 		})
 	}

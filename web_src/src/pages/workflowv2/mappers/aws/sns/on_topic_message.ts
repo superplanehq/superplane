@@ -2,44 +2,60 @@ import { getBackgroundColorClass } from "@/utils/colors";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
 import { TriggerProps } from "@/ui/trigger";
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
-import { SnsTopicMessageEvent, SnsTriggerConfiguration, SnsTriggerMetadata } from "./types";
 import { formatTimeAgo } from "@/utils/date";
 import { stringOrDash } from "../../utils";
 
+interface OnTopicMessageConfiguration {
+  region?: string;
+  topicArn?: string;
+}
+
+interface OnTopicMessageMetadata {
+  region?: string;
+  topicArn?: string;
+}
+
+interface TopicMessageEvent {
+  Type?: string;
+  Message?: string;
+  MessageId?: string;
+  TopicArn?: string;
+  Subject?: string;
+  Timestamp?: string;
+  SignatureVersion?: string;
+  Signature?: string;
+  SigningCertURL?: string;
+  UnsubscribeURL?: string;
+  SubscribeURL?: string;
+  Token?: string;
+  MessageAttributes?: Record<string, { Type: string; Value: string }>;
+}
+
 export const onTopicMessageTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event?.data as SnsTopicMessageEvent;
-    const topicArn = extractTopicArn(eventData);
-    const subject = eventData?.detail?.subject || eventData?.detail?.Subject;
-    const topicName = topicArn ? topicArn.split(":").at(-1) : undefined;
-
-    const title = topicName ? `${topicName}${subject ? ` • ${subject}` : ""}` : "SNS topic message";
+    const eventData = context.event?.data as TopicMessageEvent;
+    const title = eventData?.MessageId ? eventData.MessageId : "SNS topic message";
     const subtitle = context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
 
     return { title, subtitle };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data as SnsTopicMessageEvent;
-    const topicArn = extractTopicArn(eventData);
-    const messageID = eventData?.messageId || eventData?.detail?.messageId;
-    const subject = eventData?.detail?.subject || eventData?.detail?.Subject;
-    const message = eventData?.detail?.message || eventData?.detail?.Message;
+    const eventData = context.event?.data as TopicMessageEvent;
 
     return {
-      "Message ID": stringOrDash(messageID),
-      "Topic ARN": stringOrDash(topicArn),
-      Subject: stringOrDash(subject),
-      Message: stringOrDash(message),
-      Region: stringOrDash(eventData?.region),
-      Account: stringOrDash(eventData?.account),
+      "Message ID": stringOrDash(eventData?.MessageId),
+      Message: stringOrDash(eventData?.Message),
+      "Topic ARN": stringOrDash(eventData?.TopicArn),
+      Timestamp: stringOrDash(eventData?.Timestamp),
+      Subject: stringOrDash(eventData?.Subject),
     };
   },
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
-    const metadata = node.metadata as SnsTriggerMetadata | undefined;
-    const configuration = node.configuration as SnsTriggerConfiguration | undefined;
+    const metadata = node.metadata as OnTopicMessageMetadata | undefined;
+    const configuration = node.configuration as OnTopicMessageConfiguration | undefined;
     const topicArn = metadata?.topicArn || configuration?.topicArn;
     const topicName = topicArn ? topicArn.split(":").at(-1) : undefined;
 
@@ -64,21 +80,3 @@ export const onTopicMessageTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
-
-function extractTopicArn(eventData: SnsTopicMessageEvent | undefined): string | undefined {
-  if (eventData?.topicArn) {
-    return eventData.topicArn;
-  }
-
-  const fromDetail = eventData?.detail?.topicArn || eventData?.detail?.TopicArn;
-  if (fromDetail) {
-    return fromDetail;
-  }
-
-  const firstResource = eventData?.resources?.[0];
-  if (firstResource) {
-    return firstResource;
-  }
-
-  return undefined;
-}

@@ -71,23 +71,3 @@ func requireSubscriptionArn(subscriptionArn string) (string, error) {
 
 	return normalized, nil
 }
-
-// requireTopicName validates and normalizes topic names.
-func requireTopicName(name string) (string, error) {
-	normalized := strings.TrimSpace(name)
-	if normalized == "" {
-		return "", fmt.Errorf("topic name is required")
-	}
-
-	return normalized, nil
-}
-
-// requireMessage validates and normalizes SNS publish message values.
-func requireMessage(message string) (string, error) {
-	normalized := strings.TrimSpace(message)
-	if normalized == "" {
-		return "", fmt.Errorf("message is required")
-	}
-
-	return normalized, nil
-}

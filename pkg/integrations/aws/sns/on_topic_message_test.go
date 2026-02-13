@@ -1,10 +1,21 @@
 package sns
 
 import (
+	"bytes"
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/json"
+	"encoding/pem"
 	"io"
+	"math/big"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -36,7 +47,13 @@ func Test__OnTopicMessage__Setup(t *testing.T) {
 		}
 
 		metadataContext := &contexts.MetadataContext{}
-		integration := testIntegrationContext()
+		integration := &contexts.IntegrationContext{
+			Secrets: map[string]core.IntegrationSecret{
+				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+			},
+		}
 
 		err := trigger.Setup(core.TriggerContext{
 			Configuration: map[string]any{
@@ -75,7 +92,13 @@ func Test__OnTopicMessage__Setup(t *testing.T) {
 			},
 		}
 
-		integration := testIntegrationContext()
+		integration := &contexts.IntegrationContext{
+			Secrets: map[string]core.IntegrationSecret{
+				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+			},
+		}
 		err := trigger.Setup(core.TriggerContext{
 			Configuration: map[string]any{
 				"region":   "us-east-1",
@@ -96,23 +119,37 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 	trigger := &OnTopicMessage{}
 
 	t.Run("notification for configured topic -> emits event", func(t *testing.T) {
+		privateKey, certPEM := createTestSigningCert(t)
+		message := signTestMessage(t, trigger, SubscriptionMessage{
+			Type:             "Notification",
+			MessageID:        "msg-123",
+			TopicArn:         "arn:aws:sns:us-east-1:123456789012:orders-events",
+			Subject:          "order.created",
+			Message:          "{\"orderId\":\"ord_123\"}",
+			Timestamp:        "2026-01-10T10:00:00Z",
+			SigningCertURL:   testSigningCertURL,
+			SignatureVersion: "2",
+		}, privateKey)
+
+		body, err := json.Marshal(message)
+		require.NoError(t, err)
+
 		eventContext := &contexts.EventContext{}
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewReader(certPEM)),
+			}},
+		}
 
 		status, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body: []byte(`{
-				"Type": "Notification",
-				"MessageId": "msg-123",
-				"TopicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
-				"Subject": "order.created",
-				"Message": "{\"orderId\":\"ord_123\"}",
-				"Timestamp": "2026-01-10T10:00:00Z"
-			}`),
+			Body: body,
 			Configuration: map[string]any{
 				"region":   "us-east-1",
 				"topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
 			},
 			Events: eventContext,
-			HTTP:   &contexts.HTTPContext{},
+			HTTP:   httpContext,
 			Logger: log.NewEntry(log.New()),
 		})
 
@@ -130,18 +167,37 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("subscription confirmation for different topic -> ignored", func(t *testing.T) {
+		privateKey, certPEM := createTestSigningCert(t)
+		message := signTestMessage(t, trigger, SubscriptionMessage{
+			Type:             "SubscriptionConfirmation",
+			MessageID:        "msg-456",
+			TopicArn:         "arn:aws:sns:us-east-1:123456789012:different-topic",
+			Message:          "confirm",
+			SubscribeURL:     "https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription",
+			Timestamp:        "2026-01-10T10:00:00Z",
+			Token:            "token-123",
+			SigningCertURL:   testSigningCertURL,
+			SignatureVersion: "2",
+		}, privateKey)
+
+		body, err := json.Marshal(message)
+		require.NoError(t, err)
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewReader(certPEM)),
+			}},
+		}
+
 		status, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body: []byte(`{
-				"Type": "SubscriptionConfirmation",
-				"TopicArn": "arn:aws:sns:us-east-1:123456789012:different-topic",
-				"SubscribeURL": "https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription"
-			}`),
+			Body: body,
 			Configuration: map[string]any{
 				"region":   "us-east-1",
 				"topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
 			},
 			Events: &contexts.EventContext{},
-			HTTP:   &contexts.HTTPContext{},
+			HTTP:   httpContext,
 			Logger: log.NewEntry(log.New()),
 		})
 
@@ -150,19 +206,34 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("confirmation for configured topic -> confirms subscription", func(t *testing.T) {
+		privateKey, certPEM := createTestSigningCert(t)
+		message := signTestMessage(t, trigger, SubscriptionMessage{
+			Type:             "SubscriptionConfirmation",
+			MessageID:        "msg-789",
+			TopicArn:         "arn:aws:sns:us-east-1:123456789012:orders-events",
+			Message:          "confirm",
+			SubscribeURL:     "https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription",
+			Timestamp:        "2026-01-10T10:00:00Z",
+			Token:            "token-456",
+			SigningCertURL:   testSigningCertURL,
+			SignatureVersion: "2",
+		}, privateKey)
+
+		body, err := json.Marshal(message)
+		require.NoError(t, err)
+
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewReader(certPEM)),
+			}, {
 				StatusCode: http.StatusOK,
 				Body:       io.NopCloser(strings.NewReader(``)),
 			}},
 		}
 
 		status, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body: []byte(`{
-				"Type": "SubscriptionConfirmation",
-				"TopicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
-				"SubscribeURL": "https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription"
-			}`),
+			Body: body,
 			Configuration: map[string]any{
 				"region":   "us-east-1",
 				"topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
@@ -174,8 +245,9 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, status)
-		require.Len(t, httpCtx.Requests, 1)
-		assert.Equal(t, "https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription", httpCtx.Requests[0].URL.String())
+		require.Len(t, httpCtx.Requests, 2)
+		assert.Equal(t, testSigningCertURL, httpCtx.Requests[0].URL.String())
+		assert.Equal(t, "https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription", httpCtx.Requests[1].URL.String())
 	})
 
 	t.Run("unsupported message type -> bad request", func(t *testing.T) {
@@ -189,9 +261,60 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 				"topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
 			},
 			Events: &contexts.EventContext{},
+			Logger: log.NewEntry(log.New()),
 		})
 
 		require.Error(t, err)
 		assert.Equal(t, http.StatusBadRequest, status)
 	})
+}
+
+const testSigningCertURL = "https://sns.us-east-1.amazonaws.com/test.pem"
+
+func createTestSigningCert(t *testing.T) (*rsa.PrivateKey, []byte) {
+	t.Helper()
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	now := time.Now()
+	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	require.NoError(t, err)
+
+	template := x509.Certificate{
+		SerialNumber:          serialNumber,
+		NotBefore:             now.Add(-time.Minute),
+		NotAfter:              now.Add(time.Hour),
+		KeyUsage:              x509.KeyUsageDigitalSignature,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
+	require.NoError(t, err)
+
+	certPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: derBytes,
+	})
+
+	return privateKey, certPEM
+}
+
+func signTestMessage(t *testing.T, trigger *OnTopicMessage, message SubscriptionMessage, privateKey *rsa.PrivateKey) SubscriptionMessage {
+	t.Helper()
+
+	if message.SignatureVersion == "" {
+		message.SignatureVersion = "2"
+	}
+
+	stringToSign, err := trigger.buildStringToSign(message)
+	require.NoError(t, err)
+
+	sum := sha256.Sum256([]byte(stringToSign))
+	signature, err := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, sum[:])
+	require.NoError(t, err)
+
+	message.Signature = base64.StdEncoding.EncodeToString(signature)
+	return message
 }

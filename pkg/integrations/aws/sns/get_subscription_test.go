@@ -77,7 +77,13 @@ func Test__GetSubscription__Execute(t *testing.T) {
 			},
 			HTTP:           httpContext,
 			ExecutionState: executionState,
-			Integration:    testIntegrationContext(),
+			Integration: &contexts.IntegrationContext{
+				Secrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
 		})
 
 		require.NoError(t, err)

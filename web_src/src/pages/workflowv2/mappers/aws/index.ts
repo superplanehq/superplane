@@ -16,13 +16,11 @@ import { disposePackageVersionsMapper } from "./codeartifact/dispose_package_ver
 import { updatePackageVersionsStatusMapper } from "./codeartifact/update_package_versions_status";
 import { onAlarmTriggerRenderer } from "./cloudwatch/on_alarm";
 import { onTopicMessageTriggerRenderer } from "./sns/on_topic_message";
-import {
-  createTopicMapper,
-  deleteTopicMapper,
-  getSubscriptionMapper,
-  getTopicMapper,
-  publishMessageMapper,
-} from "./sns/components";
+import { createTopicMapper } from "./sns/create_topic";
+import { deleteTopicMapper } from "./sns/delete_topic";
+import { getSubscriptionMapper } from "./sns/get_subscription";
+import { getTopicMapper } from "./sns/get_topic";
+import { publishMessageMapper } from "./sns/publish_message";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   "lambda.runFunction": runFunctionMapper,

@@ -3,6 +3,7 @@ package sns
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -14,9 +15,8 @@ import (
 type CreateTopic struct{}
 
 type CreateTopicConfiguration struct {
-	Region     string         `json:"region" mapstructure:"region"`
-	Name       string         `json:"name" mapstructure:"name"`
-	Attributes map[string]any `json:"attributes" mapstructure:"attributes"`
+	Region string `json:"region" mapstructure:"region"`
+	Name   string `json:"name" mapstructure:"name"`
 }
 
 func (c *CreateTopic) Name() string {
@@ -69,34 +69,22 @@ func (c *CreateTopic) Configuration() []configuration.Field {
 				},
 			},
 		},
-		{
-			Name:        "attributes",
-			Label:       "Attributes",
-			Type:        configuration.FieldTypeObject,
-			Required:    false,
-			Description: "Optional topic attributes as key-value pairs",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{
-					Field:  "name",
-					Values: []string{"*"},
-				},
-			},
-		},
 	}
 }
 
 func (c *CreateTopic) Setup(ctx core.SetupContext) error {
 	var config CreateTopicConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("%s: failed to decode setup configuration: %w", c.Name(), err)
+		return fmt.Errorf("failed to decode setup configuration: %w", err)
 	}
 
 	if _, err := requireRegion(config.Region); err != nil {
-		return fmt.Errorf("%s: invalid region: %w", c.Name(), err)
+		return fmt.Errorf("invalid region: %w", err)
 	}
 
-	if _, err := requireTopicName(config.Name); err != nil {
-		return fmt.Errorf("%s: invalid topic name: %w", c.Name(), err)
+	name := strings.TrimSpace(config.Name)
+	if name == "" {
+		return fmt.Errorf("topic name is required")
 	}
 
 	return nil
@@ -109,32 +97,22 @@ func (c *CreateTopic) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 func (c *CreateTopic) Execute(ctx core.ExecutionContext) error {
 	var config CreateTopicConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("%s: failed to decode execution configuration: %w", c.Name(), err)
-	}
-
-	region, err := requireRegion(config.Region)
-	if err != nil {
-		return fmt.Errorf("%s: invalid region: %w", c.Name(), err)
-	}
-
-	name, err := requireTopicName(config.Name)
-	if err != nil {
-		return fmt.Errorf("%s: invalid topic name: %w", c.Name(), err)
+		return fmt.Errorf("failed to decode execution configuration: %w", err)
 	}
 
 	credentials, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {
-		return fmt.Errorf("%s: failed to load AWS credentials from integration: %w", c.Name(), err)
+		return fmt.Errorf("failed to load AWS credentials from integration: %w", err)
 	}
 
-	client := NewClient(ctx.HTTP, credentials, region)
-	topic, err := client.CreateTopic(name, mapAnyToStringMap(config.Attributes))
+	client := NewClient(ctx.HTTP, credentials, config.Region)
+	topic, err := client.CreateTopic(config.Name)
 	if err != nil {
-		return fmt.Errorf("%s: failed to create topic %q: %w", c.Name(), name, err)
+		return fmt.Errorf("failed to create topic %q: %w", config.Name, err)
 	}
 
 	if err := ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "aws.sns.topic", []any{topic}); err != nil {
-		return fmt.Errorf("%s: failed to emit created topic payload: %w", c.Name(), err)
+		return fmt.Errorf("failed to emit created topic payload: %w", err)
 	}
 
 	return nil

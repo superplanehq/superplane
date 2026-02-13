@@ -71,16 +71,9 @@ func (c *Client) GetTopic(topicArn string) (*Topic, error) {
 	}, nil
 }
 
-// CreateTopic creates an SNS topic and returns its resulting metadata.
-func (c *Client) CreateTopic(name string, attributes map[string]string) (*Topic, error) {
+func (c *Client) CreateTopic(name string) (*Topic, error) {
 	params := map[string]string{
 		"Name": name,
-	}
-
-	for index, key := range sortedKeys(attributes) {
-		entry := strconv.Itoa(index + 1)
-		params["Attributes.entry."+entry+".key"] = key
-		params["Attributes.entry."+entry+".value"] = attributes[key]
 	}
 
 	var response createTopicResponse
@@ -229,7 +222,7 @@ func (c *Client) ListTopics() ([]Topic, error) {
 
 		var response listTopicsResponse
 		if err := c.postForm("ListTopics", params, &response); err != nil {
-			return nil, fmt.Errorf("sns client: failed to list topics in region %q: %w", c.region, err)
+			return nil, fmt.Errorf("failed to list topics in region %q: %w", c.region, err)
 		}
 
 		for _, item := range response.Topics {
@@ -251,16 +244,11 @@ func (c *Client) ListTopics() ([]Topic, error) {
 	}
 }
 
-// ListSubscriptions returns subscriptions, optionally filtered by topic ARN.
-func (c *Client) ListSubscriptions(topicArn string) ([]Subscription, error) {
+func (c *Client) ListSubscriptionsByTopic(topicArn string) ([]Subscription, error) {
 	subscriptions := []Subscription{}
 	nextToken := ""
-	action := "ListSubscriptions"
-	baseParams := map[string]string{}
-
-	if strings.TrimSpace(topicArn) != "" {
-		action = "ListSubscriptionsByTopic"
-		baseParams["TopicArn"] = topicArn
+	baseParams := map[string]string{
+		"TopicArn": topicArn,
 	}
 
 	for {
@@ -273,41 +261,18 @@ func (c *Client) ListSubscriptions(topicArn string) ([]Subscription, error) {
 		}
 
 		var response listSubscriptionsResponse
-		if err := c.postForm(action, params, &response); err != nil {
-			return nil, fmt.Errorf("sns client: failed to %s in region %q: %w", action, c.region, err)
+		if err := c.postForm("ListSubscriptionsByTopic", params, &response); err != nil {
+			return nil, fmt.Errorf("failed to list subscriptions: %w", err)
 		}
 
-		if action == "ListSubscriptionsByTopic" {
-			for _, item := range response.SubscriptionsTopic {
-				subscriptions = append(subscriptions, Subscription{
-					SubscriptionArn: strings.TrimSpace(item.SubscriptionArn),
-					TopicArn:        strings.TrimSpace(item.TopicArn),
-					Protocol:        strings.TrimSpace(item.Protocol),
-					Endpoint:        strings.TrimSpace(item.Endpoint),
-					Owner:           strings.TrimSpace(item.Owner),
-				})
-			}
-
-			nextToken = strings.TrimSpace(response.NextTokenTopic)
-			if nextToken == "" {
-				return subscriptions, nil
-			}
-
-			continue
-		}
-
-		for _, item := range response.Subscriptions {
+		for _, item := range response.SubscriptionsTopic {
 			subscriptions = append(subscriptions, Subscription{
-				SubscriptionArn: strings.TrimSpace(item.SubscriptionArn),
-				TopicArn:        strings.TrimSpace(item.TopicArn),
-				Protocol:        strings.TrimSpace(item.Protocol),
-				Endpoint:        strings.TrimSpace(item.Endpoint),
-				Owner:           strings.TrimSpace(item.Owner),
+				SubscriptionArn: item.SubscriptionArn,
+				TopicArn:        topicArn,
 			})
 		}
 
-		nextToken = strings.TrimSpace(response.NextToken)
-		if nextToken == "" {
+		if response.NextToken == "" {
 			return subscriptions, nil
 		}
 	}
@@ -411,4 +376,27 @@ func parseSNSError(body []byte) *common.Error {
 	}
 
 	return &common.Error{Code: code, Message: message}
+}
+
+func topicNameFromArn(topicArn string) string {
+	parts := strings.Split(strings.TrimSpace(topicArn), ":")
+	if len(parts) == 0 {
+		return strings.TrimSpace(topicArn)
+	}
+
+	name := strings.TrimSpace(parts[len(parts)-1])
+	if name == "" {
+		return strings.TrimSpace(topicArn)
+	}
+
+	return name
+}
+
+func boolAttribute(attributes map[string]string, key string) bool {
+	value, ok := attributes[key]
+	if !ok {
+		return false
+	}
+
+	return strings.EqualFold(strings.TrimSpace(value), "true")
 }

@@ -1,12 +1,20 @@
 package sns
 
 import (
+	"crypto"
+	"crypto/rsa"
+	"crypto/sha1"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -161,6 +169,11 @@ func (t *OnTopicMessage) HandleWebhook(ctx core.WebhookRequestContext) (int, err
 		return http.StatusBadRequest, fmt.Errorf("failed to decode SNS webhook payload: %w", err)
 	}
 
+	if err := t.verifyMessageSignature(ctx, message); err != nil {
+		ctx.Logger.Errorf("failed to verify SNS signature: %v", err)
+		return http.StatusBadRequest, fmt.Errorf("invalid SNS message signature: %w", err)
+	}
+
 	switch message.Type {
 	case "SubscriptionConfirmation":
 		return t.confirmSubscription(ctx, config, message)
@@ -267,4 +280,194 @@ func (t *OnTopicMessage) emitTopicNotification(ctx core.WebhookRequestContext, m
 
 func (t *OnTopicMessage) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+/*
+ * Verifies that the message comes from AWS SNS.
+ * See: https://docs.aws.amazon.com/sns/latest/dg/sns-verify-signature-of-message-verify-message-signature.html
+ */
+func (t *OnTopicMessage) verifyMessageSignature(ctx core.WebhookRequestContext, message SubscriptionMessage) error {
+	signature, err := base64.StdEncoding.DecodeString(message.Signature)
+	if err != nil {
+		return fmt.Errorf("failed to decode signature: %w", err)
+	}
+
+	stringToSign, err := t.buildStringToSign(message)
+	if err != nil {
+		return fmt.Errorf("failed to build string to sign: %w", err)
+	}
+
+	//
+	// TODO: it would be good to not fetch the certificate every time.
+	//
+	cert, err := t.fetchSigningCertificate(ctx, message.SigningCertURL)
+	if err != nil {
+		return fmt.Errorf("failed to fetch signing certificate: %w", err)
+	}
+
+	hash, digest, err := t.getHashAndDigest(message.SignatureVersion, stringToSign)
+	if err != nil {
+		return fmt.Errorf("failed to get hash and digest: %w", err)
+	}
+
+	publicKey, ok := cert.PublicKey.(*rsa.PublicKey)
+	if !ok {
+		return fmt.Errorf("unsupported signing certificate key type %T", cert.PublicKey)
+	}
+
+	if err := rsa.VerifyPKCS1v15(publicKey, hash, digest, signature); err != nil {
+		return fmt.Errorf("signature verification failed: %w", err)
+	}
+
+	return nil
+}
+
+type SignableField struct {
+	name  string
+	value string
+}
+
+func (t *OnTopicMessage) buildStringToSign(message SubscriptionMessage) (string, error) {
+	signableFields, err := t.getSignableFields(message)
+	if err != nil {
+		return "", err
+	}
+
+	for _, field := range signableFields {
+		if field.value == "" {
+			return "", fmt.Errorf("missing %s for SNS signature verification", field.name)
+		}
+	}
+
+	var builder strings.Builder
+	for _, field := range signableFields {
+		builder.WriteString(field.name)
+		builder.WriteString("\n")
+		builder.WriteString(field.value)
+		builder.WriteString("\n")
+	}
+
+	return builder.String(), nil
+}
+
+func (t *OnTopicMessage) getSignableFields(message SubscriptionMessage) ([]SignableField, error) {
+	var fields []SignableField
+
+	switch message.Type {
+	case "Notification":
+		fields = append(fields, SignableField{"Message", message.Message})
+		fields = append(fields, SignableField{"MessageId", message.MessageID})
+		if message.Subject != "" {
+			fields = append(fields, SignableField{"Subject", message.Subject})
+		}
+		fields = append(fields, SignableField{"Timestamp", message.Timestamp})
+		fields = append(fields, SignableField{"TopicArn", message.TopicArn})
+		fields = append(fields, SignableField{"Type", message.Type})
+		return fields, nil
+
+	case "SubscriptionConfirmation", "UnsubscribeConfirmation":
+		fields = append(fields, SignableField{"Message", message.Message})
+		fields = append(fields, SignableField{"MessageId", message.MessageID})
+		fields = append(fields, SignableField{"SubscribeURL", message.SubscribeURL})
+		fields = append(fields, SignableField{"Timestamp", message.Timestamp})
+		fields = append(fields, SignableField{"Token", message.Token})
+		fields = append(fields, SignableField{"TopicArn", message.TopicArn})
+		fields = append(fields, SignableField{"Type", message.Type})
+		return fields, nil
+
+	default:
+		return nil, fmt.Errorf("unsupported SNS message type %q", message.Type)
+	}
+}
+
+func (t *OnTopicMessage) fetchSigningCertificate(ctx core.WebhookRequestContext, signingCertURL string) (*x509.Certificate, error) {
+	parsedURL, err := url.Parse(signingCertURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid SigningCertURL: %w", err)
+	}
+
+	if parsedURL.Scheme != "https" {
+		return nil, fmt.Errorf("SigningCertURL must use https")
+	}
+
+	host := strings.ToLower(parsedURL.Hostname())
+	if host == "" {
+		return nil, fmt.Errorf("SigningCertURL host is required")
+	}
+
+	if !strings.HasPrefix(host, "sns.") {
+		return nil, fmt.Errorf("SigningCertURL host must start with sns")
+	}
+
+	if !strings.HasSuffix(host, ".amazonaws.com") && !strings.HasSuffix(host, ".amazonaws.com.cn") {
+		return nil, fmt.Errorf("SigningCertURL host must be an AWS SNS domain")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, parsedURL.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create certificate request: %w", err)
+	}
+
+	response, err := ctx.HTTP.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download signing certificate: %w", err)
+	}
+
+	defer response.Body.Close()
+
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		responseBody, readErr := io.ReadAll(response.Body)
+		if readErr != nil {
+			return nil, fmt.Errorf("failed to download signing certificate: status %d with unreadable body: %w", response.StatusCode, readErr)
+		}
+		return nil, fmt.Errorf("failed to download signing certificate: status %d: %s", response.StatusCode, strings.TrimSpace(string(responseBody)))
+	}
+
+	certBytes, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read signing certificate: %w", err)
+	}
+
+	var block *pem.Block
+	rest := certBytes
+	for {
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			break
+		}
+		if block.Type == "CERTIFICATE" {
+			break
+		}
+	}
+
+	if block == nil || block.Type != "CERTIFICATE" {
+		return nil, fmt.Errorf("SigningCertURL did not return a certificate")
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse signing certificate: %w", err)
+	}
+
+	now := time.Now()
+	if now.Before(cert.NotBefore) || now.After(cert.NotAfter) {
+		return nil, fmt.Errorf("signing certificate is not currently valid")
+	}
+
+	return cert, nil
+}
+
+func (t *OnTopicMessage) getHashAndDigest(signatureVersion, stringToSign string) (crypto.Hash, []byte, error) {
+	switch signatureVersion {
+	case "1":
+		sum := sha1.Sum([]byte(stringToSign))
+		return crypto.SHA1, sum[:], nil
+
+	case "2":
+		sum := sha256.Sum256([]byte(stringToSign))
+		return crypto.SHA256, sum[:], nil
+
+	default:
+		return 0, nil, fmt.Errorf("unsupported SignatureVersion %q", signatureVersion)
+	}
 }

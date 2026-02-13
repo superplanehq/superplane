@@ -15,6 +15,7 @@ type GetSubscription struct{}
 
 type GetSubscriptionConfiguration struct {
 	Region          string `json:"region" mapstructure:"region"`
+	TopicArn        string `json:"topicArn" mapstructure:"topicArn"`
 	SubscriptionArn string `json:"subscriptionArn" mapstructure:"subscriptionArn"`
 }
 
@@ -55,7 +56,43 @@ func (c *GetSubscription) OutputChannels(configuration any) []core.OutputChannel
 func (c *GetSubscription) Configuration() []configuration.Field {
 	return []configuration.Field{
 		regionField(),
-		subscriptionField(),
+		topicField(),
+		{
+			Name:        "subscriptionArn",
+			Label:       "Subscription",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "ARN of the SNS subscription",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "region",
+					Values: []string{"*"},
+				},
+				{
+					Field:  "topicArn",
+					Values: []string{"*"},
+				},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "sns.subscription",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "region",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "region",
+							},
+						},
+						{
+							Name: "topicArn",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "topicArn",
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -67,6 +104,10 @@ func (c *GetSubscription) Setup(ctx core.SetupContext) error {
 
 	if _, err := requireRegion(config.Region); err != nil {
 		return fmt.Errorf("%s: invalid region: %w", c.Name(), err)
+	}
+
+	if _, err := requireTopicArn(config.TopicArn); err != nil {
+		return fmt.Errorf("%s: invalid topic ARN: %w", c.Name(), err)
 	}
 
 	if _, err := requireSubscriptionArn(config.SubscriptionArn); err != nil {
