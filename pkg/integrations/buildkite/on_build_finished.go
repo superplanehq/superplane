@@ -1,7 +1,6 @@
 package buildkite
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -214,86 +213,6 @@ func (t *OnBuildFinished) HandleAction(ctx core.TriggerActionContext) (map[strin
 }
 
 func (t *OnBuildFinished) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	config := OnBuildFinishedConfiguration{}
-	err := mapstructure.Decode(ctx.Configuration, &config)
-	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	eventType := ctx.Headers.Get("X-Buildkite-Event")
-	if eventType == "" {
-		// Try to get event type from payload
-		var payload map[string]any
-		if err := json.Unmarshal(ctx.Body, &payload); err != nil {
-			return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
-		}
-		if event, ok := payload["event"].(string); ok {
-			eventType = event
-		}
-	}
-
-	// Verify webhook signature or token with replay protection
-	secret, err := ctx.Webhook.GetSecret()
-	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error getting webhook secret: %w", err)
-	}
-	if err := VerifyWebhook(ctx.Headers, ctx.Body, secret); err != nil {
-		return http.StatusForbidden, fmt.Errorf("webhook verification failed: %w", err)
-	}
-
-	if eventType != "build.finished" {
-		return http.StatusOK, nil
-	}
-
-	data := map[string]any{}
-	err = json.Unmarshal(ctx.Body, &data)
-	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
-	}
-
-	// Filter by organization from integration config
-	orgConfig, err := ctx.Integration.GetConfig("organization")
-	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to get organization from integration config: %w", err)
-	}
-	expectedOrgSlug, err := extractOrgSlug(string(orgConfig))
-	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to extract organization slug: %w", err)
-	}
-	if org, ok := data["organization"].(map[string]any); ok {
-		if orgSlug, ok := org["slug"].(string); ok {
-			if expectedOrgSlug != orgSlug && expectedOrgSlug != "*" {
-				return http.StatusOK, nil
-			}
-		}
-	}
-
-	if config.Pipeline != "" && config.Pipeline != "*" {
-		if pipeline, ok := data["pipeline"].(map[string]any); ok {
-			if pipelineSlug, ok := pipeline["slug"].(string); ok {
-				if config.Pipeline != pipelineSlug {
-					return http.StatusOK, nil
-				}
-			}
-		}
-	}
-
-	if config.Branch != "" {
-		if build, ok := data["build"].(map[string]any); ok {
-			if branch, ok := build["branch"].(string); ok {
-				if config.Branch != branch {
-					return http.StatusOK, nil
-				}
-			}
-		}
-	}
-
-	err = ctx.Events.Emit("buildkite.build.finished", data)
-
-	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
-	}
-
 	return http.StatusOK, nil
 }
 

@@ -362,36 +362,6 @@ type WebhookMetadata struct {
 	Pipelines       []string `json:"pipelines"`
 }
 
-func (b *Buildkite) SetupWebhook(ctx core.WebhookContext) (any, error) {
-	config := Configuration{}
-	err := mapstructure.Decode(ctx.GetConfiguration(), &config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode configuration: %v", err)
-	}
-
-	if config.WebhookToken == "" {
-		// Return empty webhook metadata if no token configured yet
-		// The UI will prompt user to configure webhook token
-		return WebhookMetadata{
-			URL:             ctx.GetURL(),
-			Token:           "",
-			VerifySignature: false,
-			Active:          false,
-			Events:          []string{"build.finished"},
-			Pipelines:       []string{"*"},
-		}, nil
-	}
-
-	return WebhookMetadata{
-		URL:             ctx.GetURL(),
-		Token:           config.WebhookToken,
-		VerifySignature: true,
-		Active:          true,
-		Events:          []string{"build.finished"},
-		Pipelines:       []string{"*"},
-	}, nil
-}
-
 func (b *Buildkite) Components() []core.Component {
 	return []core.Component{
 		&TriggerBuild{},
