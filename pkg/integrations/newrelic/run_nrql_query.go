@@ -57,7 +57,8 @@ func (c *RunNRQLQuery) Documentation() string {
 
 ## Configuration
 
-- **Account ID**: The New Relic account ID to query against (required)
+- **Account**: The New Relic account to query (select from dropdown)
+- **Manual Account ID**: Manually enter Account ID if dropdown fails
 - **Query**: The NRQL query string to execute (required)
 - **Timeout**: Query timeout in seconds (optional, default: 10, max: 120)
 
@@ -325,7 +326,7 @@ func extractResourceID(v any) string {
 	case float64:
 		return strconv.FormatFloat(n, 'f', -1, 64)
 	case float32:
-		return strconv.FormatFloat(float64(n), 'f', -1, 64)
+		return strconv.FormatFloat(float64(n), 'f', -1, 32)
 	}
 
 	// Handle maps

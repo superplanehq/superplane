@@ -77,16 +77,12 @@ This trigger generates a webhook URL. You must configure a **Workflow** in New R
 
 ```json
 {
-  "impacted_entities": [
-    "infra-host-1"
-  ],
-  "issue_id": "12345678-abcd-efgh-ijkl-1234567890ab",
-  "issue_url": "https://one.newrelic.com/launcher/nrai.launcher?pane=eyJuZXJkbGV0SWQiOiJhbGVydGluZy11aS1jbGFzc2ljLmluY2lkZW50cyIsInNlbGVjdGVkSW5jaWRlbnRJZCI6IjEyMzQ1Njc4In0=",
+  "issueId": "12345678-abcd-efgh-ijkl-1234567890ab",
+  "issueUrl": "https://one.newrelic.com/launcher/nrai.launcher?pane=eyJuZXJkbGV0SWQiOiJhbGVydGluZy11aS1jbGFzc2ljLmluY2lkZW50cyIsInNlbGVjdGVkSW5jaWRlbnRJZCI6IjEyMzQ1Njc4In0=",
   "owner": "Team SRE",
   "priority": "CRITICAL",
   "state": "ACTIVATED",
-  "title": "High CPU Usage",
-  "total_incidents": 1
+  "title": "High CPU Usage"
 }
 ```
 
@@ -102,6 +98,7 @@ The Report Metric component allows you to send custom metrics (Gauge, Count, Sum
 - **Metric Type**: The type of metric (Gauge, Count, or Summary)
 - **Value**: The numeric value of the metric
 - **Timestamp**: Optional Unix timestamp (milliseconds). Defaults to now.
+- **Interval (ms)**: Required for Count and Summary metrics. The duration of the measurement window in milliseconds.
 - **Attributes**: Optional JSON object with additional attributes
 
 ### Output
@@ -112,13 +109,11 @@ Returns the sent metric payload.
 
 ```json
 {
-  "attributes": {
-    "environment": "production",
-    "host": "server1.example.com"
-  },
-  "metricName": "server.cpu.usage",
-  "metricType": "gauge",
+  "intervalMs": 0,
+  "name": "server.cpu.usage",
+  "status": "202 Accepted",
   "timestamp": 1707552000000,
+  "type": "gauge",
   "value": 75.5
 }
 ```
@@ -138,7 +133,8 @@ The Run NRQL Query component allows you to execute NRQL queries via New Relic's 
 
 ### Configuration
 
-- **Account ID**: The New Relic account ID to query against (required)
+- **Account**: The New Relic account to query (select from dropdown)
+- **Manual Account ID**: Manually enter Account ID if dropdown fails
 - **Query**: The NRQL query string to execute (required)
 - **Timeout**: Query timeout in seconds (optional, default: 10, max: 120)
 
@@ -162,4 +158,30 @@ Returns query results including:
 - Requires a valid New Relic API key with query permissions
 - Queries are subject to New Relic's NRQL query limits
 - Invalid NRQL syntax will return an error from the API
+
+### Example Output
+
+```json
+{
+  "accountId": "1234567",
+  "metadata": {
+    "eventTypes": [
+      "Transaction"
+    ],
+    "facets": null,
+    "messages": [],
+    "timeWindow": {
+      "begin": 1707559740000,
+      "end": 1707563340000
+    }
+  },
+  "query": "SELECT count(*) FROM Transaction SINCE 1 hour ago",
+  "results": [
+    {
+      "count": 1523
+    }
+  ],
+  "totalResult": null
+}
+```
 
