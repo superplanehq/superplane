@@ -20,9 +20,21 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   sendAndWait: {
     stateMap: {
       ...DEFAULT_EVENT_STATE_MAP,
-      waiting: { color: "blue", label: "Waiting" },
+      waiting: {
+        icon: "refresh-cw",
+        textColor: "text-gray-800",
+        backgroundColor: "bg-sky-100",
+        badgeColor: "bg-blue-500",
+        label: "Waiting",
+      },
       received: DEFAULT_EVENT_STATE_MAP.success,
-      timed_out: { color: "orange", label: "Timed Out" },
+      timed_out: {
+        icon: "clock",
+        textColor: "text-gray-800",
+        backgroundColor: "bg-orange-100",
+        badgeColor: "bg-orange-500",
+        label: "Timed Out",
+      },
     },
     getState: (execution) => {
       const metadata = execution.metadata as { state?: string } | undefined;
