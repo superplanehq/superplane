@@ -283,6 +283,16 @@ export const ComponentSidebar = ({
   );
   const selectedIntegrationForDialog = isCreateIntegrationDialogOpen ? createIntegrationDefinition : undefined;
   const selectedInstructions = selectedIntegrationForDialog?.instructions?.trim();
+  const nodeWebhookUrl = useMemo(() => {
+    if (!nodeId) return "";
+    const node = workflowNodes.find((n) => n.id === nodeId);
+    const metadata = node?.metadata as Record<string, unknown> | undefined;
+    if (!metadata) return "";
+    const webhookUrl = typeof metadata.webhookUrl === "string" ? metadata.webhookUrl : "";
+    const webhookUrlSnake = typeof metadata.webhook_url === "string" ? metadata.webhook_url : "";
+    const legacyUrl = typeof metadata.url === "string" ? metadata.url : "";
+    return webhookUrl || webhookUrlSnake || legacyUrl || "";
+  }, [nodeId, workflowNodes]);
   const integrationHomeHref = useMemo(() => {
     if (!domainId) return "#";
     const selectedIntegrationId =
@@ -296,12 +306,13 @@ export const ComponentSidebar = ({
   }, [domainId, integrationRef?.id, integrations, selectedIntegrationForDialog?.name]);
 
   const handleCopyNodeId = useCallback(async () => {
-    if (nodeId) {
-      await navigator.clipboard.writeText(nodeId);
+    const textToCopy = nodeWebhookUrl || nodeId;
+    if (textToCopy) {
+      await navigator.clipboard.writeText(textToCopy);
       setJustCopied(true);
       setTimeout(() => setJustCopied(false), 1000);
     }
-  }, [nodeId]);
+  }, [nodeId, nodeWebhookUrl]);
 
   const handleOpenCreateIntegrationDialog = useCallback(() => {
     setCreateIntegrationName(createIntegrationDefinition?.name ?? "");
@@ -718,13 +729,13 @@ export const ComponentSidebar = ({
                 </div>
                 <h2 className="text-base font-semibold">{nodeName}</h2>
               </div>
-              {nodeId && !hideNodeId && (
+              {(nodeWebhookUrl || nodeId) && !hideNodeId && (
                 <div className="flex items-center gap-2">
-                  <span className="text-[13px] text-gray-500 font-mono">{nodeId}</span>
+                  <span className="text-[13px] text-gray-500 font-mono">{nodeWebhookUrl || nodeId}</span>
                   <button
                     onClick={handleCopyNodeId}
                     className={"text-gray-500 hover:text-gray-800"}
-                    title={justCopied ? "Copied!" : "Copy Node ID"}
+                    title={justCopied ? "Copied!" : nodeWebhookUrl ? "Copy Webhook URL" : "Copy Node ID"}
                   >
                     {justCopied ? <Check size={14} /> : <Copy size={14} />}
                   </button>
