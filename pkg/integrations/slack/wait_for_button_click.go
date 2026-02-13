@@ -11,7 +11,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-    
 )
 
 const (
@@ -228,6 +227,10 @@ func (c *WaitForButtonClick) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("channel validation failed: %w", err)
 	}
 
+	if channelInfo == nil {
+		return fmt.Errorf("channel validation failed: GetChannelInfo returned nil for '%s'", config.Channel)
+	}
+
 	metadata := WaitForButtonClickMetadata{
 		Channel: &ChannelMetadata{
 			ID:   channelInfo.ID,
@@ -328,13 +331,15 @@ func (c *WaitForButtonClick) Execute(ctx core.ExecutionContext) error {
 			return fmt.Errorf("failed to resolve channel id for '%s': %w", config.Channel, err)
 		}
 
-		if channelInfo != nil {
-			channelID = channelInfo.ID
-			// update metadata with resolved channel info
-			metadata.Channel = &ChannelMetadata{ID: channelInfo.ID, Name: channelInfo.Name}
-			if err := ctx.Metadata.Set(metadata); err != nil {
-				return fmt.Errorf("failed to persist metadata with resolved channel info: %w", err)
-			}
+		if channelInfo == nil {
+			return fmt.Errorf("failed to resolve channel info for '%s': GetChannelInfo returned nil", config.Channel)
+		}
+
+		channelID = channelInfo.ID
+		// update metadata with resolved channel info
+		metadata.Channel = &ChannelMetadata{ID: channelInfo.ID, Name: channelInfo.Name}
+		if err := ctx.Metadata.Set(metadata); err != nil {
+			return fmt.Errorf("failed to persist metadata with resolved channel info: %w", err)
 		}
 	}
 

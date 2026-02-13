@@ -118,6 +118,10 @@ func (c *SendTextMessage) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("channel validation failed: %w", err)
 	}
 
+	if channelInfo == nil {
+		return fmt.Errorf("channel validation failed: GetChannelInfo returned nil for '%s'", config.Channel)
+	}
+
 	metadata := SendTextMessageMetadata{
 		Channel: &ChannelMetadata{
 			ID:   channelInfo.ID,
