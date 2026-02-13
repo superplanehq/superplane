@@ -406,6 +406,7 @@ export type ConfigurationListItemDefinition = {
 export type ConfigurationListTypeOptions = {
   itemDefinition?: ConfigurationListItemDefinition;
   itemLabel?: string;
+  maxItems?: number;
 };
 
 export type ConfigurationMultiSelectTypeOptions = {
