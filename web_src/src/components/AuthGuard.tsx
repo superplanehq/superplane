@@ -1,6 +1,6 @@
 import React from "react";
 import { useAccount } from "../contexts/AccountContext";
-import { useNavigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -8,15 +8,13 @@ interface AuthGuardProps {
 
 const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   const { account, loading } = useAccount();
-  const navigate = useNavigate();
   const location = useLocation();
 
   // If account is not loaded and not loading, redirect to login
   if (!loading && !account) {
     console.log("[AuthGuard] No account, redirecting to organization select from:", location.pathname);
     const redirectParam = encodeURIComponent(`${location.pathname}${location.search}`);
-    navigate(`/login?redirect=${redirectParam}`, { replace: true });
-    return null;
+    return <Navigate to={`/login?redirect=${redirectParam}`} replace />;
   }
 
   // Show loading spinner while fetching account
