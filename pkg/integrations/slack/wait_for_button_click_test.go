@@ -152,6 +152,10 @@ func Test__WaitForButtonClick__Execute(t *testing.T) {
 				require.Len(t, payload.Blocks, 2) // text section + actions
 				return jsonResponse(http.StatusOK, `{"ok": true, "ts": "1234567890.123456"}`), nil
 			}
+			if req.URL.Scheme+"://"+req.URL.Host+req.URL.Path == "https://slack.com/api/conversations.info" {
+				assert.Equal(t, "C123", req.URL.Query().Get("channel"))
+				return jsonResponse(http.StatusOK, `{"ok": true, "channel": {"id": "C123", "name": "general"}}`), nil
+			}
 			return jsonResponse(http.StatusNotFound, `{"ok": false}`), nil
 		})
 
@@ -191,6 +195,10 @@ func Test__WaitForButtonClick__Execute(t *testing.T) {
 		withDefaultTransport(t, func(req *http.Request) (*http.Response, error) {
 			if req.URL.String() == "https://slack.com/api/chat.postMessage" {
 				return jsonResponse(http.StatusOK, `{"ok": true, "ts": "1234567890.123456"}`), nil
+			}
+			if req.URL.Scheme+"://"+req.URL.Host+req.URL.Path == "https://slack.com/api/conversations.info" {
+				assert.Equal(t, "C123", req.URL.Query().Get("channel"))
+				return jsonResponse(http.StatusOK, `{"ok": true, "channel": {"id": "C123", "name": "general"}}`), nil
 			}
 			return jsonResponse(http.StatusNotFound, `{"ok": false}`), nil
 		})

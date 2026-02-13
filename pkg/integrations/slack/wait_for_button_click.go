@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/openapi_client"
+    
 )
 
 const (
@@ -142,7 +142,7 @@ func (c *WaitForButtonClick) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Button",
-					MaxItems:  openapi_client.PtrInt(4),
+					MaxItems:  ptrInt(4),
 					ItemDefinition: &configuration.ListItemDefinition{
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{
@@ -165,6 +165,9 @@ func (c *WaitForButtonClick) Configuration() []configuration.Field {
 		},
 	}
 }
+
+// small helper to avoid importing generated clients for a pointer literal
+func ptrInt(v int) *int { return &v }
 
 // validateButtons checks button configuration for common errors
 func validateButtons(buttons []Button) error {
