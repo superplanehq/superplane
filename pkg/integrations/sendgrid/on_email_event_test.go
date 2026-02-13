@@ -171,10 +171,6 @@ func (t *testNodeWebhookContext) Setup() (string, error) {
 	return "", nil
 }
 
-func (t *testNodeWebhookContext) GetURL() (string, error) {
-	return "", nil
-}
-
 func (t *testNodeWebhookContext) GetSecret() ([]byte, error) {
 	return t.secret, nil
 }
