@@ -35,6 +35,7 @@ import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
+import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
@@ -415,6 +416,7 @@ function CategorySection({
     semaphore: SemaphoreLogo,
     slack: slackIcon,
     sendgrid: sendgridIcon,
+    sentry: sentryIcon,
     prometheus: prometheusIcon,
     render: renderIcon,
     dockerhub: dockerIcon,
@@ -492,6 +494,7 @@ function CategorySection({
             semaphore: SemaphoreLogo,
             slack: slackIcon,
             sendgrid: sendgridIcon,
+            sentry: sentryIcon,
             prometheus: prometheusIcon,
             render: renderIcon,
             dockerhub: dockerIcon,

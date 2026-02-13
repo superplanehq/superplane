@@ -42,21 +42,33 @@ export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) =>
         const response = await fetch("/account", {
           method: "GET",
           credentials: "include",
-          redirect: "manual", // Don't follow redirects, check status code instead
         });
 
         if (response.status === 409 && response.headers.get("X-Owner-Setup-Required") === "true") {
           setSetupRequired(true);
+          setAccount(null);
           return;
         }
 
-        if (response.status === 200) {
-          const accountData = await response.json();
-          setAccount(accountData);
+        if (!response.ok) {
+          setAccount(null);
+          setSetupRequired(false);
+          return;
         }
-        // If response is not 200 (e.g., 307 redirect, 401, etc.), user is not authenticated
+
+        const contentType = response.headers.get("Content-Type") ?? "";
+        if (!contentType.includes("application/json")) {
+          setAccount(null);
+          setSetupRequired(false);
+          return;
+        }
+
+        const accountData = (await response.json()) as Account;
+        setAccount(accountData);
+        setSetupRequired(false);
       } catch (_error) {
         // Network errors or other unexpected errors
+        setAccount(null);
       } finally {
         setLoading(false);
       }

@@ -102,6 +102,15 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 				return
 			}
 
+			// Allow public integration setup pages without authentication.
+			// These routes handle prompting the user to log in and should not be forced
+			// through the middleware redirect, otherwise the browser can get into a
+			// redirect loop between the page and /login.
+			if strings.HasPrefix(r.URL.Path, "/sentry/setup") {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			// Allow static assets and Vite dev server paths without authentication
 			// These are needed for the React app to load in development
 			path := r.URL.Path

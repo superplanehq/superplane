@@ -16,6 +16,7 @@ import { Login } from "./pages/auth/Login";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
+import { SentrySetup } from "./pages/sentry/SentrySetup";
 import { CustomComponent } from "./pages/custom-component";
 import { CreateCanvasPage } from "./pages/canvas/CreateCanvasPage";
 import HomePage from "./pages/home";
@@ -71,6 +72,9 @@ function AppRouter() {
           <Route path="login" element={<Login />} />
           <Route path="create" element={<OrganizationCreate />} />
           <Route path="setup" element={<OwnerSetup />} />
+
+          {/* Sentry public integration finalize */}
+          <Route path="sentry/setup" element={<SentrySetup />} />
 
           {/* Organization selection and creation */}
           <Route path="" element={withAuthOnly(OrganizationSelect)} />
