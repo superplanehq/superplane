@@ -1,0 +1,27 @@
+{
+  "data": {
+    "type": "Notification",
+    "messageId": "95df01b4-ee98-5cb9-9903-4c221d41eb5e",
+    "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
+    "subject": "order.created",
+    "message": "{\"orderId\":\"ord_123\",\"status\":\"created\"}",
+    "timestamp": "2026-01-10T10:00:00Z",
+    "region": "us-east-1",
+    "account": "123456789012",
+    "messageAttributes": {
+      "eventType": {
+        "Type": "String",
+        "Value": "order.created"
+      }
+    },
+    "detail": {
+      "messageId": "95df01b4-ee98-5cb9-9903-4c221d41eb5e",
+      "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
+      "subject": "order.created",
+      "message": "{\"orderId\":\"ord_123\",\"status\":\"created\"}",
+      "timestamp": "2026-01-10T10:00:00Z"
+    }
+  },
+  "timestamp": "2026-01-10T10:00:02.000000000Z",
+  "type": "aws.sns.topic.message"
+}

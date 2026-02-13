@@ -169,6 +169,9 @@ func (g *GitLab) Configuration() []configuration.Field {
 func (g *GitLab) Components() []core.Component {
 	return []core.Component{
 		&CreateIssue{},
+		&GetPipeline{},
+		&GetLatestPipeline{},
+		&GetTestReportSummary{},
 	}
 }
 

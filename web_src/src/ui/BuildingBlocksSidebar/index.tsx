@@ -32,6 +32,7 @@ import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
+import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
@@ -423,6 +424,7 @@ function CategorySection({
       cloudwatch: awsCloudwatchIcon,
       lambda: awsLambdaIcon,
       ecr: awsEcrIcon,
+      sns: awsSnsIcon,
     },
   };
 
@@ -500,6 +502,7 @@ function CategorySection({
               cloudwatch: awsCloudwatchIcon,
               ecr: awsEcrIcon,
               lambda: awsLambdaIcon,
+              sns: awsSnsIcon,
             },
           };
           const appLogo = nameParts[0] ? appLogoMap[nameParts[0]] : undefined;

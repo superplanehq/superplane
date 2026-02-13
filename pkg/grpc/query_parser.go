@@ -26,13 +26,23 @@ func (p *QueryParser) Parse(target proto.Message, values url.Values, filter *uti
 func populateListIntegrationResourcesParams(values url.Values, r *pb.ListIntegrationResourcesRequest) error {
 	parameters := map[string]string{}
 
-	encodedParameters := values.Encode()
-	queryParams := strings.Split(encodedParameters, "&")
-	for _, queryParam := range queryParams {
-		parts := strings.Split(queryParam, "=")
-		if len(parts) == 2 {
-			parameters[parts[0]] = parts[1]
+	for key, vals := range values {
+		if len(vals) == 0 {
+			continue
 		}
+		decodedVals := make([]string, 0, len(vals))
+		for _, val := range vals {
+			decoded, err := url.QueryUnescape(val)
+			if err != nil {
+				decoded = val
+			}
+			decodedVals = append(decodedVals, decoded)
+		}
+		if len(decodedVals) == 1 {
+			parameters[key] = decodedVals[0]
+			continue
+		}
+		parameters[key] = strings.Join(decodedVals, ",")
 	}
 
 	r.Parameters = parameters

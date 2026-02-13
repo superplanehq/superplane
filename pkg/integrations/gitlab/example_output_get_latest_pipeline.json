@@ -1,0 +1,39 @@
+{
+  "data": {
+    "id": 457882200,
+    "iid": 9822,
+    "project_id": 123456,
+    "status": "success",
+    "source": "merge_request_event",
+    "ref": "main",
+    "sha": "afce89e8d28741d4f65ec71ad0a4174a801122cd",
+    "before_sha": "f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
+    "tag": false,
+    "yaml_errors": null,
+    "web_url": "https://gitlab.com/group/example-project/-/pipelines/457882200",
+    "created_at": "2026-02-13T19:21:00.000Z",
+    "updated_at": "2026-02-13T19:25:43.000Z",
+    "started_at": "2026-02-13T19:21:15.000Z",
+    "finished_at": "2026-02-13T19:25:43.000Z",
+    "committed_at": "2026-02-13T19:20:45.000Z",
+    "duration": 268.0,
+    "queued_duration": 12.6,
+    "coverage": "87.1",
+    "user": {
+      "id": 18,
+      "name": "Alex Garcia",
+      "username": "agarcia",
+      "avatar_url": "https://www.gravatar.com/avatar/ef56gh78"
+    },
+    "detailed_status": {
+      "icon": "status_success",
+      "text": "passed",
+      "label": "passed",
+      "group": "success",
+      "tooltip": "passed",
+      "has_details": true
+    }
+  },
+  "timestamp": "2026-02-13T19:25:43.000Z",
+  "type": "gitlab.pipeline"
+}
