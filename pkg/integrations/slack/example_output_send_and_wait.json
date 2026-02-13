@@ -1,0 +1,9 @@
+{
+  "value": "approve",
+  "user": {
+    "id": "U12345678",
+    "username": "john.doe",
+    "name": "John Doe",
+    "team_id": "T12345678"
+  }
+}
