@@ -87,6 +87,11 @@ import {
 } from "./aws";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
 import {
+  componentMappers as digitaloceanComponentMappers,
+  triggerRenderers as digitaloceanTriggerRenderers,
+  eventStateRegistry as digitaloceanEventStateRegistry,
+} from "./digitalocean/index";
+import {
   componentMappers as discordComponentMappers,
   triggerRenderers as discordTriggerRenderers,
   eventStateRegistry as discordEventStateRegistry,
@@ -156,6 +161,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
 
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   cloudflare: cloudflareComponentMappers,
+  digitalocean: digitaloceanComponentMappers,
   semaphore: semaphoreComponentMappers,
   github: githubComponentMappers,
   gitlab: gitlabComponentMappers,
@@ -180,6 +186,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   cloudflare: cloudflareTriggerRenderers,
+  digitalocean: digitaloceanTriggerRenderers,
   semaphore: semaphoreTriggerRenderers,
   github: githubTriggerRenderers,
   gitlab: gitlabTriggerRenderers,
@@ -204,6 +211,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
   cloudflare: cloudflareEventStateRegistry,
+  digitalocean: digitaloceanEventStateRegistry,
   semaphore: semaphoreEventStateRegistry,
   github: githubEventStateRegistry,
   pagerduty: pagerdutyEventStateRegistry,
