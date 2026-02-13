@@ -1,0 +1,121 @@
+---
+title: "Linear"
+---
+
+Manage and react to issues in Linear
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Issue Created" href="#on-issue-created" description="Start a workflow when a new issue is created in Linear" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in Linear" />
+</CardGrid>
+
+<a id="on-issue-created"></a>
+
+## On Issue Created
+
+The On Issue Created trigger starts a workflow when a new issue is created in Linear.
+
+### Use Cases
+
+- **Issue automation**: Run workflows when new issues are created
+- **Notification workflows**: Notify channels or create tasks elsewhere
+- **Filter by team/label**: Optionally restrict to a team and/or labels
+
+### Configuration
+
+- **Team**: Optional. Select a team to listen to, or leave empty to listen to all public teams.
+- **Labels**: Optional. Only trigger when the issue has at least one of these labels.
+
+### Event Data
+
+The payload includes Linear webhook fields: action, type, data (issue), actor, url, createdAt, webhookTimestamp.
+
+### Example Data
+
+```json
+{
+  "action": "create",
+  "actor": {
+    "email": "alice@example.com",
+    "id": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+    "name": "Alice",
+    "type": "user"
+  },
+  "createdAt": "2020-01-23T12:53:18.084Z",
+  "data": {
+    "assigneeId": "user-1",
+    "createdAt": "2020-01-23T12:53:18.084Z",
+    "description": "Issue description",
+    "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+    "identifier": "ENG-42",
+    "labelIds": [
+      "label-1"
+    ],
+    "priority": 2,
+    "stateId": "state-1",
+    "teamId": "72b2a2dc-6f4f-4423-9d34-24b5bd10634a",
+    "title": "Example issue",
+    "updatedAt": "2020-01-23T12:53:18.084Z"
+  },
+  "type": "Issue",
+  "url": "https://linear.app/company/issue/ENG-42/example-issue",
+  "webhookTimestamp": 1676056940508
+}
+```
+
+<a id="create-issue"></a>
+
+## Create Issue
+
+The Create Issue component creates a new issue in Linear.
+
+### Use Cases
+
+- **Task creation**: Automatically create issues from workflow events
+- **Bug tracking**: Create issues from alerts or external systems
+- **Feature requests**: Generate issues from forms or other triggers
+
+### Configuration
+
+- **Team**: The Linear team to create the issue in
+- **Title**: Issue title (required)
+- **Description**: Optional description
+- **Assignee**, **Labels**, **Priority**, **Status**: Optional
+
+### Output
+
+Returns the created issue: id, identifier, title, description, priority, url, createdAt.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": "2026-01-19T12:00:00.000Z",
+    "description": "Issue description",
+    "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+    "identifier": "ENG-42",
+    "priority": 2,
+    "state": {
+      "id": "state-1"
+    },
+    "team": {
+      "id": "72b2a2dc-6f4f-4423-9d34-24b5bd10634a"
+    },
+    "title": "Example issue",
+    "url": "https://linear.app/company/issue/ENG-42/example-issue"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "linear.issue"
+}
+```
+
