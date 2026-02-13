@@ -9,6 +9,8 @@ import (
 
 func (r *Rootly) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
+	case "incident_status":
+		return listResourcesForIncidentStatus(ctx)
 	case "service":
 		return listResourcesForService(ctx)
 	case "severity":
@@ -100,6 +102,42 @@ func listResourcesForSubStatus(ctx core.ListResourcesContext) ([]core.Integratio
 			Type: "sub_status",
 			Name: subStatus.Name,
 			ID:   subStatus.ID,
+		})
+	}
+	return resources, nil
+}
+
+func listResourcesForIncidentStatus(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	statuses, err := client.ListStatuses()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list statuses: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(statuses))
+	for _, status := range statuses {
+		if !status.Enabled {
+			continue
+		}
+
+		resourceID := status.Slug
+		if resourceID == "" {
+			resourceID = status.ID
+		}
+
+		resourceName := status.Name
+		if resourceName == "" {
+			resourceName = resourceID
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: "incident_status",
+			Name: resourceName,
+			ID:   resourceID,
 		})
 	}
 	return resources, nil
