@@ -8,7 +8,6 @@ import {
 } from "../types";
 import {
   ComponentBaseProps,
-  ComponentBaseSpec,
   EventSection,
 } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
