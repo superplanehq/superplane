@@ -82,18 +82,32 @@ func FindSentryIntegrationByInstallationID(installationID string) (*Integration,
 	return FindSentryIntegrationByInstallationIDInTransaction(database.Conn(), installationID)
 }
 
-func FindSentryIntegrationByInstallationIDInTransaction(tx *gorm.DB, installationID string) (*Integration, error) {
-	var integration Integration
+func ListSentryIntegrationsByInstallationID(installationID string) ([]Integration, error) {
+	return ListSentryIntegrationsByInstallationIDInTransaction(database.Conn(), installationID)
+}
+
+func ListSentryIntegrationsByInstallationIDInTransaction(tx *gorm.DB, installationID string) ([]Integration, error) {
+	var integrations []Integration
 	err := tx.
 		Where("app_name = ?", "sentry").
 		Where("(metadata ->> 'sentryInstallationUUID' = ?) OR (metadata ->> 'sentryInstallationID' = ?)", installationID, installationID).
-		First(&integration).
+		Find(&integrations).
 		Error
 	if err != nil {
 		return nil, err
 	}
+	if len(integrations) == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return integrations, nil
+}
 
-	return &integration, nil
+func FindSentryIntegrationByInstallationIDInTransaction(tx *gorm.DB, installationID string) (*Integration, error) {
+	integrations, err := ListSentryIntegrationsByInstallationIDInTransaction(tx, installationID)
+	if err != nil {
+		return nil, err
+	}
+	return &integrations[0], nil
 }
 
 func ListIntegrations(orgID uuid.UUID) ([]Integration, error) {

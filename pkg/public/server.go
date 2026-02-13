@@ -590,6 +590,18 @@ func (s *Server) HandleSentryPublicIntegrationAttach(w http.ResponseWriter, r *h
 	if installationUUID != "" {
 		metadata["sentryInstallationUUID"] = installationUUID
 	}
+
+	if installationUUID != "" {
+		existing, existingErr := models.ListSentryIntegrationsByInstallationIDInTransaction(tx, installationUUID)
+		if existingErr == nil {
+			for _, ex := range existing {
+				if ex.ID != integrationInstance.ID {
+					http.Error(w, "Sentry installation is already attached to another integration", http.StatusConflict)
+					return
+				}
+			}
+		}
+	}
 	integrationInstance.Metadata = datatypes.NewJSONType(metadata)
 
 	// Schedule a resync so Sync can refresh the token before expiry.
@@ -672,7 +684,7 @@ func (s *Server) HandleSentryPublicIntegrationWebhook(w http.ResponseWriter, r *
 	}
 
 	tx := database.Conn()
-	integrationInstance, err := models.FindSentryIntegrationByInstallationIDInTransaction(tx, installationUUID)
+	integrations, err := models.ListSentryIntegrationsByInstallationIDInTransaction(tx, installationUUID)
 	if err != nil {
 		log.Warnf(
 			"Sentry webhook: unknown installation: installation_uuid=%s body_sha256=%x err=%v",
@@ -684,48 +696,50 @@ func (s *Server) HandleSentryPublicIntegrationWebhook(w http.ResponseWriter, r *
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	log.Infof(
-		"Sentry webhook: matched integration: integration_id=%s installation_uuid=%s body_sha256=%x",
-		integrationInstance.ID.String(),
-		installationUUID,
-		bodyHash,
-	)
-
-	nodes, err := models.ListReadyTriggersForIntegrationInTransaction(tx, integrationInstance.ID)
-	if err != nil {
-		http.Error(w, "failed to list nodes", http.StatusInternalServerError)
-		return
-	}
-	log.Infof(
-		"Sentry webhook: ready nodes: integration_id=%s count=%d body_sha256=%x",
-		integrationInstance.ID.String(),
-		len(nodes),
-		bodyHash,
-	)
-
-	for _, node := range nodes {
-		ref := node.Ref.Data()
-		if ref.Trigger == nil || ref.Trigger.Name != "sentry.onIssueEvent" {
-			continue
-		}
+	for _, integrationInstance := range integrations {
 		log.Infof(
-			"Sentry webhook: executing trigger node: node_id=%s trigger=%s body_sha256=%x",
-			node.NodeID,
-			ref.Trigger.Name,
+			"Sentry webhook: matched integration: integration_id=%s installation_uuid=%s body_sha256=%x",
+			integrationInstance.ID.String(),
+			installationUUID,
 			bodyHash,
 		)
-		code, execErr := s.executeTriggerNode(r.Context(), body, r.Header, node)
-		if execErr != nil {
-			log.Errorf(
-				"Sentry webhook: trigger execution failed: node_id=%s trigger=%s status=%d body_sha256=%x err=%v",
+
+		nodes, err := models.ListReadyTriggersForIntegrationInTransaction(tx, integrationInstance.ID)
+		if err != nil {
+			http.Error(w, "failed to list nodes", http.StatusInternalServerError)
+			return
+		}
+		log.Infof(
+			"Sentry webhook: ready nodes: integration_id=%s count=%d body_sha256=%x",
+			integrationInstance.ID.String(),
+			len(nodes),
+			bodyHash,
+		)
+
+		for _, node := range nodes {
+			ref := node.Ref.Data()
+			if ref.Trigger == nil || ref.Trigger.Name != "sentry.onIssueEvent" {
+				continue
+			}
+			log.Infof(
+				"Sentry webhook: executing trigger node: node_id=%s trigger=%s body_sha256=%x",
 				node.NodeID,
 				ref.Trigger.Name,
-				code,
 				bodyHash,
-				execErr,
 			)
-			http.Error(w, "trigger execution failed", code)
-			return
+			code, execErr := s.executeTriggerNode(r.Context(), body, r.Header, node)
+			if execErr != nil {
+				log.Errorf(
+					"Sentry webhook: trigger execution failed: node_id=%s trigger=%s status=%d body_sha256=%x err=%v",
+					node.NodeID,
+					ref.Trigger.Name,
+					code,
+					bodyHash,
+					execErr,
+				)
+				http.Error(w, "trigger execution failed", code)
+				return
+			}
 		}
 	}
 
