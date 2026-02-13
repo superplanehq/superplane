@@ -23,6 +23,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/eventbridge"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/iam"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/lambda"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/route53"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -142,6 +143,9 @@ func (a *AWS) Components() []core.Component {
 		&ecr.GetImageScanFindings{},
 		&ecr.ScanImage{},
 		&lambda.RunFunction{},
+		&route53.CreateRecord{},
+		&route53.UpsertRecord{},
+		&route53.DeleteRecord{},
 	}
 }
 
