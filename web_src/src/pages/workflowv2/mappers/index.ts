@@ -85,6 +85,11 @@ import {
   triggerRenderers as awsTriggerRenderers,
   eventStateRegistry as awsEventStateRegistry,
 } from "./aws";
+import {
+  componentMappers as azureComponentMappers,
+  triggerRenderers as azureTriggerRenderers,
+  eventStateRegistry as azureEventStateRegistry,
+} from "./azure/index";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
 import {
   componentMappers as discordComponentMappers,
@@ -169,6 +174,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   render: renderComponentMappers,
   rootly: rootlyComponentMappers,
   aws: awsComponentMappers,
+  azure: azureComponentMappers,
   discord: discordComponentMappers,
   openai: openaiComponentMappers,
   circleci: circleCIComponentMappers,
@@ -193,6 +199,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   render: renderTriggerRenderers,
   rootly: rootlyTriggerRenderers,
   aws: awsTriggerRenderers,
+  azure: azureTriggerRenderers,
   discord: discordTriggerRenderers,
   openai: openaiTriggerRenderers,
   circleci: circleCITriggerRenderers,
@@ -220,6 +227,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
   aws: awsEventStateRegistry,
+  azure: azureEventStateRegistry,
   prometheus: prometheusEventStateRegistry,
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
