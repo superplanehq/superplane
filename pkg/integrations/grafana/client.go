@@ -52,16 +52,25 @@ func readBaseURL(ctx core.IntegrationContext) (string, error) {
 		return "", fmt.Errorf("baseURL is required")
 	}
 
-	baseURL := strings.TrimSpace(string(baseURLConfig))
-	if baseURL == "" {
+	baseURLRaw := strings.TrimSpace(string(baseURLConfig))
+	if baseURLRaw == "" {
 		return "", fmt.Errorf("baseURL is required")
 	}
 
-	if _, err := url.Parse(baseURL); err != nil {
+	parsed, err := url.Parse(baseURLRaw)
+	if err != nil {
 		return "", fmt.Errorf("invalid baseURL: %v", err)
 	}
 
-	return strings.TrimSuffix(baseURL, "/"), nil
+	// url.Parse accepts relative URLs (e.g. "grafana.local"), which will fail later in http.NewRequest.
+	if parsed.Scheme == "" || parsed.Host == "" {
+		return "", fmt.Errorf("invalid baseURL: must include scheme and host (e.g. https://grafana.example.com)")
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return "", fmt.Errorf("invalid baseURL: unsupported scheme %q (expected http or https)", parsed.Scheme)
+	}
+
+	return strings.TrimSuffix(baseURLRaw, "/"), nil
 }
 
 func readAPIToken(ctx core.IntegrationContext) (string, error) {
