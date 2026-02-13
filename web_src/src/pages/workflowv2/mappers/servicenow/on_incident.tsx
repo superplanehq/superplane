@@ -17,7 +17,7 @@ interface OnIncidentMetadata {
   webhookUrl?: string;
 }
 
-interface OnIncidentEventData extends ServiceNowIncident { }
+interface OnIncidentEventData extends ServiceNowIncident {}
 
 export const onIncidentTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
