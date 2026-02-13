@@ -31,18 +31,13 @@ type Client struct {
 	conn       *ssh.Client
 }
 
-// CommandResult holds the result of a single command execution.
 type CommandResult struct {
 	Stdout   string `json:"stdout"`
 	Stderr   string `json:"stderr"`
 	ExitCode int    `json:"exitCode"`
 }
 
-// NewClient builds a client for key-based auth.
 func NewClientKey(host string, port int, username string, privateKey, passphrase []byte) *Client {
-	if port == 0 {
-		port = 22
-	}
 	return &Client{
 		Host:       host,
 		Port:       port,
@@ -53,11 +48,7 @@ func NewClientKey(host string, port int, username string, privateKey, passphrase
 	}
 }
 
-// NewClientPassword builds a client for password auth.
 func NewClientPassword(host string, port int, username string, password []byte) *Client {
-	if port == 0 {
-		port = 22
-	}
 	return &Client{
 		Host:       host,
 		Port:       port,

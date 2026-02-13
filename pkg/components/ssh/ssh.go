@@ -24,7 +24,6 @@ func init() {
 
 type SSHCommand struct{}
 
-// SecretKeyRef is stored in YAML as: { secret: "name", key: "keyName" }.
 type SecretKeyRef struct {
 	Secret string `json:"secret" mapstructure:"secret"`
 	Key    string `json:"key" mapstructure:"key"`
@@ -34,7 +33,6 @@ func (r SecretKeyRef) IsSet() bool {
 	return r.Secret != "" && r.Key != ""
 }
 
-// AuthSpec is the authentication config group (SSH key or password, credential references).
 type AuthSpec struct {
 	Method     string       `json:"authMethod" mapstructure:"authMethod"`
 	PrivateKey SecretKeyRef `json:"privateKey" mapstructure:"privateKey"`
@@ -42,7 +40,6 @@ type AuthSpec struct {
 	Password   SecretKeyRef `json:"password" mapstructure:"password"`
 }
 
-// ConnectionRetrySpec is the optional connection retry config group (togglable).
 type ConnectionRetrySpec struct {
 	Enabled         bool `json:"enabled" mapstructure:"enabled"`
 	Retries         int  `json:"retries" mapstructure:"retries"`
@@ -57,18 +54,17 @@ type Spec struct {
 	Command          string               `json:"command" mapstructure:"command"`
 	WorkingDirectory string               `json:"workingDirectory,omitempty" mapstructure:"workingDirectory"`
 	Timeout          int                  `json:"timeout" mapstructure:"timeout"`
-	ConnectionRetry *ConnectionRetrySpec `json:"connectionRetry,omitempty" mapstructure:"connectionRetry"`
+	ConnectionRetry  *ConnectionRetrySpec `json:"connectionRetry,omitempty" mapstructure:"connectionRetry"`
 }
 
 type ExecutionMetadata struct {
 	Result *CommandResult `json:"result" mapstructure:"result"`
 }
 
-// ConnectionRetryState is stored in metadata when scheduling a connection retry action (so we don't sit idle).
 type ConnectionRetryState struct {
-	Attempt         int `json:"attempt" mapstructure:"attempt"`                   // retries done so far (1 = first retry)
-	MaxRetries      int `json:"maxRetries" mapstructure:"maxRetries"`              // max retries from config
-	IntervalSeconds int `json:"intervalSeconds" mapstructure:"intervalSeconds"`     // seconds between attempts
+	Attempt         int `json:"attempt" mapstructure:"attempt"`                 // retries done so far (1 = first retry)
+	MaxRetries      int `json:"maxRetries" mapstructure:"maxRetries"`           // max retries from config
+	IntervalSeconds int `json:"intervalSeconds" mapstructure:"intervalSeconds"` // seconds between attempts
 }
 
 func (c *SSHCommand) Name() string  { return "ssh" }
@@ -326,140 +322,95 @@ func (c *SSHCommand) Setup(ctx core.SetupContext) error {
 }
 
 func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
-	spec, err := c.decodeSpec(ctx.Configuration)
+	return c.executeSSH(ctx.Configuration, ctx.Secrets, ctx.Metadata, ctx.Requests, ctx.ExecutionState)
+}
+
+func (c *SSHCommand) HandleAction(ctx core.ActionContext) error {
+	if ctx.Name == "connectionRetry" {
+		return c.executeSSH(ctx.Configuration, ctx.Secrets, ctx.Metadata, ctx.Requests, ctx.ExecutionState)
+	}
+
+	return fmt.Errorf("unknown action: %s", ctx.Name)
+}
+
+func (c *SSHCommand) executeSSH(config any, secrets core.SecretsContext, metadata core.MetadataContext, req core.RequestContext, state core.ExecutionStateContext) error {
+	spec, err := c.decodeSpec(config)
 	if err != nil {
 		return err
 	}
-	if ctx.Secrets == nil {
-		return fmt.Errorf("secrets context not available")
+
+	client, err := c.createClient(secrets, spec)
+	if err != nil {
+		return err
 	}
-	return c.executeSSH(ctx, spec)
+	defer client.Close()
+
+	result, err := client.ExecuteCommand(spec.Command, time.Duration(spec.Timeout)*time.Second)
+	if c.isConnectError(err) && c.shouldRetry(spec.ConnectionRetry, metadata) {
+		err = c.incrementRetryCount(metadata)
+		if err != nil {
+			return err
+		}
+
+		return req.ScheduleActionCall("connectionRetry", map[string]any{}, time.Duration(spec.ConnectionRetry.IntervalSeconds)*time.Second)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	channel := channelFailed
+	if result.ExitCode == 0 {
+		channel = channelSuccess
+	}
+
+	return state.Emit(channel, "ssh.command.executed", []any{result})
 }
 
-// executeSSH runs one connect+command attempt. On connect error with retries enabled it schedules
-// a connectionRetry action and returns nil (execution does not sit idle). On success or non-retryable error it sets state and returns.
-func (c *SSHCommand) executeSSH(ctx core.ExecutionContext, spec Spec) error {
-	port := spec.Port
-	if port == 0 {
-		port = 22
+func (c *SSHCommand) shouldRetry(retrySpec *ConnectionRetrySpec, metadata core.MetadataContext) bool {
+	if retrySpec == nil || !retrySpec.Enabled {
+		return false
 	}
 
-	var currentAttempt, maxRetries, intervalSec int
-	if meta := ctx.Metadata.Get(); meta != nil {
-		var state ConnectionRetryState
-		if err := mapstructure.Decode(meta, &state); err == nil && state.MaxRetries > 0 {
-			currentAttempt = state.Attempt
-			maxRetries = state.MaxRetries
-			intervalSec = state.IntervalSeconds
-			if intervalSec <= 0 {
-				intervalSec = 15
-			}
-		}
-	}
-	if maxRetries == 0 && spec.ConnectionRetry != nil && spec.ConnectionRetry.Enabled && spec.ConnectionRetry.Retries > 0 {
-		maxRetries = spec.ConnectionRetry.Retries
-		intervalSec = spec.ConnectionRetry.IntervalSeconds
-		if intervalSec <= 0 {
-			intervalSec = 15
-		}
+	attempt, ok := metadata.Get().(int)
+	if !ok {
+		attempt = 0
 	}
 
-	result, err := c.runOneAttempt(ctx, spec, port)
-	if err == nil {
-		if err := ctx.Metadata.Set(ExecutionMetadata{Result: result}); err != nil {
-			return fmt.Errorf("set metadata: %w", err)
-		}
-		if result.ExitCode == 0 {
-			return ctx.ExecutionState.Emit(channelSuccess, "ssh.command.executed", []any{result})
-		}
-		return ctx.ExecutionState.Emit(channelFailed, "ssh.command.failed", []any{result})
-	}
-
-	if isConnectError(err) && currentAttempt < maxRetries {
-		nextAttempt := currentAttempt + 1
-		ctx.Logger.Infof("Connect attempt failed (%v), scheduling connection retry %d/%d in %ds", err, nextAttempt, maxRetries, intervalSec)
-		state := ConnectionRetryState{Attempt: nextAttempt, MaxRetries: maxRetries, IntervalSeconds: intervalSec}
-		if setErr := ctx.Metadata.Set(state); setErr != nil {
-			return fmt.Errorf("set retry metadata: %w", setErr)
-		}
-		return ctx.Requests.ScheduleActionCall("connectionRetry", map[string]any{}, time.Duration(intervalSec)*time.Second)
-	}
-
-	return fmt.Errorf("SSH execution failed: %w", err)
+	return attempt < retrySpec.Retries
 }
 
-// runOneAttempt builds the SSH client, runs the command once, and returns the result or error.
-func (c *SSHCommand) runOneAttempt(ctx core.ExecutionContext, spec Spec, port int) (*CommandResult, error) {
-	var client *Client
-	switch spec.Authentication.Method {
-	case AuthMethodSSHKey:
-		if !spec.Authentication.PrivateKey.IsSet() {
-			return nil, fmt.Errorf("private key credential is required")
-		}
-		privateKey, err := ctx.Secrets.GetKey(spec.Authentication.PrivateKey.Secret, spec.Authentication.PrivateKey.Key)
-		if err != nil {
-			if errors.Is(err, core.ErrSecretKeyNotFound) {
-				return nil, fmt.Errorf("private key could not be resolved from the selected credential")
-			}
-			return nil, fmt.Errorf("resolve private key: %w", err)
-		}
-		var passphrase []byte
-		if spec.Authentication.Passphrase.IsSet() {
-			passphrase, _ = ctx.Secrets.GetKey(spec.Authentication.Passphrase.Secret, spec.Authentication.Passphrase.Key)
-		}
-		client = NewClientKey(spec.Host, port, spec.User, privateKey, passphrase)
-	case AuthMethodPassword:
-		if !spec.Authentication.Password.IsSet() {
-			return nil, fmt.Errorf("password credential is required")
-		}
-		password, err := ctx.Secrets.GetKey(spec.Authentication.Password.Secret, spec.Authentication.Password.Key)
-		if err != nil {
-			if errors.Is(err, core.ErrSecretKeyNotFound) {
-				return nil, fmt.Errorf("password could not be resolved from the selected credential")
-			}
-			return nil, fmt.Errorf("resolve password: %w", err)
-		}
-		client = NewClientPassword(spec.Host, port, spec.User, password)
-	default:
-		return nil, fmt.Errorf("invalid auth method: %s", spec.Authentication.Method)
+func (c *SSHCommand) incrementRetryCount(metadata core.MetadataContext) error {
+	attempt, ok := metadata.Get().(int)
+	if !ok {
+		attempt = 0
 	}
-	defer func() { _ = client.Close() }()
 
-	command := spec.Command
-	if spec.WorkingDirectory != "" {
-		command = fmt.Sprintf("cd %s && %s", spec.WorkingDirectory, command)
-	}
-	timeoutSec := spec.Timeout
-	if timeoutSec <= 0 {
-		timeoutSec = 60
-	}
-	timeout := time.Duration(timeoutSec) * time.Second
-	ctx.Logger.Infof("Executing SSH command on %s@%s:%d: %s", spec.User, spec.Host, port, command)
-	return client.ExecuteCommand(command, timeout)
+	return metadata.Set(attempt + 1)
 }
 
 func (c *SSHCommand) decodeSpec(cfg any) (Spec, error) {
 	var spec Spec
+
 	config, ok := cfg.(map[string]any)
 	if !ok || config == nil {
 		return spec, fmt.Errorf("decode configuration: invalid configuration type")
 	}
+
 	if err := mapstructure.Decode(config, &spec); err != nil {
 		return spec, fmt.Errorf("decode configuration: %w", err)
 	}
-	if spec.Host == "" || spec.User == "" || spec.Command == "" {
-		return spec, fmt.Errorf("host, username, and command are required")
-	}
+
 	return spec, nil
 }
 
-// isConnectError returns true for errors that indicate the SSH connection could not be established
-// (e.g. host unreachable, timeout, connection refused). Used to decide whether to retry.
-func isConnectError(err error) bool {
+func (c *SSHCommand) isConnectError(err error) bool {
 	if err == nil {
 		return false
 	}
+
 	s := strings.ToLower(err.Error())
+
 	return strings.Contains(s, "dial") ||
 		strings.Contains(s, "timeout") ||
 		strings.Contains(s, "connection refused") ||
@@ -482,35 +433,38 @@ func (c *SSHCommand) Actions() []core.Action {
 	}
 }
 
-func (c *SSHCommand) HandleAction(ctx core.ActionContext) error {
-	if ctx.Name != "connectionRetry" {
-		return fmt.Errorf("unknown action: %s", ctx.Name)
-	}
-	if ctx.ExecutionState.IsFinished() {
-		return nil
-	}
-	if ctx.Secrets == nil {
-		return fmt.Errorf("secrets context not available for connection retry")
-	}
-	spec, err := c.decodeSpec(ctx.Configuration)
-	if err != nil {
-		return err
-	}
-	execCtx := core.ExecutionContext{
-		Configuration:  ctx.Configuration,
-		Metadata:       ctx.Metadata,
-		ExecutionState: ctx.ExecutionState,
-		Requests:       ctx.Requests,
-		Logger:         ctx.Logger,
-		Secrets:        ctx.Secrets,
-	}
-	return c.executeSSH(execCtx, spec)
-}
-
 func (c *SSHCommand) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	return 404, fmt.Errorf("SSH component does not handle webhooks")
 }
 
 func (c *SSHCommand) Cleanup(ctx core.SetupContext) error {
 	return nil
+}
+
+func (c *SSHCommand) createClient(secrets core.SecretsContext, spec Spec) (*Client, error) {
+	switch spec.Authentication.Method {
+	case AuthMethodSSHKey:
+		return c.createClientSSHKey(secrets, spec)
+	case AuthMethodPassword:
+		return c.createClientForPassword(secrets, spec)
+	default:
+		return nil, fmt.Errorf("unsupported authentication method: %s", spec.Authentication.Method)
+	}
+}
+
+func (c *SSHCommand) createClientForPassword(secrets core.SecretsContext, spec Spec) (*Client, error) {
+	password, err := secrets.GetKey(spec.Authentication.Password.Secret, spec.Authentication.Password.Key)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get password: %w", err)
+	}
+	return NewClientPassword(spec.Host, spec.Port, spec.User, password), nil
+}
+
+func (c *SSHCommand) createClientSSHKey(secrets core.SecretsContext, spec Spec) (*Client, error) {
+	privateKey, err := secrets.GetKey(spec.Authentication.PrivateKey.Secret, spec.Authentication.PrivateKey.Key)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get private key: %w", err)
+	}
+
+	return NewClientKey(spec.Host, spec.Port, spec.User, privateKey, nil), nil
 }
