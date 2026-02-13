@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -345,7 +346,7 @@ func (c *Client) ListCategories() ([]ChoiceRecord, error) {
 func (c *Client) ListSubcategories(category string) ([]ChoiceRecord, error) {
 	query := "name=incident^element=subcategory"
 	if category != "" {
-		query += "^dependent_value=" + category
+		query += "^dependent_value=" + url.QueryEscape(category)
 	}
 
 	path := fmt.Sprintf("/api/now/table/sys_choice?sysparm_query=%s&sysparm_fields=label,value&sysparm_limit=200", query)
