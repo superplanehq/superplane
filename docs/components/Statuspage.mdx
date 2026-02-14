@@ -1,0 +1,194 @@
+---
+title: "Statuspage"
+---
+
+Create and manage incidents on your Atlassian Statuspage
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident or scheduled maintenance on your Statuspage." />
+  <LinkCard title="Get Incident" href="#get-incident" description="Get the full details of an incident including its timeline and status on your Statuspage." />
+  <LinkCard title="Update Incident" href="#update-incident" description="Update the status and message of an existing incident on your Statuspage." />
+</CardGrid>
+
+## Instructions
+
+To get your API key: Open your Statuspage, click the icon in the top-right corner, select API info, then create an API key.
+
+<a id="create-incident"></a>
+
+## Create Incident
+
+The Create Incident component creates a new realtime or scheduled incident on your Atlassian Statuspage.
+
+### Use Cases
+
+- **Realtime incidents**: Create and notify subscribers when an unexpected outage occurs
+- **Scheduled maintenance**: Schedule maintenance windows with optional reminders and auto-transitions
+- **Integration workflows**: Create incidents from monitoring alerts or other workflow events
+
+### Configuration
+
+- **Page** (required): The Statuspage to create the incident on. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.page_id }}).
+- **Incident type**: Realtime (active incident) or Scheduled (planned maintenance)
+- **Name** (required): Short title for the incident
+- **Body** (optional): Initial message shown as the first incident update
+- **Status** (realtime): investigating, identified, monitoring, or resolved
+- **Impact override** (realtime): none, minor, major, or critical
+- **Components** (optional): Select one or more components to associate with the incident
+- **Component status** (optional): Status to set for all selected components (e.g. degraded_performance, under_maintenance)
+- **Scheduled For / Until** (scheduled): Start and end time for scheduled maintenance (ISO 8601, e.g. 2026-02-15T02:00)
+- **Scheduled timezone** (scheduled): Timezone for the scheduled times (default UTC). Output is converted to UTC for the API.
+- **Scheduled options** (scheduled): Remind prior, auto in-progress, auto completed
+- **Deliver notifications** (optional): Whether to send notifications for the initial update (default: true)
+
+### Output
+
+Returns the full Statuspage Incident object from the API. The payload has structure { type, timestamp, data } where data is the incident. Common expression paths (use $['Node Name'].data. as prefix):
+- data.id, data.name, data.status, data.impact
+- data.shortlink — link to the incident
+- data.created_at, data.updated_at
+- data.components — array of affected components
+- data.incident_updates — array of update messages
+
+### Example Output
+
+```json
+{
+  "component_ids": [
+    "8kbf7d35c070"
+  ],
+  "created_at": "2026-02-12T10:30:00.000Z",
+  "id": "p31zjtct2jer",
+  "impact": "major",
+  "incident_updates": [
+    {
+      "body": "We are investigating reports of slow database queries.",
+      "created_at": "2026-02-12T10:30:00.000Z",
+      "id": "upd1",
+      "status": "investigating"
+    }
+  ],
+  "name": "Database Connection Issues",
+  "page_id": "kctbh9vrtdwd",
+  "shortlink": "http://stspg.io/p31zjtct2jer",
+  "status": "investigating"
+}
+```
+
+<a id="get-incident"></a>
+
+## Get Incident
+
+The Get Incident component fetches the full details of an existing incident on your Atlassian Statuspage.
+
+### Use Cases
+
+- **Incident lookup**: Fetch incident details for processing or display
+- **Workflow automation**: Get incident information to make decisions in workflows
+- **Timeline enrichment**: Retrieve the incident timeline (incident_updates) for reporting or notifications
+- **Status checking**: Check incident status before performing actions
+
+### Configuration
+
+- **Page** (required): The Statuspage containing the incident. Select from the dropdown, or switch to expression mode for workflow chaining (e.g. {{ $['Create Incident'].data.page_id }}).
+- **Incident** (required): Incident ID to fetch. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.id }}).
+
+### Output
+
+Returns the full Statuspage Incident object from the API. The payload has structure { type, timestamp, data } where data is the incident. Common expression paths (use $['Node Name'].data. as prefix):
+- data.id, data.name, data.status, data.impact
+- data.shortlink — link to the incident
+- data.created_at, data.updated_at, data.resolved_at
+- data.components — array of affected components
+- data.incident_updates — array of update messages (timeline), in API order
+
+### Example Output
+
+```json
+{
+  "component_ids": [
+    "8kbf7d35c070"
+  ],
+  "created_at": "2026-02-12T10:30:00.000Z",
+  "id": "p31zjtct2jer",
+  "impact": "major",
+  "incident_updates": [
+    {
+      "body": "We are investigating reports of slow database queries.",
+      "created_at": "2026-02-12T10:30:00.000Z",
+      "id": "upd1",
+      "status": "investigating"
+    }
+  ],
+  "name": "Database Connection Issues",
+  "page_id": "kctbh9vrtdwd",
+  "shortlink": "http://stspg.io/p31zjtct2jer",
+  "status": "investigating",
+  "updated_at": "2026-02-12T10:30:00.000Z"
+}
+```
+
+<a id="update-incident"></a>
+
+## Update Incident
+
+The Update Incident component updates an existing incident on your Atlassian Statuspage.
+
+### Use Cases
+
+- **Status transitions**: Update incident status (e.g. investigating → identified → resolved)
+- **Maintenance updates**: Transition scheduled maintenance to in progress or completed
+- **Integration workflows**: Update incidents from monitoring systems or approval workflows
+
+### Configuration
+
+- **Page** (required): The Statuspage containing the incident. Select from the dropdown, or switch to expression mode for workflow chaining (e.g. {{ $['Create Incident'].data.page_id }}).
+- **Incident** (required): Incident ID to update. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.id }}).
+- **Status** (optional): New status (investigating, identified, monitoring, resolved, scheduled, in_progress, completed)
+- **Body** (optional): Update message shown as the latest incident update
+- **Impact override** (optional): Override displayed severity (none, maintenance, minor, major, critical)
+- **Components** (optional): Components to associate with this update
+- **Component status** (optional): Status to set for selected components
+- **Deliver notifications** (optional): Whether to send notifications for this update (default: true)
+
+At least one of Status, Body, Impact override, or Components must be provided.
+
+### Output
+
+Returns the full Statuspage Incident object from the API. The payload has structure { type, timestamp, data } where data is the incident. Common expression paths (use $['Node Name'].data. as prefix):
+- data.id, data.name, data.status, data.impact
+- data.shortlink — link to the incident
+- data.created_at, data.updated_at
+- data.components — array of affected components
+- data.incident_updates — array of update messages
+
+### Example Output
+
+```json
+{
+  "component_ids": [
+    "8kbf7d35c070"
+  ],
+  "created_at": "2026-02-12T10:30:00.000Z",
+  "id": "p31zjtct2jer",
+  "impact": "major",
+  "incident_updates": [
+    {
+      "body": "All systems operational. Issue resolved.",
+      "created_at": "2026-02-12T11:00:00.000Z",
+      "id": "upd1",
+      "status": "resolved"
+    }
+  ],
+  "name": "Database Connection Issues",
+  "page_id": "kctbh9vrtdwd",
+  "shortlink": "http://stspg.io/p31zjtct2jer",
+  "status": "resolved",
+  "updated_at": "2026-02-12T11:00:00.000Z"
+}
+```
+
