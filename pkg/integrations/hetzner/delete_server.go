@@ -2,7 +2,6 @@ package hetzner
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -25,7 +24,7 @@ type DeleteServerSpec struct {
 
 type DeleteServerExecutionMetadata struct {
 	ActionID int    `json:"actionId" mapstructure:"actionId"`
-	ServerID int    `json:"serverId" mapstructure:"serverId"`
+	ServerID string `json:"serverId" mapstructure:"serverId"`
 }
 
 func (c *DeleteServer) Name() string {
@@ -52,7 +51,7 @@ func (c *DeleteServer) Documentation() string {
 }
 
 func (c *DeleteServer) Icon() string {
-	return "server"
+	return "hetzner"
 }
 
 func (c *DeleteServer) Color() string {
@@ -107,9 +106,9 @@ func (c *DeleteServer) Execute(ctx core.ExecutionContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return err
 	}
-	serverID, err := strconv.Atoi(strings.TrimSpace(spec.Server))
-	if err != nil || serverID <= 0 {
-		return fmt.Errorf("invalid server ID: %s", spec.Server)
+	serverID := strings.TrimSpace(spec.Server)
+	if serverID == "" {
+		return fmt.Errorf("server ID is required")
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)

@@ -188,8 +188,8 @@ func (c *Client) GetAction(actionID int) (*ActionResponse, error) {
 	return &out.Action, nil
 }
 
-func (c *Client) GetServer(serverID int) (*ServerResponse, error) {
-	resp, err := c.do("GET", "/servers/"+strconv.Itoa(serverID), nil)
+func (c *Client) GetServer(serverID string) (*ServerResponse, error) {
+	resp, err := c.do("GET", "/servers/"+serverID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -208,8 +208,8 @@ func (c *Client) GetServer(serverID int) (*ServerResponse, error) {
 	return &out.Server, nil
 }
 
-func (c *Client) DeleteServer(serverID int) (*ActionResponse, error) {
-	resp, err := c.do("DELETE", "/servers/"+strconv.Itoa(serverID), nil)
+func (c *Client) DeleteServer(serverID string) (*ActionResponse, error) {
+	resp, err := c.do("DELETE", "/servers/"+serverID, nil)
 	if err != nil {
 		return nil, err
 	}

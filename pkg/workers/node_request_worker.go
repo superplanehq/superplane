@@ -291,7 +291,7 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request 
 
 	actionCtx := core.ActionContext{
 		Name:           actionName,
-		Configuration:  childNode.Configuration,
+		Configuration:  execution.Configuration.Data(),
 		Parameters:     spec.InvokeAction.Parameters,
 		Logger:         logging.ForExecution(execution, parentExecution),
 		HTTP:           w.registry.HTTPContext(),

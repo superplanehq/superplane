@@ -2,6 +2,7 @@ package hetzner
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -65,7 +66,7 @@ func (c *CreateServer) Documentation() string {
 }
 
 func (c *CreateServer) Icon() string {
-	return "server"
+	return "hetzner"
 }
 
 func (c *CreateServer) Color() string {
@@ -260,7 +261,7 @@ func (c *CreateServer) poll(ctx core.ActionContext) error {
 	case ActionStatusSuccess:
 		server := metadata.Server
 		if server != nil && server.ID != 0 {
-			if refreshed, err := client.GetServer(server.ID); err == nil {
+			if refreshed, err := client.GetServer(strconv.Itoa(server.ID)); err == nil {
 				server = refreshed
 			}
 		}

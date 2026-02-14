@@ -29,7 +29,7 @@ func (h *Hetzner) Label() string {
 }
 
 func (h *Hetzner) Icon() string {
-	return "server"
+	return "hetzner"
 }
 
 func (h *Hetzner) Description() string {
