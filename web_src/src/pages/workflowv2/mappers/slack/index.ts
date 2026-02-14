@@ -27,7 +27,10 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
         badgeColor: "bg-blue-500",
         label: "Waiting",
       },
-      received: DEFAULT_EVENT_STATE_MAP.success,
+      received: {
+        ...DEFAULT_EVENT_STATE_MAP.success,
+        label: "Received",
+      },
       timed_out: {
         icon: "clock",
         textColor: "text-gray-800",
