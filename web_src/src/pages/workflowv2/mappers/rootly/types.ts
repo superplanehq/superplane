@@ -20,6 +20,12 @@ export interface Incident {
   mitigated_at?: string;
   updated_at?: string;
   url?: string;
+  user?: { id?: string; full_name?: string; email?: string };
+  started_by?: { id?: string; full_name?: string; email?: string };
+  services?: Array<{ id?: string; name?: string; slug?: string }>;
+  groups?: Array<{ id?: string; name?: string; slug?: string }>;
+  events?: Array<Record<string, unknown>>;
+  action_items?: Array<{ id?: string; summary?: string; status?: string }>;
 }
 
 export interface IncidentEvent {
