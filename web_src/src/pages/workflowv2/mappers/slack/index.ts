@@ -40,6 +40,20 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
       },
     },
     getState: (execution) => {
+      // Check for error and cancellation states first, before metadata-driven states,
+      // so that framework-level states (cancelled, error) are not masked.
+      if (
+        execution.resultMessage &&
+        (execution.resultReason === "RESULT_REASON_ERROR" ||
+          (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
+      ) {
+        return "error";
+      }
+
+      if (execution.result === "RESULT_CANCELLED") {
+        return "cancelled";
+      }
+
       const metadata = execution.metadata as { state?: string } | undefined;
       if (metadata?.state === "waiting") return "waiting" as any;
       if (metadata?.state === "timed_out") return "timed_out" as any;
