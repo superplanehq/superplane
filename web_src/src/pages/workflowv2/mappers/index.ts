@@ -85,9 +85,7 @@ import {
   triggerRenderers as awsTriggerRenderers,
   eventStateRegistry as awsEventStateRegistry,
 } from "./aws";
-import {
-  componentMappers as hetznerComponentMappers,
-} from "./hetzner/index";
+import { componentMappers as hetznerComponentMappers } from "./hetzner/index";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
 import {
   componentMappers as discordComponentMappers,

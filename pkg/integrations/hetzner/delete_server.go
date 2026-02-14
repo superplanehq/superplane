@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	DeleteServerPayloadType   = "hetzner.server.deleted"
-	DeleteServerPollInterval   = 5 * time.Second
+	DeleteServerPayloadType  = "hetzner.server.deleted"
+	DeleteServerPollInterval = 5 * time.Second
 )
 
 type DeleteServer struct{}
@@ -23,7 +23,7 @@ type DeleteServerSpec struct {
 }
 
 type DeleteServerExecutionMetadata struct {
-	ActionID int    `json:"actionId" mapstructure:"actionId"`
+	ActionID string `json:"actionId" mapstructure:"actionId"`
 	ServerID string `json:"serverId" mapstructure:"serverId"`
 }
 
@@ -159,7 +159,7 @@ func (c *DeleteServer) poll(ctx core.ActionContext) error {
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
 		return fmt.Errorf("decode metadata: %w", err)
 	}
-	if metadata.ActionID == 0 {
+	if metadata.ActionID == "" {
 		return nil
 	}
 

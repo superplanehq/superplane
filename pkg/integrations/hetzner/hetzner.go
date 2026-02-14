@@ -105,7 +105,7 @@ func (h *Hetzner) ListResources(resourceType string, ctx core.ListResourcesConte
 		}
 		resources := make([]core.IntegrationResource, 0, len(servers))
 		for _, s := range servers {
-			id := fmt.Sprintf("%d", s.ID)
+			id := s.ID
 			name := s.Name
 			if name == "" {
 				name = id

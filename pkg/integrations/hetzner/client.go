@@ -6,16 +6,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 const defaultHetznerBaseURL = "https://api.hetzner.cloud/v1"
 
 type Client struct {
-	Token  string
+	Token   string
 	BaseURL string
 	http    core.HTTPContext
 }
@@ -34,13 +34,13 @@ func (e *APIError) Error() string {
 }
 
 type createServerRequest struct {
-	Name        string   `json:"name"`
-	ServerType  string   `json:"server_type"`
-	Image       string   `json:"image"`
-	Location    string   `json:"location,omitempty"`
-	SSHKeys     []string `json:"ssh_keys,omitempty"`
-	UserData    string   `json:"user_data,omitempty"`
-	StartAfterCreate *bool `json:"start_after_create,omitempty"`
+	Name             string   `json:"name"`
+	ServerType       string   `json:"server_type"`
+	Image            string   `json:"image"`
+	Location         string   `json:"location,omitempty"`
+	SSHKeys          []string `json:"ssh_keys,omitempty"`
+	UserData         string   `json:"user_data,omitempty"`
+	StartAfterCreate *bool    `json:"start_after_create,omitempty"`
 }
 
 type createServerResponse struct {
@@ -49,10 +49,10 @@ type createServerResponse struct {
 }
 
 type ServerResponse struct {
-	ID       int    `json:"id"`
-	Name     string `json:"name"`
-	Status   string `json:"status"`
-	Created  string `json:"created"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Status    string `json:"status"`
+	Created   string `json:"created"`
 	PublicNet struct {
 		IPv4 struct {
 			IP string `json:"ip"`
@@ -61,13 +61,13 @@ type ServerResponse struct {
 }
 
 type ActionResponse struct {
-	ID        int    `json:"id"`
-	Status    string `json:"status"`
-	Command   string `json:"command"`
-	Progress  int    `json:"progress"`
-	Started   string `json:"started"`
-	Finished  string `json:"finished"`
-	Error     *struct {
+	ID       string `json:"id"`
+	Status   string `json:"status"`
+	Command  string `json:"command"`
+	Progress int    `json:"progress"`
+	Started  string `json:"started"`
+	Finished string `json:"finished"`
+	Error    *struct {
 		Code    string `json:"code"`
 		Message string `json:"message"`
 	} `json:"error"`
@@ -119,6 +119,29 @@ func (c *Client) do(method, path string, body any) (*http.Response, error) {
 	return resp, nil
 }
 
+// decodeJSON decodes a JSON response body into the target struct.
+// It uses json.Decoder.UseNumber() so that numeric IDs from the Hetzner API
+// are preserved as strings (via mapstructure's WeaklyTypedInput).
+func decodeJSON(r io.Reader, result any) error {
+	var raw any
+	dec := json.NewDecoder(r)
+	dec.UseNumber()
+	if err := dec.Decode(&raw); err != nil {
+		return err
+	}
+
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:           result,
+		TagName:          "json",
+		WeaklyTypedInput: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	return decoder.Decode(raw)
+}
+
 func (c *Client) parseError(resp *http.Response) error {
 	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
@@ -161,7 +184,7 @@ func (c *Client) CreateServer(name, serverType, image, location string, sshKeys 
 	}
 
 	var out createServerResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := decodeJSON(resp.Body, &out); err != nil {
 		return nil, nil, fmt.Errorf("decode create server response: %w", err)
 	}
 	if out.Server == nil || out.Action == nil {
@@ -170,8 +193,8 @@ func (c *Client) CreateServer(name, serverType, image, location string, sshKeys 
 	return out.Server, out.Action, nil
 }
 
-func (c *Client) GetAction(actionID int) (*ActionResponse, error) {
-	resp, err := c.do("GET", "/actions/"+strconv.Itoa(actionID), nil)
+func (c *Client) GetAction(actionID string) (*ActionResponse, error) {
+	resp, err := c.do("GET", "/actions/"+actionID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +205,7 @@ func (c *Client) GetAction(actionID int) (*ActionResponse, error) {
 	}
 
 	var out getActionResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := decodeJSON(resp.Body, &out); err != nil {
 		return nil, fmt.Errorf("decode get action response: %w", err)
 	}
 	return &out.Action, nil
@@ -202,7 +225,7 @@ func (c *Client) GetServer(serverID string) (*ServerResponse, error) {
 	var out struct {
 		Server ServerResponse `json:"server"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := decodeJSON(resp.Body, &out); err != nil {
 		return nil, fmt.Errorf("decode get server response: %w", err)
 	}
 	return &out.Server, nil
@@ -222,7 +245,7 @@ func (c *Client) DeleteServer(serverID string) (*ActionResponse, error) {
 	var out struct {
 		Action ActionResponse `json:"action"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := decodeJSON(resp.Body, &out); err != nil {
 		return nil, fmt.Errorf("decode delete server response: %w", err)
 	}
 	return &out.Action, nil
@@ -242,7 +265,7 @@ func (c *Client) ListServers() ([]ServerResponse, error) {
 	var out struct {
 		Servers []ServerResponse `json:"servers"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := decodeJSON(resp.Body, &out); err != nil {
 		return nil, fmt.Errorf("decode list servers response: %w", err)
 	}
 	return out.Servers, nil
@@ -253,13 +276,13 @@ type ServerTypePrice struct {
 }
 
 type ServerTypeResponse struct {
-	Name        string             `json:"name"`
-	ID          int                `json:"id"`
-	Description string             `json:"description"`
-	Cores       int                `json:"cores"`
-	Memory      float64            `json:"memory"`
-	Disk        int                `json:"disk"`
-	Prices      []ServerTypePrice  `json:"prices"`
+	Name        string            `json:"name"`
+	ID          int               `json:"id"`
+	Description string            `json:"description"`
+	Cores       int               `json:"cores"`
+	Memory      float64           `json:"memory"`
+	Disk        int               `json:"disk"`
+	Prices      []ServerTypePrice `json:"prices"`
 }
 
 func (c *Client) ListServerTypes() ([]ServerTypeResponse, error) {
@@ -428,9 +451,9 @@ func resolveServerID(config any) (string, error) {
 		}
 		return s, nil
 	case float64:
-		return strconv.Itoa(int(v)), nil
+		return fmt.Sprintf("%.0f", v), nil
 	case int:
-		return strconv.Itoa(v), nil
+		return fmt.Sprintf("%d", v), nil
 	default:
 		return "", fmt.Errorf("invalid server value: %v", raw)
 	}

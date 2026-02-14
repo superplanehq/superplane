@@ -1,0 +1,73 @@
+---
+title: "Hetzner Cloud"
+---
+
+Create and delete Hetzner Cloud servers
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Server" href="#create-server" description="Create a Hetzner Cloud server and wait for the action to complete" />
+  <LinkCard title="Delete Server" href="#delete-server" description="Delete a Hetzner Cloud server and wait for the action to complete" />
+</CardGrid>
+
+## Instructions
+
+**API Token:** Create a token in [Hetzner Cloud Console](https://console.hetzner.cloud/) → Project → Security → API Tokens. Use **Read & Write** scope.
+
+<a id="create-server"></a>
+
+## Create Server
+
+The Create Server component creates a new server in Hetzner Cloud and waits for the create action to complete.
+
+### How It Works
+
+1. Creates a server with the given name, server type, image, and optional location/SSH keys/user data
+2. Polls the Hetzner API until the create action finishes
+3. Emits the server details on the default output when ready. If creation fails, the execution errors.
+
+### Configuration
+
+- **Name**: Server name (supports expressions)
+- **Server type**: e.g. cx11, cpx11, cax11
+- **Image**: Image name or ID, e.g. ubuntu-24.04
+- **Location** (optional): e.g. fsn1, nbg1, hel1
+- **SSH keys** (optional): List of SSH key names or IDs
+- **User data** (optional): Cloud-init user data
+
+### Example Output
+
+```json
+{
+  "created": "2024-01-15T10:30:00+00:00",
+  "id": 42,
+  "name": "my-server",
+  "publicIp": "1.2.3.4",
+  "status": "running"
+}
+```
+
+<a id="delete-server"></a>
+
+## Delete Server
+
+The Delete Server component deletes a server in Hetzner Cloud and waits for the delete action to complete.
+
+### How It Works
+
+1. Deletes the selected server via the Hetzner API
+2. Polls the API until the delete action finishes
+3. Emits on the default output when the server is deleted. If deletion fails, the execution errors.
+
+### Example Output
+
+```json
+{
+  "actionId": 123,
+  "serverId": 42
+}
+```
+

@@ -2,7 +2,6 @@ package hetzner
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -13,7 +12,7 @@ import (
 )
 
 const (
-	CreateServerPayloadType = "hetzner.server.created"
+	CreateServerPayloadType  = "hetzner.server.created"
 	CreateServerPollInterval = 5 * time.Second
 )
 
@@ -29,7 +28,7 @@ type CreateServerSpec struct {
 }
 
 type CreateServerExecutionMetadata struct {
-	ActionID int             `json:"actionId" mapstructure:"actionId"`
+	ActionID string          `json:"actionId" mapstructure:"actionId"`
 	Server   *ServerResponse `json:"server,omitempty" mapstructure:"server"`
 }
 
@@ -79,11 +78,11 @@ func (c *CreateServer) OutputChannels(configuration any) []core.OutputChannel {
 
 func (c *CreateServer) ExampleOutput() map[string]any {
 	return map[string]any{
-		"id":        42,
-		"name":      "my-server",
-		"status":    "running",
-		"created":   "2024-01-15T10:30:00+00:00",
-		"publicIp":  "1.2.3.4",
+		"id":       42,
+		"name":     "my-server",
+		"status":   "running",
+		"created":  "2024-01-15T10:30:00+00:00",
+		"publicIp": "1.2.3.4",
 	}
 }
 
@@ -137,10 +136,10 @@ func (c *CreateServer) Configuration() []configuration.Field {
 			Description: "Location (optional, omit for auto). Only locations that support the selected server type are shown.",
 		},
 		{
-			Name:     "sshKeys",
-			Label:    "SSH keys",
-			Type:     configuration.FieldTypeList,
-			Required: false,
+			Name:        "sshKeys",
+			Label:       "SSH keys",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
 			Description: "Add the name or ID of each SSH key from your Hetzner Cloud project (Security → SSH Keys). The server will allow login with these keys.",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
@@ -235,7 +234,7 @@ func (c *CreateServer) poll(ctx core.ActionContext) error {
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
 		return fmt.Errorf("decode metadata: %w", err)
 	}
-	if metadata.ActionID == 0 {
+	if metadata.ActionID == "" {
 		return nil
 	}
 
@@ -260,8 +259,8 @@ func (c *CreateServer) poll(ctx core.ActionContext) error {
 		return fmt.Errorf("%s", msg)
 	case ActionStatusSuccess:
 		server := metadata.Server
-		if server != nil && server.ID != 0 {
-			if refreshed, err := client.GetServer(strconv.Itoa(server.ID)); err == nil {
+		if server != nil && server.ID != "" {
+			if refreshed, err := client.GetServer(server.ID); err == nil {
 				server = refreshed
 			}
 		}
@@ -289,9 +288,9 @@ func serverToPayload(s *ServerResponse) map[string]any {
 		return map[string]any{}
 	}
 	out := map[string]any{
-		"id":     s.ID,
-		"name":   s.Name,
-		"status": s.Status,
+		"id":      s.ID,
+		"name":    s.Name,
+		"status":  s.Status,
 		"created": s.Created,
 	}
 	if s.PublicNet.IPv4.IP != "" {
