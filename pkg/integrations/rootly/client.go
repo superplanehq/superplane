@@ -189,56 +189,6 @@ func (c *Client) ListSeverities() ([]Severity, error) {
 	return severities, nil
 }
 
-// Status represents a Rootly incident status.
-type Status struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Slug    string `json:"slug"`
-	Enabled bool   `json:"enabled"`
-}
-
-type StatusData struct {
-	ID         string           `json:"id"`
-	Type       string           `json:"type"`
-	Attributes StatusAttributes `json:"attributes"`
-}
-
-type StatusAttributes struct {
-	Name    string `json:"name"`
-	Slug    string `json:"slug"`
-	Enabled bool   `json:"enabled"`
-}
-
-type StatusesResponse struct {
-	Data []StatusData `json:"data"`
-}
-
-func (c *Client) ListStatuses() ([]Status, error) {
-	url := fmt.Sprintf("%s/statuses", c.BaseURL)
-	responseBody, err := c.execRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var response StatusesResponse
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	statuses := make([]Status, 0, len(response.Data))
-	for _, data := range response.Data {
-		statuses = append(statuses, Status{
-			ID:      data.ID,
-			Name:    data.Attributes.Name,
-			Slug:    data.Attributes.Slug,
-			Enabled: data.Attributes.Enabled,
-		})
-	}
-
-	return statuses, nil
-}
-
 // Incident represents a Rootly incident
 type Incident struct {
 	ID           string `json:"id"`
