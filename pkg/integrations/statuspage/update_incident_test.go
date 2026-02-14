@@ -86,7 +86,7 @@ func Test__UpdateIncident__Setup(t *testing.T) {
 			Configuration: map[string]any{
 				"page":            "kctbh9vrtdwd",
 				"incident":        "p31zjtct2jer",
-				"status":         "resolved",
+				"status":          "resolved",
 				"componentIds":    []string{"comp1"},
 				"componentStatus": "operational",
 			},
@@ -154,9 +154,9 @@ func Test__UpdateIncident__Execute(t *testing.T) {
 				"status":   "resolved",
 				"body":     "All systems operational.",
 			},
-			HTTP:            httpContext,
-			Integration:     integrationCtx,
-			ExecutionState:  executionState,
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
+			ExecutionState: executionState,
 		})
 
 		require.NoError(t, err)
@@ -191,8 +191,8 @@ func Test__UpdateIncident__Execute(t *testing.T) {
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
 				"page":                 "kctbh9vrtdwd",
-				"incident":            "p31zjtct2jer",
-				"status":              "resolved",
+				"incident":             "p31zjtct2jer",
+				"status":               "resolved",
 				"deliverNotifications": &deliverFalse,
 			},
 			HTTP:           httpContext,

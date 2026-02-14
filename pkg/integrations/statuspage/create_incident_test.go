@@ -186,9 +186,9 @@ func Test__CreateIncident__Execute(t *testing.T) {
 				"name":         "Database Connection Issues",
 				"body":         "We are investigating.",
 			},
-			HTTP:            httpContext,
-			Integration:     integrationCtx,
-			ExecutionState:  executionState,
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
+			ExecutionState: executionState,
 		})
 
 		require.NoError(t, err)
@@ -234,10 +234,10 @@ func Test__CreateIncident__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"page":         "kctbh9vrtdwd",
-				"incidentType": "scheduled",
-				"name":         "Maintenance",
-				"scheduledFor": "2026-02-15T02:00:00Z",
+				"page":           "kctbh9vrtdwd",
+				"incidentType":   "scheduled",
+				"name":           "Maintenance",
+				"scheduledFor":   "2026-02-15T02:00:00Z",
 				"scheduledUntil": "2026-02-15T04:00:00Z",
 			},
 			HTTP:           httpContext,

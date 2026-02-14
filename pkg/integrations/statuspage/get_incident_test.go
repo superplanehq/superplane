@@ -89,9 +89,9 @@ func Test__GetIncident__Execute(t *testing.T) {
 				"page":     "kctbh9vrtdwd",
 				"incident": "p31zjtct2jer",
 			},
-			HTTP:            httpContext,
-			Integration:     integrationCtx,
-			ExecutionState:  executionState,
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
+			ExecutionState: executionState,
 		})
 
 		require.NoError(t, err)
