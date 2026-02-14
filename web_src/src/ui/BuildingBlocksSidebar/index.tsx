@@ -32,12 +32,14 @@ import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
+import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
+import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
 
 export interface BuildingBlock {
   name: string;
@@ -405,6 +407,7 @@ function CategorySection({
     discord: discordIcon,
     github: githubIcon,
     gitlab: gitlabIcon,
+    hetzner: hetznerIcon,
     jira: jiraIcon,
     openai: openAiIcon,
     "open-ai": openAiIcon,
@@ -424,6 +427,7 @@ function CategorySection({
       lambda: awsLambdaIcon,
       ecr: awsEcrIcon,
       ecs: awsIcon,
+      sns: awsSnsIcon,
     },
   };
 
@@ -484,6 +488,7 @@ function CategorySection({
             discord: discordIcon,
             github: githubIcon,
             gitlab: gitlabIcon,
+            hetzner: hetznerIcon,
             openai: openAiIcon,
             "open-ai": openAiIcon,
             claude: claudeIcon,
@@ -502,6 +507,7 @@ function CategorySection({
               ecr: awsEcrIcon,
               lambda: awsLambdaIcon,
               ecs: awsIcon,
+              sns: awsSnsIcon,
             },
           };
           const appLogo = nameParts[0] ? appLogoMap[nameParts[0]] : undefined;

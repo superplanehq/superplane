@@ -24,6 +24,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/eventbridge"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/iam"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/lambda"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/sns"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -34,7 +35,7 @@ const (
 )
 
 func init() {
-	registry.RegisterIntegration("aws", &AWS{})
+	registry.RegisterIntegrationWithWebhookHandler("aws", &AWS{}, &WebhookHandler{})
 }
 
 type AWS struct{}
@@ -142,6 +143,11 @@ func (a *AWS) Components() []core.Component {
 		&ecs.DescribeService{},
 		&ecs.RunTask{},
 		&ecs.StopTask{},
+		&sns.GetTopic{},
+		&sns.GetSubscription{},
+		&sns.CreateTopic{},
+		&sns.DeleteTopic{},
+		&sns.PublishMessage{},
 		&ecr.GetImage{},
 		&ecr.GetImageScanFindings{},
 		&ecr.ScanImage{},
@@ -155,6 +161,7 @@ func (a *AWS) Triggers() []core.Trigger {
 		&codeartifact.OnPackageVersion{},
 		&ecr.OnImageScan{},
 		&ecr.OnImagePush{},
+		&sns.OnTopicMessage{},
 	}
 }
 

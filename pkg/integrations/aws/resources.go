@@ -6,6 +6,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ecr"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ecs"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/lambda"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/sns"
 )
 
 func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -33,6 +34,12 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 
 	case "codeartifact.domain":
 		return codeartifact.ListDomains(ctx, resourceType)
+
+	case "sns.topic":
+		return sns.ListTopics(ctx, resourceType)
+
+	case "sns.subscription":
+		return sns.ListSubscriptions(ctx, resourceType)
 
 	default:
 		return []core.IntegrationResource{}, nil
