@@ -2,17 +2,17 @@ import {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
-  ExecutionInfo,
   NodeInfo,
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
+import { ComponentBaseProps, ComponentBaseSpec } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getStateMap } from "..";
 import { MetadataItem } from "@/ui/metadataList";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import { formatTimeAgo } from "@/utils/date";
+import { slackEventSections } from "./base";
 
 interface SendAndWaitConfiguration {
   channel?: string;
@@ -46,7 +46,7 @@ export const sendAndWaitMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? sendAndWaitEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? slackEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: sendAndWaitMetadataList(context.node),
       specs: sendAndWaitSpecs(context.node),
@@ -121,20 +121,4 @@ function sendAndWaitSpecs(node: NodeInfo): ComponentBaseSpec[] {
   }
 
   return specs;
-}
-
-function sendAndWaitEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
-  return [
-    {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
-      eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent!.id!,
-    },
-  ];
 }
