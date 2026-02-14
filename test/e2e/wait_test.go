@@ -14,9 +14,8 @@ import (
 )
 
 func TestWaitComponent(t *testing.T) {
-	steps := &WaitSteps{t: t}
-
 	t.Run("configure Wait for seconds", func(t *testing.T) {
+		steps := &WaitSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists("Wait Seconds")
 		steps.addWaitWithDuration(10, "Seconds")
@@ -24,6 +23,7 @@ func TestWaitComponent(t *testing.T) {
 	})
 
 	t.Run("configure Wait for minutes", func(t *testing.T) {
+		steps := &WaitSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists("Wait Minutes")
 		steps.addWaitWithDuration(5, "Minutes")
@@ -31,6 +31,7 @@ func TestWaitComponent(t *testing.T) {
 	})
 
 	t.Run("configure Wait for hours", func(t *testing.T) {
+		steps := &WaitSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists("Wait Hours")
 		steps.addWaitWithDuration(2, "Hours")
@@ -38,6 +39,7 @@ func TestWaitComponent(t *testing.T) {
 	})
 
 	t.Run("push through the wait item", func(t *testing.T) {
+		steps := &WaitSteps{t: t}
 		steps.start()
 		steps.givenACanvasWithManualTriggerWaitAndOutput()
 		steps.runManualTrigger()

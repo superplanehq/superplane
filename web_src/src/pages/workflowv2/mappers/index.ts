@@ -85,6 +85,7 @@ import {
   triggerRenderers as awsTriggerRenderers,
   eventStateRegistry as awsEventStateRegistry,
 } from "./aws";
+import { componentMappers as hetznerComponentMappers } from "./hetzner/index";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
 import {
   componentMappers as discordComponentMappers,
@@ -97,10 +98,26 @@ import {
   eventStateRegistry as openaiEventStateRegistry,
 } from "./openai/index";
 import {
+  componentMappers as circleCIComponentMappers,
+  triggerRenderers as circleCITriggerRenderers,
+  eventStateRegistry as circleCIEventStateRegistry,
+} from "./circleci/index";
+import {
   componentMappers as claudeComponentMappers,
   triggerRenderers as claudeTriggerRenderers,
   eventStateRegistry as claudeEventStateRegistry,
 } from "./claude/index";
+import {
+  componentMappers as prometheusComponentMappers,
+  customFieldRenderers as prometheusCustomFieldRenderers,
+  triggerRenderers as prometheusTriggerRenderers,
+  eventStateRegistry as prometheusEventStateRegistry,
+} from "./prometheus/index";
+import {
+  componentMappers as cursorComponentMappers,
+  triggerRenderers as cursorTriggerRenderers,
+  eventStateRegistry as cursorEventStateRegistry,
+} from "./cursor/index";
 import {
   componentMappers as statuspageComponentMappers,
   triggerRenderers as statuspageTriggerRenderers,
@@ -112,7 +129,6 @@ import {
   triggerRenderers as dockerhubTriggerRenderers,
   eventStateRegistry as dockerhubEventStateRegistry,
 } from "./dockerhub";
-
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
@@ -161,7 +177,11 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   aws: awsComponentMappers,
   discord: discordComponentMappers,
   openai: openaiComponentMappers,
+  circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
+  prometheus: prometheusComponentMappers,
+  cursor: cursorComponentMappers,
+  hetzner: hetznerComponentMappers,
   statuspage: statuspageComponentMappers,
   dockerhub: dockerhubComponentMappers,
 };
@@ -183,7 +203,10 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   aws: awsTriggerRenderers,
   discord: discordTriggerRenderers,
   openai: openaiTriggerRenderers,
+  circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
+  prometheus: prometheusTriggerRenderers,
+  cursor: cursorTriggerRenderers,
   statuspage: statuspageTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
 };
@@ -203,9 +226,12 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   discord: discordEventStateRegistry,
   rootly: rootlyEventStateRegistry,
   openai: openaiEventStateRegistry,
+  circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
   statuspage: statuspageEventStateRegistry,
   aws: awsEventStateRegistry,
+  prometheus: prometheusEventStateRegistry,
+  cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
 };
@@ -233,6 +259,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
+  prometheus: prometheusCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
 };
 

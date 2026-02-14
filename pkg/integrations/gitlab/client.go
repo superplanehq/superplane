@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 
@@ -247,4 +248,208 @@ func (c *Client) FetchIntegrationData() (*User, []Project, error) {
 	}
 
 	return user, projects, nil
+}
+
+type PipelineVariable struct {
+	Key          string `json:"key"`
+	Value        string `json:"value"`
+	VariableType string `json:"variable_type,omitempty"`
+}
+
+type CreatePipelineRequest struct {
+	Ref    string            `json:"ref"`
+	Inputs map[string]string `json:"inputs,omitempty"`
+}
+
+type PipelineInput struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+type Pipeline struct {
+	ID             int            `json:"id"`
+	IID            int            `json:"iid"`
+	ProjectID      int            `json:"project_id"`
+	Status         string         `json:"status"`
+	Source         string         `json:"source,omitempty"`
+	Ref            string         `json:"ref"`
+	SHA            string         `json:"sha"`
+	BeforeSHA      string         `json:"before_sha,omitempty"`
+	Tag            bool           `json:"tag,omitempty"`
+	YamlErrors     *string        `json:"yaml_errors,omitempty"`
+	WebURL         string         `json:"web_url"`
+	URL            string         `json:"url,omitempty"`
+	CreatedAt      string         `json:"created_at"`
+	UpdatedAt      string         `json:"updated_at"`
+	StartedAt      string         `json:"started_at,omitempty"`
+	FinishedAt     string         `json:"finished_at,omitempty"`
+	CommittedAt    string         `json:"committed_at,omitempty"`
+	Duration       float64        `json:"duration,omitempty"`
+	QueuedDuration float64        `json:"queued_duration,omitempty"`
+	Coverage       string         `json:"coverage,omitempty"`
+	User           map[string]any `json:"user,omitempty"`
+	DetailedStatus map[string]any `json:"detailed_status,omitempty"`
+}
+
+type PipelineTestReportSummary struct {
+	Total      map[string]any   `json:"total"`
+	TestSuites []map[string]any `json:"test_suites"`
+}
+
+func (c *Client) CreatePipeline(ctx context.Context, projectID string, req *CreatePipelineRequest) (*Pipeline, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/pipeline", c.baseURL, apiVersion, url.PathEscape(projectID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("failed to create pipeline: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var pipeline Pipeline
+	if err := json.NewDecoder(resp.Body).Decode(&pipeline); err != nil {
+		return nil, fmt.Errorf("failed to decode pipeline: %v", err)
+	}
+
+	if pipeline.WebURL == "" && pipeline.URL != "" {
+		pipeline.WebURL = pipeline.URL
+	}
+
+	return &pipeline, nil
+}
+
+func (c *Client) GetPipeline(projectID string, pipelineID int) (*Pipeline, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/pipelines/%d", c.baseURL, apiVersion, url.PathEscape(projectID), pipelineID)
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get pipeline: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var pipeline Pipeline
+	if err := json.NewDecoder(resp.Body).Decode(&pipeline); err != nil {
+		return nil, fmt.Errorf("failed to decode pipeline: %v", err)
+	}
+
+	if pipeline.WebURL == "" && pipeline.URL != "" {
+		pipeline.WebURL = pipeline.URL
+	}
+
+	return &pipeline, nil
+}
+
+func (c *Client) CancelPipeline(ctx context.Context, projectID string, pipelineID int) error {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/pipelines/%d/cancel", c.baseURL, apiVersion, url.PathEscape(projectID), pipelineID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK, http.StatusCreated, http.StatusAccepted, http.StatusNoContent:
+		return nil
+	default:
+		return fmt.Errorf("failed to cancel pipeline: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+}
+
+func (c *Client) GetLatestPipeline(projectID, ref string) (*Pipeline, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/pipelines/latest", c.baseURL, apiVersion, url.PathEscape(projectID))
+	if ref != "" {
+		apiURL += fmt.Sprintf("?ref=%s", url.QueryEscape(ref))
+	}
+
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get latest pipeline: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var pipeline Pipeline
+	if err := json.NewDecoder(resp.Body).Decode(&pipeline); err != nil {
+		return nil, fmt.Errorf("failed to decode pipeline: %v", err)
+	}
+
+	if pipeline.WebURL == "" && pipeline.URL != "" {
+		pipeline.WebURL = pipeline.URL
+	}
+
+	return &pipeline, nil
+}
+
+func (c *Client) GetPipelineTestReportSummary(projectID string, pipelineID int) (*PipelineTestReportSummary, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/pipelines/%d/test_report_summary", c.baseURL, apiVersion, url.PathEscape(projectID), pipelineID)
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get pipeline test report summary: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var summary PipelineTestReportSummary
+	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
+		return nil, fmt.Errorf("failed to decode pipeline test report summary: %v", err)
+	}
+
+	return &summary, nil
+}
+
+func (c *Client) ListPipelines(projectID string) ([]Pipeline, error) {
+	return fetchAllResources[Pipeline](c, func(page int) string {
+		return fmt.Sprintf("%s/api/%s/projects/%s/pipelines?per_page=100&page=%d", c.baseURL, apiVersion, url.PathEscape(projectID), page)
+	})
+}
+
+func readResponseBody(resp *http.Response) string {
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if err != nil {
+		return ""
+	}
+	return string(body)
 }
