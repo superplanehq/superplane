@@ -1,0 +1,32 @@
+{
+    "type": "rootly.onEvent",
+    "data": {
+        "event": "incident_event.created",
+        "incident": {
+            "id": "abc123-def456",
+            "severity": "sev1",
+            "started_at": "2026-01-19T12:00:00Z",
+            "status": "started",
+            "title": "API latency spike detected",
+            "url": "https://app.rootly.com/incidents/abc123-def456"
+        },
+        "incident_event": {
+            "created_at": "2026-01-19T12:30:00Z",
+            "event": "Investigation update: database connections stabilized.",
+            "id": "a2d32bb7-0417-4d0d-8483-a583c37853",
+            "incident": {
+                "id": "abc123-def456",
+                "severity": "sev1",
+                "started_at": "2026-01-19T12:00:00Z",
+                "status": "started",
+                "title": "API latency spike detected",
+                "url": "https://app.rootly.com/incidents/abc123-def456"
+            },
+            "kind": "note",
+            "occurred_at": "2026-01-19T12:30:00Z",
+            "user_display_name": "John Doe",
+            "visibility": "internal"
+        }
+    },
+    "timestamp": "2026-01-19T12:30:00Z"
+}
