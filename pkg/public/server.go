@@ -407,6 +407,8 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	//
 	// Webhook endpoints for triggers
 	//
+	// No Content-Type header constraint - some providers (e.g. Jira)
+	// send "application/json; charset=utf-8" which won't match an exact check.
 	publicRoute.
 		HandleFunc(s.BasePath+"/webhooks/{webhookID}", s.HandleWebhook).
 		Methods("POST")
