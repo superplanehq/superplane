@@ -203,6 +203,11 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 		return fmt.Errorf("action '%s' not found for component '%s'", actionName, component.Name())
 	}
 
+	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID)
+	if err != nil {
+		return fmt.Errorf("workflow not found: %w", err)
+	}
+
 	logger := logging.ForExecution(execution, nil)
 	actionCtx := core.ActionContext{
 		Name:           actionName,
@@ -213,6 +218,8 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, node.WorkflowID),
+		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, nil, nil),
+		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
 	}
 
 	if node.AppInstallationID != nil {
@@ -277,9 +284,14 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request 
 		return fmt.Errorf("action '%s' not found for component '%s'", actionName, component.Name())
 	}
 
+	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID)
+	if err != nil {
+		return fmt.Errorf("workflow not found: %w", err)
+	}
+
 	actionCtx := core.ActionContext{
 		Name:           actionName,
-		Configuration:  childNode.Configuration,
+		Configuration:  execution.Configuration.Data(),
 		Parameters:     spec.InvokeAction.Parameters,
 		Logger:         logging.ForExecution(execution, parentExecution),
 		HTTP:           w.registry.HTTPContext(),
@@ -287,6 +299,8 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request 
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
+		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, nil, nil),
+		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
 	}
 
 	err = component.HandleAction(actionCtx)

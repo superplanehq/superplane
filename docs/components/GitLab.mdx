@@ -10,6 +10,7 @@ Manage and react to changes in your GitLab repositories
   <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events from GitLab" />
   <LinkCard title="On Merge Request" href="#on-merge-request" description="Listen to merge request events from GitLab" />
   <LinkCard title="On Milestone" href="#on-milestone" description="Listen to milestone events from GitLab" />
+  <LinkCard title="On Pipeline" href="#on-pipeline" description="Listen to pipeline events from GitLab" />
   <LinkCard title="On Release" href="#on-release" description="Listen to release events from GitLab" />
   <LinkCard title="On Tag" href="#on-tag" description="Listen to tag events from GitLab" />
   <LinkCard title="On Vulnerability" href="#on-vulnerability" description="Listen to vulnerability events from GitLab" />
@@ -24,6 +25,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Latest Pipeline" href="#get-latest-pipeline" description="Get the latest GitLab pipeline for a project" />
   <LinkCard title="Get Pipeline" href="#get-pipeline" description="Get a GitLab pipeline" />
   <LinkCard title="Get Test Report Summary" href="#get-test-report-summary" description="Get GitLab pipeline test report summary" />
+  <LinkCard title="Run Pipeline" href="#run-pipeline" description="Run a GitLab pipeline and wait for completion" />
 </CardGrid>
 
 ## Instructions
@@ -288,6 +290,65 @@ The On Milestone trigger starts a workflow execution when milestone events occur
   },
   "timestamp": "2026-02-12T20:40:00.000000000Z",
   "type": "gitlab.milestone"
+}
+```
+
+<a id="on-pipeline"></a>
+
+## On Pipeline
+
+The On Pipeline trigger starts a workflow execution when pipeline events occur in a GitLab project.
+
+### Configuration
+
+- **Project** (required): GitLab project to monitor
+- **Statuses** (required): Select which pipeline statuses to listen for. Default: success, failed, canceled.
+
+### Outputs
+
+- **Default channel**: Emits pipeline webhook payload data including status, ref, SHA, and project information
+
+### Webhook Setup
+
+This trigger automatically sets up a GitLab webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "merge_request": {
+      "iid": 12,
+      "title": "Improve CI pipeline"
+    },
+    "object_attributes": {
+      "created_at": "2026-02-10 12:00:00 UTC",
+      "duration": 190,
+      "finished_at": "2026-02-10 12:03:10 UTC",
+      "id": 12345,
+      "iid": 321,
+      "ref": "main",
+      "sha": "f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
+      "source": "push",
+      "status": "success",
+      "updated_at": "2026-02-10 12:03:10 UTC",
+      "url": "https://gitlab.com/group/example-project/-/pipelines/12345"
+    },
+    "object_kind": "pipeline",
+    "project": {
+      "id": 987,
+      "name": "example-project",
+      "path_with_namespace": "group/example-project",
+      "web_url": "https://gitlab.com/group/example-project"
+    },
+    "user": {
+      "id": 22,
+      "name": "Jamie Rivera",
+      "username": "jrivera"
+    }
+  },
+  "timestamp": "2026-02-13T18:00:00.000000000Z",
+  "type": "gitlab.pipeline"
 }
 ```
 
@@ -806,6 +867,65 @@ The Get Test Report Summary component fetches the test report summary for a GitL
   },
   "timestamp": "2026-02-13T19:26:01.000Z",
   "type": "gitlab.testReportSummary"
+}
+```
+
+<a id="run-pipeline"></a>
+
+## Run Pipeline
+
+The Run Pipeline component triggers a GitLab pipeline and waits for it to complete.
+
+### Use Cases
+
+- **CI/CD orchestration**: Trigger GitLab pipelines from SuperPlane workflows
+- **Deployment automation**: Run deployment pipelines with inputs
+- **Pipeline chaining**: Coordinate follow-up actions after pipeline completion
+
+### Example Output
+
+```json
+{
+  "data": {
+    "pipeline": {
+      "before_sha": "0000000000000000000000000000000000000000",
+      "committed_at": "2026-02-13T17:59:22.000Z",
+      "coverage": "86.5",
+      "created_at": "2026-02-13T18:00:00.000Z",
+      "detailed_status": {
+        "group": "success",
+        "has_details": true,
+        "icon": "status_success",
+        "label": "passed",
+        "text": "passed",
+        "tooltip": "passed"
+      },
+      "duration": 240,
+      "finished_at": "2026-02-13T18:04:12.000Z",
+      "id": 457882113,
+      "iid": 9821,
+      "project_id": 123456,
+      "queued_duration": 8.2,
+      "ref": "main",
+      "sha": "f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
+      "source": "web",
+      "started_at": "2026-02-13T18:00:12.000Z",
+      "status": "success",
+      "tag": false,
+      "updated_at": "2026-02-13T18:04:12.000Z",
+      "url": "https://gitlab.com/group/example-project/-/pipelines/457882113",
+      "user": {
+        "avatar_url": "https://www.gravatar.com/avatar/abc123",
+        "id": 22,
+        "name": "Jamie Rivera",
+        "username": "jrivera"
+      },
+      "web_url": "https://gitlab.com/group/example-project/-/pipelines/457882113",
+      "yaml_errors": null
+    }
+  },
+  "timestamp": "2026-02-13T18:04:12.000Z",
+  "type": "gitlab.pipeline.finished"
 }
 ```
 

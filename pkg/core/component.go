@@ -253,6 +253,7 @@ type ActionContext struct {
 	Requests       RequestContext
 	Integration    IntegrationContext
 	Notifications  NotificationContext
+	Secrets        SecretsContext
 }
 
 /*

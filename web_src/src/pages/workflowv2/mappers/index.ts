@@ -85,6 +85,7 @@ import {
   triggerRenderers as awsTriggerRenderers,
   eventStateRegistry as awsEventStateRegistry,
 } from "./aws";
+import { componentMappers as hetznerComponentMappers } from "./hetzner/index";
 import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
 import {
   componentMappers as discordComponentMappers,
@@ -175,6 +176,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   claude: claudeComponentMappers,
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
+  hetzner: hetznerComponentMappers,
   dockerhub: dockerhubComponentMappers,
 };
 
