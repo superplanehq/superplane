@@ -108,6 +108,11 @@ import {
   eventStateRegistry as claudeEventStateRegistry,
 } from "./claude/index";
 import {
+  componentMappers as snykComponentMappers,
+  triggerRenderers as snykTriggerRenderers,
+  eventStateRegistry as snykEventStateRegistry,
+} from "./snyk/index";
+import {
   componentMappers as prometheusComponentMappers,
   customFieldRenderers as prometheusCustomFieldRenderers,
   triggerRenderers as prometheusTriggerRenderers,
@@ -174,6 +179,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   openai: openaiComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
+  snyk: snykComponentMappers,
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
   hetzner: hetznerComponentMappers,
@@ -199,6 +205,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   openai: openaiTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
+  snyk: snykTriggerRenderers,
   prometheus: prometheusTriggerRenderers,
   cursor: cursorTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
@@ -222,6 +229,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
   aws: awsEventStateRegistry,
+  snyk: snykEventStateRegistry,
   prometheus: prometheusEventStateRegistry,
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
@@ -372,7 +380,7 @@ export function getExecutionDetails(
   execution: CanvasesCanvasNodeExecution,
   node: ComponentsNode,
   nodes?: ComponentsNode[],
-): Record<string, any> | undefined {
+): Record<string, unknown> | undefined {
   const parts = componentName?.split(".");
   let mapper: ComponentBaseMapper | undefined;
 
