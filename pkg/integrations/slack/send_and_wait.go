@@ -3,6 +3,7 @@ package slack
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -525,7 +526,7 @@ func isSuperplaneInteraction(interaction map[string]any) bool {
 		return false
 	}
 	actionID, _ := action["action_id"].(string)
-	return len(actionID) > 0 && len(actionID) >= 15 && actionID[:15] == "superplane_btn_"
+	return strings.HasPrefix(actionID, "superplane_btn_")
 }
 
 func updateMessageAfterClick(integration core.IntegrationContext, channelID, messageTS string, channelMeta *ChannelMetadata, buttonValue, userName string) {
