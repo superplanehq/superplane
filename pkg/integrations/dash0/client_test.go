@@ -210,3 +210,53 @@ func Test__Client__ExecutePrometheusRangeQuery(t *testing.T) {
 		assert.Contains(t, httpContext.Requests[0].URL.String(), "/api/prometheus/api/v1/query_range")
 	})
 }
+
+func Test__Client__UpsertCheckRule(t *testing.T) {
+	t.Run("successful upsert", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"status":"updated"}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken": "token123",
+				"baseURL":  "https://api.us-west-2.aws.dash0.com",
+			},
+		}
+
+		client, err := NewClient(httpContext, integrationCtx)
+		require.NoError(t, err)
+
+		response, err := client.UpsertCheckRule("checkout-errors", map[string]any{
+			"name":       "CheckoutErrors",
+			"expression": "sum(rate(http_requests_total[5m])) > 1",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "updated", response["status"])
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, http.MethodPut, httpContext.Requests[0].Method)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/api/alerting/check-rules/checkout-errors")
+		assert.Equal(t, "default", httpContext.Requests[0].URL.Query().Get("dataset"))
+	})
+
+	t.Run("missing origin id", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken": "token123",
+				"baseURL":  "https://api.us-west-2.aws.dash0.com",
+			},
+		}
+
+		client, err := NewClient(httpContext, integrationCtx)
+		require.NoError(t, err)
+
+		_, err = client.UpsertCheckRule(" ", map[string]any{"name": "Rule", "expression": "up > 0"})
+		require.ErrorContains(t, err, "originOrId is required")
+	})
+}

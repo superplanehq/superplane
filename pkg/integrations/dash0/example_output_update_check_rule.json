@@ -1,0 +1,11 @@
+{
+  "data": {
+    "originOrId": "checkout-errors",
+    "response": {
+      "id": "checkout-errors",
+      "status": "updated"
+    }
+  },
+  "timestamp": "2026-02-09T12:00:00Z",
+  "type": "dash0.check.rule.updated"
+}
