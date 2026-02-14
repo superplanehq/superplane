@@ -200,6 +200,7 @@ type UpdateIncidentPayload struct {
 	Title            string               `json:"title,omitempty"`
 	Priority         *PriorityReference   `json:"priority,omitempty"`
 	EscalationPolicy *EscalationPolicyRef `json:"escalation_policy,omitempty"`
+	EscalationLevel  int                  `json:"escalation_level,omitempty"`
 	Assignments      []AssignmentPayload  `json:"assignments,omitempty"`
 	Body             *IncidentBody        `json:"body,omitempty"`
 }
@@ -231,6 +232,7 @@ func (c *Client) UpdateIncident(
 	title string,
 	description string,
 	escalationPolicy string,
+	escalationLevel int,
 	assignees []string,
 ) (any, error) {
 	request := UpdateIncidentRequest{
@@ -267,6 +269,10 @@ func (c *Client) UpdateIncident(
 			ID:   escalationPolicy,
 			Type: "escalation_policy_reference",
 		}
+	}
+
+	if escalationLevel > 0 {
+		request.Incident.EscalationLevel = escalationLevel
 	}
 
 	if len(assignees) > 0 {
