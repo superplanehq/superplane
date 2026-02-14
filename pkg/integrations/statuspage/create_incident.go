@@ -238,6 +238,7 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			Label:    "Component status",
 			Type:     configuration.FieldTypeSelect,
 			Required: false,
+			Default:  "degraded_performance",
 			Description: "Status to set for all selected components",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
@@ -423,12 +424,12 @@ func (c *CreateIncident) Execute(ctx core.ExecutionContext) error {
 	}
 
 	components := make(map[string]string)
+	componentStatus := spec.ComponentStatus
+	if componentStatus == "" {
+		componentStatus = "degraded_performance"
+	}
 	for _, id := range spec.ComponentIDs {
-		if spec.ComponentStatus != "" {
-			components[id] = spec.ComponentStatus
-		} else {
-			components[id] = "operational"
-		}
+		components[id] = componentStatus
 	}
 
 	deliverNotifications := spec.DeliverNotifications

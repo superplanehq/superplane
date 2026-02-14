@@ -178,7 +178,8 @@ func (c *UpdateIncident) Configuration() []configuration.Field {
 			Label:       "Components",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Components to update in this incident",
+			Togglable:   true,
+			Description: "Components to update in this incident. Requires a fixed page selection.",
 			Placeholder: "Select components",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
@@ -198,6 +199,7 @@ func (c *UpdateIncident) Configuration() []configuration.Field {
 			Label:       "Component status",
 			Type:        configuration.FieldTypeSelect,
 			Required:    false,
+			Togglable:   true,
 			Description: "Status to set for all selected components",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
