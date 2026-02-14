@@ -154,7 +154,7 @@ func (c *Client) ListServices(cluster string) ([]string, error) {
 	return c.listPaginatedStrings(
 		"ListServices",
 		map[string]any{
-			"cluster": strings.TrimSpace(cluster),
+			"cluster": cluster,
 		},
 		"serviceArns",
 	)
@@ -496,16 +496,17 @@ func taskDefinitionNameFromArn(arn string) string {
 	return strings.TrimSpace(parts[1])
 }
 
-func taskNameFromArn(arn string) string {
-	parts := strings.SplitN(strings.TrimSpace(arn), "task/", 2)
+func taskIDFromArn(arn string) string {
+	parts := strings.Split(strings.TrimSpace(arn), "task/")
 	if len(parts) != 2 {
 		return strings.TrimSpace(arn)
 	}
 
-	segments := strings.Split(parts[1], "/")
-	if len(segments) == 0 {
-		return strings.TrimSpace(arn)
+	taskIDWithClustername := parts[1]
+	parts = strings.Split(taskIDWithClustername, "/")
+	if len(parts) != 2 {
+		return arn
 	}
 
-	return strings.TrimSpace(segments[len(segments)-1])
+	return parts[1]
 }

@@ -2,14 +2,11 @@ package ecs
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 )
-
-var ecsTaskIDPattern = regexp.MustCompile(`^[a-zA-Z0-9]+$`)
 
 func ListClusters(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
 	creds, err := common.CredentialsFromInstallation(ctx.Integration)
@@ -145,7 +142,7 @@ func ListTasks(ctx core.ListResourcesContext, resourceType string) ([]core.Integ
 	for _, arn := range taskArns {
 		name := strings.TrimSpace(taskResourceNames[arn])
 		if name == "" {
-			name = shortTaskID(taskNameFromArn(arn))
+			name = taskIDFromArn(arn)
 		}
 
 		resources = append(resources, core.IntegrationResource{
@@ -159,14 +156,12 @@ func ListTasks(ctx core.ListResourcesContext, resourceType string) ([]core.Integ
 }
 
 func formatTaskResourceName(task Task) string {
-	taskID := taskNameFromArn(task.TaskArn)
-	taskID = shortTaskID(taskID)
-
+	taskID := taskIDFromArn(task.TaskArn)
 	taskDefinition := taskDefinitionNameFromArn(task.TaskDefinitionArn)
 	status := strings.TrimSpace(task.LastStatus)
 
 	if taskDefinition != "" && status != "" && taskID != "" {
-		return fmt.Sprintf("%s (%s) %s", taskDefinition, status, taskID)
+		return fmt.Sprintf("%s %s (%s)", taskDefinition, task.LaunchType, taskID)
 	}
 
 	if taskDefinition != "" && taskID != "" {
@@ -178,21 +173,4 @@ func formatTaskResourceName(task Task) string {
 	}
 
 	return strings.TrimSpace(task.TaskArn)
-}
-
-func shortTaskID(taskID string) string {
-	taskID = strings.TrimSpace(taskID)
-	if taskID == "" {
-		return ""
-	}
-
-	if !ecsTaskIDPattern.MatchString(taskID) {
-		return taskID
-	}
-
-	if len(taskID) <= 8 {
-		return taskID
-	}
-
-	return taskID[:8]
 }
