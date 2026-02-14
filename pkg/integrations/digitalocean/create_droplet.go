@@ -291,15 +291,18 @@ func (c *CreateDroplet) HandleAction(ctx core.ActionContext) error {
 		return fmt.Errorf("failed to get droplet: %v", err)
 	}
 
-	if droplet.Status != "active" {
+	switch droplet.Status {
+	case "active":
+		return ctx.ExecutionState.Emit(
+			core.DefaultOutputChannel.Name,
+			"digitalocean.droplet.created",
+			[]any{droplet},
+		)
+	case "new":
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, dropletPollInterval)
+	default:
+		return fmt.Errorf("droplet reached unexpected status %q", droplet.Status)
 	}
-
-	return ctx.ExecutionState.Emit(
-		core.DefaultOutputChannel.Name,
-		"digitalocean.droplet.created",
-		[]any{droplet},
-	)
 }
 
 func (c *CreateDroplet) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
