@@ -26,3 +26,13 @@ func (c *SendTextMessage) ExampleOutput() map[string]any {
 func (t *OnAppMention) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnce, exampleDataOnAppMentionBytes, &exampleData)
 }
+
+//go:embed example_output_send_and_wait.json
+var exampleOutputSendAndWaitBytes []byte
+
+var exampleOutputSendAndWaitOnce sync.Once
+var exampleOutputSendAndWait map[string]any
+
+func (c *SendAndWait) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputSendAndWaitOnce, exampleOutputSendAndWaitBytes, &exampleOutputSendAndWait)
+}

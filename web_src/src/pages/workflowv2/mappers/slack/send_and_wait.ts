@@ -14,19 +14,23 @@ import slackIcon from "@/assets/icons/integrations/slack.svg";
 import { formatTimeAgo } from "@/utils/date";
 import { slackEventSections } from "./base";
 
-interface SendTextMessageConfiguration {
+interface SendAndWaitConfiguration {
   channel?: string;
-  text?: string;
+  message?: string;
+  timeout?: number;
+  buttons?: Array<{ name: string; value: string }>;
 }
 
-interface SendTextMessageMetadata {
+interface SendAndWaitMetadata {
   channel?: {
     id?: string;
     name?: string;
   };
+  state?: string;
+  messageTs?: string;
 }
 
-export const sendTextMessageMapper: ComponentBaseMapper = {
+export const sendAndWaitMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition.name || "unknown";
@@ -44,82 +48,77 @@ export const sendTextMessageMapper: ComponentBaseMapper = {
       collapsed: context.node.isCollapsed,
       eventSections: lastExecution ? slackEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
-      metadata: sendTextMessageMetadataList(context.node),
-      specs: sendTextMessageSpecs(context.node),
+      metadata: sendAndWaitMetadataList(context.node),
+      specs: sendAndWaitSpecs(context.node),
       eventStateMap: getStateMap(componentName),
     };
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const message = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+    const metadata = context.execution.metadata as SendAndWaitMetadata | undefined;
+    const outputs = context.execution.outputs as { received?: OutputPayload[] } | undefined;
+    const response = outputs?.received?.[0]?.data as Record<string, unknown> | undefined;
 
     return {
-      "Sent At": formatSlackTimestamp(message?.ts || message?.event_ts) || "-",
-      Channel: stringOrDash(message?.channel),
-      User: stringOrDash(message?.user),
-      Text: stringOrDash(message?.text),
+      Status: metadata?.state || "-",
+      "Button Value": response?.value ? String(response.value) : "-",
+      User: response?.user ? String((response.user as Record<string, unknown>)?.username || "-") : "-",
+      Channel: metadata?.channel?.name || "-",
     };
   },
+
   subtitle(context: SubtitleContext): string {
+    const metadata = context.execution.metadata as SendAndWaitMetadata | undefined;
+    const state = metadata?.state;
+
+    if (state === "waiting") {
+      return "Waiting for response...";
+    }
+
+    if (state === "received") {
+      return "Response received";
+    }
+
+    if (state === "timed_out") {
+      return "Timed out";
+    }
+
     if (!context.execution.createdAt) return "";
     return formatTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
-function sendTextMessageMetadataList(node: NodeInfo): MetadataItem[] {
+function sendAndWaitMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const nodeMetadata = node.metadata as SendTextMessageMetadata | undefined;
-  const configuration = node.configuration as SendTextMessageConfiguration | undefined;
+  const nodeMetadata = node.metadata as SendAndWaitMetadata | undefined;
+  const configuration = node.configuration as SendAndWaitConfiguration | undefined;
 
   const channelLabel = nodeMetadata?.channel?.name || configuration?.channel;
   if (channelLabel) {
     metadata.push({ icon: "hash", label: channelLabel });
   }
 
+  const buttonCount = configuration?.buttons?.length;
+  if (buttonCount) {
+    metadata.push({ icon: "mouse-pointer-click", label: `${buttonCount} button${buttonCount > 1 ? "s" : ""}` });
+  }
+
   return metadata;
 }
 
-function sendTextMessageSpecs(node: NodeInfo): ComponentBaseSpec[] {
+function sendAndWaitSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
-  const configuration = node.configuration as SendTextMessageConfiguration | undefined;
+  const configuration = node.configuration as SendAndWaitConfiguration | undefined;
 
-  if (configuration?.text) {
+  if (configuration?.message) {
     specs.push({
-      title: "text",
-      tooltipTitle: "text",
+      title: "message",
+      tooltipTitle: "message",
       iconSlug: "message-square",
-      value: configuration.text,
+      value: configuration.message,
       contentType: "text",
     });
   }
 
   return specs;
-}
-
-function stringOrDash(value?: unknown): string {
-  if (value === undefined || value === null || value === "") {
-    return "-";
-  }
-
-  return String(value);
-}
-
-function formatSlackTimestamp(value?: unknown): string | undefined {
-  if (value === undefined || value === null || value === "") {
-    return undefined;
-  }
-
-  const raw = String(value);
-  const seconds = Number.parseFloat(raw);
-  if (!Number.isNaN(seconds)) {
-    return new Date(seconds * 1000).toLocaleString();
-  }
-
-  const asDate = new Date(raw);
-  if (!Number.isNaN(asDate.getTime())) {
-    return asDate.toLocaleString();
-  }
-
-  return raw;
 }
