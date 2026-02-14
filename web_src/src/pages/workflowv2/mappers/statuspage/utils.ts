@@ -108,11 +108,7 @@ export function getDetailsForIncident(incident: StatuspageIncident): Record<stri
   return details;
 }
 
-export function baseEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
+export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   if (!rootTriggerNode || !execution.rootEvent?.id) {
     return [

@@ -17,9 +17,9 @@ import (
 const defaultBaseURL = "https://api.statuspage.io/v1"
 
 type Client struct {
-	apiKey   string
-	baseURL  string
-	http     core.HTTPContext
+	apiKey  string
+	baseURL string
+	http    core.HTTPContext
 }
 
 func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
@@ -115,45 +115,45 @@ func (c *Client) ListComponents(pageID string) ([]Component, error) {
 // Realtime: name, body, status, impactOverride, componentIds + componentStatus, deliverNotifications.
 // Scheduled: name, body, scheduledFor, scheduledUntil, scheduledRemindPrior, scheduledAutoInProgress, scheduledAutoCompleted, componentIds + componentStatus, deliverNotifications.
 type CreateIncidentRequest struct {
-	Name                     string            `json:"name"`
-	Body                     string            `json:"body"`
-	Status                   string            `json:"status"`
-	ImpactOverride           string            `json:"impact_override"`
-	ComponentIDs             []string          `json:"component_ids"`
-	Components               map[string]string `json:"components"` // component_id -> status
-	ScheduledFor              string            `json:"scheduled_for"`
-	ScheduledUntil            string            `json:"scheduled_until"`
-	ScheduledRemindPrior      bool              `json:"scheduled_remind_prior"`
-	ScheduledAutoInProgress   bool              `json:"scheduled_auto_in_progress"`
-	ScheduledAutoCompleted    bool              `json:"scheduled_auto_completed"`
-	DeliverNotifications     *bool             `json:"deliver_notifications"`
-	Realtime                 bool              `json:"-"` // if true, send as realtime; else scheduled
+	Name                    string            `json:"name"`
+	Body                    string            `json:"body"`
+	Status                  string            `json:"status"`
+	ImpactOverride          string            `json:"impact_override"`
+	ComponentIDs            []string          `json:"component_ids"`
+	Components              map[string]string `json:"components"` // component_id -> status
+	ScheduledFor            string            `json:"scheduled_for"`
+	ScheduledUntil          string            `json:"scheduled_until"`
+	ScheduledRemindPrior    bool              `json:"scheduled_remind_prior"`
+	ScheduledAutoInProgress bool              `json:"scheduled_auto_in_progress"`
+	ScheduledAutoCompleted  bool              `json:"scheduled_auto_completed"`
+	DeliverNotifications    *bool             `json:"deliver_notifications"`
+	Realtime                bool              `json:"-"` // if true, send as realtime; else scheduled
 }
 
 // incidentPayload is the JSON body for POST /pages/{page_id}/incidents (see api-documentation).
 type incidentPayload struct {
-	Name                   string            `json:"name"`
-	Body                   string            `json:"body,omitempty"`
-	Status                 string            `json:"status,omitempty"`
-	ImpactOverride         string            `json:"impact_override,omitempty"`
-	ComponentIDs           []string          `json:"component_ids,omitempty"`
-	Components             map[string]string `json:"components,omitempty"`
-	ScheduledFor           string            `json:"scheduled_for,omitempty"`
-	ScheduledUntil         string            `json:"scheduled_until,omitempty"`
-	ScheduledRemindPrior   *bool             `json:"scheduled_remind_prior,omitempty"`
-	ScheduledAutoInProgress *bool            `json:"scheduled_auto_in_progress,omitempty"`
+	Name                    string            `json:"name"`
+	Body                    string            `json:"body,omitempty"`
+	Status                  string            `json:"status,omitempty"`
+	ImpactOverride          string            `json:"impact_override,omitempty"`
+	ComponentIDs            []string          `json:"component_ids,omitempty"`
+	Components              map[string]string `json:"components,omitempty"`
+	ScheduledFor            string            `json:"scheduled_for,omitempty"`
+	ScheduledUntil          string            `json:"scheduled_until,omitempty"`
+	ScheduledRemindPrior    *bool             `json:"scheduled_remind_prior,omitempty"`
+	ScheduledAutoInProgress *bool             `json:"scheduled_auto_in_progress,omitempty"`
 	ScheduledAutoCompleted  *bool             `json:"scheduled_auto_completed,omitempty"`
-	DeliverNotifications   *bool             `json:"deliver_notifications,omitempty"`
+	DeliverNotifications    *bool             `json:"deliver_notifications,omitempty"`
 }
 
 // CreateIncident creates an incident and returns the full 201 response as map[string]any.
 // Request format follows api-documentation/statuspage-api-guide.md (JSON recommended).
 func (c *Client) CreateIncident(pageID string, req CreateIncidentRequest) (map[string]any, error) {
 	payload := incidentPayload{
-		Name:         req.Name,
-		Body:         req.Body,
-		ComponentIDs: req.ComponentIDs,
-		Components:   req.Components,
+		Name:                 req.Name,
+		Body:                 req.Body,
+		ComponentIDs:         req.ComponentIDs,
+		Components:           req.Components,
 		DeliverNotifications: req.DeliverNotifications,
 	}
 
@@ -289,4 +289,3 @@ func (c *Client) GetIncident(pageID, incidentID string) (map[string]any, error) 
 	}
 	return incident, nil
 }
-

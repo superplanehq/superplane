@@ -71,14 +71,14 @@ func (c *GetIncident) OutputChannels(configuration any) []core.OutputChannel {
 
 func (c *GetIncident) ExampleOutput() map[string]any {
 	return map[string]any{
-		"id":         "p31zjtct2jer",
-		"name":       "Database Connection Issues",
-		"status":     "investigating",
-		"impact":     "major",
-		"shortlink":  "http://stspg.io/p31zjtct2jer",
-		"created_at": "2026-02-12T10:30:00.000Z",
-		"updated_at": "2026-02-12T10:30:00.000Z",
-		"page_id":    "kctbh9vrtdwd",
+		"id":            "p31zjtct2jer",
+		"name":          "Database Connection Issues",
+		"status":        "investigating",
+		"impact":        "major",
+		"shortlink":     "http://stspg.io/p31zjtct2jer",
+		"created_at":    "2026-02-12T10:30:00.000Z",
+		"updated_at":    "2026-02-12T10:30:00.000Z",
+		"page_id":       "kctbh9vrtdwd",
 		"component_ids": []string{"8kbf7d35c070"},
 		"incident_updates": []map[string]any{
 			{

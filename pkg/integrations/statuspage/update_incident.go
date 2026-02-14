@@ -84,14 +84,14 @@ func (c *UpdateIncident) OutputChannels(configuration any) []core.OutputChannel 
 
 func (c *UpdateIncident) ExampleOutput() map[string]any {
 	return map[string]any{
-		"id":         "p31zjtct2jer",
-		"name":       "Database Connection Issues",
-		"status":     "resolved",
-		"impact":     "major",
-		"shortlink":  "http://stspg.io/p31zjtct2jer",
-		"created_at": "2026-02-12T10:30:00.000Z",
-		"updated_at": "2026-02-12T11:00:00.000Z",
-		"page_id":    "kctbh9vrtdwd",
+		"id":            "p31zjtct2jer",
+		"name":          "Database Connection Issues",
+		"status":        "resolved",
+		"impact":        "major",
+		"shortlink":     "http://stspg.io/p31zjtct2jer",
+		"created_at":    "2026-02-12T10:30:00.000Z",
+		"updated_at":    "2026-02-12T11:00:00.000Z",
+		"page_id":       "kctbh9vrtdwd",
 		"component_ids": []string{"8kbf7d35c070"},
 		"incident_updates": []map[string]any{
 			{

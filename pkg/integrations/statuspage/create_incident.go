@@ -111,13 +111,13 @@ func (c *CreateIncident) OutputChannels(configuration any) []core.OutputChannel 
 
 func (c *CreateIncident) ExampleOutput() map[string]any {
 	return map[string]any{
-		"id":        "p31zjtct2jer",
-		"name":      "Database Connection Issues",
-		"status":    "investigating",
-		"impact":    "major",
-		"shortlink": "http://stspg.io/p31zjtct2jer",
-		"created_at": "2026-02-12T10:30:00.000Z",
-		"page_id":   "kctbh9vrtdwd",
+		"id":            "p31zjtct2jer",
+		"name":          "Database Connection Issues",
+		"status":        "investigating",
+		"impact":        "major",
+		"shortlink":     "http://stspg.io/p31zjtct2jer",
+		"created_at":    "2026-02-12T10:30:00.000Z",
+		"page_id":       "kctbh9vrtdwd",
 		"component_ids": []string{"8kbf7d35c070"},
 		"incident_updates": []map[string]any{
 			{
@@ -234,11 +234,11 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "componentStatus",
-			Label:    "Component status",
-			Type:     configuration.FieldTypeSelect,
-			Required: false,
-			Default:  "degraded_performance",
+			Name:        "componentStatus",
+			Label:       "Component status",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Default:     "degraded_performance",
 			Description: "Status to set for all selected components",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
@@ -308,31 +308,31 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "scheduledRemindPrior",
-			Label:       "Remind subscribers 60 minutes before",
-			Type:        configuration.FieldTypeBool,
-			Required:    false,
-			Default:     false,
+			Name:     "scheduledRemindPrior",
+			Label:    "Remind subscribers 60 minutes before",
+			Type:     configuration.FieldTypeBool,
+			Required: false,
+			Default:  false,
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "incidentType", Values: []string{"scheduled"}},
 			},
 		},
 		{
-			Name:        "scheduledAutoInProgress",
-			Label:       "Auto transition to In Progress at start",
-			Type:        configuration.FieldTypeBool,
-			Required:    false,
-			Default:     false,
+			Name:     "scheduledAutoInProgress",
+			Label:    "Auto transition to In Progress at start",
+			Type:     configuration.FieldTypeBool,
+			Required: false,
+			Default:  false,
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "incidentType", Values: []string{"scheduled"}},
 			},
 		},
 		{
-			Name:        "scheduledAutoCompleted",
-			Label:       "Auto transition to Completed at end",
-			Type:        configuration.FieldTypeBool,
-			Required:    false,
-			Default:     false,
+			Name:     "scheduledAutoCompleted",
+			Label:    "Auto transition to Completed at end",
+			Type:     configuration.FieldTypeBool,
+			Required: false,
+			Default:  false,
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "incidentType", Values: []string{"scheduled"}},
 			},
@@ -439,11 +439,11 @@ func (c *CreateIncident) Execute(ctx core.ExecutionContext) error {
 	}
 
 	req := CreateIncidentRequest{
-		Name:             spec.Name,
-		Body:             spec.Body,
-		ComponentIDs:     spec.ComponentIDs,
-		Components:       components,
-		Realtime:         spec.IncidentType == "realtime",
+		Name:                 spec.Name,
+		Body:                 spec.Body,
+		ComponentIDs:         spec.ComponentIDs,
+		Components:           components,
+		Realtime:             spec.IncidentType == "realtime",
 		DeliverNotifications: deliverNotifications,
 	}
 
