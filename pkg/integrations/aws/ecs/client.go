@@ -513,13 +513,13 @@ func taskDefinitionNameFromArn(arn string) string {
 }
 
 func taskIDFromArn(arn string) string {
-	parts := strings.Split(arn, "task/")
+	parts := strings.SplitN(arn, "task/", 2)
 	if len(parts) != 2 {
 		return arn
 	}
 
-	taskIDWithClustername := parts[1]
-	parts = strings.Split(taskIDWithClustername, "/")
+	taskIDWithClusterName := parts[1]
+	parts = strings.SplitN(taskIDWithClusterName, "/", 2)
 	if len(parts) != 2 {
 		return arn
 	}

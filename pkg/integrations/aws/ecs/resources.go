@@ -125,8 +125,11 @@ func ListTasks(ctx core.ListResourcesContext, resourceType string) ([]core.Integ
 	if err != nil {
 		return nil, fmt.Errorf("failed to list ECS tasks: %w", err)
 	}
+	if len(taskArns) == 0 {
+		return []core.IntegrationResource{}, nil
+	}
 
-	taskResourceNames := map[string]string{}
+	taskResourceNames := make(map[string]string, len(taskArns))
 	describeResponse, err := client.DescribeTasks(cluster, taskArns)
 	if err == nil {
 		for _, task := range describeResponse.Tasks {
@@ -160,7 +163,7 @@ func formatTaskResourceName(task Task) string {
 	status := task.LastStatus
 
 	if taskDefinition != "" && status != "" && taskID != "" {
-		return fmt.Sprintf("%s %s (%s)", taskDefinition, task.LaunchType, taskID)
+		return fmt.Sprintf("%s (%s) %s", taskDefinition, status, taskID)
 	}
 
 	if taskDefinition != "" && taskID != "" {
