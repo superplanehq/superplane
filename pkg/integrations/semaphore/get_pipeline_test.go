@@ -1,6 +1,7 @@
 package semaphore
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -62,8 +63,10 @@ func Test__Semaphore_GetPipeline__Execute(t *testing.T) {
 		require.Len(t, executionState.Payloads, 1)
 
 		emittedPayload := executionState.Payloads[0].(map[string]any)
-		pipeline, ok := emittedPayload["data"].(*Pipeline)
-		require.True(t, ok)
+		var pipeline Pipeline
+		payloadBytes, err := json.Marshal(emittedPayload["data"])
+		require.NoError(t, err)
+		require.NoError(t, json.Unmarshal(payloadBytes, &pipeline))
 		assert.Equal(t, "Initial Pipeline", pipeline.PipelineName)
 		assert.Equal(t, "ppl-123", pipeline.PipelineID)
 		assert.Equal(t, "wf-456", pipeline.WorkflowID)

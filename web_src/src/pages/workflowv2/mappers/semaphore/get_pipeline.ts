@@ -10,6 +10,7 @@ import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
 import { getState, getStateMap, getTriggerRenderer } from "..";
+import { stringOrDash } from "../utils";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { formatTimeAgo } from "@/utils/date";
 
@@ -34,13 +35,6 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   }
 
   return metadata;
-}
-
-function stringOrDash(value?: unknown): string {
-  if (value === undefined || value === null || value === "") {
-    return "-";
-  }
-  return String(value);
 }
 
 export const getPipelineMapper: ComponentBaseMapper = {
