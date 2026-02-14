@@ -6,6 +6,22 @@ import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import { Incident, IncidentEvent } from "./types";
 import { getDetailsForIncident, getDetailsForIncidentEvent } from "./base";
 
+// Map incident status values to display labels (matching backend configuration)
+const incidentStatusLabels: Record<string, string> = {
+  in_triage: "In Triage",
+  started: "Started",
+  detected: "Detected",
+  acknowledged: "Acknowledged",
+  mitigated: "Mitigated",
+  resolved: "Resolved",
+  closed: "Closed",
+  cancelled: "Cancelled",
+};
+
+function formatIncidentStatus(status: string): string {
+  return incidentStatusLabels[status] || status;
+}
+
 interface OnEventConfiguration {
   incidentStatuses?: string[];
   severities?: string[];
@@ -110,8 +126,10 @@ function addMetadata(
 
   const list = Array.isArray(values) ? values : [values];
 
+  const formatted = label === "Incident Status" ? list.map(formatIncidentStatus).join(", ") : list.join(", ");
+
   metadataItems.push({
     icon: "funnel",
-    label: `${label}: ${list.join(", ")}`,
+    label: `${label}: ${formatted}`,
   });
 }

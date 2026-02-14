@@ -88,9 +88,18 @@ func (t *OnEvent) Configuration() []configuration.Field {
 			Description: "Filter by incident status values (e.g. started, resolved)",
 			Placeholder: "Select incident statuses",
 			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type:  "incident_status",
-					Multi: true,
+				MultiSelect: &configuration.MultiSelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "In Triage", Value: "in_triage"},
+						{Label: "Started", Value: "started"},
+						{Label: "Detected", Value: "detected"},
+
+						{Label: "Acknowledged", Value: "acknowledged"},
+						{Label: "Mitigated", Value: "mitigated"},
+						{Label: "Resolved", Value: "resolved"},
+						{Label: "Closed", Value: "closed"},
+						{Label: "Cancelled", Value: "cancelled"},
+					},
 				},
 			},
 		},
