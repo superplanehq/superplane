@@ -42,9 +42,7 @@ export const sendTextMessageMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
-      eventSections: lastExecution
-        ? slackEventSections(context.nodes, lastExecution, componentName)
-        : undefined,
+      eventSections: lastExecution ? slackEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       metadata: sendTextMessageMetadataList(context.node),
       specs: sendTextMessageSpecs(context.node),
