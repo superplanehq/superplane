@@ -405,3 +405,33 @@ func (c *Client) Verify() error {
 	}
 	return nil
 }
+
+// resolveServerID extracts the server ID from the configuration map,
+// handling both string values and float64 values (which occur when
+// template expressions resolve to JSON numbers).
+func resolveServerID(config any) (string, error) {
+	m, ok := config.(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("invalid configuration type")
+	}
+
+	raw, ok := m["server"]
+	if !ok {
+		return "", fmt.Errorf("server is required")
+	}
+
+	switch v := raw.(type) {
+	case string:
+		s := strings.TrimSpace(v)
+		if s == "" {
+			return "", fmt.Errorf("server is required")
+		}
+		return s, nil
+	case float64:
+		return strconv.Itoa(int(v)), nil
+	case int:
+		return strconv.Itoa(v), nil
+	default:
+		return "", fmt.Errorf("invalid server value: %v", raw)
+	}
+}

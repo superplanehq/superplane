@@ -106,9 +106,15 @@ func (c *DeleteServer) Execute(ctx core.ExecutionContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return err
 	}
-	serverID := strings.TrimSpace(spec.Server)
-	if serverID == "" {
-		return fmt.Errorf("server ID is required")
+	serverID, err := resolveServerID(ctx.Configuration)
+	if err != nil {
+		return err
+	}
+
+	// Store server ID in metadata early so it's visible in the UI
+	// even if the API call fails.
+	if err := ctx.Metadata.Set(DeleteServerExecutionMetadata{ServerID: serverID}); err != nil {
+		return err
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -121,11 +127,10 @@ func (c *DeleteServer) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("delete server: %w", err)
 	}
 
-	metadata := DeleteServerExecutionMetadata{
+	if err := ctx.Metadata.Set(DeleteServerExecutionMetadata{
 		ActionID: action.ID,
 		ServerID: serverID,
-	}
-	if err := ctx.Metadata.Set(metadata); err != nil {
+	}); err != nil {
 		return err
 	}
 
