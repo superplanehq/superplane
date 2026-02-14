@@ -1,15 +1,19 @@
 {
-  "type": "linear.issue",
   "data": {
-    "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
-    "identifier": "ENG-42",
-    "title": "Example issue",
-    "description": "Issue description",
-    "priority": 2,
-    "url": "https://linear.app/company/issue/ENG-42/example-issue",
-    "createdAt": "2026-01-19T12:00:00.000Z",
-    "team": { "id": "72b2a2dc-6f4f-4423-9d34-24b5bd10634a" },
-    "state": { "id": "state-1" }
+    "createdAt": "2026-02-16T21:35:23.762Z",
+    "description": "test test",
+    "id": "4aae5d23-07a5-4e68-912e-098dbf5a5b4e",
+    "identifier": "BRA-45",
+    "priority": 0,
+    "state": {
+      "id": "af874731-64fd-4b3e-b871-b762922637b6"
+    },
+    "team": {
+      "id": "01d0cb17-f38a-4fea-9e5c-717dbb27766f"
+    },
+    "title": "Test superplane",
+    "url": "https://linear.app/brainstormmingdev/issue/BRA-45/test-superplane"
   },
-  "timestamp": "2026-01-19T12:00:00Z"
+  "timestamp": "2026-02-16T21:35:22.010159122Z",
+  "type": "linear.issue"
 }

@@ -7,7 +7,7 @@ Manage and react to issues in Linear
 ## Triggers
 
 <CardGrid>
-  <LinkCard title="On Issue Created" href="#on-issue-created" description="Start a workflow when a new issue is created in Linear" />
+  <LinkCard title="On Issue" href="#on-issue" description="Start a workflow when an issue is created, updated, or removed in Linear" />
 </CardGrid>
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
@@ -18,15 +18,19 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in Linear" />
 </CardGrid>
 
-<a id="on-issue-created"></a>
+## Instructions
 
-## On Issue Created
+Leave **Client ID** and **Client Secret** empty to start the setup wizard.
 
-The On Issue Created trigger starts a workflow when a new issue is created in Linear.
+<a id="on-issue"></a>
+
+## On Issue
+
+The On Issue trigger starts a workflow when an issue is created, updated, or removed in Linear.
 
 ### Use Cases
 
-- **Issue automation**: Run workflows when new issues are created
+- **Issue automation**: Run workflows when issues change
 - **Notification workflows**: Notify channels or create tasks elsewhere
 - **Filter by team/label**: Optionally restrict to a team and/or labels
 
@@ -38,37 +42,67 @@ The On Issue Created trigger starts a workflow when a new issue is created in Li
 ### Event Data
 
 The payload includes Linear webhook fields: action, type, data (issue), actor, url, createdAt, webhookTimestamp.
+The action field indicates the event type: "create", "update", or "remove".
 
 ### Example Data
 
 ```json
 {
-  "action": "create",
-  "actor": {
-    "email": "alice@example.com",
-    "id": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
-    "name": "Alice",
-    "type": "user"
-  },
-  "createdAt": "2020-01-23T12:53:18.084Z",
   "data": {
-    "assigneeId": "user-1",
-    "createdAt": "2020-01-23T12:53:18.084Z",
-    "description": "Issue description",
-    "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
-    "identifier": "ENG-42",
-    "labelIds": [
-      "label-1"
-    ],
-    "priority": 2,
-    "stateId": "state-1",
-    "teamId": "72b2a2dc-6f4f-4423-9d34-24b5bd10634a",
-    "title": "Example issue",
-    "updatedAt": "2020-01-23T12:53:18.084Z"
+    "action": "create",
+    "actor": {
+      "email": "590b5685-0c0d-476f-b33b-2afdc1273716@oauthapp.linear.app",
+      "id": "bd35d567-0f57-46fa-85e1-9b1e53529393",
+      "name": "superplane",
+      "type": "user",
+      "url": "https://linear.app/brainstormmingdev/profiles/superplane1"
+    },
+    "createdAt": "2026-02-16T21:35:23.762Z",
+    "data": {
+      "addedToTeamAt": "2026-02-16T21:35:23.788Z",
+      "botActor": null,
+      "createdAt": "2026-02-16T21:35:23.762Z",
+      "creatorId": "bd35d567-0f57-46fa-85e1-9b1e53529393",
+      "description": "test test",
+      "descriptionData": "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"test test\"}]}]}",
+      "id": "4aae5d23-07a5-4e68-912e-098dbf5a5b4e",
+      "identifier": "BRA-45",
+      "labelIds": [],
+      "labels": [],
+      "number": 45,
+      "previousIdentifiers": [],
+      "priority": 0,
+      "priorityLabel": "No priority",
+      "prioritySortOrder": -4135,
+      "reactionData": [],
+      "slaType": "all",
+      "sortOrder": -4029,
+      "state": {
+        "color": "#bec2c8",
+        "id": "af874731-64fd-4b3e-b871-b762922637b6",
+        "name": "Backlog",
+        "type": "backlog"
+      },
+      "stateId": "af874731-64fd-4b3e-b871-b762922637b6",
+      "subscriberIds": [
+        "bd35d567-0f57-46fa-85e1-9b1e53529393"
+      ],
+      "team": {
+        "id": "01d0cb17-f38a-4fea-9e5c-717dbb27766f",
+        "key": "BRA",
+        "name": "BrainStormmingDev"
+      },
+      "teamId": "01d0cb17-f38a-4fea-9e5c-717dbb27766f",
+      "title": "Test superplane",
+      "updatedAt": "2026-02-16T21:35:23.762Z",
+      "url": "https://linear.app/brainstormmingdev/issue/BRA-45/test-superplane"
+    },
+    "type": "Issue",
+    "url": "https://linear.app/brainstormmingdev/issue/BRA-45/test-superplane",
+    "webhookTimestamp": 1771277724034
   },
-  "type": "Issue",
-  "url": "https://linear.app/company/issue/ENG-42/example-issue",
-  "webhookTimestamp": 1676056940508
+  "timestamp": "2026-02-16T21:35:22.388339184Z",
+  "type": "linear.issue"
 }
 ```
 
@@ -100,21 +134,21 @@ Returns the created issue: id, identifier, title, description, priority, url, cr
 ```json
 {
   "data": {
-    "createdAt": "2026-01-19T12:00:00.000Z",
-    "description": "Issue description",
-    "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
-    "identifier": "ENG-42",
-    "priority": 2,
+    "createdAt": "2026-02-16T21:35:23.762Z",
+    "description": "test test",
+    "id": "4aae5d23-07a5-4e68-912e-098dbf5a5b4e",
+    "identifier": "BRA-45",
+    "priority": 0,
     "state": {
-      "id": "state-1"
+      "id": "af874731-64fd-4b3e-b871-b762922637b6"
     },
     "team": {
-      "id": "72b2a2dc-6f4f-4423-9d34-24b5bd10634a"
+      "id": "01d0cb17-f38a-4fea-9e5c-717dbb27766f"
     },
-    "title": "Example issue",
-    "url": "https://linear.app/company/issue/ENG-42/example-issue"
+    "title": "Test superplane",
+    "url": "https://linear.app/brainstormmingdev/issue/BRA-45/test-superplane"
   },
-  "timestamp": "2026-01-19T12:00:00Z",
+  "timestamp": "2026-02-16T21:35:22.010159122Z",
   "type": "linear.issue"
 }
 ```

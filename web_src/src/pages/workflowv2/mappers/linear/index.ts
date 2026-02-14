@@ -1,5 +1,5 @@
 import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
-import { onIssueCreatedTriggerRenderer } from "./on_issue_created";
+import { onIssueTriggerRenderer } from "./on_issue";
 import { createIssueMapper } from "./create_issue";
 import { buildActionStateRegistry } from "../utils";
 
@@ -8,7 +8,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
-  onIssueCreated: onIssueCreatedTriggerRenderer,
+  onIssue: onIssueTriggerRenderer,
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {

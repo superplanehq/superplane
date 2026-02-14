@@ -188,27 +188,27 @@ func (c *CreateIssue) Setup(ctx core.SetupContext) error {
 	if err != nil {
 		return fmt.Errorf("create client: %w", err)
 	}
-	teams, err := client.ListTeams()
+	team, err := client.FindTeam(spec.Team)
 	if err != nil {
-		return fmt.Errorf("list teams: %w", err)
-	}
-	var team *Team
-	for i := range teams {
-		if teams[i].ID == spec.Team {
-			team = &teams[i]
-			break
-		}
-	}
-	if team == nil {
-		return fmt.Errorf("team %s not found", spec.Team)
+		return err
 	}
 	return ctx.Metadata.Set(NodeMetadata{Team: team})
 }
 
 func (c *CreateIssue) Execute(ctx core.ExecutionContext) error {
+	if ctx.Integration == nil {
+		return fmt.Errorf("integration not configured")
+	}
+
 	spec := CreateIssueSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("decode configuration: %w", err)
+	}
+	if spec.Team == "" {
+		return fmt.Errorf("team is required")
+	}
+	if spec.Title == "" {
+		return fmt.Errorf("title is required")
 	}
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {

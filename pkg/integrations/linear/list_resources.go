@@ -84,7 +84,7 @@ func (l *Linear) ListResources(resourceType string, ctx core.ListResourcesContex
 		}
 		return resources, nil
 	default:
-		return []core.IntegrationResource{}, nil
+		return nil, fmt.Errorf("unknown resource type: %s", resourceType)
 	}
 }
 

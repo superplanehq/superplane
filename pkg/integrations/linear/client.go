@@ -10,22 +10,27 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const graphqlURL = "https://api.linear.app/graphql"
+const (
+	graphqlURL = "https://api.linear.app/graphql"
+	maxPages   = 50 // safety cap for paginated queries
+)
 
 type Client struct {
-	apiKey string
-	http   core.HTTPContext
+	accessToken string
+	http        core.HTTPContext
 }
 
-// NewClient builds a Linear API client from integration config.
 func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
-	apiToken, err := ctx.GetConfig("apiToken")
+	accessToken, err := findSecret(ctx, OAuthAccessToken)
 	if err != nil {
-		return nil, fmt.Errorf("get apiToken: %w", err)
+		return nil, fmt.Errorf("get access token: %w", err)
+	}
+	if accessToken == "" {
+		return nil, fmt.Errorf("OAuth access token not found")
 	}
 	return &Client{
-		apiKey: string(apiToken),
-		http:   httpCtx,
+		accessToken: accessToken,
+		http:        httpCtx,
 	}, nil
 }
 
@@ -56,8 +61,7 @@ func (c *Client) execGraphQL(query string, variables map[string]any, result any)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	// Personal API key: "Authorization: <API_KEY>" (no Bearer)
-	req.Header.Set("Authorization", c.apiKey)
+	req.Header.Set("Authorization", "Bearer "+c.accessToken)
 
 	res, err := c.http.Do(req)
 	if err != nil {
@@ -123,7 +127,7 @@ func (c *Client) ListTeams() ([]Team, error) {
 	const query = `query($after: String) { teams(first: 100, after: $after) { nodes { id name key } pageInfo { hasNextPage endCursor } } }`
 	var all []Team
 	var cursor *string
-	for {
+	for range maxPages {
 		vars := map[string]any{"after": cursor}
 		var out teamsResponse
 		if err := c.execGraphQL(query, vars, &out); err != nil {
@@ -136,6 +140,20 @@ func (c *Client) ListTeams() ([]Team, error) {
 		cursor = &out.Teams.PageInfo.EndCursor
 	}
 	return all, nil
+}
+
+// FindTeam fetches all teams and returns the one matching the given ID.
+func (c *Client) FindTeam(id string) (*Team, error) {
+	teams, err := c.ListTeams()
+	if err != nil {
+		return nil, fmt.Errorf("list teams: %w", err)
+	}
+	for i := range teams {
+		if teams[i].ID == id {
+			return &teams[i], nil
+		}
+	}
+	return nil, fmt.Errorf("team %s not found", id)
 }
 
 // organizationLabelsResponse for org-level labels.
@@ -153,7 +171,7 @@ func (c *Client) ListLabels() ([]Label, error) {
 	const query = `query($after: String) { organization { labels(first: 100, after: $after) { nodes { id name } pageInfo { hasNextPage endCursor } } } }`
 	var all []Label
 	var cursor *string
-	for {
+	for range maxPages {
 		vars := map[string]any{"after": cursor}
 		var out organizationLabelsResponse
 		if err := c.execGraphQL(query, vars, &out); err != nil {
@@ -196,14 +214,20 @@ type teamMembersResponse struct {
 	} `json:"team"`
 }
 
-// ListTeamMembers returns all members of a team.
+// ListTeamMembers returns all human members of a team (excludes the app user itself).
 func (c *Client) ListTeamMembers(teamID string) ([]Member, error) {
-	const query = `query($id: String!) { team(id: $id) { members { nodes { id name displayName email } } } }`
+	const query = `query($id: String!) { team(id: $id) { members { nodes { id name displayName email active isMe } } } }`
 	var out teamMembersResponse
 	if err := c.execGraphQL(query, map[string]any{"id": teamID}, &out); err != nil {
 		return nil, err
 	}
-	return out.Team.Members.Nodes, nil
+	members := make([]Member, 0, len(out.Team.Members.Nodes))
+	for _, m := range out.Team.Members.Nodes {
+		if m.Active && !m.IsMe && m.Email != "" {
+			members = append(members, m)
+		}
+	}
+	return members, nil
 }
 
 // IssueCreateInput is the input for issueCreate mutation.
@@ -242,75 +266,4 @@ mutation IssueCreate($input: IssueCreateInput!) {
 		return nil, fmt.Errorf("issueCreate returned success: false")
 	}
 	return &out.IssueCreate.Issue, nil
-}
-
-// WebhookCreateInput for webhookCreate mutation.
-type WebhookCreateInput struct {
-	URL            string   `json:"url"`
-	TeamID         *string  `json:"teamId,omitempty"`
-	AllPublicTeams *bool    `json:"allPublicTeams,omitempty"`
-	ResourceTypes  []string `json:"resourceTypes"`
-	Label          *string  `json:"label,omitempty"`
-}
-
-// WebhookCreateResult returned from webhookCreate.
-type WebhookCreateResult struct {
-	WebhookCreate struct {
-		Success bool `json:"success"`
-		Webhook struct {
-			ID      string `json:"id"`
-			Enabled bool   `json:"enabled"`
-			Secret  string `json:"secret,omitempty"`
-		} `json:"webhook"`
-	} `json:"webhookCreate"`
-}
-
-// WebhookCreate creates a webhook in Linear. Returns webhook ID and secret if present.
-func (c *Client) WebhookCreate(url string, teamID *string, allPublicTeams bool, resourceTypes []string) (id string, secret []byte, err error) {
-	input := WebhookCreateInput{
-		URL:            url,
-		ResourceTypes:  resourceTypes,
-		AllPublicTeams: &allPublicTeams,
-	}
-	if teamID != nil && *teamID != "" {
-		input.AllPublicTeams = nil
-		input.TeamID = teamID
-	}
-	const query = `
-mutation WebhookCreate($input: WebhookCreateInput!) {
-  webhookCreate(input: $input) {
-    success
-    webhook { id enabled secret }
-  }
-}`
-	var out WebhookCreateResult
-	if err := c.execGraphQL(query, map[string]any{"input": input}, &out); err != nil {
-		return "", nil, err
-	}
-	if !out.WebhookCreate.Success {
-		return "", nil, fmt.Errorf("webhookCreate returned success: false")
-	}
-	w := out.WebhookCreate.Webhook
-	sec := []byte(w.Secret)
-	return w.ID, sec, nil
-}
-
-// WebhookDelete deletes a webhook by ID.
-func (c *Client) WebhookDelete(webhookID string) error {
-	const query = `
-mutation WebhookDelete($id: String!) {
-  webhookDelete(id: $id) { success }
-}`
-	var out struct {
-		WebhookDelete struct {
-			Success bool `json:"success"`
-		} `json:"webhookDelete"`
-	}
-	if err := c.execGraphQL(query, map[string]any{"id": webhookID}, &out); err != nil {
-		return err
-	}
-	if !out.WebhookDelete.Success {
-		return fmt.Errorf("webhookDelete returned success: false")
-	}
-	return nil
 }
