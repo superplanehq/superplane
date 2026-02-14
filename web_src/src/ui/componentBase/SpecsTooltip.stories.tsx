@@ -48,6 +48,20 @@ const mockSpecValuesComplex: ComponentBaseSpecValue[] = [
   },
 ];
 
+// Long filter value tests tooltip wrapping
+const mockSpecValuesLongFilter: ComponentBaseSpecValue[] = [
+  {
+    badges: [
+      {
+        label:
+          'let files = concat($.head_commit.added, $.head_commit.modified, $.head_commit.removed) | uniq(); $.ref == "refs/heads/main" and any(files, hasPrefix(#, "helm/staging"))',
+        bgColor: "bg-purple-100",
+        textColor: "text-purple-700",
+      },
+    ],
+  },
+];
+
 // Mock badge component similar to what's in ComponentBase
 const MockSpecsBadge: React.FC<{ count: number; title: string }> = ({ count, title }) => (
   <div className="flex items-center gap-3 text-md text-gray-500 cursor-pointer">
@@ -144,6 +158,26 @@ export const WithTextChild: Story = {
         <span className="text-blue-600 cursor-pointer underline">
           View {args.specValues.length} {args.specTitle}
         </span>
+      </SpecsTooltip>
+    </div>
+  ),
+};
+
+export const LongFilter: Story = {
+  args: {
+    specTitle: "filter",
+    tooltipTitle: "filters applied",
+    specValues: mockSpecValuesLongFilter,
+  },
+  render: (args) => (
+    <div className="p-8">
+      <p className="mb-4 text-sm text-gray-500">
+        Hover over the badge below to see how long filter values wrap in the tooltip:
+      </p>
+      <SpecsTooltip {...args}>
+        <div>
+          <MockSpecsBadge count={args.specValues.length} title={args.specTitle} />
+        </div>
       </SpecsTooltip>
     </div>
   ),
