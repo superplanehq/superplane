@@ -172,6 +172,11 @@ func listTypeOptionsToProto(opts *configuration.ListTypeOptions) *configpb.ListT
 		},
 	}
 
+	if opts.MaxItems != nil {
+		maxItems := int32(*opts.MaxItems)
+		pbOpts.MaxItems = &maxItems
+	}
+
 	if len(opts.ItemDefinition.Schema) > 0 {
 		pbOpts.ItemDefinition.Schema = make([]*configpb.Field, len(opts.ItemDefinition.Schema))
 		for i, schemaField := range opts.ItemDefinition.Schema {
@@ -506,6 +511,11 @@ func protoToListTypeOptions(pbOpts *configpb.ListTypeOptions) *configuration.Lis
 		ItemDefinition: &configuration.ListItemDefinition{
 			Type: pbOpts.ItemDefinition.Type,
 		},
+	}
+
+	if pbOpts.MaxItems != nil {
+		maxItems := int(*pbOpts.MaxItems)
+		opts.MaxItems = &maxItems
 	}
 
 	if len(pbOpts.ItemDefinition.Schema) > 0 {
