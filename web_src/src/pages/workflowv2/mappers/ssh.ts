@@ -92,6 +92,13 @@ export const sshMapper: ComponentBaseMapper = {
     const details: Record<string, string> = {};
     const metadata = context.execution.metadata as Record<string, unknown> | undefined;
     const result = metadata?.result as { stdout?: string; stderr?: string; exitCode?: number } | undefined;
+    const host = metadata?.host as string | undefined;
+    const port = metadata?.port as number | undefined;
+    const username = metadata?.username as string | undefined;
+    if (host) {
+      const portSuffix = port && port !== 22 ? `:${port}` : "";
+      details["Host"] = `${username || "user"}@${host}${portSuffix}`;
+    }
 
     if (context.execution.createdAt) {
       details["Started at"] = new Date(context.execution.createdAt).toLocaleString();

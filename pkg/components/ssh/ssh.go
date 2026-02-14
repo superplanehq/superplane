@@ -339,6 +339,11 @@ func (c *SSHCommand) executeSSH(config any, secrets core.SecretsContext, metadat
 		return err
 	}
 
+	err = c.setHostMetadata(metadata, spec)
+	if err != nil {
+		return err
+	}
+
 	client, err := c.createClient(secrets, spec)
 	if err != nil {
 		return err
@@ -364,7 +369,10 @@ func (c *SSHCommand) executeSSH(config any, secrets core.SecretsContext, metadat
 			ExitCode: -1,
 		}
 
-		c.setResultMetadata(metadata, failResult)
+		err = c.setResultMetadata(metadata, failResult)
+		if err != nil {
+			return err
+		}
 
 		return state.Emit(channelFailed, "ssh.connection.failed", []any{failResult})
 	}
@@ -427,6 +435,19 @@ func (c *SSHCommand) getMetadataMap(metadata core.MetadataContext) map[string]an
 	}
 
 	return current
+}
+
+func (c *SSHCommand) setHostMetadata(metadata core.MetadataContext, spec Spec) error {
+	current := c.getMetadataMap(metadata)
+	if _, ok := current["host"]; ok {
+		return nil
+	}
+
+	current["host"] = spec.Host
+	current["port"] = spec.Port
+	current["username"] = spec.User
+
+	return metadata.Set(current)
 }
 
 func (c *SSHCommand) setResultMetadata(metadata core.MetadataContext, result *CommandResult) error {
