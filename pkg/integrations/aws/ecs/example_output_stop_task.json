@@ -1,14 +1,19 @@
 {
   "data": {
     "task": {
-      "taskArn": "arn:aws:ecs:us-east-1:123456789012:task/demo/abc123",
-      "clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/demo",
-      "taskDefinitionArn": "arn:aws:ecs:us-east-1:123456789012:task-definition/worker:7",
-      "lastStatus": "DEACTIVATING",
+      "clusterArn": "arn:aws:ecs:ap-southeast-1:444555666777:cluster/analytics-cluster-staging",
+      "createdAt": "2026-01-18T06:42:11Z",
       "desiredStatus": "STOPPED",
-      "stoppedReason": "manual test stop"
+      "group": "service:analytics-worker-service",
+      "lastStatus": "STOPPED",
+      "launchType": "FARGATE",
+      "platformVersion": "1.4.0",
+      "startedBy": "ecs-svc/5647382910293847561",
+      "stoppedReason": "Essential container in task exited",
+      "taskArn": "arn:aws:ecs:ap-southeast-1:444555666777:task/analytics-cluster-staging/7c6b5a4d3e2f1a0987b6c5d4e3f2a1b0",
+      "taskDefinitionArn": "arn:aws:ecs:ap-southeast-1:444555666777:task-definition/analytics-worker:23"
     }
   },
-  "timestamp": "2026-02-13T10:02:00Z",
+  "timestamp": "2026-01-18T06:48:33.118274556Z",
   "type": "aws.ecs.task"
 }
