@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
+
+const dropletPollInterval = 10 * time.Second
 
 var validHostnameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9.\-]*$`)
 
@@ -236,11 +239,12 @@ func (c *CreateDroplet) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create droplet: %v", err)
 	}
 
-	return ctx.ExecutionState.Emit(
-		core.DefaultOutputChannel.Name,
-		"digitalocean.droplet.created",
-		[]any{droplet},
-	)
+	err = ctx.Metadata.Set(map[string]any{"dropletID": droplet.ID})
+	if err != nil {
+		return fmt.Errorf("failed to store metadata: %v", err)
+	}
+
+	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, dropletPollInterval)
 }
 
 func (c *CreateDroplet) Cancel(ctx core.ExecutionContext) error {
@@ -252,11 +256,50 @@ func (c *CreateDroplet) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UU
 }
 
 func (c *CreateDroplet) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		{
+			Name:           "poll",
+			UserAccessible: false,
+		},
+	}
 }
 
 func (c *CreateDroplet) HandleAction(ctx core.ActionContext) error {
-	return nil
+	if ctx.Name != "poll" {
+		return fmt.Errorf("unknown action: %s", ctx.Name)
+	}
+
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
+	var metadata struct {
+		DropletID int `mapstructure:"dropletID"`
+	}
+
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %v", err)
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("error creating client: %v", err)
+	}
+
+	droplet, err := client.GetDroplet(metadata.DropletID)
+	if err != nil {
+		return fmt.Errorf("failed to get droplet: %v", err)
+	}
+
+	if droplet.Status != "active" {
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, dropletPollInterval)
+	}
+
+	return ctx.ExecutionState.Emit(
+		core.DefaultOutputChannel.Name,
+		"digitalocean.droplet.created",
+		[]any{droplet},
+	)
 }
 
 func (c *CreateDroplet) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
