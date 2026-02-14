@@ -1,33 +1,34 @@
 package linear
 
 import (
-	"io"
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 func Test__NewClient(t *testing.T) {
-	t.Run("missing apiToken -> error", func(t *testing.T) {
+	t.Run("missing access token -> error", func(t *testing.T) {
 		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{},
+			Secrets: map[string]core.IntegrationSecret{},
 		}
 		_, err := NewClient(&contexts.HTTPContext{}, appCtx)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "apiToken")
+		assert.Contains(t, err.Error(), "access token")
 	})
 
 	t.Run("successful client creation", func(t *testing.T) {
 		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{"apiToken": "test-key"},
+			Secrets: map[string]core.IntegrationSecret{
+				OAuthAccessToken: {Name: OAuthAccessToken, Value: []byte("test-key")},
+			},
 		}
 		client, err := NewClient(&contexts.HTTPContext{}, appCtx)
 		require.NoError(t, err)
-		assert.Equal(t, "test-key", client.apiKey)
+		assert.Equal(t, "test-key", client.accessToken)
 	})
 }
 
@@ -36,10 +37,14 @@ func Test__Client__GetViewer(t *testing.T) {
 		resp := `{"data":{"viewer":{"id":"u1","name":"Alice","email":"a@b.com"}}}`
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(resp))},
+				linearMockResponse(http.StatusOK, resp),
 			},
 		}
-		appCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "key"}}
+		appCtx := &contexts.IntegrationContext{
+			Secrets: map[string]core.IntegrationSecret{
+				OAuthAccessToken: {Name: OAuthAccessToken, Value: []byte("key")},
+			},
+		}
 		client, err := NewClient(httpCtx, appCtx)
 		require.NoError(t, err)
 		viewer, err := client.GetViewer()
@@ -54,10 +59,14 @@ func Test__Client__ListTeams(t *testing.T) {
 		resp := `{"data":{"teams":{"nodes":[{"id":"t1","name":"Eng","key":"ENG"}]}}}`
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(resp))},
+				linearMockResponse(http.StatusOK, resp),
 			},
 		}
-		appCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "key"}}
+		appCtx := &contexts.IntegrationContext{
+			Secrets: map[string]core.IntegrationSecret{
+				OAuthAccessToken: {Name: OAuthAccessToken, Value: []byte("key")},
+			},
+		}
 		client, err := NewClient(httpCtx, appCtx)
 		require.NoError(t, err)
 		teams, err := client.ListTeams()

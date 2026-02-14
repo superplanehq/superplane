@@ -7,15 +7,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/utils"
 )
 
-//go:embed example_data_on_issue_created.json
-var exampleDataOnIssueCreatedBytes []byte
+//go:embed example_data_on_issue.json
+var exampleDataOnIssueBytes []byte
 
-var exampleDataOnIssueCreatedOnce sync.Once
-var exampleDataOnIssueCreated map[string]any
+var exampleDataOnIssueOnce sync.Once
+var exampleDataOnIssue map[string]any
 
-// UnmarshalExampleDataOnIssueCreated returns example webhook payload for On Issue Created.
-func UnmarshalExampleDataOnIssueCreated() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueCreatedOnce, exampleDataOnIssueCreatedBytes, &exampleDataOnIssueCreated)
+// UnmarshalExampleDataOnIssue returns example webhook payload for On Issue.
+func UnmarshalExampleDataOnIssue() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueOnce, exampleDataOnIssueBytes, &exampleDataOnIssue)
 }
 
 //go:embed example_output_create_issue.json

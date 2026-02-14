@@ -51,9 +51,12 @@ type Member struct {
 	Name        string `json:"name"`
 	DisplayName string `json:"displayName,omitempty"`
 	Email       string `json:"email,omitempty"`
+	Active      bool   `json:"active,omitempty"`
+	IsMe        bool   `json:"isMe,omitempty"`
 }
 
 // NodeMetadata stores metadata on trigger/component nodes.
 type NodeMetadata struct {
-	Team *Team `json:"team,omitempty"`
+	Team           *Team   `json:"team,omitempty" mapstructure:"team,omitempty"`
+	SubscriptionID *string `json:"appSubscriptionID,omitempty" mapstructure:"appSubscriptionID,omitempty"`
 }
