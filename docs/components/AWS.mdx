@@ -29,6 +29,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
   <LinkCard title="ECR • Scan Image" href="#ecr-•-scan-image" description="Scan an ECR image for vulnerabilities" />
+  <LinkCard title="ECS • Describe Service" href="#ecs-•-describe-service" description="Describe an AWS ECS service" />
+  <LinkCard title="ECS • Run Task" href="#ecs-•-run-task" description="Run a task in AWS ECS" />
+  <LinkCard title="ECS • Stop Task" href="#ecs-•-stop-task" description="Stop a running AWS ECS task" />
   <LinkCard title="Lambda • Run Function" href="#lambda-•-run-function" description="Invoke a Lambda function, optionally creating it from inline JavaScript" />
   <LinkCard title="SNS • Create Topic" href="#sns-•-create-topic" description="Create an AWS SNS topic" />
   <LinkCard title="SNS • Delete Topic" href="#sns-•-delete-topic" description="Delete an AWS SNS topic" />
@@ -715,6 +718,173 @@ At least one of **Image Digest** or **Image Tag** is required. If both are provi
   },
   "timestamp": "2026-02-03T12:05:00Z",
   "type": "aws.ecr.image.scanFindings"
+}
+```
+
+<a id="ecs-•-describe-service"></a>
+
+## ECS • Describe Service
+
+The Describe Service component fetches details about a single ECS service.
+
+### Use Cases
+
+- **Deployment checks**: Inspect running/desired task counts before or after deployment
+- **Operational visibility**: Fetch service status and task definition details in workflows
+- **Automation branching**: Route workflow execution based on ECS service state
+
+### Example Output
+
+```json
+{
+  "data": {
+    "service": {
+      "clusterArn": "arn:aws:ecs:us-west-1:123456789012:cluster/production-cluster-alpha",
+      "createdAt": "2026-01-20T10:12:33Z",
+      "deployments": [
+        {
+          "createdAt": "2026-01-20T10:12:33Z",
+          "desiredCount": 3,
+          "id": "ecs-svc/8473629182736450912",
+          "pendingCount": 0,
+          "runningCount": 3,
+          "status": "PRIMARY",
+          "taskDefinition": "arn:aws:ecs:us-west-1:123456789012:task-definition/api-gateway-service:7",
+          "updatedAt": "2026-01-20T10:18:11Z"
+        }
+      ],
+      "desiredCount": 3,
+      "enableExecuteCommand": true,
+      "events": [
+        {
+          "createdAt": "2026-01-20T10:18:11Z",
+          "id": "d91b5e4a-7a5f-4b1d-bdb4-3d4f8f8a9912",
+          "message": "(service api-gateway-service-prod) has reached a steady state."
+        },
+        {
+          "createdAt": "2026-01-20T10:17:02Z",
+          "id": "a12f9c47-92c3-4c9f-8d12-88d6ab3f8e72",
+          "message": "(service api-gateway-service-prod) (deployment ecs-svc/8473629182736450912) deployment completed."
+        },
+        {
+          "createdAt": "2026-01-20T10:13:05Z",
+          "id": "c7a8e3b1-11f2-4fbc-9d8e-2194bb0eaf55",
+          "message": "(service api-gateway-service-prod) has started 3 tasks: (task 9f8e7d6c5b4a3210e1f2a3b4c5d6e7f8)."
+        }
+      ],
+      "launchType": "FARGATE",
+      "networkConfiguration": {
+        "awsvpcConfiguration": {
+          "assignPublicIp": "DISABLED",
+          "securityGroups": [
+            "sg-0a1b2c3d4e5f6a7b8",
+            "sg-1b2c3d4e5f6a7b8c9"
+          ],
+          "subnets": [
+            "subnet-01a2b3c4d5e6f7a8b",
+            "subnet-09f8e7d6c5b4a3210"
+          ]
+        }
+      },
+      "pendingCount": 0,
+      "platformVersion": "1.4.0",
+      "propagateTags": "SERVICE",
+      "runningCount": 3,
+      "schedulingStrategy": "REPLICA",
+      "serviceArn": "arn:aws:ecs:us-west-1:123456789012:service/production-cluster-alpha/api-gateway-service-prod",
+      "serviceName": "api-gateway-service-prod",
+      "status": "ACTIVE",
+      "taskDefinition": "arn:aws:ecs:us-west-1:123456789012:task-definition/api-gateway-service:7",
+      "taskSets": []
+    }
+  },
+  "timestamp": "2026-01-20T12:45:09.123456789Z",
+  "type": "aws.ecs.service"
+}
+```
+
+<a id="ecs-•-run-task"></a>
+
+## ECS • Run Task
+
+The Run Task component starts one or more ECS tasks.
+
+### Use Cases
+
+- **One-off workloads**: Execute ad-hoc jobs on ECS
+- **Batch processing**: Trigger task runs from workflow events
+- **Operational automation**: Run remediation or maintenance tasks
+
+### Notes
+
+- For Fargate tasks, set **Network Configuration** using the ECS awsvpcConfiguration format.
+- Optional ECS API fields can be passed directly through **Overrides** and **Network Configuration**.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "failures": [],
+    "tasks": [
+      {
+        "clusterArn": "arn:aws:ecs:eu-central-1:555666777888:cluster/payments-cluster-prod",
+        "createdAt": "2026-01-22T08:14:55Z",
+        "desiredStatus": "RUNNING",
+        "group": "service:payments-api-service",
+        "lastStatus": "RUNNING",
+        "launchType": "FARGATE",
+        "platformVersion": "1.4.0",
+        "startedBy": "ecs-svc/9182736455647382910",
+        "stoppedReason": "",
+        "taskArn": "arn:aws:ecs:eu-central-1:555666777888:task/payments-cluster-prod/3f2a1b9c8d7e6f5a4b3c2d1e0f9a8b7c",
+        "taskDefinitionArn": "arn:aws:ecs:eu-central-1:555666777888:task-definition/payments-api:12"
+      }
+    ]
+  },
+  "timestamp": "2026-01-22T08:15:12.452187341Z",
+  "type": "aws.ecs.task"
+}
+```
+
+<a id="ecs-•-stop-task"></a>
+
+## ECS • Stop Task
+
+The Stop Task component requests ECS to stop a running task.
+
+### Use Cases
+
+- **Operational control**: Stop ad-hoc or long-running tasks from workflows
+- **Remediation**: Terminate unhealthy tasks during automated incident response
+- **Cost control**: Stop no-longer-needed background workloads
+
+### Notes
+
+- ECS sends a SIGTERM signal and then force-stops the task if it does not exit gracefully.
+- **Reason** is optional and appears in ECS task stop metadata when provided.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "task": {
+      "clusterArn": "arn:aws:ecs:ap-southeast-1:444555666777:cluster/analytics-cluster-staging",
+      "createdAt": "2026-01-18T06:42:11Z",
+      "desiredStatus": "STOPPED",
+      "group": "service:analytics-worker-service",
+      "lastStatus": "STOPPED",
+      "launchType": "FARGATE",
+      "platformVersion": "1.4.0",
+      "startedBy": "ecs-svc/5647382910293847561",
+      "stoppedReason": "Essential container in task exited",
+      "taskArn": "arn:aws:ecs:ap-southeast-1:444555666777:task/analytics-cluster-staging/7c6b5a4d3e2f1a0987b6c5d4e3f2a1b0",
+      "taskDefinitionArn": "arn:aws:ecs:ap-southeast-1:444555666777:task-definition/analytics-worker:23"
+    }
+  },
+  "timestamp": "2026-01-18T06:48:33.118274556Z",
+  "type": "aws.ecs.task"
 }
 ```
 

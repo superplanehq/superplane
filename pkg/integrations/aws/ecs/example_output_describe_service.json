@@ -1,0 +1,65 @@
+{
+  "data": {
+    "service": {
+      "clusterArn": "arn:aws:ecs:us-west-1:123456789012:cluster/production-cluster-alpha",
+      "createdAt": "2026-01-20T10:12:33Z",
+      "deployments": [
+        {
+          "createdAt": "2026-01-20T10:12:33Z",
+          "desiredCount": 3,
+          "id": "ecs-svc/8473629182736450912",
+          "pendingCount": 0,
+          "runningCount": 3,
+          "status": "PRIMARY",
+          "taskDefinition": "arn:aws:ecs:us-west-1:123456789012:task-definition/api-gateway-service:7",
+          "updatedAt": "2026-01-20T10:18:11Z"
+        }
+      ],
+      "desiredCount": 3,
+      "enableExecuteCommand": true,
+      "events": [
+        {
+          "createdAt": "2026-01-20T10:18:11Z",
+          "id": "d91b5e4a-7a5f-4b1d-bdb4-3d4f8f8a9912",
+          "message": "(service api-gateway-service-prod) has reached a steady state."
+        },
+        {
+          "createdAt": "2026-01-20T10:17:02Z",
+          "id": "a12f9c47-92c3-4c9f-8d12-88d6ab3f8e72",
+          "message": "(service api-gateway-service-prod) (deployment ecs-svc/8473629182736450912) deployment completed."
+        },
+        {
+          "createdAt": "2026-01-20T10:13:05Z",
+          "id": "c7a8e3b1-11f2-4fbc-9d8e-2194bb0eaf55",
+          "message": "(service api-gateway-service-prod) has started 3 tasks: (task 9f8e7d6c5b4a3210e1f2a3b4c5d6e7f8)."
+        }
+      ],
+      "launchType": "FARGATE",
+      "networkConfiguration": {
+        "awsvpcConfiguration": {
+          "assignPublicIp": "DISABLED",
+          "securityGroups": [
+            "sg-0a1b2c3d4e5f6a7b8",
+            "sg-1b2c3d4e5f6a7b8c9"
+          ],
+          "subnets": [
+            "subnet-01a2b3c4d5e6f7a8b",
+            "subnet-09f8e7d6c5b4a3210"
+          ]
+        }
+      },
+      "pendingCount": 0,
+      "platformVersion": "1.4.0",
+      "propagateTags": "SERVICE",
+      "runningCount": 3,
+      "schedulingStrategy": "REPLICA",
+      "serviceArn": "arn:aws:ecs:us-west-1:123456789012:service/production-cluster-alpha/api-gateway-service-prod",
+      "serviceName": "api-gateway-service-prod",
+      "status": "ACTIVE",
+      "taskDefinition": "arn:aws:ecs:us-west-1:123456789012:task-definition/api-gateway-service:7",
+      "taskSets": []
+    }
+  },
+  "timestamp": "2026-01-20T12:45:09.123456789Z",
+  "type": "aws.ecs.service"
+}

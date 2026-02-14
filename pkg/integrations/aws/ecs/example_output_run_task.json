@@ -1,0 +1,22 @@
+{
+  "data": {
+    "failures": [],
+    "tasks": [
+      {
+        "clusterArn": "arn:aws:ecs:eu-central-1:555666777888:cluster/payments-cluster-prod",
+        "createdAt": "2026-01-22T08:14:55Z",
+        "desiredStatus": "RUNNING",
+        "group": "service:payments-api-service",
+        "lastStatus": "RUNNING",
+        "launchType": "FARGATE",
+        "platformVersion": "1.4.0",
+        "startedBy": "ecs-svc/9182736455647382910",
+        "stoppedReason": "",
+        "taskArn": "arn:aws:ecs:eu-central-1:555666777888:task/payments-cluster-prod/3f2a1b9c8d7e6f5a4b3c2d1e0f9a8b7c",
+        "taskDefinitionArn": "arn:aws:ecs:eu-central-1:555666777888:task-definition/payments-api:12"
+      }
+    ]
+  },
+  "timestamp": "2026-01-22T08:15:12.452187341Z",
+  "type": "aws.ecs.task"
+}

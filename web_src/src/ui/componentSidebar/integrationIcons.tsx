@@ -82,6 +82,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   aws: {
     cloudwatch: awsCloudwatchIcon,
     lambda: awsLambdaIcon,
+    ecs: awsIcon,
     sns: awsSnsIcon,
   },
 };
