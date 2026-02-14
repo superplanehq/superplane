@@ -220,12 +220,11 @@ func (t *OnDropletEvent) HandleAction(ctx core.TriggerActionContext) (map[string
 			}
 		}
 
-		err = ctx.Events.Emit(
+		if err := ctx.Events.Emit(
 			fmt.Sprintf("digitalocean.droplet.%s", action.Type),
 			payload,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("error emitting event: %v", err)
+		); err != nil {
+			ctx.Logger.Errorf("error emitting event for action %d: %v", action.ID, err)
 		}
 	}
 

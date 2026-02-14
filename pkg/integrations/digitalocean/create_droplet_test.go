@@ -303,4 +303,53 @@ func Test__CreateDroplet__HandleAction(t *testing.T) {
 		assert.Equal(t, "poll", requestCtx.Action)
 		assert.Equal(t, 10*time.Second, requestCtx.Duration)
 	})
+
+	t.Run("droplet terminal status -> returns error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"droplet": {
+							"id": 98765432,
+							"name": "my-droplet",
+							"status": "off",
+							"region": {"name": "New York 3", "slug": "nyc3"},
+							"image": {"id": 12345, "name": "Ubuntu 24.04 (LTS) x64", "slug": "ubuntu-24-04-x64"},
+							"size_slug": "s-1vcpu-1gb",
+							"networks": {"v4": []},
+							"tags": []
+						}
+					}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken": "test-token",
+			},
+		}
+
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: map[string]any{"dropletID": 98765432},
+		}
+
+		executionState := &contexts.ExecutionStateContext{
+			KVs: map[string]string{},
+		}
+
+		err := component.HandleAction(core.ActionContext{
+			Name:           "poll",
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
+			Metadata:       metadataCtx,
+			ExecutionState: executionState,
+			Requests:       &contexts.RequestContext{},
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unexpected status")
+		assert.False(t, executionState.Passed)
+	})
 }
