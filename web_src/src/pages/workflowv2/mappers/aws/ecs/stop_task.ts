@@ -70,6 +70,9 @@ export const stopTaskMapper: ComponentBaseMapper = {
     }
 
     return {
+      "Stopped At": stringOrDash(
+        context.execution.updatedAt ? new Date(context.execution.updatedAt).toLocaleString() : "-",
+      ),
       "Task ARN": stringOrDash(task.taskArn),
       "Task Definition": stringOrDash(task.taskDefinitionArn),
       "Cluster ARN": stringOrDash(task.clusterArn),

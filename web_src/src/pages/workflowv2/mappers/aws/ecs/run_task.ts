@@ -78,6 +78,9 @@ export const runTaskMapper: ComponentBaseMapper = {
 
     const firstTask = data.tasks?.[0];
     return {
+      "Started At": stringOrDash(
+        context.execution.updatedAt ? new Date(context.execution.updatedAt).toLocaleString() : "-",
+      ),
       "Tasks Started": String(data.tasks?.length || 0),
       Failures: String(data.failures?.length || 0),
       "Task ARN": stringOrDash(firstTask?.taskArn),

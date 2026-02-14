@@ -2,7 +2,6 @@ package ecs
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
@@ -14,7 +13,7 @@ func ListClusters(ctx core.ListResourcesContext, resourceType string) ([]core.In
 		return nil, err
 	}
 
-	region := strings.TrimSpace(ctx.Parameters["region"])
+	region := ctx.Parameters["region"]
 	if region == "" {
 		return nil, fmt.Errorf("region is required")
 	}
@@ -27,7 +26,7 @@ func ListClusters(ctx core.ListResourcesContext, resourceType string) ([]core.In
 
 	resources := make([]core.IntegrationResource, 0, len(clusters))
 	for _, cluster := range clusters {
-		name := strings.TrimSpace(cluster.ClusterName)
+		name := cluster.ClusterName
 		if name == "" {
 			name = clusterNameFromArn(cluster.ClusterArn)
 		}
@@ -48,12 +47,12 @@ func ListServices(ctx core.ListResourcesContext, resourceType string) ([]core.In
 		return nil, err
 	}
 
-	region := strings.TrimSpace(ctx.Parameters["region"])
+	region := ctx.Parameters["region"]
 	if region == "" {
 		return nil, fmt.Errorf("region is required")
 	}
 
-	cluster := strings.TrimSpace(ctx.Parameters["cluster"])
+	cluster := ctx.Parameters["cluster"]
 	if cluster == "" {
 		return nil, fmt.Errorf("cluster is required")
 	}
@@ -82,7 +81,7 @@ func ListTaskDefinitions(ctx core.ListResourcesContext, resourceType string) ([]
 		return nil, err
 	}
 
-	region := strings.TrimSpace(ctx.Parameters["region"])
+	region := ctx.Parameters["region"]
 	if region == "" {
 		return nil, fmt.Errorf("region is required")
 	}
@@ -111,12 +110,12 @@ func ListTasks(ctx core.ListResourcesContext, resourceType string) ([]core.Integ
 		return nil, err
 	}
 
-	region := strings.TrimSpace(ctx.Parameters["region"])
+	region := ctx.Parameters["region"]
 	if region == "" {
 		return nil, fmt.Errorf("region is required")
 	}
 
-	cluster := strings.TrimSpace(ctx.Parameters["cluster"])
+	cluster := ctx.Parameters["cluster"]
 	if cluster == "" {
 		return nil, fmt.Errorf("cluster is required")
 	}
@@ -131,7 +130,7 @@ func ListTasks(ctx core.ListResourcesContext, resourceType string) ([]core.Integ
 	describeResponse, err := client.DescribeTasks(cluster, taskArns)
 	if err == nil {
 		for _, task := range describeResponse.Tasks {
-			if strings.TrimSpace(task.TaskArn) == "" {
+			if task.TaskArn == "" {
 				continue
 			}
 			taskResourceNames[task.TaskArn] = formatTaskResourceName(task)
@@ -140,7 +139,7 @@ func ListTasks(ctx core.ListResourcesContext, resourceType string) ([]core.Integ
 
 	resources := make([]core.IntegrationResource, 0, len(taskArns))
 	for _, arn := range taskArns {
-		name := strings.TrimSpace(taskResourceNames[arn])
+		name := taskResourceNames[arn]
 		if name == "" {
 			name = taskIDFromArn(arn)
 		}
@@ -158,7 +157,7 @@ func ListTasks(ctx core.ListResourcesContext, resourceType string) ([]core.Integ
 func formatTaskResourceName(task Task) string {
 	taskID := taskIDFromArn(task.TaskArn)
 	taskDefinition := taskDefinitionNameFromArn(task.TaskDefinitionArn)
-	status := strings.TrimSpace(task.LastStatus)
+	status := task.LastStatus
 
 	if taskDefinition != "" && status != "" && taskID != "" {
 		return fmt.Sprintf("%s %s (%s)", taskDefinition, task.LaunchType, taskID)
@@ -172,5 +171,5 @@ func formatTaskResourceName(task Task) string {
 		return taskID
 	}
 
-	return strings.TrimSpace(task.TaskArn)
+	return task.TaskArn
 }

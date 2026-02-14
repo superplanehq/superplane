@@ -55,6 +55,7 @@ type Service struct {
 	CreatedAt       common.FloatTime    `json:"createdAt,omitempty"`
 	Deployments     []ServiceDeployment `json:"deployments"`
 	Events          []ServiceEvent      `json:"events"`
+	TaskSets        []ServiceTaskSet    `json:"taskSets"`
 	NetworkConfig   any                 `json:"networkConfiguration,omitempty"`
 	PropagateTags   string              `json:"propagateTags"`
 	EnableExec      bool                `json:"enableExecuteCommand"`
@@ -75,6 +76,22 @@ type ServiceEvent struct {
 	ID        string           `json:"id"`
 	CreatedAt common.FloatTime `json:"createdAt,omitempty"`
 	Message   string           `json:"message"`
+}
+
+type ServiceTaskSet struct {
+	ID                   string           `json:"id"`
+	TaskSetArn           string           `json:"taskSetArn"`
+	Status               string           `json:"status"`
+	TaskDefinition       string           `json:"taskDefinition"`
+	ServiceArn           string           `json:"serviceArn"`
+	ClusterArn           string           `json:"clusterArn"`
+	LaunchType           string           `json:"launchType"`
+	PlatformVersion      string           `json:"platformVersion"`
+	ComputedDesiredCount int              `json:"computedDesiredCount"`
+	PendingCount         int              `json:"pendingCount"`
+	RunningCount         int              `json:"runningCount"`
+	CreatedAt            common.FloatTime `json:"createdAt,omitempty"`
+	UpdatedAt            common.FloatTime `json:"updatedAt,omitempty"`
 }
 
 type DescribeServicesResponse struct {
@@ -174,7 +191,7 @@ func (c *Client) ListTasks(cluster string) ([]string, error) {
 	return c.listPaginatedStrings(
 		"ListTasks",
 		map[string]any{
-			"cluster":       strings.TrimSpace(cluster),
+			"cluster":       cluster,
 			"desiredStatus": "RUNNING",
 		},
 		"taskArns",
@@ -183,7 +200,7 @@ func (c *Client) ListTasks(cluster string) ([]string, error) {
 
 func (c *Client) DescribeServices(cluster string, services []string) (*DescribeServicesResponse, error) {
 	payload := map[string]any{
-		"cluster":  strings.TrimSpace(cluster),
+		"cluster":  cluster,
 		"services": services,
 	}
 
@@ -197,7 +214,7 @@ func (c *Client) DescribeServices(cluster string, services []string) (*DescribeS
 
 func (c *Client) DescribeTasks(cluster string, tasks []string) (*DescribeTasksResponse, error) {
 	payload := map[string]any{
-		"cluster": strings.TrimSpace(cluster),
+		"cluster": cluster,
 		"tasks":   tasks,
 	}
 
@@ -216,22 +233,22 @@ func (c *Client) RunTask(input RunTaskInput) (*RunTaskResponse, error) {
 	}
 
 	payload := map[string]any{
-		"cluster":        strings.TrimSpace(input.Cluster),
-		"taskDefinition": strings.TrimSpace(input.TaskDefinition),
+		"cluster":        input.Cluster,
+		"taskDefinition": input.TaskDefinition,
 		"count":          count,
 	}
 
-	if strings.TrimSpace(input.LaunchType) != "" {
-		payload["launchType"] = strings.TrimSpace(input.LaunchType)
+	if input.LaunchType != "" {
+		payload["launchType"] = input.LaunchType
 	}
-	if strings.TrimSpace(input.Group) != "" {
-		payload["group"] = strings.TrimSpace(input.Group)
+	if input.Group != "" {
+		payload["group"] = input.Group
 	}
-	if strings.TrimSpace(input.StartedBy) != "" {
-		payload["startedBy"] = strings.TrimSpace(input.StartedBy)
+	if input.StartedBy != "" {
+		payload["startedBy"] = input.StartedBy
 	}
-	if strings.TrimSpace(input.PlatformVersion) != "" {
-		payload["platformVersion"] = strings.TrimSpace(input.PlatformVersion)
+	if input.PlatformVersion != "" {
+		payload["platformVersion"] = input.PlatformVersion
 	}
 	if input.EnableExecuteCommand {
 		payload["enableExecuteCommand"] = true
@@ -253,11 +270,10 @@ func (c *Client) RunTask(input RunTaskInput) (*RunTaskResponse, error) {
 
 func (c *Client) StopTask(cluster string, task string, reason string) (*StopTaskResponse, error) {
 	payload := map[string]any{
-		"cluster": strings.TrimSpace(cluster),
-		"task":    strings.TrimSpace(task),
+		"cluster": cluster,
+		"task":    task,
 	}
 
-	reason = strings.TrimSpace(reason)
 	if reason != "" {
 		payload["reason"] = reason
 	}
@@ -331,8 +347,8 @@ func (c *Client) listPaginatedStrings(action string, basePayload map[string]any,
 	for {
 		payload := clonePayload(basePayload)
 		payload["maxResults"] = 100
-		if strings.TrimSpace(nextToken) != "" {
-			payload["nextToken"] = strings.TrimSpace(nextToken)
+		if nextToken != "" {
+			payload["nextToken"] = nextToken
 		}
 
 		response := map[string]json.RawMessage{}
@@ -360,7 +376,7 @@ func (c *Client) listPaginatedStrings(action string, basePayload map[string]any,
 		if err := json.Unmarshal(rawNextToken, &pageNextToken); err != nil {
 			return nil, fmt.Errorf("failed to decode nextToken in %s response: %w", action, err)
 		}
-		if strings.TrimSpace(pageNextToken) == "" {
+		if pageNextToken == "" {
 			break
 		}
 
@@ -413,7 +429,7 @@ func isNetworkConfigurationTemplate(value any) bool {
 	}
 
 	assignPublicIP, _ := config["assignPublicIp"].(string)
-	if strings.ToUpper(strings.TrimSpace(assignPublicIP)) != "DISABLED" {
+	if strings.ToUpper(assignPublicIP) != "DISABLED" {
 		return false
 	}
 
@@ -468,38 +484,38 @@ func toStringAnyMap(value any) (map[string]any, bool) {
 }
 
 func clusterNameFromArn(arn string) string {
-	parts := strings.SplitN(strings.TrimSpace(arn), "cluster/", 2)
+	parts := strings.SplitN(arn, "cluster/", 2)
 	if len(parts) != 2 {
-		return strings.TrimSpace(arn)
+		return arn
 	}
-	return strings.TrimSpace(parts[1])
+	return parts[1]
 }
 
 func serviceNameFromArn(arn string) string {
-	parts := strings.SplitN(strings.TrimSpace(arn), "service/", 2)
+	parts := strings.SplitN(arn, "service/", 2)
 	if len(parts) != 2 {
-		return strings.TrimSpace(arn)
+		return arn
 	}
 
 	segments := strings.Split(parts[1], "/")
 	if len(segments) == 0 {
-		return strings.TrimSpace(arn)
+		return arn
 	}
-	return strings.TrimSpace(segments[len(segments)-1])
+	return segments[len(segments)-1]
 }
 
 func taskDefinitionNameFromArn(arn string) string {
-	parts := strings.SplitN(strings.TrimSpace(arn), "task-definition/", 2)
+	parts := strings.SplitN(arn, "task-definition/", 2)
 	if len(parts) != 2 {
-		return strings.TrimSpace(arn)
+		return arn
 	}
-	return strings.TrimSpace(parts[1])
+	return parts[1]
 }
 
 func taskIDFromArn(arn string) string {
-	parts := strings.Split(strings.TrimSpace(arn), "task/")
+	parts := strings.Split(arn, "task/")
 	if len(parts) != 2 {
-		return strings.TrimSpace(arn)
+		return arn
 	}
 
 	taskIDWithClustername := parts[1]

@@ -190,7 +190,7 @@ func (c *StopTask) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to stop ECS task: %w", err)
 	}
 
-	if strings.TrimSpace(response.Task.TaskArn) == "" {
+	if response.Task.TaskArn == "" {
 		return fmt.Errorf("failed to stop ECS task: response did not include a task")
 	}
 

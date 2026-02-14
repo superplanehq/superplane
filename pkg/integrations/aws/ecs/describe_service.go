@@ -179,7 +179,7 @@ func (c *DescribeService) Execute(ctx core.ExecutionContext) error {
 	if len(response.Services) == 0 {
 		if len(response.Failures) > 0 {
 			failure := response.Failures[0]
-			return fmt.Errorf("failed to describe ECS service %s: %s (%s)", config.Service, strings.TrimSpace(failure.Reason), strings.TrimSpace(failure.Detail))
+			return fmt.Errorf("failed to describe ECS service %s: %s (%s)", config.Service, failure.Reason, failure.Detail)
 		}
 		return fmt.Errorf("service not found: %s", config.Service)
 	}

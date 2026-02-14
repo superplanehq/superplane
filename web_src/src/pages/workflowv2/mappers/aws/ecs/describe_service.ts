@@ -79,6 +79,9 @@ export const describeServiceMapper: ComponentBaseMapper = {
     }
 
     return {
+      "Retrieved At": stringOrDash(
+        context.execution.updatedAt ? new Date(context.execution.updatedAt).toLocaleString() : "-",
+      ),
       Service: stringOrDash(service.serviceName),
       "Service ARN": stringOrDash(service.serviceArn),
       Status: stringOrDash(service.status),

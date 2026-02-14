@@ -286,7 +286,7 @@ func (c *RunTask) Execute(ctx core.ExecutionContext) error {
 
 	if len(response.Tasks) == 0 && len(response.Failures) > 0 {
 		failure := response.Failures[0]
-		return fmt.Errorf("failed to run ECS task: %s (%s)", strings.TrimSpace(failure.Reason), strings.TrimSpace(failure.Detail))
+		return fmt.Errorf("failed to run ECS task: %s (%s)", failure.Reason, failure.Detail)
 	}
 
 	output := map[string]any{

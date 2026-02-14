@@ -111,7 +111,16 @@ func Test__DescribeService__Execute(t *testing.T) {
 									"status": "ACTIVE",
 									"desiredCount": 2,
 									"runningCount": 2,
-									"pendingCount": 0
+									"pendingCount": 0,
+									"taskSets": [
+										{
+											"id": "ecs-svc/1234567890123456789",
+											"taskSetArn": "arn:aws:ecs:us-east-1:123456789012:task-set/demo/web/1234567890123456789",
+											"status": "PRIMARY",
+											"taskDefinition": "arn:aws:ecs:us-east-1:123456789012:task-definition/web:7",
+											"runningCount": 2
+										}
+									]
 								}
 							]
 						}
@@ -146,6 +155,9 @@ func Test__DescribeService__Execute(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "web", service.ServiceName)
 		assert.Equal(t, "ACTIVE", service.Status)
+		require.Len(t, service.TaskSets, 1)
+		assert.Equal(t, "arn:aws:ecs:us-east-1:123456789012:task-set/demo/web/1234567890123456789", service.TaskSets[0].TaskSetArn)
+		assert.Equal(t, "PRIMARY", service.TaskSets[0].Status)
 
 		require.Len(t, httpContext.Requests, 1)
 		assert.Equal(t, "https://ecs.us-east-1.amazonaws.com/", httpContext.Requests[0].URL.String())

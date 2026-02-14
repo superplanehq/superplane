@@ -8,7 +8,16 @@
       "taskDefinition": "arn:aws:ecs:us-east-1:123456789012:task-definition/web:7",
       "desiredCount": 2,
       "runningCount": 2,
-      "pendingCount": 0
+      "pendingCount": 0,
+      "taskSets": [
+        {
+          "id": "ecs-svc/1234567890123456789",
+          "taskSetArn": "arn:aws:ecs:us-east-1:123456789012:task-set/demo/web/1234567890123456789",
+          "status": "PRIMARY",
+          "taskDefinition": "arn:aws:ecs:us-east-1:123456789012:task-definition/web:7",
+          "runningCount": 2
+        }
+      ]
     },
     "failures": []
   },
