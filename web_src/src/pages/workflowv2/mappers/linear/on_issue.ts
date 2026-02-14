@@ -5,7 +5,7 @@ import { TriggerProps } from "@/ui/trigger";
 import linearIcon from "@/assets/icons/integrations/linear.svg";
 import { Issue } from "./types";
 
-interface OnIssueCreatedEventData {
+interface OnIssueEventData {
   action?: string;
   type?: string;
   data?: Issue & { teamId?: string; stateId?: string; assigneeId?: string };
@@ -13,20 +13,20 @@ interface OnIssueCreatedEventData {
   url?: string;
 }
 
-export const onIssueCreatedTriggerRenderer: TriggerRenderer = {
+export const onIssueTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const eventData = context.event?.data as OnIssueCreatedEventData;
+    const eventData = context.event?.data as OnIssueEventData;
     const issue = eventData?.data;
     const subtitle = buildSubtitle(issue?.identifier, context.event?.createdAt);
 
     return {
-      title: issue?.title || "Issue Created",
+      title: buildTitle(eventData),
       subtitle,
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data as OnIssueCreatedEventData;
+    const eventData = context.event?.data as OnIssueEventData;
     const issue = eventData?.data;
     if (!issue) return {};
 
@@ -70,12 +70,12 @@ export const onIssueCreatedTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnIssueCreatedEventData;
+      const eventData = lastEvent.data as OnIssueEventData;
       const issue = eventData?.data;
       const subtitle = buildSubtitle(issue?.identifier, lastEvent.createdAt);
 
       props.lastEventData = {
-        title: issue?.title || "Issue Created",
+        title: buildTitle(eventData),
         subtitle,
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
@@ -86,6 +86,19 @@ export const onIssueCreatedTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+const actionLabels: Record<string, string> = {
+  create: "Issue created",
+  update: "Issue updated",
+  remove: "Issue removed",
+};
+
+function buildTitle(eventData?: OnIssueEventData): string {
+  const action = eventData?.action;
+  const label = (action && actionLabels[action]) || "Issue";
+  const title = eventData?.data?.title;
+  return title ? `${label}: ${title}` : label;
+}
 
 function buildSubtitle(identifier?: string, createdAt?: string): string {
   const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";

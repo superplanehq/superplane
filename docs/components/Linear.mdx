@@ -7,7 +7,7 @@ Manage and react to issues in Linear
 ## Triggers
 
 <CardGrid>
-  <LinkCard title="On Issue Created" href="#on-issue-created" description="Start a workflow when a new issue is created in Linear" />
+  <LinkCard title="On Issue" href="#on-issue" description="Start a workflow when an issue is created, updated, or removed in Linear" />
 </CardGrid>
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
@@ -18,15 +18,19 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in Linear" />
 </CardGrid>
 
-<a id="on-issue-created"></a>
+## Instructions
 
-## On Issue Created
+Leave **Client ID** and **Client Secret** empty to start the setup wizard.
 
-The On Issue Created trigger starts a workflow when a new issue is created in Linear.
+<a id="on-issue"></a>
+
+## On Issue
+
+The On Issue trigger starts a workflow when an issue is created, updated, or removed in Linear.
 
 ### Use Cases
 
-- **Issue automation**: Run workflows when new issues are created
+- **Issue automation**: Run workflows when issues change
 - **Notification workflows**: Notify channels or create tasks elsewhere
 - **Filter by team/label**: Optionally restrict to a team and/or labels
 
@@ -38,6 +42,7 @@ The On Issue Created trigger starts a workflow when a new issue is created in Li
 ### Event Data
 
 The payload includes Linear webhook fields: action, type, data (issue), actor, url, createdAt, webhookTimestamp.
+The action field indicates the event type: "create", "update", or "remove".
 
 ### Example Data
 
@@ -45,30 +50,69 @@ The payload includes Linear webhook fields: action, type, data (issue), actor, u
 {
   "action": "create",
   "actor": {
-    "email": "alice@example.com",
+    "email": "sarah@company.com",
     "id": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
-    "name": "Alice",
-    "type": "user"
+    "name": "Sarah Chen",
+    "type": "user",
+    "url": "https://linear.app/company/profiles/sarah"
   },
-  "createdAt": "2020-01-23T12:53:18.084Z",
+  "createdAt": "2025-01-24T14:32:18.084Z",
   "data": {
-    "assigneeId": "user-1",
-    "createdAt": "2020-01-23T12:53:18.084Z",
-    "description": "Issue description",
-    "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
-    "identifier": "ENG-42",
+    "assignee": {
+      "email": "alex@company.com",
+      "id": "530a965e-b465-40f3-af72-3e04c470d62a",
+      "name": "Alex Rivera",
+      "url": "https://linear.app/company/profiles/alex"
+    },
+    "assigneeId": "530a965e-b465-40f3-af72-3e04c470d62a",
+    "autoClosedAt": null,
+    "canceledAt": null,
+    "completedAt": null,
+    "createdAt": "2025-01-24T14:32:18.076Z",
+    "creatorId": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+    "description": "Implement JWT-based authentication for all public API endpoints.",
+    "id": "8f7e6d5c-4b3a-2198-7f6e-5d4c3b2a1098",
+    "identifier": "ENG-123",
     "labelIds": [
-      "label-1"
+      "f1e2d3c4-b5a6-9788-7654-321fedcba098"
     ],
-    "priority": 2,
-    "stateId": "state-1",
+    "labels": [
+      {
+        "color": "#BB87FC",
+        "id": "f1e2d3c4-b5a6-9788-7654-321fedcba098",
+        "name": "Feature"
+      }
+    ],
+    "number": 123,
+    "priority": 1,
+    "priorityLabel": "Urgent",
+    "sortOrder": -2090,
+    "startedAt": null,
+    "state": {
+      "color": "#e2e2e2",
+      "id": "e3d2c1b0-a987-6f5e-4d3c-2b1a09876543",
+      "name": "Todo",
+      "type": "unstarted"
+    },
+    "stateId": "e3d2c1b0-a987-6f5e-4d3c-2b1a09876543",
+    "subscriberIds": [
+      "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+      "530a965e-b465-40f3-af72-3e04c470d62a"
+    ],
+    "team": {
+      "id": "72b2a2dc-6f4f-4423-9d34-24b5bd10634a",
+      "key": "ENG",
+      "name": "Engineering"
+    },
     "teamId": "72b2a2dc-6f4f-4423-9d34-24b5bd10634a",
-    "title": "Example issue",
-    "updatedAt": "2020-01-23T12:53:18.084Z"
+    "title": "Add user authentication to API endpoints",
+    "triagedAt": null,
+    "updatedAt": "2025-01-24T14:32:18.076Z",
+    "url": "https://linear.app/company/issue/ENG-123/add-user-authentication"
   },
   "type": "Issue",
-  "url": "https://linear.app/company/issue/ENG-42/example-issue",
-  "webhookTimestamp": 1676056940508
+  "url": "https://linear.app/company/issue/ENG-123/add-user-authentication",
+  "webhookTimestamp": 1706107938084
 }
 ```
 

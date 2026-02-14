@@ -1,0 +1,65 @@
+{
+  "action": "create",
+  "type": "Issue",
+  "createdAt": "2025-01-24T14:32:18.084Z",
+  "webhookTimestamp": 1706107938084,
+  "url": "https://linear.app/company/issue/ENG-123/add-user-authentication",
+  "actor": {
+    "id": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+    "type": "user",
+    "name": "Sarah Chen",
+    "email": "sarah@company.com",
+    "url": "https://linear.app/company/profiles/sarah"
+  },
+  "data": {
+    "id": "8f7e6d5c-4b3a-2198-7f6e-5d4c3b2a1098",
+    "createdAt": "2025-01-24T14:32:18.076Z",
+    "updatedAt": "2025-01-24T14:32:18.076Z",
+    "number": 123,
+    "title": "Add user authentication to API endpoints",
+    "description": "Implement JWT-based authentication for all public API endpoints.",
+    "identifier": "ENG-123",
+    "priority": 1,
+    "priorityLabel": "Urgent",
+    "sortOrder": -2090,
+    "startedAt": null,
+    "completedAt": null,
+    "canceledAt": null,
+    "autoClosedAt": null,
+    "triagedAt": null,
+    "creatorId": "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+    "teamId": "72b2a2dc-6f4f-4423-9d34-24b5bd10634a",
+    "team": {
+      "id": "72b2a2dc-6f4f-4423-9d34-24b5bd10634a",
+      "key": "ENG",
+      "name": "Engineering"
+    },
+    "stateId": "e3d2c1b0-a987-6f5e-4d3c-2b1a09876543",
+    "state": {
+      "id": "e3d2c1b0-a987-6f5e-4d3c-2b1a09876543",
+      "name": "Todo",
+      "color": "#e2e2e2",
+      "type": "unstarted"
+    },
+    "assigneeId": "530a965e-b465-40f3-af72-3e04c470d62a",
+    "assignee": {
+      "id": "530a965e-b465-40f3-af72-3e04c470d62a",
+      "name": "Alex Rivera",
+      "email": "alex@company.com",
+      "url": "https://linear.app/company/profiles/alex"
+    },
+    "labelIds": ["f1e2d3c4-b5a6-9788-7654-321fedcba098"],
+    "labels": [
+      {
+        "id": "f1e2d3c4-b5a6-9788-7654-321fedcba098",
+        "name": "Feature",
+        "color": "#BB87FC"
+      }
+    ],
+    "subscriberIds": [
+      "b5ea5f1f-8adc-4f52-b4bd-ab4e84cf51ba",
+      "530a965e-b465-40f3-af72-3e04c470d62a"
+    ],
+    "url": "https://linear.app/company/issue/ENG-123/add-user-authentication"
+  }
+}

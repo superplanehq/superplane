@@ -17,7 +17,11 @@ func Test__CreateIssue__Setup(t *testing.T) {
 
 	t.Run("missing team -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			Integration:   &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "x"}},
+			Integration: &contexts.IntegrationContext{
+				Secrets: map[string]core.IntegrationSecret{
+					OAuthAccessToken: {Name: OAuthAccessToken, Value: []byte("x")},
+				},
+			},
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: map[string]any{"title": "Fix bug"},
 		})
@@ -27,7 +31,11 @@ func Test__CreateIssue__Setup(t *testing.T) {
 
 	t.Run("missing title -> error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			Integration:   &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "x"}},
+			Integration: &contexts.IntegrationContext{
+				Secrets: map[string]core.IntegrationSecret{
+					OAuthAccessToken: {Name: OAuthAccessToken, Value: []byte("x")},
+				},
+			},
 			Metadata:      &contexts.MetadataContext{},
 			Configuration: map[string]any{"team": "t1"},
 		})
@@ -42,7 +50,11 @@ func Test__CreateIssue__Setup(t *testing.T) {
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(teamsResp))},
 			},
 		}
-		appCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "key"}}
+		appCtx := &contexts.IntegrationContext{
+			Secrets: map[string]core.IntegrationSecret{
+				OAuthAccessToken: {Name: OAuthAccessToken, Value: []byte("key")},
+			},
+		}
 		err := component.Setup(core.SetupContext{
 			HTTP:          httpCtx,
 			Integration:   appCtx,
@@ -60,7 +72,11 @@ func Test__CreateIssue__Setup(t *testing.T) {
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(teamsResp))},
 			},
 		}
-		appCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "key"}}
+		appCtx := &contexts.IntegrationContext{
+			Secrets: map[string]core.IntegrationSecret{
+				OAuthAccessToken: {Name: OAuthAccessToken, Value: []byte("key")},
+			},
+		}
 		metaCtx := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{
 			HTTP:          httpCtx,
@@ -78,6 +94,14 @@ func Test__CreateIssue__Setup(t *testing.T) {
 func Test__CreateIssue__Execute(t *testing.T) {
 	component := &CreateIssue{}
 
+	t.Run("nil integration -> error", func(t *testing.T) {
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{"team": "t1", "title": "Task"},
+		})
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "integration not configured")
+	})
+
 	t.Run("success", func(t *testing.T) {
 		createResp := `{"data":{"issueCreate":{"success":true,"issue":{"id":"i1","identifier":"ENG-1","title":"Task","team":{"id":"t1"},"state":{"id":"s1"}}}}}`
 		httpCtx := &contexts.HTTPContext{
@@ -85,7 +109,11 @@ func Test__CreateIssue__Execute(t *testing.T) {
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(createResp))},
 			},
 		}
-		appCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "key"}}
+		appCtx := &contexts.IntegrationContext{
+			Secrets: map[string]core.IntegrationSecret{
+				OAuthAccessToken: {Name: OAuthAccessToken, Value: []byte("key")},
+			},
+		}
 		execState := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			HTTP:           httpCtx,
