@@ -116,13 +116,13 @@ type CreateIncidentRequest struct {
 
 // IncidentPayload holds fields for creating/updating an incident
 type IncidentPayload struct {
-	Name               string   `json:"name"`
-	Status             string   `json:"status,omitempty"`
-	ImpactOverride     string   `json:"impact_override,omitempty"`
-	Body               string   `json:"body,omitempty"`
-	ComponentIDs       []string `json:"component_ids,omitempty"`
-	ComponentStatus    string   `json:"component_status,omitempty"`
-	DeliverNotifications *bool  `json:"deliver_notifications,omitempty"`
+	Name                 string   `json:"name"`
+	Status               string   `json:"status,omitempty"`
+	ImpactOverride       string   `json:"impact_override,omitempty"`
+	Body                 string   `json:"body,omitempty"`
+	ComponentIDs         []string `json:"component_ids,omitempty"`
+	ComponentStatus      string   `json:"component_status,omitempty"`
+	DeliverNotifications *bool    `json:"deliver_notifications,omitempty"`
 }
 
 // CreateIncident creates a new incident on the page
@@ -158,13 +158,13 @@ type UpdateIncidentRequest struct {
 
 // UpdateIncidentPayload holds fields for updating an incident
 type UpdateIncidentPayload struct {
-	Name               string   `json:"name,omitempty"`
-	Status             string   `json:"status,omitempty"`
-	ImpactOverride     string   `json:"impact_override,omitempty"`
-	Body               string   `json:"body,omitempty"`
-	ComponentIDs       []string `json:"component_ids,omitempty"`
-	ComponentStatus    string   `json:"component_status,omitempty"`
-	DeliverNotifications *bool  `json:"deliver_notifications,omitempty"`
+	Name                 string   `json:"name,omitempty"`
+	Status               string   `json:"status,omitempty"`
+	ImpactOverride       string   `json:"impact_override,omitempty"`
+	Body                 string   `json:"body,omitempty"`
+	ComponentIDs         []string `json:"component_ids,omitempty"`
+	ComponentStatus      string   `json:"component_status,omitempty"`
+	DeliverNotifications *bool    `json:"deliver_notifications,omitempty"`
 }
 
 // UpdateIncident updates an existing incident on the page
