@@ -78,12 +78,38 @@ export function buildIncidentTimeline(updates: StatuspageIncidentUpdate[]): Inci
   return timeline;
 }
 
+export type GetDetailsForIncidentOptions = {
+  componentName?: string;
+  execution?: ExecutionInfo;
+};
+
 /**
  * Returns human-readable execution details for a Statuspage incident.
  * API returns incident_updates in chronological order; last element is latest.
+ * Timestamp and timeline vary by component: create (Created At, no timeline),
+ * get (Fetched At, with timeline), update (Updated At, with timeline).
  */
-export function getDetailsForIncident(incident: StatuspageIncident): Record<string, string | IncidentTimelineEntry[]> {
+export function getDetailsForIncident(
+  incident: StatuspageIncident,
+  options?: GetDetailsForIncidentOptions,
+): Record<string, string | IncidentTimelineEntry[]> {
   const details: Record<string, string | IncidentTimelineEntry[]> = {};
+  const componentName = options?.componentName;
+  const execution = options?.execution;
+
+  // Timestamp first (single timestamp per component)
+  if (componentName === "statuspage.createIncident" && incident?.created_at) {
+    details["Created At"] = new Date(incident.created_at).toLocaleString();
+  } else if (componentName === "statuspage.getIncident" && execution?.createdAt) {
+    details["Fetched At"] = new Date(execution.createdAt).toLocaleString();
+  } else if (componentName === "statuspage.updateIncident" && incident?.updated_at) {
+    details["Updated At"] = new Date(incident.updated_at).toLocaleString();
+  } else if (!componentName) {
+    // Fallback when options not passed (e.g. from tests)
+    if (incident?.created_at) {
+      details["Created At"] = new Date(incident.created_at).toLocaleString();
+    }
+  }
 
   details["ID"] = stringOrDash(incident?.id);
   details["Name"] = stringOrDash(incident?.name);
@@ -91,18 +117,14 @@ export function getDetailsForIncident(incident: StatuspageIncident): Record<stri
   details["Impact"] = stringOrDash(incident?.impact);
   details["Incident URL"] = stringOrDash(incident?.shortlink);
 
-  if (incident?.created_at) {
-    details["Created At"] = new Date(incident.created_at).toLocaleString();
-  }
-  if (incident?.updated_at) {
-    details["Updated At"] = new Date(incident.updated_at).toLocaleString();
-  }
-
-  const updates = incident?.incident_updates;
-  if (updates && updates.length > 0) {
-    details["Timeline"] = buildIncidentTimeline(updates);
-  } else {
-    details["Updates"] = "No updates recorded";
+  // Timeline only for get and update, omit completely for create
+  if (componentName !== "statuspage.createIncident") {
+    const updates = incident?.incident_updates;
+    if (updates && updates.length > 0) {
+      details["Timeline"] = buildIncidentTimeline(updates);
+    } else {
+      details["Updates"] = "No updates recorded";
+    }
   }
 
   return details;

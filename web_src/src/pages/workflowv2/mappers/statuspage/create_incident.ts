@@ -45,7 +45,10 @@ export const createIncidentMapper: ComponentBaseMapper = {
       return {};
     }
     const incident = outputs.default[0].data as StatuspageIncident;
-    return getDetailsForIncident(incident);
+    return getDetailsForIncident(incident, {
+      componentName: context.node.componentName,
+      execution: context.execution,
+    });
   },
 
   subtitle(context: SubtitleContext): string {
