@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"sort"
 	"strings"
 )
 
@@ -48,19 +49,79 @@ func extractPipelineWebhookEvent(payload map[string]any) pipelineWebhookEvent {
 	event := pipelineWebhookEvent{}
 
 	event.ExecutionID = firstNonEmpty(
+		findStringByPaths(payload,
+			[]string{"eventData", "planExecutionId"},
+			[]string{"eventData", "executionId"},
+			[]string{"eventData", "execution_id"},
+			[]string{"data", "planExecutionId"},
+			[]string{"data", "executionId"},
+			[]string{"data", "execution_id"},
+			[]string{"planExecutionId"},
+			[]string{"executionId"},
+			[]string{"execution_id"},
+		),
 		findStringRecursive(payload, []string{"planExecutionId", "executionId", "execution_id"}, 0),
 	)
 	event.PipelineIdentifier = firstNonEmpty(
+		findStringByPaths(payload,
+			[]string{"eventData", "pipelineIdentifier"},
+			[]string{"eventData", "pipelineId"},
+			[]string{"eventData", "pipeline_id"},
+			[]string{"data", "pipelineIdentifier"},
+			[]string{"data", "pipelineId"},
+			[]string{"data", "pipeline_id"},
+			[]string{"pipelineIdentifier"},
+			[]string{"pipelineId"},
+			[]string{"pipeline_id"},
+		),
 		findStringRecursive(payload, []string{"pipelineIdentifier", "pipelineId", "pipeline_id"}, 0),
 	)
 	event.Status = firstNonEmpty(
+		findStringByPaths(payload,
+			[]string{"eventData", "nodeStatus"},
+			[]string{"eventData", "status"},
+			[]string{"eventData", "pipelineStatus"},
+			[]string{"eventData", "planExecutionStatus"},
+			[]string{"eventData", "executionStatus"},
+			[]string{"data", "nodeStatus"},
+			[]string{"data", "status"},
+			[]string{"data", "pipelineStatus"},
+			[]string{"data", "planExecutionStatus"},
+			[]string{"data", "executionStatus"},
+			[]string{"nodeStatus"},
+			[]string{"status"},
+			[]string{"pipelineStatus"},
+			[]string{"planExecutionStatus"},
+			[]string{"executionStatus"},
+		),
 		findStringRecursive(payload, []string{"status", "pipelineStatus", "planExecutionStatus", "executionStatus", "nodeStatus"}, 0),
 	)
 	event.EventType = firstNonEmpty(
+		findStringByPaths(payload,
+			[]string{"eventType"},
+			[]string{"eventData", "eventType"},
+			[]string{"data", "eventType"},
+			[]string{"type"},
+			[]string{"event"},
+		),
 		findStringRecursive(payload, []string{"eventType", "type", "event"}, 0),
 	)
 
 	return event
+}
+
+func findStringByPaths(input map[string]any, paths ...[]string) string {
+	for _, path := range paths {
+		if len(path) == 0 {
+			continue
+		}
+
+		if text := readString(readAnyPath(input, path...)); text != "" {
+			return text
+		}
+	}
+
+	return ""
 }
 
 func findStringRecursive(input any, keys []string, depth int) string {
@@ -78,7 +139,14 @@ func findStringRecursive(input any, keys []string, depth int) string {
 			}
 		}
 
-		for _, nested := range value {
+		nestedKeys := make([]string, 0, len(value))
+		for key := range value {
+			nestedKeys = append(nestedKeys, key)
+		}
+		sort.Strings(nestedKeys)
+
+		for _, key := range nestedKeys {
+			nested := value[key]
 			if text := findStringRecursive(nested, keys, depth+1); text != "" {
 				return text
 			}
