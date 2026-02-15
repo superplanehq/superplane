@@ -26,6 +26,7 @@ type BuildkiteSubscriptionConfiguration struct {
 	Organization string `json:"organization"`
 	Pipeline     string `json:"pipeline"`
 	Branch       string `json:"branch,omitempty"`
+	EventType    string `json:"eventType,omitempty"`
 }
 
 func (t *OnBuildFinished) Name() string {
@@ -194,6 +195,7 @@ func (t *OnBuildFinished) subscribe(ctx core.TriggerContext, metadata OnBuildFin
 		Organization: orgSlug,
 		Pipeline:     config.Pipeline,
 		Branch:       config.Branch,
+		EventType:    "build.finished",
 	})
 
 	if err != nil {

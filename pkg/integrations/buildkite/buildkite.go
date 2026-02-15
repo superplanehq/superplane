@@ -255,7 +255,7 @@ func (b *Buildkite) subscriptionApplies(ctx core.HTTPRequestContext, subscriptio
 		return false
 	}
 
-	if eventType != "build.finished" {
+	if config.EventType != eventType {
 		return false
 	}
 
