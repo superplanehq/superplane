@@ -1,4 +1,4 @@
-package cli
+package core
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ const (
 	APIVersion = "v1"
 )
 
-// returns tuple (apiVersion, kind, error)
+// ParseYamlResourceHeaders returns tuple (apiVersion, kind, error).
 func ParseYamlResourceHeaders(raw []byte) (string, string, error) {
 	m := make(map[string]interface{})
 
@@ -20,13 +20,11 @@ func ParseYamlResourceHeaders(raw []byte) (string, string, error) {
 	}
 
 	apiVersion, ok := m["apiVersion"].(string)
-
 	if !ok {
 		return "", "", fmt.Errorf("failed to parse resource's api version")
 	}
 
 	kind, ok := m["kind"].(string)
-
 	if !ok {
 		return "", "", fmt.Errorf("failed to parse resource's kind")
 	}

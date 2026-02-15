@@ -12,52 +12,52 @@ Use this workflow to build or debug canvases from the CLI.
 Run these first:
 
 ```bash
-superplane list integrations
-superplane list integrations --connected
-superplane list triggers
-superplane list components
+superplane integrations list
+superplane integrations list --connected
+superplane triggers list
+superplane components list
 ```
 
 Narrow to one integration:
 
 ```bash
-superplane list triggers --from github
-superplane list components --from github
-superplane list components --from semaphore
+superplane triggers list --from github
+superplane components list --from github
+superplane components list --from semaphore
 ```
 
-Use `--connected` to list organization-connected integration instances (not just available providers). The CLI resolves this via `/api/v1/me` to get `organizationId`, then `/api/v1/organizations/{organizationId}/integrations`.
+Use `--connected` to list organization-connected integration instances (not just available providers).
 
 Inspect required config fields and example payloads:
 
 ```bash
-superplane get trigger --name github.onPush
-superplane get component --name semaphore.runWorkflow
-superplane get component --name github.runWorkflow
-superplane get component --name approval
+superplane triggers get github.onPush
+superplane components get semaphore.runWorkflow
+superplane components get github.runWorkflow
+superplane components get approval
 ```
 
 List runtime options for `integration-resource` fields:
 
 ```bash
-superplane list integration-resources --integration-id <integration-id> --type <type> --parameters key1=value1,key2=value2
+superplane integrations list-resources --id <integration-id> --type <type> --parameters key1=value1,key2=value2
 ```
 
-Use `superplane list integrations --connected` first to find valid integration IDs.
+Use `superplane integrations list --connected` first to find valid integration IDs.
 
 ## Build canvas incrementally
 
 Create a blank canvas first:
 
 ```bash
-superplane create canvas <name>
-superplane get canvas <name>
+superplane canvases create <name>
+superplane canvases get <name>
 ```
 
 Edit a canvas file and update via:
 
 ```bash
-superplane update -f <canvas-file.yaml>
+superplane canvases update --file <canvas-file.yaml>
 ```
 
 Use this resource header:
@@ -189,18 +189,18 @@ Symptoms of missing binding:
 
 How to resolve:
 
-1. Run `superplane list integrations --connected` and confirm required providers are connected for the org.
+1. Run `superplane integrations list --connected` and confirm required providers are connected for the org.
 2. Ensure the provider integration (GitHub, Semaphore, etc.) is installed and authenticated for the organization.
 3. Reopen the node config and select valid provider resources for required fields.
-4. Use `superplane list integration-resources --integration-id <integration-id> --type <type> --parameters ...` to inspect valid option IDs/names.
-5. Re-run `superplane get canvas <name>` and confirm node errors are cleared.
+4. Use `superplane integrations list-resources --id <integration-id> --type <type> --parameters ...` to inspect valid option IDs/names.
+5. Re-run `superplane canvases get <name>` and confirm node errors are cleared.
 
 ## Troubleshooting checklist
 
 Run this after every update:
 
 ```bash
-superplane get canvas <name>
+superplane canvases get <name>
 ```
 
 Check:
