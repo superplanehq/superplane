@@ -142,12 +142,7 @@ func (c *UpdateIncident) Configuration() []configuration.Field {
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Component ID",
 					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeIntegrationResource,
-						TypeOptions: &configuration.TypeOptions{
-							Resource: &configuration.ResourceTypeOptions{
-								Type: "component",
-							},
-						},
+						Type: configuration.FieldTypeString,
 					},
 				},
 			},
