@@ -52,3 +52,12 @@ func Test__ExtractPipelineWebhookEvent__FallsBackToRecursiveSearch(t *testing.T)
 	assert.Equal(t, "FAILED", event.Status)
 	assert.Equal(t, "PipelineEnd", event.EventType)
 }
+
+func Test__IsPipelineCompletedEventType(t *testing.T) {
+	assert.True(t, isPipelineCompletedEventType("PIPELINE_END"))
+	assert.True(t, isPipelineCompletedEventType("PipelineEnd"))
+	assert.True(t, isPipelineCompletedEventType("pipeline-end"))
+	assert.True(t, isPipelineCompletedEventType("pipeline.completed"))
+	assert.False(t, isPipelineCompletedEventType("STAGE_END"))
+	assert.False(t, isPipelineCompletedEventType(""))
+}

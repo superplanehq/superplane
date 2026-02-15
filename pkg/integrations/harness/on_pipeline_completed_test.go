@@ -142,6 +142,26 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		require.Equal(t, 1, events.Count())
 	})
 
+	t.Run("ignores non pipeline completed event types", func(t *testing.T) {
+		headers := http.Header{}
+		headers.Set("Authorization", "Bearer expected")
+		events := &contexts.EventContext{}
+
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers: headers,
+			Body:    []byte(`{"eventType":"STAGE_END","data":{"planExecutionId":"exec-3","pipelineIdentifier":"deploy","status":"FAILED"}}`),
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{
+				"webhookSecret": "expected",
+			}},
+			Configuration: OnPipelineCompletedConfiguration{PipelineIdentifier: "deploy", Statuses: []string{"failed"}},
+			Events:        events,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Equal(t, 0, events.Count())
+	})
+
 	t.Run("maps completed status to succeeded for filtering and emitted payload", func(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("Authorization", "Bearer expected")

@@ -149,6 +149,10 @@ func (t *OnPipelineCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int
 	}
 
 	event := extractPipelineWebhookEvent(payload)
+	if !isPipelineCompletedEventType(event.EventType) {
+		return http.StatusOK, nil
+	}
+
 	if !isTerminalStatus(event.Status) {
 		return http.StatusOK, nil
 	}

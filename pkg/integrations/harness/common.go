@@ -45,6 +45,23 @@ func isSuccessStatus(status string) bool {
 	return canonicalStatus(status) == "succeeded"
 }
 
+func isPipelineCompletedEventType(eventType string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(eventType))
+	if normalized == "" {
+		return false
+	}
+
+	replacer := strings.NewReplacer("_", "", "-", "", ".", "", " ", "")
+	normalized = replacer.Replace(normalized)
+
+	switch normalized {
+	case "pipelineend", "pipelinecompleted":
+		return true
+	default:
+		return false
+	}
+}
+
 func extractPipelineWebhookEvent(payload map[string]any) pipelineWebhookEvent {
 	event := pipelineWebhookEvent{}
 
