@@ -37,6 +37,14 @@ superplane get component --name github.runWorkflow
 superplane get component --name approval
 ```
 
+List runtime options for `integration-resource` fields:
+
+```bash
+superplane list integration-resources --integration-id <integration-id> --type <type> --parameters key1=value1,key2=value2
+```
+
+Use `superplane list integrations --connected` first to find valid integration IDs.
+
 ## Build canvas incrementally
 
 Create a blank canvas first:
@@ -81,6 +89,7 @@ Top-level fields:
 Node structure:
 
 - Common fields: `id`, `name`, `type`, `configuration`, `position`, `paused`, `isCollapsed`
+- Keep node `name` values unique within a canvas. Duplicate names can produce warnings and make expressions/diagnostics ambiguous.
 - `type` must be `TYPE_TRIGGER` or `TYPE_COMPONENT`
 - Trigger nodes must include `trigger.name`
 - Component nodes must include `component.name`
@@ -183,7 +192,8 @@ How to resolve:
 1. Run `superplane list integrations --connected` and confirm required providers are connected for the org.
 2. Ensure the provider integration (GitHub, Semaphore, etc.) is installed and authenticated for the organization.
 3. Reopen the node config and select valid provider resources for required fields.
-4. Re-run `superplane get canvas <name>` and confirm node errors are cleared.
+4. Use `superplane list integration-resources --integration-id <integration-id> --type <type> --parameters ...` to inspect valid option IDs/names.
+5. Re-run `superplane get canvas <name>` and confirm node errors are cleared.
 
 ## Troubleshooting checklist
 
@@ -198,4 +208,5 @@ Check:
 - All required `configuration` fields are present.
 - Edges use the correct output channels.
 - No node `errorMessage` remains.
+- No node `warningMessage` indicates duplicate names (for example: `Multiple components named "semaphore.runWorkflow"`).
 - Expressions reference existing node names.

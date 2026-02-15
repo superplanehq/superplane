@@ -2,8 +2,13 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -19,7 +24,7 @@ var listCmd = &cobra.Command{
 	Aliases: []string{"ls"},
 }
 
-var listCanvasCmd = &cobra.Command{
+var listCanvasesCmd = &cobra.Command{
 	Use:     "canvas",
 	Short:   "List canvases",
 	Aliases: []string{"canvases"},
@@ -173,14 +178,186 @@ var listTriggersCmd = &cobra.Command{
 	},
 }
 
+type integrationResourceListResponse struct {
+	Resources []openapi_client.OrganizationsIntegrationResourceRef `json:"resources"`
+}
+
+var listIntegrationResourcesType string
+var listIntegrationResourcesParameters string
+var listIntegrationResourcesIntegrationID string
+
+var listIntegrationResourcesCmd = &cobra.Command{
+	Use:   "integration-resources",
+	Short: "List integration resources",
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		if strings.TrimSpace(listIntegrationResourcesType) == "" {
+			Fail("--type is required")
+		}
+
+		extraParameters, err := parseIntegrationResourceParametersFlag(listIntegrationResourcesParameters)
+		Check(err)
+		extraParameters["type"] = listIntegrationResourcesType
+
+		client := DefaultClient()
+		ctx := context.Background()
+		me, _, err := client.MeAPI.MeMe(ctx).Execute()
+		Check(err)
+		if !me.HasOrganizationId() {
+			Fail("organization id not found for authenticated user")
+		}
+
+		if strings.TrimSpace(listIntegrationResourcesIntegrationID) == "" {
+			Fail("--integration-id is required")
+		}
+
+		integrationResponse, _, err := client.OrganizationAPI.
+			OrganizationsDescribeIntegration(ctx, me.GetOrganizationId(), listIntegrationResourcesIntegrationID).
+			Execute()
+		Check(err)
+
+		integration := integrationResponse.GetIntegration()
+		metadata := integration.GetMetadata()
+		spec := integration.GetSpec()
+
+		config := NewClientConfig()
+		writer := tabwriter.NewWriter(os.Stdout, 0, 8, 2, ' ', 0)
+		fmt.Fprintln(writer, "INTEGRATION_ID\tINTEGRATION_NAME\tINTEGRATION\tTYPE\tNAME\tID")
+
+		response, err := listIntegrationResourcesRequest(
+			ctx,
+			config,
+			me.GetOrganizationId(),
+			metadata.GetId(),
+			extraParameters,
+		)
+		Check(err)
+
+		for _, resource := range response.Resources {
+			fmt.Fprintf(
+				writer,
+				"%s\t%s\t%s\t%s\t%s\t%s\n",
+				metadata.GetId(),
+				metadata.GetName(),
+				spec.GetIntegrationName(),
+				resource.GetType(),
+				resource.GetName(),
+				resource.GetId(),
+			)
+		}
+
+		_ = writer.Flush()
+	},
+}
+
+func parseIntegrationResourceParametersFlag(raw string) (map[string]string, error) {
+	parameters := map[string]string{}
+
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return parameters, nil
+	}
+
+	pairs := strings.Split(raw, ",")
+	for _, pair := range pairs {
+		trimmedPair := strings.TrimSpace(pair)
+		if trimmedPair == "" {
+			return nil, fmt.Errorf("invalid empty parameter in --parameters")
+		}
+
+		key, value, found := strings.Cut(trimmedPair, "=")
+		if !found {
+			return nil, fmt.Errorf("invalid parameter %q, expected key=value", trimmedPair)
+		}
+
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if key == "" || value == "" {
+			return nil, fmt.Errorf("invalid parameter %q, expected non-empty key and value", trimmedPair)
+		}
+
+		parameters[key] = value
+	}
+
+	return parameters, nil
+}
+
+func listIntegrationResourcesRequest(
+	ctx context.Context,
+	config *ClientConfig,
+	organizationID string,
+	integrationID string,
+	parameters map[string]string,
+) (*integrationResourceListResponse, error) {
+	values := url.Values{}
+	for key, value := range parameters {
+		values.Set(key, value)
+	}
+
+	baseURL := strings.TrimRight(config.BaseURL, "/")
+	endpoint := fmt.Sprintf(
+		"%s/api/v1/organizations/%s/integrations/%s/resources",
+		baseURL,
+		url.PathEscape(organizationID),
+		url.PathEscape(integrationID),
+	)
+	if encoded := values.Encode(); encoded != "" {
+		endpoint = endpoint + "?" + encoded
+	}
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("Accept", "application/json")
+	if config.APIToken != "" {
+		request.Header.Set("Authorization", "Bearer "+config.APIToken)
+	}
+
+	response, err := config.HTTPClient.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if response.StatusCode >= http.StatusMultipleChoices {
+		errorPayload := struct {
+			Message string `json:"message"`
+		}{}
+		_ = json.Unmarshal(body, &errorPayload)
+		if errorPayload.Message != "" {
+			return nil, fmt.Errorf(errorPayload.Message)
+		}
+		return nil, fmt.Errorf("failed to list integration resources: %s", response.Status)
+	}
+
+	payload := integrationResourceListResponse{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, err
+	}
+
+	return &payload, nil
+}
+
 func init() {
 	RootCmd.AddCommand(listCmd)
-	listCmd.AddCommand(listCanvasCmd)
+	listCmd.AddCommand(listCanvasesCmd)
 	listCmd.AddCommand(listIntegrationsCmd)
 	listCmd.AddCommand(listComponentsCmd)
 	listCmd.AddCommand(listTriggersCmd)
+	listCmd.AddCommand(listIntegrationResourcesCmd)
 
 	listIntegrationsCmd.Flags().BoolVar(&listIntegrationsConnected, "connected", false, "list connected integrations for the authenticated organization")
 	listComponentsCmd.Flags().StringVar(&listComponentsFrom, "from", "", "integration name")
 	listTriggersCmd.Flags().StringVar(&listTriggersFrom, "from", "", "integration name")
+	listIntegrationResourcesCmd.Flags().StringVar(&listIntegrationResourcesType, "type", "", "integration resource type")
+	listIntegrationResourcesCmd.Flags().StringVar(&listIntegrationResourcesParameters, "parameters", "", "additional comma-separated query parameters (key=value,key2=value2)")
+	listIntegrationResourcesCmd.Flags().StringVar(&listIntegrationResourcesIntegrationID, "integration-id", "", "connected integration id")
+	_ = listIntegrationResourcesCmd.MarkFlagRequired("type")
+	_ = listIntegrationResourcesCmd.MarkFlagRequired("integration-id")
 }
