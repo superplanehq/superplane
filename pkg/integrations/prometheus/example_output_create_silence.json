@@ -1,6 +1,6 @@
 {
   "data": {
-    "silenceID": "a]b4c5d6-e7f8-9012-3456-789abcdef012",
+    "silenceID": "a1b4c5d6-e7f8-9012-3456-789abcdef012",
     "matchers": [
       {
         "name": "alertname",

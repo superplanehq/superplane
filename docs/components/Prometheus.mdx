@@ -15,7 +15,12 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Silence" href="#create-silence" description="Create a silence in Alertmanager" />
+  <LinkCard title="Expire Silence" href="#expire-silence" description="Expire (delete) a silence in Alertmanager" />
   <LinkCard title="Get Alert" href="#get-alert" description="Get a Prometheus alert by name" />
+  <LinkCard title="Get Silence" href="#get-silence" description="Get a silence by ID from Alertmanager" />
+  <LinkCard title="Query" href="#query" description="Execute an instant query against Prometheus" />
+  <LinkCard title="Query Range" href="#query-range" description="Execute a range query against Prometheus" />
 </CardGrid>
 
 ## Instructions
@@ -98,6 +103,74 @@ After updating Alertmanager config, reload it (for example `POST /-/reload` when
 }
 ```
 
+<a id="create-silence"></a>
+
+## Create Silence
+
+The Create Silence component creates a silence in Alertmanager to suppress matching alerts for a given duration.
+
+### Configuration
+
+- **Matchers**: Required list of label matchers for the silence
+- **Duration**: Required duration for the silence (e.g., `1h`, `30m`, `2h30m`)
+- **Created By**: Required author of the silence (supports expressions)
+- **Comment**: Required reason for the silence (supports expressions)
+
+### Output
+
+Emits one `prometheus.silence` payload with the silence ID, matchers, timing, and author fields.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "comment": "Silenced by SuperPlane workflow",
+    "createdBy": "SuperPlane",
+    "endsAt": "2026-02-12T17:00:00Z",
+    "matchers": [
+      {
+        "isEqual": true,
+        "isRegex": false,
+        "name": "alertname",
+        "value": "SuperplaneTestAlert"
+      }
+    ],
+    "silenceID": "a1b4c5d6-e7f8-9012-3456-789abcdef012",
+    "startsAt": "2026-02-12T16:00:00Z"
+  },
+  "timestamp": "2026-02-12T16:00:01.123456789Z",
+  "type": "prometheus.silence"
+}
+```
+
+<a id="expire-silence"></a>
+
+## Expire Silence
+
+The Expire Silence component expires an active silence in Alertmanager, causing suppressed alerts to fire again.
+
+### Configuration
+
+- **Silence ID**: Required ID of the silence to expire (supports expressions)
+
+### Output
+
+Emits one `prometheus.silence` payload confirming the expired silence ID.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "silenceID": "a1b4c5d6-e7f8-9012-3456-789abcdef012",
+    "state": "expired"
+  },
+  "timestamp": "2026-02-12T17:00:01.123456789Z",
+  "type": "prometheus.silence"
+}
+```
+
 <a id="get-alert"></a>
 
 ## Get Alert
@@ -132,6 +205,137 @@ Emits one `prometheus.alert` payload with labels, annotations, state, and timing
   },
   "timestamp": "2026-02-12T16:18:05.943610583Z",
   "type": "prometheus.alert"
+}
+```
+
+<a id="get-silence"></a>
+
+## Get Silence
+
+The Get Silence component retrieves a silence from Alertmanager by its ID.
+
+### Configuration
+
+- **Silence ID**: Required ID of the silence to retrieve (supports expressions)
+
+### Output
+
+Emits one `prometheus.silence` payload with the full silence details including matchers, timing, state, and author fields.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "comment": "Silenced by SuperPlane workflow",
+    "createdBy": "SuperPlane",
+    "endsAt": "2026-02-12T17:00:00Z",
+    "matchers": [
+      {
+        "isEqual": true,
+        "isRegex": false,
+        "name": "alertname",
+        "value": "SuperplaneTestAlert"
+      }
+    ],
+    "silenceID": "a1b4c5d6-e7f8-9012-3456-789abcdef012",
+    "startsAt": "2026-02-12T16:00:00Z",
+    "state": "active"
+  },
+  "timestamp": "2026-02-12T16:30:00.123456789Z",
+  "type": "prometheus.silence"
+}
+```
+
+<a id="query"></a>
+
+## Query
+
+The Query component executes an instant PromQL query against the Prometheus API (`/api/v1/query`).
+
+### Configuration
+
+- **Query**: Required PromQL expression to evaluate (supports expressions)
+
+### Output
+
+Emits one `prometheus.queryResult` payload with the query result data including resultType and result array.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "query": "up",
+    "result": [
+      {
+        "metric": {
+          "__name__": "up",
+          "instance": "localhost:9090",
+          "job": "prometheus"
+        },
+        "value": [
+          1707753600,
+          "1"
+        ]
+      }
+    ],
+    "resultType": "vector"
+  },
+  "timestamp": "2026-02-12T16:00:01.123456789Z",
+  "type": "prometheus.queryResult"
+}
+```
+
+<a id="query-range"></a>
+
+## Query Range
+
+The Query Range component executes a range PromQL query against the Prometheus API (`/api/v1/query_range`).
+
+### Configuration
+
+- **Query**: Required PromQL expression to evaluate (supports expressions)
+- **Start**: Required start timestamp in RFC3339 format or relative duration (supports expressions)
+- **End**: Required end timestamp in RFC3339 format or relative duration (supports expressions)
+- **Step**: Required query resolution step width as a duration (e.g., `15s`, `1m`, `5m`)
+
+### Output
+
+Emits one `prometheus.queryResult` payload with the range query result data including resultType and result array.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "end": "2026-02-12T16:00:00Z",
+    "query": "rate(http_requests_total[5m])",
+    "result": [
+      {
+        "metric": {
+          "__name__": "http_requests_total",
+          "instance": "localhost:9090",
+          "job": "prometheus"
+        },
+        "values": [
+          [
+            1707750000,
+            "0.5"
+          ],
+          [
+            1707750015,
+            "0.6"
+          ]
+        ]
+      }
+    ],
+    "resultType": "matrix",
+    "start": "2026-02-12T15:00:00Z",
+    "step": "15s"
+  },
+  "timestamp": "2026-02-12T16:00:01.123456789Z",
+  "type": "prometheus.queryResult"
 }
 ```
 
