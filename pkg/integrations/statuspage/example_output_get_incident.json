@@ -1,0 +1,51 @@
+{
+    "type": "statuspage.incident",
+    "data": {
+        "id": "abc123def456",
+        "name": "Service Degradation",
+        "status": "resolved",
+        "impact": "minor",
+        "impact_override": "minor",
+        "shortlink": "https://stspg.io/abc123",
+        "page_id": "page123",
+        "created_at": "2026-01-19T12:00:00Z",
+        "updated_at": "2026-01-19T13:00:00Z",
+        "resolved_at": "2026-01-19T13:00:00Z",
+        "started_at": "2026-01-19T12:00:00Z",
+        "monitoring_at": "2026-01-19T12:30:00Z",
+        "incident_updates": [
+            {
+                "id": "upd789",
+                "status": "resolved",
+                "body": "The issue has been resolved. All systems are operational.",
+                "created_at": "2026-01-19T13:00:00Z",
+                "updated_at": "2026-01-19T13:00:00Z",
+                "display_at": "2026-01-19T13:00:00Z"
+            },
+            {
+                "id": "upd456",
+                "status": "monitoring",
+                "body": "We have identified the issue and are monitoring the fix.",
+                "created_at": "2026-01-19T12:30:00Z",
+                "updated_at": "2026-01-19T12:30:00Z",
+                "display_at": "2026-01-19T12:30:00Z"
+            },
+            {
+                "id": "upd123",
+                "status": "investigating",
+                "body": "We are investigating reports of degraded performance.",
+                "created_at": "2026-01-19T12:00:00Z",
+                "updated_at": "2026-01-19T12:00:00Z",
+                "display_at": "2026-01-19T12:00:00Z"
+            }
+        ],
+        "components": [
+            {
+                "id": "comp123",
+                "name": "API",
+                "status": "operational"
+            }
+        ]
+    },
+    "timestamp": "2026-01-19T13:00:00Z"
+}

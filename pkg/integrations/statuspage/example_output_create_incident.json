@@ -1,0 +1,35 @@
+{
+    "type": "statuspage.incident",
+    "data": {
+        "id": "abc123def456",
+        "name": "Service Degradation",
+        "status": "investigating",
+        "impact": "minor",
+        "impact_override": "minor",
+        "shortlink": "https://stspg.io/abc123",
+        "page_id": "page123",
+        "created_at": "2026-01-19T12:00:00Z",
+        "updated_at": "2026-01-19T12:00:00Z",
+        "resolved_at": null,
+        "started_at": "2026-01-19T12:00:00Z",
+        "monitoring_at": null,
+        "incident_updates": [
+            {
+                "id": "upd123",
+                "status": "investigating",
+                "body": "We are investigating reports of degraded performance.",
+                "created_at": "2026-01-19T12:00:00Z",
+                "updated_at": "2026-01-19T12:00:00Z",
+                "display_at": "2026-01-19T12:00:00Z"
+            }
+        ],
+        "components": [
+            {
+                "id": "comp123",
+                "name": "API",
+                "status": "degraded_performance"
+            }
+        ]
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}
