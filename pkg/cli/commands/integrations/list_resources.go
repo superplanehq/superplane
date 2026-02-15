@@ -129,7 +129,16 @@ func listIntegrationResourcesRequest(
 	integrationID string,
 	parameters map[string]string,
 ) (*integrationResourceListResponse, error) {
-	if strings.TrimSpace(ctx.BaseURL) == "" {
+	config := ctx.API.GetConfig()
+	if config == nil {
+		return nil, fmt.Errorf("api client config is required")
+	}
+
+	baseURL, err := config.ServerURLWithContext(ctx.Context, "OrganizationAPIService.OrganizationsListIntegrationResources")
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(baseURL) == "" {
 		return nil, fmt.Errorf("api_url is required")
 	}
 
@@ -138,7 +147,7 @@ func listIntegrationResourcesRequest(
 		values.Set(key, value)
 	}
 
-	baseURL := strings.TrimRight(ctx.BaseURL, "/")
+	baseURL = strings.TrimRight(baseURL, "/")
 	endpoint := fmt.Sprintf(
 		"%s/api/v1/organizations/%s/integrations/%s/resources",
 		baseURL,
@@ -154,11 +163,16 @@ func listIntegrationResourcesRequest(
 		return nil, err
 	}
 	request.Header.Set("Accept", "application/json")
-	if ctx.APIToken != "" {
-		request.Header.Set("Authorization", "Bearer "+ctx.APIToken)
+
+	if authorization := strings.TrimSpace(config.DefaultHeader["Authorization"]); authorization != "" {
+		request.Header.Set("Authorization", authorization)
 	}
 
-	httpClient := &http.Client{Timeout: 30 * time.Second}
+	httpClient := config.HTTPClient
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 30 * time.Second}
+	}
+
 	response, err := httpClient.Do(request)
 	if err != nil {
 		return nil, err

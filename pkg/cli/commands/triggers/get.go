@@ -14,14 +14,14 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	name := ctx.Args[0]
 	var trigger openapi_client.TriggersTrigger
 
-	integrationName, triggerName, scoped := parseIntegrationScopedName(name)
+	integrationName, triggerName, scoped := core.ParseIntegrationScopedName(name)
 	if scoped {
-		integration, err := findIntegrationDefinitionByName(ctx, integrationName)
+		integration, err := core.FindIntegrationDefinition(ctx, integrationName)
 		if err != nil {
 			return err
 		}
 
-		resolvedTrigger, err := findIntegrationTriggerByName(integration, triggerName)
+		resolvedTrigger, err := findTrigger(integration, triggerName)
 		if err != nil {
 			return err
 		}
@@ -44,4 +44,15 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.Render(trigger)
+}
+
+func findTrigger(integration openapi_client.IntegrationsIntegrationDefinition, name string) (openapi_client.TriggersTrigger, error) {
+	for _, trigger := range integration.GetTriggers() {
+		triggerName := trigger.GetName()
+		if triggerName == name || triggerName == fmt.Sprintf("%s.%s", integration.GetName(), name) {
+			return trigger, nil
+		}
+	}
+
+	return openapi_client.TriggersTrigger{}, fmt.Errorf("trigger %q not found in integration %q", name, integration.GetName())
 }

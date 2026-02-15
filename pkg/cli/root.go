@@ -90,8 +90,6 @@ func defaultBindOptions() core.BindOptions {
 	return core.BindOptions{
 		NewAPIClient:        DefaultClient,
 		DefaultOutputFormat: GetOutputFormat,
-		DefaultBaseURL:      GetAPIURL,
-		DefaultAPIToken:     GetAPIToken,
 	}
 }
 

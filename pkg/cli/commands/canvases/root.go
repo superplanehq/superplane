@@ -6,7 +6,7 @@ import (
 )
 
 func NewCommand(options core.BindOptions) *cobra.Command {
-	canvasesCmd := &cobra.Command{
+	root := &cobra.Command{
 		Use:     "canvases",
 		Short:   "Manage canvases",
 		Aliases: []string{"canvas"},
@@ -45,10 +45,10 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	_ = updateCmd.MarkFlagRequired("file")
 	core.Bind(updateCmd, &updateCommand{file: &updateFile}, options)
 
-	canvasesCmd.AddCommand(listCmd)
-	canvasesCmd.AddCommand(getCmd)
-	canvasesCmd.AddCommand(createCmd)
-	canvasesCmd.AddCommand(updateCmd)
+	root.AddCommand(listCmd)
+	root.AddCommand(getCmd)
+	root.AddCommand(createCmd)
+	root.AddCommand(updateCmd)
 
-	return canvasesCmd
+	return root
 }

@@ -6,7 +6,7 @@ import (
 )
 
 func NewCommand(options core.BindOptions) *cobra.Command {
-	componentsCmd := &cobra.Command{
+	root := &cobra.Command{
 		Use:   "components",
 		Short: "Manage components",
 	}
@@ -27,8 +27,8 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	}
 	core.Bind(getCmd, &getCommand{}, options)
 
-	componentsCmd.AddCommand(listCmd)
-	componentsCmd.AddCommand(getCmd)
+	root.AddCommand(listCmd)
+	root.AddCommand(getCmd)
 
-	return componentsCmd
+	return root
 }

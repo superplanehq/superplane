@@ -10,7 +10,7 @@ import (
 type getCommand struct{}
 
 func (c *getCommand) Execute(ctx core.CommandContext) error {
-	integration, err := findIntegrationDefinitionByName(ctx, ctx.Args[0])
+	integration, err := core.FindIntegrationDefinition(ctx, ctx.Args[0])
 	if err != nil {
 		return err
 	}

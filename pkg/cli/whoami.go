@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/spf13/cobra"
 	"github.com/superplanehq/superplane/pkg/cli/core"
@@ -15,11 +16,16 @@ func (w *whoamiCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(ctx.Stdout, "ID: %s\n", response.GetId())
-	_, _ = fmt.Fprintf(ctx.Stdout, "Email: %s\n", response.GetEmail())
-	_, _ = fmt.Fprintf(ctx.Stdout, "Organization: %s\n", response.GetOrganizationId())
+	if ctx.Renderer.IsText() {
+		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+			_, _ = fmt.Fprintf(stdout, "ID: %s\n", response.GetId())
+			_, _ = fmt.Fprintf(stdout, "Email: %s\n", response.GetEmail())
+			_, _ = fmt.Fprintf(stdout, "Organization: %s\n", response.GetOrganizationId())
+			return nil
+		})
+	}
 
-	return nil
+	return ctx.Renderer.Render(response)
 }
 
 var whoamiCmd = &cobra.Command{

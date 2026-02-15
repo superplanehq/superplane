@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -16,8 +17,17 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("configuration key %q not found", key)
 	}
 
-	_, _ = fmt.Fprintln(ctx.Stdout, viper.GetString(key))
-	return nil
+	value := viper.Get(key)
+	if ctx.Renderer.IsText() {
+		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+			_, _ = fmt.Fprintln(stdout, value)
+			return nil
+		})
+	}
+
+	return ctx.Renderer.Render(map[string]any{
+		key: value,
+	})
 }
 
 type setCommand struct{}
@@ -38,21 +48,28 @@ type viewCommand struct{}
 
 func (c *viewCommand) Execute(ctx core.CommandContext) error {
 	allSettings := viper.AllSettings()
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(allSettings)
+	}
+
 	if len(allSettings) == 0 {
-		_, _ = fmt.Fprintln(ctx.Stdout, "No configuration values set")
+		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+			_, _ = fmt.Fprintln(stdout, "No configuration values set")
+			return nil
+		})
+	}
+
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		_, _ = fmt.Fprintln(stdout, "Current configuration:")
+		for key, value := range allSettings {
+			_, _ = fmt.Fprintf(stdout, "  %s: %v\n", key, value)
+		}
 		return nil
-	}
-
-	_, _ = fmt.Fprintln(ctx.Stdout, "Current configuration:")
-	for key, value := range allSettings {
-		_, _ = fmt.Fprintf(ctx.Stdout, "  %s: %v\n", key, value)
-	}
-
-	return nil
+	})
 }
 
 func NewCommand(options core.BindOptions) *cobra.Command {
-	configCmd := &cobra.Command{
+	root := &cobra.Command{
 		Use:   "config",
 		Short: "Get and set configuration options",
 		Long:  "Get and set CLI configuration options like API URL and authentication token.",
@@ -81,9 +98,9 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	}
 	core.Bind(viewCmd, &viewCommand{}, options)
 
-	configCmd.AddCommand(getCmd)
-	configCmd.AddCommand(setCmd)
-	configCmd.AddCommand(viewCmd)
+	root.AddCommand(getCmd)
+	root.AddCommand(setCmd)
+	root.AddCommand(viewCmd)
 
-	return configCmd
+	return root
 }

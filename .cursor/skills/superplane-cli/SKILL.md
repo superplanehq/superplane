@@ -1,5 +1,5 @@
 ---
-name: superplane-cli-canvas
+name: superplane-cli
 description: Use when working with the SuperPlane CLI to discover available integrations, components, and triggers, and to build or troubleshoot canvases that connect trigger->component flows. Covers list/get command usage, interpreting configuration schemas, wiring channels between nodes, and resolving integration binding issues such as "integration is required".
 ---
 

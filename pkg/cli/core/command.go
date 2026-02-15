@@ -90,18 +90,12 @@ type CommandContext struct {
 	Args     []string
 	Logger   *log.Entry
 	API      *openapi_client.APIClient
-	BaseURL  string
-	APIToken string
-	Stdout   io.Writer
-	Stderr   io.Writer
 	Renderer Renderer
 }
 
 type BindOptions struct {
 	NewAPIClient        func() *openapi_client.APIClient
 	DefaultOutputFormat func() string
-	DefaultBaseURL      func() string
-	DefaultAPIToken     func() string
 }
 
 func NewCommandContext(cmd *cobra.Command, args []string, options BindOptions) (CommandContext, error) {
@@ -130,19 +124,11 @@ func NewCommandContext(cmd *cobra.Command, args []string, options BindOptions) (
 		Cmd:      cmd,
 		Args:     args,
 		Logger:   log.WithField("command", cmd.CommandPath()),
-		Stdout:   cmd.OutOrStdout(),
-		Stderr:   cmd.ErrOrStderr(),
 		Renderer: renderer,
 	}
 
 	if options.NewAPIClient != nil {
 		commandContext.API = options.NewAPIClient()
-	}
-	if options.DefaultBaseURL != nil {
-		commandContext.BaseURL = options.DefaultBaseURL()
-	}
-	if options.DefaultAPIToken != nil {
-		commandContext.APIToken = options.DefaultAPIToken()
 	}
 
 	return commandContext, nil

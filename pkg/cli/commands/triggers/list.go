@@ -17,7 +17,7 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 	triggers := []openapi_client.TriggersTrigger{}
 
 	if c.from != nil && *c.from != "" {
-		integration, err := findIntegrationDefinitionByName(ctx, *c.from)
+		integration, err := core.FindIntegrationDefinition(ctx, *c.from)
 		if err != nil {
 			return err
 		}

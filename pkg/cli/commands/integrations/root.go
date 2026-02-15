@@ -6,7 +6,7 @@ import (
 )
 
 func NewCommand(options core.BindOptions) *cobra.Command {
-	integrationsCmd := &cobra.Command{
+	root := &cobra.Command{
 		Use:   "integrations",
 		Short: "Manage integrations",
 	}
@@ -42,9 +42,9 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	_ = listResourcesCmd.MarkFlagRequired("type")
 	core.Bind(listResourcesCmd, &listResourcesCommand{integrationID: &integrationID, resourceType: &resourceType, parameters: &parameters}, options)
 
-	integrationsCmd.AddCommand(listCmd)
-	integrationsCmd.AddCommand(getCmd)
-	integrationsCmd.AddCommand(listResourcesCmd)
+	root.AddCommand(listCmd)
+	root.AddCommand(getCmd)
+	root.AddCommand(listResourcesCmd)
 
-	return integrationsCmd
+	return root
 }

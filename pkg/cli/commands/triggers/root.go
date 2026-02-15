@@ -6,7 +6,7 @@ import (
 )
 
 func NewCommand(options core.BindOptions) *cobra.Command {
-	triggersCmd := &cobra.Command{
+	root := &cobra.Command{
 		Use:   "triggers",
 		Short: "Manage triggers",
 	}
@@ -27,8 +27,8 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	}
 	core.Bind(getCmd, &getCommand{}, options)
 
-	triggersCmd.AddCommand(listCmd)
-	triggersCmd.AddCommand(getCmd)
+	root.AddCommand(listCmd)
+	root.AddCommand(getCmd)
 
-	return triggersCmd
+	return root
 }
