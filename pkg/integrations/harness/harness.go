@@ -45,7 +45,7 @@ func (h *Harness) Description() string {
 
 func (h *Harness) Instructions() string {
 	return `1. **Create API key:** In Harness, create a service-account API key with permission to run and read pipeline executions.
-2. **Scope fields:** Enter **Account ID**, and optionally **Org ID** / **Project ID** for scoped APIs.
+2. **Scope fields:** Enter **Account ID**, and optionally **Org ID** and **Project ID** for scoped APIs (**Project ID** requires **Org ID**).
 3. **Webhook Secret (optional but recommended):** Set a secret token and configure Harness webhook notifications to send it in an Authorization Bearer header.
 4. **Trigger setup:** After adding the On Pipeline Completed trigger, copy the generated SuperPlane webhook URL from trigger metadata into a Harness notification webhook.
 5. **Auth method:** SuperPlane calls Harness APIs with ` + "`x-api-key: <token>`" + ` against ` + "`https://app.harness.io/gateway`" + ` unless overridden by Base URL.`
@@ -80,7 +80,7 @@ func (h *Harness) Configuration() []configuration.Field {
 			Label:       "Project ID",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Optional Harness project identifier",
+			Description: "Optional Harness project identifier (requires Org ID)",
 		},
 		{
 			Name:        "baseURL",

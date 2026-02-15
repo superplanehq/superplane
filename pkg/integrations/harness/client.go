@@ -87,6 +87,9 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 	if err != nil {
 		return nil, err
 	}
+	if projectID != "" && orgID == "" {
+		return nil, fmt.Errorf("orgId is required when projectId is set")
+	}
 
 	baseURL, err := optionalConfig(ctx, "baseURL")
 	if err != nil {
@@ -134,7 +137,28 @@ func optionalConfig(ctx core.IntegrationContext, name string) (string, error) {
 
 func (c *Client) Verify() error {
 	_, _, err := c.execRequest(http.MethodGet, "/ng/api/user/currentUser", nil, nil, false)
-	return err
+	if err != nil {
+		return err
+	}
+
+	query := c.scopeQuery()
+	query.Set("page", "0")
+	query.Set("size", "1")
+
+	_, _, err = c.execRequest(
+		http.MethodPost,
+		"/pipeline/api/pipelines/list",
+		query,
+		map[string]any{
+			"filterType": "PipelineSetup",
+		},
+		true,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to verify account scope: %w", err)
+	}
+
+	return nil
 }
 
 func (c *Client) RunPipeline(request RunPipelineRequest) (*RunPipelineResponse, error) {
