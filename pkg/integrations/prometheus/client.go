@@ -153,14 +153,14 @@ func (c *Client) Query(query string) (map[string]any, error) {
 
 // AlertmanagerSilence represents a silence object from the Alertmanager API.
 type AlertmanagerSilence struct {
-	ID        string            `json:"id"`
-	Status    *SilenceStatus    `json:"status,omitempty"`
-	Matchers  []SilenceMatcher  `json:"matchers"`
-	StartsAt  string            `json:"startsAt"`
-	EndsAt    string            `json:"endsAt"`
-	CreatedBy string            `json:"createdBy"`
-	Comment   string            `json:"comment"`
-	UpdatedAt string            `json:"updatedAt,omitempty"`
+	ID        string           `json:"id"`
+	Status    *SilenceStatus   `json:"status,omitempty"`
+	Matchers  []SilenceMatcher `json:"matchers"`
+	StartsAt  string           `json:"startsAt"`
+	EndsAt    string           `json:"endsAt"`
+	CreatedBy string           `json:"createdBy"`
+	Comment   string           `json:"comment"`
+	UpdatedAt string           `json:"updatedAt,omitempty"`
 }
 
 // SilenceStatus represents the status of a silence.
