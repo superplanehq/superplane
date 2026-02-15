@@ -1,6 +1,7 @@
 package prometheus
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -148,6 +149,167 @@ func (c *Client) Query(query string) (map[string]any, error) {
 	}
 
 	return response.Data, nil
+}
+
+// AlertmanagerSilence represents a silence object from the Alertmanager API.
+type AlertmanagerSilence struct {
+	ID        string            `json:"id"`
+	Status    *SilenceStatus    `json:"status,omitempty"`
+	Matchers  []SilenceMatcher  `json:"matchers"`
+	StartsAt  string            `json:"startsAt"`
+	EndsAt    string            `json:"endsAt"`
+	CreatedBy string            `json:"createdBy"`
+	Comment   string            `json:"comment"`
+	UpdatedAt string            `json:"updatedAt,omitempty"`
+}
+
+// SilenceStatus represents the status of a silence.
+type SilenceStatus struct {
+	State string `json:"state"`
+}
+
+// SilenceMatcher represents a matcher within a silence.
+type SilenceMatcher struct {
+	Name    string `json:"name"`
+	Value   string `json:"value"`
+	IsRegex bool   `json:"isRegex"`
+	IsEqual bool   `json:"isEqual"`
+}
+
+// CreateSilenceRequest is the request body for creating a silence.
+type CreateSilenceRequest struct {
+	Matchers  []SilenceMatcher `json:"matchers"`
+	StartsAt  string           `json:"startsAt"`
+	EndsAt    string           `json:"endsAt"`
+	CreatedBy string           `json:"createdBy"`
+	Comment   string           `json:"comment"`
+}
+
+// CreateSilenceResponse is the response from creating a silence.
+type CreateSilenceResponse struct {
+	SilenceID string `json:"silenceID"`
+}
+
+// CreateSilence creates a silence in Alertmanager.
+func (c *Client) CreateSilence(request CreateSilenceRequest) (string, error) {
+	body, err := json.Marshal(request)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	respBody, err := c.execRequestWithBody(http.MethodPost, "/api/v2/silences", body)
+	if err != nil {
+		return "", err
+	}
+
+	response := CreateSilenceResponse{}
+	if err := decodeResponse(respBody, &response); err != nil {
+		return "", err
+	}
+
+	if response.SilenceID == "" {
+		return "", fmt.Errorf("empty silence ID in response")
+	}
+
+	return response.SilenceID, nil
+}
+
+// ExpireSilence expires (deletes) a silence in Alertmanager.
+func (c *Client) ExpireSilence(silenceID string) error {
+	path := fmt.Sprintf("/api/v2/silence/%s", url.PathEscape(silenceID))
+	_, err := c.execRequestWithBody(http.MethodDelete, path, nil)
+	return err
+}
+
+// GetSilence retrieves a silence by ID from Alertmanager.
+func (c *Client) GetSilence(silenceID string) (*AlertmanagerSilence, error) {
+	path := fmt.Sprintf("/api/v2/silence/%s", url.PathEscape(silenceID))
+	body, err := c.execRequest(http.MethodGet, path)
+	if err != nil {
+		return nil, err
+	}
+
+	silence := AlertmanagerSilence{}
+	if err := decodeResponse(body, &silence); err != nil {
+		return nil, err
+	}
+
+	return &silence, nil
+}
+
+// QueryRange executes a range query against the Prometheus API.
+func (c *Client) QueryRange(query, start, end, step string) (map[string]any, error) {
+	params := url.Values{}
+	params.Set("query", query)
+	params.Set("start", start)
+	params.Set("end", end)
+	params.Set("step", step)
+
+	apiPath := fmt.Sprintf("/api/v1/query_range?%s", params.Encode())
+	body, err := c.execRequest(http.MethodGet, apiPath)
+	if err != nil {
+		return nil, err
+	}
+
+	response := prometheusResponse[map[string]any]{}
+	if err := decodeResponse(body, &response); err != nil {
+		return nil, err
+	}
+
+	if response.Status != "success" {
+		return nil, formatPrometheusError(response.ErrorType, response.Error)
+	}
+
+	return response.Data, nil
+}
+
+func (c *Client) execRequestWithBody(method string, path string, body []byte) ([]byte, error) {
+	apiURL := c.baseURL
+	if strings.HasPrefix(path, "/") {
+		apiURL += path
+	} else {
+		apiURL += "/" + path
+	}
+
+	var bodyReader io.Reader
+	if body != nil {
+		bodyReader = bytes.NewReader(body)
+	}
+
+	req, err := http.NewRequest(method, apiURL, bodyReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Accept", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if err := c.setAuth(req); err != nil {
+		return nil, err
+	}
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer res.Body.Close()
+
+	limitedReader := io.LimitReader(res.Body, MaxResponseSize+1)
+	respBody, err := io.ReadAll(limitedReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if len(respBody) > MaxResponseSize {
+		return nil, fmt.Errorf("response too large: exceeds maximum size of %d bytes", MaxResponseSize)
+	}
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return nil, fmt.Errorf("request failed with status %d: %s", res.StatusCode, string(respBody))
+	}
+
+	return respBody, nil
 }
 
 func (c *Client) execRequest(method string, path string) ([]byte, error) {

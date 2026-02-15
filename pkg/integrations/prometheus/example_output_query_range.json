@@ -1,0 +1,24 @@
+{
+  "data": {
+    "query": "rate(http_requests_total[5m])",
+    "start": "2026-02-12T15:00:00Z",
+    "end": "2026-02-12T16:00:00Z",
+    "step": "15s",
+    "resultType": "matrix",
+    "result": [
+      {
+        "metric": {
+          "__name__": "http_requests_total",
+          "instance": "localhost:9090",
+          "job": "prometheus"
+        },
+        "values": [
+          [1707750000, "0.5"],
+          [1707750015, "0.6"]
+        ]
+      }
+    ]
+  },
+  "timestamp": "2026-02-12T16:00:01.123456789Z",
+  "type": "prometheus.queryResult"
+}
