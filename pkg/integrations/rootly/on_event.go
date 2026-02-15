@@ -83,7 +83,7 @@ func (t *OnEvent) Configuration() []configuration.Field {
 		{
 			Name:        "incidentStatuses",
 			Label:       "Incident Status",
-			Type:        configuration.FieldTypeIntegrationResource,
+			Type:        configuration.FieldTypeMultiSelect,
 			Required:    false,
 			Description: "Filter by incident status values (e.g. started, resolved)",
 			Placeholder: "Select incident statuses",
