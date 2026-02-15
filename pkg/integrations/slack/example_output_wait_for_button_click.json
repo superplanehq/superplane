@@ -1,0 +1,10 @@
+{
+  "received": {
+    "data": {
+      "value": "approve",
+      "clicked_at": "2026-02-10T21:00:00.000Z"
+    },
+    "timestamp": "2026-02-10T21:00:00.000Z",
+    "type": "slack.button.clicked"
+  }
+}

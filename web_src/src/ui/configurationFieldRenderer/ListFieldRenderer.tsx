@@ -28,12 +28,14 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
 }) => {
   const listOptions = field.typeOptions?.list;
   const itemDefinition = listOptions?.itemDefinition;
+  const maxItems = listOptions?.maxItems;
   const items = Array.isArray(value)
     ? itemDefinition?.type === "day-in-year"
       ? value.filter((item) => typeof item === "string" && item.trim().length > 0)
       : value
     : [];
   const itemLabel = listOptions?.itemLabel || "Item";
+  const canAddMore = maxItems === undefined || items.length < maxItems;
   const isApprovalItemsList =
     itemDefinition?.type === "object" &&
     Array.isArray(itemDefinition.schema) &&
@@ -173,7 +175,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
           </Button>
         </div>
       ))}
-      <Button variant="outline" onClick={addItem} className="w-full mt-3">
+      <Button variant="outline" onClick={addItem} className="w-full mt-3" disabled={!canAddMore}>
         <Plus className="h-4 w-4 mr-2" />
         Add {itemLabel}
       </Button>
