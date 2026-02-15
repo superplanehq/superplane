@@ -103,6 +103,11 @@ import {
   eventStateRegistry as circleCIEventStateRegistry,
 } from "./circleci/index";
 import {
+  componentMappers as harnessComponentMappers,
+  triggerRenderers as harnessTriggerRenderers,
+  eventStateRegistry as harnessEventStateRegistry,
+} from "./harness";
+import {
   componentMappers as claudeComponentMappers,
   triggerRenderers as claudeTriggerRenderers,
   eventStateRegistry as claudeEventStateRegistry,
@@ -178,6 +183,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   cursor: cursorComponentMappers,
   hetzner: hetznerComponentMappers,
   dockerhub: dockerhubComponentMappers,
+  harness: harnessComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -202,6 +208,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   prometheus: prometheusTriggerRenderers,
   cursor: cursorTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
+  harness: harnessTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -226,6 +233,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   cursor: cursorEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
+  harness: harnessEventStateRegistry,
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
