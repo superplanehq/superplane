@@ -25,6 +25,7 @@ import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
+import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
 
 /** Integration type name (e.g. "github") → logo src. Used for Settings tab and header. */
 export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
@@ -37,6 +38,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   discord: discordIcon,
   github: githubIcon,
   gitlab: gitlabIcon,
+  hetzner: hetznerIcon,
   jira: jiraIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
@@ -63,6 +65,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   discord: discordIcon,
   github: githubIcon,
   gitlab: gitlabIcon,
+  hetzner: hetznerIcon,
   jira: jiraIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
