@@ -1,4 +1,4 @@
-package service_accounts
+package serviceaccounts
 
 import (
 	"github.com/superplanehq/superplane/pkg/models"

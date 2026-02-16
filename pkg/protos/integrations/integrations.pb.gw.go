@@ -40,9 +40,7 @@ func request_Integrations_ListIntegrations_0(ctx context.Context, marshaler runt
 		protoReq ListIntegrationsRequest
 		metadata runtime.ServerMetadata
 	)
-	if req.Body != nil {
-		_, _ = io.Copy(io.Discard, req.Body)
-	}
+	io.Copy(io.Discard, req.Body)
 	msg, err := client.ListIntegrations(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 }
