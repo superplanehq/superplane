@@ -26,20 +26,26 @@ func newDryRunPostgresDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-func TestFindButtonClickSubscriptionQuery(t *testing.T) {
+func buildButtonClickSubscriptionStatement(t *testing.T, db *gorm.DB, installationID uuid.UUID, messageTS, channelID string) *gorm.Statement {
+	t.Helper()
+
+	return db.
+		Where("installation_id = ?", installationID).
+		Where("configuration->>'type' = ?", "button_click").
+		Where("configuration->>'message_ts' = ?", messageTS).
+		Where("configuration->>'channel_id' = ?", channelID).
+		First(&models.IntegrationSubscription{}).
+		Statement
+}
+
+func TestButtonClickSubscriptionQuery(t *testing.T) {
 	t.Run("uses fixed predicates and parameterized values", func(t *testing.T) {
 		db := newDryRunPostgresDB(t)
 		installationID := uuid.New()
 		messageTS := "1234567890.1234"
 		channelID := "C12345"
 
-		stmt := db.
-			Where("installation_id = ?", installationID).
-			Where("configuration->>'type' = ?", "button_click").
-			Where("configuration->>'message_ts' = ?", messageTS).
-			Where("configuration->>'channel_id' = ?", channelID).
-			First(&models.IntegrationSubscription{}).
-			Statement
+		stmt := buildButtonClickSubscriptionStatement(t, db, installationID, messageTS, channelID)
 
 		sql := stmt.SQL.String()
 		assert.Contains(t, sql, "installation_id = $1")
@@ -47,7 +53,7 @@ func TestFindButtonClickSubscriptionQuery(t *testing.T) {
 		assert.Contains(t, sql, "configuration->>'message_ts' = $3")
 		assert.Contains(t, sql, "configuration->>'channel_id' = $4")
 
-		// Ensure values are bound parameters and not interpolated directly into SQL
+		// Ensure values are bound parameters and not interpolated directly into SQL.
 		assert.NotContains(t, sql, messageTS)
 		assert.NotContains(t, sql, channelID)
 
@@ -64,13 +70,7 @@ func TestFindButtonClickSubscriptionQuery(t *testing.T) {
 		messageTS := "1234' OR 1=1 --"
 		channelID := "C123'; DROP TABLE app_installation_subscriptions; --"
 
-		stmt := db.
-			Where("installation_id = ?", installationID).
-			Where("configuration->>'type' = ?", "button_click").
-			Where("configuration->>'message_ts' = ?", messageTS).
-			Where("configuration->>'channel_id' = ?", channelID).
-			First(&models.IntegrationSubscription{}).
-			Statement
+		stmt := buildButtonClickSubscriptionStatement(t, db, installationID, messageTS, channelID)
 
 		sql := stmt.SQL.String()
 		assert.NotContains(t, sql, "DROP TABLE")
