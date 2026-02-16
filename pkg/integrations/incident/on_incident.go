@@ -114,7 +114,8 @@ func (t *OnIncident) Setup(ctx core.TriggerContext) error {
 	}
 
 	if err := ctx.Integration.RequestWebhook(WebhookConfiguration{
-		Events: config.Events,
+		Events:        config.Events,
+		SigningSecret: config.SigningSecret,
 	}); err != nil {
 		return err
 	}
