@@ -14,6 +14,7 @@ import (
 	components "github.com/superplanehq/superplane/pkg/cli/commands/components"
 	config "github.com/superplanehq/superplane/pkg/cli/commands/config"
 	integrations "github.com/superplanehq/superplane/pkg/cli/commands/integrations"
+	secrets "github.com/superplanehq/superplane/pkg/cli/commands/secrets"
 	triggers "github.com/superplanehq/superplane/pkg/cli/commands/triggers"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
@@ -54,6 +55,7 @@ func init() {
 	RootCmd.AddCommand(components.NewCommand(options))
 	RootCmd.AddCommand(triggers.NewCommand(options))
 	RootCmd.AddCommand(integrations.NewCommand(options))
+	RootCmd.AddCommand(secrets.NewCommand(options))
 	RootCmd.AddCommand(config.NewCommand(options))
 }
 
