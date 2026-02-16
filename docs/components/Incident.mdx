@@ -1,0 +1,123 @@
+---
+title: "Incident"
+---
+
+Manage and react to incidents in incident.io
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Incident" href="#on-incident" description="Listen to incident created and updated events" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in incident.io" />
+</CardGrid>
+
+<a id="on-incident"></a>
+
+## On Incident
+
+The On Incident trigger starts a workflow execution when incident.io sends webhooks for incident created or updated events.
+
+### Use Cases
+
+- **Incident automation**: Notify Slack, update a status page, or create a Jira ticket when an incident is opened or updated
+- **Notification workflows**: Send notifications when incidents are created or their status changes
+- **Integration workflows**: Sync incidents with external systems
+
+### Configuration
+
+- **Events**: Select which events to listen for (Incident created, Incident updated)
+- **Signing secret**: Paste the signing secret from your incident.io webhook endpoint (Settings > Webhooks). Required to verify webhook authenticity.
+
+### Event Data
+
+Each event includes:
+- **event_type**: The incident.io event type (e.g. public_incident.incident_created_v2)
+- **incident**: Incident details including id, name, summary, reference, permalink, visibility, severity, incident_status, created_at, updated_at
+
+### Webhook Setup
+
+incident.io does not provide an API to register webhook endpoints. You configure them in the incident.io dashboard:
+
+1. Add the On Incident trigger to your workflow and save the canvas.
+2. Copy the **webhook URL** shown for this trigger.
+3. In incident.io go to **Settings > Webhooks** and create a new endpoint. Paste the SuperPlane webhook URL.
+4. Subscribe to **Public incident created (v2)** and/or **Public incident updated (v2)** as needed.
+5. Copy the **Signing secret** from the new endpoint and paste it into the trigger's Signing secret field in SuperPlane.
+
+### Example Data
+
+```json
+{
+  "type": "incident.incident.created",
+  "data": {
+    "event_type": "public_incident.incident_created_v2",
+    "incident": {
+      "id": "01FDAG4SAP5TYPT98WGR2N7W91",
+      "name": "Our database is sad",
+      "summary": "Our database is really really sad, and we don't know why yet.",
+      "reference": "INC-123",
+      "permalink": "https://app.incident.io/incidents/123",
+      "visibility": "public",
+      "created_at": "2021-08-17T13:28:57.801578Z",
+      "updated_at": "2021-08-17T13:28:57.801578Z",
+      "severity": { "id": "01FCNDV6P870EA6S7TK1DSYDG0", "name": "Minor" },
+      "incident_status": { "id": "01FCNDV6P870EA6S7TK1DSYD5H", "name": "Triage" }
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z"
+}
+```
+
+<a id="create-incident"></a>
+
+## Create Incident
+
+The Create Incident component creates a new incident in incident.io via the API.
+
+### Use Cases
+
+- **Alert escalation**: Create incidents from monitoring alerts
+- **Error tracking**: Automatically create incidents when errors are detected
+- **Manual incident creation**: Create incidents from workflow events
+- **Integration workflows**: Create incidents from external system events
+
+### Configuration
+
+- **Incident Name**: A succinct name or title for the incident (required, supports expressions)
+- **Summary**: Additional details about the incident (optional, supports expressions)
+- **Severity**: Select a severity from your incident.io organization (optional). Severities are listed from your connected account.
+- **Visibility**: Public (anyone can access) or Private (only invited users). Default is Public.
+
+### Output
+
+Returns the created incident object including:
+- **id**: Incident ID
+- **name**: Incident name
+- **reference**: Human-readable reference (e.g. INC-123)
+- **permalink**: Link to the incident in incident.io
+- **severity**: Severity details if set
+- **visibility**: public or private
+- **created_at**, **updated_at**: Timestamps
+
+### Example Output
+
+```json
+{
+  "id": "01FDAG4SAP5TYPT98WGR2N7W91",
+  "name": "Database connectivity issues",
+  "summary": "Users are experiencing slow queries and connection timeouts.",
+  "reference": "INC-123",
+  "permalink": "https://app.incident.io/incidents/123",
+  "visibility": "public",
+  "created_at": "2021-08-17T13:28:57.801578Z",
+  "updated_at": "2021-08-17T13:28:57.801578Z",
+  "severity": { "id": "01FCNDV6P870EA6S7TK1DSYDG0", "name": "Minor" }
+}
+```
