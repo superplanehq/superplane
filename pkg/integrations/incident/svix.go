@@ -43,7 +43,7 @@ func VerifySvixSignature(webhookID, webhookTimestamp, webhookSignature string, b
 		if strings.HasPrefix(part, "v1,") {
 			sig = strings.TrimPrefix(part, "v1,")
 		}
-		if hmacEqual([]byte(sig), []byte(expectedSig)) {
+		if hmac.Equal([]byte(sig), []byte(expectedSig)) {
 			// Optional: reject old timestamps to limit replay
 			ts, err := strconv.ParseInt(webhookTimestamp, 10, 64)
 			if err != nil {
@@ -58,15 +58,4 @@ func VerifySvixSignature(webhookID, webhookTimestamp, webhookSignature string, b
 	}
 
 	return fmt.Errorf("signature mismatch")
-}
-
-func hmacEqual(a, b []byte) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	var result byte
-	for i := 0; i < len(a); i++ {
-		result |= a[i] ^ b[i]
-	}
-	return result == 0
 }
