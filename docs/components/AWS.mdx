@@ -807,13 +807,18 @@ The Describe Service component fetches details about a single ECS service.
 
 ## ECS • Run Task
 
-The Run Task component starts one or more ECS tasks.
+The Run Task component starts one or more ECS tasks and completes based on task lifecycle events.
 
 ### Use Cases
 
 - **One-off workloads**: Execute ad-hoc jobs on ECS
 - **Batch processing**: Trigger task runs from workflow events
 - **Operational automation**: Run remediation or maintenance tasks
+
+### Completion behavior
+
+- Always waits for tasks to leave startup states (for example, PENDING) before completing.
+- If **Timeout (seconds)** is set, waits for all tracked tasks to reach STOPPED, or completes with timeout when that deadline is reached.
 
 ### Notes
 
@@ -828,21 +833,22 @@ The Run Task component starts one or more ECS tasks.
     "failures": [],
     "tasks": [
       {
-        "clusterArn": "arn:aws:ecs:eu-central-1:555666777888:cluster/payments-cluster-prod",
-        "createdAt": "2026-01-22T08:14:55Z",
+        "clusterArn": "arn:aws:ecs:us-east-1:111122223333:cluster/superplane-demo-cluster",
+        "createdAt": "2026-02-10T14:30:01Z",
         "desiredStatus": "RUNNING",
-        "group": "service:payments-api-service",
+        "group": "family:superplane-ecs-task",
         "lastStatus": "RUNNING",
         "launchType": "FARGATE",
         "platformVersion": "1.4.0",
-        "startedBy": "ecs-svc/9182736455647382910",
+        "startedBy": "",
         "stoppedReason": "",
-        "taskArn": "arn:aws:ecs:eu-central-1:555666777888:task/payments-cluster-prod/3f2a1b9c8d7e6f5a4b3c2d1e0f9a8b7c",
-        "taskDefinitionArn": "arn:aws:ecs:eu-central-1:555666777888:task-definition/payments-api:12"
+        "taskArn": "arn:aws:ecs:us-east-1:111122223333:task/superplane-demo-cluster/aaaaaaaa11111111bbbbbbbb22222222",
+        "taskDefinitionArn": "arn:aws:ecs:us-east-1:111122223333:task-definition/superplane-ecs-task:1"
       }
-    ]
+    ],
+    "timedOut": false
   },
-  "timestamp": "2026-01-22T08:15:12.452187341Z",
+  "timestamp": "2026-02-10T14:30:37.633534466Z",
   "type": "aws.ecs.task"
 }
 ```
@@ -851,7 +857,7 @@ The Run Task component starts one or more ECS tasks.
 
 ## ECS • Stop Task
 
-The Stop Task component requests ECS to stop a running task.
+The Stop Task component requests ECS to stop a running task and waits for the task to reach STOPPED.
 
 ### Use Cases
 
@@ -870,20 +876,20 @@ The Stop Task component requests ECS to stop a running task.
 {
   "data": {
     "task": {
-      "clusterArn": "arn:aws:ecs:ap-southeast-1:444555666777:cluster/analytics-cluster-staging",
-      "createdAt": "2026-01-18T06:42:11Z",
+      "clusterArn": "arn:aws:ecs:us-east-1:111122223333:cluster/superplane-demo-cluster",
+      "createdAt": "2026-02-10T14:30:01Z",
       "desiredStatus": "STOPPED",
-      "group": "service:analytics-worker-service",
+      "group": "family:superplane-ecs-task",
       "lastStatus": "STOPPED",
       "launchType": "FARGATE",
       "platformVersion": "1.4.0",
-      "startedBy": "ecs-svc/5647382910293847561",
-      "stoppedReason": "Essential container in task exited",
-      "taskArn": "arn:aws:ecs:ap-southeast-1:444555666777:task/analytics-cluster-staging/7c6b5a4d3e2f1a0987b6c5d4e3f2a1b0",
-      "taskDefinitionArn": "arn:aws:ecs:ap-southeast-1:444555666777:task-definition/analytics-worker:23"
+      "startedBy": "",
+      "stoppedReason": "stopping",
+      "taskArn": "arn:aws:ecs:us-east-1:111122223333:task/superplane-demo-cluster/aaaaaaaa11111111bbbbbbbb22222222",
+      "taskDefinitionArn": "arn:aws:ecs:us-east-1:111122223333:task-definition/superplane-ecs-task:1"
     }
   },
-  "timestamp": "2026-01-18T06:48:33.118274556Z",
+  "timestamp": "2026-02-10T14:31:19.987196041Z",
   "type": "aws.ecs.task"
 }
 ```
