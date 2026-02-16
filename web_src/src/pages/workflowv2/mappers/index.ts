@@ -20,6 +20,11 @@ import {
   eventStateRegistry as semaphoreEventStateRegistry,
 } from "./semaphore/index";
 import {
+  componentMappers as sentryComponentMappers,
+  triggerRenderers as sentryTriggerRenderers,
+  eventStateRegistry as sentryEventStateRegistry,
+} from "./sentry/index";
+import {
   componentMappers as githubComponentMappers,
   triggerRenderers as githubTriggerRenderers,
   eventStateRegistry as githubEventStateRegistry,
@@ -158,6 +163,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   cloudflare: cloudflareComponentMappers,
   semaphore: semaphoreComponentMappers,
+  sentry: sentryComponentMappers,
   github: githubComponentMappers,
   gitlab: gitlabComponentMappers,
   pagerduty: pagerdutyComponentMappers,
@@ -183,6 +189,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   cloudflare: cloudflareTriggerRenderers,
   semaphore: semaphoreTriggerRenderers,
+  sentry: sentryTriggerRenderers,
   github: githubTriggerRenderers,
   gitlab: gitlabTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
@@ -207,6 +214,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
   cloudflare: cloudflareEventStateRegistry,
   semaphore: semaphoreEventStateRegistry,
+  sentry: sentryEventStateRegistry,
   github: githubEventStateRegistry,
   pagerduty: pagerdutyEventStateRegistry,
   dash0: dash0EventStateRegistry,

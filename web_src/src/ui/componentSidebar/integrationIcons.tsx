@@ -24,6 +24,7 @@ import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
+import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
 
@@ -52,6 +53,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   sendgrid: sendgridIcon,
   prometheus: prometheusIcon,
   render: renderIcon,
+  sentry: sentryIcon,
   dockerhub: dockerIcon,
 };
 
@@ -78,6 +80,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   sendgrid: sendgridIcon,
   prometheus: prometheusIcon,
   render: renderIcon,
+  sentry: sentryIcon,
   dockerhub: dockerIcon,
   aws: {
     cloudwatch: awsCloudwatchIcon,
