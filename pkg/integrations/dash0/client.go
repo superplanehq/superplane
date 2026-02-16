@@ -1,6 +1,7 @@
 package dash0
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -206,4 +207,124 @@ func (c *Client) ListCheckRules() ([]CheckRule, error) {
 	}
 
 	return checkRules, nil
+}
+
+// SyntheticCheckAssertion represents a single assertion in a synthetic check.
+type SyntheticCheckAssertion struct {
+	Kind string         `json:"kind"`
+	Spec map[string]any `json:"spec"`
+}
+
+// SyntheticCheckHeader represents an HTTP header key-value pair.
+type SyntheticCheckHeader struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// SyntheticCheckRequest represents the full request payload for creating a synthetic check.
+// Matches the Dash0 API envelope: kind + metadata + spec.
+type SyntheticCheckRequest struct {
+	Kind     string                       `json:"kind"`
+	Metadata SyntheticCheckMetadata       `json:"metadata"`
+	Spec     SyntheticCheckTopLevelSpec   `json:"spec"`
+}
+
+// SyntheticCheckMetadata contains the check name and labels.
+type SyntheticCheckMetadata struct {
+	Name   string         `json:"name"`
+	Labels map[string]any `json:"labels"`
+}
+
+// SyntheticCheckTopLevelSpec wraps the plugin, schedule, retries, and enabled flag.
+type SyntheticCheckTopLevelSpec struct {
+	Enabled  bool                   `json:"enabled"`
+	Schedule SyntheticCheckSchedule `json:"schedule"`
+	Plugin   SyntheticCheckPlugin   `json:"plugin"`
+}
+
+// SyntheticCheckPlugin contains the check type, display metadata, and specification.
+type SyntheticCheckPlugin struct {
+	Display SyntheticCheckDisplay    `json:"display"`
+	Kind    string                   `json:"kind"`
+	Spec    SyntheticCheckPluginSpec `json:"spec"`
+}
+
+// SyntheticCheckDisplay contains the display name for a synthetic check.
+type SyntheticCheckDisplay struct {
+	Name string `json:"name"`
+}
+
+// SyntheticCheckPluginSpec contains the HTTP request, assertions, and retries for a synthetic check.
+type SyntheticCheckPluginSpec struct {
+	Request    SyntheticCheckHTTPRequest `json:"request"`
+	Assertions SyntheticCheckAssertions  `json:"assertions"`
+	Retries    SyntheticCheckRetries     `json:"retries"`
+}
+
+// SyntheticCheckHTTPRequest defines the HTTP request configuration.
+type SyntheticCheckHTTPRequest struct {
+	Method          string                 `json:"method"`
+	URL             string                 `json:"url"`
+	Headers         []SyntheticCheckHeader `json:"headers"`
+	QueryParameters []any                  `json:"queryParameters"`
+	Body            *string                `json:"body,omitempty"`
+	Redirects       string                 `json:"redirects"`
+	TLS             SyntheticCheckTLS      `json:"tls"`
+	Tracing         SyntheticCheckTracing  `json:"tracing"`
+}
+
+// SyntheticCheckTLS holds TLS configuration.
+type SyntheticCheckTLS struct {
+	AllowInsecure bool `json:"allowInsecure"`
+}
+
+// SyntheticCheckTracing holds tracing configuration.
+type SyntheticCheckTracing struct {
+	AddTracingHeaders bool `json:"addTracingHeaders"`
+}
+
+// SyntheticCheckAssertions groups critical and degraded assertions.
+type SyntheticCheckAssertions struct {
+	CriticalAssertions []SyntheticCheckAssertion `json:"criticalAssertions"`
+	DegradedAssertions []SyntheticCheckAssertion `json:"degradedAssertions"`
+}
+
+// SyntheticCheckSchedule defines how often and where a check runs.
+type SyntheticCheckSchedule struct {
+	Interval  string   `json:"interval"`
+	Locations []string `json:"locations"`
+	Strategy  string   `json:"strategy"`
+}
+
+// SyntheticCheckRetries defines retry behavior for failed checks.
+type SyntheticCheckRetries struct {
+	Kind string                    `json:"kind"`
+	Spec SyntheticCheckRetriesSpec `json:"spec"`
+}
+
+// SyntheticCheckRetriesSpec contains the retry parameters.
+type SyntheticCheckRetriesSpec struct {
+	Attempts int    `json:"attempts"`
+	Delay    string `json:"delay"`
+}
+
+func (c *Client) CreateSyntheticCheck(request SyntheticCheckRequest, dataset string) (map[string]any, error) {
+	apiURL := fmt.Sprintf("%s/api/synthetic-checks?dataset=%s", c.BaseURL, url.QueryEscape(dataset))
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, apiURL, bytes.NewReader(body), "application/json")
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response, nil
 }

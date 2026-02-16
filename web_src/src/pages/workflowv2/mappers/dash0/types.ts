@@ -26,3 +26,40 @@ export interface PrometheusResponse {
     }>;
   };
 }
+
+export interface AssertionItem {
+  kind: string;
+  severity: string;
+  statusCodeOperator?: string;
+  statusCodeValue?: string;
+  timingType?: string;
+  timingOperator?: string;
+  timingValue?: string;
+  errorTypeValue?: string;
+  sslOperator?: string;
+  sslDays?: string;
+  headerName?: string;
+  headerOperator?: string;
+  headerValue?: string;
+  jsonPath?: string;
+  jsonOperator?: string;
+  jsonValue?: string;
+  textOperator?: string;
+  textValue?: string;
+}
+
+export interface CreateSyntheticCheckConfiguration {
+  name: string;
+  url: string;
+  method: string;
+  dataset: string;
+  locations: string[];
+  interval: string;
+  assertions?: AssertionItem[];
+  headers?: Array<{ name: string; value: string }>;
+  body?: string;
+  strategy?: string;
+  retries?: { attempts: number; delay: string };
+  followRedirects?: string;
+  allowInsecure?: string;
+}
