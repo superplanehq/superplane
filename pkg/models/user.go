@@ -128,6 +128,19 @@ func FindUnscopedUserByID(id string) (*User, error) {
 	return &user, err
 }
 
+func FindUsersByIDs(ids []string) ([]User, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	var users []User
+	err := database.Conn().
+		Where("id IN ?", ids).
+		Find(&users).Error
+
+	return users, err
+}
+
 func FindHumanUsersByIDs(ids []string) ([]User, error) {
 	if len(ids) == 0 {
 		return nil, nil

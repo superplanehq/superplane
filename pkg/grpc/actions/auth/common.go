@@ -94,7 +94,7 @@ func FindUser(org, id, email string) (*models.User, error) {
 	return models.FindActiveUserByEmail(orgID.String(), email)
 }
 
-func GetUsersWithRolesInDomain(domainID, domainType string, authService authorization.Authorization) ([]*pbUsers.User, error) {
+func GetUsersWithRolesInDomain(domainID, domainType string, includeServiceAccounts bool, authService authorization.Authorization) ([]*pbUsers.User, error) {
 	if domainType != models.DomainTypeOrganization {
 		return nil, status.Error(codes.InvalidArgument, "domain type must be organization")
 	}
@@ -144,7 +144,12 @@ func GetUsersWithRolesInDomain(domainID, domainType string, authService authoriz
 		userIDs = append(userIDs, userID)
 	}
 
-	dbUsers, err := models.FindHumanUsersByIDs(userIDs)
+	var dbUsers []models.User
+	if includeServiceAccounts {
+		dbUsers, err = models.FindUsersByIDs(userIDs)
+	} else {
+		dbUsers, err = models.FindHumanUsersByIDs(userIDs)
+	}
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to fetch users")
 	}
