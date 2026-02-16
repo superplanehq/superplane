@@ -6,13 +6,11 @@ import {
   ComponentBaseMapper,
   ExecutionDetailsContext,
   NodeInfo,
-  OutputPayload,
   SubtitleContext,
 } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import incidentIcon from "@/assets/icons/integrations/incident.svg";
-import { Incident } from "./types";
-import { baseEventSections, getDetailsForIncident } from "./base";
+import { baseEventSections, buildIncidentExecutionDetails } from "./base";
 import { formatTimeAgo } from "@/utils/date";
 
 export const createIncidentMapper: ComponentBaseMapper = {
@@ -36,13 +34,8 @@ export const createIncidentMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const outputs = context.execution.outputs as { default: OutputPayload[] };
-    if (!outputs?.default || outputs.default.length === 0) {
-      return {};
-    }
-    const incident = outputs.default[0].data as Incident;
-    return getDetailsForIncident(incident);
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
+    return buildIncidentExecutionDetails(context.execution);
   },
 
   subtitle(context: SubtitleContext): string {

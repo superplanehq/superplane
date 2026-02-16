@@ -1,4 +1,3 @@
-import { CanvasesCanvasNodeExecution } from "@/api-client";
 import { EventSection } from "@/ui/componentBase";
 import { getState, getTriggerRenderer } from "..";
 import { ExecutionInfo, NodeInfo, OutputPayload } from "../types";
@@ -24,7 +23,7 @@ export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
 /**
  * Extracts an incident from execution outputs with proper null checks.
  */
-export function getIncidentFromExecution(execution: CanvasesCanvasNodeExecution): Incident | null {
+export function getIncidentFromExecution(execution: ExecutionInfo): Incident | null {
   const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
 
   if (!outputs?.default || outputs.default.length === 0) {
@@ -69,7 +68,7 @@ export function getDetailsForIncident(incident: Incident): Record<string, string
 /**
  * Builds execution details for Incident integration components.
  */
-export function buildIncidentExecutionDetails(execution: CanvasesCanvasNodeExecution): Record<string, unknown> {
+export function buildIncidentExecutionDetails(execution: ExecutionInfo): Record<string, unknown> {
   const details: Record<string, unknown> = {};
 
   if (execution.createdAt) {
