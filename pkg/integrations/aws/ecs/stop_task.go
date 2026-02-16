@@ -192,9 +192,9 @@ func (c *StopTask) Setup(ctx core.SetupContext) error {
 		return nil
 	}
 
-	integrationMetadata, err := decodeIntegrationMetadata(ctx.Integration.GetMetadata())
-	if err != nil {
-		return err
+	integrationMetadata := common.IntegrationMetadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
+		return fmt.Errorf("failed to decode integration metadata: %w", err)
 	}
 	if integrationMetadata.EventBridge == nil {
 		return fmt.Errorf("event bridge metadata is not configured")
@@ -275,10 +275,6 @@ func persistStopTaskExecutionState(ctx core.ExecutionContext, config StopTaskCon
 }
 
 func (c *StopTask) OnIntegrationMessage(ctx core.IntegrationMessageContext) error {
-	if ctx.FindExecutionByKV == nil {
-		return fmt.Errorf("integration message context does not support find execution by kv")
-	}
-
 	messageData, err := decodeStopTaskMessage(ctx.Message)
 	if err != nil {
 		return err
@@ -287,10 +283,12 @@ func (c *StopTask) OnIntegrationMessage(ctx core.IntegrationMessageContext) erro
 		return nil
 	}
 
-	executionCtx, err := resolveExecutionByTaskARN(ctx, messageData.TaskARN)
+	executionCtx, err := ctx.FindExecutionByKV(ecsTaskExecutionKVTaskARN, messageData.TaskARN)
+
 	if err != nil {
 		return err
 	}
+
 	if executionCtx == nil {
 		return nil
 	}

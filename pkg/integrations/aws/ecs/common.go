@@ -17,15 +17,6 @@ const (
 	ecsTaskStateChangeEventDetailType = "ECS Task State Change"
 )
 
-func decodeIntegrationMetadata(metadata any) (common.IntegrationMetadata, error) {
-	integrationMetadata := common.IntegrationMetadata{}
-	if err := mapstructure.Decode(metadata, &integrationMetadata); err != nil {
-		return common.IntegrationMetadata{}, fmt.Errorf("failed to decode integration metadata: %w", err)
-	}
-
-	return integrationMetadata, nil
-}
-
 func hasTaskStateChangeRule(integrationMetadata common.IntegrationMetadata) bool {
 	if integrationMetadata.EventBridge == nil {
 		return false
@@ -81,9 +72,9 @@ func subscribeWhenTaskStateChangeRuleAvailable(
 	subscriptionPattern *common.EventBridgeEvent,
 	onSubscribed func(subscriptionID string) error,
 ) error {
-	integrationMetadata, err := decodeIntegrationMetadata(ctx.Integration.GetMetadata())
-	if err != nil {
-		return err
+	integrationMetadata := common.IntegrationMetadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
+		return fmt.Errorf("failed to decode integration metadata: %w", err)
 	}
 
 	if integrationMetadata.EventBridge == nil {
@@ -116,19 +107,4 @@ func subscribeWhenTaskStateChangeRuleAvailable(
 	}
 
 	return onSubscribed(subscriptionID.String())
-}
-
-func resolveExecutionByTaskARN(ctx core.IntegrationMessageContext, taskARN string) (*core.ExecutionContext, error) {
-	executionCtx, err := ctx.FindExecutionByKV(ecsTaskExecutionKVTaskARN, taskARN)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve execution by task ARN %s: %w", taskARN, err)
-	}
-	if executionCtx == nil {
-		return nil, nil
-	}
-	if executionCtx.ExecutionState.IsFinished() {
-		return nil, nil
-	}
-
-	return executionCtx, nil
 }
