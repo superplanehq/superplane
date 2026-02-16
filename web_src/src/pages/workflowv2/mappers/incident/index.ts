@@ -1,9 +1,4 @@
-import {
-  ComponentBaseMapper,
-  CustomFieldRenderer,
-  EventStateRegistry,
-  TriggerRenderer,
-} from "../types";
+import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
 import { onIncidentTriggerRenderer } from "./on_incident";
 import { onIncidentCustomFieldRenderer } from "./on_incident_webhook";
 import { createIncidentMapper } from "./create_incident";
