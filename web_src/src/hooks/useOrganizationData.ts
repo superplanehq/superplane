@@ -60,7 +60,9 @@ export const useOrganization = (organizationId: string) => {
 
 export const useOrganizationUsers = (organizationId: string, includeServiceAccounts = false) => {
   return useQuery({
-    queryKey: [...organizationKeys.users(organizationId), includeServiceAccounts],
+    queryKey: includeServiceAccounts
+      ? [...organizationKeys.users(organizationId), includeServiceAccounts]
+      : organizationKeys.users(organizationId),
     queryFn: async () => {
       const response = await usersListUsers(
         withOrganizationHeader({
