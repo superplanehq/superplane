@@ -1,7 +1,6 @@
 package rootly
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"slices"
@@ -112,29 +111,12 @@ func (t *OnIncident) HandleAction(ctx core.TriggerActionContext) (map[string]any
 
 func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	config := OnIncidentConfiguration{}
-	err := mapstructure.Decode(ctx.Configuration, &config)
+	req, code, err := decodeAndVerifyWebhook(ctx, &config)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+		return code, err
 	}
 
-	// Verify signature
-	signature := ctx.Headers.Get("X-Rootly-Signature")
-	secret, err := ctx.Webhook.GetSecret()
-	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error getting secret: %v", err)
-	}
-
-	if err := verifyWebhookSignature(signature, ctx.Body, secret); err != nil {
-		return http.StatusForbidden, fmt.Errorf("invalid signature: %v", err)
-	}
-
-	// Parse webhook payload
-	var webhook WebhookPayload
-	err = json.Unmarshal(ctx.Body, &webhook)
-	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
-	}
-
+	webhook := req.payload
 	eventType := webhook.Event.Type
 
 	// Since the webhook may be shared and receive more events than this trigger cares about,
@@ -153,19 +135,6 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 	}
 
 	return http.StatusOK, nil
-}
-
-// WebhookPayload represents the Rootly webhook payload
-type WebhookPayload struct {
-	Event WebhookEvent   `json:"event"`
-	Data  map[string]any `json:"data"`
-}
-
-// WebhookEvent represents the event metadata in a Rootly webhook
-type WebhookEvent struct {
-	ID       string `json:"id"`
-	Type     string `json:"type"`
-	IssuedAt string `json:"issued_at"`
 }
 
 func buildIncidentPayload(webhook WebhookPayload) map[string]any {
