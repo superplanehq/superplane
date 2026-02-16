@@ -395,7 +395,7 @@ func decodeStopTaskMessage(message any) (*stopTaskMessageData, error) {
 		return nil, fmt.Errorf("failed to decode message: %w", err)
 	}
 
-	if event.Source != ecsTaskStateChangeEventSource || event.DetailType != ecsTaskStateChangeEventDetailType {
+	if event.Source != ecsEventBridgeSource || event.DetailType != ecsTaskStateChangeEventDetailType {
 		return nil, nil
 	}
 

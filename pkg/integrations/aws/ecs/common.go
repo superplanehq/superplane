@@ -13,7 +13,7 @@ import (
 const (
 	ecsTaskPayloadType                = "aws.ecs.task"
 	ecsTaskExecutionKVTaskARN         = "aws_ecs_task_arn"
-	ecsTaskStateChangeEventSource     = "aws.ecs"
+	ecsEventBridgeSource              = "aws.ecs"
 	ecsTaskStateChangeEventDetailType = "ECS Task State Change"
 )
 
@@ -22,7 +22,7 @@ func hasTaskStateChangeRule(integrationMetadata common.IntegrationMetadata) bool
 		return false
 	}
 
-	rule, ok := integrationMetadata.EventBridge.Rules[ecsTaskStateChangeEventSource]
+	rule, ok := integrationMetadata.EventBridge.Rules[ecsEventBridgeSource]
 	if !ok {
 		return false
 	}
@@ -41,7 +41,7 @@ func scheduleTaskStateChangeRuleProvision(
 		"provisionRule",
 		common.ProvisionRuleParameters{
 			Region:     region,
-			Source:     ecsTaskStateChangeEventSource,
+			Source:     ecsEventBridgeSource,
 			DetailType: ecsTaskStateChangeEventDetailType,
 		},
 		time.Second,
@@ -60,7 +60,7 @@ func taskStateChangeSubscriptionPattern(region string, detail map[string]any) *c
 	return &common.EventBridgeEvent{
 		Region:     region,
 		DetailType: ecsTaskStateChangeEventDetailType,
-		Source:     ecsTaskStateChangeEventSource,
+		Source:     ecsEventBridgeSource,
 		Detail:     detail,
 	}
 }
@@ -82,11 +82,11 @@ func subscribeWhenTaskStateChangeRuleAvailable(
 		return ctx.Requests.ScheduleActionCall(checkActionName, map[string]any{}, retryInterval)
 	}
 
-	rule, ok := integrationMetadata.EventBridge.Rules[ecsTaskStateChangeEventSource]
+	rule, ok := integrationMetadata.EventBridge.Rules[ecsEventBridgeSource]
 	if !ok {
 		ctx.Logger.Infof(
 			"Rule not found for source %s - checking again in %s",
-			ecsTaskStateChangeEventSource,
+			ecsEventBridgeSource,
 			retryInterval,
 		)
 		return ctx.Requests.ScheduleActionCall(checkActionName, map[string]any{}, retryInterval)
