@@ -1,0 +1,17 @@
+{
+  "received": {
+    "data": {
+      "value": "approve",
+      "clicked_at": "2026-02-10T21:00:00Z"
+    },
+    "timestamp": "2026-02-10T21:00:00Z",
+    "type": "slack.button.clicked"
+  },
+  "timeout": {
+    "data": {
+      "timeout_at": "2026-02-10T21:05:00Z"
+    },
+    "timestamp": "2026-02-10T21:05:00Z",
+    "type": "slack.button.timeout"
+  }
+}

@@ -366,10 +366,22 @@ func (e *CanvasNodeExecution) StartInTransaction(tx *gorm.DB) error {
 	//
 	// Update the execution state to started.
 	//
-	return tx.Model(e).
+	now := time.Now()
+	err := tx.Model(e).
 		Update("state", CanvasNodeExecutionStateStarted).
-		Update("updated_at", time.Now()).
+		Update("updated_at", now).
 		Error
+
+	if err != nil {
+		return err
+	}
+
+	// Update the struct fields to match the database state
+	// This ensures that any subsequent Save() calls won't overwrite these changes
+	e.State = CanvasNodeExecutionStateStarted
+	e.UpdatedAt = &now
+
+	return nil
 }
 
 func (e *CanvasNodeExecution) Pass(outputs map[string][]any) ([]CanvasEvent, error) {
@@ -445,6 +457,12 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 		return nil, err
 	}
 
+	// Update the struct fields to match the database state
+	// This ensures that any subsequent Save() calls won't overwrite these changes
+	e.State = CanvasNodeExecutionStateFinished
+	e.Result = CanvasNodeExecutionResultPassed
+	e.UpdatedAt = &now
+
 	return events, nil
 }
 
@@ -469,6 +487,14 @@ func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message str
 	if err != nil {
 		return err
 	}
+
+	// Update the struct fields to match the database state
+	// This ensures that any subsequent Save() calls won't overwrite these changes
+	e.State = CanvasNodeExecutionStateFinished
+	e.Result = CanvasNodeExecutionResultFailed
+	e.ResultReason = reason
+	e.ResultMessage = message
+	e.UpdatedAt = &now
 
 	//
 	// Update the workflow node state to ready.
@@ -522,6 +548,13 @@ func (e *CanvasNodeExecution) CancelInTransaction(tx *gorm.DB, cancelledBy *uuid
 	if err != nil {
 		return err
 	}
+
+	// Update the struct fields to match the database state
+	// This ensures that any subsequent Save() calls won't overwrite these changes
+	e.State = CanvasNodeExecutionStateFinished
+	e.Result = CanvasNodeExecutionResultCancelled
+	e.CancelledBy = cancelledBy
+	e.UpdatedAt = &now
 
 	node, err := FindCanvasNode(tx, e.WorkflowID, e.NodeID)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {

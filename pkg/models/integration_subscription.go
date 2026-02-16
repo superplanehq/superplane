@@ -79,3 +79,23 @@ func ListIntegrationSubscriptions(tx *gorm.DB, installationID uuid.UUID) ([]Node
 
 	return subscriptions, nil
 }
+
+// FindIntegrationSubscriptionByConfigFields finds a subscription by installation_id and arbitrary configuration fields.
+// This is a generic function that can be used by any integration to query subscriptions.
+// The filters parameter is a map of JSON field paths to their expected values.
+// Example: filters["configuration->>'message_ts'"] = messageTS
+func FindIntegrationSubscriptionByConfigFields(tx *gorm.DB, installationID uuid.UUID, filters map[string]string) (*IntegrationSubscription, error) {
+	var subscription IntegrationSubscription
+
+	query := tx.Where("installation_id = ?", installationID)
+	for field, value := range filters {
+		query = query.Where(field+" = ?", value)
+	}
+
+	err := query.First(&subscription).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &subscription, nil
+}

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,10 +15,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"gorm.io/gorm"
 )
 
 const (
@@ -106,6 +111,7 @@ func (s *Slack) HandleAction(ctx core.IntegrationActionContext) error {
 func (s *Slack) Components() []core.Component {
 	return []core.Component{
 		&SendTextMessage{},
+		&WaitForButtonClick{},
 	}
 }
 
@@ -356,8 +362,155 @@ func (s *Slack) handleChallenge(ctx core.HTTPRequestContext, payload EventPayloa
 	}
 }
 
+type InteractionPayload struct {
+	Type        string              `json:"type"`
+	User        map[string]any      `json:"user"`
+	Container   map[string]any      `json:"container"`
+	Actions     []InteractionAction `json:"actions"`
+	ResponseURL string              `json:"response_url"`
+	Message     map[string]any      `json:"message"`
+	Channel     map[string]any      `json:"channel"`
+	State       map[string]any      `json:"state"`
+	Token       string              `json:"token"`
+	APIAppID    string              `json:"api_app_id"`
+	Team        map[string]any      `json:"team"`
+}
+
+type InteractionAction struct {
+	Type     string         `json:"type"`
+	ActionID string         `json:"action_id"`
+	Value    string         `json:"value"`
+	Text     map[string]any `json:"text"`
+}
+
 func (s *Slack) handleInteractivity(ctx core.HTTPRequestContext, body []byte) {
-	// TODO
+	// Parse the payload parameter from form data
+	formValues, err := url.ParseQuery(string(body))
+	if err != nil {
+		ctx.Logger.Errorf("error parsing form data: %v", err)
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	payloadStr := formValues.Get("payload")
+	if payloadStr == "" {
+		ctx.Logger.Errorf("missing payload in form data")
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var payload InteractionPayload
+	if err := json.Unmarshal([]byte(payloadStr), &payload); err != nil {
+		ctx.Logger.Errorf("error unmarshaling interaction payload: %v", err)
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Only handle block_actions type for button clicks
+	if payload.Type != "block_actions" {
+		ctx.Logger.Infof("ignoring interaction type: %s", payload.Type)
+		ctx.Response.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if len(payload.Actions) == 0 {
+		ctx.Logger.Errorf("no actions in payload")
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Get the first action (button click)
+	action := payload.Actions[0]
+	if action.Type != "button" {
+		ctx.Logger.Infof("ignoring action type: %s", action.Type)
+		ctx.Response.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Get message timestamp from container
+	messageTS, ok := payload.Container["message_ts"].(string)
+	if !ok {
+		ctx.Logger.Errorf("message_ts not found in container")
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Get channel ID from payload
+	channelID, ok := payload.Channel["id"].(string)
+	if !ok {
+		ctx.Logger.Errorf("channel id not found in payload")
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Use generic query to find subscription by Slack-specific fields
+	subscription, err := models.FindIntegrationSubscriptionByConfigFields(database.Conn(), ctx.Integration.ID(), map[string]string{
+		"configuration->>'message_ts'": messageTS,
+		"configuration->>'channel_id'": channelID,
+		"configuration->>'type'":       "button_click",
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			ctx.Logger.Warnf("no subscription found for message_ts %s", messageTS)
+			ctx.Response.WriteHeader(http.StatusOK)
+			return
+		}
+		ctx.Logger.Errorf("error finding subscription: %v", err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Get the configuration
+	config := subscription.Configuration.Data()
+	configMap, ok := config.(map[string]any)
+	if !ok {
+		ctx.Logger.Errorf("invalid subscription configuration")
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Get the execution ID from the subscription configuration
+	executionIDStr, ok := configMap["execution_id"].(string)
+	if !ok {
+		ctx.Logger.Errorf("execution_id not found in subscription configuration")
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	executionID, err := uuid.Parse(executionIDStr)
+	if err != nil {
+		ctx.Logger.Errorf("invalid execution_id in subscription: %v", err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Create an action request for this execution
+	err = s.createButtonClickAction(executionID, action.Value)
+	if err != nil {
+		ctx.Logger.Errorf("error creating button click action: %v", err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	ctx.Response.WriteHeader(http.StatusOK)
+}
+
+func (s *Slack) createButtonClickAction(executionID uuid.UUID, buttonValue string) error {
+	var execution models.CanvasNodeExecution
+	err := database.Conn().Where("id = ?", executionID).First(&execution).Error
+	if err != nil {
+		return fmt.Errorf("failed to find execution: %w", err)
+	}
+
+	runAt := time.Now()
+	return execution.CreateRequest(database.Conn(), models.NodeRequestTypeInvokeAction, models.NodeExecutionRequestSpec{
+		InvokeAction: &models.InvokeAction{
+			ActionName: ActionButtonClick,
+			Parameters: map[string]any{
+				"value": buttonValue,
+			},
+		},
+	}, &runAt)
 }
 
 func (s *Slack) parseEventCallback(eventPayload EventPayload) (string, any, error) {
