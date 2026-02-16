@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 var (
@@ -61,11 +62,17 @@ func ParseIssueCreatedWebhook(body []byte) (IssueCreatedEvent, error) {
 	}
 
 	labels := make([]string, 0, len(payload.Data.Labels))
+	seenLabels := make(map[string]struct{}, len(payload.Data.Labels))
 	for _, label := range payload.Data.Labels {
-		if label.Name == "" {
+		name := strings.TrimSpace(label.Name)
+		if name == "" {
 			continue
 		}
-		labels = append(labels, label.Name)
+		if _, exists := seenLabels[name]; exists {
+			continue
+		}
+		seenLabels[name] = struct{}{}
+		labels = append(labels, name)
 	}
 
 	return IssueCreatedEvent{
@@ -90,10 +97,12 @@ type CreateIssueInput struct {
 }
 
 func BuildIssueCreateVariables(input CreateIssueInput) (map[string]any, error) {
-	if input.TeamID == "" {
+	teamID := strings.TrimSpace(input.TeamID)
+	title := strings.TrimSpace(input.Title)
+	if teamID == "" {
 		return nil, errors.New("teamId is required")
 	}
-	if input.Title == "" {
+	if title == "" {
 		return nil, errors.New("title is required")
 	}
 	if input.Priority < 0 || input.Priority > 4 {
@@ -101,22 +110,37 @@ func BuildIssueCreateVariables(input CreateIssueInput) (map[string]any, error) {
 	}
 
 	mutationInput := map[string]any{
-		"teamId":   input.TeamID,
-		"title":    input.Title,
+		"teamId":   teamID,
+		"title":    title,
 		"priority": input.Priority,
 	}
 
-	if input.Description != "" {
-		mutationInput["description"] = input.Description
+	if description := strings.TrimSpace(input.Description); description != "" {
+		mutationInput["description"] = description
 	}
-	if input.AssigneeID != "" {
-		mutationInput["assigneeId"] = input.AssigneeID
+	if assigneeID := strings.TrimSpace(input.AssigneeID); assigneeID != "" {
+		mutationInput["assigneeId"] = assigneeID
 	}
 	if len(input.LabelIDs) > 0 {
-		mutationInput["labelIds"] = input.LabelIDs
+		labelIDs := make([]string, 0, len(input.LabelIDs))
+		seenLabelIDs := make(map[string]struct{}, len(input.LabelIDs))
+		for _, raw := range input.LabelIDs {
+			labelID := strings.TrimSpace(raw)
+			if labelID == "" {
+				continue
+			}
+			if _, exists := seenLabelIDs[labelID]; exists {
+				continue
+			}
+			seenLabelIDs[labelID] = struct{}{}
+			labelIDs = append(labelIDs, labelID)
+		}
+		if len(labelIDs) > 0 {
+			mutationInput["labelIds"] = labelIDs
+		}
 	}
-	if input.StateID != "" {
-		mutationInput["stateId"] = input.StateID
+	if stateID := strings.TrimSpace(input.StateID); stateID != "" {
+		mutationInput["stateId"] = stateID
 	}
 
 	return map[string]any{

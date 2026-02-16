@@ -31,6 +31,30 @@ func TestParseIssueCreatedWebhook(t *testing.T) {
 		assert.Equal(t, []string{"bug", "prod"}, got.IssueLabels)
 	})
 
+	t.Run("trims and deduplicates labels", func(t *testing.T) {
+		body := []byte(`{
+			"action": "create",
+			"type": "Issue",
+			"data": {
+				"id": "issue_124",
+				"identifier": "ENG-43",
+				"title": "Label normalization",
+				"url": "https://linear.app/acme/issue/ENG-43",
+				"team": {"id":"team_1","name":"Engineering"},
+				"labels": [
+					{"id":"label_1","name":" bug "},
+					{"id":"label_2","name":"bug"},
+					{"id":"label_3","name":""},
+					{"id":"label_4","name":"  prod  "}
+				]
+			}
+		}`)
+
+		got, err := ParseIssueCreatedWebhook(body)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"bug", "prod"}, got.IssueLabels)
+	})
+
 	t.Run("filters out non issue.create events", func(t *testing.T) {
 		body := []byte(`{
 			"action": "update",
@@ -84,5 +108,26 @@ func TestBuildIssueCreateVariables(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Equal(t, "priority must be in range 0..4", err.Error())
+	})
+
+	t.Run("trims required and optional fields", func(t *testing.T) {
+		vars, err := BuildIssueCreateVariables(CreateIssueInput{
+			TeamID:      " team_1 ",
+			Title:       "  Auto-created issue from SuperPlane  ",
+			Description: "  Generated from PoC  ",
+			AssigneeID:  " user_1 ",
+			LabelIDs:    []string{" label_bug ", "label_bug", "", " label_backend "},
+			Priority:    1,
+			StateID:     " state_todo ",
+		})
+		require.NoError(t, err)
+
+		input := vars["input"].(map[string]any)
+		assert.Equal(t, "team_1", input["teamId"])
+		assert.Equal(t, "Auto-created issue from SuperPlane", input["title"])
+		assert.Equal(t, "Generated from PoC", input["description"])
+		assert.Equal(t, "user_1", input["assigneeId"])
+		assert.Equal(t, []string{"label_bug", "label_backend"}, input["labelIds"])
+		assert.Equal(t, "state_todo", input["stateId"])
 	})
 }
