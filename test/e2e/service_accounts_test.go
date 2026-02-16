@@ -189,7 +189,7 @@ func (s *serviceAccountSteps) assertServiceAccountSavedInDB(name, description, e
 	err = database.Conn().
 		Table("casbin_rule").
 		Select("v0, v1").
-		Where("ptype = 'g' AND v0 = ? AND v2 LIKE ?", "/users/"+found.ID.String(), "org:%").
+		Where("ptype = 'g' AND v0 = ? AND v2 LIKE ?", "/users/"+found.ID.String(), "/org/%").
 		First(&casbinRule).Error
 	require.NoError(s.t, err)
 	require.Equal(s.t, "/roles/"+expectedRole, casbinRule.V1)
@@ -282,13 +282,17 @@ func (s *serviceAccountSteps) clickRegenerateToken() {
 
 // givenServiceAccountExists creates a service account directly in the DB for test setup.
 func (s *serviceAccountSteps) givenServiceAccountExists(name, description string) {
+	// Look up the human user to use as created_by (the FK references users.id, not accounts.id)
+	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), "e2e@superplane.local")
+	require.NoError(s.t, err)
+
 	desc := description
 	sa, err := models.CreateServiceAccount(
 		database.Conn(),
 		s.session.OrgID,
 		name,
 		&desc,
-		s.session.Account.ID,
+		user.ID,
 	)
 	require.NoError(s.t, err)
 	require.NotNil(s.t, sa)

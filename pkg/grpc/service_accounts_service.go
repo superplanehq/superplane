@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
-	serviceaccounts "github.com/superplanehq/superplane/pkg/grpc/actions/service_accounts"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/serviceaccounts"
 	pb "github.com/superplanehq/superplane/pkg/protos/service_accounts"
 )
 
