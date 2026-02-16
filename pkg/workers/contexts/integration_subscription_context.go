@@ -3,7 +3,6 @@ package contexts
 import (
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -124,11 +123,6 @@ func (c *IntegrationSubscriptionContext) findExecutionByKV(key string, value str
 		return nil, err
 	}
 
-	orgID := uuid.Nil
-	if c.integration != nil {
-		orgID = c.integration.OrganizationID
-	}
-
 	return &core.ExecutionContext{
 		ID:             execution.ID,
 		WorkflowID:     execution.WorkflowID.String(),
@@ -141,6 +135,6 @@ func (c *IntegrationSubscriptionContext) findExecutionByKV(key string, value str
 		Requests:       NewExecutionRequestContext(c.tx, execution),
 		Integration:    c.integrationCtx,
 		Logger:         logging.WithExecution(logging.ForNode(*c.node), execution, nil),
-		Notifications:  NewNotificationContext(c.tx, orgID, execution.WorkflowID),
+		Notifications:  NewNotificationContext(c.tx, c.integration.OrganizationID, execution.WorkflowID),
 	}, nil
 }
