@@ -30,6 +30,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitHub repository" />
+  <LinkCard title="Get Workflow Usage" href="#get-workflow-usage" description="Get GitHub Actions billable usage for an organization" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
@@ -1278,6 +1279,61 @@ Returns release information including:
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.release"
+}
+```
+
+<a id="get-workflow-usage"></a>
+
+## Get Workflow Usage
+
+The Get Workflow Usage component retrieves billable GitHub Actions usage for the installation organization.
+
+### Prerequisites
+
+- GitHub App must include **Organization Administration: Read** permission.
+- Existing installations may need to approve this permission update before usage requests succeed.
+
+### Use Cases
+
+- **Billing visibility**: Track Actions billable minutes over time
+- **Cost monitoring**: Break usage down by runner OS/SKU
+- **Repository slicing**: Limit usage report to selected repositories
+
+### Configuration
+
+- **Repositories**: Optional multi-select. Leave empty to include all organization repositories.
+- **Year / Month / Day**: Optional period filters.
+- **Product**: Billing product (defaults to Actions).
+- **Runner OS / SKU**: Optional SKU filter.
+
+### Output
+
+Returns usage data including:
+- **minutes_used**: Total billable minutes
+- **minutes_used_breakdown**: Billable minutes grouped by OS/SKU
+- **net_amount**: Aggregated cost (when available)
+- **usage_items**: Raw usage rows from GitHub billing report
+
+Note: The API supports breakdown by repository and OS/SKU, not by workflow.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "minutes_used": 49.4,
+    "minutes_used_breakdown": {
+      "linux": 32.4,
+      "windows": 12,
+      "macos": 5
+    },
+    "net_amount": 7.17,
+    "repositories": [
+      "example-repo"
+    ]
+  },
+  "timestamp": "2026-02-16T10:12:00.000000000Z",
+  "type": "github.workflowUsage"
 }
 ```
 
