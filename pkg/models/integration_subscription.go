@@ -7,6 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type IntegrationSubscription struct {
@@ -38,12 +39,36 @@ func CreateIntegrationSubscriptionInTransaction(tx *gorm.DB, node *CanvasNode, i
 		UpdatedAt:      &now,
 	}
 
-	err := tx.Create(&s).Error
+	err := tx.
+		Clauses(clause.OnConflict{
+			Columns: []clause.Column{
+				{Name: "installation_id"},
+				{Name: "workflow_id"},
+				{Name: "node_id"},
+			},
+			DoUpdates: clause.Assignments(map[string]any{
+				"configuration": s.Configuration,
+				"updated_at":    now,
+			}),
+		}).
+		Create(&s).
+		Error
 	if err != nil {
 		return nil, err
 	}
 
-	return &s, nil
+	var subscription IntegrationSubscription
+	err = tx.
+		Where("installation_id = ?", integration.ID).
+		Where("workflow_id = ?", node.WorkflowID).
+		Where("node_id = ?", node.NodeID).
+		First(&subscription).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &subscription, nil
 }
 
 func DeleteIntegrationSubscriptionsForNodeInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID string) error {

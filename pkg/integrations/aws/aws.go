@@ -20,6 +20,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/codeartifact"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ecr"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/ecs"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/eventbridge"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/iam"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/lambda"
@@ -139,6 +140,9 @@ func (a *AWS) Components() []core.Component {
 		&codeartifact.DisposePackageVersions{},
 		&codeartifact.GetPackageVersion{},
 		&codeartifact.UpdatePackageVersionsStatus{},
+		&ecs.DescribeService{},
+		&ecs.RunTask{},
+		&ecs.StopTask{},
 		&sns.GetTopic{},
 		&sns.GetSubscription{},
 		&sns.CreateTopic{},
