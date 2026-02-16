@@ -53,7 +53,7 @@ func Test__GetWorkflowUsage__Setup(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Integration:   integrationCtx,
 			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{},
+			Configuration: map[string]any{"repositories": []string{"hello"}},
 		})
 		require.ErrorContains(t, err, "only supported for organization installs")
 	})
