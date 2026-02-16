@@ -1,38 +1,42 @@
 {
-  "minutes_used": 49.4,
-  "minutes_used_breakdown": {
-    "linux": 32.4,
-    "macos": 5.0,
-    "windows": 12.0
+  "data": {
+    "minutes_used": 49.4,
+    "minutes_used_breakdown": {
+      "linux": 32.4,
+      "macos": 5.0,
+      "windows": 12.0
+    },
+    "net_amount": 7.17,
+    "repositories": [
+      "example-repo"
+    ],
+    "usage_items": [
+      {
+        "product": "Actions",
+        "sku": "actions_linux",
+        "quantity": 32.4,
+        "unitType": "Minutes",
+        "netAmount": 2.59,
+        "repositoryName": "example-repo"
+      },
+      {
+        "product": "Actions",
+        "sku": "actions_windows",
+        "quantity": 12.0,
+        "unitType": "Minutes",
+        "netAmount": 3.84,
+        "repositoryName": "example-repo"
+      },
+      {
+        "product": "Actions",
+        "sku": "actions_macos",
+        "quantity": 5.0,
+        "unitType": "Minutes",
+        "netAmount": 0.74,
+        "repositoryName": "example-repo"
+      }
+    ]
   },
-  "net_amount": 7.17,
-  "repositories": [
-    "example-repo"
-  ],
-  "usage_items": [
-    {
-      "product": "Actions",
-      "sku": "actions_linux",
-      "quantity": 32.4,
-      "unitType": "Minutes",
-      "netAmount": 2.59,
-      "repositoryName": "example-repo"
-    },
-    {
-      "product": "Actions",
-      "sku": "actions_windows",
-      "quantity": 12.0,
-      "unitType": "Minutes",
-      "netAmount": 3.84,
-      "repositoryName": "example-repo"
-    },
-    {
-      "product": "Actions",
-      "sku": "actions_macos",
-      "quantity": 5.0,
-      "unitType": "Minutes",
-      "netAmount": 0.74,
-      "repositoryName": "example-repo"
-    }
-  ]
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.workflowUsage"
 }
