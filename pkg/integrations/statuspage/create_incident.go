@@ -18,24 +18,24 @@ type CreateIncident struct{}
 // CreateIncidentSpec is the strongly typed configuration for the Create Incident component.
 // Conditionally visible fields use pointers so they can be nil when not shown.
 type CreateIncidentSpec struct {
-	Page                    string   `json:"page"`
-	IncidentType            string   `json:"incidentType"`
-	Name                    string   `json:"name"`
-	Body                    string   `json:"body"`
-	StatusRealtime          *string  `json:"statusRealtime,omitempty"`
-	StatusScheduled         *string  `json:"statusScheduled,omitempty"`
-	ImpactOverride          *string  `json:"impactOverride,omitempty"`
-	Components []struct {
+	Page            string  `json:"page"`
+	IncidentType    string  `json:"incidentType"`
+	Name            string  `json:"name"`
+	Body            string  `json:"body"`
+	StatusRealtime  *string `json:"statusRealtime,omitempty"`
+	StatusScheduled *string `json:"statusScheduled,omitempty"`
+	ImpactOverride  *string `json:"impactOverride,omitempty"`
+	Components      []struct {
 		ComponentID string `json:"componentId"`
-		Status     string `json:"status"`
+		Status      string `json:"status"`
 	} `json:"components"`
-	ScheduledFor            *string  `json:"scheduledFor,omitempty"`
-	ScheduledUntil          *string  `json:"scheduledUntil,omitempty"`
-	ScheduledTimezone       *string  `json:"scheduledTimezone,omitempty"`
-	ScheduledRemindPrior    *bool    `json:"scheduledRemindPrior,omitempty"`
-	ScheduledAutoInProgress *bool    `json:"scheduledAutoInProgress,omitempty"`
-	ScheduledAutoCompleted  *bool    `json:"scheduledAutoCompleted,omitempty"`
-	DeliverNotifications    *bool    `json:"deliverNotifications,omitempty"`
+	ScheduledFor            *string `json:"scheduledFor,omitempty"`
+	ScheduledUntil          *string `json:"scheduledUntil,omitempty"`
+	ScheduledTimezone       *string `json:"scheduledTimezone,omitempty"`
+	ScheduledRemindPrior    *bool   `json:"scheduledRemindPrior,omitempty"`
+	ScheduledAutoInProgress *bool   `json:"scheduledAutoInProgress,omitempty"`
+	ScheduledAutoCompleted  *bool   `json:"scheduledAutoCompleted,omitempty"`
+	DeliverNotifications    *bool   `json:"deliverNotifications,omitempty"`
 }
 
 // derefStr safely dereferences a *string, returning "" if nil.
