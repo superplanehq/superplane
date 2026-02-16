@@ -1,13 +1,12 @@
 package rootly
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"slices"
 	"strings"
 	"time"
-
+	
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -182,25 +181,12 @@ func (t *OnEvent) HandleAction(ctx core.TriggerActionContext) (map[string]any, e
 
 func (t *OnEvent) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
 	config := OnEventConfiguration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	signature := ctx.Headers.Get("X-Rootly-Signature")
-	secret, err := ctx.Webhook.GetSecret()
+	req, code, err := decodeAndVerifyWebhook(ctx, &config)
 	if err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error getting secret: %v", err)
+		return code, err
 	}
 
-	if err := verifyWebhookSignature(signature, ctx.Body, secret); err != nil {
-		return http.StatusForbidden, fmt.Errorf("invalid signature: %v", err)
-	}
-
-	var webhook WebhookPayload
-	if err := json.Unmarshal(ctx.Body, &webhook); err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
-	}
-
+	webhook := req.payload
 	if !slices.Contains(onEventWebhookEvents, webhook.Event.Type) {
 		return http.StatusOK, nil
 	}

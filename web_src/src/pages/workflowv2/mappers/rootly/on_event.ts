@@ -1,10 +1,9 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import { Incident, IncidentEvent } from "./types";
-import { getDetailsForIncident, getDetailsForIncidentEvent } from "./base";
+import { buildTimeAgoSubtitle, getDetailsForIncident, getDetailsForIncidentEvent } from "./base";
 
 // Map incident status values to display labels (matching backend configuration)
 const incidentStatusLabels: Record<string, string> = {
@@ -47,7 +46,7 @@ export const onEventTriggerRenderer: TriggerRenderer = {
       contentParts.push(eventData.kind);
     }
 
-    const subtitle = buildSubtitle(contentParts.filter(Boolean).join(" · "), context.event?.createdAt);
+    const subtitle = buildTimeAgoSubtitle(contentParts.filter(Boolean).join(" · "), context.event?.createdAt);
 
     return {
       title: incident?.title || "Incident Event",
@@ -91,7 +90,7 @@ export const onEventTriggerRenderer: TriggerRenderer = {
         contentParts.push(eventData.kind);
       }
 
-      const subtitle = buildSubtitle(contentParts.filter(Boolean).join(" · "), lastEvent.createdAt);
+      const subtitle = buildTimeAgoSubtitle(contentParts.filter(Boolean).join(" · "), lastEvent.createdAt);
 
       props.lastEventData = {
         title: incident?.title || "Incident Event",
@@ -105,15 +104,6 @@ export const onEventTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
-
-function buildSubtitle(content: string, createdAt?: string): string {
-  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
-  if (content && timeAgo) {
-    return `${content} · ${timeAgo}`;
-  }
-
-  return content || timeAgo;
-}
 
 function addMetadata(
   metadataItems: Array<{ icon: string; label: string }>,

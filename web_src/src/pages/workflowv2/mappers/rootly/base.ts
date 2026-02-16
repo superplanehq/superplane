@@ -20,6 +20,15 @@ export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
   ];
 }
 
+export function buildTimeAgoSubtitle(content: string, createdAt?: string): string {
+  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
+  if (content && timeAgo) {
+    return `${content} · ${timeAgo}`;
+  }
+
+  return content || timeAgo;
+}
+
 export function getDetailsForIncident(incident: Incident): Record<string, string> {
   const details: Record<string, string> = {};
 
