@@ -128,13 +128,13 @@ func TestAccount_UpdateEmail(t *testing.T) {
 		var userFromDB User
 		err = database.Conn().Where("id = ?", user.ID).First(&userFromDB).Error
 		require.NoError(t, err)
-		assert.Equal(t, normalizedNewEmail, userFromDB.Email)
+		assert.Equal(t, normalizedNewEmail, userFromDB.GetEmail())
 
 		var otherUserFromDB User
 		err = database.Conn().Where("id = ?", otherUser.ID).First(&otherUserFromDB).Error
 		require.NoError(t, err)
-		assert.Equal(t, otherAccount.Email, otherUserFromDB.Email)
-		assert.NotEqual(t, normalizedNewEmail, otherUserFromDB.Email)
+		assert.Equal(t, otherAccount.Email, otherUserFromDB.GetEmail())
+		assert.NotEqual(t, normalizedNewEmail, otherUserFromDB.GetEmail())
 	})
 
 	t.Run("should normalize email", func(t *testing.T) {
@@ -238,7 +238,7 @@ func TestAccount_UpdateEmailForProvider(t *testing.T) {
 		var userFromDB User
 		err = database.Conn().Where("id = ?", user.ID).First(&userFromDB).Error
 		require.NoError(t, err)
-		assert.Equal(t, normalizedNewEmail, userFromDB.Email)
+		assert.Equal(t, normalizedNewEmail, userFromDB.GetEmail())
 
 		var githubProviderFromDB AccountProvider
 		err = database.Conn().Where("id = ?", githubProvider.ID).First(&githubProviderFromDB).Error

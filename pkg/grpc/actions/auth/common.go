@@ -141,7 +141,17 @@ func GetUsersWithRolesInDomain(domainID, domainType string, authService authoriz
 
 	var users []*pbUsers.User
 	for userID, roleAssignments := range userRoleMap {
-		user, err := convertUserToProto(userID, roleAssignments)
+		dbUser, err := models.FindUnscopedUserByID(userID)
+		if err != nil {
+			continue
+		}
+
+		// Filter out service accounts — they have their own listing endpoint
+		if dbUser.IsServiceAccount() {
+			continue
+		}
+
+		user, err := convertUserToProto(dbUser, roleAssignments)
 		if err != nil {
 			continue
 		}
@@ -151,39 +161,34 @@ func GetUsersWithRolesInDomain(domainID, domainType string, authService authoriz
 	return users, nil
 }
 
-func convertUserToProto(userID string, roleAssignments []*pbUsers.UserRoleAssignment) (*pbUsers.User, error) {
-	dbUser, err := models.FindUnscopedUserByID(userID)
-	if err != nil {
-		return nil, err
-	}
+func convertUserToProto(dbUser *models.User, roleAssignments []*pbUsers.UserRoleAssignment) (*pbUsers.User, error) {
+	var pbAccountProviders []*pbUsers.AccountProvider
 
-	account, err := models.FindAccountByID(dbUser.AccountID.String())
-	if err != nil {
-		return nil, err
-	}
-
-	providers, err := account.GetAccountProviders()
-	if err != nil {
-		return nil, err
-	}
-
-	pbAccountProviders := make([]*pbUsers.AccountProvider, len(providers))
-	for i, provider := range providers {
-		pbAccountProviders[i] = &pb.AccountProvider{
-			ProviderType: provider.Provider,
-			ProviderId:   provider.ProviderID,
-			Email:        provider.Email,
-			DisplayName:  provider.Name,
-			AvatarUrl:    provider.AvatarURL,
-			CreatedAt:    timestamppb.New(provider.CreatedAt),
-			UpdatedAt:    timestamppb.New(provider.UpdatedAt),
+	if dbUser.AccountID != nil {
+		account, err := models.FindAccountByID(dbUser.AccountID.String())
+		if err == nil {
+			providers, err := account.GetAccountProviders()
+			if err == nil {
+				pbAccountProviders = make([]*pbUsers.AccountProvider, len(providers))
+				for i, provider := range providers {
+					pbAccountProviders[i] = &pb.AccountProvider{
+						ProviderType: provider.Provider,
+						ProviderId:   provider.ProviderID,
+						Email:        provider.Email,
+						DisplayName:  provider.Name,
+						AvatarUrl:    provider.AvatarURL,
+						CreatedAt:    timestamppb.New(provider.CreatedAt),
+						UpdatedAt:    timestamppb.New(provider.UpdatedAt),
+					}
+				}
+			}
 		}
 	}
 
 	return &pb.User{
 		Metadata: &pb.User_Metadata{
-			Id:        userID,
-			Email:     dbUser.Email,
+			Id:        dbUser.ID.String(),
+			Email:     dbUser.GetEmail(),
 			CreatedAt: timestamppb.New(dbUser.CreatedAt),
 			UpdatedAt: timestamppb.New(dbUser.UpdatedAt),
 		},

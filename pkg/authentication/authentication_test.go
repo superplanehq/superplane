@@ -83,7 +83,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 		var userFromDB models.User
 		err = database.Conn().Where("id = ?", user.ID).First(&userFromDB).Error
 		require.NoError(t, err)
-		assert.Equal(t, newEmail, userFromDB.Email)
+		assert.Equal(t, newEmail, userFromDB.GetEmail())
 
 		var providerFromDB models.AccountProvider
 		err = database.Conn().Where("id = ?", provider.ID).First(&providerFromDB).Error
