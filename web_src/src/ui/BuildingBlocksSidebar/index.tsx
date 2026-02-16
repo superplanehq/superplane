@@ -38,6 +38,7 @@ import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
+import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
 
@@ -420,6 +421,7 @@ function CategorySection({
     sendgrid: sendgridIcon,
     prometheus: prometheusIcon,
     render: renderIcon,
+    sentry: sentryIcon,
     dockerhub: dockerIcon,
     aws: {
       codeArtifact: awsIcon,
@@ -499,6 +501,7 @@ function CategorySection({
             sendgrid: sendgridIcon,
             prometheus: prometheusIcon,
             render: renderIcon,
+            sentry: sentryIcon,
             dockerhub: dockerIcon,
             aws: {
               codeArtifact: awsCodeArtifactIcon,

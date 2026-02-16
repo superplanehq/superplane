@@ -1,0 +1,24 @@
+{
+    "type": "sentry.onIssue",
+    "data": {
+        "event": "issue.created",
+        "issue": {
+            "id": "1234567890",
+            "shortId": "MY-PROJECT-1",
+            "title": "TypeError: Cannot read property 'x' of undefined",
+            "level": "error",
+            "status": "unresolved",
+            "project": {
+                "id": "1",
+                "slug": "my-project",
+                "name": "My Project"
+            }
+        },
+        "actionUser": {
+            "id": "1",
+            "username": "user@example.com",
+            "email": "user@example.com"
+        }
+    },
+    "timestamp": "2026-02-16T12:00:00Z"
+}
