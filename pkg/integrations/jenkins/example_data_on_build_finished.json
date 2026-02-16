@@ -1,0 +1,11 @@
+{
+  "job": {
+    "name": "my-project/my-job",
+    "url": "https://jenkins.example.com/job/my-project/job/my-job/"
+  },
+  "build": {
+    "number": 42,
+    "url": "https://jenkins.example.com/job/my-project/job/my-job/42/",
+    "result": "SUCCESS"
+  }
+}
