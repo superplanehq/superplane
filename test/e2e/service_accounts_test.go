@@ -5,9 +5,12 @@ import (
 
 	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
+	"github.com/superplanehq/superplane/test/support"
 )
 
 func TestServiceAccounts(t *testing.T) {
@@ -83,6 +86,17 @@ func TestServiceAccounts(t *testing.T) {
 		steps.clickServiceAccountLink("regen-test-bot")
 		steps.clickRegenerateToken()
 		steps.assertTokenDisplayed()
+	})
+
+	t.Run("viewer cannot create or manage service accounts", func(t *testing.T) {
+		steps.start()
+		steps.givenServiceAccountExists("viewer-test-bot", "Viewer RBAC test")
+		steps.loginAsViewer()
+		steps.visitServiceAccountsPage()
+		steps.assertCreateButtonDisabled()
+		steps.clickServiceAccountLink("viewer-test-bot")
+		steps.assertEditButtonDisabled()
+		steps.assertDeleteButtonDisabled()
 	})
 }
 
@@ -278,6 +292,36 @@ func (s *serviceAccountSteps) clickRegenerateToken() {
 	err := page.GetByTestId("sa-detail-regenerate-token").Click()
 	require.NoError(s.t, err)
 	s.session.Sleep(1000)
+}
+
+func (s *serviceAccountSteps) loginAsViewer() {
+	viewerEmail := support.RandomName("viewer") + "@superplane.local"
+	viewerAccount, err := models.CreateAccount("Viewer User", viewerEmail)
+	require.NoError(s.t, err)
+
+	viewerUser, err := models.CreateUser(s.session.OrgID, viewerAccount.ID, viewerEmail, "Viewer User")
+	require.NoError(s.t, err)
+
+	authService, err := authorization.NewAuthService()
+	require.NoError(s.t, err)
+
+	err = authService.AssignRole(viewerUser.ID.String(), models.RoleOrgViewer, s.session.OrgID.String(), models.DomainTypeOrganization)
+	require.NoError(s.t, err)
+
+	s.session.Account = viewerAccount
+	s.session.Login()
+}
+
+func (s *serviceAccountSteps) assertCreateButtonDisabled() {
+	s.session.AssertDisabled(q.TestID("sa-create-btn"))
+}
+
+func (s *serviceAccountSteps) assertEditButtonDisabled() {
+	s.session.AssertDisabled(q.TestID("sa-detail-edit"))
+}
+
+func (s *serviceAccountSteps) assertDeleteButtonDisabled() {
+	s.session.AssertDisabled(q.TestID("sa-detail-delete"))
 }
 
 // givenServiceAccountExists creates a service account directly in the DB for test setup.
