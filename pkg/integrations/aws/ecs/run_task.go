@@ -338,6 +338,67 @@ func (c *RunTask) Configuration() []configuration.Field {
 			Default:     "{\"awsvpcConfiguration\":{\"subnets\":[],\"securityGroups\":[],\"assignPublicIp\":\"DISABLED\"}}",
 			Togglable:   true,
 			Description: "Optional ECS networkConfiguration object (for example, awsvpcConfiguration)",
+			TypeOptions: &configuration.TypeOptions{
+				Object: &configuration.ObjectTypeOptions{
+					Schema: []configuration.Field{
+						{
+							Name:     "awsvpcConfiguration",
+							Label:    "AWS VPC Configuration",
+							Type:     configuration.FieldTypeObject,
+							Required: false,
+							TypeOptions: &configuration.TypeOptions{
+								Object: &configuration.ObjectTypeOptions{
+									Schema: []configuration.Field{
+										{
+											Name:     "subnets",
+											Label:    "Subnets",
+											Type:     configuration.FieldTypeList,
+											Required: false,
+											TypeOptions: &configuration.TypeOptions{
+												List: &configuration.ListTypeOptions{
+													ItemLabel: "Subnet",
+													ItemDefinition: &configuration.ListItemDefinition{
+														Type: configuration.FieldTypeString,
+													},
+												},
+											},
+										},
+										{
+											Name:     "securityGroups",
+											Label:    "Security Groups",
+											Type:     configuration.FieldTypeList,
+											Required: false,
+											TypeOptions: &configuration.TypeOptions{
+												List: &configuration.ListTypeOptions{
+													ItemLabel: "Security Group",
+													ItemDefinition: &configuration.ListItemDefinition{
+														Type: configuration.FieldTypeString,
+													},
+												},
+											},
+										},
+										{
+											Name:     "assignPublicIp",
+											Label:    "Assign Public IP",
+											Type:     configuration.FieldTypeSelect,
+											Required: false,
+											Default:  "DISABLED",
+											TypeOptions: &configuration.TypeOptions{
+												Select: &configuration.SelectTypeOptions{
+													Options: []configuration.FieldOption{
+														{Label: "Disabled", Value: "DISABLED"},
+														{Label: "Enabled", Value: "ENABLED"},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "overrides",
@@ -347,6 +408,109 @@ func (c *RunTask) Configuration() []configuration.Field {
 			Default:     "{\"containerOverrides\":[]}",
 			Togglable:   true,
 			Description: "Optional ECS task overrides object",
+			TypeOptions: &configuration.TypeOptions{
+				Object: &configuration.ObjectTypeOptions{
+					Schema: []configuration.Field{
+						{
+							Name:     "containerOverrides",
+							Label:    "Container Overrides",
+							Type:     configuration.FieldTypeList,
+							Required: false,
+							TypeOptions: &configuration.TypeOptions{
+								List: &configuration.ListTypeOptions{
+									ItemLabel: "Container Override",
+									ItemDefinition: &configuration.ListItemDefinition{
+										Type: configuration.FieldTypeObject,
+										Schema: []configuration.Field{
+											{
+												Name:     "name",
+												Label:    "Name",
+												Type:     configuration.FieldTypeString,
+												Required: false,
+											},
+											{
+												Name:     "command",
+												Label:    "Command",
+												Type:     configuration.FieldTypeList,
+												Required: false,
+												TypeOptions: &configuration.TypeOptions{
+													List: &configuration.ListTypeOptions{
+														ItemLabel: "Argument",
+														ItemDefinition: &configuration.ListItemDefinition{
+															Type: configuration.FieldTypeString,
+														},
+													},
+												},
+											},
+											{
+												Name:     "environment",
+												Label:    "Environment",
+												Type:     configuration.FieldTypeList,
+												Required: false,
+												TypeOptions: &configuration.TypeOptions{
+													List: &configuration.ListTypeOptions{
+														ItemLabel: "Environment Variable",
+														ItemDefinition: &configuration.ListItemDefinition{
+															Type: configuration.FieldTypeObject,
+															Schema: []configuration.Field{
+																{
+																	Name:     "name",
+																	Label:    "Name",
+																	Type:     configuration.FieldTypeString,
+																	Required: true,
+																},
+																{
+																	Name:     "value",
+																	Label:    "Value",
+																	Type:     configuration.FieldTypeString,
+																	Required: false,
+																},
+															},
+														},
+													},
+												},
+											},
+											{
+												Name:     "cpu",
+												Label:    "CPU",
+												Type:     configuration.FieldTypeNumber,
+												Required: false,
+												TypeOptions: &configuration.TypeOptions{
+													Number: &configuration.NumberTypeOptions{
+														Min: func() *int { min := 0; return &min }(),
+													},
+												},
+											},
+											{
+												Name:     "memory",
+												Label:    "Memory",
+												Type:     configuration.FieldTypeNumber,
+												Required: false,
+												TypeOptions: &configuration.TypeOptions{
+													Number: &configuration.NumberTypeOptions{
+														Min: func() *int { min := 0; return &min }(),
+													},
+												},
+											},
+											{
+												Name:     "memoryReservation",
+												Label:    "Memory Reservation",
+												Type:     configuration.FieldTypeNumber,
+												Required: false,
+												TypeOptions: &configuration.TypeOptions{
+													Number: &configuration.NumberTypeOptions{
+														Min: func() *int { min := 0; return &min }(),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "timeoutSeconds",
