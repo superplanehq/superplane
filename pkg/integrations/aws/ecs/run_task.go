@@ -77,19 +77,16 @@ type RunTaskCapacityProviderStrategyItem struct {
 
 type RunTaskNetworkConfiguration struct {
 	AwsvpcConfiguration *RunTaskAwsvpcConfiguration `json:"awsvpcConfiguration,omitempty" mapstructure:"awsvpcConfiguration"`
-	AdditionalFields    map[string]any              `json:"-" mapstructure:",remain"`
 }
 
 type RunTaskAwsvpcConfiguration struct {
-	Subnets          []string       `json:"subnets,omitempty" mapstructure:"subnets"`
-	SecurityGroups   []string       `json:"securityGroups,omitempty" mapstructure:"securityGroups"`
-	AssignPublicIP   string         `json:"assignPublicIp,omitempty" mapstructure:"assignPublicIp"`
-	AdditionalFields map[string]any `json:"-" mapstructure:",remain"`
+	Subnets        []string `json:"subnets,omitempty" mapstructure:"subnets"`
+	SecurityGroups []string `json:"securityGroups,omitempty" mapstructure:"securityGroups"`
+	AssignPublicIP string   `json:"assignPublicIp,omitempty" mapstructure:"assignPublicIp"`
 }
 
 type RunTaskOverrides struct {
 	ContainerOverrides []RunTaskContainerOverride `json:"containerOverrides,omitempty" mapstructure:"containerOverrides"`
-	AdditionalFields   map[string]any             `json:"-" mapstructure:",remain"`
 }
 
 type RunTaskContainerOverride struct {
@@ -99,7 +96,6 @@ type RunTaskContainerOverride struct {
 	CPU               int                           `json:"cpu,omitempty" mapstructure:"cpu"`
 	Memory            int                           `json:"memory,omitempty" mapstructure:"memory"`
 	MemoryReservation int                           `json:"memoryReservation,omitempty" mapstructure:"memoryReservation"`
-	AdditionalFields  map[string]any                `json:"-" mapstructure:",remain"`
 }
 
 type RunTaskContainerEnvironment struct {
@@ -141,7 +137,6 @@ func (c *RunTask) Documentation() string {
 
 - For Fargate tasks, set **Network Configuration** using the ECS awsvpcConfiguration format.
 - Use **Capacity Provider Strategy** when you want ECS to choose capacity providers; it cannot be combined with **Launch Type**.
-- Optional ECS API fields can be passed directly through **Overrides** and **Network Configuration**.
 `
 }
 
@@ -699,12 +694,12 @@ func (c *RunTask) normalizeConfig(config RunTaskConfiguration) RunTaskConfigurat
 }
 
 func (c RunTaskNetworkConfiguration) ToMap() map[string]any {
-	configuration := cloneStringAnyMap(c.AdditionalFields)
+	configuration := map[string]any{}
 	if c.AwsvpcConfiguration == nil {
 		return configuration
 	}
 
-	awsvpcConfiguration := cloneStringAnyMap(c.AwsvpcConfiguration.AdditionalFields)
+	awsvpcConfiguration := map[string]any{}
 	if len(c.AwsvpcConfiguration.Subnets) > 0 {
 		awsvpcConfiguration["subnets"] = c.AwsvpcConfiguration.Subnets
 	}
@@ -720,7 +715,7 @@ func (c RunTaskNetworkConfiguration) ToMap() map[string]any {
 }
 
 func (o RunTaskOverrides) ToMap() map[string]any {
-	overrides := cloneStringAnyMap(o.AdditionalFields)
+	overrides := map[string]any{}
 	if len(o.ContainerOverrides) == 0 {
 		return overrides
 	}
@@ -734,7 +729,7 @@ func (o RunTaskOverrides) ToMap() map[string]any {
 }
 
 func (o RunTaskContainerOverride) ToMap() map[string]any {
-	containerOverride := cloneStringAnyMap(o.AdditionalFields)
+	containerOverride := map[string]any{}
 	if o.Name != "" {
 		containerOverride["name"] = o.Name
 	}
@@ -755,19 +750,6 @@ func (o RunTaskContainerOverride) ToMap() map[string]any {
 	}
 
 	return containerOverride
-}
-
-func cloneStringAnyMap(value map[string]any) map[string]any {
-	if len(value) == 0 {
-		return map[string]any{}
-	}
-
-	cloned := make(map[string]any, len(value))
-	for key, item := range value {
-		cloned[key] = item
-	}
-
-	return cloned
 }
 
 func hasConfigKey(configuration any, key string) bool {
