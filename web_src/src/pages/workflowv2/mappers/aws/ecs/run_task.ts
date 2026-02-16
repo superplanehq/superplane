@@ -10,7 +10,7 @@ import {
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
-import awsIcon from "@/assets/icons/integrations/aws.svg";
+import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
 import { formatTimeAgo } from "@/utils/date";
 import { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../../utils";
@@ -57,7 +57,7 @@ export const runTaskMapper: ComponentBaseMapper = {
         context.componentDefinition.label ||
         context.componentDefinition.name ||
         "Unnamed component",
-      iconSrc: awsIcon,
+      iconSrc: awsEcsIcon,
       iconColor: getColorClass(context.componentDefinition.color),
       collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
