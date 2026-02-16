@@ -26,18 +26,18 @@ func isScheduledStatus(status string) bool {
 
 // UpdateIncidentSpec is the strongly typed configuration for the Update Incident component.
 type UpdateIncidentSpec struct {
-	Page                 string   `json:"page"`
-	Incident             string   `json:"incident"`
-	IncidentType         string   `json:"incidentType"`
-	StatusRealtime       string   `json:"statusRealtime"`
-	StatusScheduled      string   `json:"statusScheduled"`
-	Body                 string   `json:"body"`
-	ImpactOverride       string   `json:"impactOverride"`
-	Components []struct {
+	Page            string `json:"page"`
+	Incident        string `json:"incident"`
+	IncidentType    string `json:"incidentType"`
+	StatusRealtime  string `json:"statusRealtime"`
+	StatusScheduled string `json:"statusScheduled"`
+	Body            string `json:"body"`
+	ImpactOverride  string `json:"impactOverride"`
+	Components      []struct {
 		ComponentID string `json:"componentId"`
-		Status     string `json:"status"`
+		Status      string `json:"status"`
 	} `json:"components"`
-	DeliverNotifications *bool    `json:"deliverNotifications,omitempty"`
+	DeliverNotifications *bool `json:"deliverNotifications,omitempty"`
 }
 
 func (c *UpdateIncident) Name() string {
