@@ -154,12 +154,12 @@ func Test__RunTask__Setup(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 		integration := setupIntegrationContext(&common.EventBridgeMetadata{
 			Rules: map[string]common.EventBridgeRuleMetadata{
-				runTaskEventSource: {
-					Source:      runTaskEventSource,
+				ecsTaskStateChangeEventSource: {
+					Source:      ecsTaskStateChangeEventSource,
 					Region:      "us-east-1",
 					Name:        "ecs-task-events",
 					RuleArn:     "arn:aws:events:us-east-1:123:rule/ecs-task-events",
-					DetailTypes: []string{runTaskEventDetailType},
+					DetailTypes: []string{ecsTaskStateChangeEventDetailType},
 				},
 			},
 		})
@@ -369,7 +369,7 @@ func Test__RunTask__Execute(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.False(t, execState.Finished)
-		assert.Equal(t, "arn:aws:ecs:us-east-1:123456789012:task/demo/abc", execState.KVs[runTaskExecutionKVTaskARN])
+		assert.Equal(t, "arn:aws:ecs:us-east-1:123456789012:task/demo/abc", execState.KVs[ecsTaskExecutionKVTaskARN])
 
 		executionMetadata, ok := metadata.Metadata.(RunTaskExecutionMetadata)
 		require.True(t, ok)
@@ -712,8 +712,8 @@ func validIntegrationContext() *contexts.IntegrationContext {
 func ecsTaskStateChangeEvent(taskARN string) common.EventBridgeEvent {
 	return common.EventBridgeEvent{
 		Region:     "us-east-1",
-		Source:     runTaskEventSource,
-		DetailType: runTaskEventDetailType,
+		Source:     ecsTaskStateChangeEventSource,
+		DetailType: ecsTaskStateChangeEventDetailType,
 		Detail: map[string]any{
 			"taskArn": taskARN,
 		},

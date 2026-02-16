@@ -16,10 +16,6 @@ import (
 )
 
 const (
-	stopTaskPayloadType                  = "aws.ecs.task"
-	stopTaskEventSource                  = "aws.ecs"
-	stopTaskEventDetailType              = "ECS Task State Change"
-	stopTaskExecutionKVTaskARN           = "aws_ecs_task_arn"
 	stopTaskCheckRuleAvailabilityAction  = "checkRuleAvailability"
 	stopTaskCheckRuleRetryInterval       = 10 * time.Second
 	stopTaskInitialRuleAvailabilityCheck = 5 * time.Second
@@ -206,8 +202,8 @@ func (c *StopTask) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("event bridge metadata is not configured")
 	}
 
-	rule, ok := integrationMetadata.EventBridge.Rules[stopTaskEventSource]
-	if !ok || !slices.Contains(rule.DetailTypes, stopTaskEventDetailType) {
+	rule, ok := integrationMetadata.EventBridge.Rules[ecsTaskStateChangeEventSource]
+	if !ok || !slices.Contains(rule.DetailTypes, ecsTaskStateChangeEventDetailType) {
 		if err := ctx.Metadata.Set(StopTaskNodeMetadata{Region: config.Region}); err != nil {
 			return fmt.Errorf("failed to set metadata: %w", err)
 		}
@@ -268,7 +264,7 @@ func persistStopTaskExecutionState(ctx core.ExecutionContext, config StopTaskCon
 		return fmt.Errorf("failed to set execution metadata: %w", err)
 	}
 
-	if err := ctx.ExecutionState.SetKV(stopTaskExecutionKVTaskARN, taskARN); err != nil {
+	if err := ctx.ExecutionState.SetKV(ecsTaskExecutionKVTaskARN, taskARN); err != nil {
 		return fmt.Errorf("failed to set execution kv: %w", err)
 	}
 
@@ -375,8 +371,8 @@ func (c *StopTask) provisionRule(integration core.IntegrationContext, requests c
 		"provisionRule",
 		common.ProvisionRuleParameters{
 			Region:     region,
-			Source:     stopTaskEventSource,
-			DetailType: stopTaskEventDetailType,
+			Source:     ecsTaskStateChangeEventSource,
+			DetailType: ecsTaskStateChangeEventDetailType,
 		},
 		time.Second,
 	); err != nil {
@@ -393,8 +389,8 @@ func (c *StopTask) provisionRule(integration core.IntegrationContext, requests c
 func (c *StopTask) subscriptionPattern(region string) *common.EventBridgeEvent {
 	return &common.EventBridgeEvent{
 		Region:     region,
-		DetailType: stopTaskEventDetailType,
-		Source:     stopTaskEventSource,
+		DetailType: ecsTaskStateChangeEventDetailType,
+		Source:     ecsTaskStateChangeEventSource,
 		Detail: map[string]any{
 			"lastStatus": "STOPPED",
 		},
@@ -411,21 +407,21 @@ func (c *StopTask) checkRuleAvailability(ctx core.ActionContext) error {
 		return retryStopTaskRuleAvailabilityCheck(ctx, "EventBridge metadata not found - checking again in %s", stopTaskCheckRuleRetryInterval)
 	}
 
-	rule, ok := integrationMetadata.EventBridge.Rules[stopTaskEventSource]
+	rule, ok := integrationMetadata.EventBridge.Rules[ecsTaskStateChangeEventSource]
 	if !ok {
 		return retryStopTaskRuleAvailabilityCheck(
 			ctx,
 			"Rule not found for source %s - checking again in %s",
-			stopTaskEventSource,
+			ecsTaskStateChangeEventSource,
 			stopTaskCheckRuleRetryInterval,
 		)
 	}
 
-	if !slices.Contains(rule.DetailTypes, stopTaskEventDetailType) {
+	if !slices.Contains(rule.DetailTypes, ecsTaskStateChangeEventDetailType) {
 		return retryStopTaskRuleAvailabilityCheck(
 			ctx,
 			"Rule does not have detail type %q - checking again in %s",
-			stopTaskEventDetailType,
+			ecsTaskStateChangeEventDetailType,
 			stopTaskCheckRuleRetryInterval,
 		)
 	}
@@ -472,7 +468,7 @@ func decodeStopTaskMessage(message any) (*stopTaskMessageData, error) {
 		return nil, fmt.Errorf("failed to decode message: %w", err)
 	}
 
-	if event.Source != stopTaskEventSource || event.DetailType != stopTaskEventDetailType {
+	if event.Source != ecsTaskStateChangeEventSource || event.DetailType != ecsTaskStateChangeEventDetailType {
 		return nil, nil
 	}
 
@@ -497,7 +493,7 @@ func decodeStopTaskMessage(message any) (*stopTaskMessageData, error) {
 }
 
 func resolveStopTaskExecutionByTaskARN(ctx core.IntegrationMessageContext, taskARN string) (*core.ExecutionContext, error) {
-	executionCtx, err := ctx.FindExecutionByKV(stopTaskExecutionKVTaskARN, taskARN)
+	executionCtx, err := ctx.FindExecutionByKV(ecsTaskExecutionKVTaskARN, taskARN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve execution by task ARN %s: %w", taskARN, err)
 	}
@@ -514,7 +510,7 @@ func resolveStopTaskExecutionByTaskARN(ctx core.IntegrationMessageContext, taskA
 func emitStopTaskOutput(executionState core.ExecutionStateContext, task Task) error {
 	return executionState.Emit(
 		core.DefaultOutputChannel.Name,
-		stopTaskPayloadType,
+		ecsTaskPayloadType,
 		[]any{
 			map[string]any{
 				"task": task,

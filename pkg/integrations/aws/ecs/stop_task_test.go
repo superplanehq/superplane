@@ -93,12 +93,12 @@ func Test__StopTask__Setup(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 		integration := setupStopTaskIntegrationContext(&common.EventBridgeMetadata{
 			Rules: map[string]common.EventBridgeRuleMetadata{
-				stopTaskEventSource: {
-					Source:      stopTaskEventSource,
+				ecsTaskStateChangeEventSource: {
+					Source:      ecsTaskStateChangeEventSource,
 					Region:      "us-east-1",
 					Name:        "ecs-task-events",
 					RuleArn:     "arn:aws:events:us-east-1:123:rule/ecs-task-events",
-					DetailTypes: []string{stopTaskEventDetailType},
+					DetailTypes: []string{ecsTaskStateChangeEventDetailType},
 				},
 			},
 		})
@@ -264,7 +264,7 @@ func Test__StopTask__Execute(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Empty(t, execState.Payloads)
-		assert.Equal(t, "arn:aws:ecs:us-east-1:123456789012:task/demo/abc", execState.KVs[stopTaskExecutionKVTaskARN])
+		assert.Equal(t, "arn:aws:ecs:us-east-1:123456789012:task/demo/abc", execState.KVs[ecsTaskExecutionKVTaskARN])
 
 		executionMetadata, ok := metadata.Metadata.(StopTaskExecutionMetadata)
 		require.True(t, ok)
@@ -368,8 +368,8 @@ func validStopTaskIntegrationContext() *contexts.IntegrationContext {
 func stopTaskStateChangeEvent(taskARN string, status string) common.EventBridgeEvent {
 	return common.EventBridgeEvent{
 		Region:     "us-east-1",
-		Source:     stopTaskEventSource,
-		DetailType: stopTaskEventDetailType,
+		Source:     ecsTaskStateChangeEventSource,
+		DetailType: ecsTaskStateChangeEventDetailType,
 		Detail: map[string]any{
 			"taskArn":       taskARN,
 			"lastStatus":    status,

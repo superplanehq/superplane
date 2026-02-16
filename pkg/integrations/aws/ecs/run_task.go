@@ -15,10 +15,6 @@ import (
 )
 
 const (
-	runTaskPayloadType                  = "aws.ecs.task"
-	runTaskEventSource                  = "aws.ecs"
-	runTaskEventDetailType              = "ECS Task State Change"
-	runTaskExecutionKVTaskARN           = "aws_ecs_task_arn"
 	runTaskMaxCount                     = 10
 	runTaskCheckRuleAvailabilityAction  = "checkRuleAvailability"
 	runTaskTimeoutAction                = "timeout"
@@ -398,8 +394,8 @@ func (c *RunTask) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("event bridge metadata is not configured")
 	}
 
-	rule, ok := integrationMetadata.EventBridge.Rules[runTaskEventSource]
-	if !ok || !slices.Contains(rule.DetailTypes, runTaskEventDetailType) {
+	rule, ok := integrationMetadata.EventBridge.Rules[ecsTaskStateChangeEventSource]
+	if !ok || !slices.Contains(rule.DetailTypes, ecsTaskStateChangeEventDetailType) {
 		if err := ctx.Metadata.Set(RunTaskNodeMetadata{Region: config.Region}); err != nil {
 			return fmt.Errorf("failed to set metadata: %w", err)
 		}
@@ -518,7 +514,7 @@ func persistRunTaskExecutionState(ctx core.ExecutionContext, executionMetadata R
 	}
 
 	for _, taskARN := range executionMetadata.TaskARNs {
-		if err := ctx.ExecutionState.SetKV(runTaskExecutionKVTaskARN, taskARN); err != nil {
+		if err := ctx.ExecutionState.SetKV(ecsTaskExecutionKVTaskARN, taskARN); err != nil {
 			return fmt.Errorf("failed to set execution kv: %w", err)
 		}
 	}
@@ -785,8 +781,8 @@ func (c *RunTask) provisionRule(integration core.IntegrationContext, requests co
 		"provisionRule",
 		common.ProvisionRuleParameters{
 			Region:     region,
-			Source:     runTaskEventSource,
-			DetailType: runTaskEventDetailType,
+			Source:     ecsTaskStateChangeEventSource,
+			DetailType: ecsTaskStateChangeEventDetailType,
 		},
 		time.Second,
 	); err != nil {
@@ -803,8 +799,8 @@ func (c *RunTask) provisionRule(integration core.IntegrationContext, requests co
 func (c *RunTask) subscriptionPattern(region string) *common.EventBridgeEvent {
 	return &common.EventBridgeEvent{
 		Region:     region,
-		DetailType: runTaskEventDetailType,
-		Source:     runTaskEventSource,
+		DetailType: ecsTaskStateChangeEventDetailType,
+		Source:     ecsTaskStateChangeEventSource,
 	}
 }
 
@@ -823,11 +819,11 @@ func (c *RunTask) checkRuleAvailability(ctx core.ActionContext) error {
 		)
 	}
 
-	rule, ok := integrationMetadata.EventBridge.Rules[runTaskEventSource]
+	rule, ok := integrationMetadata.EventBridge.Rules[ecsTaskStateChangeEventSource]
 	if !ok {
 		ctx.Logger.Infof(
 			"Rule not found for source %s - checking again in %s",
-			runTaskEventSource,
+			ecsTaskStateChangeEventSource,
 			runTaskCheckRuleRetryInterval,
 		)
 		return ctx.Requests.ScheduleActionCall(
@@ -837,10 +833,10 @@ func (c *RunTask) checkRuleAvailability(ctx core.ActionContext) error {
 		)
 	}
 
-	if !slices.Contains(rule.DetailTypes, runTaskEventDetailType) {
+	if !slices.Contains(rule.DetailTypes, ecsTaskStateChangeEventDetailType) {
 		ctx.Logger.Infof(
 			"Rule does not have detail type %q - checking again in %s",
-			runTaskEventDetailType,
+			ecsTaskStateChangeEventDetailType,
 			runTaskCheckRuleRetryInterval,
 		)
 		return ctx.Requests.ScheduleActionCall(
@@ -924,7 +920,7 @@ func decodeRunTaskMessage(message any) (*runTaskMessageData, error) {
 		return nil, fmt.Errorf("failed to decode message: %w", err)
 	}
 
-	if event.Source != runTaskEventSource || event.DetailType != runTaskEventDetailType {
+	if event.Source != ecsTaskStateChangeEventSource || event.DetailType != ecsTaskStateChangeEventDetailType {
 		return nil, nil
 	}
 
@@ -944,7 +940,7 @@ func decodeRunTaskMessage(message any) (*runTaskMessageData, error) {
 }
 
 func resolveRunTaskExecutionByTaskARN(ctx core.IntegrationMessageContext, taskARN string) (*core.ExecutionContext, error) {
-	executionCtx, err := ctx.FindExecutionByKV(runTaskExecutionKVTaskARN, taskARN)
+	executionCtx, err := ctx.FindExecutionByKV(ecsTaskExecutionKVTaskARN, taskARN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve execution by task ARN %s: %w", taskARN, err)
 	}
@@ -1110,7 +1106,7 @@ func emitRunTaskOutput(
 ) error {
 	return executionState.Emit(
 		core.DefaultOutputChannel.Name,
-		runTaskPayloadType,
+		ecsTaskPayloadType,
 		[]any{
 			map[string]any{
 				"tasks":    tasks,
