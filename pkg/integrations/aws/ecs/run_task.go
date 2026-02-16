@@ -385,25 +385,29 @@ func (c *RunTask) Setup(ctx core.SetupContext) error {
 		return nil
 	}
 
-	integrationMetadata := common.IntegrationMetadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
+	integrationMetadata, err := decodeIntegrationMetadata(ctx.Integration.GetMetadata())
+	if err != nil {
+		return err
 	}
-
 	if integrationMetadata.EventBridge == nil {
 		return fmt.Errorf("event bridge metadata is not configured")
 	}
 
-	rule, ok := integrationMetadata.EventBridge.Rules[ecsTaskStateChangeEventSource]
-	if !ok || !slices.Contains(rule.DetailTypes, ecsTaskStateChangeEventDetailType) {
+	if !hasTaskStateChangeRule(integrationMetadata) {
 		if err := ctx.Metadata.Set(RunTaskNodeMetadata{Region: config.Region}); err != nil {
 			return fmt.Errorf("failed to set metadata: %w", err)
 		}
 
-		return c.provisionRule(ctx.Integration, ctx.Requests, config.Region)
+		return scheduleTaskStateChangeRuleProvision(
+			ctx.Integration,
+			ctx.Requests,
+			runTaskCheckRuleAvailabilityAction,
+			runTaskInitialRuleAvailabilityCheck,
+			config.Region,
+		)
 	}
 
-	subscriptionID, err := ctx.Integration.Subscribe(c.subscriptionPattern(config.Region))
+	subscriptionID, err := ctx.Integration.Subscribe(taskStateChangeSubscriptionPattern(config.Region, nil))
 	if err != nil {
 		return fmt.Errorf("failed to subscribe: %w", err)
 	}
@@ -552,7 +556,7 @@ func (c *RunTask) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 		return nil
 	}
 
-	executionCtx, err := resolveRunTaskExecutionByTaskARN(ctx, messageData.TaskARN)
+	executionCtx, err := resolveExecutionByTaskARN(ctx, messageData.TaskARN)
 	if err != nil {
 		return err
 	}
@@ -776,101 +780,22 @@ func hasConfigKey(configuration any, key string) bool {
 	return exists
 }
 
-func (c *RunTask) provisionRule(integration core.IntegrationContext, requests core.RequestContext, region string) error {
-	if err := integration.ScheduleActionCall(
-		"provisionRule",
-		common.ProvisionRuleParameters{
-			Region:     region,
-			Source:     ecsTaskStateChangeEventSource,
-			DetailType: ecsTaskStateChangeEventDetailType,
-		},
-		time.Second,
-	); err != nil {
-		return fmt.Errorf("failed to schedule rule provisioning for integration: %w", err)
-	}
-
-	return requests.ScheduleActionCall(
-		runTaskCheckRuleAvailabilityAction,
-		map[string]any{},
-		runTaskInitialRuleAvailabilityCheck,
-	)
-}
-
-func (c *RunTask) subscriptionPattern(region string) *common.EventBridgeEvent {
-	return &common.EventBridgeEvent{
-		Region:     region,
-		DetailType: ecsTaskStateChangeEventDetailType,
-		Source:     ecsTaskStateChangeEventSource,
-	}
-}
-
 func (c *RunTask) checkRuleAvailability(ctx core.ActionContext) error {
-	metadata, integrationMetadata, err := decodeRunTaskRuleAvailabilityData(ctx)
-	if err != nil {
-		return err
-	}
-
-	if integrationMetadata.EventBridge == nil {
-		ctx.Logger.Infof("EventBridge metadata not found - checking again in %s", runTaskCheckRuleRetryInterval)
-		return ctx.Requests.ScheduleActionCall(
-			runTaskCheckRuleAvailabilityAction,
-			map[string]any{},
-			runTaskCheckRuleRetryInterval,
-		)
-	}
-
-	rule, ok := integrationMetadata.EventBridge.Rules[ecsTaskStateChangeEventSource]
-	if !ok {
-		ctx.Logger.Infof(
-			"Rule not found for source %s - checking again in %s",
-			ecsTaskStateChangeEventSource,
-			runTaskCheckRuleRetryInterval,
-		)
-		return ctx.Requests.ScheduleActionCall(
-			runTaskCheckRuleAvailabilityAction,
-			map[string]any{},
-			runTaskCheckRuleRetryInterval,
-		)
-	}
-
-	if !slices.Contains(rule.DetailTypes, ecsTaskStateChangeEventDetailType) {
-		ctx.Logger.Infof(
-			"Rule does not have detail type %q - checking again in %s",
-			ecsTaskStateChangeEventDetailType,
-			runTaskCheckRuleRetryInterval,
-		)
-		return ctx.Requests.ScheduleActionCall(
-			runTaskCheckRuleAvailabilityAction,
-			map[string]any{},
-			runTaskCheckRuleRetryInterval,
-		)
-	}
-
-	return c.subscribeToRunTaskStateChanges(ctx, metadata)
-}
-
-func (c *RunTask) subscribeToRunTaskStateChanges(ctx core.ActionContext, metadata RunTaskNodeMetadata) error {
-	subscriptionID, err := ctx.Integration.Subscribe(c.subscriptionPattern(metadata.Region))
-	if err != nil {
-		return fmt.Errorf("failed to subscribe: %w", err)
-	}
-
-	metadata.SubscriptionID = subscriptionID.String()
-	return ctx.Metadata.Set(metadata)
-}
-
-func decodeRunTaskRuleAvailabilityData(ctx core.ActionContext) (RunTaskNodeMetadata, common.IntegrationMetadata, error) {
 	metadata := RunTaskNodeMetadata{}
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-		return RunTaskNodeMetadata{}, common.IntegrationMetadata{}, fmt.Errorf("failed to decode metadata: %w", err)
+		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	integrationMetadata := common.IntegrationMetadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
-		return RunTaskNodeMetadata{}, common.IntegrationMetadata{}, fmt.Errorf("failed to decode integration metadata: %w", err)
-	}
-
-	return metadata, integrationMetadata, nil
+	return subscribeWhenTaskStateChangeRuleAvailable(
+		ctx,
+		runTaskCheckRuleAvailabilityAction,
+		runTaskCheckRuleRetryInterval,
+		taskStateChangeSubscriptionPattern(metadata.Region, nil),
+		func(subscriptionID string) error {
+			metadata.SubscriptionID = subscriptionID
+			return ctx.Metadata.Set(metadata)
+		},
+	)
 }
 
 func (c *RunTask) handleTimeout(ctx core.ActionContext) error {
@@ -937,21 +862,6 @@ func decodeRunTaskMessage(message any) (*runTaskMessageData, error) {
 	return &runTaskMessageData{
 		TaskARN: taskARN,
 	}, nil
-}
-
-func resolveRunTaskExecutionByTaskARN(ctx core.IntegrationMessageContext, taskARN string) (*core.ExecutionContext, error) {
-	executionCtx, err := ctx.FindExecutionByKV(ecsTaskExecutionKVTaskARN, taskARN)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve execution by task ARN %s: %w", taskARN, err)
-	}
-	if executionCtx == nil {
-		return nil, nil
-	}
-	if executionCtx.ExecutionState.IsFinished() {
-		return nil, nil
-	}
-
-	return executionCtx, nil
 }
 
 func decodeRunTaskExecutionMetadata(metadata any) (RunTaskExecutionMetadata, error) {

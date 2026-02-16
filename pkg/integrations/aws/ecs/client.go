@@ -430,7 +430,10 @@ func isNetworkConfigurationTemplate(value any) bool {
 	}
 
 	config, ok := toStringAnyMap(rawConfig)
-	if !ok || len(config) != 3 {
+	if !ok {
+		return false
+	}
+	if !hasOnlyKeys(config, "assignPublicIp", "subnets", "securityGroups") {
 		return false
 	}
 
@@ -439,7 +442,17 @@ func isNetworkConfigurationTemplate(value any) bool {
 		return false
 	}
 
-	return isEmptyArray(config["subnets"]) && isEmptyArray(config["securityGroups"])
+	subnets, hasSubnets := config["subnets"]
+	if hasSubnets && !isEmptyArray(subnets) {
+		return false
+	}
+
+	securityGroups, hasSecurityGroups := config["securityGroups"]
+	if hasSecurityGroups && !isEmptyArray(securityGroups) {
+		return false
+	}
+
+	return true
 }
 
 func isOverridesTemplate(value any) bool {
@@ -487,6 +500,21 @@ func toStringAnyMap(value any) (map[string]any, bool) {
 	}
 
 	return converted, true
+}
+
+func hasOnlyKeys(object map[string]any, allowedKeys ...string) bool {
+	allowed := make(map[string]struct{}, len(allowedKeys))
+	for _, key := range allowedKeys {
+		allowed[key] = struct{}{}
+	}
+
+	for key := range object {
+		if _, ok := allowed[key]; !ok {
+			return false
+		}
+	}
+
+	return true
 }
 
 func clusterNameFromArn(arn string) string {

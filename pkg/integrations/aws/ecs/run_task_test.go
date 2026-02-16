@@ -274,6 +274,56 @@ func Test__RunTask__Execute(t *testing.T) {
 		assert.Equal(t, float64(2), payloadSent["count"])
 	})
 
+	t.Run("default network configuration template -> omits networkConfiguration from API payload", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"tasks": [
+								{
+									"taskArn": "arn:aws:ecs:us-east-1:123456789012:task/demo/abc",
+									"lastStatus": "RUNNING"
+								}
+							],
+							"failures": []
+						}
+					`)),
+				},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":         "us-east-1",
+				"cluster":        "demo",
+				"taskDefinition": "worker:1",
+				"networkConfiguration": map[string]any{
+					"awsvpcConfiguration": map[string]any{
+						"subnets":        []any{},
+						"securityGroups": []any{},
+						"assignPublicIp": "DISABLED",
+					},
+				},
+			},
+			HTTP:           httpContext,
+			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+			Integration:    validIntegrationContext(),
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+
+		requestBody, err := io.ReadAll(httpContext.Requests[0].Body)
+		require.NoError(t, err)
+
+		payloadSent := map[string]any{}
+		err = json.Unmarshal(requestBody, &payloadSent)
+		require.NoError(t, err)
+		assert.NotContains(t, payloadSent, "networkConfiguration")
+	})
+
 	t.Run("capacity provider strategy -> sends runTask with capacityProviderStrategy", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
