@@ -404,24 +404,37 @@ func (c *StopTask) checkRuleAvailability(ctx core.ActionContext) error {
 	}
 
 	if integrationMetadata.EventBridge == nil {
-		return retryStopTaskRuleAvailabilityCheck(ctx, "EventBridge metadata not found - checking again in %s", stopTaskCheckRuleRetryInterval)
+		ctx.Logger.Infof("EventBridge metadata not found - checking again in %s", stopTaskCheckRuleRetryInterval)
+		return ctx.Requests.ScheduleActionCall(
+			stopTaskCheckRuleAvailabilityAction,
+			map[string]any{},
+			stopTaskCheckRuleRetryInterval,
+		)
 	}
 
 	rule, ok := integrationMetadata.EventBridge.Rules[ecsTaskStateChangeEventSource]
 	if !ok {
-		return retryStopTaskRuleAvailabilityCheck(
-			ctx,
+		ctx.Logger.Infof(
 			"Rule not found for source %s - checking again in %s",
 			ecsTaskStateChangeEventSource,
+			stopTaskCheckRuleRetryInterval,
+		)
+		return ctx.Requests.ScheduleActionCall(
+			stopTaskCheckRuleAvailabilityAction,
+			map[string]any{},
 			stopTaskCheckRuleRetryInterval,
 		)
 	}
 
 	if !slices.Contains(rule.DetailTypes, ecsTaskStateChangeEventDetailType) {
-		return retryStopTaskRuleAvailabilityCheck(
-			ctx,
+		ctx.Logger.Infof(
 			"Rule does not have detail type %q - checking again in %s",
 			ecsTaskStateChangeEventDetailType,
+			stopTaskCheckRuleRetryInterval,
+		)
+		return ctx.Requests.ScheduleActionCall(
+			stopTaskCheckRuleAvailabilityAction,
+			map[string]any{},
 			stopTaskCheckRuleRetryInterval,
 		)
 	}
@@ -451,15 +464,6 @@ func decodeStopTaskRuleAvailabilityData(ctx core.ActionContext) (StopTaskNodeMet
 	}
 
 	return metadata, integrationMetadata, nil
-}
-
-func retryStopTaskRuleAvailabilityCheck(ctx core.ActionContext, logMessage string, args ...any) error {
-	ctx.Logger.Infof(logMessage, args...)
-	return ctx.Requests.ScheduleActionCall(
-		stopTaskCheckRuleAvailabilityAction,
-		map[string]any{},
-		stopTaskCheckRuleRetryInterval,
-	)
 }
 
 func decodeStopTaskMessage(message any) (*stopTaskMessageData, error) {
