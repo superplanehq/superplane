@@ -50,6 +50,7 @@ type Metadata struct {
 	InstallationID string            `mapstructure:"installationId" json:"installationId"`
 	State          string            `mapstructure:"state" json:"state"`
 	Owner          string            `mapstructure:"owner" json:"owner"`
+	OwnerType      string            `mapstructure:"ownerType" json:"ownerType"`
 	Repositories   []Repository      `mapstructure:"repositories" json:"repositories"`
 	GitHubApp      GitHubAppMetadata `mapstructure:"githubApp" json:"githubApp"`
 }
@@ -162,8 +163,9 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 	})
 
 	ctx.Integration.SetMetadata(Metadata{
-		Owner: config.Organization,
-		State: state,
+		Owner:     config.Organization,
+		OwnerType: ownerTypeFromConfiguration(config),
+		State:     state,
 	})
 
 	return nil
@@ -479,6 +481,14 @@ func (g *GitHub) browserActionURL(organization string) string {
 	}
 
 	return "https://github.com/settings/apps/new"
+}
+
+func ownerTypeFromConfiguration(config Configuration) string {
+	if strings.TrimSpace(config.Organization) != "" {
+		return "Organization"
+	}
+
+	return "User"
 }
 
 func (g *GitHub) appManifest(ctx core.SyncContext) string {

@@ -41,6 +41,22 @@ func Test__GetWorkflowUsage__Setup(t *testing.T) {
 		})
 		require.ErrorContains(t, err, "repository world is not accessible to app installation")
 	})
+
+	t.Run("fails for user-owned installations", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Metadata: Metadata{
+				OwnerType:    "User",
+				Repositories: []Repository{helloRepo},
+			},
+		}
+
+		err := component.Setup(core.SetupContext{
+			Integration:   integrationCtx,
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{},
+		})
+		require.ErrorContains(t, err, "only supported for organization installs")
+	})
 }
 
 func Test__GetWorkflowUsage__Execute__Validation(t *testing.T) {

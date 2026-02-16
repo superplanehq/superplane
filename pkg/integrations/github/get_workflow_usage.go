@@ -2,11 +2,14 @@ package github
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
+	ghapi "github.com/google/go-github/v74/github"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -64,6 +67,7 @@ func (c *GetWorkflowUsage) Documentation() string {
 
 - GitHub App must have **Organization Administration: Read** permission.
 - Existing app installations may need approval for the new permission before this action can access billing usage.
+- This action is available for **organization installs only**.
 
 ## Use Cases
 
@@ -211,6 +215,10 @@ func (c *GetWorkflowUsage) Setup(ctx core.SetupContext) error {
 		return nil
 	}
 
+	if strings.EqualFold(appMetadata.OwnerType, "User") {
+		return fmt.Errorf("github.getWorkflowUsage is only supported for organization installs")
+	}
+
 	known := map[string]struct{}{}
 	for _, repo := range appMetadata.Repositories {
 		known[repo.Name] = struct{}{}
@@ -278,6 +286,18 @@ func (c *GetWorkflowUsage) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
+	ownerType := strings.TrimSpace(appMetadata.OwnerType)
+	if ownerType == "" {
+		ownerType, err = getGitHubOwnerType(context.Background(), client, appMetadata.Owner)
+		if err != nil {
+			return err
+		}
+	}
+
+	if !strings.EqualFold(ownerType, "Organization") {
+		return fmt.Errorf("github.getWorkflowUsage is only supported for organization installs")
+	}
+
 	path := fmt.Sprintf("orgs/%s/settings/billing/usage", appMetadata.Owner)
 	if query.Encode() != "" {
 		path = fmt.Sprintf("%s?%s", path, query.Encode())
@@ -290,7 +310,7 @@ func (c *GetWorkflowUsage) Execute(ctx core.ExecutionContext) error {
 
 	var response githubBillingUsageResponse
 	if _, err = client.Do(context.Background(), req, &response); err != nil {
-		return fmt.Errorf("failed to fetch billing usage: %w", err)
+		return fmt.Errorf("failed to fetch billing usage: %w", normalizeBillingUsageError(err))
 	}
 
 	selectedRepos := map[string]struct{}{}
@@ -360,6 +380,51 @@ func normalizeUsageSKU(sku string) string {
 		}
 		return value
 	}
+}
+
+func getGitHubOwnerType(ctx context.Context, client *ghapi.Client, owner string) (string, error) {
+	req, err := client.NewRequest("GET", fmt.Sprintf("users/%s", owner), nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create owner type request: %w", err)
+	}
+
+	var user struct {
+		Type string `json:"type"`
+	}
+	if _, err = client.Do(ctx, req, &user); err != nil {
+		return "", fmt.Errorf("failed to resolve owner type for %q: %w", owner, err)
+	}
+
+	if strings.TrimSpace(user.Type) == "" {
+		return "", fmt.Errorf("failed to resolve owner type for %q: empty owner type", owner)
+	}
+
+	return user.Type, nil
+}
+
+func normalizeBillingUsageError(err error) error {
+	var responseErr *ghapi.ErrorResponse
+	if !errors.As(err, &responseErr) {
+		return err
+	}
+
+	if responseErr.Response == nil {
+		return err
+	}
+
+	status := responseErr.Response.StatusCode
+	if status != http.StatusUnauthorized && status != http.StatusForbidden {
+		return err
+	}
+
+	message := strings.ToLower(responseErr.Message)
+	if strings.Contains(message, "resource not accessible by integration") ||
+		strings.Contains(message, "requires authentication") ||
+		strings.Contains(message, "personal access token") {
+		return fmt.Errorf("billing usage endpoint is not accessible with the current integration token; ensure this integration is installed on an organization with the required billing API access")
+	}
+
+	return err
 }
 
 func (c *GetWorkflowUsage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
