@@ -90,7 +90,7 @@ function createIncidentSpecs(node: NodeInfo): ComponentBaseSpec[] {
     impactOverride?: string;
     scheduledFor?: string;
     scheduledUntil?: string;
-    componentIds?: string[];
+    components?: Array<{ componentId?: string; status?: string }>;
   };
   const nodeMetadata = node.metadata as StatuspageNodeMetadata | undefined;
   const values: ComponentBaseSpec["values"] = [];
@@ -129,11 +129,11 @@ function createIncidentSpecs(node: NodeInfo): ComponentBaseSpec[] {
       ],
     });
   }
-  if (configuration?.componentIds && configuration.componentIds.length > 0) {
+  if (configuration?.components && configuration.components.length > 0) {
     const componentLabel =
       nodeMetadata?.componentNames && nodeMetadata.componentNames.length > 0
         ? nodeMetadata.componentNames.join(", ")
-        : `${configuration.componentIds.length} selected`;
+        : `${configuration.components.length} component(s)`;
     values.push({
       badges: [
         { label: "Components:", bgColor: "bg-gray-100", textColor: "text-gray-700" },

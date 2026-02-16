@@ -110,12 +110,13 @@ func Test__UpdateIncident__Setup(t *testing.T) {
 		}
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"page":            "kctbh9vrtdwd",
-				"incident":        "p31zjtct2jer",
-				"incidentType":    "realtime",
-				"statusRealtime":  "resolved",
-				"componentIds":    []string{"comp1"},
-				"componentStatus": "operational",
+				"page":           "kctbh9vrtdwd",
+				"incident":       "p31zjtct2jer",
+				"incidentType":   "realtime",
+				"statusRealtime": "resolved",
+				"components": []any{
+					map[string]any{"componentId": "comp1", "status": "operational"},
+				},
 			},
 			Integration: integrationCtx,
 			Metadata:    &contexts.MetadataContext{},

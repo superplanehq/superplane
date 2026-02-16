@@ -25,8 +25,10 @@ type CreateIncidentSpec struct {
 	StatusRealtime          *string  `json:"statusRealtime,omitempty"`
 	StatusScheduled         *string  `json:"statusScheduled,omitempty"`
 	ImpactOverride          *string  `json:"impactOverride,omitempty"`
-	ComponentIDs            []string `json:"componentIds"`
-	ComponentStatus         string   `json:"componentStatus"`
+	Components []struct {
+		ComponentID string `json:"componentId"`
+		Status     string `json:"status"`
+	} `json:"components"`
 	ScheduledFor            *string  `json:"scheduledFor,omitempty"`
 	ScheduledUntil          *string  `json:"scheduledUntil,omitempty"`
 	ScheduledTimezone       *string  `json:"scheduledTimezone,omitempty"`
@@ -81,8 +83,7 @@ func (c *CreateIncident) Documentation() string {
 - **Body** (optional): Initial message shown as the first incident update
 - **Status** (realtime): investigating, identified, monitoring, or resolved
 - **Impact override** (realtime): none, minor, major, or critical
-- **Components** (optional): Select one or more components to associate with the incident
-- **Component status** (optional): Status to set for all selected components (e.g. degraded_performance, under_maintenance)
+- **Components** (optional): List of components and their status. Each item has Component ID (supports expressions) and Status (operational, degraded_performance, partial_outage, major_outage, under_maintenance)
 - **Scheduled For / Until** (scheduled): Start and end time for scheduled maintenance (ISO 8601, e.g. 2026-02-15T02:00)
 - **Scheduled timezone** (scheduled): Timezone for the scheduled times (default UTC). Output is converted to UTC for the API.
 - **Scheduled options** (scheduled): Remind prior, auto in-progress, auto completed
@@ -223,35 +224,44 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "componentIds",
+			Name:        "components",
 			Label:       "Components",
-			Type:        configuration.FieldTypeIntegrationResource,
+			Type:        configuration.FieldTypeList,
 			Required:    false,
-			Description: "Components to associate with this incident",
-			Placeholder: "Select components",
+			Description: "Components to associate with this incident and their status. Component ID supports expressions.",
 			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type:  ResourceTypeComponent,
-					Multi: true,
-					Parameters: []configuration.ParameterRef{
-						{
-							Name:      "page_id",
-							ValueFrom: &configuration.ParameterValueFrom{Field: "page"},
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Component",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:        "componentId",
+								Label:       "Component ID",
+								Type:        configuration.FieldTypeString,
+								Required:    true,
+								Placeholder: "e.g. 8kbf7d35c070 or {{ $['X'].data.id }}",
+							},
+							{
+								Name:     "status",
+								Label:    "Status",
+								Type:     configuration.FieldTypeSelect,
+								Required: false,
+								Default:  "degraded_performance",
+								TypeOptions: &configuration.TypeOptions{
+									Select: &configuration.SelectTypeOptions{
+										Options: []configuration.FieldOption{
+											{Label: "Operational", Value: "operational"},
+											{Label: "Degraded performance", Value: "degraded_performance"},
+											{Label: "Partial outage", Value: "partial_outage"},
+											{Label: "Major outage", Value: "major_outage"},
+											{Label: "Under maintenance", Value: "under_maintenance"},
+										},
+									},
+								},
+							},
 						},
 					},
-				},
-			},
-		},
-		{
-			Name:        "componentStatus",
-			Label:       "Component status",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
-			Default:     "degraded_performance",
-			Description: "Status to set for all selected components (supports expressions)",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: ResourceTypeComponentStatus,
 				},
 			},
 		},
@@ -403,7 +413,11 @@ func (c *CreateIncident) Setup(ctx core.SetupContext) error {
 	}
 	componentIDs := extractComponentIDs(configMap)
 	if len(componentIDs) == 0 {
-		componentIDs = spec.ComponentIDs
+		for _, item := range spec.Components {
+			if item.ComponentID != "" {
+				componentIDs = append(componentIDs, item.ComponentID)
+			}
+		}
 	}
 	if spec.Page != "" && !strings.Contains(spec.Page, "{{") && ctx.HTTP != nil {
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -451,13 +465,34 @@ func (c *CreateIncident) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %w", err)
 	}
 
-	components := make(map[string]string)
-	componentStatus := spec.ComponentStatus
-	if componentStatus == "" {
-		componentStatus = "degraded_performance"
+	nameOrIDToStatus := make(map[string]string)
+	rawIDs := make([]string, 0, len(spec.Components))
+	for _, item := range spec.Components {
+		if item.ComponentID == "" {
+			continue
+		}
+		status := item.Status
+		if status == "" {
+			status = "degraded_performance"
+		}
+		nameOrIDToStatus[item.ComponentID] = status
+		rawIDs = append(rawIDs, item.ComponentID)
 	}
-	for _, id := range spec.ComponentIDs {
-		components[id] = componentStatus
+
+	var componentIDs []string
+	var components map[string]string
+	if len(nameOrIDToStatus) > 0 && !containsExpression(rawIDs) {
+		var errResolve error
+		componentIDs, components, errResolve = resolveComponentNameOrIDs(client, spec.Page, nameOrIDToStatus)
+		if errResolve != nil {
+			return fmt.Errorf("failed to resolve component IDs: %w", errResolve)
+		}
+	} else {
+		components = nameOrIDToStatus
+		componentIDs = make([]string, 0, len(components))
+		for id := range components {
+			componentIDs = append(componentIDs, id)
+		}
 	}
 
 	deliverNotifications := spec.DeliverNotifications
@@ -469,7 +504,7 @@ func (c *CreateIncident) Execute(ctx core.ExecutionContext) error {
 	req := CreateIncidentRequest{
 		Name:                 spec.Name,
 		Body:                 spec.Body,
-		ComponentIDs:         spec.ComponentIDs,
+		ComponentIDs:         componentIDs,
 		Components:           components,
 		Realtime:             spec.IncidentType == "realtime",
 		DeliverNotifications: deliverNotifications,

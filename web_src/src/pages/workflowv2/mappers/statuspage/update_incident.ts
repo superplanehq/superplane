@@ -89,7 +89,7 @@ function updateIncidentSpecs(node: NodeInfo): ComponentBaseSpec[] {
     incidentType?: string;
     body?: string;
     impactOverride?: string;
-    componentIds?: string[];
+    components?: Array<{ componentId?: string; status?: string }>;
   };
   const values: ComponentBaseSpec["values"] = [];
 
@@ -118,12 +118,12 @@ function updateIncidentSpecs(node: NodeInfo): ComponentBaseSpec[] {
       ],
     });
   }
-  if (configuration?.componentIds && configuration.componentIds.length > 0) {
+  if (configuration?.components && configuration.components.length > 0) {
     const nodeMetadata = node.metadata as StatuspageNodeMetadata | undefined;
     const componentLabel =
       nodeMetadata?.componentNames && nodeMetadata.componentNames.length > 0
         ? nodeMetadata.componentNames.join(", ")
-        : `${configuration.componentIds.length} selected`;
+        : `${configuration.components.length} component(s)`;
     values.push({
       badges: [
         { label: "Components:", bgColor: "bg-gray-100", textColor: "text-gray-700" },

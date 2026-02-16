@@ -112,8 +112,8 @@ func (c *Client) ListComponents(pageID string) ([]Component, error) {
 }
 
 // CreateIncidentRequest holds the payload for creating an incident.
-// Realtime: name, body, status, impactOverride, componentIds + componentStatus, deliverNotifications.
-// Scheduled: name, body, scheduledFor, scheduledUntil, scheduledRemindPrior, scheduledAutoInProgress, scheduledAutoCompleted, componentIds + componentStatus, deliverNotifications.
+// Realtime: name, body, status, impactOverride, components (list of { componentId, status }), deliverNotifications.
+// Scheduled: name, body, scheduledFor, scheduledUntil, scheduledRemindPrior, scheduledAutoInProgress, scheduledAutoCompleted, components, deliverNotifications.
 type CreateIncidentRequest struct {
 	Name                    string            `json:"name"`
 	Body                    string            `json:"body"`

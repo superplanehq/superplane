@@ -1,6 +1,7 @@
 package statuspage
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -160,6 +161,26 @@ func Test__CreateIncident__Setup(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "scheduledFor must be before scheduledUntil")
 	})
+
+	t.Run("valid configuration with components", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "test-key"},
+		}
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"page":         "kctbh9vrtdwd",
+				"incidentType": "realtime",
+				"name":         "Test Incident",
+				"components": []any{
+					map[string]any{"componentId": "comp1", "status": "degraded_performance"},
+					map[string]any{"componentId": "comp2", "status": "operational"},
+				},
+			},
+			Integration: integrationCtx,
+			Metadata:    &contexts.MetadataContext{},
+		})
+		require.NoError(t, err)
+	})
 }
 
 func Test__CreateIncident__Execute(t *testing.T) {
@@ -307,6 +328,99 @@ func Test__CreateIncident__Execute(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "sched456", data["id"])
 		assert.Equal(t, "in_progress", data["status"])
+	})
+
+	t.Run("success with components sends per-component status", func(t *testing.T) {
+		componentsJSON := `[{"id":"comp1","name":"comp1","status":"operational"},{"id":"comp2","name":"comp2","status":"operational"}]`
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(componentsJSON))},
+				{
+					StatusCode: http.StatusCreated,
+					Body:       io.NopCloser(strings.NewReader(sampleIncidentJSON)),
+				},
+			},
+		}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "test-key"},
+		}
+		executionState := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"page":         "kctbh9vrtdwd",
+				"incidentType": "realtime",
+				"name":         "Test with components",
+				"components": []any{
+					map[string]any{"componentId": "comp1", "status": "degraded_performance"},
+					map[string]any{"componentId": "comp2", "status": "major_outage"},
+				},
+			},
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
+			ExecutionState: executionState,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 2) // ListComponents, then CreateIncident
+		reqBody, readErr := io.ReadAll(httpContext.Requests[1].Body)
+		require.NoError(t, readErr)
+
+		var payload map[string]any
+		require.NoError(t, json.Unmarshal(reqBody, &payload))
+		incident, ok := payload["incident"].(map[string]any)
+		require.True(t, ok)
+		components, ok := incident["components"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "degraded_performance", components["comp1"])
+		assert.Equal(t, "major_outage", components["comp2"])
+	})
+
+	t.Run("resolves component names to IDs before API call", func(t *testing.T) {
+		// User enters "Management Portal" (name) but API expects ID "mgmt123"
+		componentsJSON := `[{"id":"mgmt123","name":"Management Portal","status":"operational"},{"id":"api456","name":"API","status":"operational"}]`
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(componentsJSON))},
+				{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(sampleIncidentJSON))},
+			},
+		}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "test-key"},
+		}
+		executionState := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"page":         "kctbh9vrtdwd",
+				"incidentType": "realtime",
+				"name":         "Test with component names",
+				"components": []any{
+					map[string]any{"componentId": "Management Portal", "status": "partial_outage"},
+					map[string]any{"componentId": "API", "status": "degraded_performance"},
+				},
+			},
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
+			ExecutionState: executionState,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 2)
+		reqBody, readErr := io.ReadAll(httpContext.Requests[1].Body)
+		require.NoError(t, readErr)
+		var payload map[string]any
+		require.NoError(t, json.Unmarshal(reqBody, &payload))
+		incident, ok := payload["incident"].(map[string]any)
+		require.True(t, ok)
+		componentIDs, ok := incident["component_ids"].([]any)
+		require.True(t, ok)
+		assert.Contains(t, componentIDs, "mgmt123")
+		assert.Contains(t, componentIDs, "api456")
+		components, ok := incident["components"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "partial_outage", components["mgmt123"])
+		assert.Equal(t, "degraded_performance", components["api456"])
 	})
 
 	t.Run("API error returns error and no emit", func(t *testing.T) {

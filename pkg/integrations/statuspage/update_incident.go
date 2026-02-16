@@ -33,8 +33,10 @@ type UpdateIncidentSpec struct {
 	StatusScheduled      string   `json:"statusScheduled"`
 	Body                 string   `json:"body"`
 	ImpactOverride       string   `json:"impactOverride"`
-	ComponentIDs         []string `json:"componentIds"`
-	ComponentStatus      string   `json:"componentStatus"`
+	Components []struct {
+		ComponentID string `json:"componentId"`
+		Status     string `json:"status"`
+	} `json:"components"`
 	DeliverNotifications *bool    `json:"deliverNotifications,omitempty"`
 }
 
@@ -67,8 +69,7 @@ func (c *UpdateIncident) Documentation() string {
 - **Status** (optional): New status. Options depend on incident type: realtime (investigating, identified, monitoring, resolved) or scheduled (scheduled, in progress, verifying, completed)
 - **Body** (optional): Update message shown as the latest incident update
 - **Impact override** (optional, realtime only): Override displayed severity (none, maintenance, minor, major, critical)
-- **Components** (optional): Components to associate with this update
-- **Component status** (optional): Status to set for selected components
+- **Components** (optional): List of components and their status. Each item has Component ID (supports expressions) and Status (operational, degraded_performance, partial_outage, major_outage, under_maintenance)
 - **Deliver notifications** (optional): Whether to send notifications for this update (default: true)
 
 At least one of Status, Body, Impact override, or Components must be provided.
@@ -208,36 +209,45 @@ func (c *UpdateIncident) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "componentIds",
+			Name:        "components",
 			Label:       "Components",
-			Type:        configuration.FieldTypeIntegrationResource,
+			Type:        configuration.FieldTypeList,
 			Required:    false,
 			Togglable:   true,
-			Description: "Components to update in this incident. Requires a fixed page selection.",
-			Placeholder: "Select components",
+			Description: "Components to update in this incident and their status. Component ID supports expressions.",
 			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type:  ResourceTypeComponent,
-					Multi: true,
-					Parameters: []configuration.ParameterRef{
-						{
-							Name:      "page_id",
-							ValueFrom: &configuration.ParameterValueFrom{Field: "page"},
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Component",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:        "componentId",
+								Label:       "Component ID",
+								Type:        configuration.FieldTypeString,
+								Required:    true,
+								Placeholder: "e.g. 8kbf7d35c070 or {{ $['X'].data.id }}",
+							},
+							{
+								Name:     "status",
+								Label:    "Status",
+								Type:     configuration.FieldTypeSelect,
+								Required: false,
+								Default:  "operational",
+								TypeOptions: &configuration.TypeOptions{
+									Select: &configuration.SelectTypeOptions{
+										Options: []configuration.FieldOption{
+											{Label: "Operational", Value: "operational"},
+											{Label: "Degraded performance", Value: "degraded_performance"},
+											{Label: "Partial outage", Value: "partial_outage"},
+											{Label: "Major outage", Value: "major_outage"},
+											{Label: "Under maintenance", Value: "under_maintenance"},
+										},
+									},
+								},
+							},
 						},
 					},
-				},
-			},
-		},
-		{
-			Name:        "componentStatus",
-			Label:       "Component status",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
-			Togglable:   true,
-			Description: "Status to set for all selected components (supports expressions)",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: ResourceTypeComponentStatus,
 				},
 			},
 		},
@@ -276,7 +286,7 @@ func (c *UpdateIncident) Setup(ctx core.SetupContext) error {
 	if effectiveImpact == "__none__" {
 		effectiveImpact = ""
 	}
-	hasUpdate := spec.StatusRealtime != "" || spec.StatusScheduled != "" || spec.Body != "" || effectiveImpact != "" || len(spec.ComponentIDs) > 0
+	hasUpdate := spec.StatusRealtime != "" || spec.StatusScheduled != "" || spec.Body != "" || effectiveImpact != "" || len(spec.Components) > 0
 	if !hasUpdate {
 		return errors.New("at least one of status, body, impact override, or components must be provided")
 	}
@@ -290,7 +300,11 @@ func (c *UpdateIncident) Setup(ctx core.SetupContext) error {
 	}
 	componentIDs := extractComponentIDs(configMap)
 	if len(componentIDs) == 0 {
-		componentIDs = spec.ComponentIDs
+		for _, item := range spec.Components {
+			if item.ComponentID != "" {
+				componentIDs = append(componentIDs, item.ComponentID)
+			}
+		}
 	}
 	if spec.Page != "" && !strings.Contains(spec.Page, "{{") && ctx.HTTP != nil {
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -372,12 +386,33 @@ func (c *UpdateIncident) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
-	components := make(map[string]string)
-	for _, id := range spec.ComponentIDs {
-		if spec.ComponentStatus != "" {
-			components[id] = spec.ComponentStatus
-		} else {
-			components[id] = "operational"
+	nameOrIDToStatus := make(map[string]string)
+	rawIDs := make([]string, 0, len(spec.Components))
+	for _, item := range spec.Components {
+		if item.ComponentID == "" {
+			continue
+		}
+		status := item.Status
+		if status == "" {
+			status = "operational"
+		}
+		nameOrIDToStatus[item.ComponentID] = status
+		rawIDs = append(rawIDs, item.ComponentID)
+	}
+
+	var componentIDs []string
+	var components map[string]string
+	if len(nameOrIDToStatus) > 0 && !containsExpression(rawIDs) {
+		var errResolve error
+		componentIDs, components, errResolve = resolveComponentNameOrIDs(client, spec.Page, nameOrIDToStatus)
+		if errResolve != nil {
+			return fmt.Errorf("failed to resolve component IDs: %w", errResolve)
+		}
+	} else {
+		components = nameOrIDToStatus
+		componentIDs = make([]string, 0, len(components))
+		for id := range components {
+			componentIDs = append(componentIDs, id)
 		}
 	}
 
@@ -385,7 +420,7 @@ func (c *UpdateIncident) Execute(ctx core.ExecutionContext) error {
 		Status:               effectiveStatus,
 		Body:                 spec.Body,
 		ImpactOverride:       impactOverride,
-		ComponentIDs:         spec.ComponentIDs,
+		ComponentIDs:         componentIDs,
 		Components:           components,
 		DeliverNotifications: spec.DeliverNotifications,
 	}
