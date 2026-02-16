@@ -230,6 +230,7 @@ type MultiSelectTypeOptions struct {
 type ListTypeOptions struct {
 	ItemDefinition *ListItemDefinition `json:"item_definition"`
 	ItemLabel      string              `json:"item_label,omitempty"`
+	MaxItems       *int                `json:"max_items,omitempty"`
 }
 
 /*
