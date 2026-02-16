@@ -59,11 +59,11 @@ func Test__UpdateIncident__Setup(t *testing.T) {
 		}
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"page":            "kctbh9vrtdwd",
-				"incident":        "p31zjtct2jer",
-				"incidentType":    "realtime",
-				"statusRealtime":  "resolved",
-				"body":            "Issue resolved.",
+				"page":           "kctbh9vrtdwd",
+				"incident":       "p31zjtct2jer",
+				"incidentType":   "realtime",
+				"statusRealtime": "resolved",
+				"body":           "Issue resolved.",
 			},
 			Integration: integrationCtx,
 			Metadata:    &contexts.MetadataContext{},
@@ -77,7 +77,7 @@ func Test__UpdateIncident__Setup(t *testing.T) {
 		}
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"page":             "kctbh9vrtdwd",
+				"page":            "kctbh9vrtdwd",
 				"incident":        "p31zjtct2jer",
 				"incidentType":    "scheduled",
 				"statusScheduled": "in_progress",
@@ -180,11 +180,11 @@ func Test__UpdateIncident__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"page":            "kctbh9vrtdwd",
-				"incident":        "p31zjtct2jer",
-				"incidentType":    "realtime",
-				"statusRealtime":  "resolved",
-				"body":            "All systems operational.",
+				"page":           "kctbh9vrtdwd",
+				"incident":       "p31zjtct2jer",
+				"incidentType":   "realtime",
+				"statusRealtime": "resolved",
+				"body":           "All systems operational.",
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -302,10 +302,10 @@ func Test__UpdateIncident__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"page":             "kctbh9vrtdwd",
-				"incident":         "p31zjtct2jer",
-				"incidentType":     "scheduled",
-				"statusScheduled":  "in_progress",
+				"page":            "kctbh9vrtdwd",
+				"incident":        "p31zjtct2jer",
+				"incidentType":    "scheduled",
+				"statusScheduled": "in_progress",
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -333,10 +333,10 @@ func Test__UpdateIncident__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"page":            "kctbh9vrtdwd",
-				"incident":        "sched123",
-				"incidentType":    "realtime",
-				"statusRealtime":  "resolved",
+				"page":           "kctbh9vrtdwd",
+				"incident":       "sched123",
+				"incidentType":   "realtime",
+				"statusRealtime": "resolved",
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -378,10 +378,10 @@ func Test__UpdateIncident__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"page":             "kctbh9vrtdwd",
-				"incident":         "sched123",
-				"incidentType":     "scheduled",
-				"statusScheduled":  "completed",
+				"page":            "kctbh9vrtdwd",
+				"incident":        "sched123",
+				"incidentType":    "scheduled",
+				"statusScheduled": "completed",
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,

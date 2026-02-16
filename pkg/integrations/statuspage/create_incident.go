@@ -176,19 +176,15 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			Description: "First incident update message (optional)",
 		},
 		{
-			Name:     "statusRealtime",
-			Label:    "Status",
-			Type:     configuration.FieldTypeSelect,
-			Required: false,
-			Default:  "investigating",
+			Name:        "statusRealtime",
+			Label:       "Status",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Default:     "investigating",
+			Description: "Incident status (supports expressions)",
 			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Investigating", Value: "investigating"},
-						{Label: "Identified", Value: "identified"},
-						{Label: "Monitoring", Value: "monitoring"},
-						{Label: "Resolved", Value: "resolved"},
-					},
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeIncidentStatusRealtime,
 				},
 			},
 			VisibilityConditions: []configuration.VisibilityCondition{
@@ -196,19 +192,15 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "statusScheduled",
-			Label:    "Status",
-			Type:     configuration.FieldTypeSelect,
-			Required: false,
-			Default:  "scheduled",
+			Name:        "statusScheduled",
+			Label:       "Status",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Default:     "scheduled",
+			Description: "Incident status (supports expressions)",
 			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Scheduled", Value: "scheduled"},
-						{Label: "In progress", Value: "in_progress"},
-						{Label: "Verifying", Value: "verifying"},
-						{Label: "Completed", Value: "completed"},
-					},
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeIncidentStatusScheduled,
 				},
 			},
 			VisibilityConditions: []configuration.VisibilityCondition{
@@ -216,18 +208,14 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "impactOverride",
-			Label:    "Impact override",
-			Type:     configuration.FieldTypeSelect,
-			Required: false,
+			Name:        "impactOverride",
+			Label:       "Impact override",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Override displayed severity (supports expressions)",
 			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "None", Value: "none"},
-						{Label: "Minor", Value: "minor"},
-						{Label: "Major", Value: "major"},
-						{Label: "Critical", Value: "critical"},
-					},
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeImpact,
 				},
 			},
 			VisibilityConditions: []configuration.VisibilityCondition{
@@ -257,19 +245,13 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 		{
 			Name:        "componentStatus",
 			Label:       "Component status",
-			Type:        configuration.FieldTypeSelect,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Default:     "degraded_performance",
-			Description: "Status to set for all selected components",
+			Description: "Status to set for all selected components (supports expressions)",
 			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Operational", Value: "operational"},
-						{Label: "Degraded performance", Value: "degraded_performance"},
-						{Label: "Partial outage", Value: "partial_outage"},
-						{Label: "Major outage", Value: "major_outage"},
-						{Label: "Under maintenance", Value: "under_maintenance"},
-					},
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeComponentStatus,
 				},
 			},
 		},

@@ -125,3 +125,92 @@ func Test__ListResources__Unknown_type(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, resources)
 }
+
+func Test__ListResources__Impact(t *testing.T) {
+	s := &Statuspage{}
+	ctx := core.ListResourcesContext{Parameters: map[string]string{}}
+
+	resources, err := s.ListResources(ResourceTypeImpact, ctx)
+	require.NoError(t, err)
+	require.Len(t, resources, 4)
+	assert.Equal(t, ResourceTypeImpact, resources[0].Type)
+	assert.Equal(t, "None", resources[0].Name)
+	assert.Equal(t, "none", resources[0].ID)
+	assert.Equal(t, "Minor", resources[1].Name)
+	assert.Equal(t, "minor", resources[1].ID)
+	assert.Equal(t, "Major", resources[2].Name)
+	assert.Equal(t, "major", resources[2].ID)
+	assert.Equal(t, "Critical", resources[3].Name)
+	assert.Equal(t, "critical", resources[3].ID)
+}
+
+func Test__ListResources__ImpactUpdate(t *testing.T) {
+	s := &Statuspage{}
+	ctx := core.ListResourcesContext{Parameters: map[string]string{}}
+
+	resources, err := s.ListResources(ResourceTypeImpactUpdate, ctx)
+	require.NoError(t, err)
+	require.Len(t, resources, 6)
+	assert.Equal(t, "Don't override", resources[0].Name)
+	assert.Equal(t, "__none__", resources[0].ID)
+	assert.Equal(t, "None", resources[1].Name)
+	assert.Equal(t, "none", resources[1].ID)
+	assert.Equal(t, "Maintenance", resources[2].Name)
+	assert.Equal(t, "maintenance", resources[2].ID)
+	assert.Equal(t, "Minor", resources[3].Name)
+	assert.Equal(t, "Critical", resources[5].Name)
+	assert.Equal(t, "critical", resources[5].ID)
+}
+
+func Test__ListResources__IncidentStatusRealtime(t *testing.T) {
+	s := &Statuspage{}
+	ctx := core.ListResourcesContext{Parameters: map[string]string{}}
+
+	resources, err := s.ListResources(ResourceTypeIncidentStatusRealtime, ctx)
+	require.NoError(t, err)
+	require.Len(t, resources, 4)
+	assert.Equal(t, "Investigating", resources[0].Name)
+	assert.Equal(t, "investigating", resources[0].ID)
+	assert.Equal(t, "Identified", resources[1].Name)
+	assert.Equal(t, "identified", resources[1].ID)
+	assert.Equal(t, "Monitoring", resources[2].Name)
+	assert.Equal(t, "monitoring", resources[2].ID)
+	assert.Equal(t, "Resolved", resources[3].Name)
+	assert.Equal(t, "resolved", resources[3].ID)
+}
+
+func Test__ListResources__IncidentStatusScheduled(t *testing.T) {
+	s := &Statuspage{}
+	ctx := core.ListResourcesContext{Parameters: map[string]string{}}
+
+	resources, err := s.ListResources(ResourceTypeIncidentStatusScheduled, ctx)
+	require.NoError(t, err)
+	require.Len(t, resources, 4)
+	assert.Equal(t, "Scheduled", resources[0].Name)
+	assert.Equal(t, "scheduled", resources[0].ID)
+	assert.Equal(t, "In progress", resources[1].Name)
+	assert.Equal(t, "in_progress", resources[1].ID)
+	assert.Equal(t, "Verifying", resources[2].Name)
+	assert.Equal(t, "verifying", resources[2].ID)
+	assert.Equal(t, "Completed", resources[3].Name)
+	assert.Equal(t, "completed", resources[3].ID)
+}
+
+func Test__ListResources__ComponentStatus(t *testing.T) {
+	s := &Statuspage{}
+	ctx := core.ListResourcesContext{Parameters: map[string]string{}}
+
+	resources, err := s.ListResources(ResourceTypeComponentStatus, ctx)
+	require.NoError(t, err)
+	require.Len(t, resources, 5)
+	assert.Equal(t, "Operational", resources[0].Name)
+	assert.Equal(t, "operational", resources[0].ID)
+	assert.Equal(t, "Degraded performance", resources[1].Name)
+	assert.Equal(t, "degraded_performance", resources[1].ID)
+	assert.Equal(t, "Partial outage", resources[2].Name)
+	assert.Equal(t, "partial_outage", resources[2].ID)
+	assert.Equal(t, "Major outage", resources[3].Name)
+	assert.Equal(t, "major_outage", resources[3].ID)
+	assert.Equal(t, "Under maintenance", resources[4].Name)
+	assert.Equal(t, "under_maintenance", resources[4].ID)
+}

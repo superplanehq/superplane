@@ -181,11 +181,11 @@ func Test__CreateIncident__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"page":            "kctbh9vrtdwd",
-				"incidentType":    "realtime",
-				"name":            "Database Connection Issues",
-				"body":            "We are investigating.",
-				"statusRealtime":  "investigating",
+				"page":           "kctbh9vrtdwd",
+				"incidentType":   "realtime",
+				"name":           "Database Connection Issues",
+				"body":           "We are investigating.",
+				"statusRealtime": "investigating",
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
