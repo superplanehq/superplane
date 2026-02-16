@@ -430,6 +430,7 @@ function CategorySection({
       cloudwatch: awsCloudwatchIcon,
       lambda: awsLambdaIcon,
       ecr: awsEcrIcon,
+      ecs: awsEcsIcon,
       sns: awsSnsIcon,
     },
   };
@@ -511,6 +512,7 @@ function CategorySection({
               cloudwatch: awsCloudwatchIcon,
               ecr: awsEcrIcon,
               lambda: awsLambdaIcon,
+              ecs: awsEcsIcon,
               sns: awsSnsIcon,
             },
           };
