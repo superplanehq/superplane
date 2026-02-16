@@ -1,0 +1,15 @@
+{
+  "type": "linear.issue",
+  "data": {
+    "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+    "identifier": "ENG-42",
+    "title": "Example issue",
+    "description": "Issue description",
+    "priority": 2,
+    "url": "https://linear.app/company/issue/ENG-42/example-issue",
+    "createdAt": "2026-01-19T12:00:00.000Z",
+    "team": { "id": "72b2a2dc-6f4f-4423-9d34-24b5bd10634a" },
+    "state": { "id": "state-1" }
+  },
+  "timestamp": "2026-01-19T12:00:00Z"
+}
