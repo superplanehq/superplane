@@ -19,6 +19,7 @@ const (
 	runTaskEventSource                  = "aws.ecs"
 	runTaskEventDetailType              = "ECS Task State Change"
 	runTaskExecutionKVTaskARN           = "aws_ecs_task_arn"
+	runTaskMaxCount                     = 10
 	runTaskCheckRuleAvailabilityAction  = "checkRuleAvailability"
 	runTaskTimeoutAction                = "timeout"
 	runTaskTimeoutCheckInterval         = 5 * time.Minute
@@ -195,6 +196,7 @@ func (c *RunTask) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Number: &configuration.NumberTypeOptions{
 					Min: func() *int { min := 1; return &min }(),
+					Max: func() *int { max := runTaskMaxCount; return &max }(),
 				},
 			},
 		},
@@ -534,6 +536,10 @@ func (c *RunTask) decodeAndValidateConfiguration(rawConfiguration any) (RunTaskC
 		return RunTaskConfiguration{}, fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	if !hasConfigKey(rawConfiguration, "count") {
+		config.Count = 1
+	}
+
 	config = c.normalizeConfig(config)
 	if config.Region == "" {
 		return RunTaskConfiguration{}, fmt.Errorf("region is required")
@@ -544,8 +550,11 @@ func (c *RunTask) decodeAndValidateConfiguration(rawConfiguration any) (RunTaskC
 	if config.TaskDefinition == "" {
 		return RunTaskConfiguration{}, fmt.Errorf("task definition is required")
 	}
-	if config.Count < 0 {
-		return RunTaskConfiguration{}, fmt.Errorf("count cannot be negative")
+	if config.Count < 1 {
+		return RunTaskConfiguration{}, fmt.Errorf("count must be at least 1")
+	}
+	if config.Count > runTaskMaxCount {
+		return RunTaskConfiguration{}, fmt.Errorf("count cannot exceed %d", runTaskMaxCount)
 	}
 	if config.LaunchType != "" && !slices.Contains(allowedLaunchTypes, config.LaunchType) {
 		return RunTaskConfiguration{}, fmt.Errorf("invalid launch type: %s", config.LaunchType)
@@ -569,6 +578,16 @@ func (c *RunTask) normalizeConfig(config RunTaskConfiguration) RunTaskConfigurat
 	config.StartedBy = strings.TrimSpace(config.StartedBy)
 	config.PlatformVersion = strings.TrimSpace(config.PlatformVersion)
 	return config
+}
+
+func hasConfigKey(configuration any, key string) bool {
+	configurationMap, ok := configuration.(map[string]any)
+	if !ok {
+		return false
+	}
+
+	_, exists := configurationMap[key]
+	return exists
 }
 
 func (c *RunTask) provisionRule(integration core.IntegrationContext, requests core.RequestContext, region string) error {

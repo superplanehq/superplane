@@ -45,6 +45,38 @@ func Test__RunTask__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "timeout seconds cannot be negative")
 	})
 
+	t.Run("count is zero -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"region":         "us-east-1",
+				"cluster":        "demo",
+				"taskDefinition": "worker:1",
+				"count":          0,
+			},
+			Metadata:    &contexts.MetadataContext{},
+			Requests:    &contexts.RequestContext{},
+			Integration: setupIntegrationContext(nil),
+		})
+
+		require.ErrorContains(t, err, "count must be at least 1")
+	})
+
+	t.Run("count is above api limit -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"region":         "us-east-1",
+				"cluster":        "demo",
+				"taskDefinition": "worker:1",
+				"count":          11,
+			},
+			Metadata:    &contexts.MetadataContext{},
+			Requests:    &contexts.RequestContext{},
+			Integration: setupIntegrationContext(nil),
+		})
+
+		require.ErrorContains(t, err, "count cannot exceed 10")
+	})
+
 	t.Run("rule missing -> schedules rule provisioning", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 		requests := &contexts.RequestContext{}

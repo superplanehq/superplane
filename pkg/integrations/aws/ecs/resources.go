@@ -7,6 +7,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
 )
 
+const describeTasksMaxBatchSize = 100
+
 func ListClusters(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
 	creds, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {
@@ -129,16 +131,7 @@ func ListTasks(ctx core.ListResourcesContext, resourceType string) ([]core.Integ
 		return []core.IntegrationResource{}, nil
 	}
 
-	taskResourceNames := make(map[string]string, len(taskArns))
-	describeResponse, err := client.DescribeTasks(cluster, taskArns)
-	if err == nil {
-		for _, task := range describeResponse.Tasks {
-			if task.TaskArn == "" {
-				continue
-			}
-			taskResourceNames[task.TaskArn] = formatTaskResourceName(task)
-		}
-	}
+	taskResourceNames := listTaskResourceNamesByDescribe(cluster, taskArns, client.DescribeTasks)
 
 	resources := make([]core.IntegrationResource, 0, len(taskArns))
 	for _, arn := range taskArns {
@@ -155,6 +148,53 @@ func ListTasks(ctx core.ListResourcesContext, resourceType string) ([]core.Integ
 	}
 
 	return resources, nil
+}
+
+func listTaskResourceNamesByDescribe(
+	cluster string,
+	taskArns []string,
+	describeTasks func(string, []string) (*DescribeTasksResponse, error),
+) map[string]string {
+	taskResourceNames := make(map[string]string, len(taskArns))
+
+	for _, batch := range batchTaskARNs(taskArns, describeTasksMaxBatchSize) {
+		describeResponse, err := describeTasks(cluster, batch)
+		if err != nil {
+			continue
+		}
+
+		for _, task := range describeResponse.Tasks {
+			if task.TaskArn == "" {
+				continue
+			}
+
+			taskResourceNames[task.TaskArn] = formatTaskResourceName(task)
+		}
+	}
+
+	return taskResourceNames
+}
+
+func batchTaskARNs(taskArns []string, batchSize int) [][]string {
+	if len(taskArns) == 0 {
+		return [][]string{}
+	}
+
+	if batchSize <= 0 {
+		return [][]string{taskArns}
+	}
+
+	batches := make([][]string, 0, (len(taskArns)+batchSize-1)/batchSize)
+	for start := 0; start < len(taskArns); start += batchSize {
+		end := start + batchSize
+		if end > len(taskArns) {
+			end = len(taskArns)
+		}
+
+		batches = append(batches, taskArns[start:end])
+	}
+
+	return batches
 }
 
 func formatTaskResourceName(task Task) string {
