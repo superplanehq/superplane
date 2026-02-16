@@ -38,18 +38,23 @@ func ListGroupUsers(ctx context.Context, domainType, domainID, groupName string,
 
 	roleMetadata := roleMetadataMap[role]
 
-	var users []*pbUsers.User
-	for _, userID := range userIDs {
-		roleAssignment := &pbUsers.UserRoleAssignment{
-			RoleName:        role,
-			RoleDisplayName: roleMetadata.DisplayName,
-			RoleDescription: roleMetadata.Description,
-			DomainType:      actions.DomainTypeToProto(domainType),
-			DomainId:        domainID,
-			AssignedAt:      timestamppb.Now(),
-		}
+	dbUsers, err := models.FindUsersByIDs(userIDs)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to fetch group users")
+	}
 
-		user, err := convertUserToProto(userID, []*pbUsers.UserRoleAssignment{roleAssignment})
+	roleAssignment := &pbUsers.UserRoleAssignment{
+		RoleName:        role,
+		RoleDisplayName: roleMetadata.DisplayName,
+		RoleDescription: roleMetadata.Description,
+		DomainType:      actions.DomainTypeToProto(domainType),
+		DomainId:        domainID,
+		AssignedAt:      timestamppb.Now(),
+	}
+
+	var users []*pbUsers.User
+	for i := range dbUsers {
+		user, err := convertUserToProto(&dbUsers[i], []*pbUsers.UserRoleAssignment{roleAssignment})
 		if err != nil {
 			continue
 		}
