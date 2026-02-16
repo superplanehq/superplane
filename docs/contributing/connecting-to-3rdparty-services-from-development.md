@@ -18,13 +18,28 @@ ngrok config add-authtoken YOUR_AUTH_TOKEN
 
 ### 2. Start ngrok Tunnel
 
-Start an ngrok tunnel pointing to your local SuperPlane instance:
+**Option A – Stable URL (recommended; no redo on restart)**
+
+ngrok’s free plan includes **one static domain** that stays the same across restarts:
+
+1. In the [ngrok dashboard](https://dashboard.ngrok.com/) go to **Cloud Edge → Domains** and claim your free domain (e.g. `yourname.ngrok-free.app`).
+2. Start the tunnel with that domain:
+
+   ```bash
+   ngrok http --domain=yourname.ngrok-free.app 8000
+   ```
+
+3. Set `WEBHOOKS_BASE_URL=https://yourname.ngrok-free.app` once (e.g. in `.env`). After that you can restart app and tunnel without changing URLs or re-saving workflows.
+
+**Option B – Random URL (changes every run)**
+
+If you don’t use a static domain:
 
 ```bash
 ngrok http 8000
 ```
 
-This outputs a public URL like `https://abc123.ngrok-free.app` that forwards to `http://localhost:8000`.
+This outputs a new public URL each time (e.g. `https://abc123.ngrok-free.app`). You must update `WEBHOOKS_BASE_URL`, restart the app, re-save workflows that use webhooks, and update the URL in third-party services (e.g. incident.io) whenever the URL changes.
 
 ### 3. Set WEBHOOKS_BASE_URL
 
