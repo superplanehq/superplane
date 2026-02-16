@@ -28,11 +28,36 @@ This outputs a public URL like `https://abc123.ngrok-free.app` that forwards to 
 
 ### 3. Set WEBHOOKS_BASE_URL
 
-Set the `WEBHOOKS_BASE_URL` environment variable to your ngrok URL when starting SuperPlane:
+Set the `WEBHOOKS_BASE_URL` environment variable to your tunnel’s **HTTPS** URL (no trailing slash). The app uses it when generating webhook URLs so they are reachable by third-party services.
+
+**Option A – Inline when running Make**
 
 ```bash
-make dev.start WEBHOOKS_BASE_URL=https://abc123.ngrok-free.app
+WEBHOOKS_BASE_URL=https://abc123.ngrok-free.app make dev.start
 ```
+
+Or use the target that checks the variable and prints usage if missing:
+
+```bash
+WEBHOOKS_BASE_URL=https://abc123.ngrok-free.app make dev.start.with-webhook-tunnel
+```
+
+**Option B – In a `.env` file (project root)**
+
+```env
+WEBHOOKS_BASE_URL=https://abc123.ngrok-free.app
+```
+
+Then run `make dev.start` as usual. Docker Compose reads `.env` and passes the value into the app container.
+
+**Option C – Export in the shell**
+
+```bash
+export WEBHOOKS_BASE_URL=https://abc123.ngrok-free.app
+make dev.start
+```
+
+After changing `WEBHOOKS_BASE_URL`, restart the app (`make dev.down` then start again) and **re-save any workflow** that uses webhooks so the URL is regenerated with the new base.
 
 ## AWS IAM OIDC (Identity Provider)
 
