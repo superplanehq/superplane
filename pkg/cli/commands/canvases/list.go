@@ -24,23 +24,23 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 		resources = append(resources, models.CanvasResourceFromCanvas(canvas))
 	}
 
-	if ctx.Renderer.IsText() {
-		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
-			_, _ = fmt.Fprintln(writer, "ID\tNAME\tCREATED_AT")
-
-			for _, canvas := range canvases {
-				metadata := canvas.GetMetadata()
-				createdAt := ""
-				if metadata.HasCreatedAt() {
-					createdAt = metadata.GetCreatedAt().Format(time.RFC3339)
-				}
-				_, _ = fmt.Fprintf(writer, "%s\t%s\t%s\n", metadata.GetId(), metadata.GetName(), createdAt)
-			}
-
-			return writer.Flush()
-		})
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(resources)
 	}
 
-	return ctx.Renderer.Render(resources)
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
+		_, _ = fmt.Fprintln(writer, "ID\tNAME\tCREATED_AT")
+
+		for _, canvas := range canvases {
+			metadata := canvas.GetMetadata()
+			createdAt := ""
+			if metadata.HasCreatedAt() {
+				createdAt = metadata.GetCreatedAt().Format(time.RFC3339)
+			}
+			_, _ = fmt.Fprintf(writer, "%s\t%s\t%s\n", metadata.GetId(), metadata.GetName(), createdAt)
+		}
+
+		return writer.Flush()
+	})
 }

@@ -8,21 +8,19 @@ import (
 func NewCommand(options core.BindOptions) *cobra.Command {
 	root := &cobra.Command{
 		Use:   "integrations",
-		Short: "Manage integrations",
+		Short: "Manage connected integrations",
 	}
 
-	var connected bool
 	listCmd := &cobra.Command{
 		Use:   "list",
-		Short: "List integrations",
+		Short: "List connected integrations",
 		Args:  cobra.NoArgs,
 	}
-	listCmd.Flags().BoolVar(&connected, "connected", false, "list connected integrations for the authenticated organization")
-	core.Bind(listCmd, &listCommand{connected: &connected}, options)
+	core.Bind(listCmd, &listCommand{}, options)
 
 	getCmd := &cobra.Command{
-		Use:   "get <integration-name>",
-		Short: "Get integration details",
+		Use:   "get <integration-id>",
+		Short: "Get connected integration details",
 		Args:  cobra.ExactArgs(1),
 	}
 	core.Bind(getCmd, &getCommand{}, options)
