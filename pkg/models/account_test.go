@@ -92,8 +92,8 @@ func TestAccount_UpdateEmail(t *testing.T) {
 
 		user := &User{
 			OrganizationID: orgID,
-			AccountID:      account.ID,
-			Email:          account.Email,
+			AccountID:      &account.ID,
+			Email:          &account.Email,
 			Name:           account.Name,
 		}
 		err = database.Conn().Create(user).Error
@@ -103,8 +103,8 @@ func TestAccount_UpdateEmail(t *testing.T) {
 		require.NoError(t, err)
 		otherUser := &User{
 			OrganizationID: orgID,
-			AccountID:      otherAccount.ID,
-			Email:          otherAccount.Email,
+			AccountID:      &otherAccount.ID,
+			Email:          &otherAccount.Email,
 			Name:           otherAccount.Name,
 		}
 		err = database.Conn().Create(otherUser).Error
@@ -191,8 +191,8 @@ func TestAccount_UpdateEmailForProvider(t *testing.T) {
 
 		user := &User{
 			OrganizationID: orgID,
-			AccountID:      account.ID,
-			Email:          account.Email,
+			AccountID:      &account.ID,
+			Email:          &account.Email,
 			Name:           account.Name,
 		}
 		err = database.Conn().Create(user).Error

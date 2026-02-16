@@ -43,8 +43,8 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 
 		user := &models.User{
 			OrganizationID: r.Organization.ID,
-			AccountID:      account.ID,
-			Email:          originalEmail,
+			AccountID:      &account.ID,
+			Email:          &originalEmail,
 			Name:           account.Name,
 		}
 		err = database.Conn().Create(user).Error

@@ -40,6 +40,11 @@ func ListGroupUsers(ctx context.Context, domainType, domainID, groupName string,
 
 	var users []*pbUsers.User
 	for _, userID := range userIDs {
+		dbUser, err := models.FindUnscopedUserByID(userID)
+		if err != nil {
+			continue
+		}
+
 		roleAssignment := &pbUsers.UserRoleAssignment{
 			RoleName:        role,
 			RoleDisplayName: roleMetadata.DisplayName,
@@ -49,7 +54,7 @@ func ListGroupUsers(ctx context.Context, domainType, domainID, groupName string,
 			AssignedAt:      timestamppb.Now(),
 		}
 
-		user, err := convertUserToProto(userID, []*pbUsers.UserRoleAssignment{roleAssignment})
+		user, err := convertUserToProto(dbUser, []*pbUsers.UserRoleAssignment{roleAssignment})
 		if err != nil {
 			continue
 		}
