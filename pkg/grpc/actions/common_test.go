@@ -62,4 +62,37 @@ func TestConfigurationFieldToProto(t *testing.T) {
 			assert.Equal(t, original[i], v)
 		}
 	})
+
+	t.Run("roundtrip list type options with MaxItems preserves field", func(t *testing.T) {
+		maxItems := 4
+
+		field := configuration.Field{
+			Name:  "buttons",
+			Label: "Buttons",
+			Type:  configuration.FieldTypeList,
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Button",
+					MaxItems:  &maxItems,
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeString,
+					},
+				},
+			},
+		}
+
+		// Convert to proto
+		pbField := ConfigurationFieldToProto(field)
+		require.NotNil(t, pbField.TypeOptions, "expected TypeOptions to be set")
+		require.NotNil(t, pbField.TypeOptions.List, "expected List options to be set")
+		require.NotNil(t, pbField.TypeOptions.List.MaxItems, "expected MaxItems to be set in proto")
+		assert.Equal(t, int32(maxItems), *pbField.TypeOptions.List.MaxItems)
+
+		// Convert back from proto
+		field2 := ProtoToConfigurationField(pbField)
+		require.NotNil(t, field2.TypeOptions, "expected TypeOptions to be set after roundtrip")
+		require.NotNil(t, field2.TypeOptions.List, "expected List options to be set after roundtrip")
+		require.NotNil(t, field2.TypeOptions.List.MaxItems, "expected MaxItems to be set after roundtrip")
+		assert.Equal(t, maxItems, *field2.TypeOptions.List.MaxItems)
+	})
 }
