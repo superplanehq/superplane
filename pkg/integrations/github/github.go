@@ -50,6 +50,7 @@ type Metadata struct {
 	InstallationID string            `mapstructure:"installationId" json:"installationId"`
 	State          string            `mapstructure:"state" json:"state"`
 	Owner          string            `mapstructure:"owner" json:"owner"`
+	OwnerType      string            `mapstructure:"ownerType" json:"ownerType"`
 	Repositories   []Repository      `mapstructure:"repositories" json:"repositories"`
 	GitHubApp      GitHubAppMetadata `mapstructure:"githubApp" json:"githubApp"`
 }
@@ -94,6 +95,7 @@ func (g *GitHub) Configuration() []configuration.Field {
 func (g *GitHub) Components() []core.Component {
 	return []core.Component{
 		&GetIssue{},
+		&GetWorkflowUsage{},
 		&CreateIssue{},
 		&CreateIssueComment{},
 		&UpdateIssue{},
@@ -161,8 +163,9 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 	})
 
 	ctx.Integration.SetMetadata(Metadata{
-		Owner: config.Organization,
-		State: state,
+		Owner:     config.Organization,
+		OwnerType: ownerTypeFromConfiguration(config),
+		State:     state,
 	})
 
 	return nil
@@ -480,18 +483,27 @@ func (g *GitHub) browserActionURL(organization string) string {
 	return "https://github.com/settings/apps/new"
 }
 
+func ownerTypeFromConfiguration(config Configuration) string {
+	if strings.TrimSpace(config.Organization) != "" {
+		return "Organization"
+	}
+
+	return "User"
+}
+
 func (g *GitHub) appManifest(ctx core.SyncContext) string {
 	manifest := map[string]any{
 		"name":   `SuperPlane GH integration`,
 		"public": false,
 		"url":    "https://superplane.com",
 		"default_permissions": map[string]string{
-			"issues":           "write",
-			"actions":          "write",
-			"contents":         "write",
-			"pull_requests":    "write",
-			"repository_hooks": "write",
-			"statuses":         "write",
+			"issues":                    "write",
+			"actions":                   "write",
+			"contents":                  "write",
+			"pull_requests":             "write",
+			"repository_hooks":          "write",
+			"statuses":                  "write",
+			"organization_administration": "read",
 		},
 		"setup_url":    fmt.Sprintf(`%s/api/v1/integrations/%s/setup`, ctx.BaseURL, ctx.Integration.ID().String()),
 		"redirect_url": fmt.Sprintf(`%s/api/v1/integrations/%s/redirect`, ctx.BaseURL, ctx.Integration.ID().String()),
