@@ -31,19 +31,19 @@ func Test_AddUserToGroup(t *testing.T) {
 		response, err := ListGroupUsers(context.Background(), models.DomainTypeOrganization, orgID, groupName, r.AuthService)
 		require.NoError(t, err)
 		assert.True(t, slices.ContainsFunc(response.Users, func(user *users.User) bool {
-			return user.Metadata.Id == newUser.ID.String() && user.Metadata.Email == newUser.Email
+			return user.Metadata.Id == newUser.ID.String() && user.Metadata.Email == newUser.GetEmail()
 		}))
 	})
 
 	t.Run("add user to organization group with email", func(t *testing.T) {
 		newUser := support.CreateUser(t, r, r.Organization.ID)
-		_, err := AddUserToGroup(ctx, orgID, models.DomainTypeOrganization, orgID, "", newUser.Email, groupName, r.AuthService)
+		_, err := AddUserToGroup(ctx, orgID, models.DomainTypeOrganization, orgID, "", newUser.GetEmail(), groupName, r.AuthService)
 		require.NoError(t, err)
 
 		response, err := ListGroupUsers(context.Background(), models.DomainTypeOrganization, orgID, groupName, r.AuthService)
 		require.NoError(t, err)
 		assert.True(t, slices.ContainsFunc(response.Users, func(user *users.User) bool {
-			return user.Metadata.Id == newUser.ID.String() && user.Metadata.Email == newUser.Email
+			return user.Metadata.Id == newUser.ID.String() && user.Metadata.Email == newUser.GetEmail()
 		}))
 	})
 

@@ -25,6 +25,10 @@ const (
 	MetaDescOrgOwner  = "Full control over organization settings, billing, and member management."
 	MetaDescOrgAdmin  = "Can manage canvases, users, groups, and roles within the organization."
 	MetaDescOrgViewer = "Read-only access to organization resources and information."
+
+	// User types
+	UserTypeHuman          = "human"
+	UserTypeServiceAccount = "service_account"
 )
 
 var (

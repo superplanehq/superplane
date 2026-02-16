@@ -12,29 +12,30 @@ Use this workflow to build or debug canvases from the CLI.
 Run these first:
 
 ```bash
+superplane index integrations
 superplane integrations list
-superplane integrations list --connected
-superplane triggers list
-superplane components list
+superplane index triggers
+superplane index components
 ```
 
 Narrow to one integration:
 
 ```bash
-superplane triggers list --from github
-superplane components list --from github
-superplane components list --from semaphore
+superplane index triggers --from github
+superplane index components --from github
+superplane index components --from semaphore
 ```
 
-Use `--connected` to list organization-connected integration instances (not just available providers).
+Use `superplane integrations list` to list organization-connected integration instances (not just available providers).
 
 Inspect required config fields and example payloads:
 
 ```bash
-superplane triggers get github.onPush
-superplane components get semaphore.runWorkflow
-superplane components get github.runWorkflow
-superplane components get approval
+superplane index integrations --name github
+superplane index triggers --name github.onPush
+superplane index components --name semaphore.runWorkflow
+superplane index components --name github.runWorkflow
+superplane index components --name approval
 ```
 
 List runtime options for `integration-resource` fields:
@@ -43,7 +44,7 @@ List runtime options for `integration-resource` fields:
 superplane integrations list-resources --id <integration-id> --type <type> --parameters key1=value1,key2=value2
 ```
 
-Use `superplane integrations list --connected` first to find valid integration IDs.
+Use `superplane integrations list` first to find valid integration IDs.
 
 ## Build canvas incrementally
 
@@ -189,11 +190,12 @@ Symptoms of missing binding:
 
 How to resolve:
 
-1. Run `superplane integrations list --connected` and confirm required providers are connected for the org.
-2. Ensure the provider integration (GitHub, Semaphore, etc.) is installed and authenticated for the organization.
-3. Reopen the node config and select valid provider resources for required fields.
-4. Use `superplane integrations list-resources --id <integration-id> --type <type> --parameters ...` to inspect valid option IDs/names.
-5. Re-run `superplane canvases get <name>` and confirm node errors are cleared.
+1. Run `superplane integrations list` and confirm required providers are connected for the org.
+2. Use `superplane integrations get <integration-id>` to inspect one connected integration when needed.
+3. Ensure the provider integration (GitHub, Semaphore, etc.) is installed and authenticated for the organization.
+4. Reopen the node config and select valid provider resources for required fields.
+5. Use `superplane integrations list-resources --id <integration-id> --type <type> --parameters ...` to inspect valid option IDs/names.
+6. Re-run `superplane canvases get <name>` and confirm node errors are cleared.
 
 ## Troubleshooting checklist
 

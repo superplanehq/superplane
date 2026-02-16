@@ -68,27 +68,27 @@ func (c *listResourcesCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	if ctx.Renderer.IsText() {
-		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
-			_, _ = fmt.Fprintln(writer, "INTEGRATION_ID\tINTEGRATION_NAME\tINTEGRATION\tTYPE\tNAME\tID")
-			for _, resource := range response.Resources {
-				_, _ = fmt.Fprintf(
-					writer,
-					"%s\t%s\t%s\t%s\t%s\t%s\n",
-					metadata.GetId(),
-					metadata.GetName(),
-					spec.GetIntegrationName(),
-					resource.GetType(),
-					resource.GetName(),
-					resource.GetId(),
-				)
-			}
-			return writer.Flush()
-		})
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(response.Resources)
 	}
 
-	return ctx.Renderer.Render(response.Resources)
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
+		_, _ = fmt.Fprintln(writer, "INTEGRATION_ID\tINTEGRATION_NAME\tINTEGRATION\tTYPE\tNAME\tID")
+		for _, resource := range response.Resources {
+			_, _ = fmt.Fprintf(
+				writer,
+				"%s\t%s\t%s\t%s\t%s\t%s\n",
+				metadata.GetId(),
+				metadata.GetName(),
+				spec.GetIntegrationName(),
+				resource.GetType(),
+				resource.GetName(),
+				resource.GetId(),
+			)
+		}
+		return writer.Flush()
+	})
 }
 
 func parseIntegrationResourceParametersFlag(raw string) (map[string]string, error) {
