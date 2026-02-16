@@ -97,7 +97,10 @@ export const useIntegrationResources = (
   integrationId: string,
   resourceType: string,
   parameters?: Record<string, string>,
+  options?: { enabled?: boolean },
 ) => {
+  const enabled = (options?.enabled ?? true) && !!organizationId && !!integrationId && !!resourceType;
+
   return useQuery({
     queryKey: integrationKeys.resources(organizationId, integrationId, resourceType, parameters),
     queryFn: async () => {
@@ -119,7 +122,7 @@ export const useIntegrationResources = (
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
-    enabled: !!organizationId && !!integrationId && !!resourceType,
+    enabled,
   });
 };
 
