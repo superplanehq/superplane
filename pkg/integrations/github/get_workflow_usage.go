@@ -240,11 +240,6 @@ func (c *GetWorkflowUsage) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("organization owner is missing from integration metadata")
 	}
 
-	client, err := NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
-	if err != nil {
-		return fmt.Errorf("failed to initialize GitHub client: %w", err)
-	}
-
 	query := url.Values{}
 	if config.Year != nil && *config.Year != "" {
 		year, err := strconv.Atoi(*config.Year)
@@ -276,6 +271,11 @@ func (c *GetWorkflowUsage) Execute(ctx core.ExecutionContext) error {
 
 	if config.SKU != nil && strings.TrimSpace(*config.SKU) != "" {
 		query.Set("sku", strings.TrimSpace(*config.SKU))
+	}
+
+	client, err := NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	if err != nil {
+		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
 	path := fmt.Sprintf("orgs/%s/settings/billing/usage", appMetadata.Owner)
