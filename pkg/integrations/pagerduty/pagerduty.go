@@ -136,6 +136,7 @@ func (p *PagerDuty) Components() []core.Component {
 	return []core.Component{
 		&CreateIncident{},
 		&UpdateIncident{},
+		&AcknowledgeIncident{},
 		&AnnotateIncident{},
 		&ListIncidents{},
 		&ListNotes{},

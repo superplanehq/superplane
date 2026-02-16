@@ -17,6 +17,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Acknowledge Incident" href="#acknowledge-incident" description="Acknowledge an incident in PagerDuty" />
   <LinkCard title="Annotate Incident" href="#annotate-incident" description="Add a note to an existing incident in PagerDuty" />
   <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in PagerDuty" />
   <LinkCard title="List Incidents" href="#list-incidents" description="Query PagerDuty to get a list of all open incidents (triggered and acknowledged)" />
@@ -288,6 +289,123 @@ This trigger automatically sets up a PagerDuty webhook subscription when configu
   },
   "timestamp": "2026-01-19T12:30:00Z",
   "type": "pagerduty.incident.status_update_published"
+}
+```
+
+<a id="acknowledge-incident"></a>
+
+## Acknowledge Incident
+
+The Acknowledge Incident component acknowledges a PagerDuty incident so it is assigned and being worked on.
+
+### Use Cases
+
+- **Auto-acknowledge incidents**: Acknowledge incidents when an on-call engineer is assigned or when a workflow starts from SuperPlane
+- **Automation remediation**: Acknowledge incidents when automation begins remediation
+- **Sync incident state**: Sync incident state with Jira or Slack (e.g., acknowledge when ticket is in progress)
+
+### Configuration
+
+- **Incident ID**: PagerDuty incident ID (e.g., P1ABC23)
+- **From Email**: Email address of a valid PagerDuty user (required for App OAuth, optional for API tokens)
+- **Escalation Policy**: Optional escalation policy override
+
+### Output
+
+Returns the acknowledged incident object with all current information including status, acknowledged by, and timestamp.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "incident": {
+      "acknowledgements": [
+        {
+          "acknowledger": {
+            "html_url": "https://subdomain.pagerduty.com/users/PXPGF42",
+            "id": "PXPGF42",
+            "self": "https://api.pagerduty.com/users/PXPGF42",
+            "summary": "Earline Greenholt",
+            "type": "user_reference"
+          },
+          "at": "2015-10-06T21:38:23Z"
+        }
+      ],
+      "assigned_via": "escalation_policy",
+      "assignments": [
+        {
+          "assignee": {
+            "html_url": "https://subdomain.pagerduty.com/users/PXPGF42",
+            "id": "PXPGF42",
+            "self": "https://api.pagerduty.com/users/PXPGF42",
+            "summary": "Earline Greenholt",
+            "type": "user_reference"
+          },
+          "at": "2015-11-10T00:31:52Z"
+        }
+      ],
+      "created_at": "2015-10-06T21:30:42Z",
+      "escalation_policy": {
+        "html_url": "https://subdomain.pagerduty.com/escalation_policies/PT20YPA",
+        "id": "PT20YPA",
+        "self": "https://api.pagerduty.com/escalation_policies/PT20YPA",
+        "summary": "Another Escalation Policy",
+        "type": "escalation_policy_reference"
+      },
+      "first_trigger_log_entry": {
+        "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK/log_entries/Q02JTSNZWHSEKV",
+        "id": "Q02JTSNZWHSEKV",
+        "self": "https://api.pagerduty.com/log_entries/Q02JTSNZWHSEKV?incident_id=PT4KHLK",
+        "summary": "Triggered through the API",
+        "type": "trigger_log_entry_reference"
+      },
+      "html_url": "https://subdomain.pagerduty.com/incidents/PT4KHLK",
+      "id": "PT4KHLK",
+      "incident_key": "baf7cf21b1da41b4b0221008339ff357",
+      "incident_number": 1234,
+      "last_status_change_at": "2015-10-06T21:38:23Z",
+      "last_status_change_by": {
+        "html_url": "https://subdomain.pagerduty.com/users/PXPGF42",
+        "id": "PXPGF42",
+        "self": "https://api.pagerduty.com/users/PXPGF42",
+        "summary": "Earline Greenholt",
+        "type": "user_reference"
+      },
+      "priority": {
+        "id": "P53ZZH5",
+        "self": "https://api.pagerduty.com/priorities/P53ZZH5",
+        "summary": "P2",
+        "type": "priority_reference"
+      },
+      "resolved_at": null,
+      "self": "https://api.pagerduty.com/incidents/PT4KHLK",
+      "service": {
+        "html_url": "https://subdomain.pagerduty.com/service-directory/PWIXJZS",
+        "id": "PWIXJZS",
+        "self": "https://api.pagerduty.com/services/PWIXJZS",
+        "summary": "My Mail Service",
+        "type": "service_reference"
+      },
+      "status": "acknowledged",
+      "summary": "[#1234] The server is on fire.",
+      "teams": [
+        {
+          "html_url": "https://subdomain.pagerduty.com/teams/PQ9K7I8",
+          "id": "PQ9K7I8",
+          "self": "https://api.pagerduty.com/teams/PQ9K7I8",
+          "summary": "Engineering",
+          "type": "team_reference"
+        }
+      ],
+      "title": "The server is on fire.",
+      "type": "incident",
+      "updated_at": "2015-10-06T21:40:23Z",
+      "urgency": "high"
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "pagerduty.incident"
 }
 ```
 

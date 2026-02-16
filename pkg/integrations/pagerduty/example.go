@@ -31,6 +31,12 @@ var exampleOutputSnoozeIncidentBytes []byte
 var exampleOutputSnoozeIncidentOnce sync.Once
 var exampleOutputSnoozeIncident map[string]any
 
+//go:embed example_output_acknowledge_incident.json
+var exampleOutputAcknowledgeIncidentBytes []byte
+
+var exampleOutputAcknowledgeIncidentOnce sync.Once
+var exampleOutputAcknowledgeIncident map[string]any
+
 //go:embed example_data_on_incident.json
 var exampleDataOnIncidentBytes []byte
 
@@ -81,6 +87,10 @@ func (c *AnnotateIncident) ExampleOutput() map[string]any {
 
 func (c *SnoozeIncident) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputSnoozeIncidentOnce, exampleOutputSnoozeIncidentBytes, &exampleOutputSnoozeIncident)
+}
+
+func (c *AcknowledgeIncident) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputAcknowledgeIncidentOnce, exampleOutputAcknowledgeIncidentBytes, &exampleOutputAcknowledgeIncident)
 }
 
 func (l *ListIncidents) ExampleOutput() map[string]any {
