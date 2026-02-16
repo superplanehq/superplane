@@ -186,13 +186,11 @@ func (c *CreateHTTPSyntheticCheck) Configuration() []configuration.Field {
 								},
 							},
 						},
-						{
-							Name:      "redirects",
-							Label:     "Redirects",
-							Type:      configuration.FieldTypeSelect,
-							Required:  false,
-							Togglable: true,
-							Default:   "follow",
+					{
+						Name:    "redirects",
+						Label:   "Redirects",
+						Type:    configuration.FieldTypeSelect,
+						Default: "follow",
 							TypeOptions: &configuration.TypeOptions{
 								Select: &configuration.SelectTypeOptions{
 									Options: []configuration.FieldOption{
@@ -203,13 +201,11 @@ func (c *CreateHTTPSyntheticCheck) Configuration() []configuration.Field {
 							},
 							Description: "Whether to follow HTTP redirects",
 						},
-						{
-							Name:      "allowInsecure",
-							Label:     "Allow Insecure TLS",
-							Type:      configuration.FieldTypeSelect,
-							Required:  false,
-							Togglable: true,
-							Default:   "false",
+					{
+						Name:    "allowInsecure",
+						Label:   "Allow Insecure TLS",
+						Type:    configuration.FieldTypeSelect,
+						Default: "false",
 							TypeOptions: &configuration.TypeOptions{
 								Select: &configuration.SelectTypeOptions{
 									Options: []configuration.FieldOption{
