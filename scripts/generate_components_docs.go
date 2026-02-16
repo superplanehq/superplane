@@ -280,9 +280,12 @@ func slugify(value string) string {
 
 func integrationFilename(integration core.Integration) string {
 	label := strings.TrimSpace(integration.Label())
+	label = strings.ReplaceAll(label, " ", "")
+
 	if label == "" {
 		return slugify(integration.Name())
 	}
+
 	return label
 }
 
