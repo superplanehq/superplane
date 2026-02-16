@@ -139,19 +139,20 @@ func GetUsersWithRolesInDomain(domainID, domainType string, authService authoriz
 		}
 	}
 
+	userIDs := make([]string, 0, len(userRoleMap))
+	for userID := range userRoleMap {
+		userIDs = append(userIDs, userID)
+	}
+
+	dbUsers, err := models.FindHumanUsersByIDs(userIDs)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to fetch users")
+	}
+
 	var users []*pbUsers.User
-	for userID, roleAssignments := range userRoleMap {
-		dbUser, err := models.FindUnscopedUserByID(userID)
-		if err != nil {
-			continue
-		}
-
-		// Filter out service accounts — they have their own listing endpoint
-		if dbUser.IsServiceAccount() {
-			continue
-		}
-
-		user, err := convertUserToProto(dbUser, roleAssignments)
+	for i := range dbUsers {
+		roleAssignments := userRoleMap[dbUsers[i].ID.String()]
+		user, err := convertUserToProto(&dbUsers[i], roleAssignments)
 		if err != nil {
 			continue
 		}
