@@ -5,6 +5,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/codeartifact"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/ecr"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/lambda"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/route53"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/sns"
 )
 
@@ -21,6 +22,9 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 
 	case "codeartifact.domain":
 		return codeartifact.ListDomains(ctx, resourceType)
+
+	case "route53.hostedZone":
+		return route53.ListHostedZones(ctx, resourceType)
 
 	case "sns.topic":
 		return sns.ListTopics(ctx, resourceType)

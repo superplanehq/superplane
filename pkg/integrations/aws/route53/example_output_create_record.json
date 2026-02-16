@@ -1,0 +1,7 @@
+{
+  "changeId": "/change/C1234567890ABC",
+  "status": "PENDING",
+  "submittedAt": "2026-01-28T10:30:00.000Z",
+  "recordName": "api.example.com",
+  "recordType": "A"
+}

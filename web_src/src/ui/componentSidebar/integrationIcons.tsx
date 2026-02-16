@@ -4,6 +4,7 @@ import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 import circleciIcon from "@/assets/icons/integrations/circleci.svg";
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
+import awsRoute53Icon from "@/assets/icons/integrations/aws.route53.svg";
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
@@ -82,6 +83,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   aws: {
     cloudwatch: awsCloudwatchIcon,
     lambda: awsLambdaIcon,
+    route53: awsRoute53Icon,
     sns: awsSnsIcon,
   },
 };
