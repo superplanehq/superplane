@@ -815,24 +815,37 @@ func (c *RunTask) checkRuleAvailability(ctx core.ActionContext) error {
 	}
 
 	if integrationMetadata.EventBridge == nil {
-		return retryRunTaskRuleAvailabilityCheck(ctx, "EventBridge metadata not found - checking again in %s", runTaskCheckRuleRetryInterval)
+		ctx.Logger.Infof("EventBridge metadata not found - checking again in %s", runTaskCheckRuleRetryInterval)
+		return ctx.Requests.ScheduleActionCall(
+			runTaskCheckRuleAvailabilityAction,
+			map[string]any{},
+			runTaskCheckRuleRetryInterval,
+		)
 	}
 
 	rule, ok := integrationMetadata.EventBridge.Rules[runTaskEventSource]
 	if !ok {
-		return retryRunTaskRuleAvailabilityCheck(
-			ctx,
+		ctx.Logger.Infof(
 			"Rule not found for source %s - checking again in %s",
 			runTaskEventSource,
+			runTaskCheckRuleRetryInterval,
+		)
+		return ctx.Requests.ScheduleActionCall(
+			runTaskCheckRuleAvailabilityAction,
+			map[string]any{},
 			runTaskCheckRuleRetryInterval,
 		)
 	}
 
 	if !slices.Contains(rule.DetailTypes, runTaskEventDetailType) {
-		return retryRunTaskRuleAvailabilityCheck(
-			ctx,
+		ctx.Logger.Infof(
 			"Rule does not have detail type %q - checking again in %s",
 			runTaskEventDetailType,
+			runTaskCheckRuleRetryInterval,
+		)
+		return ctx.Requests.ScheduleActionCall(
+			runTaskCheckRuleAvailabilityAction,
+			map[string]any{},
 			runTaskCheckRuleRetryInterval,
 		)
 	}
@@ -862,15 +875,6 @@ func decodeRunTaskRuleAvailabilityData(ctx core.ActionContext) (RunTaskNodeMetad
 	}
 
 	return metadata, integrationMetadata, nil
-}
-
-func retryRunTaskRuleAvailabilityCheck(ctx core.ActionContext, logMessage string, args ...any) error {
-	ctx.Logger.Infof(logMessage, args...)
-	return ctx.Requests.ScheduleActionCall(
-		runTaskCheckRuleAvailabilityAction,
-		map[string]any{},
-		runTaskCheckRuleRetryInterval,
-	)
 }
 
 func (c *RunTask) handleTimeout(ctx core.ActionContext) error {
