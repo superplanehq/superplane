@@ -40,18 +40,19 @@ var startedTaskStatuses = []string{"RUNNING", "STOPPED"}
 type RunTask struct{}
 
 type RunTaskConfiguration struct {
-	Region               string `json:"region" mapstructure:"region"`
-	Cluster              string `json:"cluster" mapstructure:"cluster"`
-	TaskDefinition       string `json:"taskDefinition" mapstructure:"taskDefinition"`
-	Count                int    `json:"count" mapstructure:"count"`
-	LaunchType           string `json:"launchType" mapstructure:"launchType"`
-	Group                string `json:"group" mapstructure:"group"`
-	StartedBy            string `json:"startedBy" mapstructure:"startedBy"`
-	PlatformVersion      string `json:"platformVersion" mapstructure:"platformVersion"`
-	EnableExecuteCommand bool   `json:"enableExecuteCommand" mapstructure:"enableExecuteCommand"`
-	NetworkConfiguration any    `json:"networkConfiguration,omitempty" mapstructure:"networkConfiguration"`
-	Overrides            any    `json:"overrides,omitempty" mapstructure:"overrides"`
-	TimeoutSeconds       int    `json:"timeoutSeconds" mapstructure:"timeoutSeconds"`
+	Region               string                                `json:"region" mapstructure:"region"`
+	Cluster              string                                `json:"cluster" mapstructure:"cluster"`
+	TaskDefinition       string                                `json:"taskDefinition" mapstructure:"taskDefinition"`
+	Count                int                                   `json:"count" mapstructure:"count"`
+	LaunchType           string                                `json:"launchType" mapstructure:"launchType"`
+	CapacityProvider     []RunTaskCapacityProviderStrategyItem `json:"capacityProviderStrategy" mapstructure:"capacityProviderStrategy"`
+	Group                string                                `json:"group" mapstructure:"group"`
+	StartedBy            string                                `json:"startedBy" mapstructure:"startedBy"`
+	PlatformVersion      string                                `json:"platformVersion" mapstructure:"platformVersion"`
+	EnableExecuteCommand bool                                  `json:"enableExecuteCommand" mapstructure:"enableExecuteCommand"`
+	NetworkConfiguration RunTaskNetworkConfiguration           `json:"networkConfiguration,omitempty" mapstructure:"networkConfiguration"`
+	Overrides            RunTaskOverrides                      `json:"overrides,omitempty" mapstructure:"overrides"`
+	TimeoutSeconds       int                                   `json:"timeoutSeconds" mapstructure:"timeoutSeconds"`
 }
 
 type RunTaskNodeMetadata struct {
@@ -70,6 +71,44 @@ type RunTaskExecutionMetadata struct {
 
 type RunTaskStateChangeDetail struct {
 	TaskARN string `json:"taskArn" mapstructure:"taskArn"`
+}
+
+type RunTaskCapacityProviderStrategyItem struct {
+	CapacityProvider string `json:"capacityProvider" mapstructure:"capacityProvider"`
+	Weight           int    `json:"weight,omitempty" mapstructure:"weight"`
+	Base             int    `json:"base,omitempty" mapstructure:"base"`
+}
+
+type RunTaskNetworkConfiguration struct {
+	AwsvpcConfiguration *RunTaskAwsvpcConfiguration `json:"awsvpcConfiguration,omitempty" mapstructure:"awsvpcConfiguration"`
+	AdditionalFields    map[string]any              `json:"-" mapstructure:",remain"`
+}
+
+type RunTaskAwsvpcConfiguration struct {
+	Subnets          []string       `json:"subnets,omitempty" mapstructure:"subnets"`
+	SecurityGroups   []string       `json:"securityGroups,omitempty" mapstructure:"securityGroups"`
+	AssignPublicIP   string         `json:"assignPublicIp,omitempty" mapstructure:"assignPublicIp"`
+	AdditionalFields map[string]any `json:"-" mapstructure:",remain"`
+}
+
+type RunTaskOverrides struct {
+	ContainerOverrides []RunTaskContainerOverride `json:"containerOverrides,omitempty" mapstructure:"containerOverrides"`
+	AdditionalFields   map[string]any             `json:"-" mapstructure:",remain"`
+}
+
+type RunTaskContainerOverride struct {
+	Name              string                        `json:"name,omitempty" mapstructure:"name"`
+	Command           []string                      `json:"command,omitempty" mapstructure:"command"`
+	Environment       []RunTaskContainerEnvironment `json:"environment,omitempty" mapstructure:"environment"`
+	CPU               int                           `json:"cpu,omitempty" mapstructure:"cpu"`
+	Memory            int                           `json:"memory,omitempty" mapstructure:"memory"`
+	MemoryReservation int                           `json:"memoryReservation,omitempty" mapstructure:"memoryReservation"`
+	AdditionalFields  map[string]any                `json:"-" mapstructure:",remain"`
+}
+
+type RunTaskContainerEnvironment struct {
+	Name  string `json:"name" mapstructure:"name"`
+	Value string `json:"value" mapstructure:"value"`
 }
 
 type runTaskMessageData struct {
@@ -105,6 +144,7 @@ func (c *RunTask) Documentation() string {
 ## Notes
 
 - For Fargate tasks, set **Network Configuration** using the ECS awsvpcConfiguration format.
+- Use **Capacity Provider Strategy** when you want ECS to choose capacity providers; it cannot be combined with **Launch Type**.
 - Optional ECS API fields can be passed directly through **Overrides** and **Network Configuration**.
 `
 }
@@ -209,6 +249,57 @@ func (c *RunTask) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: launchTypeOptions,
+				},
+			},
+		},
+		{
+			Name:        "capacityProviderStrategy",
+			Label:       "Capacity Provider Strategy",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Default:     []any{},
+			Togglable:   true,
+			Description: "Optional capacity provider strategy (cannot be used with Launch Type)",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Strategy",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:     "capacityProvider",
+								Label:    "Capacity Provider",
+								Type:     configuration.FieldTypeString,
+								Required: true,
+							},
+							{
+								Name:      "weight",
+								Label:     "Weight",
+								Type:      configuration.FieldTypeNumber,
+								Required:  false,
+								Default:   "0",
+								Togglable: true,
+								TypeOptions: &configuration.TypeOptions{
+									Number: &configuration.NumberTypeOptions{
+										Min: func() *int { min := 0; return &min }(),
+									},
+								},
+							},
+							{
+								Name:      "base",
+								Label:     "Base",
+								Type:      configuration.FieldTypeNumber,
+								Required:  false,
+								Default:   "0",
+								Togglable: true,
+								TypeOptions: &configuration.TypeOptions{
+									Number: &configuration.NumberTypeOptions{
+										Min: func() *int { min := 0; return &min }(),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -376,6 +467,7 @@ func (c *RunTask) runTask(ctx core.ExecutionContext, config RunTaskConfiguration
 		TaskDefinition:       config.TaskDefinition,
 		Count:                config.Count,
 		LaunchType:           config.LaunchType,
+		CapacityProvider:     config.CapacityProvider,
 		Group:                config.Group,
 		StartedBy:            config.StartedBy,
 		PlatformVersion:      config.PlatformVersion,
@@ -556,6 +648,20 @@ func (c *RunTask) decodeAndValidateConfiguration(rawConfiguration any) (RunTaskC
 	if config.Count > runTaskMaxCount {
 		return RunTaskConfiguration{}, fmt.Errorf("count cannot exceed %d", runTaskMaxCount)
 	}
+	if config.LaunchType != "" && len(config.CapacityProvider) > 0 {
+		return RunTaskConfiguration{}, fmt.Errorf("launch type cannot be combined with capacity provider strategy")
+	}
+	for _, strategy := range config.CapacityProvider {
+		if strategy.CapacityProvider == "" {
+			return RunTaskConfiguration{}, fmt.Errorf("capacity provider is required for each strategy item")
+		}
+		if strategy.Weight < 0 {
+			return RunTaskConfiguration{}, fmt.Errorf("capacity provider weight cannot be negative")
+		}
+		if strategy.Base < 0 {
+			return RunTaskConfiguration{}, fmt.Errorf("capacity provider base cannot be negative")
+		}
+	}
 	if config.LaunchType != "" && !slices.Contains(allowedLaunchTypes, config.LaunchType) {
 		return RunTaskConfiguration{}, fmt.Errorf("invalid launch type: %s", config.LaunchType)
 	}
@@ -577,7 +683,91 @@ func (c *RunTask) normalizeConfig(config RunTaskConfiguration) RunTaskConfigurat
 	config.Group = strings.TrimSpace(config.Group)
 	config.StartedBy = strings.TrimSpace(config.StartedBy)
 	config.PlatformVersion = strings.TrimSpace(config.PlatformVersion)
+	for i := range config.CapacityProvider {
+		config.CapacityProvider[i].CapacityProvider = strings.TrimSpace(config.CapacityProvider[i].CapacityProvider)
+	}
+	if config.NetworkConfiguration.AwsvpcConfiguration != nil {
+		config.NetworkConfiguration.AwsvpcConfiguration.AssignPublicIP = strings.TrimSpace(config.NetworkConfiguration.AwsvpcConfiguration.AssignPublicIP)
+	}
+	for i := range config.Overrides.ContainerOverrides {
+		config.Overrides.ContainerOverrides[i].Name = strings.TrimSpace(config.Overrides.ContainerOverrides[i].Name)
+		for j := range config.Overrides.ContainerOverrides[i].Environment {
+			config.Overrides.ContainerOverrides[i].Environment[j].Name = strings.TrimSpace(config.Overrides.ContainerOverrides[i].Environment[j].Name)
+		}
+	}
 	return config
+}
+
+func (c RunTaskNetworkConfiguration) ToMap() map[string]any {
+	configuration := cloneStringAnyMap(c.AdditionalFields)
+	if c.AwsvpcConfiguration == nil {
+		return configuration
+	}
+
+	awsvpcConfiguration := cloneStringAnyMap(c.AwsvpcConfiguration.AdditionalFields)
+	if len(c.AwsvpcConfiguration.Subnets) > 0 {
+		awsvpcConfiguration["subnets"] = c.AwsvpcConfiguration.Subnets
+	}
+	if len(c.AwsvpcConfiguration.SecurityGroups) > 0 {
+		awsvpcConfiguration["securityGroups"] = c.AwsvpcConfiguration.SecurityGroups
+	}
+	if c.AwsvpcConfiguration.AssignPublicIP != "" {
+		awsvpcConfiguration["assignPublicIp"] = c.AwsvpcConfiguration.AssignPublicIP
+	}
+
+	configuration["awsvpcConfiguration"] = awsvpcConfiguration
+	return configuration
+}
+
+func (o RunTaskOverrides) ToMap() map[string]any {
+	overrides := cloneStringAnyMap(o.AdditionalFields)
+	if len(o.ContainerOverrides) == 0 {
+		return overrides
+	}
+
+	containerOverrides := make([]map[string]any, 0, len(o.ContainerOverrides))
+	for _, containerOverride := range o.ContainerOverrides {
+		containerOverrides = append(containerOverrides, containerOverride.ToMap())
+	}
+	overrides["containerOverrides"] = containerOverrides
+	return overrides
+}
+
+func (o RunTaskContainerOverride) ToMap() map[string]any {
+	containerOverride := cloneStringAnyMap(o.AdditionalFields)
+	if o.Name != "" {
+		containerOverride["name"] = o.Name
+	}
+	if len(o.Command) > 0 {
+		containerOverride["command"] = o.Command
+	}
+	if len(o.Environment) > 0 {
+		containerOverride["environment"] = o.Environment
+	}
+	if o.CPU > 0 {
+		containerOverride["cpu"] = o.CPU
+	}
+	if o.Memory > 0 {
+		containerOverride["memory"] = o.Memory
+	}
+	if o.MemoryReservation > 0 {
+		containerOverride["memoryReservation"] = o.MemoryReservation
+	}
+
+	return containerOverride
+}
+
+func cloneStringAnyMap(value map[string]any) map[string]any {
+	if len(value) == 0 {
+		return map[string]any{}
+	}
+
+	cloned := make(map[string]any, len(value))
+	for key, item := range value {
+		cloned[key] = item
+	}
+
+	return cloned
 }
 
 func hasConfigKey(configuration any, key string) bool {
@@ -675,10 +865,7 @@ func decodeRunTaskRuleAvailabilityData(ctx core.ActionContext) (RunTaskNodeMetad
 }
 
 func retryRunTaskRuleAvailabilityCheck(ctx core.ActionContext, logMessage string, args ...any) error {
-	if ctx.Logger != nil {
-		ctx.Logger.Infof(logMessage, args...)
-	}
-
+	ctx.Logger.Infof(logMessage, args...)
 	return ctx.Requests.ScheduleActionCall(
 		runTaskCheckRuleAvailabilityAction,
 		map[string]any{},

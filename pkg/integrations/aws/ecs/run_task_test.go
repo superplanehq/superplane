@@ -77,6 +77,49 @@ func Test__RunTask__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "count cannot exceed 10")
 	})
 
+	t.Run("launch type with capacity provider strategy -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"region":         "us-east-1",
+				"cluster":        "demo",
+				"taskDefinition": "worker:1",
+				"launchType":     "FARGATE",
+				"capacityProviderStrategy": []any{
+					map[string]any{
+						"capacityProvider": "FARGATE_SPOT",
+						"weight":           1,
+					},
+				},
+			},
+			Metadata:    &contexts.MetadataContext{},
+			Requests:    &contexts.RequestContext{},
+			Integration: setupIntegrationContext(nil),
+		})
+
+		require.ErrorContains(t, err, "launch type cannot be combined with capacity provider strategy")
+	})
+
+	t.Run("capacity provider strategy item missing provider -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"region":         "us-east-1",
+				"cluster":        "demo",
+				"taskDefinition": "worker:1",
+				"capacityProviderStrategy": []any{
+					map[string]any{
+						"capacityProvider": "  ",
+						"weight":           1,
+					},
+				},
+			},
+			Metadata:    &contexts.MetadataContext{},
+			Requests:    &contexts.RequestContext{},
+			Integration: setupIntegrationContext(nil),
+		})
+
+		require.ErrorContains(t, err, "capacity provider is required for each strategy item")
+	})
+
 	t.Run("rule missing -> schedules rule provisioning", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 		requests := &contexts.RequestContext{}
@@ -229,6 +272,64 @@ func Test__RunTask__Execute(t *testing.T) {
 		assert.Equal(t, "demo", payloadSent["cluster"])
 		assert.Equal(t, "worker:1", payloadSent["taskDefinition"])
 		assert.Equal(t, float64(2), payloadSent["count"])
+	})
+
+	t.Run("capacity provider strategy -> sends runTask with capacityProviderStrategy", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						{
+							"tasks": [
+								{
+									"taskArn": "arn:aws:ecs:us-east-1:123456789012:task/demo/abc",
+									"lastStatus": "RUNNING"
+								}
+							],
+							"failures": []
+						}
+					`)),
+				},
+			},
+		}
+
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":         "us-east-1",
+				"cluster":        "demo",
+				"taskDefinition": "worker:1",
+				"launchType":     "AUTO",
+				"capacityProviderStrategy": []any{
+					map[string]any{
+						"capacityProvider": "FARGATE_SPOT",
+						"weight":           1,
+					},
+				},
+			},
+			HTTP:           httpContext,
+			ExecutionState: execState,
+			Integration:    validIntegrationContext(),
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+
+		requestBody, err := io.ReadAll(httpContext.Requests[0].Body)
+		require.NoError(t, err)
+
+		payloadSent := map[string]any{}
+		err = json.Unmarshal(requestBody, &payloadSent)
+		require.NoError(t, err)
+		assert.NotContains(t, payloadSent, "launchType")
+		capacityProviderStrategy, ok := payloadSent["capacityProviderStrategy"].([]any)
+		require.True(t, ok)
+		require.Len(t, capacityProviderStrategy, 1)
+		firstItem, ok := capacityProviderStrategy[0].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "FARGATE_SPOT", firstItem["capacityProvider"])
+		assert.Equal(t, float64(1), firstItem["weight"])
 	})
 
 	t.Run("pending task and no timeout -> waits for integration message", func(t *testing.T) {

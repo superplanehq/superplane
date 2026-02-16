@@ -123,12 +123,13 @@ type RunTaskInput struct {
 	TaskDefinition       string
 	Count                int
 	LaunchType           string
+	CapacityProvider     []RunTaskCapacityProviderStrategyItem
 	Group                string
 	StartedBy            string
 	PlatformVersion      string
 	EnableExecuteCommand bool
-	NetworkConfiguration any
-	Overrides            any
+	NetworkConfiguration RunTaskNetworkConfiguration
+	Overrides            RunTaskOverrides
 }
 
 type RunTaskResponse struct {
@@ -241,6 +242,9 @@ func (c *Client) RunTask(input RunTaskInput) (*RunTaskResponse, error) {
 	if input.LaunchType != "" {
 		payload["launchType"] = input.LaunchType
 	}
+	if len(input.CapacityProvider) > 0 {
+		payload["capacityProviderStrategy"] = input.CapacityProvider
+	}
 	if input.Group != "" {
 		payload["group"] = input.Group
 	}
@@ -253,11 +257,13 @@ func (c *Client) RunTask(input RunTaskInput) (*RunTaskResponse, error) {
 	if input.EnableExecuteCommand {
 		payload["enableExecuteCommand"] = true
 	}
-	if !isEmptyObject(input.NetworkConfiguration) && !isNetworkConfigurationTemplate(input.NetworkConfiguration) {
-		payload["networkConfiguration"] = input.NetworkConfiguration
+	networkConfiguration := input.NetworkConfiguration.ToMap()
+	if !isEmptyObject(networkConfiguration) && !isNetworkConfigurationTemplate(networkConfiguration) {
+		payload["networkConfiguration"] = networkConfiguration
 	}
-	if !isEmptyObject(input.Overrides) && !isOverridesTemplate(input.Overrides) {
-		payload["overrides"] = input.Overrides
+	overrides := input.Overrides.ToMap()
+	if !isEmptyObject(overrides) && !isOverridesTemplate(overrides) {
+		payload["overrides"] = overrides
 	}
 
 	response := RunTaskResponse{}

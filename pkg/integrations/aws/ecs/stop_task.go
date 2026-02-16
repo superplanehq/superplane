@@ -458,10 +458,7 @@ func decodeStopTaskRuleAvailabilityData(ctx core.ActionContext) (StopTaskNodeMet
 }
 
 func retryStopTaskRuleAvailabilityCheck(ctx core.ActionContext, logMessage string, args ...any) error {
-	if ctx.Logger != nil {
-		ctx.Logger.Infof(logMessage, args...)
-	}
-
+	ctx.Logger.Infof(logMessage, args...)
 	return ctx.Requests.ScheduleActionCall(
 		stopTaskCheckRuleAvailabilityAction,
 		map[string]any{},
