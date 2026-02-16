@@ -224,9 +224,9 @@ type SyntheticCheckHeader struct {
 // SyntheticCheckRequest represents the full request payload for creating a synthetic check.
 // Matches the Dash0 API envelope: kind + metadata + spec.
 type SyntheticCheckRequest struct {
-	Kind     string                       `json:"kind"`
-	Metadata SyntheticCheckMetadata       `json:"metadata"`
-	Spec     SyntheticCheckTopLevelSpec   `json:"spec"`
+	Kind     string                     `json:"kind"`
+	Metadata SyntheticCheckMetadata     `json:"metadata"`
+	Spec     SyntheticCheckTopLevelSpec `json:"spec"`
 }
 
 // SyntheticCheckMetadata contains the check name and labels.

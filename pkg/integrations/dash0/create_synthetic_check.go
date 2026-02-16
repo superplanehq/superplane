@@ -242,17 +242,17 @@ func (c *CreateSyntheticCheck) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Header",
-				ItemDefinition: &configuration.ListItemDefinition{
-					Type: configuration.FieldTypeObject,
-					Schema: []configuration.Field{
-						{
-							Name:               "name",
-							Label:              "Name",
-							Type:               configuration.FieldTypeString,
-							Required:           true,
-							DisallowExpression: true,
-							Placeholder:        "Content-Type",
-						},
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:               "name",
+								Label:              "Name",
+								Type:               configuration.FieldTypeString,
+								Required:           true,
+								DisallowExpression: true,
+								Placeholder:        "Content-Type",
+							},
 							{
 								Name:        "value",
 								Label:       "Value",
