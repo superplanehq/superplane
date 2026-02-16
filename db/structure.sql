@@ -5,7 +5,7 @@
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.7 (Ubuntu 17.7-3.pgdg22.04+1)
+-- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1496,7 +1496,7 @@ ALTER TABLE ONLY public.workflow_nodes
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.7 (Ubuntu 17.7-3.pgdg22.04+1)
+-- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1532,7 +1532,7 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.7 (Ubuntu 17.7-3.pgdg22.04+1)
+-- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
