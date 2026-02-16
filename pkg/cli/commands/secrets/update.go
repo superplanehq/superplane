@@ -50,12 +50,11 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	updatedSecret := response.GetSecret()
-	if ctx.Renderer.IsText() {
-		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			_, _ = fmt.Fprintln(stdout, "Secret updated")
-			return renderSecretText(stdout, updatedSecret)
-		})
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(updatedSecret)
 	}
 
-	return ctx.Renderer.Render(updatedSecret)
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		return renderSecretText(stdout, updatedSecret)
+	})
 }

@@ -24,11 +24,11 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	secret := response.GetSecret()
-	if ctx.Renderer.IsText() {
-		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			return renderSecretText(stdout, secret)
-		})
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(secret)
 	}
 
-	return ctx.Renderer.Render(secret)
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		return renderSecretText(stdout, secret)
+	})
 }

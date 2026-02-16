@@ -24,11 +24,11 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	secrets := response.GetSecrets()
-	if ctx.Renderer.IsText() {
-		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			return renderSecretListText(stdout, secrets)
-		})
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(secrets)
 	}
 
-	return ctx.Renderer.Render(secrets)
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		return renderSecretListText(stdout, secrets)
+	})
 }
