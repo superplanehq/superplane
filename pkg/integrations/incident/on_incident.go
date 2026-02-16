@@ -178,7 +178,14 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %w", err)
 	}
 
-	eventType, _ := payload["event_type"].(string)
+	// incident.io sends a Svix envelope: { "data": { "event_type": "...", "incident": {...} }, "type": "...", "timestamp": "..." }.
+	// Support both that shape and a flat shape (event_type + payload[eventType]) for backwards compatibility.
+	source := payload
+	if data, ok := payload["data"].(map[string]any); ok && data != nil {
+		source = data
+	}
+
+	eventType, _ := source["event_type"].(string)
 	if eventType == "" {
 		return http.StatusBadRequest, fmt.Errorf("missing event_type in payload")
 	}
@@ -187,7 +194,11 @@ func (t *OnIncident) HandleWebhook(ctx core.WebhookRequestContext) (int, error) 
 		return http.StatusOK, nil
 	}
 
-	incidentData, _ := payload[eventType].(map[string]any)
+	// Prefer documented "incident" key; fall back to payload[eventType] for flat payloads.
+	incidentData, _ := source["incident"].(map[string]any)
+	if incidentData == nil {
+		incidentData, _ = payload[eventType].(map[string]any)
+	}
 	emitPayload := map[string]any{
 		"event_type": eventType,
 		"incident":   incidentData,

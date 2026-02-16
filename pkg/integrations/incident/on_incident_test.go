@@ -129,6 +129,38 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 		assert.Equal(t, "01FDAG4SAP5TYPT98WGR2N7W91", incident["id"])
 		assert.Equal(t, "Database sad", incident["name"])
 	})
+
+	t.Run("Svix envelope with data.incident -> emit", func(t *testing.T) {
+		// Real incident.io payload shape: { "data": { "event_type": "...", "incident": {...} }, "type": "...", "timestamp": "..." }
+		body := []byte(`{"type":"incident.incident.created","data":{"event_type":"public_incident.incident_created_v2","incident":{"id":"01FDAG4SAP5TYPT98WGR2N7W91","name":"Our database is sad","reference":"INC-123"}},"timestamp":"2026-01-19T12:00:00Z"}`)
+		ts := strconv.FormatInt(time.Now().Unix(), 10)
+		id := "msg_svix"
+		secret := "test-secret-32-bytes-long-enough!!"
+		headers := http.Header{}
+		headers.Set("webhook-id", id)
+		headers.Set("webhook-timestamp", ts)
+		headers.Set("webhook-signature", svixSignatureFor(secret, id, ts, body))
+
+		eventContext := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Headers:       headers,
+			Configuration: validConfig,
+			Webhook:       &contexts.WebhookContext{},
+			Events:        eventContext,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 1, eventContext.Count())
+		assert.Equal(t, "incident.incident.created", eventContext.Payloads[0].Type)
+		payload := eventContext.Payloads[0].Data.(map[string]any)
+		assert.Equal(t, "public_incident.incident_created_v2", payload["event_type"])
+		incident, _ := payload["incident"].(map[string]any)
+		require.NotNil(t, incident, "incident must be populated when payload uses data.incident")
+		assert.Equal(t, "01FDAG4SAP5TYPT98WGR2N7W91", incident["id"])
+		assert.Equal(t, "Our database is sad", incident["name"])
+	})
 }
 
 func Test__OnIncident__Setup(t *testing.T) {
