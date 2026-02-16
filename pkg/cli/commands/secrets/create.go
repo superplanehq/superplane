@@ -44,12 +44,11 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	createdSecret := response.GetSecret()
-	if ctx.Renderer.IsText() {
-		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			_, _ = fmt.Fprintln(stdout, "Secret created")
-			return renderSecretText(stdout, createdSecret)
-		})
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(createdSecret)
 	}
 
-	return ctx.Renderer.Render(createdSecret)
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		return renderSecretText(stdout, createdSecret)
+	})
 }

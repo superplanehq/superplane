@@ -45,18 +45,18 @@ func (c *componentsCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	if ctx.Renderer.IsText() {
-		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
-			_, _ = fmt.Fprintln(writer, "NAME\tLABEL\tDESCRIPTION")
-			for _, component := range components {
-				_, _ = fmt.Fprintf(writer, "%s\t%s\t%s\n", component.GetName(), component.GetLabel(), component.GetDescription())
-			}
-			return writer.Flush()
-		})
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(components)
 	}
 
-	return ctx.Renderer.Render(components)
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
+		_, _ = fmt.Fprintln(writer, "NAME\tLABEL\tDESCRIPTION")
+		for _, component := range components {
+			_, _ = fmt.Fprintf(writer, "%s\t%s\t%s\n", component.GetName(), component.GetLabel(), component.GetDescription())
+		}
+		return writer.Flush()
+	})
 }
 
 func (c *componentsCommand) getComponentByName(ctx core.CommandContext, name string) error {
@@ -65,16 +65,16 @@ func (c *componentsCommand) getComponentByName(ctx core.CommandContext, name str
 		return err
 	}
 
-	if ctx.Renderer.IsText() {
-		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			_, _ = fmt.Fprintf(stdout, "Name: %s\n", component.GetName())
-			_, _ = fmt.Fprintf(stdout, "Label: %s\n", component.GetLabel())
-			_, err := fmt.Fprintf(stdout, "Description: %s\n", component.GetDescription())
-			return err
-		})
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(component)
 	}
 
-	return ctx.Renderer.Render(component)
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		_, _ = fmt.Fprintf(stdout, "Name: %s\n", component.GetName())
+		_, _ = fmt.Fprintf(stdout, "Label: %s\n", component.GetLabel())
+		_, err := fmt.Fprintf(stdout, "Description: %s\n", component.GetDescription())
+		return err
+	})
 }
 
 func (c *componentsCommand) listComponents(ctx core.CommandContext, from string) ([]openapi_client.ComponentsComponent, error) {

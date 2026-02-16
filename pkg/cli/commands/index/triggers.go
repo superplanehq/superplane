@@ -45,18 +45,18 @@ func (c *triggersCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	if ctx.Renderer.IsText() {
-		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
-			_, _ = fmt.Fprintln(writer, "NAME\tLABEL\tDESCRIPTION")
-			for _, trigger := range triggers {
-				_, _ = fmt.Fprintf(writer, "%s\t%s\t%s\n", trigger.GetName(), trigger.GetLabel(), trigger.GetDescription())
-			}
-			return writer.Flush()
-		})
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(triggers)
 	}
 
-	return ctx.Renderer.Render(triggers)
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
+		_, _ = fmt.Fprintln(writer, "NAME\tLABEL\tDESCRIPTION")
+		for _, trigger := range triggers {
+			_, _ = fmt.Fprintf(writer, "%s\t%s\t%s\n", trigger.GetName(), trigger.GetLabel(), trigger.GetDescription())
+		}
+		return writer.Flush()
+	})
 }
 
 func (c *triggersCommand) getTriggerByName(ctx core.CommandContext, name string) error {
@@ -65,16 +65,16 @@ func (c *triggersCommand) getTriggerByName(ctx core.CommandContext, name string)
 		return err
 	}
 
-	if ctx.Renderer.IsText() {
-		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			_, _ = fmt.Fprintf(stdout, "Name: %s\n", trigger.GetName())
-			_, _ = fmt.Fprintf(stdout, "Label: %s\n", trigger.GetLabel())
-			_, err := fmt.Fprintf(stdout, "Description: %s\n", trigger.GetDescription())
-			return err
-		})
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(trigger)
 	}
 
-	return ctx.Renderer.Render(trigger)
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		_, _ = fmt.Fprintf(stdout, "Name: %s\n", trigger.GetName())
+		_, _ = fmt.Fprintf(stdout, "Label: %s\n", trigger.GetLabel())
+		_, err := fmt.Fprintf(stdout, "Description: %s\n", trigger.GetDescription())
+		return err
+	})
 }
 
 func (c *triggersCommand) listTriggers(ctx core.CommandContext, from string) ([]openapi_client.TriggersTrigger, error) {

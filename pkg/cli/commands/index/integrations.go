@@ -39,18 +39,18 @@ func (c *integrationsCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	if ctx.Renderer.IsText() {
-		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
-			_, _ = fmt.Fprintln(writer, "NAME\tLABEL\tDESCRIPTION")
-			for _, integration := range response.GetIntegrations() {
-				_, _ = fmt.Fprintf(writer, "%s\t%s\t%s\n", integration.GetName(), integration.GetLabel(), integration.GetDescription())
-			}
-			return writer.Flush()
-		})
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(response.GetIntegrations())
 	}
 
-	return ctx.Renderer.Render(response.GetIntegrations())
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
+		_, _ = fmt.Fprintln(writer, "NAME\tLABEL\tDESCRIPTION")
+		for _, integration := range response.GetIntegrations() {
+			_, _ = fmt.Fprintf(writer, "%s\t%s\t%s\n", integration.GetName(), integration.GetLabel(), integration.GetDescription())
+		}
+		return writer.Flush()
+	})
 }
 
 func (c *integrationsCommand) getIntegrationByName(ctx core.CommandContext, name string) error {
@@ -59,16 +59,16 @@ func (c *integrationsCommand) getIntegrationByName(ctx core.CommandContext, name
 		return err
 	}
 
-	if ctx.Renderer.IsText() {
-		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			_, _ = fmt.Fprintf(stdout, "Name: %s\n", integration.GetName())
-			_, _ = fmt.Fprintf(stdout, "Label: %s\n", integration.GetLabel())
-			_, _ = fmt.Fprintf(stdout, "Description: %s\n", integration.GetDescription())
-			_, _ = fmt.Fprintf(stdout, "Components: %d\n", len(integration.GetComponents()))
-			_, err := fmt.Fprintf(stdout, "Triggers: %d\n", len(integration.GetTriggers()))
-			return err
-		})
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(integration)
 	}
 
-	return ctx.Renderer.Render(integration)
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		_, _ = fmt.Fprintf(stdout, "Name: %s\n", integration.GetName())
+		_, _ = fmt.Fprintf(stdout, "Label: %s\n", integration.GetLabel())
+		_, _ = fmt.Fprintf(stdout, "Description: %s\n", integration.GetDescription())
+		_, _ = fmt.Fprintf(stdout, "Components: %d\n", len(integration.GetComponents()))
+		_, err := fmt.Fprintf(stdout, "Triggers: %d\n", len(integration.GetTriggers()))
+		return err
+	})
 }
