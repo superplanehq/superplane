@@ -37,36 +37,12 @@ func (c *componentsCommand) Execute(ctx core.CommandContext) error {
 	from := strings.TrimSpace(*c.from)
 
 	if name != "" {
-		component, err := findComponent(ctx, from, name)
-		if err != nil {
-			return err
-		}
-
-		if ctx.Renderer.IsText() {
-			return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-				_, _ = fmt.Fprintf(stdout, "Name: %s\n", component.GetName())
-				_, _ = fmt.Fprintf(stdout, "Label: %s\n", component.GetLabel())
-				_, err := fmt.Fprintf(stdout, "Description: %s\n", component.GetDescription())
-				return err
-			})
-		}
-
-		return ctx.Renderer.Render(component)
+		return c.getComponentByName(ctx, name)
 	}
 
-	components := []openapi_client.ComponentsComponent{}
-	if from != "" {
-		integration, err := core.FindIntegrationDefinition(ctx, from)
-		if err != nil {
-			return err
-		}
-		components = integration.GetComponents()
-	} else {
-		response, _, err := ctx.API.ComponentAPI.ComponentsListComponents(ctx.Context).Execute()
-		if err != nil {
-			return err
-		}
-		components = response.GetComponents()
+	components, err := c.listComponents(ctx, from)
+	if err != nil {
+		return err
 	}
 
 	if ctx.Renderer.IsText() {
@@ -83,19 +59,48 @@ func (c *componentsCommand) Execute(ctx core.CommandContext) error {
 	return ctx.Renderer.Render(components)
 }
 
-func findComponent(
-	ctx core.CommandContext,
-	from string,
-	name string,
-) (openapi_client.ComponentsComponent, error) {
+func (c *componentsCommand) getComponentByName(ctx core.CommandContext, name string) error {
+	component, err := c.findComponentByName(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	if ctx.Renderer.IsText() {
+		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+			_, _ = fmt.Fprintf(stdout, "Name: %s\n", component.GetName())
+			_, _ = fmt.Fprintf(stdout, "Label: %s\n", component.GetLabel())
+			_, err := fmt.Fprintf(stdout, "Description: %s\n", component.GetDescription())
+			return err
+		})
+	}
+
+	return ctx.Renderer.Render(component)
+}
+
+func (c *componentsCommand) listComponents(ctx core.CommandContext, from string) ([]openapi_client.ComponentsComponent, error) {
+	//
+	// if --from is used, we grab the components from the integration
+	//
 	if from != "" {
 		integration, err := core.FindIntegrationDefinition(ctx, from)
 		if err != nil {
-			return openapi_client.ComponentsComponent{}, err
+			return nil, err
 		}
-		return findIntegrationComponent(integration, name)
+
+		return integration.GetComponents(), nil
 	}
 
+	//
+	// Otherwise, we list core components.
+	//
+	response, _, err := ctx.API.ComponentAPI.ComponentsListComponents(ctx.Context).Execute()
+	if err != nil {
+		return nil, err
+	}
+	return response.GetComponents(), nil
+}
+
+func (c *componentsCommand) findComponentByName(ctx core.CommandContext, name string) (openapi_client.ComponentsComponent, error) {
 	integrationName, componentName, scoped := core.ParseIntegrationScopedName(name)
 	if scoped {
 		integration, err := core.FindIntegrationDefinition(ctx, integrationName)
@@ -109,13 +114,11 @@ func findComponent(
 	if err != nil {
 		return openapi_client.ComponentsComponent{}, err
 	}
+
 	return response.GetComponent(), nil
 }
 
-func findIntegrationComponent(
-	integration openapi_client.IntegrationsIntegrationDefinition,
-	name string,
-) (openapi_client.ComponentsComponent, error) {
+func findIntegrationComponent(integration openapi_client.IntegrationsIntegrationDefinition, name string) (openapi_client.ComponentsComponent, error) {
 	for _, component := range integration.GetComponents() {
 		componentName := component.GetName()
 		if componentName == name || componentName == fmt.Sprintf("%s.%s", integration.GetName(), name) {

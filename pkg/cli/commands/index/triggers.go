@@ -37,36 +37,12 @@ func (c *triggersCommand) Execute(ctx core.CommandContext) error {
 	from := strings.TrimSpace(*c.from)
 
 	if name != "" {
-		trigger, err := findTrigger(ctx, from, name)
-		if err != nil {
-			return err
-		}
-
-		if ctx.Renderer.IsText() {
-			return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-				_, _ = fmt.Fprintf(stdout, "Name: %s\n", trigger.GetName())
-				_, _ = fmt.Fprintf(stdout, "Label: %s\n", trigger.GetLabel())
-				_, err := fmt.Fprintf(stdout, "Description: %s\n", trigger.GetDescription())
-				return err
-			})
-		}
-
-		return ctx.Renderer.Render(trigger)
+		return c.getTriggerByName(ctx, name)
 	}
 
-	triggers := []openapi_client.TriggersTrigger{}
-	if from != "" {
-		integration, err := core.FindIntegrationDefinition(ctx, from)
-		if err != nil {
-			return err
-		}
-		triggers = integration.GetTriggers()
-	} else {
-		response, _, err := ctx.API.TriggerAPI.TriggersListTriggers(ctx.Context).Execute()
-		if err != nil {
-			return err
-		}
-		triggers = response.GetTriggers()
+	triggers, err := c.listTriggers(ctx, from)
+	if err != nil {
+		return err
 	}
 
 	if ctx.Renderer.IsText() {
@@ -83,19 +59,49 @@ func (c *triggersCommand) Execute(ctx core.CommandContext) error {
 	return ctx.Renderer.Render(triggers)
 }
 
-func findTrigger(
-	ctx core.CommandContext,
-	from string,
-	name string,
-) (openapi_client.TriggersTrigger, error) {
+func (c *triggersCommand) getTriggerByName(ctx core.CommandContext, name string) error {
+	trigger, err := c.findTriggerByName(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	if ctx.Renderer.IsText() {
+		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+			_, _ = fmt.Fprintf(stdout, "Name: %s\n", trigger.GetName())
+			_, _ = fmt.Fprintf(stdout, "Label: %s\n", trigger.GetLabel())
+			_, err := fmt.Fprintf(stdout, "Description: %s\n", trigger.GetDescription())
+			return err
+		})
+	}
+
+	return ctx.Renderer.Render(trigger)
+}
+
+func (c *triggersCommand) listTriggers(ctx core.CommandContext, from string) ([]openapi_client.TriggersTrigger, error) {
+	//
+	// if --from is used, we grab the triggers from the integration
+	//
 	if from != "" {
 		integration, err := core.FindIntegrationDefinition(ctx, from)
 		if err != nil {
-			return openapi_client.TriggersTrigger{}, err
+			return nil, err
 		}
-		return findIntegrationTrigger(integration, name)
+
+		return integration.GetTriggers(), nil
 	}
 
+	//
+	// Otherwise, we list core triggers.
+	//
+	response, _, err := ctx.API.TriggerAPI.TriggersListTriggers(ctx.Context).Execute()
+	if err != nil {
+		return nil, err
+	}
+
+	return response.GetTriggers(), nil
+}
+
+func (c *triggersCommand) findTriggerByName(ctx core.CommandContext, name string) (openapi_client.TriggersTrigger, error) {
 	integrationName, triggerName, scoped := core.ParseIntegrationScopedName(name)
 	if scoped {
 		integration, err := core.FindIntegrationDefinition(ctx, integrationName)
