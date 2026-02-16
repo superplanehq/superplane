@@ -7,7 +7,7 @@ Manage and react to incidents in incident.io
 ## Triggers
 
 <CardGrid>
-  <LinkCard title="On Incident" href="#on-incident" description="Listen to incident created and updated events" />
+  <LinkCard title="On Incident" href="#on-incident" description="Listen to incident created and updated events from incident.io" />
 </CardGrid>
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
@@ -17,6 +17,25 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in incident.io" />
 </CardGrid>
+
+## Instructions
+
+## Connect incident.io to SuperPlane
+
+1. **Create an API key** in [incident.io Settings > API keys](https://app.incident.io/settings/api-keys). Grant the key permission to create incidents and read severities (and optionally view private incidents if you use private incidents).
+
+2. **Paste the API key** below. The key is stored securely and used to validate the connection and to run Create Incident actions.
+
+## On Incident trigger (webhooks)
+
+incident.io sends webhooks via Svix. There is no API to register webhook endpoints; you configure them in the incident.io dashboard:
+
+1. Add the **On Incident** trigger to your workflow and select the events you want (e.g. Incident created, Incident updated).
+2. Copy the **webhook URL** shown for this trigger (after saving the canvas).
+3. In incident.io go to **Settings > Webhooks** and create a new endpoint. Paste the SuperPlane webhook URL and subscribe to the same events (e.g. **Public incident created (v2)**, **Public incident updated (v2)**).
+4. Copy the **Signing secret** from the new endpoint in incident.io and paste it into the trigger's **Signing secret** field in SuperPlane.
+
+Without the signing secret, webhook requests cannot be verified and will be rejected.
 
 <a id="on-incident"></a>
 
@@ -33,45 +52,44 @@ The On Incident trigger starts a workflow execution when incident.io sends webho
 ### Configuration
 
 - **Events**: Select which events to listen for (Incident created, Incident updated)
-- **Signing secret**: Paste the signing secret from your incident.io webhook endpoint (Settings > Webhooks). Required to verify webhook authenticity.
-
-### Event Data
-
-Each event includes:
-- **event_type**: The incident.io event type (e.g. public_incident.incident_created_v2)
-- **incident**: Incident details including id, name, summary, reference, permalink, visibility, severity, incident_status, created_at, updated_at
+- **Signing secret**: Paste the signing secret from your incident.io webhook endpoint (Settings > Webhooks). Required to verify webhook authenticity; you can add it after creating the endpoint with the URL shown in the trigger settings.
 
 ### Webhook Setup
 
-incident.io does not provide an API to register webhook endpoints. You configure them in the incident.io dashboard:
+incident.io does not provide an API to register webhook endpoints. After adding this trigger:
 
-1. Add the On Incident trigger to your workflow and save the canvas.
-2. Copy the **webhook URL** shown for this trigger.
-3. In incident.io go to **Settings > Webhooks** and create a new endpoint. Paste the SuperPlane webhook URL.
-4. Subscribe to **Public incident created (v2)** and/or **Public incident updated (v2)** as needed.
-5. Copy the **Signing secret** from the new endpoint and paste it into the trigger's Signing secret field in SuperPlane.
+1. Copy the webhook URL shown for this trigger (after saving the canvas).
+2. In incident.io go to **Settings > Webhooks** and create a new endpoint with that URL.
+3. Subscribe to **Public incident created (v2)** and/or **Public incident updated (v2)** as needed.
+4. Copy the **Signing secret** from the endpoint and paste it into the trigger's Signing secret field.
 
 ### Example Data
 
 ```json
 {
-  "type": "incident.incident.created",
   "data": {
     "event_type": "public_incident.incident_created_v2",
     "incident": {
-      "id": "01FDAG4SAP5TYPT98WGR2N7W91",
-      "name": "Our database is sad",
-      "summary": "Our database is really really sad, and we don't know why yet.",
-      "reference": "INC-123",
-      "permalink": "https://app.incident.io/incidents/123",
-      "visibility": "public",
       "created_at": "2021-08-17T13:28:57.801578Z",
+      "id": "01FDAG4SAP5TYPT98WGR2N7W91",
+      "incident_status": {
+        "id": "01FCNDV6P870EA6S7TK1DSYD5H",
+        "name": "Triage"
+      },
+      "name": "Our database is sad",
+      "permalink": "https://app.incident.io/incidents/123",
+      "reference": "INC-123",
+      "severity": {
+        "id": "01FCNDV6P870EA6S7TK1DSYDG0",
+        "name": "Minor"
+      },
+      "summary": "Our database is really really sad, and we don't know why yet.",
       "updated_at": "2021-08-17T13:28:57.801578Z",
-      "severity": { "id": "01FCNDV6P870EA6S7TK1DSYDG0", "name": "Minor" },
-      "incident_status": { "id": "01FCNDV6P870EA6S7TK1DSYD5H", "name": "Triage" }
+      "visibility": "public"
     }
   },
-  "timestamp": "2026-01-19T12:00:00Z"
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "incident.incident.created"
 }
 ```
 
@@ -79,7 +97,7 @@ incident.io does not provide an API to register webhook endpoints. You configure
 
 ## Create Incident
 
-The Create Incident component creates a new incident in incident.io via the API.
+The Create Incident component creates a new incident in incident.io.
 
 ### Use Cases
 
@@ -90,10 +108,10 @@ The Create Incident component creates a new incident in incident.io via the API.
 
 ### Configuration
 
-- **Incident Name**: A succinct name or title for the incident (required, supports expressions)
+- **Name**: The incident name or title (required, supports expressions)
 - **Summary**: Additional details about the incident (optional, supports expressions)
-- **Severity**: Select a severity from your incident.io organization (optional). Severities are listed from your connected account.
-- **Visibility**: Public (anyone can access) or Private (only invited users). Default is Public.
+- **Severity**: Select a severity from your incident.io organization (optional)
+- **Visibility**: Public (anyone can access) or Private (only invited users)
 
 ### Output
 
@@ -110,14 +128,18 @@ Returns the created incident object including:
 
 ```json
 {
+  "created_at": "2021-08-17T13:28:57.801578Z",
   "id": "01FDAG4SAP5TYPT98WGR2N7W91",
   "name": "Database connectivity issues",
-  "summary": "Users are experiencing slow queries and connection timeouts.",
-  "reference": "INC-123",
   "permalink": "https://app.incident.io/incidents/123",
-  "visibility": "public",
-  "created_at": "2021-08-17T13:28:57.801578Z",
+  "reference": "INC-123",
+  "severity": {
+    "id": "01FCNDV6P870EA6S7TK1DSYDG0",
+    "name": "Minor"
+  },
+  "summary": "Users are experiencing slow queries and connection timeouts.",
   "updated_at": "2021-08-17T13:28:57.801578Z",
-  "severity": { "id": "01FCNDV6P870EA6S7TK1DSYDG0", "name": "Minor" }
+  "visibility": "public"
 }
 ```
+
