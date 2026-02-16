@@ -1,0 +1,132 @@
+---
+title: "Google Cloud"
+---
+
+Manage and use Google Cloud resources in your workflows
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On VM Created" href="#on-vm-created" description="Emit when a new Compute Engine VM is created (provisioning succeeded)" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Virtual Machine" href="#create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
+</CardGrid>
+
+## Instructions
+
+## Connection method
+
+Choose **Service Account Key** (paste JSON) or **Workload Identity Federation** (keyless, using this SuperPlane instance as OIDC issuer).
+
+### Service Account Key
+
+1. In [Google Cloud Console](https://console.cloud.google.com/) → **IAM & Admin** → **Service Accounts**
+2. Open a service account → **Keys** → **Add Key** → **Create new key** → **JSON**
+3. Download the JSON and paste its **entire contents** below.
+
+### Workload Identity Federation (keyless)
+
+1. Create a [Workload Identity Pool](https://cloud.google.com/iam/docs/workload-identity-federation) with an **OIDC provider** in GCP.
+2. Set **Issuer** to **this SuperPlane instance URL** (must serve /.well-known/openid-configuration and /.well-known/jwks.json over HTTPS and be reachable by Google; otherwise use Service Account Key).
+3. Set **Audience** to the pool provider resource name.
+4. Configure [attribute mapping](https://cloud.google.com/iam/docs/workload-identity-federation-with-other-providers#mapping) so the federated identity can impersonate a GCP service account with the roles your workflows need.
+5. Below, choose **Workload Identity Federation** and enter the **pool provider resource name** and **Project ID**.
+
+> **Note**: Use a dedicated service account (or WIF mapping) with only the IAM roles your workflows need.
+
+<a id="on-vm-created"></a>
+
+## On VM Created
+
+The On VM Created trigger starts a workflow execution when a new Compute Engine VM is created and provisioning has succeeded.
+
+### Use Cases
+
+- **Post-provisioning automation**: Run configuration, monitoring, or security setup after a VM is created
+- **Inventory and compliance**: Record new VMs or trigger audits
+- **Notifications**: Notify teams or systems when new VMs appear in a project or zone
+
+### Event Source
+
+This trigger expects events from Google Cloud via **Eventarc** (Cloud Audit Logs) or a **Cloud Logging sink to Pub/Sub** with push to the trigger webhook URL.
+
+1. **Eventarc (recommended)**
+   Create an Eventarc trigger with:
+   - **Event type**: Cloud Audit Log
+   - **Log type**: Admin Activity (VM create is an admin write)
+   - **Filters**: protoPayload.serviceName="compute.googleapis.com", protoPayload.methodName="v1.compute.instances.insert"
+   - **Destination**: HTTP destination (SuperPlane webhook URL for this trigger)
+
+2. **Log sink + Pub/Sub**
+   Create a log sink that writes to a Pub/Sub topic (filter as above), then create a push subscription to the trigger webhook URL.
+
+### Configuration
+
+- **Project ID**: Optional. Only emit for VMs created in this project.
+
+### Event Data
+
+Each event includes the full CloudEvents audit payload, including resourceName (e.g. projects/my-project/zones/us-central1-a/instances/my-vm), serviceName (compute.googleapis.com), methodName (v1.compute.instances.insert), and data (decoded audit log entry).
+
+### Example Data
+
+```json
+{
+  "data": {
+    "protoPayload": {
+      "methodName": "v1.compute.instances.insert",
+      "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
+      "serviceName": "compute.googleapis.com"
+    }
+  },
+  "id": "example-event-id",
+  "methodName": "v1.compute.instances.insert",
+  "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
+  "serviceName": "compute.googleapis.com",
+  "source": "//cloudaudit.googleapis.com/projects/my-project/logs/activity",
+  "time": "2025-02-14T12:00:00Z",
+  "type": "google.cloud.audit.log.v1.written"
+}
+```
+
+<a id="create-virtual-machine"></a>
+
+## Create Virtual Machine
+
+Creates a new Google Compute Engine VM.
+
+### Steps
+
+1. **Machine Configuration** – Region, zone, machine type, provisioning model (Spot/Standard), instance name.
+2. **OS & Storage** – Boot disk source (public/custom image, snapshot, existing disk), disk type, size, snapshot schedule.
+3. **Security** – Shielded VM (secure boot, vTPM, integrity monitoring), Confidential VM (AMD SEV/SEV-SNP, Intel TDX).
+4. **Identity & API access** – VM service account, OAuth scopes, OS Login, block project-wide SSH keys.
+5. **Networking** – VPC, subnet, NIC type, internal/external IP (including static), network tags, firewall rules.
+6. **Management** – Metadata, startup script, automatic restart, on host maintenance, maintenance policy.
+7. **Advanced** – GPU accelerators, placement policy (min node CPUs), sole-tenant/host affinity, resource policies.
+
+### Output
+
+Emits a payload with instance details: instanceId, selfLink, internalIP, externalIP, status, zone, name, machineType.
+
+### Example Output
+
+```json
+{
+  "externalIP": "34.1.2.3",
+  "instanceId": "1234567890123456789",
+  "internalIP": "10.0.0.2",
+  "machineType": "e2-medium",
+  "name": "my-vm",
+  "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/instances/my-vm",
+  "status": "RUNNING",
+  "zone": "us-central1-a"
+}
+```
+
