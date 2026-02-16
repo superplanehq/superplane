@@ -1,0 +1,14 @@
+{
+  "input": {
+    "teamId": "team_1",
+    "title": "Auto-created issue from SuperPlane",
+    "description": "Generated from PoC",
+    "assigneeId": "user_1",
+    "labelIds": [
+      "label_bug",
+      "label_backend"
+    ],
+    "priority": 2,
+    "stateId": "state_todo"
+  }
+}

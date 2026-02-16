@@ -1,0 +1,24 @@
+{
+  "action": "create",
+  "type": "Issue",
+  "data": {
+    "id": "issue_123",
+    "identifier": "ENG-42",
+    "title": "Investigate failed deploy webhook",
+    "url": "https://linear.app/acme/issue/ENG-42",
+    "team": {
+      "id": "team_1",
+      "name": "Engineering"
+    },
+    "labels": [
+      {
+        "id": "label_1",
+        "name": "bug"
+      },
+      {
+        "id": "label_2",
+        "name": "prod"
+      }
+    ]
+  }
+}
