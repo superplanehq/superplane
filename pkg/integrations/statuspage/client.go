@@ -163,7 +163,10 @@ func (c *Client) CreateIncident(pageID string, req CreateIncidentRequest) (map[s
 		}
 		payload.ImpactOverride = req.ImpactOverride
 	} else {
-		payload.Status = "scheduled"
+		payload.Status = req.Status
+		if payload.Status == "" {
+			payload.Status = "scheduled"
+		}
 		payload.ScheduledFor = req.ScheduledFor
 		payload.ScheduledUntil = req.ScheduledUntil
 		payload.ScheduledRemindPrior = &req.ScheduledRemindPrior

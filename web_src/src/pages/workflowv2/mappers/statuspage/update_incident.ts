@@ -1,4 +1,4 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
+import { ComponentBaseProps, ComponentBaseSpec } from "@/ui/componentBase";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getStateMap } from "..";
 import {
@@ -13,7 +13,7 @@ import { MetadataItem } from "@/ui/metadataList";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
 import { StatuspageIncident, StatuspageNodeMetadata } from "./types";
 import { formatTimeAgo } from "@/utils/date";
-import { baseEventSections, getDetailsForIncident } from "./utils";
+import { baseEventSections, getDetailsForIncident, truncateForDisplay } from "./utils";
 
 export const updateIncidentMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -31,6 +31,7 @@ export const updateIncidentMapper: ComponentBaseMapper = {
         "Unnamed component",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
       metadata: metadataList(context.node),
+      specs: updateIncidentSpecs(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -62,7 +63,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as {
     page?: string;
     incident?: string;
-    status?: string;
+    statusRealtime?: string;
+    statusScheduled?: string;
   };
   const nodeMetadata = node.metadata as StatuspageNodeMetadata | undefined;
 
@@ -70,9 +72,72 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   if (pageLabel) {
     metadata.push({ icon: "globe", label: "Page: " + pageLabel });
   }
-  if (configuration?.status) {
-    metadata.push({ icon: "arrow-right-circle", label: "Status: " + configuration.status });
+  if (configuration?.incident) {
+    const incidentLabel = truncateForDisplay(configuration.incident);
+    metadata.push({ icon: "alert-triangle", label: "Incident: " + incidentLabel });
+  }
+  const status = configuration?.statusRealtime || configuration?.statusScheduled;
+  if (status) {
+    metadata.push({ icon: "arrow-right-circle", label: "Status: " + status });
   }
 
   return metadata;
+}
+
+function updateIncidentSpecs(node: NodeInfo): ComponentBaseSpec[] {
+  const configuration = node.configuration as {
+    incidentType?: string;
+    body?: string;
+    impactOverride?: string;
+    componentIds?: string[];
+  };
+  const values: ComponentBaseSpec["values"] = [];
+
+  const typeLabel = configuration?.incidentType === "scheduled" ? "Scheduled" : "Realtime";
+  values.push({
+    badges: [
+      { label: "Type:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
+      { label: typeLabel, bgColor: "bg-gray-100", textColor: "text-gray-800" },
+    ],
+  });
+
+  if (configuration?.body) {
+    const bodyPreview = truncateForDisplay(configuration.body, 50);
+    values.push({
+      badges: [
+        { label: "Body:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
+        { label: bodyPreview, bgColor: "bg-gray-100", textColor: "text-gray-800" },
+      ],
+    });
+  }
+  if (configuration?.impactOverride) {
+    values.push({
+      badges: [
+        { label: "Impact:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
+        { label: configuration.impactOverride, bgColor: "bg-gray-100", textColor: "text-gray-800" },
+      ],
+    });
+  }
+  if (configuration?.componentIds && configuration.componentIds.length > 0) {
+    const nodeMetadata = node.metadata as StatuspageNodeMetadata | undefined;
+    const componentLabel =
+      nodeMetadata?.componentNames && nodeMetadata.componentNames.length > 0
+        ? nodeMetadata.componentNames.join(", ")
+        : `${configuration.componentIds.length} selected`;
+    values.push({
+      badges: [
+        { label: "Components:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
+        { label: truncateForDisplay(componentLabel, 60), bgColor: "bg-gray-100", textColor: "text-gray-800" },
+      ],
+    });
+  }
+
+  return [
+    {
+      title: "option",
+      tooltipTitle: "Configuration options",
+      iconSlug: "settings",
+      values,
+    },
+  ];
 }

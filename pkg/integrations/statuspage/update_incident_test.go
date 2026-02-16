@@ -26,6 +26,30 @@ const sampleUpdatedIncidentJSON = `{
 	"incident_updates": []
 }`
 
+const sampleRealtimeIncidentJSON = `{
+	"id": "p31zjtct2jer",
+	"name": "Database Connection Issues",
+	"status": "investigating",
+	"impact": "major",
+	"shortlink": "http://stspg.io/p31zjtct2jer",
+	"page_id": "kctbh9vrtdwd",
+	"components": [],
+	"incident_updates": []
+}`
+
+const sampleScheduledIncidentJSON = `{
+	"id": "sched123",
+	"name": "Maintenance",
+	"status": "scheduled",
+	"impact": "none",
+	"shortlink": "http://stspg.io/sched123",
+	"page_id": "kctbh9vrtdwd",
+	"scheduled_for": "2026-02-15T02:00:00Z",
+	"scheduled_until": "2026-02-15T04:00:00Z",
+	"components": [],
+	"incident_updates": []
+}`
+
 func Test__UpdateIncident__Setup(t *testing.T) {
 	component := &UpdateIncident{}
 
@@ -35,10 +59,11 @@ func Test__UpdateIncident__Setup(t *testing.T) {
 		}
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"page":     "kctbh9vrtdwd",
-				"incident": "p31zjtct2jer",
-				"status":   "resolved",
-				"body":     "Issue resolved.",
+				"page":            "kctbh9vrtdwd",
+				"incident":        "p31zjtct2jer",
+				"incidentType":    "realtime",
+				"statusRealtime":  "resolved",
+				"body":            "Issue resolved.",
 			},
 			Integration: integrationCtx,
 			Metadata:    &contexts.MetadataContext{},
@@ -52,9 +77,10 @@ func Test__UpdateIncident__Setup(t *testing.T) {
 		}
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"page":     "kctbh9vrtdwd",
-				"incident": "p31zjtct2jer",
-				"status":   "in_progress",
+				"page":             "kctbh9vrtdwd",
+				"incident":        "p31zjtct2jer",
+				"incidentType":    "scheduled",
+				"statusScheduled": "in_progress",
 			},
 			Integration: integrationCtx,
 			Metadata:    &contexts.MetadataContext{},
@@ -86,7 +112,8 @@ func Test__UpdateIncident__Setup(t *testing.T) {
 			Configuration: map[string]any{
 				"page":            "kctbh9vrtdwd",
 				"incident":        "p31zjtct2jer",
-				"status":          "resolved",
+				"incidentType":    "realtime",
+				"statusRealtime":  "resolved",
 				"componentIds":    []string{"comp1"},
 				"componentStatus": "operational",
 			},
@@ -99,8 +126,8 @@ func Test__UpdateIncident__Setup(t *testing.T) {
 	t.Run("missing page returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"incident": "p31zjtct2jer",
-				"status":   "resolved",
+				"incident":       "p31zjtct2jer",
+				"statusRealtime": "resolved",
 			},
 		})
 		require.Error(t, err)
@@ -110,8 +137,8 @@ func Test__UpdateIncident__Setup(t *testing.T) {
 	t.Run("missing incident returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"page":   "kctbh9vrtdwd",
-				"status": "resolved",
+				"page":           "kctbh9vrtdwd",
+				"statusRealtime": "resolved",
 			},
 		})
 		require.Error(t, err)
@@ -138,6 +165,10 @@ func Test__UpdateIncident__Execute(t *testing.T) {
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(sampleRealtimeIncidentJSON)),
+				},
+				{
+					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(sampleUpdatedIncidentJSON)),
 				},
 			},
@@ -149,10 +180,11 @@ func Test__UpdateIncident__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"page":     "kctbh9vrtdwd",
-				"incident": "p31zjtct2jer",
-				"status":   "resolved",
-				"body":     "All systems operational.",
+				"page":            "kctbh9vrtdwd",
+				"incident":        "p31zjtct2jer",
+				"incidentType":    "realtime",
+				"statusRealtime":  "resolved",
+				"body":            "All systems operational.",
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -178,6 +210,10 @@ func Test__UpdateIncident__Execute(t *testing.T) {
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(sampleRealtimeIncidentJSON)),
+				},
+				{
+					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(sampleUpdatedIncidentJSON)),
 				},
 			},
@@ -192,7 +228,8 @@ func Test__UpdateIncident__Execute(t *testing.T) {
 			Configuration: map[string]any{
 				"page":                 "kctbh9vrtdwd",
 				"incident":             "p31zjtct2jer",
-				"status":               "resolved",
+				"incidentType":         "realtime",
+				"statusRealtime":       "resolved",
 				"deliverNotifications": &deliverFalse,
 			},
 			HTTP:           httpContext,
@@ -201,9 +238,9 @@ func Test__UpdateIncident__Execute(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		require.Len(t, httpContext.Requests, 1)
+		require.Len(t, httpContext.Requests, 2)
 
-		reqBody, readErr := io.ReadAll(httpContext.Requests[0].Body)
+		reqBody, readErr := io.ReadAll(httpContext.Requests[1].Body)
 		require.NoError(t, readErr)
 
 		var payload map[string]any
@@ -218,6 +255,10 @@ func Test__UpdateIncident__Execute(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(sampleRealtimeIncidentJSON)),
+				},
+				{
 					StatusCode: http.StatusNotFound,
 					Body:       io.NopCloser(strings.NewReader(`{"error": "Incident not found"}`)),
 				},
@@ -230,9 +271,10 @@ func Test__UpdateIncident__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"page":     "kctbh9vrtdwd",
-				"incident": "nonexistent",
-				"status":   "resolved",
+				"page":           "kctbh9vrtdwd",
+				"incident":       "nonexistent",
+				"incidentType":   "realtime",
+				"statusRealtime": "resolved",
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -242,5 +284,147 @@ func Test__UpdateIncident__Execute(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to update incident")
 		assert.Empty(t, executionState.Payloads)
+	})
+
+	t.Run("type mismatch realtime incident with scheduled status returns error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(sampleRealtimeIncidentJSON)),
+				},
+			},
+		}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "test-key"},
+		}
+		executionState := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"page":             "kctbh9vrtdwd",
+				"incident":         "p31zjtct2jer",
+				"incidentType":     "scheduled",
+				"statusScheduled":  "in_progress",
+			},
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
+			ExecutionState: executionState,
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot change a realtime incident to scheduled maintenance")
+		assert.Empty(t, executionState.Payloads)
+	})
+
+	t.Run("type mismatch scheduled incident with realtime status returns error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(sampleScheduledIncidentJSON)),
+				},
+			},
+		}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "test-key"},
+		}
+		executionState := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"page":            "kctbh9vrtdwd",
+				"incident":        "sched123",
+				"incidentType":    "realtime",
+				"statusRealtime":  "resolved",
+			},
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
+			ExecutionState: executionState,
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot change a scheduled maintenance incident to realtime")
+		assert.Empty(t, executionState.Payloads)
+	})
+
+	t.Run("type match scheduled incident with scheduled status succeeds", func(t *testing.T) {
+		scheduledCompletedJSON := `{
+			"id": "sched123",
+			"name": "Maintenance",
+			"status": "completed",
+			"impact": "none",
+			"shortlink": "http://stspg.io/sched123",
+			"page_id": "kctbh9vrtdwd",
+			"components": [],
+			"incident_updates": []
+		}`
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(sampleScheduledIncidentJSON)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(scheduledCompletedJSON)),
+				},
+			},
+		}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "test-key"},
+		}
+		executionState := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"page":             "kctbh9vrtdwd",
+				"incident":         "sched123",
+				"incidentType":     "scheduled",
+				"statusScheduled":  "completed",
+			},
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
+			ExecutionState: executionState,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "statuspage.incident", executionState.Type)
+		require.Len(t, executionState.Payloads, 1)
+		wrapped, ok := executionState.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		data, ok := wrapped["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "completed", data["status"])
+	})
+
+	t.Run("body only update skips type validation", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(sampleUpdatedIncidentJSON)),
+				},
+			},
+		}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "test-key"},
+		}
+		executionState := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"page":     "kctbh9vrtdwd",
+				"incident": "p31zjtct2jer",
+				"body":     "Additional update message.",
+			},
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
+			ExecutionState: executionState,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "statuspage.incident", executionState.Type)
 	})
 }

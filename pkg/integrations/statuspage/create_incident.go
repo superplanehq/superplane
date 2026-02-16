@@ -22,7 +22,8 @@ type CreateIncidentSpec struct {
 	IncidentType            string   `json:"incidentType"`
 	Name                    string   `json:"name"`
 	Body                    string   `json:"body"`
-	Status                  *string  `json:"status,omitempty"`
+	StatusRealtime          *string  `json:"statusRealtime,omitempty"`
+	StatusScheduled         *string  `json:"statusScheduled,omitempty"`
 	ImpactOverride          *string  `json:"impactOverride,omitempty"`
 	ComponentIDs            []string `json:"componentIds"`
 	ComponentStatus         string   `json:"componentStatus"`
@@ -175,7 +176,7 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			Description: "First incident update message (optional)",
 		},
 		{
-			Name:     "status",
+			Name:     "statusRealtime",
 			Label:    "Status",
 			Type:     configuration.FieldTypeSelect,
 			Required: false,
@@ -192,6 +193,26 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			},
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "incidentType", Values: []string{"realtime"}},
+			},
+		},
+		{
+			Name:     "statusScheduled",
+			Label:    "Status",
+			Type:     configuration.FieldTypeSelect,
+			Required: false,
+			Default:  "scheduled",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Scheduled", Value: "scheduled"},
+						{Label: "In progress", Value: "in_progress"},
+						{Label: "Verifying", Value: "verifying"},
+						{Label: "Completed", Value: "completed"},
+					},
+				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "incidentType", Values: []string{"scheduled"}},
 			},
 		},
 		{
@@ -391,9 +412,17 @@ func (c *CreateIncident) Setup(ctx core.SetupContext) error {
 		}
 	}
 
-	// Resolve page name for metadata when Page is a static ID (no expression).
+	// Resolve page name and component names for metadata when IDs are static (no expressions).
 	// Skip API call if HTTP context is not available (e.g. in tests without HTTP mock).
 	metadata := NodeMetadata{}
+	configMap, _ := ctx.Configuration.(map[string]any)
+	if configMap == nil {
+		configMap = make(map[string]any)
+	}
+	componentIDs := extractComponentIDs(configMap)
+	if len(componentIDs) == 0 {
+		componentIDs = spec.ComponentIDs
+	}
 	if spec.Page != "" && !strings.Contains(spec.Page, "{{") && ctx.HTTP != nil {
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
 		if err == nil {
@@ -403,6 +432,23 @@ func (c *CreateIncident) Setup(ctx core.SetupContext) error {
 					if p.ID == spec.Page {
 						metadata.PageName = p.Name
 						break
+					}
+				}
+			}
+			// Resolve component names when componentIds are static
+			if len(componentIDs) > 0 && !containsExpression(componentIDs) {
+				components, err := client.ListComponents(spec.Page)
+				if err == nil {
+					idToName := make(map[string]string)
+					for _, c := range components {
+						idToName[c.ID] = c.Name
+					}
+					for _, id := range componentIDs {
+						if name := idToName[id]; name != "" {
+							metadata.ComponentNames = append(metadata.ComponentNames, name)
+						} else {
+							metadata.ComponentNames = append(metadata.ComponentNames, id)
+						}
 					}
 				}
 			}
@@ -447,11 +493,19 @@ func (c *CreateIncident) Execute(ctx core.ExecutionContext) error {
 		DeliverNotifications: deliverNotifications,
 	}
 
+	status := derefStr(spec.StatusRealtime)
+	if status == "" {
+		status = derefStr(spec.StatusScheduled)
+	}
+	if status == "" && spec.IncidentType == "realtime" {
+		status = "investigating"
+	}
+	if status == "" && spec.IncidentType == "scheduled" {
+		status = "scheduled"
+	}
+	req.Status = status
+
 	if spec.IncidentType == "realtime" {
-		req.Status = derefStr(spec.Status)
-		if req.Status == "" {
-			req.Status = "investigating"
-		}
 		req.ImpactOverride = derefStr(spec.ImpactOverride)
 	} else {
 		tz := derefStr(spec.ScheduledTimezone)

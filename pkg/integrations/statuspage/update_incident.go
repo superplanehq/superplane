@@ -14,11 +14,23 @@ import (
 
 type UpdateIncident struct{}
 
+// isScheduledStatus returns true if the status belongs to a scheduled maintenance incident.
+func isScheduledStatus(status string) bool {
+	switch status {
+	case "scheduled", "in_progress", "verifying", "completed":
+		return true
+	default:
+		return false
+	}
+}
+
 // UpdateIncidentSpec is the strongly typed configuration for the Update Incident component.
 type UpdateIncidentSpec struct {
 	Page                 string   `json:"page"`
 	Incident             string   `json:"incident"`
-	Status               string   `json:"status"`
+	IncidentType         string   `json:"incidentType"`
+	StatusRealtime       string   `json:"statusRealtime"`
+	StatusScheduled      string   `json:"statusScheduled"`
 	Body                 string   `json:"body"`
 	ImpactOverride       string   `json:"impactOverride"`
 	ComponentIDs         []string `json:"componentIds"`
@@ -51,9 +63,10 @@ func (c *UpdateIncident) Documentation() string {
 
 - **Page** (required): The Statuspage containing the incident. Select from the dropdown, or switch to expression mode for workflow chaining (e.g. {{ $['Create Incident'].data.page_id }}).
 - **Incident** (required): Incident ID to update. Supports expressions for workflow chaining (e.g. {{ $['Create Incident'].data.id }}).
-- **Status** (optional): New status (investigating, identified, monitoring, resolved, scheduled, in_progress, completed)
+- **Incident type**: Realtime or Scheduled — determines which status options are shown. You cannot change an incident's type.
+- **Status** (optional): New status. Options depend on incident type: realtime (investigating, identified, monitoring, resolved) or scheduled (scheduled, in progress, verifying, completed)
 - **Body** (optional): Update message shown as the latest incident update
-- **Impact override** (optional): Override displayed severity (none, maintenance, minor, major, critical)
+- **Impact override** (optional, realtime only): Override displayed severity (none, maintenance, minor, major, critical)
 - **Components** (optional): Components to associate with this update
 - **Component status** (optional): Status to set for selected components
 - **Deliver notifications** (optional): Whether to send notifications for this update (default: true)
@@ -128,7 +141,22 @@ func (c *UpdateIncident) Configuration() []configuration.Field {
 			Placeholder: "e.g., p31zjtct2jer or {{ $['Create Incident'].data.id }}",
 		},
 		{
-			Name:        "status",
+			Name:     "incidentType",
+			Label:    "Incident type",
+			Type:     configuration.FieldTypeSelect,
+			Required: true,
+			Default:  "realtime",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Realtime", Value: "realtime"},
+						{Label: "Scheduled", Value: "scheduled"},
+					},
+				},
+			},
+		},
+		{
+			Name:        "statusRealtime",
 			Label:       "Status",
 			Type:        configuration.FieldTypeSelect,
 			Required:    false,
@@ -140,11 +168,31 @@ func (c *UpdateIncident) Configuration() []configuration.Field {
 						{Label: "Identified", Value: "identified"},
 						{Label: "Monitoring", Value: "monitoring"},
 						{Label: "Resolved", Value: "resolved"},
+					},
+				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "incidentType", Values: []string{"realtime"}},
+			},
+		},
+		{
+			Name:        "statusScheduled",
+			Label:       "Status",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Description: "New incident status",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
 						{Label: "Scheduled", Value: "scheduled"},
 						{Label: "In progress", Value: "in_progress"},
+						{Label: "Verifying", Value: "verifying"},
 						{Label: "Completed", Value: "completed"},
 					},
 				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "incidentType", Values: []string{"scheduled"}},
 			},
 		},
 		{
@@ -171,6 +219,9 @@ func (c *UpdateIncident) Configuration() []configuration.Field {
 						{Label: "Critical", Value: "critical"},
 					},
 				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "incidentType", Values: []string{"realtime"}},
 			},
 		},
 		{
@@ -239,18 +290,31 @@ func (c *UpdateIncident) Setup(ctx core.SetupContext) error {
 		return errors.New("incident is required")
 	}
 
+	incidentType := spec.IncidentType
+	if incidentType == "" {
+		incidentType = "realtime"
+	}
+
 	effectiveImpact := spec.ImpactOverride
 	if effectiveImpact == "__none__" {
 		effectiveImpact = ""
 	}
-	hasUpdate := spec.Status != "" || spec.Body != "" || effectiveImpact != "" || len(spec.ComponentIDs) > 0
+	hasUpdate := spec.StatusRealtime != "" || spec.StatusScheduled != "" || spec.Body != "" || effectiveImpact != "" || len(spec.ComponentIDs) > 0
 	if !hasUpdate {
 		return errors.New("at least one of status, body, impact override, or components must be provided")
 	}
 
-	// Resolve page name for metadata when Page is a static ID (no expression).
+	// Resolve page name and component names for metadata when IDs are static (no expressions).
 	// Skip API call if HTTP context is not available (e.g. in tests without HTTP mock).
 	metadata := NodeMetadata{}
+	configMap, _ := ctx.Configuration.(map[string]any)
+	if configMap == nil {
+		configMap = make(map[string]any)
+	}
+	componentIDs := extractComponentIDs(configMap)
+	if len(componentIDs) == 0 {
+		componentIDs = spec.ComponentIDs
+	}
 	if spec.Page != "" && !strings.Contains(spec.Page, "{{") && ctx.HTTP != nil {
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
 		if err == nil {
@@ -260,6 +324,23 @@ func (c *UpdateIncident) Setup(ctx core.SetupContext) error {
 					if p.ID == spec.Page {
 						metadata.PageName = p.Name
 						break
+					}
+				}
+			}
+			// Resolve component names when componentIds are static
+			if len(componentIDs) > 0 && !containsExpression(componentIDs) {
+				components, err := client.ListComponents(spec.Page)
+				if err == nil {
+					idToName := make(map[string]string)
+					for _, c := range components {
+						idToName[c.ID] = c.Name
+					}
+					for _, id := range componentIDs {
+						if name := idToName[id]; name != "" {
+							metadata.ComponentNames = append(metadata.ComponentNames, name)
+						} else {
+							metadata.ComponentNames = append(metadata.ComponentNames, id)
+						}
 					}
 				}
 			}
@@ -275,9 +356,43 @@ func (c *UpdateIncident) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error decoding configuration: %w", err)
 	}
 
+	incidentType := spec.IncidentType
+	if incidentType == "" {
+		incidentType = "realtime"
+	}
+
+	effectiveStatus := spec.StatusRealtime
+	if effectiveStatus == "" {
+		effectiveStatus = spec.StatusScheduled
+	}
+
+	impactOverride := spec.ImpactOverride
+	if impactOverride == "__none__" {
+		impactOverride = ""
+	}
+	if incidentType == "scheduled" {
+		impactOverride = ""
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %w", err)
+	}
+
+	if effectiveStatus != "" {
+		existing, err := client.GetIncident(spec.Page, spec.Incident)
+		if err != nil {
+			return fmt.Errorf("failed to fetch incident for validation: %w", err)
+		}
+		existingStatus, _ := existing["status"].(string)
+		actualIsScheduled := isScheduledStatus(existingStatus)
+		requestedIsScheduled := isScheduledStatus(effectiveStatus)
+		if !actualIsScheduled && requestedIsScheduled {
+			return fmt.Errorf("cannot change a realtime incident to scheduled maintenance; status must be investigating, identified, monitoring, or resolved")
+		}
+		if actualIsScheduled && !requestedIsScheduled {
+			return fmt.Errorf("cannot change a scheduled maintenance incident to realtime; status must be scheduled, in progress, verifying, or completed")
+		}
 	}
 
 	components := make(map[string]string)
@@ -289,13 +404,8 @@ func (c *UpdateIncident) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
-	impactOverride := spec.ImpactOverride
-	if impactOverride == "__none__" {
-		impactOverride = ""
-	}
-
 	req := UpdateIncidentRequest{
-		Status:               spec.Status,
+		Status:               effectiveStatus,
 		Body:                 spec.Body,
 		ImpactOverride:       impactOverride,
 		ComponentIDs:         spec.ComponentIDs,

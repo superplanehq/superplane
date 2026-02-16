@@ -181,10 +181,11 @@ func Test__CreateIncident__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"page":         "kctbh9vrtdwd",
-				"incidentType": "realtime",
-				"name":         "Database Connection Issues",
-				"body":         "We are investigating.",
+				"page":            "kctbh9vrtdwd",
+				"incidentType":    "realtime",
+				"name":            "Database Connection Issues",
+				"body":            "We are investigating.",
+				"statusRealtime":  "investigating",
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -234,11 +235,12 @@ func Test__CreateIncident__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"page":           "kctbh9vrtdwd",
-				"incidentType":   "scheduled",
-				"name":           "Maintenance",
-				"scheduledFor":   "2026-02-15T02:00:00Z",
-				"scheduledUntil": "2026-02-15T04:00:00Z",
+				"page":            "kctbh9vrtdwd",
+				"incidentType":    "scheduled",
+				"name":            "Maintenance",
+				"scheduledFor":    "2026-02-15T02:00:00Z",
+				"scheduledUntil":  "2026-02-15T04:00:00Z",
+				"statusScheduled": "scheduled",
 			},
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -254,6 +256,57 @@ func Test__CreateIncident__Execute(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "sched123", data["id"])
 		assert.Equal(t, "scheduled", data["status"])
+	})
+
+	t.Run("success scheduled with statusScheduled in_progress", func(t *testing.T) {
+		scheduledInProgressJSON := `{
+			"id": "sched456",
+			"name": "Maintenance In Progress",
+			"status": "in_progress",
+			"impact": "none",
+			"shortlink": "http://stspg.io/sched456",
+			"page_id": "kctbh9vrtdwd",
+			"scheduled_for": "2026-02-15T02:00:00Z",
+			"scheduled_until": "2026-02-15T04:00:00Z",
+			"components": [],
+			"incident_updates": []
+		}`
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusCreated,
+					Body:       io.NopCloser(strings.NewReader(scheduledInProgressJSON)),
+				},
+			},
+		}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "test-key"},
+		}
+		executionState := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"page":            "kctbh9vrtdwd",
+				"incidentType":    "scheduled",
+				"name":            "Maintenance In Progress",
+				"scheduledFor":    "2026-02-15T02:00:00Z",
+				"scheduledUntil":  "2026-02-15T04:00:00Z",
+				"statusScheduled": "in_progress",
+			},
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
+			ExecutionState: executionState,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "statuspage.incident", executionState.Type)
+		require.Len(t, executionState.Payloads, 1)
+		wrapped, ok := executionState.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		data, ok := wrapped["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "sched456", data["id"])
+		assert.Equal(t, "in_progress", data["status"])
 	})
 
 	t.Run("API error returns error and no emit", func(t *testing.T) {

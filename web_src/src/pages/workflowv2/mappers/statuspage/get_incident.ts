@@ -13,7 +13,7 @@ import { MetadataItem } from "@/ui/metadataList";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
 import { StatuspageIncident, StatuspageNodeMetadata } from "./types";
 import { formatTimeAgo } from "@/utils/date";
-import { baseEventSections, getDetailsForIncident } from "./utils";
+import { baseEventSections, getDetailsForIncident, truncateForDisplay } from "./utils";
 
 export const getIncidentMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -68,6 +68,10 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const pageLabel = nodeMetadata?.pageName || configuration?.page;
   if (pageLabel) {
     metadata.push({ icon: "globe", label: "Page: " + pageLabel });
+  }
+  if (configuration?.incident) {
+    const incidentLabel = truncateForDisplay(configuration.incident);
+    metadata.push({ icon: "alert-triangle", label: "Incident: " + incidentLabel });
   }
 
   return metadata;

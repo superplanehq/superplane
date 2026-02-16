@@ -11,6 +11,12 @@ export function stringOrDash(value?: string | null): string {
   return value;
 }
 
+/** Truncates long values for display in component node meta (e.g. incident ID or expression). */
+export function truncateForDisplay(value: string, maxLen = 40): string {
+  if (!value || value.length <= maxLen) return value;
+  return value.substring(0, maxLen) + "...";
+}
+
 /** Timeline entry format for ChainItem's isApprovalTimeline renderer. */
 export type IncidentTimelineEntry = {
   label: string;
