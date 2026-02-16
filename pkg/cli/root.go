@@ -11,11 +11,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	canvases "github.com/superplanehq/superplane/pkg/cli/commands/canvases"
-	components "github.com/superplanehq/superplane/pkg/cli/commands/components"
 	config "github.com/superplanehq/superplane/pkg/cli/commands/config"
+	index "github.com/superplanehq/superplane/pkg/cli/commands/index"
 	integrations "github.com/superplanehq/superplane/pkg/cli/commands/integrations"
 	secrets "github.com/superplanehq/superplane/pkg/cli/commands/secrets"
-	triggers "github.com/superplanehq/superplane/pkg/cli/commands/triggers"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
@@ -52,8 +51,7 @@ func init() {
 
 	options := defaultBindOptions()
 	RootCmd.AddCommand(canvases.NewCommand(options))
-	RootCmd.AddCommand(components.NewCommand(options))
-	RootCmd.AddCommand(triggers.NewCommand(options))
+	RootCmd.AddCommand(index.NewCommand(options))
 	RootCmd.AddCommand(integrations.NewCommand(options))
 	RootCmd.AddCommand(secrets.NewCommand(options))
 	RootCmd.AddCommand(config.NewCommand(options))

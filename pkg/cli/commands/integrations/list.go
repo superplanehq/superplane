@@ -10,32 +10,10 @@ import (
 )
 
 type listCommand struct {
-	connected *bool
 }
 
 func (c *listCommand) Execute(ctx core.CommandContext) error {
-	if c.connected != nil && *c.connected {
-		return c.executeConnected(ctx)
-	}
-
-	response, _, err := ctx.API.IntegrationAPI.IntegrationsListIntegrations(ctx.Context).Execute()
-	if err != nil {
-		return err
-	}
-
-	integrations := response.GetIntegrations()
-	if ctx.Renderer.IsText() {
-		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
-			_, _ = fmt.Fprintln(writer, "NAME\tLABEL\tDESCRIPTION")
-			for _, integration := range integrations {
-				_, _ = fmt.Fprintf(writer, "%s\t%s\t%s\n", integration.GetName(), integration.GetLabel(), integration.GetDescription())
-			}
-			return writer.Flush()
-		})
-	}
-
-	return ctx.Renderer.Render(integrations)
+	return c.executeConnected(ctx)
 }
 
 func (c *listCommand) executeConnected(ctx core.CommandContext) error {
