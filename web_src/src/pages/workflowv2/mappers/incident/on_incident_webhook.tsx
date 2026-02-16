@@ -65,6 +65,14 @@ export const onIncidentCustomFieldRenderer: CustomFieldRenderer = {
                   app, then re-save to get an HTTPS URL.
                 </p>
               )}
+              {isGenerated && webhookUrl.includes("localhost") && (
+                <p className="mt-3 text-xs text-amber-700 dark:text-amber-300" role="status">
+                  This URL points to localhost, so incident.io cannot reach it. For local testing, use a tunnel (e.g.{" "}
+                  <code className="bg-black/10 dark:bg-white/10 px-1 rounded">ngrok http 8000</code>
+                  ), set <code className="bg-black/10 dark:bg-white/10 px-1 rounded">WEBHOOKS_BASE_URL</code> to the
+                  tunnel HTTPS URL, restart the app, then re-save the canvas.
+                </p>
+              )}
               <div className="mt-3">
                 <span className="text-xs font-medium text-gray-700 dark:text-gray-200">Webhook URL</span>
                 <div className="relative group mt-1">

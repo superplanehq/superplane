@@ -42,7 +42,9 @@ func (h *IncidentIOWebhookHandler) CompareConfig(a, b any) (bool, error) {
 		}
 	}
 
-	if configA.SigningSecret != configB.SigningSecret {
+	// Allow reuse when secrets match, or when the existing webhook has no secret yet
+	// (user added the trigger first, then pasted the signing secret; we merge it in so the URL stays the same).
+	if configA.SigningSecret != configB.SigningSecret && configA.SigningSecret != "" {
 		return false, nil
 	}
 
@@ -50,6 +52,22 @@ func (h *IncidentIOWebhookHandler) CompareConfig(a, b any) (bool, error) {
 }
 
 func (h *IncidentIOWebhookHandler) Merge(current, requested any) (any, bool, error) {
+	cur := WebhookConfiguration{}
+	req := WebhookConfiguration{}
+
+	if err := mapstructure.Decode(current, &cur); err != nil {
+		return nil, false, err
+	}
+	if err := mapstructure.Decode(requested, &req); err != nil {
+		return nil, false, err
+	}
+
+	// Merge signing secret only when the existing webhook had none (user added it after creating the trigger).
+	if cur.SigningSecret == "" && req.SigningSecret != "" {
+		cur.SigningSecret = req.SigningSecret
+		return cur, true, nil
+	}
+
 	return current, false, nil
 }
 
