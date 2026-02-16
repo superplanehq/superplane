@@ -30,36 +30,29 @@ export interface PrometheusResponse {
 export interface AssertionItem {
   kind: string;
   severity: string;
-  statusCodeOperator?: string;
-  statusCodeValue?: string;
-  timingType?: string;
-  timingOperator?: string;
-  timingValue?: string;
-  errorTypeValue?: string;
-  sslOperator?: string;
-  sslDays?: string;
-  headerName?: string;
-  headerOperator?: string;
-  headerValue?: string;
-  jsonPath?: string;
-  jsonOperator?: string;
-  jsonValue?: string;
-  textOperator?: string;
-  textValue?: string;
+  operator?: string;
+  value?: string;
+  type?: string;
+  name?: string;
+  expression?: string;
 }
 
-export interface CreateSyntheticCheckConfiguration {
+export interface CreateHttpSyntheticCheckConfiguration {
   name: string;
-  url: string;
-  method: string;
   dataset: string;
-  locations: string[];
-  interval: string;
+  request: {
+    url: string;
+    method: string;
+    redirects?: string;
+    allowInsecure?: string;
+    headers?: Array<{ name: string; value: string }>;
+    body?: string;
+  };
+  schedule: {
+    interval: string;
+    locations: string[];
+    strategy?: string;
+  };
   assertions?: AssertionItem[];
-  headers?: Array<{ name: string; value: string }>;
-  body?: string;
-  strategy?: string;
   retries?: { attempts: number; delay: string };
-  followRedirects?: string;
-  allowInsecure?: string;
 }

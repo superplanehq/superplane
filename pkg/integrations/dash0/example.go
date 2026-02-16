@@ -19,11 +19,11 @@ var exampleOutputListIssuesBytes []byte
 var exampleOutputListIssuesOnce sync.Once
 var exampleOutputListIssues map[string]any
 
-//go:embed example_output_create_synthetic_check.json
-var exampleOutputCreateSyntheticCheckBytes []byte
+//go:embed example_output_create_http_synthetic_check.json
+var exampleOutputCreateHTTPSyntheticCheckBytes []byte
 
-var exampleOutputCreateSyntheticCheckOnce sync.Once
-var exampleOutputCreateSyntheticCheck map[string]any
+var exampleOutputCreateHTTPSyntheticCheckOnce sync.Once
+var exampleOutputCreateHTTPSyntheticCheck map[string]any
 
 func (c *QueryPrometheus) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryPrometheusOnce, exampleOutputQueryPrometheusBytes, &exampleOutputQueryPrometheus)
@@ -33,6 +33,6 @@ func (c *ListIssues) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputListIssuesOnce, exampleOutputListIssuesBytes, &exampleOutputListIssues)
 }
 
-func (c *CreateSyntheticCheck) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateSyntheticCheckOnce, exampleOutputCreateSyntheticCheckBytes, &exampleOutputCreateSyntheticCheck)
+func (c *CreateHTTPSyntheticCheck) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateHTTPSyntheticCheckOnce, exampleOutputCreateHTTPSyntheticCheckBytes, &exampleOutputCreateHTTPSyntheticCheck)
 }

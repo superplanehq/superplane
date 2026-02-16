@@ -11,7 +11,7 @@ import {
 } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import { CreateSyntheticCheckConfiguration } from "./types";
+import { CreateHttpSyntheticCheckConfiguration } from "./types";
 import { formatTimeAgo } from "@/utils/date";
 
 const LOCATION_LABELS: Record<string, string> = {
@@ -23,7 +23,7 @@ const LOCATION_LABELS: Record<string, string> = {
   "au-melbourne": "Melbourne",
 };
 
-export const createSyntheticCheckMapper: ComponentBaseMapper = {
+export const createHttpSyntheticCheckMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition.name || "unknown";
@@ -76,24 +76,27 @@ export const createSyntheticCheckMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as CreateSyntheticCheckConfiguration;
+  const configuration = node.configuration as CreateHttpSyntheticCheckConfiguration;
 
-  if (configuration?.url) {
-    const urlPreview = configuration.url.length > 50 ? configuration.url.substring(0, 50) + "..." : configuration.url;
+  if (configuration?.request?.url) {
+    const urlPreview =
+      configuration.request.url.length > 50
+        ? configuration.request.url.substring(0, 50) + "..."
+        : configuration.request.url;
     metadata.push({ icon: "globe", label: urlPreview });
   }
 
-  if (configuration?.method) {
-    metadata.push({ icon: "arrow-right", label: configuration.method.toUpperCase() });
+  if (configuration?.request?.method) {
+    metadata.push({ icon: "arrow-right", label: configuration.request.method.toUpperCase() });
   }
 
-  if (configuration?.locations && configuration.locations.length > 0) {
-    const locationNames = configuration.locations.map((loc) => LOCATION_LABELS[loc] || loc).join(", ");
+  if (configuration?.schedule?.locations && configuration.schedule.locations.length > 0) {
+    const locationNames = configuration.schedule.locations.map((loc) => LOCATION_LABELS[loc] || loc).join(", ");
     metadata.push({ icon: "map-pin", label: locationNames });
   }
 
-  if (configuration?.interval) {
-    metadata.push({ icon: "clock", label: `Every ${configuration.interval}` });
+  if (configuration?.schedule?.interval) {
+    metadata.push({ icon: "clock", label: `Every ${configuration.schedule.interval}` });
   }
 
   return metadata;
