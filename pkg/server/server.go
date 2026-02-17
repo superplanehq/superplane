@@ -342,7 +342,8 @@ func Start() {
 	}
 
 	jwtSigner := jwt.NewSigner(jwtSecret)
-	oidcProvider, err := oidc.NewProviderFromKeyDir(baseURL, oidcKeysPath)
+	webhooksBaseURL := getWebhookBaseURL(baseURL)
+	oidcProvider, err := oidc.NewProviderFromKeyDir(webhooksBaseURL, oidcKeysPath)
 	if err != nil {
 		panic(fmt.Sprintf("failed to load OIDC keys: %v", err))
 	}
@@ -364,7 +365,6 @@ func Start() {
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
-		webhooksBaseURL := getWebhookBaseURL(baseURL)
 		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, authService, registry, oidcProvider)
 	}
 
