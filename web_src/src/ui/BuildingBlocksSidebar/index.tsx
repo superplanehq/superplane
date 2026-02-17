@@ -29,6 +29,7 @@ import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
+import awsRoute53Icon from "@/assets/icons/integrations/aws.route53.svg";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
@@ -427,6 +428,7 @@ function CategorySection({
       cloudwatch: awsCloudwatchIcon,
       lambda: awsLambdaIcon,
       ecr: awsEcrIcon,
+      route53: awsRoute53Icon,
       ecs: awsEcsIcon,
       sns: awsSnsIcon,
     },
@@ -507,6 +509,7 @@ function CategorySection({
               cloudwatch: awsCloudwatchIcon,
               ecr: awsEcrIcon,
               lambda: awsLambdaIcon,
+              route53: awsRoute53Icon,
               ecs: awsEcsIcon,
               sns: awsSnsIcon,
             },

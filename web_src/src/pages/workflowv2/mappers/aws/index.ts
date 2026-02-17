@@ -16,6 +16,9 @@ import { disposePackageVersionsMapper } from "./codeartifact/dispose_package_ver
 import { updatePackageVersionsStatusMapper } from "./codeartifact/update_package_versions_status";
 import { onAlarmTriggerRenderer } from "./cloudwatch/on_alarm";
 import { createServiceMapper } from "./ecs/create_service";
+import { createRecordMapper } from "./route53/create_record";
+import { upsertRecordMapper } from "./route53/upsert_record";
+import { deleteRecordMapper } from "./route53/delete_record";
 import { describeServiceMapper } from "./ecs/describe_service";
 import { executeCommandMapper } from "./ecs/execute_command";
 import { runTaskMapper } from "./ecs/run_task";
@@ -46,6 +49,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "codeArtifact.disposePackageVersions": disposePackageVersionsMapper,
   "codeArtifact.getPackageVersion": getPackageVersionMapper,
   "codeArtifact.updatePackageVersionsStatus": updatePackageVersionsStatusMapper,
+  "route53.createRecord": createRecordMapper,
+  "route53.upsertRecord": upsertRecordMapper,
+  "route53.deleteRecord": deleteRecordMapper,
   "sns.getTopic": getTopicMapper,
   "sns.getSubscription": getSubscriptionMapper,
   "sns.createTopic": createTopicMapper,
@@ -78,6 +84,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "codeArtifact.disposePackageVersions": buildActionStateRegistry("disposed"),
   "codeArtifact.getPackageVersion": buildActionStateRegistry("retrieved"),
   "codeArtifact.updatePackageVersionsStatus": buildActionStateRegistry("updated"),
+  "route53.createRecord": buildActionStateRegistry("created"),
+  "route53.upsertRecord": buildActionStateRegistry("upserted"),
+  "route53.deleteRecord": buildActionStateRegistry("deleted"),
   "sns.getTopic": buildActionStateRegistry("retrieved"),
   "sns.getSubscription": buildActionStateRegistry("retrieved"),
   "sns.createTopic": buildActionStateRegistry("created"),
