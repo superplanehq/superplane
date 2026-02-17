@@ -71,7 +71,7 @@ func (c *WaitForButtonClick) Documentation() string {
 
 ## Output Channels
 
-- **Received**: Emits when the user clicks a button; payload includes the selected button's value
+- **Received**: Emits when the user clicks a button; payload includes the selected value and clicker info (when available)
 - **Timeout**: Emits when no button click is received within the configured timeout
 
 ## Behavior
@@ -424,6 +424,9 @@ func (c *WaitForButtonClick) handleButtonClick(ctx core.ActionContext) error {
 	payload := map[string]any{
 		"value":      buttonValue,
 		"clicked_at": time.Now().Format(time.RFC3339),
+	}
+	if clickedBy, ok := ctx.Parameters["clicked_by"].(map[string]any); ok && len(clickedBy) > 0 {
+		payload["clicked_by"] = clickedBy
 	}
 
 	return ctx.ExecutionState.Emit(

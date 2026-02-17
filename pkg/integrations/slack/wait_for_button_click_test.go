@@ -275,6 +275,46 @@ func Test__WaitForButtonClick__HandleAction(t *testing.T) {
 		// They are automatically cleaned up when the node is deleted.
 	})
 
+	t.Run("button click with clicker info -> emits received event with clicker", func(t *testing.T) {
+		subscriptionID := uuid.New()
+		subscriptionIDStr := subscriptionID.String()
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		integrationCtx := &contexts.IntegrationContext{
+			Subscriptions: []contexts.Subscription{
+				{ID: subscriptionID, Configuration: map[string]any{"type": "button_click"}},
+			},
+		}
+		metadata := &contexts.MetadataContext{
+			Metadata: WaitForButtonClickMetadata{
+				AppSubscriptionID: &subscriptionIDStr,
+			},
+		}
+
+		err := component.HandleAction(core.ActionContext{
+			Name:        ActionButtonClick,
+			Metadata:    metadata,
+			Integration: integrationCtx,
+			Parameters: map[string]any{
+				"value": "approve",
+				"clicked_by": map[string]any{
+					"id":       "U123",
+					"username": "pedro",
+				},
+			},
+			ExecutionState: execState,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, ChannelReceived, execState.Channel)
+		assert.Equal(t, "slack.button.clicked", execState.Type)
+		require.Len(t, execState.Payloads, 1)
+		wrappedPayload := execState.Payloads[0].(map[string]any)
+		payload := wrappedPayload["data"].(map[string]any)
+		clickedBy := payload["clicked_by"].(map[string]any)
+		assert.Equal(t, "U123", clickedBy["id"])
+		assert.Equal(t, "pedro", clickedBy["username"])
+	})
+
 	t.Run("timeout -> emits timeout event and cleans up subscription", func(t *testing.T) {
 		subscriptionID := uuid.New()
 		subscriptionIDStr := subscriptionID.String()

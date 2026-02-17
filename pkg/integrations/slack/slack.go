@@ -493,7 +493,21 @@ func (s *Slack) handleInteractivity(ctx core.HTTPRequestContext, body []byte) {
 		return
 	}
 
-	err = s.createButtonClickAction(executionID, action.Value)
+	clickedBy := map[string]any{}
+	if userID, ok := payload.User["id"].(string); ok && userID != "" {
+		clickedBy["id"] = userID
+	}
+	if username, ok := payload.User["username"].(string); ok && username != "" {
+		clickedBy["username"] = username
+	}
+	if name, ok := payload.User["name"].(string); ok && name != "" {
+		clickedBy["name"] = name
+	}
+	if realName, ok := payload.User["real_name"].(string); ok && realName != "" {
+		clickedBy["real_name"] = realName
+	}
+
+	err = s.createButtonClickAction(executionID, action.Value, clickedBy)
 	if err != nil {
 		ctx.Logger.Errorf("error creating button click action: %v", err)
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
@@ -503,20 +517,25 @@ func (s *Slack) handleInteractivity(ctx core.HTTPRequestContext, body []byte) {
 	ctx.Response.WriteHeader(http.StatusOK)
 }
 
-func (s *Slack) createButtonClickAction(executionID uuid.UUID, buttonValue string) error {
+func (s *Slack) createButtonClickAction(executionID uuid.UUID, buttonValue string, clickedBy map[string]any) error {
 	var execution models.CanvasNodeExecution
 	err := database.Conn().Where("id = ?", executionID).First(&execution).Error
 	if err != nil {
 		return fmt.Errorf("failed to find execution: %w", err)
 	}
 
+	parameters := map[string]any{
+		"value": buttonValue,
+	}
+	if len(clickedBy) > 0 {
+		parameters["clicked_by"] = clickedBy
+	}
+
 	runAt := time.Now()
 	return execution.CreateRequest(database.Conn(), models.NodeRequestTypeInvokeAction, models.NodeExecutionRequestSpec{
 		InvokeAction: &models.InvokeAction{
 			ActionName: ActionButtonClick,
-			Parameters: map[string]any{
-				"value": buttonValue,
-			},
+			Parameters: parameters,
 		},
 	}, &runAt)
 }
