@@ -33,6 +33,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/timegate"
 	_ "github.com/superplanehq/superplane/pkg/components/wait"
 	_ "github.com/superplanehq/superplane/pkg/integrations/aws"
+	_ "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	_ "github.com/superplanehq/superplane/pkg/integrations/circleci"
 	_ "github.com/superplanehq/superplane/pkg/integrations/claude"
 	_ "github.com/superplanehq/superplane/pkg/integrations/cloudflare"
