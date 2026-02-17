@@ -52,7 +52,6 @@ function CopyRow({ label, value }: { label: string; value: string }): React.Reac
           transition: "background 150ms ease",
           fontWeight: 600,
           minWidth: 72,
-
         }}
       >
         {copied ? "Copied" : "Copy"}
