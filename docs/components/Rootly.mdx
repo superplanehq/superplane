@@ -17,6 +17,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Create Event" href="#create-event" description="Add a timeline event to a Rootly incident" />
   <LinkCard title="Create Incident" href="#create-incident" description="Create a new incident in Rootly" />
+  <LinkCard title="Get Incident" href="#get-incident" description="Get incident details from Rootly" />
   <LinkCard title="Update Incident" href="#update-incident" description="Update an existing incident in Rootly" />
 </CardGrid>
 
@@ -156,6 +157,105 @@ Returns the created incident object including:
     "url": "https://app.rootly.com/incidents/abc123-def456"
   },
   "timestamp": "2026-01-19T12:00:00Z",
+  "type": "rootly.incident"
+}
+```
+
+<a id="get-incident"></a>
+
+## Get Incident
+
+The Get Incident component retrieves a single incident from Rootly by ID, including related resources.
+
+### Use Cases
+
+- **Incident enrichment**: Fetch full incident details including services, groups, and action items
+- **Status checks**: Check the current status and severity of an incident
+- **Post-incident analysis**: Retrieve incident timeline events and action items
+- **Cross-system sync**: Get incident data to sync with external systems
+
+### Configuration
+
+- **Incident ID**: The ID of the incident to retrieve (required, supports expressions)
+
+### Output
+
+Returns the incident object including:
+- **id**: Incident ID
+- **sequential_id**: Sequential incident number
+- **title**: Incident title
+- **slug**: URL-friendly incident identifier
+- **status**: Current incident status
+- **summary**: Incident summary
+- **severity**: Incident severity slug
+- **url**: Link to the incident in Rootly
+- **started_at**: When the incident started
+- **mitigated_at**: When the incident was mitigated
+- **resolved_at**: When the incident was resolved
+- **user**: User who created the incident
+- **started_by**: User who started the incident
+- **services**: Affected services
+- **groups**: Associated groups
+- **events**: Incident timeline events
+- **action_items**: Follow-up action items
+
+### Example Output
+
+```json
+{
+  "data": {
+    "action_items": [
+      {
+        "id": "ai-001",
+        "status": "open",
+        "summary": "Investigate root cause of latency increase"
+      }
+    ],
+    "events": [
+      {
+        "created_at": "2026-01-19T12:00:00Z",
+        "id": "evt-001",
+        "kind": "incident_created",
+        "visibility": "internal"
+      }
+    ],
+    "groups": [
+      {
+        "id": "grp-001",
+        "name": "Backend Team",
+        "slug": "backend-team"
+      }
+    ],
+    "id": "abc123-def456",
+    "mitigated_at": "2026-01-19T12:30:00Z",
+    "resolved_at": null,
+    "sequential_id": 42,
+    "services": [
+      {
+        "id": "svc-001",
+        "name": "Production API",
+        "slug": "production-api"
+      }
+    ],
+    "severity": "sev1",
+    "slug": "api-latency-spike-detected",
+    "started_at": "2026-01-19T12:00:00Z",
+    "started_by": {
+      "email": "john@example.com",
+      "full_name": "John Doe",
+      "id": "user-002"
+    },
+    "status": "mitigated",
+    "summary": "The API response times have increased significantly across all endpoints.",
+    "title": "API latency spike detected",
+    "url": "https://app.rootly.com/incidents/abc123-def456",
+    "user": {
+      "email": "jane@example.com",
+      "full_name": "Jane Smith",
+      "id": "user-001"
+    }
+  },
+  "timestamp": "2026-01-19T12:05:00Z",
   "type": "rootly.incident"
 }
 ```

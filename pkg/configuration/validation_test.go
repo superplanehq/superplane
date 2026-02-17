@@ -449,3 +449,104 @@ func TestValidateDayInYearComparison(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateList_MaxItems(t *testing.T) {
+	tests := []struct {
+		name        string
+		field       Field
+		value       any
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "list with MaxItems limit - within limit",
+			field: Field{
+				Name:     "items",
+				Type:     FieldTypeList,
+				Required: true,
+				TypeOptions: &TypeOptions{
+					List: &ListTypeOptions{
+						MaxItems: ptrInt(3),
+						ItemDefinition: &ListItemDefinition{
+							Type: FieldTypeString,
+						},
+					},
+				},
+			},
+			value:       []any{"item1", "item2"},
+			expectError: false,
+		},
+		{
+			name: "list with MaxItems limit - at limit",
+			field: Field{
+				Name:     "items",
+				Type:     FieldTypeList,
+				Required: true,
+				TypeOptions: &TypeOptions{
+					List: &ListTypeOptions{
+						MaxItems: ptrInt(3),
+						ItemDefinition: &ListItemDefinition{
+							Type: FieldTypeString,
+						},
+					},
+				},
+			},
+			value:       []any{"item1", "item2", "item3"},
+			expectError: false,
+		},
+		{
+			name: "list with MaxItems limit - exceeds limit",
+			field: Field{
+				Name:     "items",
+				Type:     FieldTypeList,
+				Required: true,
+				TypeOptions: &TypeOptions{
+					List: &ListTypeOptions{
+						MaxItems: ptrInt(3),
+						ItemDefinition: &ListItemDefinition{
+							Type: FieldTypeString,
+						},
+					},
+				},
+			},
+			value:       []any{"item1", "item2", "item3", "item4"},
+			expectError: true,
+			errorMsg:    "must contain at most 3 items",
+		},
+		{
+			name: "list without MaxItems limit",
+			field: Field{
+				Name:     "items",
+				Type:     FieldTypeList,
+				Required: true,
+				TypeOptions: &TypeOptions{
+					List: &ListTypeOptions{
+						ItemDefinition: &ListItemDefinition{
+							Type: FieldTypeString,
+						},
+					},
+				},
+			},
+			value:       []any{"item1", "item2", "item3", "item4", "item5"},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateList(tt.field, tt.value)
+			if tt.expectError {
+				assert.Error(t, err)
+				if tt.errorMsg != "" {
+					assert.Contains(t, err.Error(), tt.errorMsg)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func ptrInt(v int) *int {
+	return &v
+}
