@@ -1,0 +1,5 @@
+{
+  "deleted": true,
+  "statusCode": 204,
+  "message": "Feature flag \"my-flag\" was successfully deleted from project \"default\"."
+}
