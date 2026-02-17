@@ -43,6 +43,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/daytona"
 	_ "github.com/superplanehq/superplane/pkg/integrations/discord"
 	_ "github.com/superplanehq/superplane/pkg/integrations/dockerhub"
+	_ "github.com/superplanehq/superplane/pkg/integrations/gcp"
 	_ "github.com/superplanehq/superplane/pkg/integrations/github"
 	_ "github.com/superplanehq/superplane/pkg/integrations/gitlab"
 	_ "github.com/superplanehq/superplane/pkg/integrations/hetzner"
@@ -393,7 +394,7 @@ func getWebhookBaseURL(baseURL string) string {
  * This prevents component/trigger implementations from using too much memory,
  * and also from emitting large events.
  */
-var DefaultMaxHTTPResponseBytes int64 = 512 * 1024
+var DefaultMaxHTTPResponseBytes int64 = 2 * 1024 * 1024
 
 /*
  * Default blocked HTTP hosts include:
