@@ -451,6 +451,64 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		assert.EqualValues(t, oldCheckpoint, storedMetadata.LastExecutionEnded)
 	})
 
+	t.Run("poll stops batch after race-window deferral to avoid checkpoint skipping deferred events", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		requests := &contexts.RequestContext{}
+		oldCheckpoint := time.Now().Add(-time.Hour).UnixMilli()
+		metadata := &contexts.MetadataContext{Metadata: OnPipelineCompletedMetadata{
+			LastExecutionEnded: oldCheckpoint,
+			LastExecutionID:    "exec-old",
+		}}
+
+		deferredEndTs := time.Now().Add(-30 * time.Second).UnixMilli()
+		filteredEndTs := time.Now().Add(-10 * time.Second).UnixMilli()
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						fmt.Sprintf(
+							`{"data":{"content":[{"planExecutionId":"exec-filtered","pipelineIdentifier":"deploy","status":"SUCCESS","endTs":"%d"},{"planExecutionId":"exec-deferred","pipelineIdentifier":"deploy","status":"FAILED","endTs":"%d"}]}}`,
+							filteredEndTs,
+							deferredEndTs,
+						),
+					)),
+				},
+			},
+		}
+
+		_, err := trigger.HandleAction(core.TriggerActionContext{
+			Name: OnPipelineCompletedPollAction,
+			Configuration: OnPipelineCompletedConfiguration{
+				OrgID:              "default",
+				ProjectID:          "default_project",
+				PipelineIdentifier: "deploy",
+				Statuses:           []string{"failed"},
+			},
+			HTTP:     httpCtx,
+			Metadata: metadata,
+			Requests: requests,
+			Events:   events,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken":  "pat.acc-123.test",
+					"orgId":     "default",
+					"projectId": "default_project",
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, 0, events.Count())
+		assert.Equal(t, OnPipelineCompletedPollAction, requests.Action)
+		assert.Equal(t, OnPipelineCompletedPollInterval, requests.Duration)
+
+		storedMetadata, ok := metadata.Get().(OnPipelineCompletedMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "exec-old", storedMetadata.LastExecutionID)
+		assert.EqualValues(t, oldCheckpoint, storedMetadata.LastExecutionEnded)
+	})
+
 	t.Run("poll checkpoints recent executions when they are filtered out by status", func(t *testing.T) {
 		events := &contexts.EventContext{}
 		requests := &contexts.RequestContext{}

@@ -33,6 +33,9 @@ var onPipelineCompletedCheckpointUpdateMu sync.Mutex
 var errOnPipelineCompletedUnsupportedPipelineIdentifierFilter = errors.New(
 	"pipelineIdentifier filter is not supported by this Harness account/endpoint",
 )
+var errOnPipelineCompletedDeferredForRaceWindow = errors.New(
+	"poll execution deferred due to race window",
+)
 
 type OnPipelineCompleted struct{}
 
@@ -418,7 +421,11 @@ func (t *OnPipelineCompleted) poll(ctx core.TriggerActionContext) error {
 	}
 
 	for _, execution := range executions {
-		if err := t.processPolledExecution(ctx, config, execution); err != nil {
+		err := t.processPolledExecution(ctx, config, execution)
+		if errors.Is(err, errOnPipelineCompletedDeferredForRaceWindow) {
+			break
+		}
+		if err != nil {
 			return err
 		}
 	}
@@ -500,7 +507,7 @@ func (t *OnPipelineCompleted) processPolledExecution(
 	// For pipeline-scoped mode, avoid polling terminal executions that just
 	// finished. Webhook delivery should win for near-real-time events.
 	if shouldEmit && pipelineScoped && isWithinPollRaceWindow(execution) {
-		return nil
+		return errOnPipelineCompletedDeferredForRaceWindow
 	}
 
 	if shouldEmit {
