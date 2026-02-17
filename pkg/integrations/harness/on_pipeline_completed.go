@@ -29,13 +29,13 @@ const (
 	OnPipelineCompletedPollRaceWindow = 2 * time.Minute
 )
 
-var onPipelineCompletedCheckpointUpdateMu sync.Mutex
 var errOnPipelineCompletedUnsupportedPipelineIdentifierFilter = errors.New(
 	"pipelineIdentifier filter is not supported by this Harness account/endpoint",
 )
 var errOnPipelineCompletedDeferredForRaceWindow = errors.New(
 	"poll execution deferred due to race window",
 )
+var onPipelineCompletedCheckpointLocks sync.Map
 
 type OnPipelineCompleted struct{}
 
@@ -311,8 +311,9 @@ func (t *OnPipelineCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int
 		}
 	}
 
-	onPipelineCompletedCheckpointUpdateMu.Lock()
-	defer onPipelineCompletedCheckpointUpdateMu.Unlock()
+	checkpointMu := onPipelineCompletedCheckpointMutex(config)
+	checkpointMu.Lock()
+	defer checkpointMu.Unlock()
 
 	if ctx.Metadata != nil {
 		metadata, decodeErr := decodeOnPipelineCompletedMetadata(ctx.Metadata.Get())
@@ -377,7 +378,7 @@ func (t *OnPipelineCompleted) poll(ctx core.TriggerActionContext) error {
 
 	executions, err := t.collectExecutionsSinceCheckpoint(client, metadata, pipelineIdentifierForAPI)
 	if err != nil && pipelineIdentifierForAPI != "" && errors.Is(err, errOnPipelineCompletedUnsupportedPipelineIdentifierFilter) {
-		updatedMetadata, setErr := t.updatePollingMetadata(ctx.Metadata, func(current *OnPipelineCompletedMetadata) {
+		updatedMetadata, setErr := t.updatePollingMetadata(ctx.Metadata, config, func(current *OnPipelineCompletedMetadata) {
 			current.DisableServerPipelineIDFilterInAPI = true
 		})
 		if setErr != nil {
@@ -392,7 +393,7 @@ func (t *OnPipelineCompleted) poll(ctx core.TriggerActionContext) error {
 	}
 
 	if err != nil {
-		updatedMetadata, setErr := t.updatePollingMetadata(ctx.Metadata, func(current *OnPipelineCompletedMetadata) {
+		updatedMetadata, setErr := t.updatePollingMetadata(ctx.Metadata, config, func(current *OnPipelineCompletedMetadata) {
 			current.PollErrorCount++
 		})
 		if setErr != nil {
@@ -411,7 +412,7 @@ func (t *OnPipelineCompleted) poll(ctx core.TriggerActionContext) error {
 	}
 
 	if metadata.PollErrorCount > 0 {
-		updatedMetadata, err := t.updatePollingMetadata(ctx.Metadata, func(current *OnPipelineCompletedMetadata) {
+		updatedMetadata, err := t.updatePollingMetadata(ctx.Metadata, config, func(current *OnPipelineCompletedMetadata) {
 			current.PollErrorCount = 0
 		})
 		if err != nil {
@@ -482,8 +483,9 @@ func (t *OnPipelineCompleted) processPolledExecution(
 	config OnPipelineCompletedConfiguration,
 	execution ExecutionSummary,
 ) error {
-	onPipelineCompletedCheckpointUpdateMu.Lock()
-	defer onPipelineCompletedCheckpointUpdateMu.Unlock()
+	checkpointMu := onPipelineCompletedCheckpointMutex(config)
+	checkpointMu.Lock()
+	defer checkpointMu.Unlock()
 
 	metadata, err := decodeOnPipelineCompletedMetadata(ctx.Metadata.Get())
 	if err != nil {
@@ -551,14 +553,16 @@ func (t *OnPipelineCompleted) updateCheckpointFromExecutionUnlocked(
 
 func (t *OnPipelineCompleted) updatePollingMetadata(
 	metadataCtx core.MetadataContext,
+	config OnPipelineCompletedConfiguration,
 	mutate func(*OnPipelineCompletedMetadata),
 ) (OnPipelineCompletedMetadata, error) {
 	if metadataCtx == nil {
 		return OnPipelineCompletedMetadata{}, fmt.Errorf("missing metadata context")
 	}
 
-	onPipelineCompletedCheckpointUpdateMu.Lock()
-	defer onPipelineCompletedCheckpointUpdateMu.Unlock()
+	checkpointMu := onPipelineCompletedCheckpointMutex(config)
+	checkpointMu.Lock()
+	defer checkpointMu.Unlock()
 
 	current, err := decodeOnPipelineCompletedMetadata(metadataCtx.Get())
 	if err != nil {
@@ -579,6 +583,46 @@ func (t *OnPipelineCompleted) updatePollingMetadata(
 	}
 
 	return updated, nil
+}
+
+func onPipelineCompletedCheckpointMutex(config OnPipelineCompletedConfiguration) *sync.Mutex {
+	lockKey := onPipelineCompletedCheckpointLockKey(config)
+	if value, ok := onPipelineCompletedCheckpointLocks.Load(lockKey); ok {
+		mutex, ok := value.(*sync.Mutex)
+		if ok {
+			return mutex
+		}
+	}
+
+	mutex := &sync.Mutex{}
+	actual, _ := onPipelineCompletedCheckpointLocks.LoadOrStore(lockKey, mutex)
+	resolved, ok := actual.(*sync.Mutex)
+	if ok {
+		return resolved
+	}
+
+	return mutex
+}
+
+func onPipelineCompletedCheckpointLockKey(config OnPipelineCompletedConfiguration) string {
+	statuses := make([]string, 0, len(config.Statuses))
+	for _, status := range config.Statuses {
+		normalized := normalizeStatus(status)
+		if normalized == "" {
+			continue
+		}
+		statuses = append(statuses, normalized)
+	}
+
+	slices.Sort(statuses)
+	statuses = slices.Compact(statuses)
+
+	return strings.Join([]string{
+		strings.TrimSpace(config.OrgID),
+		strings.TrimSpace(config.ProjectID),
+		strings.TrimSpace(config.PipelineIdentifier),
+		strings.Join(statuses, ","),
+	}, "|")
 }
 
 func executionSummaryFromWebhookPayload(event pipelineWebhookEvent, payload map[string]any) ExecutionSummary {
