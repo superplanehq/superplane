@@ -53,6 +53,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/rootly"
 	_ "github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	_ "github.com/superplanehq/superplane/pkg/integrations/sendgrid"
+	_ "github.com/superplanehq/superplane/pkg/integrations/servicenow"
 	_ "github.com/superplanehq/superplane/pkg/integrations/slack"
 	_ "github.com/superplanehq/superplane/pkg/integrations/smtp"
 	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
