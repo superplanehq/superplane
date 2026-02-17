@@ -6,7 +6,6 @@ design/node_modules/
 # macOS Finder metadata
 .DS_Store
 main
-server
 tmp/screenshots
 e2e.test
 wget-log*
