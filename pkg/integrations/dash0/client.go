@@ -327,23 +327,6 @@ func (c *Client) CreateSyntheticCheck(request SyntheticCheckRequest, dataset str
 	return response, nil
 }
 
-// GetSyntheticCheck fetches a synthetic check by ID (GET).
-func (c *Client) GetSyntheticCheck(checkID string, dataset string) (map[string]any, error) {
-	apiURL := fmt.Sprintf("%s/api/synthetic-checks/%s?dataset=%s", c.BaseURL, url.PathEscape(checkID), url.QueryEscape(dataset))
-
-	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil, "")
-	if err != nil {
-		return nil, err
-	}
-
-	var response map[string]any
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	return response, nil
-}
-
 // DeleteSyntheticCheck deletes a synthetic check by ID (DELETE).
 func (c *Client) DeleteSyntheticCheck(checkID string, dataset string) (map[string]any, error) {
 	apiURL := fmt.Sprintf("%s/api/synthetic-checks/%s?dataset=%s", c.BaseURL, url.PathEscape(checkID), url.QueryEscape(dataset))
