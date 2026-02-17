@@ -1,0 +1,12 @@
+{
+  "data": {
+    "deployId": "dep-cukouhrtq21c73e9scng",
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "status": "build_in_progress",
+    "trigger": "rollback",
+    "createdAt": "2026-02-05T16:18:00.000000Z",
+    "rollbackToDeployId": "dep-cukouhrtq21c73e9scnf"
+  },
+  "timestamp": "2026-02-05T16:18:00.000000Z",
+  "type": "render.deploy"
+}

@@ -22,6 +22,7 @@ import (
 	organizationPb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	secretPb "github.com/superplanehq/superplane/pkg/protos/secrets"
+	pbServiceAccounts "github.com/superplanehq/superplane/pkg/protos/service_accounts"
 	triggerPb "github.com/superplanehq/superplane/pkg/protos/triggers"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	widgetPb "github.com/superplanehq/superplane/pkg/protos/widgets"
@@ -123,6 +124,9 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 
 	integrationService := NewIntegrationService(encryptor, registry)
 	integrationpb.RegisterIntegrationsServer(grpcServer, integrationService)
+
+	serviceAccountsService := NewServiceAccountsService(authService)
+	pbServiceAccounts.RegisterServiceAccountsServer(grpcServer, serviceAccountsService)
 
 	reflection.Register(grpcServer)
 

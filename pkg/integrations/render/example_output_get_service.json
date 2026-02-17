@@ -1,0 +1,13 @@
+{
+  "data": {
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "serviceName": "backend-api",
+    "type": "web_service",
+    "dashboardUrl": "https://dashboard.render.com/web/srv-cukouhrtq21c73e9scng",
+    "suspended": "not_suspended",
+    "createdAt": "2026-02-05T15:00:00.000000Z",
+    "updatedAt": "2026-02-05T16:00:00.000000Z"
+  },
+  "timestamp": "2026-02-05T16:05:00.000000Z",
+  "type": "render.service"
+}

@@ -16,6 +16,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Send Text Message" href="#send-text-message" description="Send a text message to a Slack channel" />
+  <LinkCard title="Wait for Button Click" href="#wait-for-button-click" description="Send a message with buttons and wait for the user to click one" />
 </CardGrid>
 
 ## Instructions
@@ -121,6 +122,60 @@ Returns metadata about the sent message including channel information.
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "slack.message.sent"
+}
+```
+
+<a id="wait-for-button-click"></a>
+
+## Wait for Button Click
+
+The Wait for Button Click component sends a message to a Slack channel or DM with interactive buttons and waits for the user to click one of the configured buttons.
+
+### Use Cases
+
+- **Request approval or input**: Get structured input from a user in Slack before applying or deploying (e.g., Approve / Reject buttons)
+- **Pause a workflow**: Wait until a human selects an option (e.g., Confirm / Cancel)
+- **Implement slash-command style flows**: Create interactive flows that need a structured reply via buttons
+
+### Configuration
+
+- **Channel**: Slack channel or DM channel name to post to (required)
+- **Message**: Message text (supports Slack formatting, required)
+- **Timeout**: Maximum time to wait in seconds (optional)
+- **Buttons**: Set of 1–4 items, each with name (label) and value (required)
+
+### Output Channels
+
+- **Received**: Emits when the user clicks a button; payload includes the selected value and clicker info (when available)
+- **Timeout**: Emits when no button click is received within the configured timeout
+
+### Behavior
+
+- The message is posted with interactive buttons
+- The workflow pauses until a button is clicked or timeout occurs
+- Only the first button click is processed; subsequent clicks are ignored
+- If timeout is not configured, the component waits indefinitely
+
+### Notes
+
+- The Slack app must be installed and have permission to post to the selected channel
+- Supports Slack markdown formatting in message text
+- Button clicks are processed through Slack's interactive components API
+
+### Example Output
+
+```json
+{
+  "data": {
+    "clicked_at": "2026-02-10T21:00:00Z",
+    "clicked_by": {
+      "id": "U01234567",
+      "username": "pedro"
+    },
+    "value": "approve"
+  },
+  "timestamp": "2026-02-10T21:00:00Z",
+  "type": "slack.button.clicked"
 }
 ```
 
