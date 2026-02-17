@@ -9,6 +9,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
+const (
+	AuthTypeAPIToken             = "apiToken"
+	AuthTypeWorkspaceAccessToken = "workspaceAccessToken"
+)
+
 func init() {
 	registry.RegisterIntegrationWithWebhookHandler("bitbucket", &Bitbucket{}, &BitbucketWebhookHandler{})
 }
@@ -16,14 +21,21 @@ func init() {
 type Bitbucket struct{}
 
 type Configuration struct {
-	Workspace string `json:"workspace"`
-	Email     string `json:"email"`
-	APIToken  string `json:"apiToken"`
+	Workspace string  `json:"workspace"`
+	AuthType  string  `json:"authType"`
+	Token     *string `json:"token"`
+	Email     *string `json:"email"`
 }
 
 type Metadata struct {
-	Workspace    string       `json:"workspace" mapstructure:"workspace"`
-	Repositories []Repository `json:"repositories" mapstructure:"repositories"`
+	AuthType  string             `json:"authType" mapstructure:"authType"`
+	Workspace *WorkspaceMetadata `json:"workspace,omitempty" mapstructure:"workspace,omitempty"`
+}
+
+type WorkspaceMetadata struct {
+	UUID string `json:"uuid" mapstructure:"uuid"`
+	Name string `json:"name" mapstructure:"name"`
+	Slug string `json:"slug" mapstructure:"slug"`
 }
 
 func (b *Bitbucket) Name() string {
@@ -57,19 +69,37 @@ func (b *Bitbucket) Configuration() []configuration.Field {
 			Required:    true,
 		},
 		{
+			Name:        "authType",
+			Label:       "Authentication Type",
+			Type:        configuration.FieldTypeSelect,
+			Required:    true,
+			Description: "Bitbucket authentication type",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "API Token", Value: AuthTypeAPIToken},
+						{Label: "Workspace Access Token", Value: AuthTypeWorkspaceAccessToken},
+					},
+				},
+			},
+		},
+		{
+			Name:        "token",
+			Label:       "Token",
+			Type:        configuration.FieldTypeString,
+			Sensitive:   true,
+			Description: "The API token or workspace access token to use for authentication",
+			Required:    true,
+		},
+		{
 			Name:        "email",
 			Label:       "Email",
 			Type:        configuration.FieldTypeString,
 			Description: "Atlassian account email",
 			Required:    true,
-		},
-		{
-			Name:        "apiToken",
-			Label:       "API Token",
-			Type:        configuration.FieldTypeString,
-			Sensitive:   true,
-			Description: "Bitbucket API token with repository read scope",
-			Required:    true,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "authType", Values: []string{AuthTypeAPIToken}},
+			},
 		},
 	}
 }
@@ -98,22 +128,31 @@ func (b *Bitbucket) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("workspace is required")
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if config.AuthType == "" {
+		return fmt.Errorf("authType is required")
+	}
+
+	if config.AuthType != AuthTypeAPIToken && config.AuthType != AuthTypeWorkspaceAccessToken {
+		return fmt.Errorf("authType %s is not supported", config.AuthType)
+	}
+
+	client, err := NewClient(config.AuthType, ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %w", err)
 	}
 
-	//
-	// Validate credentials by listing repositories.
-	//
-	repos, err := client.ListRepositories(config.Workspace)
+	workspace, err := client.GetWorkspace(config.Workspace)
 	if err != nil {
-		return fmt.Errorf("error listing repositories: %w", err)
+		return fmt.Errorf("error getting workspace: %w", err)
 	}
 
 	ctx.Integration.SetMetadata(Metadata{
-		Workspace:    config.Workspace,
-		Repositories: repos,
+		AuthType: config.AuthType,
+		Workspace: &WorkspaceMetadata{
+			UUID: workspace.UUID,
+			Name: workspace.Name,
+			Slug: workspace.Slug,
+		},
 	})
 
 	ctx.Integration.Ready()

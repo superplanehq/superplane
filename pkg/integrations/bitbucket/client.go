@@ -13,8 +13,9 @@ import (
 const baseURL = "https://api.bitbucket.org/2.0"
 
 type Client struct {
+	AuthType string
 	Email    string
-	APIToken string
+	Token    string
 	HTTP     core.HTTPContext
 }
 
@@ -37,26 +38,88 @@ type RepositoryLink struct {
 	} `json:"html" mapstructure:"html"`
 }
 
-func NewClient(httpContext core.HTTPContext, integration core.IntegrationContext) (*Client, error) {
-	if integration == nil {
-		return nil, fmt.Errorf("no integration context")
+func NewClient(authType string, httpContext core.HTTPContext, integration core.IntegrationContext) (*Client, error) {
+	switch authType {
+	case AuthTypeAPIToken:
+		token, err := integration.GetConfig("token")
+		if err != nil {
+			return nil, fmt.Errorf("error getting token config: %w", err)
+		}
+
+		email, err := integration.GetConfig("email")
+		if err != nil {
+			return nil, fmt.Errorf("error getting email config: %w", err)
+		}
+
+		return &Client{
+			AuthType: AuthTypeAPIToken,
+			Email:    string(email),
+			Token:    string(token),
+			HTTP:     httpContext,
+		}, nil
+
+	case AuthTypeWorkspaceAccessToken:
+		token, err := integration.GetConfig("token")
+		if err != nil {
+			return nil, fmt.Errorf("error getting token config: %w", err)
+		}
+		return &Client{
+			AuthType: AuthTypeWorkspaceAccessToken,
+			Token:    string(token),
+			HTTP:     httpContext,
+		}, nil
 	}
 
-	email, err := integration.GetConfig("email")
+	return nil, fmt.Errorf("unknown auth type %s", authType)
+}
+
+func (c *Client) setAuthHeaders(req *http.Request) {
+	if c.AuthType == AuthTypeAPIToken {
+		req.SetBasicAuth(c.Email, c.Token)
+	} else {
+		req.Header.Set("Authorization", "Bearer "+c.Token)
+	}
+}
+
+type Workspace struct {
+	UUID string `json:"uuid" mapstructure:"uuid"`
+	Name string `json:"name" mapstructure:"name"`
+	Slug string `json:"slug" mapstructure:"slug"`
+}
+
+func (c *Client) GetWorkspace(workspaceSlug string) (*Workspace, error) {
+	url := fmt.Sprintf("%s/workspaces/%s", baseURL, workspaceSlug)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error getting email config: %w", err)
+		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	apiToken, err := integration.GetConfig("apiToken")
+	c.setAuthHeaders(req)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error getting apiToken config: %w", err)
+		return nil, fmt.Errorf("error executing request: %w", err)
 	}
 
-	return &Client{
-		Email:    string(email),
-		APIToken: string(apiToken),
-		HTTP:     httpContext,
-	}, nil
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	var workspace Workspace
+	err = json.Unmarshal(body, &workspace)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
+
+	return &workspace, nil
 }
 
 func (c *Client) ListRepositories(workspace string) ([]Repository, error) {
@@ -69,7 +132,7 @@ func (c *Client) ListRepositories(workspace string) ([]Repository, error) {
 			return nil, fmt.Errorf("error creating request: %w", err)
 		}
 
-		req.SetBasicAuth(c.Email, c.APIToken)
+		c.setAuthHeaders(req)
 		req.Header.Set("Accept", "application/json")
 
 		resp, err := c.HTTP.Do(req)
@@ -135,7 +198,7 @@ func (c *Client) CreateWebhook(workspace, repoSlug, webhookURL, secret string, e
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	req.SetBasicAuth(c.Email, c.APIToken)
+	c.setAuthHeaders(req)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
@@ -172,7 +235,7 @@ func (c *Client) DeleteWebhook(workspace, repoSlug, webhookUID string) error {
 		return fmt.Errorf("error creating request: %w", err)
 	}
 
-	req.SetBasicAuth(c.Email, c.APIToken)
+	c.setAuthHeaders(req)
 
 	resp, err := c.HTTP.Do(req)
 	if err != nil {

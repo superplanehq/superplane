@@ -9,36 +9,65 @@ import (
 )
 
 type NodeMetadata struct {
-	Repository *Repository `json:"repository" mapstructure:"repository"`
+	Repository *RepositoryMetadata `json:"repository" mapstructure:"repository"`
 }
 
-func ensureRepoInMetadata(ctx core.MetadataContext, integration core.IntegrationContext, repository string) error {
+type RepositoryMetadata struct {
+	UUID     string `json:"uuid" mapstructure:"uuid"`
+	Name     string `json:"name" mapstructure:"name"`
+	FullName string `json:"full_name" mapstructure:"full_name"`
+	Slug     string `json:"slug" mapstructure:"slug"`
+}
+
+func ensureRepoInMetadata(http core.HTTPContext, ctx core.MetadataContext, integration core.IntegrationContext, repository string) (*RepositoryMetadata, error) {
 	if repository == "" {
-		return fmt.Errorf("repository is required")
+		return nil, fmt.Errorf("repository is required")
 	}
 
 	var nodeMetadata NodeMetadata
 	if err := mapstructure.Decode(ctx.Get(), &nodeMetadata); err != nil {
-		return fmt.Errorf("failed to decode node metadata: %w", err)
+		return nil, fmt.Errorf("failed to decode node metadata: %w", err)
 	}
 
-	if nodeMetadata.Repository != nil && repositoryMatches(*nodeMetadata.Repository, repository) {
-		return nil
+	if nodeMetadata.Repository != nil && repositoryMetadataMatches(*nodeMetadata.Repository, repository) {
+		return nodeMetadata.Repository, nil
 	}
 
 	var integrationMetadata Metadata
 	if err := mapstructure.Decode(integration.GetMetadata(), &integrationMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
+		return nil, fmt.Errorf("failed to decode integration metadata: %w", err)
 	}
 
-	repoIndex := slices.IndexFunc(integrationMetadata.Repositories, func(r Repository) bool {
+	client, err := NewClient(integrationMetadata.AuthType, http, integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	repositories, err := client.ListRepositories(integrationMetadata.Workspace.Slug)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list repositories: %w", err)
+	}
+
+	repoIndex := slices.IndexFunc(repositories, func(r Repository) bool {
 		return repositoryMatches(r, repository)
 	})
+
 	if repoIndex == -1 {
-		return fmt.Errorf("repository %s is not accessible to workspace", repository)
+		return nil, fmt.Errorf("repository %s is not accessible to workspace", repository)
 	}
 
-	return ctx.Set(NodeMetadata{Repository: &integrationMetadata.Repositories[repoIndex]})
+	repoMetadata := &RepositoryMetadata{
+		UUID:     repositories[repoIndex].UUID,
+		Name:     repositories[repoIndex].Name,
+		FullName: repositories[repoIndex].FullName,
+		Slug:     repositories[repoIndex].Slug,
+	}
+
+	return repoMetadata, ctx.Set(NodeMetadata{Repository: repoMetadata})
+}
+
+func repositoryMetadataMatches(repo RepositoryMetadata, repository string) bool {
+	return repo.FullName == repository || repo.Name == repository || repo.Slug == repository || repo.UUID == repository
 }
 
 func repositoryMatches(repo Repository, repository string) bool {
