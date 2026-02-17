@@ -24,6 +24,7 @@ import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
+import snykIcon from "@/assets/icons/integrations/snyk.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
@@ -413,6 +414,7 @@ function CategorySection({
     openai: openAiIcon,
     "open-ai": openAiIcon,
     claude: claudeIcon,
+    snyk: snykIcon,
     cursor: cursorIcon,
     pagerduty: pagerDutyIcon,
     rootly: rootlyIcon,
@@ -493,6 +495,7 @@ function CategorySection({
             openai: openAiIcon,
             "open-ai": openAiIcon,
             claude: claudeIcon,
+            snyk: snykIcon,
             cursor: cursorIcon,
             pagerduty: pagerDutyIcon,
             rootly: rootlyIcon,
