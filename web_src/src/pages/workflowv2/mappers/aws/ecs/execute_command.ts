@@ -1,7 +1,7 @@
 import { ComponentBaseMapper, ExecutionDetailsContext, NodeInfo, OutputPayload, SubtitleContext } from "../../types";
 import { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../../utils";
-import { buildEcsComponentProps, ecsSubtitle } from "./common";
+import { buildEcsComponentProps, ecsConsoleUrl, ecsSubtitle, MAX_METADATA_ITEMS, truncateForDisplay } from "./common";
 
 interface ExecuteCommandConfiguration {
   region?: string;
@@ -40,24 +40,29 @@ export const executeCommandMapper: ComponentBaseMapper = {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const data = outputs?.default?.[0]?.data as ExecuteCommandOutput | undefined;
     const command = data?.command;
+    const timestamp = context.execution.updatedAt
+      ? new Date(context.execution.updatedAt).toLocaleString()
+      : context.execution.createdAt
+        ? new Date(context.execution.createdAt).toLocaleString()
+        : "-";
 
-    if (!command) {
-      return {};
-    }
-
-    return {
-      "Executed At": stringOrDash(
-        context.execution.updatedAt ? new Date(context.execution.updatedAt).toLocaleString() : "-",
-      ),
-      "Task ARN": stringOrDash(command.taskArn),
-      "Cluster ARN": stringOrDash(command.clusterArn),
-      "Container ARN": stringOrDash(command.containerArn),
-      Container: stringOrDash(command.containerName),
-      Interactive: stringOrDash(command.interactive),
-      "Session ID": stringOrDash(command.session?.sessionId),
-      "Stream URL": stringOrDash(command.session?.streamUrl),
-      "Session Token": command.session?.tokenValue ? "[redacted]" : "-",
+    const details: Record<string, string> = {
+      "Executed At": timestamp,
     };
+    if (command) {
+      details["Task ARN"] = stringOrDash(command.taskArn);
+      details["Container"] = stringOrDash(command.containerName);
+      details["Interactive"] = stringOrDash(command.interactive);
+      if (command.session?.streamUrl) {
+        details["Stream URL"] = command.session.streamUrl;
+      }
+      const region = command.clusterArn?.split(":")[2] ?? "";
+      const cluster = command.clusterArn?.split("/").pop() ?? "";
+      if (region && cluster && command.taskArn) {
+        details["ECS Console"] = ecsConsoleUrl(region, cluster, undefined, command.taskArn);
+      }
+    }
+    return details;
   },
 
   subtitle(context: SubtitleContext): string {
@@ -69,21 +74,18 @@ function executeCommandMetadataList(node: NodeInfo): MetadataItem[] {
   const config = node.configuration as ExecuteCommandConfiguration | undefined;
   const items: MetadataItem[] = [];
 
-  if (config?.region) {
-    items.push({ icon: "globe", label: config.region });
-  }
   if (config?.cluster) {
     items.push({ icon: "server", label: config.cluster });
   }
   if (config?.task) {
-    items.push({ icon: "square", label: config.task });
+    items.push({ icon: "square", label: truncateForDisplay(config.task) });
   }
   if (config?.container) {
     items.push({ icon: "package", label: config.container });
   }
-  if (config?.interactive) {
+  if (items.length < MAX_METADATA_ITEMS && config?.interactive) {
     items.push({ icon: "terminal", label: "interactive" });
   }
 
-  return items;
+  return items.slice(0, MAX_METADATA_ITEMS);
 }

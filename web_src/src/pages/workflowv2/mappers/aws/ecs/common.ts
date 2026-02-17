@@ -6,6 +6,28 @@ import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
 import { formatTimeAgo } from "@/utils/date";
 import { MetadataItem } from "@/ui/metadataList";
 
+export const MAX_METADATA_ITEMS = 3;
+const TRUNCATE_LENGTH = 24;
+
+/** Truncate long values (e.g. ARNs) for at-a-glance display. */
+export function truncateForDisplay(value: string, maxLen = TRUNCATE_LENGTH): string {
+  if (!value || value.length <= maxLen) return value;
+  return value.slice(-maxLen).replace(/^[^/]+/, "…");
+}
+
+/** ECS Console URL for a cluster (and optional service or task). */
+export function ecsConsoleUrl(region: string, cluster: string, service?: string, taskArn?: string): string {
+  const base = `https://${region}.console.aws.amazon.com/ecs/v2/clusters/${encodeURIComponent(cluster)}`;
+  if (taskArn) {
+    const taskId = taskArn.split("/").pop() ?? "";
+    return `${base}/tasks/${encodeURIComponent(taskId)}`;
+  }
+  if (service) {
+    return `${base}/services/${encodeURIComponent(service)}`;
+  }
+  return base;
+}
+
 export function buildEcsComponentProps(
   context: ComponentBaseContext,
   metadata: MetadataItem[],

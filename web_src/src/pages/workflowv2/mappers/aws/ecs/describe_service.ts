@@ -1,7 +1,7 @@
 import { ComponentBaseMapper, ExecutionDetailsContext, NodeInfo, OutputPayload, SubtitleContext } from "../../types";
 import { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../../utils";
-import { buildEcsComponentProps, ecsSubtitle } from "./common";
+import { buildEcsComponentProps, ecsConsoleUrl, ecsSubtitle, MAX_METADATA_ITEMS } from "./common";
 
 interface DescribeServiceConfiguration {
   region?: string;
@@ -42,27 +42,27 @@ export const describeServiceMapper: ComponentBaseMapper = {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const data = outputs?.default?.[0]?.data as DescribeServiceOutput | undefined;
     const service = data?.service;
+    const timestamp = context.execution.updatedAt
+      ? new Date(context.execution.updatedAt).toLocaleString()
+      : context.execution.createdAt
+        ? new Date(context.execution.createdAt).toLocaleString()
+        : "-";
 
-    if (!service) {
-      return {};
-    }
-
-    return {
-      "Retrieved At": stringOrDash(
-        context.execution.updatedAt ? new Date(context.execution.updatedAt).toLocaleString() : "-",
-      ),
-      Service: stringOrDash(service.serviceName),
-      "Service ARN": stringOrDash(service.serviceArn),
-      Status: stringOrDash(service.status),
-      Cluster: stringOrDash(service.clusterArn),
-      "Task Definition": stringOrDash(service.taskDefinition),
-      "Desired Count": stringOrDash(service.desiredCount),
-      "Running Count": stringOrDash(service.runningCount),
-      "Pending Count": stringOrDash(service.pendingCount),
-      "Launch Type": stringOrDash(service.launchType),
-      "Platform Version": stringOrDash(service.platformVersion),
-      Failures: String(data?.failures?.length || 0),
+    const details: Record<string, string> = {
+      "Retrieved At": timestamp,
     };
+    if (service) {
+      details["Service"] = stringOrDash(service.serviceName);
+      details["Status"] = stringOrDash(service.status);
+      details["Cluster"] = stringOrDash(service.clusterArn);
+      details["Task Definition"] = stringOrDash(service.taskDefinition);
+      const region = service.clusterArn?.split(":")[2] ?? "";
+      const cluster = service.clusterArn?.split("/").pop() ?? "";
+      if (region && cluster && service.serviceName) {
+        details["ECS Console"] = ecsConsoleUrl(region, cluster, service.serviceName);
+      }
+    }
+    return details;
   },
 
   subtitle(context: SubtitleContext): string {
@@ -74,9 +74,6 @@ function describeServiceMetadataList(node: NodeInfo): MetadataItem[] {
   const config = node.configuration as DescribeServiceConfiguration | undefined;
   const items: MetadataItem[] = [];
 
-  if (config?.region) {
-    items.push({ icon: "globe", label: config.region });
-  }
   if (config?.cluster) {
     items.push({ icon: "server", label: config.cluster });
   }
@@ -84,5 +81,5 @@ function describeServiceMetadataList(node: NodeInfo): MetadataItem[] {
     items.push({ icon: "package", label: config.service });
   }
 
-  return items;
+  return items.slice(0, MAX_METADATA_ITEMS);
 }
