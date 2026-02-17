@@ -15,8 +15,13 @@ type ListQueueItemsCommand struct {
 }
 
 func (c *ListQueueItemsCommand) Execute(ctx core.CommandContext) error {
+	canvasID, err := core.ResolveCanvasID(ctx, *c.CanvasID)
+	if err != nil {
+		return err
+	}
+
 	response, _, err := ctx.API.CanvasNodeAPI.
-		CanvasesListNodeQueueItems(ctx.Context, *c.CanvasID, *c.NodeID).
+		CanvasesListNodeQueueItems(ctx.Context, canvasID, *c.NodeID).
 		Execute()
 
 	if err != nil {

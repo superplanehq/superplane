@@ -5,12 +5,14 @@ import (
 	"strings"
 
 	"github.com/spf13/viper"
+	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
 type ConfigContext struct {
-	URL          string `mapstructure:"url" json:"url" yaml:"url"`
-	Organization string `mapstructure:"organization" json:"organization" yaml:"organization"`
-	APIToken     string `mapstructure:"apiToken" json:"apiToken" yaml:"apiToken"`
+	URL          string  `json:"url" yaml:"url"`
+	Organization string  `json:"organization" yaml:"organization"`
+	APIToken     string  `json:"apiToken" yaml:"apiToken"`
+	Canvas       *string `json:"canvas,omitempty" yaml:"canvas,omitempty"`
 }
 
 func normalizeBaseURL(raw string) string {
@@ -22,6 +24,11 @@ func normalizeContext(context ConfigContext) ConfigContext {
 	context.URL = normalizeBaseURL(context.URL)
 	context.Organization = strings.TrimSpace(context.Organization)
 	context.APIToken = strings.TrimSpace(context.APIToken)
+
+	if context.Canvas != nil {
+		context.Canvas = context.Canvas
+	}
+
 	return context
 }
 
@@ -158,4 +165,30 @@ func UpsertContext(context ConfigContext) (ConfigContext, error) {
 	}
 
 	return context, nil
+}
+
+/*
+ * Implementation of the core.ConfigContext interface,
+ * which uses the current context as the source for operations..
+ */
+type CurrentContext struct {
+	context ConfigContext
+}
+
+func NewCurrentContext(context ConfigContext) core.ConfigContext {
+	return &CurrentContext{context: context}
+}
+
+func (c *CurrentContext) GetActiveCanvas() string {
+	if c.context.Canvas == nil {
+		return ""
+	}
+
+	return *c.context.Canvas
+}
+
+func (c *CurrentContext) SetActiveCanvas(canvasID string) error {
+	c.context.Canvas = &canvasID
+	_, err := UpsertContext(c.context)
+	return err
 }

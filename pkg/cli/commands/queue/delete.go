@@ -14,8 +14,13 @@ type DeleteQueueItemCommand struct {
 }
 
 func (c *DeleteQueueItemCommand) Execute(ctx core.CommandContext) error {
+	canvasID, err := core.ResolveCanvasID(ctx, *c.CanvasID)
+	if err != nil {
+		return err
+	}
+
 	response, _, err := ctx.API.CanvasNodeAPI.
-		CanvasesDeleteNodeQueueItem(ctx.Context, *c.CanvasID, *c.NodeID, *c.ItemID).
+		CanvasesDeleteNodeQueueItem(ctx.Context, canvasID, *c.NodeID, *c.ItemID).
 		Execute()
 
 	if err != nil {

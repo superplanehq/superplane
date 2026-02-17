@@ -13,8 +13,13 @@ type CancelExecutionCommand struct {
 }
 
 func (c *CancelExecutionCommand) Execute(ctx core.CommandContext) error {
+	canvasID, err := core.ResolveCanvasID(ctx, *c.CanvasID)
+	if err != nil {
+		return err
+	}
+
 	response, _, err := ctx.API.CanvasNodeExecutionAPI.
-		CanvasesCancelExecution(ctx.Context, *c.CanvasID, *c.ExecutionID).
+		CanvasesCancelExecution(ctx.Context, canvasID, *c.ExecutionID).
 		Body(map[string]any{}).
 		Execute()
 

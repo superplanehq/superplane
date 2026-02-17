@@ -93,6 +93,14 @@ func defaultBindOptions() core.BindOptions {
 	return core.BindOptions{
 		NewAPIClient:        DefaultClient,
 		DefaultOutputFormat: GetOutputFormat,
+		NewConfigContext: func() core.ConfigContext {
+			context, ok := GetCurrentContext()
+			if !ok {
+				return nil
+			}
+
+			return NewCurrentContext(context)
+		},
 	}
 }
 

@@ -17,8 +17,13 @@ type ListExecutionsCommand struct {
 }
 
 func (c *ListExecutionsCommand) Execute(ctx core.CommandContext) error {
+	canvasID, err := core.ResolveCanvasID(ctx, *c.CanvasID)
+	if err != nil {
+		return err
+	}
+
 	request := ctx.API.CanvasNodeAPI.
-		CanvasesListNodeExecutions(ctx.Context, *c.CanvasID, *c.NodeID)
+		CanvasesListNodeExecutions(ctx.Context, canvasID, *c.NodeID)
 
 	if c.Limit != nil && *c.Limit > 0 {
 		request = request.Limit(*c.Limit)

@@ -23,7 +23,6 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 
 	listCmd.Flags().StringVar(&canvasID, "canvas-id", "", "canvas ID")
 	listCmd.Flags().StringVar(&nodeID, "node-id", "", "node ID")
-	_ = listCmd.MarkFlagRequired("canvas-id")
 	_ = listCmd.MarkFlagRequired("node-id")
 
 	core.Bind(listCmd, &ListQueueItemsCommand{
@@ -40,7 +39,6 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	deleteCmd.Flags().StringVar(&canvasID, "canvas-id", "", "canvas ID")
 	deleteCmd.Flags().StringVar(&nodeID, "node-id", "", "node ID")
 	deleteCmd.Flags().StringVar(&itemID, "item-id", "", "queue item ID")
-	_ = deleteCmd.MarkFlagRequired("canvas-id")
 	_ = deleteCmd.MarkFlagRequired("node-id")
 	_ = deleteCmd.MarkFlagRequired("item-id")
 	core.Bind(deleteCmd, &DeleteQueueItemCommand{

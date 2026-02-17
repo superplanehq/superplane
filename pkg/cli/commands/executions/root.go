@@ -27,7 +27,6 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	listCmd.Flags().StringVar(&nodeID, "node-id", "", "node ID")
 	listCmd.Flags().Int64Var(&limit, "limit", 20, "maximum number of items to return")
 	listCmd.Flags().StringVar(&before, "before", "", "return items before this timestamp (RFC3339)")
-	_ = listCmd.MarkFlagRequired("canvas-id")
 	_ = listCmd.MarkFlagRequired("node-id")
 	core.Bind(listCmd, &ListExecutionsCommand{
 		CanvasID: &canvasID,
@@ -43,7 +42,6 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	}
 	cancelCmd.Flags().StringVar(&canvasID, "canvas-id", "", "canvas ID")
 	cancelCmd.Flags().StringVar(&executionID, "execution-id", "", "execution ID")
-	_ = cancelCmd.MarkFlagRequired("canvas-id")
 	_ = cancelCmd.MarkFlagRequired("execution-id")
 	core.Bind(cancelCmd, &CancelExecutionCommand{
 		CanvasID:    &canvasID,

@@ -15,8 +15,13 @@ type ListEventExecutionsCommand struct {
 }
 
 func (c *ListEventExecutionsCommand) Execute(ctx core.CommandContext) error {
+	canvasID, err := core.ResolveCanvasID(ctx, *c.CanvasID)
+	if err != nil {
+		return err
+	}
+
 	response, _, err := ctx.API.CanvasEventAPI.
-		CanvasesListEventExecutions(ctx.Context, *c.CanvasID, *c.EventID).
+		CanvasesListEventExecutions(ctx.Context, canvasID, *c.EventID).
 		Execute()
 	if err != nil {
 		return err

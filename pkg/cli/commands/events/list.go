@@ -25,8 +25,13 @@ func (c *ListEventsCommand) Execute(ctx core.CommandContext) error {
 }
 
 func (c *ListEventsCommand) listNodeEvents(ctx core.CommandContext) error {
+	canvasID, err := core.ResolveCanvasID(ctx, *c.CanvasID)
+	if err != nil {
+		return err
+	}
+
 	request := ctx.API.CanvasNodeAPI.
-		CanvasesListNodeEvents(ctx.Context, *c.CanvasID, *c.NodeID)
+		CanvasesListNodeEvents(ctx.Context, canvasID, *c.NodeID)
 
 	if c.Limit != nil && *c.Limit > 0 {
 		request = request.Limit(*c.Limit)
@@ -68,8 +73,13 @@ func (c *ListEventsCommand) listNodeEvents(ctx core.CommandContext) error {
 }
 
 func (c *ListEventsCommand) listCanvasEvents(ctx core.CommandContext) error {
+	canvasID, err := core.ResolveCanvasID(ctx, *c.CanvasID)
+	if err != nil {
+		return err
+	}
+
 	request := ctx.API.CanvasEventAPI.
-		CanvasesListCanvasEvents(ctx.Context, *c.CanvasID)
+		CanvasesListCanvasEvents(ctx.Context, canvasID)
 
 	if c.Limit != nil && *c.Limit > 0 {
 		request = request.Limit(*c.Limit)
