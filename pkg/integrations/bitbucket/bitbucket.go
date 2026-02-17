@@ -12,6 +12,21 @@ import (
 const (
 	AuthTypeAPIToken             = "apiToken"
 	AuthTypeWorkspaceAccessToken = "workspaceAccessToken"
+
+	installationInstructions = `
+To configure Bitbucket with SuperPlane:
+
+- **API Token mode**:
+	- Go to **Atlassian Settings → Security → Create API token**.
+	- Select **Bitbucket** App.
+	- Create a token with admin:workspace:bitbucket scope.
+
+- **Workspace Access Token mode**:
+   - Go to **Bitbucket Workspace Settings → Security → Access tokens**.
+   - Create a workspace access token.
+
+- **Copy the token** and your workspace slug (for example: ` + "`my-workspace`" + `) below.
+`
 )
 
 func init() {
@@ -55,7 +70,7 @@ func (b *Bitbucket) Description() string {
 }
 
 func (b *Bitbucket) Instructions() string {
-	return ""
+	return installationInstructions
 }
 
 func (b *Bitbucket) Configuration() []configuration.Field {
