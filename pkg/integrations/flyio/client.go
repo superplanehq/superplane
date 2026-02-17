@@ -100,13 +100,13 @@ func newFlyIOAPIError(statusCode int, responseBody []byte) *FlyIOAPIError {
 
 // App represents a Fly.io application
 type App struct {
-	ID           string       `json:"id"`
-	Name         string       `json:"name"`
-	Status       string       `json:"status,omitempty"`
-	MachineCount int          `json:"machine_count,omitempty"`
-	VolumeCount  int          `json:"volume_count,omitempty"`
-	Network      string       `json:"network,omitempty"`
-	Organization *AppOrg      `json:"organization,omitempty"`
+	ID           string  `json:"id"`
+	Name         string  `json:"name"`
+	Status       string  `json:"status,omitempty"`
+	MachineCount int     `json:"machine_count,omitempty"`
+	VolumeCount  int     `json:"volume_count,omitempty"`
+	Network      string  `json:"network,omitempty"`
+	Organization *AppOrg `json:"organization,omitempty"`
 }
 
 type AppOrg struct {
