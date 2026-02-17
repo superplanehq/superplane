@@ -508,8 +508,9 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 	t.Run("poll retries transient API errors without failing the action", func(t *testing.T) {
 		events := &contexts.EventContext{}
 		requests := &contexts.RequestContext{}
+		checkpointTime := time.Now().Add(-time.Hour).UnixMilli()
 		metadata := &contexts.MetadataContext{Metadata: OnPipelineCompletedMetadata{
-			LastExecutionEnded: time.Now().Add(-time.Hour).UnixMilli(),
+			LastExecutionEnded: checkpointTime,
 			LastExecutionID:    "exec-old",
 		}}
 
@@ -546,6 +547,12 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		assert.Equal(t, OnPipelineCompletedPollAction, requests.Action)
 		assert.Equal(t, OnPipelineCompletedPollInterval, requests.Duration)
 		assert.Equal(t, 0, events.Count())
+
+		storedMetadata, ok := metadata.Get().(OnPipelineCompletedMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "exec-old", storedMetadata.LastExecutionID)
+		assert.EqualValues(t, checkpointTime, storedMetadata.LastExecutionEnded)
+		assert.Equal(t, 1, storedMetadata.PollErrorCount)
 	})
 
 	t.Run("poll falls back to unfiltered list when pipelineIdentifier filter is unsupported", func(t *testing.T) {

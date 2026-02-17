@@ -374,10 +374,13 @@ func (t *OnPipelineCompleted) poll(ctx core.TriggerActionContext) error {
 
 	executions, err := t.collectExecutionsSinceCheckpoint(client, metadata, pipelineIdentifierForAPI)
 	if err != nil && pipelineIdentifierForAPI != "" && errors.Is(err, errOnPipelineCompletedUnsupportedPipelineIdentifierFilter) {
-		metadata.DisableServerPipelineIDFilterInAPI = true
-		if setErr := ctx.Metadata.Set(metadata); setErr != nil {
+		updatedMetadata, setErr := t.updatePollingMetadata(ctx.Metadata, func(current *OnPipelineCompletedMetadata) {
+			current.DisableServerPipelineIDFilterInAPI = true
+		})
+		if setErr != nil {
 			return setErr
 		}
+		metadata = updatedMetadata
 		if ctx.Logger != nil {
 			ctx.Logger.Warnf("Harness execution summary API does not support pipelineIdentifier filter, falling back to unfiltered polling")
 		}
@@ -386,10 +389,13 @@ func (t *OnPipelineCompleted) poll(ctx core.TriggerActionContext) error {
 	}
 
 	if err != nil {
-		metadata.PollErrorCount++
-		if setErr := ctx.Metadata.Set(metadata); setErr != nil {
+		updatedMetadata, setErr := t.updatePollingMetadata(ctx.Metadata, func(current *OnPipelineCompletedMetadata) {
+			current.PollErrorCount++
+		})
+		if setErr != nil {
 			return setErr
 		}
+		metadata = updatedMetadata
 
 		if ctx.Logger != nil {
 			ctx.Logger.Warnf("failed to poll Harness pipeline executions (attempt %d): %v", metadata.PollErrorCount, err)
@@ -402,10 +408,13 @@ func (t *OnPipelineCompleted) poll(ctx core.TriggerActionContext) error {
 	}
 
 	if metadata.PollErrorCount > 0 {
-		metadata.PollErrorCount = 0
-		if err := ctx.Metadata.Set(metadata); err != nil {
+		updatedMetadata, err := t.updatePollingMetadata(ctx.Metadata, func(current *OnPipelineCompletedMetadata) {
+			current.PollErrorCount = 0
+		})
+		if err != nil {
 			return err
 		}
+		metadata = updatedMetadata
 	}
 
 	for _, execution := range executions {
@@ -531,6 +540,38 @@ func (t *OnPipelineCompleted) updateCheckpointFromExecutionUnlocked(
 	}
 
 	return metadataCtx.Set(updated)
+}
+
+func (t *OnPipelineCompleted) updatePollingMetadata(
+	metadataCtx core.MetadataContext,
+	mutate func(*OnPipelineCompletedMetadata),
+) (OnPipelineCompletedMetadata, error) {
+	if metadataCtx == nil {
+		return OnPipelineCompletedMetadata{}, fmt.Errorf("missing metadata context")
+	}
+
+	onPipelineCompletedCheckpointUpdateMu.Lock()
+	defer onPipelineCompletedCheckpointUpdateMu.Unlock()
+
+	current, err := decodeOnPipelineCompletedMetadata(metadataCtx.Get())
+	if err != nil {
+		return OnPipelineCompletedMetadata{}, err
+	}
+
+	updated := current
+	if mutate != nil {
+		mutate(&updated)
+	}
+
+	if updated == current {
+		return updated, nil
+	}
+
+	if err := metadataCtx.Set(updated); err != nil {
+		return OnPipelineCompletedMetadata{}, err
+	}
+
+	return updated, nil
 }
 
 func executionSummaryFromWebhookPayload(event pipelineWebhookEvent, payload map[string]any) ExecutionSummary {
