@@ -112,7 +112,7 @@ func (p *OnPush) Setup(ctx core.TriggerContext) error {
 	}
 
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		EventType:      "repo:push",
+		EventTypes:     []string{"repo:push"},
 		RepositorySlug: repo.Slug,
 	})
 }

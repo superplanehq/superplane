@@ -98,7 +98,7 @@ func Test__OnPush__Setup(t *testing.T) {
 		require.Len(t, integrationCtx.WebhookRequests, 1)
 		webhookRequest, ok := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
 		require.True(t, ok)
-		assert.Equal(t, "repo:push", webhookRequest.EventType)
+		assert.Equal(t, []string{"repo:push"}, webhookRequest.EventTypes)
 		assert.Equal(t, "hello", webhookRequest.RepositorySlug)
 
 		require.NotNil(t, nodeMetadataCtx.Metadata)

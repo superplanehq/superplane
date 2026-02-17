@@ -2,9 +2,81 @@ import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import { TriggerProps } from "@/ui/trigger";
-import { BitbucketNodeMetadata, BitbucketPush, BitbucketPushConfiguration } from "./types";
+import { NodeMetadata } from "./types";
 import { Predicate, formatPredicate } from "../utils";
 import { formatTimeAgo } from "@/utils/date";
+
+export interface OnPushConfiguration {
+  repository?: string;
+  refs: Predicate[];
+}
+
+export interface BitbucketPush {
+  actor?: {
+    display_name?: string;
+    uuid?: string;
+    nickname?: string;
+  };
+  repository?: {
+    full_name?: string;
+    name?: string;
+    uuid?: string;
+    links?: {
+      html?: {
+        href?: string;
+      };
+    };
+  };
+  push?: {
+    changes?: BitbucketChange[];
+  };
+}
+
+export interface BitbucketChange {
+  new?: {
+    type?: string;
+    name?: string;
+    target?: {
+      hash?: string;
+      message?: string;
+      date?: string;
+      author?: {
+        raw?: string;
+        user?: {
+          display_name?: string;
+          uuid?: string;
+        };
+      };
+      links?: {
+        html?: {
+          href?: string;
+        };
+      };
+    };
+  };
+  old?: {
+    type?: string;
+    name?: string;
+  };
+  created?: boolean;
+  forced?: boolean;
+  closed?: boolean;
+  commits?: BitbucketCommit[];
+  truncated?: boolean;
+}
+
+export interface BitbucketCommit {
+  hash?: string;
+  message?: string;
+  author?: {
+    raw?: string;
+  };
+  links?: {
+    html?: {
+      href?: string;
+    };
+  };
+}
 
 function buildBitbucketSubtitle(shortSha: string, createdAt?: string): string {
   const trimmedSha = shortSha.trim();
@@ -46,8 +118,8 @@ export const onPushTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
-    const metadata = node.metadata as unknown as BitbucketNodeMetadata;
-    const configuration = node.configuration as unknown as BitbucketPushConfiguration;
+    const metadata = node.metadata as unknown as NodeMetadata;
+    const configuration = node.configuration as unknown as OnPushConfiguration;
     const metadataItems = [];
 
     if (metadata?.repository) {
@@ -60,7 +132,7 @@ export const onPushTriggerRenderer: TriggerRenderer = {
     if (configuration?.refs && configuration.refs.length > 0) {
       metadataItems.push({
         icon: "funnel",
-        label: (configuration.refs as unknown as Predicate[]).map(formatPredicate).join(", "),
+        label: configuration.refs.map(formatPredicate).join(", "),
       });
     }
 

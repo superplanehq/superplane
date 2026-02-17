@@ -1,0 +1,151 @@
+---
+title: "Bitbucket"
+---
+
+React to events in your Bitbucket repositories
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Push" href="#on-push" description="Listen to Bitbucket push events" />
+</CardGrid>
+
+## Instructions
+
+To configure Bitbucket with SuperPlane:
+
+- **API Token mode**:
+	- Go to **Atlassian Settings → Security → Create API token**.
+	- Select **Bitbucket** App.
+	- Create a token with admin:workspace:bitbucket scope.
+
+- **Workspace Access Token mode**:
+   - Go to **Bitbucket Workspace Settings → Security → Access tokens**.
+   - Create a workspace access token.
+
+- **Copy the token** and your workspace slug (for example: `my-workspace`) below.
+
+<a id="on-push"></a>
+
+## On Push
+
+The On Push trigger starts a workflow execution when code is pushed to a Bitbucket repository.
+
+### Use Cases
+
+- **CI/CD automation**: Trigger builds and deployments on code pushes
+- **Code quality checks**: Run linting and tests on every push
+- **Notification workflows**: Send notifications when code is pushed
+
+### Configuration
+
+- **Repository**: Select the Bitbucket repository to monitor
+- **Refs**: Configure which branches to monitor (e.g., `refs/heads/main`)
+
+### Event Data
+
+Each push event includes:
+- **repository**: Repository information
+- **push.changes**: Array of reference changes with new/old commit details
+- **actor**: Information about who pushed
+
+### Webhook Setup
+
+This trigger automatically sets up a Bitbucket webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "actor": {
+    "display_name": "John Doe",
+    "links": {
+      "avatar": {
+        "href": "https://bitbucket.org/account/johndoe/avatar/"
+      },
+      "html": {
+        "href": "https://bitbucket.org/johndoe/"
+      }
+    },
+    "nickname": "johndoe",
+    "type": "user",
+    "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}"
+  },
+  "push": {
+    "changes": [
+      {
+        "closed": false,
+        "commits": [
+          {
+            "author": {
+              "raw": "John Doe \u003cjohn@example.com\u003e",
+              "type": "author"
+            },
+            "hash": "709d658dc5b6d6afcd46049c2f332ee3f515a67d",
+            "links": {
+              "html": {
+                "href": "https://bitbucket.org/my-workspace/my-repo/commits/709d658dc5b6d6afcd46049c2f332ee3f515a67d"
+              }
+            },
+            "message": "Add new feature\n",
+            "type": "commit"
+          }
+        ],
+        "created": false,
+        "forced": false,
+        "new": {
+          "name": "main",
+          "target": {
+            "author": {
+              "raw": "John Doe \u003cjohn@example.com\u003e",
+              "type": "author",
+              "user": {
+                "display_name": "John Doe",
+                "type": "user",
+                "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}"
+              }
+            },
+            "date": "2024-01-15T10:30:00+00:00",
+            "hash": "709d658dc5b6d6afcd46049c2f332ee3f515a67d",
+            "links": {
+              "html": {
+                "href": "https://bitbucket.org/my-workspace/my-repo/commits/709d658dc5b6d6afcd46049c2f332ee3f515a67d"
+              }
+            },
+            "message": "Add new feature\n",
+            "type": "commit"
+          },
+          "type": "branch"
+        },
+        "old": {
+          "name": "main",
+          "target": {
+            "author": {
+              "raw": "John Doe \u003cjohn@example.com\u003e",
+              "type": "author"
+            },
+            "date": "2024-01-14T15:00:00+00:00",
+            "hash": "1e65c05c1d5171631d92438a13901ca7dae9618c",
+            "message": "Previous commit\n",
+            "type": "commit"
+          },
+          "type": "branch"
+        },
+        "truncated": false
+      }
+    ]
+  },
+  "repository": {
+    "full_name": "my-workspace/my-repo",
+    "links": {
+      "html": {
+        "href": "https://bitbucket.org/my-workspace/my-repo"
+      }
+    },
+    "name": "my-repo",
+    "type": "repository",
+    "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}"
+  }
+}
+```
+

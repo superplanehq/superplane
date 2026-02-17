@@ -2,14 +2,15 @@ package bitbucket
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 type WebhookConfiguration struct {
-	EventType      string `json:"eventType"`
-	RepositorySlug string `json:"repositorySlug"`
+	EventTypes     []string `json:"eventTypes"`
+	RepositorySlug string   `json:"repositorySlug"`
 }
 
 type BitbucketWebhook struct {
@@ -36,8 +37,12 @@ func (h *BitbucketWebhookHandler) CompareConfig(a, b any) (bool, error) {
 		return false, nil
 	}
 
-	if configA.EventType != configB.EventType {
-		return false, nil
+	// Check if A contains all events from B (A is superset of B)
+	// This allows webhook sharing when existing webhook has more events than needed
+	for _, eventB := range configB.EventTypes {
+		if !slices.Contains(configA.EventTypes, eventB) {
+			return false, nil
+		}
 	}
 
 	return true, nil
@@ -79,7 +84,7 @@ func (h *BitbucketWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, er
 		config.RepositorySlug,
 		ctx.Webhook.GetURL(),
 		string(secret),
-		[]string{config.EventType},
+		config.EventTypes,
 	)
 
 	if err != nil {
