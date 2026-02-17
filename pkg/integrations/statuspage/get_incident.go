@@ -136,10 +136,10 @@ func (c *GetIncident) Setup(ctx core.SetupContext) error {
 	// Skip API call if HTTP context is not available (e.g. in tests without HTTP mock).
 	metadata := NodeMetadata{}
 	if spec.Page != "" && !strings.Contains(spec.Page, "{{") && ctx.HTTP != nil {
-		client, err := NewClient(ctx.HTTP, ctx.Integration)
-		if err == nil {
-			pages, err := client.ListPages()
-			if err == nil {
+		client, clientErr := NewClient(ctx.HTTP, ctx.Integration)
+		if clientErr == nil {
+			pages, listErr := client.ListPages()
+			if listErr == nil {
 				for _, p := range pages {
 					if p.ID == spec.Page {
 						metadata.PageName = p.Name

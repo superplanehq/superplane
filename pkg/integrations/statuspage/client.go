@@ -1,5 +1,5 @@
 // Package statuspage implements the Atlassian Statuspage integration.
-// API reference: pkg/integrations/statuspage/api-documentation/ (statuspage-api-guide.md, statuspage-api-minimal.json).
+// API reference: https://developer.statuspage.io/
 package statuspage
 
 import (
@@ -22,6 +22,21 @@ type Client struct {
 	http    core.HTTPContext
 }
 
+// validateBaseURL returns an error if the URL is invalid.
+func validateBaseURL(baseURL string) error {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return fmt.Errorf("invalid base URL: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("base URL must use http or https scheme")
+	}
+	if u.Host == "" {
+		return fmt.Errorf("base URL must have a host")
+	}
+	return nil
+}
+
 func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
 	apiKey, err := ctx.GetConfig("apiKey")
 	if err != nil {
@@ -33,6 +48,10 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 		baseURL = string(baseURLConfig)
 	}
 	baseURL = strings.TrimSuffix(baseURL, "/")
+
+	if err := validateBaseURL(baseURL); err != nil {
+		return nil, err
+	}
 
 	return &Client{
 		apiKey:  string(apiKey),
@@ -130,7 +149,7 @@ type CreateIncidentRequest struct {
 	Realtime                bool              `json:"-"` // if true, send as realtime; else scheduled
 }
 
-// incidentPayload is the JSON body for POST /pages/{page_id}/incidents (see api-documentation).
+// incidentPayload is the JSON body for POST /pages/{page_id}/incidents.
 type incidentPayload struct {
 	Name                    string            `json:"name"`
 	Body                    string            `json:"body,omitempty"`
@@ -146,8 +165,7 @@ type incidentPayload struct {
 	DeliverNotifications    *bool             `json:"deliver_notifications,omitempty"`
 }
 
-// CreateIncident creates an incident and returns the full 201 response as map[string]any.
-// Request format follows api-documentation/statuspage-api-guide.md (JSON recommended).
+// CreateIncident creates an incident and returns the incident object as map[string]any.
 func (c *Client) CreateIncident(pageID string, req CreateIncidentRequest) (map[string]any, error) {
 	payload := incidentPayload{
 		Name:                 req.Name,
@@ -185,12 +203,7 @@ func (c *Client) CreateIncident(pageID string, req CreateIncidentRequest) (map[s
 	if err != nil {
 		return nil, err
 	}
-
-	var incident map[string]any
-	if err := json.Unmarshal(resBody, &incident); err != nil {
-		return nil, fmt.Errorf("parsing incident response: %w", err)
-	}
-	return incident, nil
+	return extractIncident(resBody)
 }
 
 // Incident is a minimal incident representation for listing.
@@ -270,12 +283,20 @@ func (c *Client) UpdateIncident(pageID, incidentID string, req UpdateIncidentReq
 	if err != nil {
 		return nil, err
 	}
+	return extractIncident(resBody)
+}
 
-	var incident map[string]any
-	if err := json.Unmarshal(resBody, &incident); err != nil {
+// extractIncident parses the API response and returns the incident object.
+// The Statuspage API returns {"incident": {...}} for create/update/get; we unwrap to return the incident directly.
+func extractIncident(resBody []byte) (map[string]any, error) {
+	var raw map[string]any
+	if err := json.Unmarshal(resBody, &raw); err != nil {
 		return nil, fmt.Errorf("parsing incident response: %w", err)
 	}
-	return incident, nil
+	if inc, ok := raw["incident"].(map[string]any); ok {
+		return inc, nil
+	}
+	return raw, nil
 }
 
 // GetIncident fetches a single incident by ID and returns the full response including incident_updates (timeline).
@@ -286,9 +307,5 @@ func (c *Client) GetIncident(pageID, incidentID string) (map[string]any, error) 
 	if err != nil {
 		return nil, err
 	}
-	var incident map[string]any
-	if err := json.Unmarshal(resBody, &incident); err != nil {
-		return nil, fmt.Errorf("parsing incident response: %w", err)
-	}
-	return incident, nil
+	return extractIncident(resBody)
 }

@@ -103,18 +103,19 @@ export function getDetailsForIncident(
   const componentName = options?.componentName;
   const execution = options?.execution;
 
-  // Timestamp first (single timestamp per component)
+  // Timestamp first (single timestamp per component). Always show at least one timestamp per component-design.
   if (componentName === "statuspage.createIncident" && incident?.created_at) {
     details["Created At"] = new Date(incident.created_at).toLocaleString();
   } else if (componentName === "statuspage.getIncident" && execution?.createdAt) {
     details["Fetched At"] = new Date(execution.createdAt).toLocaleString();
   } else if (componentName === "statuspage.updateIncident" && incident?.updated_at) {
     details["Updated At"] = new Date(incident.updated_at).toLocaleString();
-  } else if (!componentName) {
+  } else if (!componentName && incident?.created_at) {
     // Fallback when options not passed (e.g. from tests)
-    if (incident?.created_at) {
-      details["Created At"] = new Date(incident.created_at).toLocaleString();
-    }
+    details["Created At"] = new Date(incident.created_at).toLocaleString();
+  } else if (execution?.createdAt) {
+    // Fallback: always show timestamp when incident is null or timestamp fields missing
+    details["Started At"] = new Date(execution.createdAt).toLocaleString();
   }
 
   details["ID"] = stringOrDash(incident?.id);
