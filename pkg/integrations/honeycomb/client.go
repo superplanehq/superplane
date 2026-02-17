@@ -108,7 +108,8 @@ func (c *Client) CreateEvent(datasetSlug string, fields map[string]any) error {
 	req.Header.Set("Content-Type", "application/json")
 
 	// Always set event timestamp header (Honeycomb uses the header for event time).
-	req.Header.Set("X-Honeycomb-Event-Time", fmt.Sprintf("%d", time.Now().Unix()))
+	// Use RFC3339Nano in UTC to match Honeycomb's expected format (same as libhoney-go).
+	req.Header.Set("X-Honeycomb-Event-Time", time.Now().UTC().Format(time.RFC3339Nano))
 
 	resp, err := c.http.Do(req)
 	if err != nil {
