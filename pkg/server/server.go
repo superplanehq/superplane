@@ -45,7 +45,11 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/dockerhub"
 	_ "github.com/superplanehq/superplane/pkg/integrations/github"
 	_ "github.com/superplanehq/superplane/pkg/integrations/gitlab"
+<<<<<<< feat/honeycomb-integration
+	_ "github.com/superplanehq/superplane/pkg/integrations/honeycomb"
+=======
 	_ "github.com/superplanehq/superplane/pkg/integrations/hetzner"
+>>>>>>> main
 	_ "github.com/superplanehq/superplane/pkg/integrations/jira"
 	_ "github.com/superplanehq/superplane/pkg/integrations/openai"
 	_ "github.com/superplanehq/superplane/pkg/integrations/pagerduty"
