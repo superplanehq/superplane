@@ -109,13 +109,11 @@ func Test__CreateEvent__Execute(t *testing.T) {
 		bodyBytes, _ := io.ReadAll(req.Body)
 		bodyStr := strings.TrimSpace(string(bodyBytes))
 
-		// tvoj client šalje JSON object (fields)
 		assert.True(t, strings.HasPrefix(bodyStr, "{"), "payload should be a JSON object")
 		assert.Contains(t, bodyStr, `"message":"deployment"`)
 		assert.Contains(t, bodyStr, `"version":"1.2.3"`)
 
-		// vreme ide kroz header (auto)
-		assert.NotEmpty(t, req.Header.Get("X-Honeycomb-Event-Time"))
+		assert.NotEmpty(t, req.Header.Get("X-Honeycomb-Event-Time"), "event time is sent via header")
 
 	})
 }
