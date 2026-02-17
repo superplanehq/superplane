@@ -521,21 +521,32 @@ func (c *CreateIncident) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-// toUTCISO8601 parses a datetime string in the given timezone and returns it as ISO 8601 UTC (e.g. 2026-02-15T02:00:00Z).
-// Input format: "2006-01-02T15:04" or "2006-01-02T15:04:05" from the datetime picker.
+// toUTCISO8601 parses a datetime string and returns it as ISO 8601 UTC (e.g. 2026-02-15T02:00:00Z).
+// Input format: "2006-01-02T15:04" or "2006-01-02T15:04:05" from the datetime picker, or "2006-01-02T15:04:05Z" for UTC.
+// If the input ends with "Z", it is already UTC and is parsed as such. Otherwise, the datetime is interpreted
+// in the given timezone (e.g. "America/New_York") and converted to UTC.
 func toUTCISO8601(dt, timezone string) (string, error) {
 	if dt == "" {
 		return "", nil
+	}
+	// "Z" suffix means UTC per ISO 8601 — parse directly, do not re-interpret in user timezone
+	if strings.HasSuffix(dt, "Z") {
+		formats := []string{"2006-01-02T15:04:05Z", "2006-01-02T15:04Z"}
+		for _, f := range formats {
+			if parsed, err := time.Parse(f, dt); err == nil {
+				return parsed.UTC().Format("2006-01-02T15:04:05") + "Z", nil
+			}
+		}
+		return "", fmt.Errorf("could not parse UTC datetime %q", dt)
 	}
 	loc, err := time.LoadLocation(timezone)
 	if err != nil {
 		return "", fmt.Errorf("invalid timezone %q: %w", timezone, err)
 	}
-	trimmed := strings.TrimSuffix(dt, "Z")
 	formats := []string{"2006-01-02T15:04:05", "2006-01-02T15:04"}
 	var t time.Time
 	for _, f := range formats {
-		if parsed, err := time.ParseInLocation(f, trimmed, loc); err == nil {
+		if parsed, err := time.ParseInLocation(f, dt, loc); err == nil {
 			t = parsed
 			break
 		}

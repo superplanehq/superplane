@@ -146,6 +146,19 @@ func Test__UpdateIncident__Setup(t *testing.T) {
 		assert.Contains(t, err.Error(), "incident is required")
 	})
 
+	t.Run("invalid incidentType returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"page":           "kctbh9vrtdwd",
+				"incident":       "p31zjtct2jer",
+				"incidentType":   "invalid",
+				"statusRealtime": "resolved",
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "incidentType must be realtime or scheduled")
+	})
+
 	t.Run("missing status body and components returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
