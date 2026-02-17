@@ -1,0 +1,118 @@
+---
+title: "Honeycomb"
+---
+
+Triggers and actions for Honeycomb
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Alert Fired" href="#on-alert-fired" description="Triggers when Honeycomb sends an alert webhook" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Event" href="#create-event" description="Send an event to Honeycomb" />
+</CardGrid>
+
+## Instructions
+
+Connect Honeycomb to Superplane using a Honeycomb API key.
+
+**Get your API key**:
+Honeycomb → Account → Team Settings → API Keys → copy key → paste here.
+
+**Trigger setup**:
+After saving a Honeycomb trigger node, Superplane generates a Webhook URL and Shared Secret.
+Add them in Honeycomb → Team Settings → Integrations → Webhooks.
+
+Once configured, Honeycomb events will trigger your workflow automatically.
+
+<a id="on-alert-fired"></a>
+
+## On Alert Fired
+
+The On Alert Fired trigger starts a workflow execution when Honeycomb sends an alert webhook.
+
+Setup:
+1) Add this trigger to a workflow
+2) Optionally set Alert Name (used to filter which node fires)
+3) SAVE the node
+4) Copy Webhook URL and Shared Secret into Honeycomb webhook integration
+
+### Example Data
+
+```json
+{
+  "dataset": {
+    "name": "Production API",
+    "slug": "api-production"
+  },
+  "description": "API error rate has exceeded the acceptable threshold",
+  "id": "01HQXYZ123ABC",
+  "name": "High Error Rate - Production API",
+  "query": {
+    "query_url": "https://ui.honeycomb.io/myteam/datasets/api-production/query/xyz789",
+    "time_range": 900
+  },
+  "result_groups": [
+    {
+      "group": {
+        "endpoint": "/api/users"
+      },
+      "result_value": 12.3
+    },
+    {
+      "group": {
+        "endpoint": "/api/orders"
+      },
+      "result_value": 6.8
+    }
+  ],
+  "result_value": 8.5,
+  "severity": "critical",
+  "status": "firing",
+  "summary": "Error rate is 8.5% (threshold: 5%)",
+  "threshold": {
+    "op": "above",
+    "value": 5
+  },
+  "trigger_url": "https://ui.honeycomb.io/myteam/triggers/abc123",
+  "triggered_at": "2026-02-15T10:30:00Z",
+  "version": "v1"
+}
+```
+
+<a id="create-event"></a>
+
+## Create Event
+
+Sends a custom event to Honeycomb using the Events API.
+
+The component sends a single event as a JSON object where each key becomes a Honeycomb field.
+
+Notes:
+- The request body is the JSON object you provide in "Fields".
+- If you do not include a "time" field, the current time is automatically set via request header.
+
+### Example Output
+
+```json
+{
+  "dataset": "deployments",
+  "fields": {
+    "deployed_by": "github-actions",
+    "duration_seconds": 42,
+    "environment": "production",
+    "event_type": "deployment",
+    "service": "billing-api",
+    "success": true,
+    "version": "2.4.1"
+  },
+  "status": "sent"
+}
+```
+
