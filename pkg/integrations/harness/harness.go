@@ -15,11 +15,6 @@ func init() {
 
 type Harness struct{}
 
-type Configuration struct {
-	APIToken string `json:"apiToken" mapstructure:"apiToken"`
-	BaseURL  string `json:"baseURL" mapstructure:"baseURL"`
-}
-
 func (h *Harness) Name() string {
 	return "harness"
 }
