@@ -1,0 +1,34 @@
+{
+  "version": "v1",
+  "id": "01HQXYZ123ABC",
+  "name": "High Error Rate - Production API",
+  "status": "firing",
+  "summary": "Error rate is 8.5% (threshold: 5%)",
+  "description": "API error rate has exceeded the acceptable threshold",
+  "trigger_url": "https://ui.honeycomb.io/myteam/triggers/abc123",
+  "dataset": {
+    "slug": "api-production",
+    "name": "Production API"
+  },
+  "query": {
+    "query_url": "https://ui.honeycomb.io/myteam/datasets/api-production/query/xyz789",
+    "time_range": 900
+  },
+  "threshold": {
+    "op": "above",
+    "value": 5
+  },
+  "result_value": 8.5,
+  "result_groups": [
+    {
+      "group": {"endpoint": "/api/users"},
+      "result_value": 12.3
+    },
+    {
+      "group": {"endpoint": "/api/orders"},
+      "result_value": 6.8
+    }
+  ],
+  "triggered_at": "2026-02-15T10:30:00Z",
+  "severity": "critical"
+}

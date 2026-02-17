@@ -1,0 +1,13 @@
+{
+  "status": "sent",
+  "dataset": "deployments",
+  "fields": {
+    "event_type": "deployment",
+    "service": "billing-api",
+    "environment": "production",
+    "version": "2.4.1",
+    "deployed_by": "github-actions",
+    "duration_seconds": 42,
+    "success": true
+  }
+}
