@@ -1,0 +1,244 @@
+---
+title: "GitLab"
+---
+
+Manage and react to changes in your GitLab repositories
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events from GitLab" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitLab project" />
+</CardGrid>
+
+## Instructions
+
+When connecting using App OAuth:
+- Leave **Client ID** and **Secret** empty to start the setup wizard.
+
+When connecting using Personal Access Token:
+- Go to Preferences → Personal Access Token → Add New token
+- Use **Scopes**: api, read_user, read_api, write_repository, read_repository
+- Copy the token and paste it into the **Access Token** configuration field, then click **Save**.
+
+<a id="on-issue"></a>
+
+## On Issue
+
+The On Issue trigger starts a workflow execution when issue events occur in a GitLab project.
+
+### Use Cases
+
+- **Notify Slack** when an issue is created or assigned for triage
+- **Create a Jira issue** when a GitLab issue is created for traceability
+- **Update external dashboards** or close linked tickets when an issue is closed
+
+### Configuration
+
+- **Project** (required): GitLab project to monitor
+- **Actions** (required): Select which issue actions to listen for (opened, closed, reopened, etc.). Default: opened.
+- **Labels** (optional): Only trigger for issues with specific labels
+
+### Outputs
+
+- **Default channel**: Emits issue payload including issue IID, title, state, labels, assignees, author, and action type
+
+### Webhook Setup
+
+This trigger automatically sets up a GitLab webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "assignees": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/abc123",
+        "id": 1,
+        "name": "John Doe",
+        "username": "johndoe"
+      }
+    ],
+    "event_type": "issue",
+    "labels": [
+      {
+        "color": "#dc3545",
+        "created_at": "2026-01-01T00:00:00Z",
+        "description": "Bug reports",
+        "group_id": null,
+        "id": 206,
+        "project_id": 15,
+        "template": false,
+        "title": "bug",
+        "type": "ProjectLabel",
+        "updated_at": "2026-01-01T00:00:00Z"
+      }
+    ],
+    "object_attributes": {
+      "action": "open",
+      "created_at": "2026-02-05T14:00:00Z",
+      "description": "This is an example issue description for testing the webhook",
+      "id": 301,
+      "iid": 1,
+      "state": "opened",
+      "title": "Example Issue",
+      "updated_at": "2026-02-05T14:00:00Z",
+      "url": "https://gitlab.com/group/my-project/-/issues/1"
+    },
+    "object_kind": "issue",
+    "project": {
+      "avatar_url": null,
+      "default_branch": "main",
+      "description": "Example project",
+      "git_http_url": "https://gitlab.com/group/my-project.git",
+      "git_ssh_url": "git@gitlab.com:group/my-project.git",
+      "id": 15,
+      "name": "my-project",
+      "namespace": "group",
+      "path_with_namespace": "group/my-project",
+      "visibility_level": 20,
+      "web_url": "https://gitlab.com/group/my-project"
+    },
+    "repository": {
+      "description": "Example project",
+      "homepage": "https://gitlab.com/group/my-project",
+      "name": "my-project",
+      "url": "git@gitlab.com:group/my-project.git"
+    },
+    "user": {
+      "avatar_url": "https://www.gravatar.com/avatar/abc123",
+      "email": "johndoe@example.com",
+      "id": 1,
+      "name": "John Doe",
+      "username": "johndoe"
+    }
+  },
+  "timestamp": "2026-02-05T14:00:00.000000000Z",
+  "type": "gitlab.issue"
+}
+```
+
+<a id="create-issue"></a>
+
+## Create Issue
+
+The Create Issue component creates a new issue in a specified GitLab project.
+
+### Use Cases
+
+- **Automated Bug Reporting**: Create issues when a monitoring system detects an error
+- **Task Management**: Automatically create tasks for new employee onboarding
+- **Feedback Loop**: Turn customer feedback into actionable issues
+
+### Configuration
+
+- **Project** (required): The GitLab project where the issue will be created
+- **Title** (required): The title of the new issue
+- **Description** (optional): The description/body of the issue
+- **Assignees** (optional): Users to assign the issue to
+- **Labels** (optional): Labels to apply to the issue (e.g., bug, enhancement)
+- **Milestone** (optional): Milestone to associate with the issue
+- **Due Date** (optional): Date when the issue is due
+
+### Output
+
+The component outputs the created issue object, including:
+- **id**: The internal ID of the issue
+- **iid**: The project-relative ID of the issue
+- **web_url**: The URL to view the issue in GitLab
+- **state**: The current state of the issue (opened/closed)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "_links": {
+      "award_emoji": "http://gitlab.example.com/api/v4/projects/1/issues/1/award_emoji",
+      "notes": "http://gitlab.example.com/api/v4/projects/1/issues/1/notes",
+      "project": "http://gitlab.example.com/api/v4/projects/1",
+      "self": "http://gitlab.example.com/api/v4/projects/1/issues/1"
+    },
+    "assignee": {
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "http://gitlab.example.com/root"
+    },
+    "assignees": [
+      {
+        "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+        "id": 1,
+        "name": "Administrator",
+        "state": "active",
+        "username": "root",
+        "web_url": "http://gitlab.example.com/root"
+      }
+    ],
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "http://gitlab.example.com/root"
+    },
+    "blocking_issues_count": 0,
+    "closed_at": null,
+    "closed_by": null,
+    "confidential": false,
+    "created_at": "2023-01-01T10:00:00.000Z",
+    "description": "This is an example issue created via SuperPlane",
+    "discussion_locked": null,
+    "downvotes": 0,
+    "due_date": null,
+    "has_tasks": false,
+    "id": 1,
+    "iid": 1,
+    "issue_type": "issue",
+    "labels": [
+      "bug",
+      "urgent"
+    ],
+    "merge_requests_count": 0,
+    "milestone": null,
+    "project_id": 3,
+    "references": {
+      "full": "gitlab-org/gitlab-test#1",
+      "relative": "#1",
+      "short": "#1"
+    },
+    "state": "opened",
+    "task_completion_status": {
+      "completed_count": 0,
+      "count": 0
+    },
+    "time_stats": {
+      "human_time_estimate": null,
+      "human_total_time_spent": null,
+      "time_estimate": 0,
+      "total_time_spent": 0
+    },
+    "title": "Example Issue",
+    "type": "ISSUE",
+    "updated_at": "2023-01-01T10:00:00.000Z",
+    "upvotes": 0,
+    "user_notes_count": 0,
+    "web_url": "http://gitlab.example.com/gitlab-org/gitlab-test/issues/1",
+    "weight": null
+  },
+  "timestamp": "2023-01-01T10:00:00.000Z",
+  "type": "gitlab.issue"
+}
+```
+

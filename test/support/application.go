@@ -20,15 +20,15 @@ type DummyIntegrationOptions struct {
 	Actions      []core.Action
 	HandleAction func(ctx core.IntegrationActionContext) error
 	OnSync       func(ctx core.SyncContext) error
+	OnCleanup    func(ctx core.IntegrationCleanupContext) error
 }
 
-func NewDummyIntegration(
-	options DummyIntegrationOptions,
-) *DummyIntegration {
+func NewDummyIntegration(options DummyIntegrationOptions) *DummyIntegration {
 	return &DummyIntegration{
 		actions:      options.Actions,
 		handleAction: options.HandleAction,
 		onSync:       options.OnSync,
+		onCleanup:    options.OnCleanup,
 	}
 }
 
@@ -100,12 +100,14 @@ type DummyWebhookHandlerOptions struct {
 	SetupFunc         func(ctx core.WebhookHandlerContext) (any, error)
 	CleanupFunc       func(ctx core.WebhookHandlerContext) error
 	CompareConfigFunc func(a, b any) (bool, error)
+	MergeFunc         func(current, requested any) (any, bool, error)
 }
 
 type DummyWebhookHandler struct {
 	setupFunc         func(ctx core.WebhookHandlerContext) (any, error)
 	cleanupFunc       func(ctx core.WebhookHandlerContext) error
 	compareConfigFunc func(a, b any) (bool, error)
+	mergeFunc         func(current, requested any) (any, bool, error)
 }
 
 func NewDummyWebhookHandler(options DummyWebhookHandlerOptions) *DummyWebhookHandler {
@@ -113,6 +115,7 @@ func NewDummyWebhookHandler(options DummyWebhookHandlerOptions) *DummyWebhookHan
 		setupFunc:         options.SetupFunc,
 		cleanupFunc:       options.CleanupFunc,
 		compareConfigFunc: options.CompareConfigFunc,
+		mergeFunc:         options.MergeFunc,
 	}
 }
 
@@ -135,4 +138,11 @@ func (t *DummyWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 		return nil
 	}
 	return t.cleanupFunc(ctx)
+}
+
+func (t *DummyWebhookHandler) Merge(current, requested any) (any, bool, error) {
+	if t.mergeFunc == nil {
+		return current, false, nil
+	}
+	return t.mergeFunc(current, requested)
 }

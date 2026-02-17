@@ -276,7 +276,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   const hasError = error && error.trim() !== "";
   const hasWarning = warning && warning.trim() !== "";
   const hasBadge = hasError || hasWarning;
-  const RunIcon = React.useMemo(() => resolveIcon("play"), []);
   const PauseIcon = React.useMemo(() => resolveIcon("pause"), []);
   const ResumeIcon = React.useMemo(() => resolveIcon("step-forward"), []);
   const DuplicateIcon = React.useMemo(() => resolveIcon("copy"), []);
@@ -301,22 +300,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
         <div className="absolute -top-8 right-0 z-10 h-8 w-44 opacity-0" />
         {showHeader ? (
           <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
-            {onRun && (
-              <button
-                type="button"
-                data-testid="node-action-run"
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  onRun();
-                }}
-                disabled={runDisabled}
-                className="flex items-center gap-1 px-1 py-0.5 text-[13px] font-medium text-gray-500 transition hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <RunIcon className="h-4 w-4" />
-                <span>Run</span>
-              </button>
-            )}
             {onTogglePause && !hasError && (
               <button
                 type="button"

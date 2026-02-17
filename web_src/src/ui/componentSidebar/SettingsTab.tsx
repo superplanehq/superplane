@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { isFieldRequired, isFieldVisible, parseDefaultValues, validateFieldForSubmission } from "@/utils/components";
 import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
+import { SimpleTooltip } from "./SimpleTooltip";
 
 interface SettingsTabProps {
   mode: "create" | "edit";
@@ -354,56 +355,78 @@ export function SettingsTab({
                   </Select>
                 </div>
                 {selectedIntegrationFull && (
-                  <div
-                    className={`mt-3 border border-gray-300 dark:border-gray-700 rounded-md bg-stripe-diagonal p-3 flex items-center justify-between gap-4 ${
-                      selectedIntegrationFull.status?.state === "ready"
-                        ? "bg-green-100 dark:bg-green-950/30"
-                        : selectedIntegrationFull.status?.state === "error"
-                          ? "bg-red-100 dark:bg-red-950/30"
-                          : "bg-orange-100 dark:bg-orange-950/30"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <IntegrationIcon
-                        integrationName={selectedIntegrationFull.spec?.integrationName}
-                        iconSlug={integrationDefinition?.icon}
-                        className="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400"
-                      />
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
-                          {getIntegrationTypeDisplayName(undefined, selectedIntegrationFull.spec?.integrationName) ||
-                            "Integration"}
-                        </h3>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                          selectedIntegrationFull.status?.state === "ready"
-                            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                            : selectedIntegrationFull.status?.state === "error"
-                              ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                              : "bg-orange-100 text-yellow-800 dark:text-yellow-900/30 dark:text-yellow-400"
-                        }`}
-                      >
-                        {selectedIntegrationFull.status?.state
-                          ? selectedIntegrationFull.status.state.charAt(0).toUpperCase() +
-                            selectedIntegrationFull.status.state.slice(1)
-                          : "Unknown"}
-                      </span>
-                      {selectedIntegrationFull.metadata?.id && onOpenConfigureIntegrationDialog && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-sm py-1.5"
-                          onClick={() => onOpenConfigureIntegrationDialog(selectedIntegrationFull.metadata!.id!)}
-                          disabled={isReadOnly || !allowUpdateIntegrations}
+                  <>
+                    {(() => {
+                      const hasIntegrationError =
+                        selectedIntegrationFull.status?.state === "error" &&
+                        !!selectedIntegrationFull.status?.stateDescription;
+
+                      const integrationStatusCard = (
+                        <div
+                          className={`mt-3 border border-gray-300 dark:border-gray-700 rounded-md bg-stripe-diagonal p-3 flex items-center justify-between gap-4 ${
+                            selectedIntegrationFull.status?.state === "ready"
+                              ? "bg-green-100 dark:bg-green-950/30"
+                              : selectedIntegrationFull.status?.state === "error"
+                                ? "bg-red-100 dark:bg-red-950/30"
+                                : "bg-orange-100 dark:bg-orange-950/30"
+                          }`}
                         >
-                          Configure...
-                        </Button>
-                      )}
-                    </div>
-                  </div>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <IntegrationIcon
+                              integrationName={selectedIntegrationFull.spec?.integrationName}
+                              iconSlug={integrationDefinition?.icon}
+                              className="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400"
+                            />
+                            <div className="min-w-0">
+                              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
+                                {getIntegrationTypeDisplayName(
+                                  undefined,
+                                  selectedIntegrationFull.spec?.integrationName,
+                                ) || "Integration"}
+                              </h3>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                selectedIntegrationFull.status?.state === "ready"
+                                  ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                                  : selectedIntegrationFull.status?.state === "error"
+                                    ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                                    : "bg-orange-100 text-yellow-800 dark:text-yellow-900/30 dark:text-yellow-400"
+                              }`}
+                            >
+                              {selectedIntegrationFull.status?.state
+                                ? selectedIntegrationFull.status.state.charAt(0).toUpperCase() +
+                                  selectedIntegrationFull.status.state.slice(1)
+                                : "Unknown"}
+                            </span>
+                            {selectedIntegrationFull.metadata?.id && onOpenConfigureIntegrationDialog && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-sm py-1.5"
+                                onClick={() => onOpenConfigureIntegrationDialog(selectedIntegrationFull.metadata!.id!)}
+                                disabled={isReadOnly || !allowUpdateIntegrations}
+                              >
+                                Configure...
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+
+                      if (hasIntegrationError) {
+                        return (
+                          <SimpleTooltip content={selectedIntegrationFull.status?.stateDescription || ""}>
+                            {integrationStatusCard}
+                          </SimpleTooltip>
+                        );
+                      }
+
+                      return integrationStatusCard;
+                    })()}
+                  </>
                 )}
               </>
             )}

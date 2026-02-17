@@ -39,13 +39,36 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   const createIntegrationMutation = useCreateIntegration(organizationId);
 
   const isLoading = loadingAvailable || loadingInstalled;
+  const integrationNames = useMemo(() => {
+    return new Set(
+      organizationIntegrations.map((integration) => integration.metadata?.name?.trim()).filter(Boolean) as string[],
+    );
+  }, [organizationIntegrations]);
+
   const selectedInstructions = useMemo(() => {
     return selectedIntegration?.instructions?.trim();
   }, [selectedIntegration?.instructions]);
+
+  const getNextIntegrationName = (baseName?: string) => {
+    const normalizedBaseName = baseName?.trim() || "integration";
+    if (!integrationNames.has(normalizedBaseName)) {
+      return normalizedBaseName;
+    }
+
+    let suffix = 2;
+    let candidate = `${normalizedBaseName}-${suffix}`;
+    while (integrationNames.has(candidate)) {
+      suffix += 1;
+      candidate = `${normalizedBaseName}-${suffix}`;
+    }
+
+    return candidate;
+  };
+
   const handleConnectClick = (integration: IntegrationsIntegrationDefinition) => {
     if (!canCreateIntegrations) return;
     setSelectedIntegration(integration);
-    setIntegrationName(integration.name || "");
+    setIntegrationName(getNextIntegrationName(integration.name));
     setConfiguration({});
     setIsModalOpen(true);
   };
@@ -99,13 +122,21 @@ export function Integrations({ organizationId }: IntegrationsProps) {
           <h2 className="text-lg font-medium mb-4">Connected</h2>
           <div className="space-y-4">
             {[...organizationIntegrations]
-              .sort((a, b) => (a.spec?.integrationName || "").localeCompare(b.spec?.integrationName || ""))
+              .sort((a, b) =>
+                (a.metadata?.name || a.spec?.integrationName || "").localeCompare(
+                  b.metadata?.name || b.spec?.integrationName || "",
+                ),
+              )
               .map((integration) => {
                 const integrationDefinition = availableIntegrations.find(
                   (a) => a.name === integration.spec?.integrationName,
                 );
                 const integrationLabel =
                   integrationDefinition?.label ||
+                  getIntegrationTypeDisplayName(undefined, integration.spec?.integrationName) ||
+                  integration.spec?.integrationName;
+                const integrationDisplayName =
+                  integration.metadata?.name ||
                   getIntegrationTypeDisplayName(undefined, integration.spec?.integrationName) ||
                   integration.spec?.integrationName;
                 const integrationName = integrationDefinition?.name || integration.spec?.integrationName;
@@ -128,11 +159,11 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                       </div>
                       <div>
                         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                          {integrationLabel ||
-                            integration.metadata?.name ||
-                            getIntegrationTypeDisplayName(undefined, integration.spec?.integrationName) ||
-                            integration.spec?.integrationName}
+                          {integrationDisplayName}
                         </h3>
+                        {integrationLabel && integrationDisplayName !== integrationLabel ? (
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Type: {integrationLabel}</p>
+                        ) : null}
                         {integrationDefinition?.description ? (
                           <p className="mt-1 text-sm text-gray-800 dark:text-gray-400">
                             {integrationDefinition.description}
@@ -182,19 +213,14 @@ export function Integrations({ organizationId }: IntegrationsProps) {
       <div>
         <h2 className="text-lg font-medium mb-4">Available</h2>
         <div>
-          {availableIntegrations.filter(
-            (integration) => !organizationIntegrations.some((i) => i.spec?.integrationName === integration.name),
-          ).length === 0 ? (
+          {availableIntegrations.length === 0 ? (
             <div className="text-center py-12">
               <AppWindow className="w-6 h-6 text-gray-800 mx-auto mb-2" />
-              <p className="text-sm text-gray-800">You&apos;ve connected all integrations!</p>
+              <p className="text-sm text-gray-800">No integrations available.</p>
             </div>
           ) : (
             <div className="space-y-4">
               {[...availableIntegrations]
-                .filter(
-                  (integration) => !organizationIntegrations.some((i) => i.spec?.integrationName === integration.name),
-                )
                 .sort((a, b) => (a.label || a.name || "").localeCompare(b.label || b.name || ""))
                 .map((app) => {
                   const appName = app.name;

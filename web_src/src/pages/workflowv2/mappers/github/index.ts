@@ -11,17 +11,21 @@ import { onWorkflowRunTriggerRenderer } from "./on_workflow_run";
 import { baseIssueMapper } from "./base";
 import { RUN_WORKFLOW_STATE_REGISTRY, runWorkflowMapper, runWorkflowCustomFieldRenderer } from "./run_workflow";
 import { publishCommitStatusMapper } from "./publish_commit_status";
+import { createIssueCommentMapper } from "./create_issue_comment";
 import { createReleaseMapper } from "./create_release";
 import { updateReleaseMapper } from "./update_release";
 import { deleteReleaseMapper } from "./delete_release";
 import { getReleaseMapper } from "./get_release";
+import { createReviewMapper } from "./create_review";
 import { buildActionStateRegistry } from "../utils";
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   runWorkflow: RUN_WORKFLOW_STATE_REGISTRY,
   createIssue: buildActionStateRegistry("created"),
+  createIssueComment: buildActionStateRegistry("created"),
   getIssue: buildActionStateRegistry("retrieved"),
   updateIssue: buildActionStateRegistry("updated"),
+  createReview: buildActionStateRegistry("created"),
   publishCommitStatus: buildActionStateRegistry("published"),
   createRelease: buildActionStateRegistry("created"),
   updateRelease: buildActionStateRegistry("updated"),
@@ -31,8 +35,10 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createIssue: baseIssueMapper,
+  createIssueComment: createIssueCommentMapper,
   getIssue: baseIssueMapper,
   updateIssue: baseIssueMapper,
+  createReview: createReviewMapper,
   runWorkflow: runWorkflowMapper,
   publishCommitStatus: publishCommitStatusMapper,
   createRelease: createReleaseMapper,

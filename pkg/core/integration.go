@@ -101,6 +101,12 @@ type WebhookHandler interface {
 	 * Compare two webhook configurations to see if they are the same.
 	 */
 	CompareConfig(a, b any) (bool, error)
+
+	/*
+	 * Merge an existing webhook configuration with a requested one.
+	 * Return changed=false when no update is needed.
+	 */
+	Merge(current, requested any) (merged any, changed bool, err error)
 }
 
 type WebhookHandlerContext struct {

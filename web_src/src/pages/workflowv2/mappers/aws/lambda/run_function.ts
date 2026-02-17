@@ -127,6 +127,7 @@ function runFunctionEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
       id: execution.rootEvent?.id!,
       createdAt: execution.rootEvent?.createdAt!,
       data: execution.rootEvent?.data || {},
+      type: execution.rootEvent?.type!,
     },
   });
 

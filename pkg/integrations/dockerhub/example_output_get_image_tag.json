@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-02-03T12:00:00Z",
+  "type": "dockerhub.tag",
+  "data": {
+    "id": 123456,
+    "name": "latest",
+    "full_size": 52837442,
+    "last_updated": "2025-01-05T21:06:53.506400Z",
+    "last_updater": 1234,
+    "last_updater_username": "superplane-bot",
+    "status": "active",
+    "tag_last_pulled": "2025-01-06T11:02:10.123456Z",
+    "tag_last_pushed": "2025-01-05T21:06:53.506400Z",
+    "repository": 98765,
+    "v2": "true",
+    "images": [
+      {
+        "architecture": "amd64",
+        "os": "linux",
+        "digest": "sha256:fe12ab34cd56ef78ab90cd12ef34ab56cd78ef90ab12cd34ef56ab78cd90ef12",
+        "size": 52837442,
+        "status": "active",
+        "last_pulled": "2025-01-06T11:02:10.123456Z",
+        "last_pushed": "2025-01-05T21:06:53.506400Z"
+      }
+    ]
+  }
+}

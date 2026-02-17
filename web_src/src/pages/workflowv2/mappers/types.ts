@@ -54,6 +54,7 @@ export type EventInfo =
       customName?: string;
       data: any;
       nodeId: string;
+      type: string;
     }
   | undefined;
 
