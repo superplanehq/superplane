@@ -1,0 +1,458 @@
+package teams
+
+import (
+	"archive/zip"
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"image"
+	"image/color"
+	"image/png"
+	"io"
+	"net/http"
+	"slices"
+	"strings"
+
+	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/registry"
+)
+
+const (
+	setupInstructions = `
+## Setup
+
+1. **Create an Azure App Registration**:
+   - Go to **Azure Portal** → **App registrations** → **New registration**
+   - Name: "SuperPlane Bot" (or your preference)
+   - Supported account types: **Accounts in any organizational directory** (multi-tenant) or single-tenant
+   - Note the **Application (client) ID** — this is the **App ID** below
+   - Go to **Certificates & secrets** → **New client secret** → copy the **Value** — this is the **App Password** below
+
+2. **Create an Azure Bot**:
+   - Go to **Azure Portal** → **Create a resource** → search **Azure Bot**
+   - Link it to the App Registration from step 1
+   - Set the **Messaging endpoint** to your SuperPlane webhook URL
+   - Under **Channels**, click **Microsoft Teams** to enable it
+
+3. **Add Graph API permissions** (required for channel listing):
+   - Go to your **App Registration** → **API permissions** → **Add a permission**
+   - Select **Microsoft Graph** → **Application permissions**
+   - Add: **Team.ReadBasic.All** and **Channel.ReadBasic.All**
+   - Click **Grant admin consent**
+
+4. **Enter credentials** in the fields below and save
+`
+
+	installAppInstructions = `
+## Install the Teams App
+
+Click **Continue** to download the auto-generated Teams app manifest ZIP.
+Then upload it to **Teams Admin Center** → **Manage apps** → **Upload new app**, or sideload to specific teams.
+
+This step is required for the bot to receive messages in Teams channels.
+`
+)
+
+func init() {
+	registry.RegisterIntegration("teams", &Teams{})
+}
+
+// Teams implements the Microsoft Teams integration.
+type Teams struct{}
+
+// Metadata stores integration metadata after successful authentication.
+type Metadata struct {
+	AppID    string `json:"appId" mapstructure:"appId"`
+	TenantID string `json:"tenantId,omitempty" mapstructure:"tenantId,omitempty"`
+}
+
+func (t *Teams) Name() string {
+	return "teams"
+}
+
+func (t *Teams) Label() string {
+	return "Microsoft Teams"
+}
+
+func (t *Teams) Icon() string {
+	return "teams"
+}
+
+func (t *Teams) Description() string {
+	return "Send and receive messages in Microsoft Teams channels"
+}
+
+func (t *Teams) Instructions() string {
+	return setupInstructions
+}
+
+func (t *Teams) Configuration() []configuration.Field {
+	return []configuration.Field{
+		{
+			Name:        "appId",
+			Label:       "App ID",
+			Type:        configuration.FieldTypeString,
+			Description: "The Application (client) ID from Azure App Registration",
+			Sensitive:   true,
+			Required:    true,
+		},
+		{
+			Name:        "appPassword",
+			Label:       "App Password",
+			Type:        configuration.FieldTypeString,
+			Description: "The client secret value from Azure App Registration",
+			Sensitive:   true,
+			Required:    true,
+		},
+		{
+			Name:        "tenantId",
+			Label:       "Tenant ID",
+			Type:        configuration.FieldTypeString,
+			Description: "Azure Tenant ID (required for Graph API permissions to list channels)",
+			Required:    true,
+		},
+	}
+}
+
+func (t *Teams) Components() []core.Component {
+	return []core.Component{
+		&SendTextMessage{},
+	}
+}
+
+func (t *Teams) Triggers() []core.Trigger {
+	return []core.Trigger{
+		&OnMention{},
+		&OnMessage{},
+	}
+}
+
+func (t *Teams) Sync(ctx core.SyncContext) error {
+	metadata := Metadata{}
+	err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	if err != nil {
+		return fmt.Errorf("failed to decode metadata: %v", err)
+	}
+
+	// If metadata is already set, nothing to do.
+	if metadata.AppID != "" {
+		return nil
+	}
+
+	appID, _ := ctx.Integration.GetConfig("appId")
+	appPassword, _ := ctx.Integration.GetConfig("appPassword")
+
+	if appID == nil || appPassword == nil || string(appID) == "" || string(appPassword) == "" {
+		return t.createSetupPrompt(ctx)
+	}
+
+	var tenantID string
+	tenantIDBytes, err := ctx.Integration.GetConfig("tenantId")
+	if err == nil && tenantIDBytes != nil {
+		tenantID = string(tenantIDBytes)
+	}
+
+	// Verify credentials by fetching a Bot Framework token
+	client := NewClientFromConfig(string(appID), string(appPassword), tenantID)
+	_, err = client.GetBotToken()
+	if err != nil {
+		return fmt.Errorf("failed to verify credentials: %v", err)
+	}
+
+	ctx.Integration.SetMetadata(Metadata{
+		AppID:    string(appID),
+		TenantID: tenantID,
+	})
+
+	// Generate manifest ZIP and offer it as a download via BrowserAction
+	webhookURL := fmt.Sprintf("%s/api/v1/integrations/%s/messages", ctx.WebhooksBaseURL, ctx.Integration.ID())
+	zipBytes, err := generateManifestZIP(string(appID), webhookURL)
+	if err != nil {
+		ctx.Integration.RemoveBrowserAction()
+	} else {
+		dataURI := "data:application/zip;base64," + base64.StdEncoding.EncodeToString(zipBytes)
+		ctx.Integration.NewBrowserAction(core.BrowserAction{
+			Description: installAppInstructions,
+			URL:         dataURI,
+			Method:      "GET",
+		})
+	}
+
+	ctx.Integration.Ready()
+	return nil
+}
+
+func (t *Teams) createSetupPrompt(ctx core.SyncContext) error {
+	ctx.Integration.NewBrowserAction(core.BrowserAction{
+		Description: setupInstructions,
+		URL:         "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade",
+		Method:      "GET",
+	})
+	return nil
+}
+
+func (t *Teams) HandleRequest(ctx core.HTTPRequestContext) {
+	// Read body
+	body, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		ctx.Logger.Errorf("error reading request body: %v", err)
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Validate JWT
+	metadata := Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		ctx.Logger.Errorf("error decoding metadata: %v", err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	authHeader := ctx.Request.Header.Get("Authorization")
+	if authHeader == "" {
+		ctx.Logger.Errorf("missing Authorization header")
+		ctx.Response.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	if tokenString == authHeader {
+		ctx.Logger.Errorf("invalid Authorization header format")
+		ctx.Response.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	validator := NewJWTValidator(metadata.AppID)
+	_, err = validator.ValidateToken(tokenString)
+	if err != nil {
+		ctx.Logger.Errorf("JWT validation failed: %v", err)
+		ctx.Response.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	// Parse activity
+	var activity Activity
+	if err := json.Unmarshal(body, &activity); err != nil {
+		ctx.Logger.Errorf("error parsing activity: %v", err)
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	switch activity.Type {
+	case "message":
+		t.handleMessage(ctx, activity)
+	case "conversationUpdate":
+		t.handleConversationUpdate(ctx, activity)
+	default:
+		ctx.Logger.Infof("ignoring activity type: %s", activity.Type)
+	}
+
+	ctx.Response.WriteHeader(http.StatusOK)
+}
+
+func (t *Teams) handleMessage(ctx core.HTTPRequestContext, activity Activity) {
+	subscriptions, err := ctx.Integration.ListSubscriptions()
+	if err != nil {
+		ctx.Logger.Errorf("error listing subscriptions: %v", err)
+		return
+	}
+
+	isMention := hasBotMention(activity)
+
+	eventData := map[string]any{
+		"type":         activity.Type,
+		"id":           activity.ID,
+		"timestamp":    activity.Timestamp,
+		"channelId":    activity.ChannelID,
+		"serviceUrl":   activity.ServiceURL,
+		"from":         activity.From,
+		"conversation": activity.Conversation,
+		"recipient":    activity.Recipient,
+		"text":         activity.Text,
+		"entities":     activity.Entities,
+		"channelData":  activity.ChannelData,
+	}
+
+	for _, subscription := range subscriptions {
+		c := SubscriptionConfiguration{}
+		if err := mapstructure.Decode(subscription.Configuration(), &c); err != nil {
+			ctx.Logger.Errorf("error decoding subscription configuration: %v", err)
+			continue
+		}
+
+		if isMention && slices.Contains(c.EventTypes, "mention") {
+			if err := subscription.SendMessage(eventData); err != nil {
+				ctx.Logger.Errorf("error sending mention message: %v", err)
+			}
+		}
+
+		if slices.Contains(c.EventTypes, "message") {
+			if err := subscription.SendMessage(eventData); err != nil {
+				ctx.Logger.Errorf("error sending message: %v", err)
+			}
+		}
+	}
+}
+
+func (t *Teams) handleConversationUpdate(ctx core.HTTPRequestContext, activity Activity) {
+	ctx.Logger.Infof("conversation update: %s (members added: %d, removed: %d)",
+		activity.Conversation.ID,
+		len(activity.MembersAdded),
+		len(activity.MembersRemoved),
+	)
+}
+
+// SubscriptionConfiguration defines which event types a trigger subscribes to.
+type SubscriptionConfiguration struct {
+	EventTypes []string `json:"eventTypes"`
+}
+
+func hasBotMention(activity Activity) bool {
+	for _, entity := range activity.Entities {
+		if entity.Type == "mention" && entity.Mentioned != nil {
+			if entity.Mentioned.ID == activity.Recipient.ID {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func (t *Teams) Cleanup(ctx core.IntegrationCleanupContext) error {
+	return nil
+}
+
+func (t *Teams) Actions() []core.Action {
+	return []core.Action{}
+}
+
+func (t *Teams) HandleAction(ctx core.IntegrationActionContext) error {
+	return nil
+}
+
+// generateManifestZIP creates a Teams app manifest ZIP ready for upload to Teams Admin Center.
+func generateManifestZIP(appID, webhookURL string) ([]byte, error) {
+	manifest := map[string]any{
+		"$schema":         "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+		"manifestVersion": "1.17",
+		"version":         "1.0.0",
+		"id":              appID,
+		"developer": map[string]string{
+			"name":          "SuperPlane",
+			"websiteUrl":    "https://superplane.com",
+			"privacyUrl":    "https://superplane.com/privacy",
+			"termsOfUseUrl": "https://superplane.com/terms",
+		},
+		"name": map[string]string{
+			"short": "SuperPlane Bot",
+			"full":  "SuperPlane Integration Bot",
+		},
+		"description": map[string]string{
+			"short": "SuperPlane workflow automation bot",
+			"full":  "Connects Microsoft Teams with SuperPlane for workflow automation, notifications, and team collaboration.",
+		},
+		"icons": map[string]string{
+			"color":   "color.png",
+			"outline": "outline.png",
+		},
+		"accentColor": "#5059C9",
+		"bots": []map[string]any{
+			{
+				"botId": appID,
+				"scopes": []string{
+					"team",
+					"groupChat",
+				},
+				"supportsFiles":      false,
+				"isNotificationOnly": false,
+				"supportsCalling":    false,
+				"supportsVideo":      false,
+			},
+		},
+		"permissions": []string{
+			"identity",
+			"messageTeamMembers",
+		},
+		"validDomains": []string{},
+		"authorization": map[string]any{
+			"permissions": map[string]any{
+				"resourceSpecific": []map[string]string{
+					{
+						"name": "ChannelMessage.Read.Group",
+						"type": "Application",
+					},
+				},
+			},
+		},
+	}
+
+	manifestJSON, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal manifest: %w", err)
+	}
+
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+
+	// manifest.json
+	f, err := w.Create("manifest.json")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create manifest entry: %w", err)
+	}
+	if _, err := f.Write(manifestJSON); err != nil {
+		return nil, fmt.Errorf("failed to write manifest: %w", err)
+	}
+
+	// color.png — Teams purple placeholder icon
+	colorPNG, err := solidPNG(192, color.NRGBA{R: 0x50, G: 0x59, B: 0xC9, A: 0xFF})
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate color.png: %w", err)
+	}
+	f, err = w.Create("color.png")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create color.png entry: %w", err)
+	}
+	if _, err := f.Write(colorPNG); err != nil {
+		return nil, fmt.Errorf("failed to write color.png: %w", err)
+	}
+
+	// outline.png — white placeholder icon
+	outlinePNG, err := solidPNG(32, color.NRGBA{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF})
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate outline.png: %w", err)
+	}
+	f, err = w.Create("outline.png")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create outline.png entry: %w", err)
+	}
+	if _, err := f.Write(outlinePNG); err != nil {
+		return nil, fmt.Errorf("failed to write outline.png: %w", err)
+	}
+
+	if err := w.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close zip: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+// solidPNG generates a solid-color PNG image of the given size.
+func solidPNG(size int, c color.Color) ([]byte, error) {
+	img := image.NewNRGBA(image.Rect(0, 0, size, size))
+	for y := range size {
+		for x := range size {
+			img.Set(x, y, c)
+		}
+	}
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
