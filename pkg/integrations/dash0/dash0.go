@@ -71,7 +71,6 @@ func (d *Dash0) Components() []core.Component {
 		&ListIssues{},
 		&CreateHTTPSyntheticCheck{},
 		&UpdateHTTPSyntheticCheck{},
-		&GetHTTPSyntheticCheck{},
 		&DeleteHTTPSyntheticCheck{},
 	}
 }

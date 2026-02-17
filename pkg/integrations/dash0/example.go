@@ -31,12 +31,6 @@ var exampleOutputUpdateHTTPSyntheticCheckBytes []byte
 var exampleOutputUpdateHTTPSyntheticCheckOnce sync.Once
 var exampleOutputUpdateHTTPSyntheticCheck map[string]any
 
-//go:embed example_output_get_http_synthetic_check.json
-var exampleOutputGetHTTPSyntheticCheckBytes []byte
-
-var exampleOutputGetHTTPSyntheticCheckOnce sync.Once
-var exampleOutputGetHTTPSyntheticCheck map[string]any
-
 //go:embed example_output_delete_http_synthetic_check.json
 var exampleOutputDeleteHTTPSyntheticCheckBytes []byte
 
@@ -57,10 +51,6 @@ func (c *CreateHTTPSyntheticCheck) ExampleOutput() map[string]any {
 
 func (c *UpdateHTTPSyntheticCheck) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateHTTPSyntheticCheckOnce, exampleOutputUpdateHTTPSyntheticCheckBytes, &exampleOutputUpdateHTTPSyntheticCheck)
-}
-
-func (c *GetHTTPSyntheticCheck) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetHTTPSyntheticCheckOnce, exampleOutputGetHTTPSyntheticCheckBytes, &exampleOutputGetHTTPSyntheticCheck)
 }
 
 func (c *DeleteHTTPSyntheticCheck) ExampleOutput() map[string]any {

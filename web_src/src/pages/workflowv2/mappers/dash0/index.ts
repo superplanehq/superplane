@@ -5,10 +5,6 @@ import { queryPrometheusMapper } from "./query_prometheus";
 import { listIssuesMapper, LIST_ISSUES_STATE_REGISTRY } from "./list_issues";
 import { createHttpSyntheticCheckMapper } from "./create_http_synthetic_check";
 import { updateHttpSyntheticCheckMapper } from "./update_http_synthetic_check";
-import {
-  getHttpSyntheticCheckMapper,
-  GET_HTTP_SYNTHETIC_CHECK_STATE_REGISTRY,
-} from "./get_http_synthetic_check";
 import { deleteHttpSyntheticCheckMapper } from "./delete_http_synthetic_check";
 import { buildActionStateRegistry } from "../utils";
 
@@ -17,7 +13,6 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   listIssues: listIssuesMapper,
   createHttpSyntheticCheck: createHttpSyntheticCheckMapper,
   updateHttpSyntheticCheck: updateHttpSyntheticCheckMapper,
-  getHttpSyntheticCheck: getHttpSyntheticCheckMapper,
   deleteHttpSyntheticCheck: deleteHttpSyntheticCheckMapper,
 };
 
@@ -28,7 +23,6 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   queryPrometheus: buildActionStateRegistry("queried"),
   createHttpSyntheticCheck: buildActionStateRegistry("created"),
   updateHttpSyntheticCheck: buildActionStateRegistry("updated"),
-  getHttpSyntheticCheck: GET_HTTP_SYNTHETIC_CHECK_STATE_REGISTRY,
   deleteHttpSyntheticCheck: buildActionStateRegistry("deleted"),
 };
 

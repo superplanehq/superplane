@@ -37,11 +37,6 @@ export interface AssertionItem {
   expression?: string;
 }
 
-export interface GetHttpSyntheticCheckConfiguration {
-  checkId: string;
-  dataset: string;
-}
-
 export interface DeleteHttpSyntheticCheckConfiguration {
   checkId: string;
   dataset: string;

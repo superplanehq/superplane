@@ -103,19 +103,6 @@ type PrometheusQueryResult struct {
 	Values [][]interface{}   `json:"values,omitempty"` // For range queries: [[timestamp, value], ...]
 }
 
-// prometheusResponseDataToMap converts PrometheusResponseData to map[string]any so consumers can use res["data"].(map[string]any).
-func prometheusResponseDataToMap(data PrometheusResponseData) (map[string]any, error) {
-	dataMap := make(map[string]any)
-	dataBytes, err := json.Marshal(data)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling response data: %w", err)
-	}
-	if err := json.Unmarshal(dataBytes, &dataMap); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response data: %w", err)
-	}
-	return dataMap, nil
-}
-
 func (c *Client) ExecutePrometheusInstantQuery(promQLQuery, dataset string) (map[string]any, error) {
 	apiURL := fmt.Sprintf("%s/api/prometheus/api/v1/query", c.BaseURL)
 
@@ -137,13 +124,9 @@ func (c *Client) ExecutePrometheusInstantQuery(promQLQuery, dataset string) (map
 	if response.Status != "success" {
 		return nil, fmt.Errorf("prometheus query failed with status: %s", response.Status)
 	}
-	dataMap, err := prometheusResponseDataToMap(response.Data)
-	if err != nil {
-		return nil, err
-	}
 	return map[string]any{
 		"status": response.Status,
-		"data":   dataMap,
+		"data":   response.Data,
 	}, nil
 }
 
@@ -171,13 +154,9 @@ func (c *Client) ExecutePrometheusRangeQuery(promQLQuery, dataset, start, end, s
 	if response.Status != "success" {
 		return nil, fmt.Errorf("prometheus query failed with status: %s", response.Status)
 	}
-	dataMap, err := prometheusResponseDataToMap(response.Data)
-	if err != nil {
-		return nil, err
-	}
 	return map[string]any{
 		"status": response.Status,
-		"data":   dataMap,
+		"data":   response.Data,
 	}, nil
 }
 
