@@ -253,6 +253,12 @@ type IntegrationContext interface {
 	 * List integration subscriptions from nodes.
 	 */
 	ListSubscriptions() ([]IntegrationSubscriptionContext, error)
+
+	/*
+	 * Find a subscription by a predicate function.
+	 * Returns the first subscription that matches the predicate, or nil if none found.
+	 */
+	FindSubscription(predicate func(IntegrationSubscriptionContext) bool) (IntegrationSubscriptionContext, error)
 }
 
 type IntegrationSubscriptionContext interface {
