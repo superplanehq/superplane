@@ -15,7 +15,6 @@ import (
 
 const (
 	BaseURLUS = "https://api.honeycomb.io"
-	BaseURLEU = "https://api.eu1.honeycomb.io"
 )
 
 type Client struct {
