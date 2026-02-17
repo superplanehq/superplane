@@ -75,10 +75,6 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   if (configuration?.name) {
     metadata.push({ icon: "alert-triangle", label: configuration.name });
   }
-  const status = configuration?.statusRealtime || configuration?.statusScheduled;
-  if (status) {
-    metadata.push({ icon: "arrow-right-circle", label: "Status: " + status });
-  }
 
   return metadata;
 }
@@ -86,6 +82,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 function createIncidentSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const configuration = node.configuration as {
     incidentType?: string;
+    statusRealtime?: string;
+    statusScheduled?: string;
     body?: string;
     impactOverride?: string;
     scheduledFor?: string;
@@ -102,6 +100,16 @@ function createIncidentSpecs(node: NodeInfo): ComponentBaseSpec[] {
       { label: typeLabel, bgColor: "bg-gray-100", textColor: "text-gray-800" },
     ],
   });
+
+  const status = configuration?.statusRealtime || configuration?.statusScheduled;
+  if (status) {
+    values.push({
+      badges: [
+        { label: "Status:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
+        { label: status, bgColor: "bg-gray-100", textColor: "text-gray-800" },
+      ],
+    });
+  }
 
   if (configuration?.body) {
     const bodyPreview = truncateForDisplay(configuration.body, 50);

@@ -285,6 +285,9 @@ func (c *UpdateIncident) Setup(ctx core.SetupContext) error {
 	if effectiveImpact == "__none__" {
 		effectiveImpact = ""
 	}
+	if incidentType == "scheduled" {
+		effectiveImpact = "" // scheduled incidents don't support impact override
+	}
 	hasUpdate := spec.StatusRealtime != "" || spec.StatusScheduled != "" || spec.Body != "" || effectiveImpact != "" || len(spec.Components) > 0
 	if !hasUpdate {
 		return errors.New("at least one of status, body, impact override, or components must be provided")
