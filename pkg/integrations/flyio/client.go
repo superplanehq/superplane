@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -174,8 +175,8 @@ type ImageRef struct {
 
 // ListApps retrieves all apps for an organization
 func (c *Client) ListApps(orgSlug string) ([]App, error) {
-	url := fmt.Sprintf("%s/v1/apps?org_slug=%s", c.BaseURL, orgSlug)
-	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	apiURL := fmt.Sprintf("%s/v1/apps?org_slug=%s", c.BaseURL, url.QueryEscape(orgSlug))
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -195,8 +196,8 @@ func (c *Client) ListApps(orgSlug string) ([]App, error) {
 
 // GetApp retrieves details about a specific app
 func (c *Client) GetApp(appName string) (*App, error) {
-	url := fmt.Sprintf("%s/v1/apps/%s", c.BaseURL, appName)
-	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	apiURL := fmt.Sprintf("%s/v1/apps/%s", c.BaseURL, url.PathEscape(appName))
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -212,8 +213,8 @@ func (c *Client) GetApp(appName string) (*App, error) {
 
 // ListMachines retrieves all machines for an app
 func (c *Client) ListMachines(appName string) ([]Machine, error) {
-	url := fmt.Sprintf("%s/v1/apps/%s/machines", c.BaseURL, appName)
-	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	apiURL := fmt.Sprintf("%s/v1/apps/%s/machines", c.BaseURL, url.PathEscape(appName))
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -229,8 +230,8 @@ func (c *Client) ListMachines(appName string) ([]Machine, error) {
 
 // GetMachine retrieves a specific machine
 func (c *Client) GetMachine(appName, machineID string) (*Machine, error) {
-	url := fmt.Sprintf("%s/v1/apps/%s/machines/%s", c.BaseURL, appName, machineID)
-	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	apiURL := fmt.Sprintf("%s/v1/apps/%s/machines/%s", c.BaseURL, url.PathEscape(appName), url.PathEscape(machineID))
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -256,14 +257,14 @@ type CreateMachineRequest struct {
 
 // CreateMachine creates a new Machine in an app
 func (c *Client) CreateMachine(appName string, req CreateMachineRequest) (*Machine, error) {
-	url := fmt.Sprintf("%s/v1/apps/%s/machines", c.BaseURL, appName)
+	apiURL := fmt.Sprintf("%s/v1/apps/%s/machines", c.BaseURL, url.PathEscape(appName))
 
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %v", err)
 	}
 
-	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	responseBody, err := c.execRequest(http.MethodPost, apiURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -284,14 +285,14 @@ type UpdateMachineRequest struct {
 
 // UpdateMachine updates an existing Machine
 func (c *Client) UpdateMachine(appName, machineID string, req UpdateMachineRequest) (*Machine, error) {
-	url := fmt.Sprintf("%s/v1/apps/%s/machines/%s", c.BaseURL, appName, machineID)
+	apiURL := fmt.Sprintf("%s/v1/apps/%s/machines/%s", c.BaseURL, url.PathEscape(appName), url.PathEscape(machineID))
 
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %v", err)
 	}
 
-	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	responseBody, err := c.execRequest(http.MethodPost, apiURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -307,8 +308,8 @@ func (c *Client) UpdateMachine(appName, machineID string, req UpdateMachineReque
 
 // StartMachine starts a stopped Machine
 func (c *Client) StartMachine(appName, machineID string) error {
-	url := fmt.Sprintf("%s/v1/apps/%s/machines/%s/start", c.BaseURL, appName, machineID)
-	_, err := c.execRequest(http.MethodPost, url, nil)
+	apiURL := fmt.Sprintf("%s/v1/apps/%s/machines/%s/start", c.BaseURL, url.PathEscape(appName), url.PathEscape(machineID))
+	_, err := c.execRequest(http.MethodPost, apiURL, nil)
 	return err
 }
 
@@ -320,7 +321,7 @@ type StopMachineRequest struct {
 
 // StopMachine stops a running Machine
 func (c *Client) StopMachine(appName, machineID string, req *StopMachineRequest) error {
-	url := fmt.Sprintf("%s/v1/apps/%s/machines/%s/stop", c.BaseURL, appName, machineID)
+	apiURL := fmt.Sprintf("%s/v1/apps/%s/machines/%s/stop", c.BaseURL, url.PathEscape(appName), url.PathEscape(machineID))
 
 	var body io.Reader
 	if req != nil {
@@ -331,35 +332,35 @@ func (c *Client) StopMachine(appName, machineID string, req *StopMachineRequest)
 		body = bytes.NewReader(bodyBytes)
 	}
 
-	_, err := c.execRequest(http.MethodPost, url, body)
+	_, err := c.execRequest(http.MethodPost, apiURL, body)
 	return err
 }
 
 // DeleteMachine permanently deletes a Machine
 func (c *Client) DeleteMachine(appName, machineID string, force bool) error {
-	url := fmt.Sprintf("%s/v1/apps/%s/machines/%s", c.BaseURL, appName, machineID)
+	apiURL := fmt.Sprintf("%s/v1/apps/%s/machines/%s", c.BaseURL, url.PathEscape(appName), url.PathEscape(machineID))
 	if force {
-		url += "?force=true"
+		apiURL += "?force=true"
 	}
 
-	_, err := c.execRequest(http.MethodDelete, url, nil)
+	_, err := c.execRequest(http.MethodDelete, apiURL, nil)
 	return err
 }
 
 // SuspendMachine suspends a Machine (takes a snapshot)
 func (c *Client) SuspendMachine(appName, machineID string) error {
-	url := fmt.Sprintf("%s/v1/apps/%s/machines/%s/suspend", c.BaseURL, appName, machineID)
-	_, err := c.execRequest(http.MethodPost, url, nil)
+	apiURL := fmt.Sprintf("%s/v1/apps/%s/machines/%s/suspend", c.BaseURL, url.PathEscape(appName), url.PathEscape(machineID))
+	_, err := c.execRequest(http.MethodPost, apiURL, nil)
 	return err
 }
 
 // WaitForState waits for a Machine to reach a specified state
 func (c *Client) WaitForState(appName, machineID, state string, timeoutSeconds int) error {
-	url := fmt.Sprintf("%s/v1/apps/%s/machines/%s/wait?state=%s", c.BaseURL, appName, machineID, state)
+	apiURL := fmt.Sprintf("%s/v1/apps/%s/machines/%s/wait?state=%s", c.BaseURL, url.PathEscape(appName), url.PathEscape(machineID), url.QueryEscape(state))
 	if timeoutSeconds > 0 {
-		url += fmt.Sprintf("&timeout=%d", timeoutSeconds)
+		apiURL += fmt.Sprintf("&timeout=%d", timeoutSeconds)
 	}
 
-	_, err := c.execRequest(http.MethodGet, url, nil)
+	_, err := c.execRequest(http.MethodGet, apiURL, nil)
 	return err
 }
