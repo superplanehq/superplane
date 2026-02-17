@@ -55,7 +55,7 @@ func Test_RemoveUser(t *testing.T) {
 		require.NotNil(t, user.DeletedAt)
 		_, err = models.FindActiveUserByID(orgID, newUser.ID.String())
 		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
-		_, err = models.FindActiveUserByEmail(orgID, newUser.Email)
+		_, err = models.FindActiveUserByEmail(orgID, newUser.GetEmail())
 		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 		_, err = models.FindActiveUserByTokenHash(newUser.TokenHash)
 		require.ErrorIs(t, err, gorm.ErrRecordNotFound)

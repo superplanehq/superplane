@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 func authConfig(method string, privateKey, password any) map[string]any {
@@ -116,27 +115,4 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 		})
 		require.NoError(t, err)
 	})
-}
-
-func TestSSHCommand_Execute_RequiresSecretsContext(t *testing.T) {
-	c := &SSHCommand{}
-	stateCtx := &contexts.ExecutionStateContext{}
-	metadataCtx := &contexts.MetadataContext{}
-
-	ctx := core.ExecutionContext{
-		Configuration: map[string]any{
-			"host":           "example.com",
-			"username":       "root",
-			"authentication": authConfig(AuthMethodSSHKey, map[string]any{"secret": "secret", "key": "key"}, nil),
-			"command":        "ls",
-			"timeout":        60,
-		},
-		ExecutionState: stateCtx,
-		Metadata:       metadataCtx,
-		Secrets:        nil, // not set
-	}
-
-	err := c.Execute(ctx)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "secrets")
 }

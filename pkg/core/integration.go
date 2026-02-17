@@ -139,13 +139,14 @@ type IntegrationTrigger interface {
 }
 
 type IntegrationMessageContext struct {
-	Message       any
-	Configuration any
-	NodeMetadata  MetadataContext
-	Logger        *logrus.Entry
-	HTTP          HTTPContext
-	Integration   IntegrationContext
-	Events        EventContext
+	Message           any
+	Configuration     any
+	NodeMetadata      MetadataContext
+	Logger            *logrus.Entry
+	HTTP              HTTPContext
+	Integration       IntegrationContext
+	Events            EventContext
+	FindExecutionByKV func(key string, value string) (*ExecutionContext, error)
 }
 
 type IntegrationResource struct {

@@ -35,7 +35,7 @@ func (c *AuthContext) AuthenticatedUser() *core.User {
 	return &core.User{
 		ID:    c.authenticatedUser.ID.String(),
 		Name:  c.authenticatedUser.Name,
-		Email: c.authenticatedUser.Email,
+		Email: c.authenticatedUser.GetEmail(),
 	}
 }
 
@@ -48,7 +48,7 @@ func (c *AuthContext) GetUser(id uuid.UUID) (*core.User, error) {
 	return &core.User{
 		ID:    user.ID.String(),
 		Name:  user.Name,
-		Email: user.Email,
+		Email: user.GetEmail(),
 	}, nil
 }
 

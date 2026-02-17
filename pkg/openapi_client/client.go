@@ -73,6 +73,8 @@ type APIClient struct {
 
 	SecretAPI *SecretAPIService
 
+	ServiceAccountsAPI *ServiceAccountsAPIService
+
 	TriggerAPI *TriggerAPIService
 
 	UsersAPI *UsersAPIService
@@ -108,6 +110,7 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	c.OrganizationAPI = (*OrganizationAPIService)(&c.common)
 	c.RolesAPI = (*RolesAPIService)(&c.common)
 	c.SecretAPI = (*SecretAPIService)(&c.common)
+	c.ServiceAccountsAPI = (*ServiceAccountsAPIService)(&c.common)
 	c.TriggerAPI = (*TriggerAPIService)(&c.common)
 	c.UsersAPI = (*UsersAPIService)(&c.common)
 	c.WidgetAPI = (*WidgetAPIService)(&c.common)

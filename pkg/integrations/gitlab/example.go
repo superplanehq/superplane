@@ -16,6 +16,9 @@ var exampleDataOnMergeRequestBytes []byte
 //go:embed example_data_on_milestone.json
 var exampleDataOnMilestoneBytes []byte
 
+//go:embed example_data_on_pipeline.json
+var exampleDataOnPipelineBytes []byte
+
 //go:embed example_data_on_release.json
 var exampleDataOnReleaseBytes []byte
 
@@ -33,6 +36,9 @@ var exampleDataOnMergeRequest map[string]any
 
 var exampleDataOnMilestoneOnce sync.Once
 var exampleDataOnMilestone map[string]any
+
+var exampleDataOnPipelineOnce sync.Once
+var exampleDataOnPipeline map[string]any
 
 var exampleDataOnReleaseOnce sync.Once
 var exampleDataOnRelease map[string]any
@@ -53,6 +59,10 @@ func (m *OnMergeRequest) ExampleData() map[string]any {
 
 func (m *OnMilestone) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnMilestoneOnce, exampleDataOnMilestoneBytes, &exampleDataOnMilestone)
+}
+
+func (p *OnPipeline) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnPipelineOnce, exampleDataOnPipelineBytes, &exampleDataOnPipeline)
 }
 
 func (r *OnRelease) ExampleData() map[string]any {
