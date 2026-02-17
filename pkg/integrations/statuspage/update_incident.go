@@ -325,9 +325,11 @@ func (c *UpdateIncident) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("incidentType must be realtime or scheduled, got %q", incidentType)
 	}
 
-	effectiveStatus := spec.StatusRealtime
-	if effectiveStatus == "" {
+	var effectiveStatus string
+	if incidentType == "scheduled" {
 		effectiveStatus = spec.StatusScheduled
+	} else {
+		effectiveStatus = spec.StatusRealtime
 	}
 
 	impactOverride := spec.ImpactOverride

@@ -475,9 +475,11 @@ func (c *CreateIncident) Execute(ctx core.ExecutionContext) error {
 		DeliverNotifications: deliverNotifications,
 	}
 
-	status := derefStr(spec.StatusRealtime)
-	if status == "" {
+	var status string
+	if spec.IncidentType == "scheduled" {
 		status = derefStr(spec.StatusScheduled)
+	} else {
+		status = derefStr(spec.StatusRealtime)
 	}
 	if status == "" && spec.IncidentType == "realtime" {
 		status = "investigating"
