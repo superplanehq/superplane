@@ -10,8 +10,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Create HTTP Synthetic Check" href="#create-http-synthetic-check" description="Create an HTTP synthetic check in Dash0 to monitor endpoint availability and performance" />
+  <LinkCard title="Delete HTTP Synthetic Check" href="#delete-http-synthetic-check" description="Delete an HTTP synthetic check from Dash0 by ID" />
+  <LinkCard title="Get HTTP Synthetic Check" href="#get-http-synthetic-check" description="Fetch an existing HTTP synthetic check from Dash0 by ID" />
   <LinkCard title="List Issues" href="#list-issues" description="Query Dash0 to get a list of all current issues using the metric dash0.issue.status" />
   <LinkCard title="Query Prometheus" href="#query-prometheus" description="Execute a PromQL query against Dash0 Prometheus API and return the response data" />
+  <LinkCard title="Update HTTP Synthetic Check" href="#update-http-synthetic-check" description="Update an existing HTTP synthetic check in Dash0 by ID" />
 </CardGrid>
 
 <a id="create-http-synthetic-check"></a>
@@ -154,6 +157,139 @@ Returns the created synthetic check details from the Dash0 API, including the ch
 }
 ```
 
+<a id="delete-http-synthetic-check"></a>
+
+## Delete HTTP Synthetic Check
+
+The Delete HTTP Synthetic Check component removes a synthetic check from Dash0 by its ID. Use the check ID from a Create/Get/Update output (e.g. metadata.labels["dash0.com/id"]) or from the Dash0 dashboard.
+
+### Configuration
+
+- **Check ID**: The Dash0 synthetic check ID to delete (required).
+- **Dataset**: The dataset the check belongs to (defaults to "default").
+
+### Output
+
+Returns a confirmation payload (e.g. deleted id).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "id": "64617368-3073-796e-7468-abc123def456"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "dash0.syntheticCheck.deleted"
+}
+```
+
+<a id="get-http-synthetic-check"></a>
+
+## Get HTTP Synthetic Check
+
+The Get HTTP Synthetic Check component retrieves a synthetic check from Dash0 by its ID. Use the check ID from a Create/Update output (e.g. metadata.labels["dash0.com/id"]) or from the Dash0 dashboard.
+
+### Configuration
+
+- **Check ID**: The Dash0 synthetic check ID to fetch (required).
+- **Dataset**: The dataset the check belongs to (defaults to "default").
+
+### Output
+
+Returns the synthetic check definition and, when available, key metrics (uptime, duration, fails, status) from Dash0 Prometheus. Payload shape: { definition, metrics? }.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "kind": "Dash0SyntheticCheck",
+    "metadata": {
+      "annotations": {},
+      "labels": {
+        "dash0.com/dataset": "default",
+        "dash0.com/id": "64617368-3073-796e-7468-abc123def456",
+        "dash0.com/origin": "api-abc12345-6789-0123-4567-890abcdef012",
+        "dash0.com/version": "1"
+      },
+      "name": "login-api-health-check"
+    },
+    "spec": {
+      "enabled": true,
+      "plugin": {
+        "display": {
+          "name": "Login API health check"
+        },
+        "kind": "http",
+        "spec": {
+          "assertions": {
+            "criticalAssertions": [
+              {
+                "kind": "status_code",
+                "spec": {
+                  "operator": "is",
+                  "value": "200"
+                }
+              },
+              {
+                "kind": "timing",
+                "spec": {
+                  "operator": "lte",
+                  "type": "response",
+                  "value": "5000ms"
+                }
+              }
+            ],
+            "degradedAssertions": [
+              {
+                "kind": "timing",
+                "spec": {
+                  "operator": "lte",
+                  "type": "response",
+                  "value": "2000ms"
+                }
+              }
+            ]
+          },
+          "request": {
+            "headers": [],
+            "method": "get",
+            "queryParameters": [],
+            "redirects": "follow",
+            "tls": {
+              "allowInsecure": false
+            },
+            "tracing": {
+              "addTracingHeaders": true
+            },
+            "url": "https://api.example.com/health"
+          },
+          "retries": {
+            "kind": "fixed",
+            "spec": {
+              "attempts": 3,
+              "delay": "1s"
+            }
+          }
+        }
+      },
+      "schedule": {
+        "interval": "1m",
+        "locations": [
+          "de-frankfurt",
+          "us-oregon"
+        ],
+        "strategy": "all_locations"
+      }
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "dash0.syntheticCheck.retrieved"
+}
+```
+
 <a id="list-issues"></a>
 
 ## List Issues
@@ -288,6 +424,91 @@ Returns the Prometheus query response including:
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "dash0.prometheus.response"
+}
+```
+
+<a id="update-http-synthetic-check"></a>
+
+## Update HTTP Synthetic Check
+
+The Update HTTP Synthetic Check component updates an existing synthetic check in Dash0. Use the check ID from a previous Create HTTP Synthetic Check output (e.g. metadata.labels["dash0.com/id"]) or from the Dash0 dashboard.
+
+### Configuration
+
+- **Check ID**: The Dash0 synthetic check ID to update (required).
+- **Dataset**: The dataset the check belongs to (defaults to "default").
+- **Name**, **Request**, **Schedule**, **Assertions**, **Retries**: Same as Create HTTP Synthetic Check; the full spec is sent to replace the existing check.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "kind": "Dash0SyntheticCheck",
+    "metadata": {
+      "annotations": {},
+      "labels": {
+        "dash0.com/dataset": "default",
+        "dash0.com/id": "64617368-3073-796e-7468-abc123def456",
+        "dash0.com/origin": "api-abc12345-6789-0123-4567-890abcdef012",
+        "dash0.com/version": "2"
+      },
+      "name": "login-api-health-check"
+    },
+    "spec": {
+      "enabled": true,
+      "plugin": {
+        "display": {
+          "name": "Login API health check"
+        },
+        "kind": "http",
+        "spec": {
+          "assertions": {
+            "criticalAssertions": [
+              {
+                "kind": "status_code",
+                "spec": {
+                  "operator": "is",
+                  "value": "200"
+                }
+              }
+            ],
+            "degradedAssertions": []
+          },
+          "request": {
+            "headers": [],
+            "method": "get",
+            "queryParameters": [],
+            "redirects": "follow",
+            "tls": {
+              "allowInsecure": false
+            },
+            "tracing": {
+              "addTracingHeaders": true
+            },
+            "url": "https://api.example.com/health"
+          },
+          "retries": {
+            "kind": "fixed",
+            "spec": {
+              "attempts": 3,
+              "delay": "1s"
+            }
+          }
+        }
+      },
+      "schedule": {
+        "interval": "1m",
+        "locations": [
+          "de-frankfurt",
+          "us-oregon"
+        ],
+        "strategy": "all_locations"
+      }
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "dash0.syntheticCheck.updated"
 }
 ```
 

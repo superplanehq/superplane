@@ -37,6 +37,37 @@ export interface AssertionItem {
   expression?: string;
 }
 
+export interface GetHttpSyntheticCheckConfiguration {
+  checkId: string;
+  dataset: string;
+}
+
+export interface DeleteHttpSyntheticCheckConfiguration {
+  checkId: string;
+  dataset: string;
+}
+
+export interface UpdateHttpSyntheticCheckConfiguration {
+  checkId: string;
+  name: string;
+  dataset: string;
+  request: {
+    url: string;
+    method: string;
+    redirects?: string;
+    allowInsecure?: string;
+    headers?: Array<{ name: string; value: string }>;
+    body?: string;
+  };
+  schedule: {
+    interval: string;
+    locations: string[];
+    strategy?: string;
+  };
+  assertions?: AssertionItem[];
+  retries?: { attempts: number; delay: string };
+}
+
 export interface CreateHttpSyntheticCheckConfiguration {
   name: string;
   dataset: string;

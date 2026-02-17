@@ -103,6 +103,19 @@ type PrometheusQueryResult struct {
 	Values [][]interface{}   `json:"values,omitempty"` // For range queries: [[timestamp, value], ...]
 }
 
+// prometheusResponseDataToMap converts PrometheusResponseData to map[string]any so consumers can use res["data"].(map[string]any).
+func prometheusResponseDataToMap(data PrometheusResponseData) (map[string]any, error) {
+	dataMap := make(map[string]any)
+	dataBytes, err := json.Marshal(data)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling response data: %w", err)
+	}
+	if err := json.Unmarshal(dataBytes, &dataMap); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response data: %w", err)
+	}
+	return dataMap, nil
+}
+
 func (c *Client) ExecutePrometheusInstantQuery(promQLQuery, dataset string) (map[string]any, error) {
 	apiURL := fmt.Sprintf("%s/api/prometheus/api/v1/query", c.BaseURL)
 
@@ -124,10 +137,13 @@ func (c *Client) ExecutePrometheusInstantQuery(promQLQuery, dataset string) (map
 	if response.Status != "success" {
 		return nil, fmt.Errorf("prometheus query failed with status: %s", response.Status)
 	}
-
+	dataMap, err := prometheusResponseDataToMap(response.Data)
+	if err != nil {
+		return nil, err
+	}
 	return map[string]any{
 		"status": response.Status,
-		"data":   response.Data,
+		"data":   dataMap,
 	}, nil
 }
 
@@ -155,10 +171,13 @@ func (c *Client) ExecutePrometheusRangeQuery(promQLQuery, dataset, start, end, s
 	if response.Status != "success" {
 		return nil, fmt.Errorf("prometheus query failed with status: %s", response.Status)
 	}
-
+	dataMap, err := prometheusResponseDataToMap(response.Data)
+	if err != nil {
+		return nil, err
+	}
 	return map[string]any{
 		"status": response.Status,
-		"data":   response.Data,
+		"data":   dataMap,
 	}, nil
 }
 
@@ -317,6 +336,68 @@ func (c *Client) CreateSyntheticCheck(request SyntheticCheckRequest, dataset str
 	}
 
 	responseBody, err := c.execRequest(http.MethodPost, apiURL, bytes.NewReader(body), "application/json")
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response, nil
+}
+
+// GetSyntheticCheck fetches a synthetic check by ID (GET).
+func (c *Client) GetSyntheticCheck(checkID string, dataset string) (map[string]any, error) {
+	apiURL := fmt.Sprintf("%s/api/synthetic-checks/%s?dataset=%s", c.BaseURL, url.PathEscape(checkID), url.QueryEscape(dataset))
+
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil, "")
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response, nil
+}
+
+// DeleteSyntheticCheck deletes a synthetic check by ID (DELETE).
+func (c *Client) DeleteSyntheticCheck(checkID string, dataset string) (map[string]any, error) {
+	apiURL := fmt.Sprintf("%s/api/synthetic-checks/%s?dataset=%s", c.BaseURL, url.PathEscape(checkID), url.QueryEscape(dataset))
+
+	responseBody, err := c.execRequest(http.MethodDelete, apiURL, nil, "")
+	if err != nil {
+		return nil, err
+	}
+
+	// DELETE may return 204 No Content with empty body
+	if len(responseBody) == 0 {
+		return map[string]any{"deleted": true, "id": checkID}, nil
+	}
+
+	var response map[string]any
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response, nil
+}
+
+// UpdateSyntheticCheck updates an existing synthetic check by ID (PUT).
+// The check ID is typically from metadata.labels["dash0.com/id"] in a create response.
+func (c *Client) UpdateSyntheticCheck(checkID string, request SyntheticCheckRequest, dataset string) (map[string]any, error) {
+	apiURL := fmt.Sprintf("%s/api/synthetic-checks/%s?dataset=%s", c.BaseURL, url.PathEscape(checkID), url.QueryEscape(dataset))
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPut, apiURL, bytes.NewReader(body), "application/json")
 	if err != nil {
 		return nil, err
 	}

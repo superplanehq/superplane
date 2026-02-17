@@ -70,6 +70,9 @@ func (d *Dash0) Components() []core.Component {
 		&QueryPrometheus{},
 		&ListIssues{},
 		&CreateHTTPSyntheticCheck{},
+		&UpdateHTTPSyntheticCheck{},
+		&GetHTTPSyntheticCheck{},
+		&DeleteHTTPSyntheticCheck{},
 	}
 }
 

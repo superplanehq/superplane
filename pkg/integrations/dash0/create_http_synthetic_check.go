@@ -336,7 +336,7 @@ func (c *CreateHTTPSyntheticCheck) Configuration() []configuration.Field {
 					ItemLabel: "Assertion",
 					ItemDefinition: &configuration.ListItemDefinition{
 						Type:   configuration.FieldTypeObject,
-						Schema: assertionFieldSchema(),
+						Schema: AssertionFieldSchema(),
 					},
 				},
 			},
@@ -434,40 +434,45 @@ func (c *CreateHTTPSyntheticCheck) Execute(ctx core.ExecutionContext) error {
 }
 
 func (c *CreateHTTPSyntheticCheck) buildRequest(spec CreateHTTPSyntheticCheckSpec) SyntheticCheckRequest {
-	method := spec.Request.Method
+	return BuildSyntheticCheckRequest(spec.Name, spec.Request, spec.Schedule, BuildSyntheticCheckAssertions(spec.Assertions), spec.Retries)
+}
+
+// BuildSyntheticCheckRequest builds the API request payload from spec fields (shared by create and update components).
+func BuildSyntheticCheckRequest(name string, req RequestSpec, sched ScheduleSpec, assertions SyntheticCheckAssertions, retries *RetrySpec) SyntheticCheckRequest {
+	method := req.Method
 	if method == "" {
 		method = "get"
 	}
 
-	redirects := spec.Request.Redirects
+	redirects := req.Redirects
 	if redirects == "" {
 		redirects = "follow"
 	}
 
-	strategy := spec.Schedule.Strategy
+	strategy := sched.Strategy
 	if strategy == "" {
 		strategy = "all_locations"
 	}
 
-	interval := spec.Schedule.Interval
+	interval := sched.Interval
 	if interval == "" {
 		interval = "1m"
 	}
 
 	retryAttempts := 3
 	retryDelay := "1s"
-	if spec.Retries != nil {
-		if spec.Retries.Attempts > 0 {
-			retryAttempts = spec.Retries.Attempts
+	if retries != nil {
+		if retries.Attempts > 0 {
+			retryAttempts = retries.Attempts
 		}
-		if spec.Retries.Delay != "" {
-			retryDelay = spec.Retries.Delay
+		if retries.Delay != "" {
+			retryDelay = retries.Delay
 		}
 	}
 
 	headers := make([]SyntheticCheckHeader, 0)
-	if spec.Request.Headers != nil {
-		for _, h := range *spec.Request.Headers {
+	if req.Headers != nil {
+		for _, h := range *req.Headers {
 			headers = append(headers, SyntheticCheckHeader{
 				Name:  h.Name,
 				Value: h.Value,
@@ -475,36 +480,34 @@ func (c *CreateHTTPSyntheticCheck) buildRequest(spec CreateHTTPSyntheticCheckSpe
 		}
 	}
 
-	assertions := c.buildAssertions(spec)
-
 	return SyntheticCheckRequest{
 		Kind: "Dash0SyntheticCheck",
 		Metadata: SyntheticCheckMetadata{
-			Name:   strings.ReplaceAll(strings.ToLower(spec.Name), " ", "-"),
+			Name:   strings.ReplaceAll(strings.ToLower(name), " ", "-"),
 			Labels: map[string]any{},
 		},
 		Spec: SyntheticCheckTopLevelSpec{
 			Enabled: true,
 			Schedule: SyntheticCheckSchedule{
 				Interval:  interval,
-				Locations: spec.Schedule.Locations,
+				Locations: sched.Locations,
 				Strategy:  strategy,
 			},
 			Plugin: SyntheticCheckPlugin{
 				Display: SyntheticCheckDisplay{
-					Name: spec.Name,
+					Name: name,
 				},
 				Kind: "http",
 				Spec: SyntheticCheckPluginSpec{
 					Request: SyntheticCheckHTTPRequest{
 						Method:          method,
-						URL:             spec.Request.URL,
+						URL:             req.URL,
 						Headers:         headers,
 						QueryParameters: make([]any, 0),
-						Body:            spec.Request.Body,
+						Body:            req.Body,
 						Redirects:       redirects,
 						TLS: SyntheticCheckTLS{
-							AllowInsecure: spec.Request.AllowInsecure == "true",
+							AllowInsecure: req.AllowInsecure == "true",
 						},
 						Tracing: SyntheticCheckTracing{
 							AddTracingHeaders: true,
@@ -524,7 +527,65 @@ func (c *CreateHTTPSyntheticCheck) buildRequest(spec CreateHTTPSyntheticCheckSpe
 	}
 }
 
-func assertionFieldSchema() []configuration.Field {
+// BuildSyntheticCheckAssertions builds the API assertions payload from spec (shared by create and update components).
+func BuildSyntheticCheckAssertions(assertions *[]AssertionSpec) SyntheticCheckAssertions {
+	criticalAssertions := make([]SyntheticCheckAssertion, 0)
+	degradedAssertions := make([]SyntheticCheckAssertion, 0)
+
+	if assertions == nil {
+		return SyntheticCheckAssertions{
+			CriticalAssertions: criticalAssertions,
+			DegradedAssertions: degradedAssertions,
+		}
+	}
+
+	for _, a := range *assertions {
+		assertion := buildSingleAssertion(a)
+		if assertion == nil {
+			continue
+		}
+
+		switch a.Severity {
+		case "degraded":
+			degradedAssertions = append(degradedAssertions, *assertion)
+		default:
+			criticalAssertions = append(criticalAssertions, *assertion)
+		}
+	}
+
+	return SyntheticCheckAssertions{
+		CriticalAssertions: criticalAssertions,
+		DegradedAssertions: degradedAssertions,
+	}
+}
+
+func buildSingleAssertion(a AssertionSpec) *SyntheticCheckAssertion {
+	spec := map[string]any{}
+
+	if a.Operator != "" {
+		spec["operator"] = a.Operator
+	}
+	if a.Value != "" {
+		spec["value"] = a.Value
+	}
+	if a.Type != "" {
+		spec["type"] = a.Type
+	}
+	if a.Name != "" {
+		spec["name"] = a.Name
+	}
+	if a.Expression != "" {
+		spec["expression"] = a.Expression
+	}
+
+	return &SyntheticCheckAssertion{
+		Kind: a.Kind,
+		Spec: spec,
+	}
+}
+
+// AssertionFieldSchema returns the configuration fields for a single assertion (used by create and update components).
+func AssertionFieldSchema() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:     "kind",
@@ -642,62 +703,6 @@ func assertionFieldSchema() []configuration.Field {
 				{Field: "kind", Values: []string{"status_code", "timing", "error_type", "ssl_certificate_validity", "response_header", "json_body", "text_body"}},
 			},
 		},
-	}
-}
-
-func (c *CreateHTTPSyntheticCheck) buildAssertions(spec CreateHTTPSyntheticCheckSpec) SyntheticCheckAssertions {
-	criticalAssertions := make([]SyntheticCheckAssertion, 0)
-	degradedAssertions := make([]SyntheticCheckAssertion, 0)
-
-	if spec.Assertions == nil {
-		return SyntheticCheckAssertions{
-			CriticalAssertions: criticalAssertions,
-			DegradedAssertions: degradedAssertions,
-		}
-	}
-
-	for _, a := range *spec.Assertions {
-		assertion := c.buildSingleAssertion(a)
-		if assertion == nil {
-			continue
-		}
-
-		switch a.Severity {
-		case "degraded":
-			degradedAssertions = append(degradedAssertions, *assertion)
-		default:
-			criticalAssertions = append(criticalAssertions, *assertion)
-		}
-	}
-
-	return SyntheticCheckAssertions{
-		CriticalAssertions: criticalAssertions,
-		DegradedAssertions: degradedAssertions,
-	}
-}
-
-func (c *CreateHTTPSyntheticCheck) buildSingleAssertion(a AssertionSpec) *SyntheticCheckAssertion {
-	spec := map[string]any{}
-
-	if a.Operator != "" {
-		spec["operator"] = a.Operator
-	}
-	if a.Value != "" {
-		spec["value"] = a.Value
-	}
-	if a.Type != "" {
-		spec["type"] = a.Type
-	}
-	if a.Name != "" {
-		spec["name"] = a.Name
-	}
-	if a.Expression != "" {
-		spec["expression"] = a.Expression
-	}
-
-	return &SyntheticCheckAssertion{
-		Kind: a.Kind,
-		Spec: spec,
 	}
 }
 
