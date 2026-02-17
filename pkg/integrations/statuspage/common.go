@@ -2,6 +2,8 @@ package statuspage
 
 import (
 	"strings"
+
+	"github.com/superplanehq/superplane/pkg/core"
 )
 
 // NodeMetadata contains metadata stored on component nodes for display in the UI.
@@ -49,6 +51,58 @@ func resolveComponentNameOrIDs(client *Client, pageID string, nameOrIDToStatus m
 		statusByID[resolved] = status
 	}
 	return ids, statusByID, nil
+}
+
+// resolveMetadataSetup fetches page and component names from the API when pageID and componentIDs
+// are static (no expressions). Returns empty metadata if HTTP context is unavailable or on error.
+func resolveMetadataSetup(ctx core.SetupContext, pageID string, componentIDs []string) NodeMetadata {
+	metadata := NodeMetadata{}
+	if pageID == "" || strings.Contains(pageID, "{{") || ctx.HTTP == nil {
+		return metadata
+	}
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return metadata
+	}
+	pages, err := client.ListPages()
+	if err == nil {
+		for _, p := range pages {
+			if p.ID == pageID {
+				metadata.PageName = p.Name
+				break
+			}
+		}
+	}
+	if len(componentIDs) > 0 && !containsExpression(componentIDs) {
+		components, err := client.ListComponents(pageID)
+		if err == nil {
+			idToName := make(map[string]string)
+			for _, c := range components {
+				idToName[c.ID] = c.Name
+			}
+			for _, id := range componentIDs {
+				if name := idToName[id]; name != "" {
+					metadata.ComponentNames = append(metadata.ComponentNames, name)
+				} else {
+					metadata.ComponentNames = append(metadata.ComponentNames, id)
+				}
+			}
+		}
+	}
+	return metadata
+}
+
+// componentIDsForMetadataSetup returns component IDs from config or from getIDsFromSpec when config has none.
+func componentIDsForMetadataSetup(config any, getIDsFromSpec func() []string) []string {
+	configMap, _ := config.(map[string]any)
+	if configMap == nil {
+		configMap = make(map[string]any)
+	}
+	ids := extractComponentIDs(configMap)
+	if len(ids) == 0 {
+		return getIDsFromSpec()
+	}
+	return ids
 }
 
 // extractComponentIDs returns component IDs from config.

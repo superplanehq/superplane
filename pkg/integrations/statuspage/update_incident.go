@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -292,51 +291,16 @@ func (c *UpdateIncident) Setup(ctx core.SetupContext) error {
 	}
 
 	// Resolve page name and component names for metadata when IDs are static (no expressions).
-	// Skip API call if HTTP context is not available (e.g. in tests without HTTP mock).
-	metadata := NodeMetadata{}
-	configMap, _ := ctx.Configuration.(map[string]any)
-	if configMap == nil {
-		configMap = make(map[string]any)
-	}
-	componentIDs := extractComponentIDs(configMap)
-	if len(componentIDs) == 0 {
+	componentIDs := componentIDsForMetadataSetup(ctx.Configuration, func() []string {
+		var ids []string
 		for _, item := range spec.Components {
 			if item.ComponentID != "" {
-				componentIDs = append(componentIDs, item.ComponentID)
+				ids = append(ids, item.ComponentID)
 			}
 		}
-	}
-	if spec.Page != "" && !strings.Contains(spec.Page, "{{") && ctx.HTTP != nil {
-		client, err := NewClient(ctx.HTTP, ctx.Integration)
-		if err == nil {
-			pages, err := client.ListPages()
-			if err == nil {
-				for _, p := range pages {
-					if p.ID == spec.Page {
-						metadata.PageName = p.Name
-						break
-					}
-				}
-			}
-			// Resolve component names when componentIds are static
-			if len(componentIDs) > 0 && !containsExpression(componentIDs) {
-				components, err := client.ListComponents(spec.Page)
-				if err == nil {
-					idToName := make(map[string]string)
-					for _, c := range components {
-						idToName[c.ID] = c.Name
-					}
-					for _, id := range componentIDs {
-						if name := idToName[id]; name != "" {
-							metadata.ComponentNames = append(metadata.ComponentNames, name)
-						} else {
-							metadata.ComponentNames = append(metadata.ComponentNames, id)
-						}
-					}
-				}
-			}
-		}
-	}
+		return ids
+	})
+	metadata := resolveMetadataSetup(ctx, spec.Page, componentIDs)
 	return ctx.Metadata.Set(metadata)
 }
 
