@@ -4194,6 +4194,10 @@
         },
         "itemLabel": {
           "type": "string"
+        },
+        "maxItems": {
+          "type": "integer",
+          "format": "int32"
         }
       }
     },
