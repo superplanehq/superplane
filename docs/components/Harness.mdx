@@ -21,9 +21,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Instructions
 
 1. **Create API key:** In Harness, create a service-account API key with permission to run and read pipeline executions.
-2. **Scope fields:** Enter **Account ID**, and optionally **Org ID** and **Project ID** for scoped APIs (**Project ID** requires **Org ID**).
-3. **Webhook Secret (optional but recommended):** Set a secret token and configure Harness webhook notifications to send it in an Authorization Bearer header.
-4. **Trigger setup:** After adding the On Pipeline Completed trigger, copy the generated SuperPlane webhook URL from trigger metadata into a Harness notification webhook.
+2. **Connect once, then configure nodes:** Scope fields (**Org**, **Project**, **Pipeline**) are selected in each Harness node.
+3. **Account ID is automatic:** SuperPlane resolves account scope from your API key.
+4. **Trigger notifications are automatic:** For **On Pipeline Completed** with a selected **Pipeline**, SuperPlane provisions a pipeline notification rule for you.
 5. **Auth method:** SuperPlane calls Harness APIs with `x-api-key: <token>` against `https://app.harness.io/gateway` unless overridden by Base URL.
 
 <a id="on-pipeline-completed"></a>
@@ -40,14 +40,16 @@ The On Pipeline Completed trigger starts a workflow when a Harness pipeline exec
 
 ### Configuration
 
+- **Org**: Harness organization identifier
+- **Project**: Harness project identifier
 - **Pipeline Identifier**: Optional pipeline identifier filter. Leave empty to accept all pipeline completions.
 - **Statuses**: Completion statuses that should trigger the workflow.
 
 ### Webhook Setup
 
-This trigger generates a SuperPlane webhook URL. Configure a Harness notification rule to send pipeline completion events to that URL.
+SuperPlane automatically provisions Harness pipeline `notificationRules` when **Pipeline** is selected.
 
-Recommended: set **Webhook Secret** in the Harness integration and send it as `Authorization: Bearer <secret>` from Harness.
+If no pipeline is selected, or webhook delivery is unavailable in your Harness account, SuperPlane falls back to polling recent executions.
 
 ### Example Data
 
@@ -88,13 +90,15 @@ The Run Pipeline component starts a Harness pipeline execution and waits for it 
 
 1. Starts a Harness pipeline execution
 2. Stores the execution ID in node execution state
-3. Polls execution summary until a terminal status is reached
+3. Watches execution completion via webhook (with polling fallback)
 4. Routes output to:
    - **Success** when execution succeeds
    - **Failed** when execution fails, aborts, or expires
 
 ### Configuration
 
+- **Org**: Harness organization identifier
+- **Project**: Harness project identifier
 - **Pipeline**: Harness pipeline identifier
 - **Ref**: Optional git ref (`refs/heads/main` or `refs/tags/v1.2.3`)
 - **Input Set References**: Optional input set identifiers
