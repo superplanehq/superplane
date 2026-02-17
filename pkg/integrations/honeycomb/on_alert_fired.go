@@ -161,12 +161,13 @@ func (t *OnAlertFired) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 	}
 
 	providedBytes := []byte(provided)
-	secretBytes := []byte(secret)
-	if len(providedBytes) != len(secretBytes) {
-		subtle.ConstantTimeCompare(secretBytes, secretBytes) // constant-time dummy to avoid leaking length
+	secretTokenBytes := []byte(secret)
+
+	if len(providedBytes) != len(secretTokenBytes) {
+		subtle.ConstantTimeCompare(secretTokenBytes, secretTokenBytes) // dummy work
 		return http.StatusForbidden, fmt.Errorf("invalid webhook token")
 	}
-	if subtle.ConstantTimeCompare(providedBytes, secretBytes) != 1 {
+	if subtle.ConstantTimeCompare(providedBytes, secretTokenBytes) != 1 {
 		return http.StatusForbidden, fmt.Errorf("invalid webhook token")
 	}
 
