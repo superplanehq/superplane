@@ -2,8 +2,10 @@ package grafana
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -81,4 +83,89 @@ func Test__Grafana__Sync__RejectsRelativeBaseURL(t *testing.T) {
 		},
 	})
 	require.ErrorContains(t, err, "must include scheme and host")
+}
+
+func Test__Client__UpsertWebhookContactPoint__UpdatesExisting(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`[{"uid":"cp_1","name":"superplane-123"}]`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"uid":"cp_1"}`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	uid, err := client.UpsertWebhookContactPoint("superplane-123", "https://example.com/webhook", "secret")
+	require.NoError(t, err)
+	require.Equal(t, "cp_1", uid)
+	require.Len(t, httpContext.Requests, 2)
+	require.Equal(t, http.MethodPut, httpContext.Requests[1].Method)
+}
+
+func Test__Client__UpsertWebhookContactPoint__CreatesAndFindsUID(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`[]`)),
+			},
+			{
+				StatusCode: http.StatusCreated,
+				Body:       io.NopCloser(strings.NewReader(`{}`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`[{"uid":"cp_2","name":"superplane-abc"}]`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	uid, err := client.UpsertWebhookContactPoint("superplane-abc", "https://example.com/webhook", "")
+	require.NoError(t, err)
+	require.Equal(t, "cp_2", uid)
+	require.Len(t, httpContext.Requests, 3)
+
+	body, err := io.ReadAll(httpContext.Requests[1].Body)
+	require.NoError(t, err)
+	payload := map[string]any{}
+	require.NoError(t, json.Unmarshal(body, &payload))
+	settings := payload["settings"].(map[string]any)
+	_, hasAuthScheme := settings["authorization_scheme"]
+	require.False(t, hasAuthScheme)
+}
+
+func Test__Client__DeleteContactPoint__NotFoundIsIgnored(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusNotFound,
+				Body:       io.NopCloser(strings.NewReader(`not found`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	err := client.DeleteContactPoint("cp_missing")
+	require.NoError(t, err)
 }

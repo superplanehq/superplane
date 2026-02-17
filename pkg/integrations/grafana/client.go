@@ -1,6 +1,8 @@
 package grafana
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,6 +20,11 @@ type Client struct {
 	BaseURL  string
 	APIToken string
 	http     core.HTTPContext
+}
+
+type contactPoint struct {
+	UID  string `json:"uid"`
+	Name string `json:"name"`
 }
 
 func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext, requireToken bool) (*Client, error) {
@@ -122,4 +129,133 @@ func (c *Client) execRequest(method, path string, body io.Reader, contentType st
 	}
 
 	return responseBody, res.StatusCode, nil
+}
+
+func (c *Client) ListContactPoints() ([]contactPoint, error) {
+	responseBody, status, err := c.execRequest(http.MethodGet, "/api/v1/provisioning/contact-points", nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error listing contact points: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, fmt.Errorf("grafana contact point list failed with status %d: %s", status, string(responseBody))
+	}
+
+	var direct []contactPoint
+	if err := json.Unmarshal(responseBody, &direct); err == nil {
+		return direct, nil
+	}
+
+	wrapped := struct {
+		Items []contactPoint `json:"items"`
+	}{}
+	if err := json.Unmarshal(responseBody, &wrapped); err == nil {
+		return wrapped.Items, nil
+	}
+
+	return nil, fmt.Errorf("error parsing contact points response")
+}
+
+func (c *Client) UpsertWebhookContactPoint(name, webhookURL, bearerToken string) (string, error) {
+	points, err := c.ListContactPoints()
+	if err != nil {
+		return "", err
+	}
+
+	existingUID := ""
+	for _, point := range points {
+		if strings.TrimSpace(point.Name) == name {
+			existingUID = strings.TrimSpace(point.UID)
+			break
+		}
+	}
+
+	payload := map[string]any{
+		"name":   name,
+		"type":   "webhook",
+		"disableResolveMessage": false,
+		"settings": map[string]any{
+			"url":        webhookURL,
+			"httpMethod": "POST",
+		},
+	}
+
+	if bearerToken != "" {
+		settings := payload["settings"].(map[string]any)
+		settings["authorization_scheme"] = "bearer"
+		settings["authorization_credentials"] = bearerToken
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("error marshaling contact point payload: %v", err)
+	}
+
+	if existingUID != "" {
+		responseBody, status, err := c.execRequest(
+			http.MethodPut,
+			fmt.Sprintf("/api/v1/provisioning/contact-points/%s", existingUID),
+			bytes.NewReader(body),
+			"application/json",
+		)
+		if err != nil {
+			return "", fmt.Errorf("error updating contact point: %v", err)
+		}
+		if status < 200 || status >= 300 {
+			return "", fmt.Errorf("grafana contact point update failed with status %d: %s", status, string(responseBody))
+		}
+		return existingUID, nil
+	}
+
+	responseBody, status, err := c.execRequest(
+		http.MethodPost,
+		"/api/v1/provisioning/contact-points",
+		bytes.NewReader(body),
+		"application/json",
+	)
+	if err != nil {
+		return "", fmt.Errorf("error creating contact point: %v", err)
+	}
+	if status < 200 || status >= 300 {
+		return "", fmt.Errorf("grafana contact point create failed with status %d: %s", status, string(responseBody))
+	}
+
+	created := contactPoint{}
+	if err := json.Unmarshal(responseBody, &created); err == nil && strings.TrimSpace(created.UID) != "" {
+		return strings.TrimSpace(created.UID), nil
+	}
+
+	refreshedPoints, err := c.ListContactPoints()
+	if err != nil {
+		return "", err
+	}
+
+	for _, point := range refreshedPoints {
+		if strings.TrimSpace(point.Name) == name && strings.TrimSpace(point.UID) != "" {
+			return strings.TrimSpace(point.UID), nil
+		}
+	}
+
+	return "", fmt.Errorf("contact point created but uid was not returned")
+}
+
+func (c *Client) DeleteContactPoint(uid string) error {
+	if strings.TrimSpace(uid) == "" {
+		return nil
+	}
+
+	responseBody, status, err := c.execRequest(http.MethodDelete, fmt.Sprintf("/api/v1/provisioning/contact-points/%s", uid), nil, "")
+	if err != nil {
+		return fmt.Errorf("error deleting contact point: %v", err)
+	}
+
+	if status == http.StatusNotFound {
+		return nil
+	}
+
+	if status < 200 || status >= 300 {
+		return fmt.Errorf("grafana contact point delete failed with status %d: %s", status, string(responseBody))
+	}
+
+	return nil
 }
