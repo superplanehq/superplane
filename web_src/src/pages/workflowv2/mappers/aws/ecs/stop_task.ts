@@ -1,19 +1,7 @@
-import {
-  ComponentBaseContext,
-  ComponentBaseMapper,
-  ExecutionDetailsContext,
-  ExecutionInfo,
-  NodeInfo,
-  OutputPayload,
-  SubtitleContext,
-} from "../../types";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { getState, getStateMap, getTriggerRenderer } from "../..";
-import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
-import { formatTimeAgo } from "@/utils/date";
+import { ComponentBaseMapper, ExecutionDetailsContext, NodeInfo, OutputPayload, SubtitleContext } from "../../types";
 import { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../../utils";
+import { buildEcsComponentProps, ecsSubtitle } from "./common";
 
 interface StopTaskConfiguration {
   region?: string;
@@ -39,25 +27,8 @@ interface StopTaskOutput {
 }
 
 export const stopTaskMapper: ComponentBaseMapper = {
-  props(context: ComponentBaseContext): ComponentBaseProps {
-    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
-    const componentName = context.componentDefinition.name || "unknown";
-
-    return {
-      title:
-        context.node.name ||
-        context.componentDefinition.label ||
-        context.componentDefinition.name ||
-        "Unnamed component",
-      iconSrc: awsEcsIcon,
-      iconColor: getColorClass(context.componentDefinition.color),
-      collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
-      collapsed: context.node.isCollapsed,
-      eventSections: lastExecution ? stopTaskEventSections(context.nodes, lastExecution, componentName) : undefined,
-      includeEmptyState: !lastExecution,
-      metadata: stopTaskMetadataList(context.node),
-      eventStateMap: getStateMap(componentName),
-    };
+  props(context) {
+    return buildEcsComponentProps(context, stopTaskMetadataList(context.node));
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
@@ -87,10 +58,7 @@ export const stopTaskMapper: ComponentBaseMapper = {
   },
 
   subtitle(context: SubtitleContext): string {
-    if (!context.execution.createdAt) {
-      return "";
-    }
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return ecsSubtitle(context);
   },
 };
 
@@ -109,20 +77,4 @@ function stopTaskMetadataList(node: NodeInfo): MetadataItem[] {
   }
 
   return items;
-}
-
-function stopTaskEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-
-  return [
-    {
-      receivedAt: new Date(execution.createdAt ?? 0),
-      eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt ?? 0)),
-      eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent?.id ?? "",
-    },
-  ];
 }

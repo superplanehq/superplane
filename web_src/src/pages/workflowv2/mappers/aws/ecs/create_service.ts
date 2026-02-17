@@ -3,16 +3,13 @@ import { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../../utils";
 import { buildEcsComponentProps, ecsSubtitle } from "./common";
 
-interface DescribeServiceConfiguration {
+interface CreateServiceConfiguration {
   region?: string;
   cluster?: string;
-  service?: string;
-}
-
-interface EcsFailure {
-  arn?: string;
-  reason?: string;
-  detail?: string;
+  serviceName?: string;
+  taskDefinition?: string;
+  desiredCount?: number;
+  launchType?: string;
 }
 
 interface EcsService {
@@ -26,21 +23,21 @@ interface EcsService {
   pendingCount?: number;
   launchType?: string;
   platformVersion?: string;
+  schedulingStrategy?: string;
 }
 
-interface DescribeServiceOutput {
+interface CreateServiceOutput {
   service?: EcsService;
-  failures?: EcsFailure[];
 }
 
-export const describeServiceMapper: ComponentBaseMapper = {
+export const createServiceMapper: ComponentBaseMapper = {
   props(context) {
-    return buildEcsComponentProps(context, describeServiceMetadataList(context.node));
+    return buildEcsComponentProps(context, createServiceMetadataList(context.node));
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const data = outputs?.default?.[0]?.data as DescribeServiceOutput | undefined;
+    const data = outputs?.default?.[0]?.data as CreateServiceOutput | undefined;
     const service = data?.service;
 
     if (!service) {
@@ -48,7 +45,7 @@ export const describeServiceMapper: ComponentBaseMapper = {
     }
 
     return {
-      "Retrieved At": stringOrDash(
+      "Created At": stringOrDash(
         context.execution.updatedAt ? new Date(context.execution.updatedAt).toLocaleString() : "-",
       ),
       Service: stringOrDash(service.serviceName),
@@ -61,7 +58,7 @@ export const describeServiceMapper: ComponentBaseMapper = {
       "Pending Count": stringOrDash(service.pendingCount),
       "Launch Type": stringOrDash(service.launchType),
       "Platform Version": stringOrDash(service.platformVersion),
-      Failures: String(data?.failures?.length || 0),
+      "Scheduling Strategy": stringOrDash(service.schedulingStrategy),
     };
   },
 
@@ -70,8 +67,8 @@ export const describeServiceMapper: ComponentBaseMapper = {
   },
 };
 
-function describeServiceMetadataList(node: NodeInfo): MetadataItem[] {
-  const config = node.configuration as DescribeServiceConfiguration | undefined;
+function createServiceMetadataList(node: NodeInfo): MetadataItem[] {
+  const config = node.configuration as CreateServiceConfiguration | undefined;
   const items: MetadataItem[] = [];
 
   if (config?.region) {
@@ -80,8 +77,14 @@ function describeServiceMetadataList(node: NodeInfo): MetadataItem[] {
   if (config?.cluster) {
     items.push({ icon: "server", label: config.cluster });
   }
-  if (config?.service) {
-    items.push({ icon: "package", label: config.service });
+  if (config?.serviceName) {
+    items.push({ icon: "package", label: config.serviceName });
+  }
+  if (config?.taskDefinition) {
+    items.push({ icon: "list", label: config.taskDefinition });
+  }
+  if (config?.launchType && config.launchType !== "AUTO") {
+    items.push({ icon: "rocket", label: config.launchType });
   }
 
   return items;

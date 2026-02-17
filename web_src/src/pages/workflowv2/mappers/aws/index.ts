@@ -15,9 +15,12 @@ import { deleteRepositoryMapper } from "./codeartifact/delete_repository";
 import { disposePackageVersionsMapper } from "./codeartifact/dispose_package_versions";
 import { updatePackageVersionsStatusMapper } from "./codeartifact/update_package_versions_status";
 import { onAlarmTriggerRenderer } from "./cloudwatch/on_alarm";
+import { createServiceMapper } from "./ecs/create_service";
 import { describeServiceMapper } from "./ecs/describe_service";
+import { executeCommandMapper } from "./ecs/execute_command";
 import { runTaskMapper } from "./ecs/run_task";
 import { stopTaskMapper } from "./ecs/stop_task";
+import { updateServiceMapper } from "./ecs/update_service";
 import { onTopicMessageTriggerRenderer } from "./sns/on_topic_message";
 import { createTopicMapper } from "./sns/create_topic";
 import { deleteTopicMapper } from "./sns/delete_topic";
@@ -27,9 +30,12 @@ import { publishMessageMapper } from "./sns/publish_message";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   "lambda.runFunction": runFunctionMapper,
+  "ecs.createService": createServiceMapper,
   "ecs.describeService": describeServiceMapper,
+  "ecs.executeCommand": executeCommandMapper,
   "ecs.runTask": runTaskMapper,
   "ecs.stopTask": stopTaskMapper,
+  "ecs.updateService": updateServiceMapper,
   "ecr.getImage": getImageMapper,
   "ecr.getImageScanFindings": getImageScanFindingsMapper,
   "ecr.scanImage": scanImageMapper,
@@ -56,9 +62,12 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
+  "ecs.createService": buildActionStateRegistry("created"),
   "ecs.describeService": buildActionStateRegistry("described"),
+  "ecs.executeCommand": buildActionStateRegistry("executed"),
   "ecs.runTask": buildActionStateRegistry("started"),
   "ecs.stopTask": buildActionStateRegistry("stopped"),
+  "ecs.updateService": buildActionStateRegistry("updated"),
   "ecr.getImage": buildActionStateRegistry("retrieved"),
   "ecr.getImageScanFindings": buildActionStateRegistry("retrieved"),
   "ecr.scanImage": buildActionStateRegistry("scanned"),
