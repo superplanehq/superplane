@@ -651,6 +651,22 @@ func (c *Client) ListIncidents(serviceIDs []string) ([]Incident, error) {
 	return response.Incidents, nil
 }
 
+func (c *Client) ResolveIncident(incidentID string, fromEmail string, resolution string) (any, error) {
+	incident, err := c.UpdateIncident(incidentID, fromEmail, "resolved", "", "", "", "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if resolution != "" {
+		err = c.AddIncidentNote(incidentID, fromEmail, resolution)
+		if err != nil {
+			return nil, fmt.Errorf("incident resolved but failed to add resolution note: %v", err)
+		}
+	}
+
+	return incident, nil
+}
+
 type SnoozeIncidentRequest struct {
 	Duration int `json:"duration"` // duration in seconds
 }
