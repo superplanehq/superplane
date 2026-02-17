@@ -58,13 +58,19 @@ export const useOrganization = (organizationId: string) => {
   });
 };
 
-export const useOrganizationUsers = (organizationId: string) => {
+export const useOrganizationUsers = (organizationId: string, includeServiceAccounts = false) => {
   return useQuery({
-    queryKey: organizationKeys.users(organizationId),
+    queryKey: includeServiceAccounts
+      ? [...organizationKeys.users(organizationId), includeServiceAccounts]
+      : organizationKeys.users(organizationId),
     queryFn: async () => {
       const response = await usersListUsers(
         withOrganizationHeader({
-          query: { domainType: "DOMAIN_TYPE_ORGANIZATION", domainId: organizationId },
+          query: {
+            domainType: "DOMAIN_TYPE_ORGANIZATION",
+            domainId: organizationId,
+            includeServiceAccounts,
+          },
         }),
       );
       return response.data?.users || [];
@@ -219,8 +225,13 @@ export const useAssignRole = (organizationId: string) => {
         }),
       );
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) });
+      if (variables.userId) {
+        queryClient.invalidateQueries({ queryKey: ["permissions", organizationId, variables.userId] });
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: ["permissions", organizationId] });
     },
   });
 };

@@ -143,7 +143,7 @@ export function buildBuildingBlockCategories(
       });
     }
 
-    // Only add the category if there are blocks
+    // Only add the category if there are blocks (label is normalized in useAvailableIntegrations)
     if (blocks.length > 0) {
       liveCategories.push({
         name: integration.label || "Unknown Integration",

@@ -14,6 +14,7 @@ import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { formatTimeAgo } from "@/utils/date";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { getComponentBaseMapper } from "@/pages/workflowv2/mappers";
+import { buildExecutionInfo, buildNodeInfo } from "@/pages/workflowv2/utils";
 
 export interface ChildExecution {
   name: string;
@@ -161,8 +162,14 @@ export const ChainItem: React.FC<ChainItemProps> = ({
     }
 
     const mapper = getComponentBaseMapper(item.workflowNode.component.name);
+
     // Pass a marker to indicate this is from ChainItem, so subtitle can skip issue counts
-    const subtitle = mapper.subtitle?.(item.workflowNode, item.originalExecution, { skipIssueCounts: true });
+    const subtitle = mapper.subtitle?.({
+      node: buildNodeInfo(item.workflowNode),
+      execution: buildExecutionInfo(item.originalExecution),
+      additionalData: { skipIssueCounts: true },
+    });
+
     const parts = subtitle ? subtitle.toString().split(" · ") : [];
     if (parts.length > 1) {
       return parts[0];

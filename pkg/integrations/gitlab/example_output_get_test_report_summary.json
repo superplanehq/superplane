@@ -1,0 +1,39 @@
+{
+  "data": {
+    "total": {
+      "time": 152.46,
+      "count": 412,
+      "success": 409,
+      "failed": 2,
+      "skipped": 1,
+      "error": 0,
+      "suite_error": null
+    },
+    "test_suites": [
+      {
+        "name": "backend-rspec",
+        "total_time": 81.27,
+        "total_count": 248,
+        "success_count": 247,
+        "failed_count": 1,
+        "skipped_count": 0,
+        "error_count": 0,
+        "build_ids": [8934210],
+        "suite_error": null
+      },
+      {
+        "name": "frontend-jest",
+        "total_time": 71.19,
+        "total_count": 164,
+        "success_count": 162,
+        "failed_count": 1,
+        "skipped_count": 1,
+        "error_count": 0,
+        "build_ids": [8934211],
+        "suite_error": null
+      }
+    ]
+  },
+  "timestamp": "2026-02-13T19:26:01.000Z",
+  "type": "gitlab.testReportSummary"
+}

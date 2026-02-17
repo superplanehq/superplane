@@ -1,0 +1,17 @@
+{
+  "data": {
+    "id": 9001,
+    "body": "LGTM. Approving after successful CI.",
+    "state": "APPROVED",
+    "submitted_at": "2026-01-25T12:34:56Z",
+    "html_url": "https://github.com/acme/widgets/pull/42#pullrequestreview-9001",
+    "user": {
+      "login": "octocat",
+      "id": 1,
+      "html_url": "https://github.com/octocat"
+    }
+  },
+  "timestamp": "2026-01-25T12:34:56.000000000Z",
+  "type": "github.pullRequestReview"
+}
+

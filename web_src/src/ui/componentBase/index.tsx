@@ -213,6 +213,7 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   iconSlug?: string;
   iconColor?: string;
   title: string;
+  showHeader?: boolean;
   paused?: boolean;
   specs?: ComponentBaseSpec[];
   hideCount?: boolean;
@@ -242,6 +243,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   iconSlug,
   iconColor,
   title,
+  showHeader = true,
   specs,
   collapsed: _collapsed = false,
   collapsedBackground: _collapsedBackground,
@@ -274,7 +276,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   const hasError = error && error.trim() !== "";
   const hasWarning = warning && warning.trim() !== "";
   const hasBadge = hasError || hasWarning;
-  const RunIcon = React.useMemo(() => resolveIcon("play"), []);
   const PauseIcon = React.useMemo(() => resolveIcon("pause"), []);
   const ResumeIcon = React.useMemo(() => resolveIcon("step-forward"), []);
   const DuplicateIcon = React.useMemo(() => resolveIcon("copy"), []);
@@ -297,81 +298,67 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
         data-view-mode={isCompactView ? "compact" : "expanded"}
       >
         <div className="absolute -top-8 right-0 z-10 h-8 w-44 opacity-0" />
-        <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
-          {onRun && (
-            <button
-              type="button"
-              data-testid="node-action-run"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onRun();
-              }}
-              disabled={runDisabled}
-              className="flex items-center gap-1 px-1 py-0.5 text-[13px] font-medium text-gray-500 transition hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <RunIcon className="h-4 w-4" />
-              <span>Run</span>
-            </button>
-          )}
-          {onTogglePause && !hasError && (
-            <button
-              type="button"
-              data-testid="node-action-pause"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onTogglePause();
-              }}
-              className="flex items-center gap-1 px-1 py-0.5 text-[13px] font-medium text-gray-500 transition hover:text-gray-800"
-            >
-              {paused ? <ResumeIcon className="h-4 w-4" /> : <PauseIcon className="h-4 w-4" />}
-              <span>{paused ? "Resume" : "Pause"}</span>
-            </button>
-          )}
-          {onDuplicate && (
-            <button
-              type="button"
-              data-testid="node-action-duplicate"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onDuplicate();
-              }}
-              className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-            >
-              <DuplicateIcon className="h-4 w-4" />
-            </button>
-          )}
-          {onToggleView && (
-            <button
-              type="button"
-              data-testid="node-action-toggle-view"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onToggleView();
-              }}
-              className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-            >
-              <ToggleViewIcon className="h-4 w-4" />
-            </button>
-          )}
-          {onDelete && (
-            <button
-              type="button"
-              data-testid="node-action-delete"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onDelete();
-              }}
-              className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-            >
-              <DeleteIcon className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+        {showHeader ? (
+          <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
+            {onTogglePause && !hasError && (
+              <button
+                type="button"
+                data-testid="node-action-pause"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onTogglePause();
+                }}
+                className="flex items-center gap-1 px-1 py-0.5 text-[13px] font-medium text-gray-500 transition hover:text-gray-800"
+              >
+                {paused ? <ResumeIcon className="h-4 w-4" /> : <PauseIcon className="h-4 w-4" />}
+                <span>{paused ? "Resume" : "Pause"}</span>
+              </button>
+            )}
+            {onDuplicate && (
+              <button
+                type="button"
+                data-testid="node-action-duplicate"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onDuplicate();
+                }}
+                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+              >
+                <DuplicateIcon className="h-4 w-4" />
+              </button>
+            )}
+            {onToggleView && (
+              <button
+                type="button"
+                data-testid="node-action-toggle-view"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onToggleView();
+                }}
+                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+              >
+                <ToggleViewIcon className="h-4 w-4" />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                data-testid="node-action-delete"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onDelete();
+                }}
+                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+              >
+                <DeleteIcon className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        ) : null}
         <ComponentHeader
           iconSrc={iconSrc}
           iconSlug={iconSlug}
@@ -457,7 +444,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
             )}
 
             {customFieldPosition === "before" &&
-              (typeof customField === "function" ? customField(onRun) : customField || null)}
+              (typeof customField === "function" ? customField(runDisabled ? undefined : onRun) : customField || null)}
 
             {eventSections?.map((section, index) => (
               <EventSectionDisplay
@@ -483,7 +470,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
             {includeEmptyState && <EmptyState {...emptyStateProps} />}
 
             {customFieldPosition === "after" &&
-              (typeof customField === "function" ? customField(onRun) : customField || null)}
+              (typeof customField === "function" ? customField(runDisabled ? undefined : onRun) : customField || null)}
           </>
         )}
       </div>

@@ -92,8 +92,8 @@ func TestAccount_UpdateEmail(t *testing.T) {
 
 		user := &User{
 			OrganizationID: orgID,
-			AccountID:      account.ID,
-			Email:          account.Email,
+			AccountID:      &account.ID,
+			Email:          &account.Email,
 			Name:           account.Name,
 		}
 		err = database.Conn().Create(user).Error
@@ -103,8 +103,8 @@ func TestAccount_UpdateEmail(t *testing.T) {
 		require.NoError(t, err)
 		otherUser := &User{
 			OrganizationID: orgID,
-			AccountID:      otherAccount.ID,
-			Email:          otherAccount.Email,
+			AccountID:      &otherAccount.ID,
+			Email:          &otherAccount.Email,
 			Name:           otherAccount.Name,
 		}
 		err = database.Conn().Create(otherUser).Error
@@ -128,13 +128,13 @@ func TestAccount_UpdateEmail(t *testing.T) {
 		var userFromDB User
 		err = database.Conn().Where("id = ?", user.ID).First(&userFromDB).Error
 		require.NoError(t, err)
-		assert.Equal(t, normalizedNewEmail, userFromDB.Email)
+		assert.Equal(t, normalizedNewEmail, userFromDB.GetEmail())
 
 		var otherUserFromDB User
 		err = database.Conn().Where("id = ?", otherUser.ID).First(&otherUserFromDB).Error
 		require.NoError(t, err)
-		assert.Equal(t, otherAccount.Email, otherUserFromDB.Email)
-		assert.NotEqual(t, normalizedNewEmail, otherUserFromDB.Email)
+		assert.Equal(t, otherAccount.Email, otherUserFromDB.GetEmail())
+		assert.NotEqual(t, normalizedNewEmail, otherUserFromDB.GetEmail())
 	})
 
 	t.Run("should normalize email", func(t *testing.T) {
@@ -191,8 +191,8 @@ func TestAccount_UpdateEmailForProvider(t *testing.T) {
 
 		user := &User{
 			OrganizationID: orgID,
-			AccountID:      account.ID,
-			Email:          account.Email,
+			AccountID:      &account.ID,
+			Email:          &account.Email,
 			Name:           account.Name,
 		}
 		err = database.Conn().Create(user).Error
@@ -238,7 +238,7 @@ func TestAccount_UpdateEmailForProvider(t *testing.T) {
 		var userFromDB User
 		err = database.Conn().Where("id = ?", user.ID).First(&userFromDB).Error
 		require.NoError(t, err)
-		assert.Equal(t, normalizedNewEmail, userFromDB.Email)
+		assert.Equal(t, normalizedNewEmail, userFromDB.GetEmail())
 
 		var githubProviderFromDB AccountProvider
 		err = database.Conn().Where("id = ?", githubProvider.ID).First(&githubProviderFromDB).Error

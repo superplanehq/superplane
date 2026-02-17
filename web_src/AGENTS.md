@@ -11,6 +11,11 @@ This document captures the architecture principles, patterns, and workflow for d
 - **No mock data in components**: Mock data belongs in Storybook stories, not in component files
 - **Backward compatibility**: Maintain compatibility where possible when refactoring
 
+### Forms and shadcn
+
+- **Forms**: Always use shadcn components from `@/components/ui` for form UI (Input, Label, Select, Textarea, Checkbox, Switch, Button, Dialog). Do not use raw HTML form elements when an equivalent exists in `@/components/ui`.
+- **New UI patterns**: Before creating a custom component, check `web_src/src/components/ui/` for an existing shadcn component; prefer reusing or composing it over building from scratch.
+
 ### State Management
 
 - **Local state with parent notification**: Components maintain local state and notify parents via callbacks

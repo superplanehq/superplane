@@ -1,6 +1,5 @@
-import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { TriggerRenderer } from "../../types";
+import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
 import { TriggerProps } from "@/ui/trigger";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import { EcrImagePushEvent, EcrTriggerConfiguration, EcrTriggerMetadata } from "./types";
@@ -12,20 +11,20 @@ import { stringOrDash } from "../../utils";
  * Renderer for the "aws.ecr.onImagePush" trigger
  */
 export const onImagePushTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as EcrImagePushEvent;
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+    const eventData = context.event?.data as EcrImagePushEvent;
     const detail = eventData?.detail;
     const repository = getRepositoryLabel(undefined, undefined, detail?.["repository-name"]);
     const tag = detail?.["image-tag"];
 
     const title = repository ? `${repository}${tag ? `:${tag}` : ""}` : "ECR image push";
-    const subtitle = event.createdAt ? formatTimeAgo(new Date(event.createdAt)) : "";
+    const subtitle = context.event?.createdAt ? formatTimeAgo(new Date(context.event?.createdAt || "")) : "";
 
     return { title, subtitle };
   },
 
-  getRootEventValues: (event: CanvasesCanvasEvent): Record<string, string> => {
-    const eventData = event.data?.data as EcrImagePushEvent;
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
+    const eventData = context.event?.data as EcrImagePushEvent;
     const detail = eventData?.detail;
 
     return {
@@ -39,26 +38,27 @@ export const onImagePushTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
+  getTriggerProps: (context: TriggerRendererContext) => {
+    const { node, definition, lastEvent } = context;
     const metadata = node.metadata as EcrTriggerMetadata | undefined;
     const configuration = node.configuration as EcrTriggerConfiguration | undefined;
     const metadataItems = buildRepositoryMetadataItems(metadata, configuration);
 
     const props: TriggerProps = {
-      title: node.name!,
+      title: node.name || definition.label || "Unnamed trigger",
       iconSrc: awsEcrIcon,
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: metadataItems,
     };
 
     if (lastEvent) {
-      const { title, subtitle } = onImagePushTriggerRenderer.getTitleAndSubtitle(lastEvent);
+      const { title, subtitle } = onImagePushTriggerRenderer.getTitleAndSubtitle({ event: lastEvent });
       props.lastEventData = {
         title,
         subtitle,
-        receivedAt: new Date(lastEvent.createdAt!),
+        receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
-        eventId: lastEvent.id!,
+        eventId: lastEvent.id,
       };
     }
 

@@ -1,7 +1,6 @@
-import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent } from "@/api-client";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
-import { TriggerRenderer } from "../types";
+import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
 import { Agent, Incident } from "./types";
@@ -24,11 +23,11 @@ interface OnIncidentEventData {
  * Renderer for the "pagerduty.onIncident" trigger type
  */
 export const onIncidentTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    const eventData = event.data?.data as OnIncidentEventData;
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+    const eventData = context.event?.data?.data as OnIncidentEventData;
     const incident = eventData?.incident;
     const contentParts = [incident?.urgency, incident?.status].filter(Boolean).join(" · ");
-    const subtitle = buildSubtitle(contentParts, event.createdAt);
+    const subtitle = buildSubtitle(contentParts, context.event?.createdAt);
 
     return {
       title: `${incident?.id || ""} - ${incident?.title || ""}`,
@@ -36,12 +35,13 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getRootEventValues: (lastEvent: CanvasesCanvasEvent): Record<string, string> => {
-    const eventData = lastEvent.data?.data as OnIncidentEventData;
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
+    const eventData = context.event?.data?.data as OnIncidentEventData;
     return getDetailsForIncident(eventData?.incident!, eventData?.agent);
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: CanvasesCanvasEvent) => {
+  getTriggerProps: (context: TriggerRendererContext) => {
+    const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as OnIncidentMetadata;
     const configuration = node.configuration as any;
     const metadataItems = [];
@@ -68,14 +68,14 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
     }
 
     const props: TriggerProps = {
-      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
+      title: node.name || definition.label || "Unnamed trigger",
       iconSrc: pdIcon,
-      collapsedBackground: getBackgroundColorClass(trigger.color),
+      collapsedBackground: getBackgroundColorClass(definition.color),
       metadata: metadataItems,
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data?.data as OnIncidentEventData;
+      const eventData = lastEvent.data as OnIncidentEventData;
       const incident = eventData?.incident;
       const contentParts = [incident?.urgency, incident?.status].filter(Boolean).join(" · ");
       const subtitle = buildSubtitle(contentParts, lastEvent.createdAt);
@@ -83,9 +83,9 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
       props.lastEventData = {
         title: `${incident?.id || ""} - ${incident?.title || ""}`,
         subtitle,
-        receivedAt: new Date(lastEvent.createdAt!),
+        receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
-        eventId: lastEvent.id!,
+        eventId: lastEvent.id,
       };
     }
 

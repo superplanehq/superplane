@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 )
 
 var DefaultOutputChannel = OutputChannel{Name: "default", Label: "Default"}
+
+var ErrSecretKeyNotFound = errors.New("secret or key not found")
 
 type Component interface {
 
@@ -149,6 +152,8 @@ type ExecutionContext struct {
 	Auth           AuthContext
 	Integration    IntegrationContext
 	Notifications  NotificationContext
+	Secrets        SecretsContext
+	Webhook        NodeWebhookContext
 }
 
 /*
@@ -174,6 +179,7 @@ type SetupContext struct {
 	Requests      RequestContext
 	Auth          AuthContext
 	Integration   IntegrationContext
+	Webhook       NodeWebhookContext
 }
 
 /*
@@ -247,6 +253,7 @@ type ActionContext struct {
 	Requests       RequestContext
 	Integration    IntegrationContext
 	Notifications  NotificationContext
+	Secrets        SecretsContext
 }
 
 /*
@@ -314,6 +321,10 @@ type NotificationReceivers struct {
 
 type NotificationContext interface {
 	Send(title, body, url, urlLabel string, receivers NotificationReceivers) error
+}
+
+type SecretsContext interface {
+	GetKey(secretName, keyName string) ([]byte, error)
 }
 
 type User struct {

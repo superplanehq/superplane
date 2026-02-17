@@ -40,3 +40,14 @@ div.monaco-editor {
   --vscode-focusBorder: transparent;
 }
 
+/* Reusable 1px 45deg diagonal line pattern (gray-950/10), 8px between lines */
+.bg-stripe-diagonal {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgb(3 7 18 / 0.1) 0,
+    rgb(3 7 18 / 0.1) 1px,
+    transparent 1px,
+    transparent 9px
+  );
+}
+

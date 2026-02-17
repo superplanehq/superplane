@@ -43,14 +43,20 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 	// We must encrypt the sensitive configuration fields before storing
 	//
 	installationID := uuid.New()
+	integrationLogger := logging.ForIntegration(models.Integration{
+		ID:      installationID,
+		AppName: integrationName,
+	})
 	configuration, err := encryptConfigurationIfNeeded(ctx, registry, integration, appConfig.AsMap(), installationID, nil)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to encrypt sensitive configuration: %v", err)
+		integrationLogger.WithError(err).Error("failed to encrypt sensitive configuration")
+		return nil, status.Error(codes.Internal, "failed to encrypt sensitive configuration")
 	}
 
-	newIntegration, err := models.CreateIntegration(installationID, uuid.MustParse(orgID), integrationName, name, configuration)
+	newIntegration, err := models.CreateIntegration(installationID, org, integrationName, name, configuration)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create integration: %v", err)
+		integrationLogger.WithError(err).Error("failed to create integration")
+		return nil, status.Error(codes.Internal, "failed to create integration")
 	}
 
 	integrationCtx := contexts.NewIntegrationContext(
@@ -63,13 +69,12 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 
 	syncErr := integration.Sync(core.SyncContext{
 		Logger:          logging.ForIntegration(*newIntegration),
-		HTTP:            contexts.NewHTTPContext(registry.GetHTTPClient()),
+		HTTP:            registry.HTTPContext(),
 		Integration:     integrationCtx,
 		Configuration:   newIntegration.Configuration.Data(),
 		BaseURL:         baseURL,
 		WebhooksBaseURL: webhooksBaseURL,
 		OrganizationID:  orgID,
-		InstallationID:  newIntegration.ID.String(),
 		OIDC:            oidcProvider,
 	})
 
@@ -87,7 +92,7 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 		}
 	}
 
-	proto, err := serializeIntegration(registry, newIntegration, []models.WorkflowNodeReference{})
+	proto, err := serializeIntegration(registry, newIntegration, []models.CanvasNodeReference{})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to serialize integration: %v", err)
 	}
@@ -97,7 +102,7 @@ func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcPro
 	}, nil
 }
 
-func serializeIntegration(registry *registry.Registry, instance *models.Integration, nodeRefs []models.WorkflowNodeReference) (*pb.Integration, error) {
+func serializeIntegration(registry *registry.Registry, instance *models.Integration, nodeRefs []models.CanvasNodeReference) (*pb.Integration, error) {
 	integration, err := registry.GetIntegration(instance.AppName)
 	if err != nil {
 		return nil, err
@@ -145,10 +150,10 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 
 	for _, nodeRef := range nodeRefs {
 		proto.Status.UsedIn = append(proto.Status.UsedIn, &pb.Integration_NodeRef{
-			WorkflowId:   nodeRef.WorkflowID.String(),
-			WorkflowName: nodeRef.WorkflowName,
-			NodeId:       nodeRef.NodeID,
-			NodeName:     nodeRef.NodeName,
+			CanvasId:   nodeRef.CanvasID.String(),
+			CanvasName: nodeRef.CanvasName,
+			NodeId:     nodeRef.NodeID,
+			NodeName:   nodeRef.NodeName,
 		})
 	}
 

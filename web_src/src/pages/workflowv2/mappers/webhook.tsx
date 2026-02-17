@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { ComponentsNode, TriggersTrigger, CanvasesCanvasEvent, canvasesInvokeNodeTriggerAction } from "@/api-client";
+import { canvasesInvokeNodeTriggerAction } from "@/api-client";
 import { getColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
-import { TriggerRenderer, CustomFieldRenderer } from "./types";
+import { TriggerRenderer, CustomFieldRenderer, NodeInfo, TriggerRendererContext, TriggerEventContext } from "./types";
 import { TriggerProps } from "@/ui/trigger";
 import { Icon } from "@/components/Icon";
 import { useQueryClient } from "@tanstack/react-query";
@@ -55,33 +55,31 @@ interface WebhookEventData {
   headers?: Record<string, string>;
 }
 
-function getWebhookEventTitle(event: CanvasesCanvasEvent): string {
+function getWebhookEventTitle(context: TriggerEventContext): string {
   // Check for run_name in the webhook request body
-  const runName = (event.data?.data as { body?: { run_name?: string } })?.body?.run_name;
+  const runName = (context.event?.data?.data as { body?: { run_name?: string } })?.body?.run_name;
   if (runName) {
     return `${runName}`;
   }
 
   // Fallback to method and date
-  return `Webhook from ${event.nodeId}`;
+  return `Webhook ${context.event?.id} at ${new Date(context.event?.createdAt || "").toLocaleString()}`;
 }
 
 /**
  * Renderer for the "webhook" trigger type
  */
 export const webhookTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (event: CanvasesCanvasEvent): { title: string; subtitle: string } => {
-    const eventDate = new Date(event.createdAt!);
-
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
     return {
-      title: getWebhookEventTitle(event),
-      subtitle: formatTimeAgo(eventDate),
+      title: getWebhookEventTitle(context),
+      subtitle: formatTimeAgo(new Date(context.event?.createdAt || "")),
     };
   },
 
-  getRootEventValues: (event: CanvasesCanvasEvent): Record<string, string> => {
-    const webhookData = event.data?._webhook as WebhookEventData | undefined;
-    const receivedOn = (event.data?.["timestamp"] as string) || event.createdAt;
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
+    const webhookData = context.event?.data?._webhook as WebhookEventData | undefined;
+    const receivedOn = (context.event?.data?.["timestamp"] as string) || context.event?.createdAt;
     const values: Record<string, string> = {
       "Received on": receivedOn ? new Date(receivedOn).toLocaleString() : "n/a",
       Response: "200",
@@ -110,13 +108,14 @@ export const webhookTriggerRenderer: TriggerRenderer = {
     return values;
   },
 
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent?: CanvasesCanvasEvent) => {
+  getTriggerProps: (context: TriggerRendererContext) => {
+    const { node, definition, lastEvent } = context;
     const metadata = node.metadata as WebhookMetadata | undefined;
     const configuration = node.configuration as WebhookConfiguration | undefined;
 
     const props: TriggerProps = {
-      title: node.name || trigger.label || trigger.name || "Unnamed trigger",
-      iconSlug: trigger.icon || "webhook",
+      title: node.name || definition.label || "Unnamed trigger",
+      iconSlug: definition.icon || "webhook",
       iconColor: getColorClass("black"),
       collapsedBackground: "bg-white",
       metadata: [
@@ -132,14 +131,14 @@ export const webhookTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventDate = new Date(lastEvent.createdAt!);
+      const eventDate = new Date(lastEvent.createdAt);
 
       props.lastEventData = {
-        title: getWebhookEventTitle(lastEvent),
+        title: getWebhookEventTitle({ event: lastEvent }),
         subtitle: formatTimeAgo(eventDate),
         receivedAt: eventDate,
         state: "triggered",
-        eventId: lastEvent.id!,
+        eventId: lastEvent.id,
       };
     }
 
@@ -294,9 +293,9 @@ const ResetAuthButton: React.FC<{
  * Custom field renderer for webhook component configuration
  */
 export const webhookCustomFieldRenderer: CustomFieldRenderer = {
-  render: (node: ComponentsNode, configuration: Record<string, unknown>) => {
+  render: (node: NodeInfo) => {
     const metadata = node.metadata as WebhookMetadata | undefined;
-    const config = configuration as WebhookConfiguration | undefined;
+    const config = node.configuration as WebhookConfiguration | undefined;
     const authMethod = config?.authentication || "none";
     const webhookUrl = metadata?.url || "[URL GENERATED ONCE THE CANVAS IS SAVED]";
 

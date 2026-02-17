@@ -108,13 +108,12 @@ func (w *IntegrationRequestWorker) syncIntegration(tx *gorm.DB, request *models.
 	integrationCtx := contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry)
 	syncErr := integration.Sync(core.SyncContext{
 		Logger:          logging.ForIntegration(*instance),
-		HTTP:            contexts.NewHTTPContext(w.registry.GetHTTPClient()),
+		HTTP:            w.registry.HTTPContext(),
 		Integration:     integrationCtx,
 		Configuration:   instance.Configuration.Data(),
 		BaseURL:         w.baseURL,
 		WebhooksBaseURL: w.webhooksBaseURL,
 		OrganizationID:  instance.OrganizationID.String(),
-		InstallationID:  instance.ID.String(),
 		OIDC:            w.oidcProvider,
 	})
 
@@ -153,7 +152,7 @@ func (w *IntegrationRequestWorker) invokeIntegrationAction(tx *gorm.DB, request 
 		Configuration:   integration.Configuration.Data(),
 		Logger:          logger,
 		Integration:     integrationCtx,
-		HTTP:            contexts.NewHTTPContext(w.registry.GetHTTPClient()),
+		HTTP:            w.registry.HTTPContext(),
 	}
 
 	err = integrationImpl.HandleAction(actionCtx)

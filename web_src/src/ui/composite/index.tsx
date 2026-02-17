@@ -50,6 +50,7 @@ export interface CompositeProps extends ComponentActionsProps {
   iconSlug?: string;
   iconColor?: string;
   title: string;
+  showHeader?: boolean;
   metadata?: MetadataItem[];
   parameters?: ParameterGroup[];
   lastRunItem?: LastRunItem;
@@ -75,6 +76,7 @@ export const Composite: React.FC<CompositeProps> = ({
   iconSlug,
   iconColor,
   title,
+  showHeader,
   metadata,
   parameters = [],
   lastRunItem,
@@ -205,6 +207,7 @@ export const Composite: React.FC<CompositeProps> = ({
       iconSlug={iconSlug}
       iconColor={iconColor}
       title={title}
+      showHeader={showHeader}
       metadata={metadata}
       specs={specs}
       eventSections={eventSections}

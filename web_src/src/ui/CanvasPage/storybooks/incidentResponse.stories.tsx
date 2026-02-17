@@ -31,11 +31,11 @@ const incidentResponseNodes: Node[] = [
     id: "datadog-alert-trigger",
     position: { x: 0, y: 0 },
     data: {
-      label: "Datadog Alert",
+      label: "DataDog Alert",
       state: "working",
       type: "trigger",
       trigger: {
-        title: "Datadog Alert",
+        title: "DataDog Alert",
         iconSrc: datadogIcon,
         collapsedBackground: "bg-purple-600",
         metadata: [

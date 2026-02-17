@@ -25,6 +25,7 @@ services:
       # Ensure Go build cache initializes in a writable, persisted location
       # This fixes: "failed to initialize build cache at /.cache/go-build: permission denied"
       # and keeps the cache across container restarts (since /app is bind-mounted)
+      GOMODCACHE: "/app/tmp/go/pkg/mod"
       GOCACHE: "/app/tmp/go-build"
       XDG_CACHE_HOME: "/app/tmp"
       # Lock Playwright browsers location so install and runtime match
@@ -77,7 +78,6 @@ services:
       OTEL_SERVICE_NAME: "superplane-dev"
       OWNER_SETUP_ENABLED: "yes"
       VITE_ENABLE_CUSTOM_COMPONENTS: "true"
-      VITE_RBAC_ENABLED: "true"
 
     ports:
       - ${VITE_DEV_PORT:-5173}:${VITE_DEV_PORT:-5173}

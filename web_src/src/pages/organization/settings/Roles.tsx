@@ -1,12 +1,15 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { RolesRole } from "../../../api-client/types.gen";
+import { AuthorizationPermission, RolesRole } from "../../../api-client/types.gen";
 import { Icon } from "../../../components/Icon";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
 import { useDeleteRole, useOrganizationRoles } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
+import { PermissionTooltip } from "@/components/PermissionGate";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { showErrorToast } from "@/utils/toast";
+import { isCustomComponentsEnabled } from "@/lib/env";
 
 interface RolesProps {
   organizationId: string;
@@ -14,21 +17,32 @@ interface RolesProps {
 
 export function Roles({ organizationId }: RolesProps) {
   const navigate = useNavigate();
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
   // Use React Query hooks for data fetching
   const { data: roles = [], isLoading: loadingRoles, error } = useOrganizationRoles(organizationId);
 
   // Mutation for role deletion
   const deleteRoleMutation = useDeleteRole(organizationId);
+  const canCreateRoles = canAct("roles", "create");
+  const canUpdateRoles = canAct("roles", "update");
+  const canDeleteRoles = canAct("roles", "delete");
 
   const handleCreateRole = () => {
+    if (!canCreateRoles) return;
     navigate(`/${organizationId}/settings/create-role`);
   };
 
   const handleEditRole = (role: RolesRole) => {
+    if (!canUpdateRoles) return;
+    navigate(`/${organizationId}/settings/create-role/${role.metadata?.name}`);
+  };
+
+  const handleViewRole = (role: RolesRole) => {
     navigate(`/${organizationId}/settings/create-role/${role.metadata?.name}`);
   };
 
   const handleDeleteRole = async (role: RolesRole) => {
+    if (!canDeleteRoles) return;
     if (!role.metadata?.name) return;
 
     const confirmed = window.confirm(
@@ -87,6 +101,15 @@ export function Roles({ organizationId }: RolesProps) {
     return getSortedData(roles);
   }, [roles]);
 
+  const filterCustomComponetsPermissions = useCallback(
+    (permissions: AuthorizationPermission[]) => {
+      return permissions.filter((permission) =>
+        permission.resource === "blueprints" ? isCustomComponentsEnabled() : true,
+      );
+    },
+    [isCustomComponentsEnabled],
+  );
+
   return (
     <div className="space-y-6 pt-6">
       {error && (
@@ -97,10 +120,15 @@ export function Roles({ organizationId }: RolesProps) {
 
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
         <div className="px-6 pt-6 pb-4 flex items-center justify-start">
-          <Button className="flex items-center" onClick={handleCreateRole}>
-            <Icon name="plus" />
-            New Organization Role
-          </Button>
+          <PermissionTooltip
+            allowed={canCreateRoles || permissionsLoading}
+            message="You don't have permission to create roles."
+          >
+            <Button className="flex items-center" onClick={handleCreateRole} disabled={!canCreateRoles}>
+              <Icon name="plus" />
+              New Organization Role
+            </Button>
+          </PermissionTooltip>
         </div>
         <div className="px-6 pb-6">
           {loadingRoles ? (
@@ -129,45 +157,75 @@ export function Roles({ organizationId }: RolesProps) {
                     return (
                       <TableRow key={role.metadata?.name || index} className="last:[&>td]:border-b-0">
                         <TableCell className="font-semibold">{role.spec?.displayName || role.metadata?.name}</TableCell>
-                        <TableCell>{role.spec?.permissions?.length || 0}</TableCell>
+                        <TableCell>
+                          {filterCustomComponetsPermissions(role.spec?.permissions || []).length || 0}
+                        </TableCell>
                         <TableCell>
                           <div className="flex justify-end">
                             {isDefault ? (
-                              <span className="text-xs text-gray-700 dark:text-gray-400 px-2 py-1 bg-gray-200 dark:bg-gray-800 rounded">
-                                Default Role
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-700 dark:text-gray-400 px-2 py-1 bg-gray-200 dark:bg-gray-800 rounded">
+                                  Default Role
+                                </span>
+                                <TooltipProvider delayDuration={200}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleViewRole(role)}
+                                        className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors dark:text-gray-100 dark:hover:bg-gray-800"
+                                        aria-label="View role"
+                                      >
+                                        <Icon name="eye" size="sm" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">View Permissions</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
                             ) : (
                               <TooltipProvider delayDuration={200}>
                                 <div className="flex items-center gap-1">
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleEditRole(role)}
-                                        className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors dark:text-gray-100 dark:hover:bg-gray-800"
-                                        aria-label="Edit role"
-                                      >
-                                        <Icon name="edit" size="sm" />
-                                      </button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top">Edit Role</TooltipContent>
-                                  </Tooltip>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDeleteRole(role)}
-                                        className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors dark:text-gray-100 dark:hover:bg-gray-800"
-                                        aria-label="Delete role"
-                                        disabled={deleteRoleMutation.isPending}
-                                      >
-                                        <Icon name="trash-2" size="sm" />
-                                      </button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top">
-                                      {deleteRoleMutation.isPending ? "Deleting..." : "Delete Role"}
-                                    </TooltipContent>
-                                  </Tooltip>
+                                  <PermissionTooltip
+                                    allowed={canUpdateRoles || permissionsLoading}
+                                    message="You don't have permission to update roles."
+                                  >
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleEditRole(role)}
+                                          className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors dark:text-gray-100 dark:hover:bg-gray-800"
+                                          aria-label="Edit role"
+                                          disabled={!canUpdateRoles}
+                                        >
+                                          <Icon name="edit" size="sm" />
+                                        </button>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top">Edit Role</TooltipContent>
+                                    </Tooltip>
+                                  </PermissionTooltip>
+                                  <PermissionTooltip
+                                    allowed={canDeleteRoles || permissionsLoading}
+                                    message="You don't have permission to delete roles."
+                                  >
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteRole(role)}
+                                          className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors dark:text-gray-100 dark:hover:bg-gray-800"
+                                          aria-label="Delete role"
+                                          disabled={deleteRoleMutation.isPending || !canDeleteRoles}
+                                        >
+                                          <Icon name="trash-2" size="sm" />
+                                        </button>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top">
+                                        {deleteRoleMutation.isPending ? "Deleting..." : "Delete Role"}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </PermissionTooltip>
                                 </div>
                               </TooltipProvider>
                             )}

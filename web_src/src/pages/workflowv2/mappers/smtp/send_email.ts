@@ -1,10 +1,12 @@
 import {
-  ComponentsComponent,
-  ComponentsNode,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
-import { ComponentBaseMapper, OutputPayload } from "../types";
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  OutputPayload,
+  SubtitleContext,
+} from "../types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
@@ -25,33 +27,31 @@ interface SendEmailMetadata {
 }
 
 export const sendEmailMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    _items?: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
-    const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const componentName = componentDefinition.name || node.component?.name || "unknown";
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+    const componentName = context.componentDefinition.name || "unknown";
 
     return {
-      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
+      title:
+        context.node.name ||
+        context.componentDefinition.label ||
+        context.componentDefinition.name ||
+        "Unnamed component",
       iconSrc: smtpIcon,
       iconSlug: "smtp",
-      iconColor: getColorClass(componentDefinition.color),
-      collapsedBackground: getBackgroundColorClass(componentDefinition.color),
-      collapsed: node.isCollapsed,
-      eventSections: lastExecution ? sendEmailEventSections(nodes, lastExecution, componentName) : undefined,
+      iconColor: getColorClass(context.componentDefinition.color),
+      collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
+      collapsed: context.node.isCollapsed,
+      eventSections: lastExecution ? sendEmailEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
-      metadata: sendEmailMetadataList(node),
-      specs: sendEmailSpecs(node),
+      metadata: sendEmailMetadataList(context.node),
+      specs: sendEmailSpecs(context.node),
       eventStateMap: getStateMap(componentName),
     };
   },
 
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, string> {
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
 
     return {
@@ -62,13 +62,13 @@ export const sendEmailMapper: ComponentBaseMapper = {
       Subject: stringOrDash(result?.subject),
     };
   },
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): string {
-    if (!execution.createdAt) return "";
-    return formatTimeAgo(new Date(execution.createdAt));
+  subtitle(context: SubtitleContext): string {
+    if (!context.execution.createdAt) return "";
+    return formatTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
-function sendEmailMetadataList(node: ComponentsNode): MetadataItem[] {
+function sendEmailMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as SendEmailMetadata | undefined;
   const configuration = node.configuration as SendEmailConfiguration | undefined;
@@ -82,7 +82,7 @@ function sendEmailMetadataList(node: ComponentsNode): MetadataItem[] {
   return metadata;
 }
 
-function sendEmailSpecs(node: ComponentsNode): ComponentBaseSpec[] {
+function sendEmailSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
   const configuration = node.configuration as SendEmailConfiguration | undefined;
 
@@ -100,14 +100,10 @@ function sendEmailSpecs(node: ComponentsNode): ComponentBaseSpec[] {
   return specs;
 }
 
-function sendEmailEventSections(
-  nodes: ComponentsNode[],
-  execution: CanvasesCanvasNodeExecution,
-  componentName: string,
-): EventSection[] {
+function sendEmailEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [
     {

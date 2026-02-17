@@ -2,7 +2,6 @@ package ecr
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
@@ -14,12 +13,10 @@ func ListRepositories(ctx core.ListResourcesContext, resourceType string) ([]cor
 		return nil, err
 	}
 
-	region := common.RegionFromInstallation(ctx.Integration)
-	if strings.TrimSpace(region) == "" {
+	region := ctx.Parameters["region"]
+	if region == "" {
 		return nil, fmt.Errorf("region is required")
 	}
-
-	ctx.Logger.Infof("listing ECR repositories in region %s", region)
 
 	client := NewClient(ctx.HTTP, creds, region)
 	repositories, err := client.ListRepositories()

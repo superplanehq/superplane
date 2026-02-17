@@ -2,22 +2,21 @@ package registry
 
 import (
 	"fmt"
-	"net/http"
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 )
 
 var (
-	registeredComponents   = make(map[string]core.Component)
-	registeredTriggers     = make(map[string]core.Trigger)
-	registeredIntegrations = make(map[string]core.Integration)
-	registeredWidgets      = make(map[string]core.Widget)
-	mu                     sync.RWMutex
+	registeredComponents      = make(map[string]core.Component)
+	registeredTriggers        = make(map[string]core.Trigger)
+	registeredIntegrations    = make(map[string]core.Integration)
+	registeredWebhookHandlers = make(map[string]core.WebhookHandler)
+	registeredWidgets         = make(map[string]core.Widget)
+	mu                        sync.RWMutex
 )
 
 func RegisterComponent(name string, c core.Component) {
@@ -38,34 +37,54 @@ func RegisterIntegration(name string, i core.Integration) {
 	registeredIntegrations[name] = i
 }
 
+func RegisterIntegrationWithWebhookHandler(name string, i core.Integration, h core.WebhookHandler) {
+	mu.Lock()
+	defer mu.Unlock()
+	registeredIntegrations[name] = i
+	registeredWebhookHandlers[name] = h
+}
+
 func RegisterWidget(name string, w core.Widget) {
 	mu.Lock()
 	defer mu.Unlock()
 	registeredWidgets[name] = w
 }
 
-type Registry struct {
-	httpClient   *http.Client
-	Encryptor    crypto.Encryptor
-	Integrations map[string]core.Integration
-	Components   map[string]core.Component
-	Triggers     map[string]core.Trigger
-	Widgets      map[string]core.Widget
+type IntegrationRegistration struct {
+	Name           string
+	Integration    core.Integration
+	WebhookHandler core.WebhookHandler
 }
 
-func NewRegistry(encryptor crypto.Encryptor) *Registry {
+type Registry struct {
+	httpCtx         *HTTPContext
+	Encryptor       crypto.Encryptor
+	Integrations    map[string]core.Integration
+	WebhookHandlers map[string]core.WebhookHandler
+	Components      map[string]core.Component
+	Triggers        map[string]core.Trigger
+	Widgets         map[string]core.Widget
+}
+
+func NewRegistry(encryptor crypto.Encryptor, httpOptions HTTPOptions) (*Registry, error) {
+	httpCtx, err := NewHTTPContext(httpOptions)
+	if err != nil {
+		return nil, err
+	}
+
 	r := &Registry{
-		Encryptor:    encryptor,
-		httpClient:   &http.Client{Timeout: 30 * time.Second},
-		Components:   map[string]core.Component{},
-		Triggers:     map[string]core.Trigger{},
-		Integrations: map[string]core.Integration{},
-		Widgets:      map[string]core.Widget{},
+		Encryptor:       encryptor,
+		httpCtx:         httpCtx,
+		Components:      map[string]core.Component{},
+		Triggers:        map[string]core.Trigger{},
+		Integrations:    map[string]core.Integration{},
+		WebhookHandlers: map[string]core.WebhookHandler{},
+		Widgets:         map[string]core.Widget{},
 	}
 
 	r.Init()
 
-	return r
+	return r, nil
 }
 
 func (r *Registry) Init() {
@@ -87,6 +106,10 @@ func (r *Registry) Init() {
 		r.Integrations[name] = NewPanicableIntegration(integration)
 	}
 
+	for name, webhookHandler := range registeredWebhookHandlers {
+		r.WebhookHandlers[name] = NewPanicableWebhookHandler(webhookHandler)
+	}
+
 	//
 	// Widgets are not required to be panicable, since they just carry Configuration data
 	// and no logic is executed.
@@ -96,8 +119,8 @@ func (r *Registry) Init() {
 	}
 }
 
-func (r *Registry) GetHTTPClient() *http.Client {
-	return r.httpClient
+func (r *Registry) HTTPContext() *HTTPContext {
+	return r.httpCtx
 }
 
 func (r *Registry) ListTriggers() []core.Trigger {
@@ -192,6 +215,15 @@ func (r *Registry) GetIntegration(name string) (core.Integration, error) {
 	}
 
 	return integration, nil
+}
+
+func (r *Registry) GetWebhookHandler(name string) (core.WebhookHandler, error) {
+	webhookHandler, ok := r.WebhookHandlers[name]
+	if !ok {
+		return nil, fmt.Errorf("webhook handler %s not registered", name)
+	}
+
+	return webhookHandler, nil
 }
 
 func (r *Registry) ListIntegrations() []core.Integration {

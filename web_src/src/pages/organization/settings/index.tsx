@@ -14,28 +14,35 @@ import { Members } from "./Members";
 import { Integrations } from "./Integrations";
 import { IntegrationDetails } from "./IntegrationDetails";
 import { Secrets } from "./Secrets";
+import { SecretDetail } from "./SecretDetail";
+import { ServiceAccounts } from "./ServiceAccounts";
+import { ServiceAccountDetail } from "./ServiceAccountDetail";
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { cn } from "@/lib/utils";
 import {
-  AppWindow,
   ArrowRightLeft,
+  Bot,
   CircleUser,
   Home,
   Key,
+  Lock,
   LogOut,
+  Plug,
   Settings,
   Shield,
   User as UserIcon,
   Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { isRBACEnabled } from "@/lib/env";
+import { usePermissions } from "@/contexts/PermissionsContext";
+import { PermissionTooltip, RequirePermission } from "@/components/PermissionGate";
 
 export function OrganizationSettings() {
   const navigate = useNavigate();
   const location = useLocation();
   const { account: user, loading: userLoading } = useAccount();
   const { organizationId } = useParams<{ organizationId: string }>();
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
 
   // Use React Query hook for organization data
   const { data: organization, isLoading: loading, error } = useOrganization(organizationId || "");
@@ -80,9 +87,19 @@ export function OrganizationSettings() {
     href?: string;
     action?: () => void;
     Icon: LucideIcon;
+    permission?: { resource: string; action: string };
   };
 
-  const sectionIds = ["profile", "general", "members", "groups", "roles", "integrations", "secrets"];
+  const sectionIds = [
+    "profile",
+    "general",
+    "members",
+    "groups",
+    "roles",
+    "integrations",
+    "secrets",
+    "service-accounts",
+  ];
   const pathSegments = location.pathname?.split("/").filter(Boolean) || [];
   const settingsIndex = pathSegments.indexOf("settings");
   const segmentsAfterSettings = settingsIndex >= 0 ? pathSegments.slice(settingsIndex + 1) : [];
@@ -100,15 +117,62 @@ export function OrganizationSettings() {
   const userEmail = user?.email || "";
 
   const organizationLinks: NavLink[] = [
-    { id: "canvases", label: "Canvases", href: `/${organizationId}`, Icon: Home },
-    { id: "general", label: "Settings", href: `/${organizationId}/settings/general`, Icon: Settings },
-    { id: "members", label: "Members", href: `/${organizationId}/settings/members`, Icon: UserIcon },
-    { id: "groups", label: "Groups", href: `/${organizationId}/settings/groups`, Icon: Users },
-    ...(isRBACEnabled()
-      ? [{ id: "roles", label: "Roles", href: `/${organizationId}/settings/roles`, Icon: Shield }]
-      : []),
-    { id: "integrations", label: "Integrations", href: `/${organizationId}/settings/integrations`, Icon: AppWindow },
-    { id: "secrets", label: "Secrets", href: `/${organizationId}/settings/secrets`, Icon: Key },
+    {
+      id: "canvases",
+      label: "Canvases",
+      href: `/${organizationId}`,
+      Icon: Home,
+      permission: { resource: "canvases", action: "read" },
+    },
+    {
+      id: "general",
+      label: "Settings",
+      href: `/${organizationId}/settings/general`,
+      Icon: Settings,
+      permission: { resource: "org", action: "read" },
+    },
+    {
+      id: "members",
+      label: "Members",
+      href: `/${organizationId}/settings/members`,
+      Icon: UserIcon,
+      permission: { resource: "members", action: "read" },
+    },
+    {
+      id: "service-accounts",
+      label: "Service Accounts",
+      href: `/${organizationId}/settings/service-accounts`,
+      Icon: Bot,
+      permission: { resource: "service_accounts", action: "read" },
+    },
+    {
+      id: "groups",
+      label: "Groups",
+      href: `/${organizationId}/settings/groups`,
+      Icon: Users,
+      permission: { resource: "groups", action: "read" },
+    },
+    {
+      id: "roles",
+      label: "Roles",
+      href: `/${organizationId}/settings/roles`,
+      Icon: Shield,
+      permission: { resource: "roles", action: "read" },
+    },
+    {
+      id: "integrations",
+      label: "Integrations",
+      href: `/${organizationId}/settings/integrations`,
+      Icon: Plug,
+      permission: { resource: "integrations", action: "read" },
+    },
+    {
+      id: "secrets",
+      label: "Secrets",
+      href: `/${organizationId}/settings/secrets`,
+      Icon: Key,
+      permission: { resource: "secrets", action: "read" },
+    },
     { id: "change-org", label: "Change Organization", href: "/", Icon: ArrowRightLeft },
   ];
 
@@ -118,6 +182,10 @@ export function OrganizationSettings() {
   ];
 
   const handleLinkClick = (link: NavLink) => {
+    if (link.permission && !permissionsLoading && !canAct(link.permission.resource, link.permission.action)) {
+      return;
+    }
+
     if (link.action) {
       link.action();
       return;
@@ -145,7 +213,16 @@ export function OrganizationSettings() {
     if (link.id === "secrets" && currentSection === "secrets") {
       return true;
     }
+    if (link.id === "service-accounts" && currentSection === "service-accounts") {
+      return true;
+    }
     return currentSection === link.id;
+  };
+
+  const canAccessLink = (link: NavLink) => {
+    if (!link.permission) return true;
+    if (permissionsLoading) return true;
+    return canAct(link.permission.resource, link.permission.action);
   };
 
   const sectionMeta: Record<
@@ -179,6 +256,10 @@ export function OrganizationSettings() {
       title: "Secrets",
       description: "Store and manage secrets.",
     },
+    "service-accounts": {
+      title: "Service Accounts",
+      description: "Create and manage service accounts for programmatic API access.",
+    },
     profile: {
       title: "Profile",
       description: "Update your personal account information and preferences.",
@@ -211,28 +292,49 @@ export function OrganizationSettings() {
               </p>
               <p className="mt-2 text-sm font-semibold text-gray-800 dark:text-white truncate">{organizationName}</p>
               <div className="mt-3 flex flex-col">
-                {organizationLinks.map((link) => (
-                  <button
-                    key={link.id}
-                    type="button"
-                    onClick={() => handleLinkClick(link)}
-                    className={cn(
-                      "group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium transition",
-                      isLinkActive(link)
-                        ? "bg-sky-100 text-gray-800 dark:bg-sky-800/40 dark:text-white"
-                        : "text-gray-500 dark:text-gray-300 hover:bg-sky-100 hover:text-gray-900 dark:hover:bg-gray-800",
-                    )}
-                  >
-                    <link.Icon
-                      size={16}
+                {organizationLinks.map((link) => {
+                  const allowed = canAccessLink(link);
+                  const linkButton = (
+                    <button
+                      key={link.id}
+                      type="button"
+                      onClick={() => handleLinkClick(link)}
+                      disabled={!allowed}
                       className={cn(
-                        "text-gray-500 transition group-hover:text-gray-900 dark:group-hover:text-white",
-                        isLinkActive(link) && "text-gray-800 dark:text-white",
+                        "group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium transition",
+                        isLinkActive(link)
+                          ? "bg-sky-100 text-gray-800 dark:bg-sky-800/40 dark:text-white"
+                          : "text-gray-500 dark:text-gray-300 hover:bg-sky-100 hover:text-gray-900 dark:hover:bg-gray-800",
+                        !allowed && "opacity-60 cursor-not-allowed hover:bg-transparent hover:text-gray-500",
                       )}
-                    />
-                    <span className="truncate">{link.label}</span>
-                  </button>
-                ))}
+                    >
+                      <link.Icon
+                        size={16}
+                        className={cn(
+                          "text-gray-500 transition group-hover:text-gray-900 dark:group-hover:text-white",
+                          isLinkActive(link) && "text-gray-800 dark:text-white",
+                        )}
+                      />
+                      <span className="truncate">{link.label}</span>
+                      {!allowed && <Lock size={12} className="ml-auto text-gray-400" />}
+                    </button>
+                  );
+
+                  if (allowed) {
+                    return linkButton;
+                  }
+
+                  return (
+                    <PermissionTooltip
+                      key={link.id}
+                      allowed={false}
+                      message={`You don't have permission to view ${link.label.toLowerCase()}.`}
+                      className="w-full"
+                    >
+                      {linkButton}
+                    </PermissionTooltip>
+                  );
+                })}
               </div>
             </div>
           </SidebarSection>
@@ -286,26 +388,99 @@ export function OrganizationSettings() {
             <Route
               path="general"
               element={
-                organization ? (
-                  <General organization={organization} />
-                ) : (
-                  <div className="flex justify-center items-center h-32">
-                    <p className="text-gray-500 dark:text-gray-400">Loading...</p>
-                  </div>
-                )
+                <RequirePermission resource="org" action="read">
+                  {organization ? (
+                    <General organization={organization} />
+                  ) : (
+                    <div className="flex justify-center items-center h-32">
+                      <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+                    </div>
+                  )}
+                </RequirePermission>
               }
             />
-            <Route path="members" element={<Members organizationId={organizationId || ""} />} />
-            <Route path="groups" element={<Groups organizationId={organizationId || ""} />} />
-            <Route path="roles" element={<Roles organizationId={organizationId || ""} />} />
-            <Route path="integrations" element={<Integrations organizationId={organizationId || ""} />} />
+            <Route
+              path="members"
+              element={
+                <RequirePermission resource="members" action="read">
+                  <Members organizationId={organizationId || ""} />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="groups"
+              element={
+                <RequirePermission resource="groups" action="read">
+                  <Groups organizationId={organizationId || ""} />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="roles"
+              element={
+                <RequirePermission resource="roles" action="read">
+                  <Roles organizationId={organizationId || ""} />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="integrations"
+              element={
+                <RequirePermission resource="integrations" action="read">
+                  <Integrations organizationId={organizationId || ""} />
+                </RequirePermission>
+              }
+            />
             <Route
               path="integrations/:integrationId"
-              element={<IntegrationDetails organizationId={organizationId || ""} />}
+              element={
+                <RequirePermission resource="integrations" action="read">
+                  <IntegrationDetails organizationId={organizationId || ""} />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="secrets"
+              element={
+                <RequirePermission resource="secrets" action="read">
+                  <Secrets organizationId={organizationId || ""} />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="groups/:groupName/members"
+              element={
+                <RequirePermission resource="groups" action="read">
+                  <GroupMembersPage />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="create-group"
+              element={
+                <RequirePermission resource="groups" action="create">
+                  <CreateGroupPage />
+                </RequirePermission>
+              }
             />
             <Route path="secrets" element={<Secrets organizationId={organizationId || ""} />} />
-            <Route path="groups/:groupName/members" element={<GroupMembersPage />} />
-            <Route path="create-group" element={<CreateGroupPage />} />
+            <Route path="secrets/:secretId" element={<SecretDetail organizationId={organizationId || ""} />} />
+            <Route
+              path="service-accounts"
+              element={
+                <RequirePermission resource="service_accounts" action="read">
+                  <ServiceAccounts organizationId={organizationId || ""} />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="service-accounts/:id"
+              element={
+                <RequirePermission resource="service_accounts" action="read">
+                  <ServiceAccountDetail organizationId={organizationId || ""} />
+                </RequirePermission>
+              }
+            />
             <Route path="create-role" element={<CreateRolePage />} />
             <Route path="create-role/:roleName" element={<CreateRolePage />} />
             <Route path="profile" element={<Profile />} />

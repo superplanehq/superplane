@@ -156,6 +156,7 @@ func resourceTypeOptionsToProto(opts *configuration.ResourceTypeOptions) *config
 		Type:           opts.Type,
 		UseNameAsValue: opts.UseNameAsValue,
 		Multi:          opts.Multi,
+		Parameters:     parameterRefsToProto(opts.Parameters),
 	}
 }
 
@@ -169,6 +170,11 @@ func listTypeOptionsToProto(opts *configuration.ListTypeOptions) *configpb.ListT
 		ItemDefinition: &configpb.ListItemDefinition{
 			Type: opts.ItemDefinition.Type,
 		},
+	}
+
+	if opts.MaxItems != nil {
+		maxItems := int32(*opts.MaxItems)
+		pbOpts.MaxItems = &maxItems
 	}
 
 	if len(opts.ItemDefinition.Schema) > 0 {
@@ -441,7 +447,58 @@ func protoToResourceTypeOptions(pbOpts *configpb.ResourceTypeOptions) *configura
 		Type:           pbOpts.Type,
 		UseNameAsValue: pbOpts.UseNameAsValue,
 		Multi:          pbOpts.Multi,
+		Parameters:     protoToParameterRefs(pbOpts.Parameters),
 	}
+}
+
+func parameterRefsToProto(params []configuration.ParameterRef) []*configpb.ParameterRef {
+	if len(params) == 0 {
+		return nil
+	}
+
+	out := make([]*configpb.ParameterRef, 0, len(params))
+	for _, param := range params {
+		pbParam := &configpb.ParameterRef{
+			Name: param.Name,
+		}
+		if param.Value != nil {
+			pbParam.Value = *param.Value
+		}
+		if param.ValueFrom != nil {
+			pbParam.ValueFrom = &configpb.ParameterValueFrom{
+				Field: param.ValueFrom.Field,
+			}
+		}
+		out = append(out, pbParam)
+	}
+	return out
+}
+
+func protoToParameterRefs(params []*configpb.ParameterRef) []configuration.ParameterRef {
+	if len(params) == 0 {
+		return nil
+	}
+
+	out := make([]configuration.ParameterRef, 0, len(params))
+	for _, param := range params {
+		if param == nil {
+			continue
+		}
+		ref := configuration.ParameterRef{
+			Name: param.Name,
+		}
+		if param.Value != "" {
+			value := param.Value
+			ref.Value = &value
+		}
+		if param.ValueFrom != nil {
+			ref.ValueFrom = &configuration.ParameterValueFrom{
+				Field: param.ValueFrom.Field,
+			}
+		}
+		out = append(out, ref)
+	}
+	return out
 }
 
 func protoToListTypeOptions(pbOpts *configpb.ListTypeOptions) *configuration.ListTypeOptions {
@@ -454,6 +511,11 @@ func protoToListTypeOptions(pbOpts *configpb.ListTypeOptions) *configuration.Lis
 		ItemDefinition: &configuration.ListItemDefinition{
 			Type: pbOpts.ItemDefinition.Type,
 		},
+	}
+
+	if pbOpts.MaxItems != nil {
+		maxItems := int(*pbOpts.MaxItems)
+		opts.MaxItems = &maxItems
 	}
 
 	if len(pbOpts.ItemDefinition.Schema) > 0 {

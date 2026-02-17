@@ -48,7 +48,7 @@ func Test__UpdateIntegration(t *testing.T) {
 		//
 		// Update the integration configuration
 		//
-		updateResponse, err := UpdateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), integrationID, map[string]any{"key": "value2", "new_key": "new_value"})
+		updateResponse, err := UpdateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), integrationID, map[string]any{"key": "value2", "new_key": "new_value"}, "")
 		require.NoError(t, err)
 		require.NotNil(t, updateResponse)
 		require.NotNil(t, updateResponse.Integration)
@@ -105,7 +105,7 @@ func Test__UpdateIntegration(t *testing.T) {
 		//
 		// Update the integration configuration (this should fail)
 		//
-		updateResponse, err := UpdateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), integrationID, map[string]any{"key": "value2"})
+		updateResponse, err := UpdateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), integrationID, map[string]any{"key": "value2"}, "")
 		require.NoError(t, err)
 		require.NotNil(t, updateResponse)
 
@@ -128,7 +128,7 @@ func Test__UpdateIntegration(t *testing.T) {
 		//
 		// Try to update with an invalid integration ID
 		//
-		_, err := UpdateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "invalid-uuid", map[string]any{"key": "value"})
+		_, err := UpdateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "invalid-uuid", map[string]any{"key": "value"}, "")
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -140,7 +140,7 @@ func Test__UpdateIntegration(t *testing.T) {
 		//
 		// Try to update a non-existent integration
 		//
-		_, err := UpdateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), uuid.NewString(), map[string]any{"key": "value"})
+		_, err := UpdateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), uuid.NewString(), map[string]any{"key": "value"}, "")
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -173,7 +173,7 @@ func Test__UpdateIntegration(t *testing.T) {
 		//
 		// Update only one key
 		//
-		_, err = UpdateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), integrationID, map[string]any{"key2": "updated_value2"})
+		_, err = UpdateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), integrationID, map[string]any{"key2": "updated_value2"}, "")
 		require.NoError(t, err)
 
 		//
@@ -185,5 +185,64 @@ func Test__UpdateIntegration(t *testing.T) {
 		assert.Equal(t, "value1", config["key1"], "key1 should be preserved")
 		assert.Equal(t, "updated_value2", config["key2"], "key2 should be updated")
 		assert.Equal(t, "value3", config["key3"], "key3 should be preserved")
+	})
+
+	t.Run("update integration name -> integration updated", func(t *testing.T) {
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
+		})
+
+		integrationName := support.RandomName("integration")
+		appConfig, err := structpb.NewStruct(map[string]any{"key": "value1"})
+		require.NoError(t, err)
+
+		createResponse, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", integrationName, appConfig)
+		require.NoError(t, err)
+		integrationID := createResponse.Integration.Metadata.Id
+
+		updatedName := support.RandomName("integration")
+		updateResponse, err := UpdateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), integrationID, nil, updatedName)
+		require.NoError(t, err)
+		require.NotNil(t, updateResponse)
+		require.NotNil(t, updateResponse.Integration)
+
+		_, err = models.FindIntegrationByName(r.Organization.ID, integrationName)
+		require.Error(t, err)
+
+		integration, err := models.FindIntegrationByName(r.Organization.ID, updatedName)
+		require.NoError(t, err)
+		assert.Equal(t, updatedName, integration.InstallationName)
+		assert.Equal(t, updatedName, updateResponse.Integration.Metadata.Name)
+	})
+
+	t.Run("update integration name to existing name -> already exists", func(t *testing.T) {
+		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
+		})
+
+		firstName := support.RandomName("integration")
+		secondName := support.RandomName("integration")
+		appConfig, err := structpb.NewStruct(map[string]any{"key": "value1"})
+		require.NoError(t, err)
+
+		_, err = CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", firstName, appConfig)
+		require.NoError(t, err)
+
+		secondIntegration, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", secondName, appConfig)
+		require.NoError(t, err)
+
+		_, err = UpdateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), secondIntegration.Integration.Metadata.Id, nil, firstName)
+		require.Error(t, err)
+
+		s, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.AlreadyExists, s.Code())
+		assert.Contains(t, s.Message(), "already exists")
 	})
 }

@@ -167,11 +167,11 @@ func (s *invitationSteps) assertInviteLinkDisabled() {
 
 func (s *invitationSteps) assertViewerInviteLinkMessage() {
 	s.session.AssertText("Invite link to add members")
-	s.session.AssertText("Only people with owner and admin roles can see this.")
+	s.session.AssertText("You don't have permission to manage invite links.")
 
 	copyLinkVisible, err := s.session.Page().Locator("text=Copy link").IsVisible()
 	require.NoError(s.t, err)
-	require.True(s.t, copyLinkVisible)
+	require.False(s.t, copyLinkVisible)
 }
 
 func (s *invitationSteps) assertInviteeViewerRole(email string) {
@@ -185,9 +185,8 @@ func (s *invitationSteps) assertInviteeViewerRole(email string) {
 	require.NoError(s.t, err)
 	require.NotEmpty(s.t, roles)
 
-	roleNames := make([]string, len(roles))
-	for i, role := range roles {
-		roleNames[i] = role.Name
-	}
-	assert.Contains(s.t, roleNames, models.RoleOrgViewer)
+	require.Equal(s.t, len(roles), 1)
+
+	role := roles[0]
+	assert.Equal(s.t, role.Name, models.RoleOrgViewer)
 }

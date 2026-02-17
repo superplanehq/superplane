@@ -1,0 +1,11 @@
+{
+  "data": {
+    "messageId": "YzQ2ODAtMTg5NC0xMWVmLTk0NGYtNTZlYjU5OGY4Y2Q3",
+    "status": "202 Accepted",
+    "statusCode": 202,
+    "to": ["recipient@example.com"],
+    "subject": "Your receipt is ready"
+  },
+  "timestamp": "2026-02-04T12:00:00Z",
+  "type": "sendgrid.email.sent"
+}

@@ -1,0 +1,11 @@
+{
+    "data": {
+        "created_at": "2026-02-10T07:34:35.902-8:00",
+        "event": "Investigation update: database connections stabilized.",
+        "id": "a2d32bb7-0417-4d0d-8483-a583c3-7853",
+        "occurred_at": "2026-02-10T07:34:35.902-8:00",
+        "visibility": "internal"
+    },
+    "timestamp": "2026-02-10T15:34:36.09877478Z",
+    "type": "rootly.incident.event"
+}

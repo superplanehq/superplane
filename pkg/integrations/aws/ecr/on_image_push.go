@@ -73,9 +73,14 @@ func (p *OnImagePush) Configuration() []configuration.Field {
 		{
 			Name:     "region",
 			Label:    "Region",
-			Type:     configuration.FieldTypeString,
+			Type:     configuration.FieldTypeSelect,
 			Required: true,
 			Default:  "us-east-1",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: common.AllRegions,
+				},
+			},
 		},
 		{
 			Name:        "repository",
@@ -83,9 +88,23 @@ func (p *OnImagePush) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "Filter by ECR repository name",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "region",
+					Values: []string{"*"},
+				},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "ecr.repository",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "region",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "region",
+							},
+						},
+					},
 				},
 			},
 		},
@@ -296,4 +315,8 @@ func (p *OnImagePush) HandleWebhook(ctx core.WebhookRequestContext) (int, error)
 	// no-op, since events are received through the integration
 	// and routed to OnIntegrationMessage()
 	return http.StatusOK, nil
+}
+
+func (p *OnImagePush) Cleanup(ctx core.TriggerContext) error {
+	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"unicode"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/registry"
 
@@ -36,7 +37,8 @@ func isValidName(name string) bool {
 }
 
 func TestComponentsAndTriggersUseCamelCaseNames(t *testing.T) {
-	reg := registry.NewRegistry(&crypto.NoOpEncryptor{})
+	reg, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
+	require.NoError(t, err)
 
 	for _, c := range reg.ListComponents() {
 		assert.True(t, isValidName(c.Name()), "Component %q is not camelCase", c.Name())

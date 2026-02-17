@@ -1,0 +1,38 @@
+{
+  "data": {
+    "version": "0",
+    "id": "d9e9ff4a-3514-3d2c-b6b8-1fb5e0b9d3b2",
+    "detail-type": "CodeArtifact Package Version State Change",
+    "source": "aws.codeartifact",
+    "account": "123456789012",
+    "time": "2024-11-20T20:35:33Z",
+    "region": "us-east-1",
+    "resources": [
+      "arn:aws:codeartifact:us-east-1:123456789012:repository/example-domain/example-repo"
+    ],
+    "detail": {
+      "domainName": "example-domain",
+      "domainOwner": "123456789012",
+      "repositoryName": "example-repo",
+      "repositoryAdministrator": "arn:aws:sts::123456789012:assumed-role/ExampleRole/example-user",
+      "packageFormat": "npm",
+      "packageNamespace": null,
+      "packageName": "@scope/example-package",
+      "packageVersion": "1.2.3",
+      "packageVersionState": "Published",
+      "packageVersionRevision": "E30D52B451F42F41",
+      "changes": {
+        "assetsAdded": 1,
+        "assetsRemoved": 0,
+        "assetsUpdated": 0,
+        "metadataUpdated": false,
+        "statusChanged": true
+      },
+      "operationType": "Created",
+      "sequenceNumber": 1,
+      "eventDeduplicationId": "5f87d1a3-2c1f-4ab0-8f55-8f4c2b4a5c76"
+    }
+  },
+  "timestamp": "2026-03-10T14:25:30.31254162Z",
+  "type": "aws.codeartifact.package.version"
+}

@@ -1,11 +1,16 @@
 import React from "react";
 import {
-  ComponentsComponent,
-  ComponentsNode,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-} from "@/api-client";
-import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, OutputPayload, StateFunction } from "./types";
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  CustomFieldRenderer,
+  EventStateRegistry,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  OutputPayload,
+  StateFunction,
+  SubtitleContext,
+} from "./types";
 import {
   ComponentBaseProps,
   EventSection,
@@ -55,42 +60,47 @@ const ExpressionTooltip: React.FC<{ expression: string; children: React.ReactEle
 };
 
 export const waitMapper: ComponentBaseMapper = {
-  props(
-    nodes: ComponentsNode[],
-    node: ComponentsNode,
-    componentDefinition: ComponentsComponent,
-    lastExecutions: CanvasesCanvasNodeExecution[],
-    nodeQueueItems?: CanvasesCanvasNodeQueueItem[],
-  ): ComponentBaseProps {
-    const componentName = componentDefinition.name || "wait";
-    const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const componentName = context.componentDefinition.name || "wait";
+    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
 
     return {
-      iconSlug: componentDefinition.icon || "circle-off",
+      iconSlug: context.componentDefinition.icon || "circle-off",
       iconColor: "text-gray-800",
-      metadata: getWaitMetadataList(node),
-      collapsed: node.isCollapsed,
+      metadata: getWaitMetadataList(context.node),
+      collapsed: context.node.isCollapsed,
       collapsedBackground: "bg-white",
-      title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
+      title:
+        context.node.name ||
+        context.componentDefinition.label ||
+        context.componentDefinition.name ||
+        "Unnamed component",
       eventSections: lastExecution
-        ? getWaitEventSections(nodes, lastExecution, nodeQueueItems, node.configuration, componentName)
+        ? getWaitEventSections(
+            context.nodes,
+            lastExecution,
+            context.node.configuration as WaitConfiguration,
+            componentName,
+          )
         : undefined,
       includeEmptyState: !lastExecution,
       hideMetadataList: false,
       eventStateMap: getStateMap(componentName),
     };
   },
-  subtitle(_node: ComponentsNode, execution: CanvasesCanvasNodeExecution): React.ReactNode {
-    const subtitle = getWaitEventSubtitle(execution, undefined, "wait");
+
+  subtitle(context: SubtitleContext): React.ReactNode {
+    const subtitle = getWaitEventSubtitle(context.execution, context.node.configuration as WaitConfiguration, "wait");
     return subtitle || "";
   },
-  getExecutionDetails(execution: CanvasesCanvasNodeExecution, _node: ComponentsNode): Record<string, any> {
+
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
     const details: Record<string, any> = {};
-    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const payload = outputs?.default?.[0];
     const data = payload?.data as Record<string, any> | undefined;
     const actor = data?.actor as { email?: string; display_name?: string } | undefined;
-    const metadata = execution.metadata as { interval_duration?: number; start_time?: string } | undefined;
+    const metadata = context.execution.metadata as { interval_duration?: number; start_time?: string } | undefined;
 
     const startedAt = formatDateValue(data?.started_at) || formatDateValue(metadata?.start_time);
     if (startedAt) {
@@ -138,7 +148,7 @@ export const WAIT_STATE_MAP: EventStateMap = {
   },
 };
 
-export const waitStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
+export const waitStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
   if (
@@ -178,7 +188,7 @@ export const WAIT_STATE_REGISTRY: EventStateRegistry = {
   getState: waitStateFunction,
 };
 
-function getWaitMetadataList(node: ComponentsNode): MetadataItem[] {
+function getWaitMetadataList(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as Record<string, unknown>;
 
   // Handle new mode-based configuration
@@ -248,16 +258,15 @@ function getWaitMetadataList(node: ComponentsNode): MetadataItem[] {
 }
 
 function getWaitEventSections(
-  nodes: ComponentsNode[],
-  execution: CanvasesCanvasNodeExecution,
-  _nodeQueueItems: CanvasesCanvasNodeQueueItem[] | undefined,
-  configuration: Record<string, unknown> | undefined,
+  nodes: NodeInfo[],
+  execution: ExecutionInfo,
+  configuration: WaitConfiguration,
   componentName: string,
 ): EventSection[] {
   const executionState = getState(componentName)(execution);
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   const eventSubtitle = getWaitEventSubtitle(execution, configuration, componentName);
 
@@ -272,9 +281,17 @@ function getWaitEventSections(
   return [eventSection];
 }
 
+type WaitConfiguration = {
+  mode: "interval" | "countdown";
+  unit?: "seconds" | "minutes" | "hours";
+  waitFor?: string;
+  waitUntil?: string;
+  duration?: { value: number; unit: "seconds" | "minutes" | "hours" };
+};
+
 function getWaitEventSubtitle(
-  execution: CanvasesCanvasNodeExecution,
-  configuration: Record<string, unknown> | undefined,
+  execution: ExecutionInfo,
+  configuration: WaitConfiguration,
   componentName: string,
 ): string | React.ReactNode | undefined {
   const executionState = getState(componentName)(execution);
@@ -370,8 +387,9 @@ function formatDateValue(value?: string): string | undefined {
  * Custom field renderer for wait component configuration
  */
 export const waitCustomFieldRenderer: CustomFieldRenderer = {
-  render: (_node: ComponentsNode, configuration: Record<string, unknown>) => {
-    const mode = configuration?.mode as string;
+  render: (node: NodeInfo) => {
+    const configuration = node.configuration as WaitConfiguration;
+    const mode = configuration.mode;
 
     let content: React.ReactNode;
     let title: string;

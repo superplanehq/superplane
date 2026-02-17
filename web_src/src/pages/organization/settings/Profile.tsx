@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { meMe, meRegenerateToken } from "../../../api-client/sdk.gen";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { meRegenerateToken } from "../../../api-client/sdk.gen";
 import type { SuperplaneMeUser } from "../../../api-client/types.gen";
 import { Avatar } from "../../../components/Avatar/avatar";
 import { Heading } from "../../../components/Heading/heading";
@@ -8,43 +9,35 @@ import { Input } from "../../../components/Input/input";
 import { Text } from "../../../components/Text/text";
 import { Button } from "@/components/ui/button";
 import { withOrganizationHeader } from "../../../utils/withOrganizationHeader";
+import { meKeys, useMe } from "@/hooks/useMe";
 
 export function Profile() {
-  const [user, setUser] = useState<SuperplaneMeUser | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { data: user, isLoading: loading, error: meError } = useMe();
+  const [actionError, setActionError] = useState<string | null>(null);
   const [token, setToken] = useState<string>("");
   const [tokenVisible, setTokenVisible] = useState(false);
   const [regeneratingToken, setRegeneratingToken] = useState(false);
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        setLoading(true);
-        const response = await meMe(withOrganizationHeader());
-        setUser(response.data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load profile");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserData();
-  }, []);
+  const errorMessage =
+    actionError || (meError instanceof Error ? meError.message : meError ? "Failed to load profile" : null);
 
   const handleRegenerateToken = async () => {
     try {
+      setActionError(null);
       setRegeneratingToken(true);
       const response = await meRegenerateToken(withOrganizationHeader());
       setToken(response.data.token || "");
       setTokenVisible(true);
       // Update user to reflect token existence
-      if (user) {
-        setUser({ ...user, hasToken: true });
-      }
+      queryClient.setQueryData<SuperplaneMeUser | null>(meKeys.me, (currentUser) => {
+        if (!currentUser) {
+          return currentUser;
+        }
+        return { ...currentUser, hasToken: true };
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to regenerate token");
+      setActionError(err instanceof Error ? err.message : "Failed to regenerate token");
     } finally {
       setRegeneratingToken(false);
     }
@@ -64,11 +57,11 @@ export function Profile() {
     );
   }
 
-  if (error) {
+  if (errorMessage) {
     return (
       <div className="pt-6">
         <div className="flex items-center justify-center py-8">
-          <Text className="text-red-500">{error}</Text>
+          <Text className="text-red-500">{errorMessage}</Text>
         </div>
       </div>
     );

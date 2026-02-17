@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -13,6 +14,85 @@ const (
 	secretAccessKeySecret = "secretAccessKey"
 	sessionTokenSecret    = "sessionToken"
 )
+
+var AllRegions = []configuration.FieldOption{
+	{
+		Label: "us-east-1",
+		Value: "us-east-1",
+	},
+	{
+		Label: "us-east-2",
+		Value: "us-east-2",
+	},
+	{
+		Label: "us-west-1",
+		Value: "us-west-1",
+	},
+	{
+		Label: "us-west-2",
+		Value: "us-west-2",
+	},
+	{
+		Label: "eu-west-1",
+		Value: "eu-west-1",
+	},
+	{
+		Label: "eu-central-1",
+		Value: "eu-central-1",
+	},
+	{
+		Label: "ap-northeast-1",
+		Value: "ap-northeast-1",
+	},
+	{
+		Label: "ap-northeast-2",
+		Value: "ap-northeast-2",
+	},
+	{
+		Label: "ap-southeast-1",
+		Value: "ap-southeast-1",
+	},
+	{
+		Label: "ap-southeast-2",
+		Value: "ap-southeast-2",
+	},
+	{
+		Label: "ap-south-1",
+		Value: "ap-south-1",
+	},
+	{
+		Label: "ca-central-1",
+		Value: "ca-central-1",
+	},
+	{
+		Label: "cn-north-1",
+		Value: "cn-north-1",
+	},
+	{
+		Label: "cn-northwest-1",
+		Value: "cn-northwest-1",
+	},
+	{
+		Label: "eu-north-1",
+		Value: "eu-north-1",
+	},
+	{
+		Label: "eu-south-1",
+		Value: "eu-south-1",
+	},
+	{
+		Label: "eu-west-2",
+		Value: "eu-west-2",
+	},
+	{
+		Label: "eu-west-3",
+		Value: "eu-west-3",
+	},
+	{
+		Label: "sa-east-1",
+		Value: "sa-east-1",
+	},
+}
 
 type IntegrationMetadata struct {
 	Session     *SessionMetadata     `json:"session" mapstructure:"session"`
@@ -84,10 +164,10 @@ type ProvisionRuleParameters struct {
 }
 
 type EventBridgeEvent struct {
-	Region     string         `json:"region"`
-	DetailType string         `json:"detail-type"`
-	Source     string         `json:"source"`
-	Detail     map[string]any `json:"detail"`
+	Region     string         `json:"region" mapstructure:"region"`
+	DetailType string         `json:"detail-type" mapstructure:"detail-type"`
+	Source     string         `json:"source" mapstructure:"source"`
+	Detail     map[string]any `json:"detail" mapstructure:"detail"`
 }
 
 type Tag struct {
@@ -107,6 +187,9 @@ func TagsForAPI(tags []Tag) []any {
 }
 
 func CredentialsFromInstallation(ctx core.IntegrationContext) (*aws.Credentials, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("AWS integration context is missing")
+	}
 	secrets, err := ctx.GetSecrets()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get AWS session secrets: %w", err)

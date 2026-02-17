@@ -1,18 +1,24 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { resolveIcon } from "@/lib/utils";
-import { Check, Copy, X } from "lucide-react";
-import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
-import githubIcon from "@/assets/icons/integrations/github.svg";
-import openAiIcon from "@/assets/icons/integrations/openai.svg";
-import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
-import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
-import slackIcon from "@/assets/icons/integrations/slack.svg";
-import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
-import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
-import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Check, Copy, Loader2, Settings, TriangleAlert, X } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getHeaderIconSrc, IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
+import {
+  useAvailableIntegrations,
+  useCreateIntegration,
+  useIntegration,
+  useUpdateIntegration,
+} from "@/hooks/useIntegrations";
+import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
+import { getApiErrorMessage } from "@/utils/errors";
+import { showErrorToast } from "@/utils/toast";
+import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { ChildEventsState } from "../composite";
 import { TabData } from "./SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "./types";
@@ -28,28 +34,13 @@ import {
   TriggersTrigger,
   BlueprintsBlueprint,
   OrganizationsIntegration,
+  OrganizationsBrowserAction,
   ComponentsIntegrationRef,
 } from "@/api-client";
 import { EventState, EventStateMap } from "../componentBase";
 import { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
-
-const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
-  dash0: dash0Icon,
-  daytona: daytonaIcon,
-  github: githubIcon,
-  openai: openAiIcon,
-  "open-ai": openAiIcon,
-  pagerduty: pagerDutyIcon,
-  rootly: rootlyIcon,
-  semaphore: SemaphoreLogo,
-  slack: slackIcon,
-  aws: {
-    ecr: awsEcrIcon,
-    lambda: awsLambdaIcon,
-  },
-};
 
 interface ComponentSidebarProps {
   isOpen?: boolean;
@@ -143,6 +134,9 @@ interface ComponentSidebarProps {
   integrationName?: string;
   integrationRef?: ComponentsIntegrationRef;
   integrations?: OrganizationsIntegration[];
+  canReadIntegrations?: boolean;
+  canCreateIntegrations?: boolean;
+  canUpdateIntegrations?: boolean;
   autocompleteExampleObj?: Record<string, unknown> | null;
 
   // Workflow metadata for ExecutionChainPage
@@ -160,6 +154,7 @@ interface ComponentSidebarProps {
   executionChainTriggerEvent?: SidebarEvent | null;
   executionChainRequestId?: number;
   onExecutionChainHandled?: () => void;
+  readOnly?: boolean;
 }
 
 export const ComponentSidebar = ({
@@ -222,6 +217,9 @@ export const ComponentSidebar = ({
   integrationName,
   integrationRef,
   integrations,
+  canReadIntegrations,
+  canCreateIntegrations,
+  canUpdateIntegrations,
   autocompleteExampleObj,
   workflowNodes = [],
   components = [],
@@ -233,6 +231,7 @@ export const ComponentSidebar = ({
   executionChainTriggerEvent,
   executionChainRequestId,
   onExecutionChainHandled,
+  readOnly = false,
 }: ComponentSidebarProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
@@ -252,8 +251,49 @@ export const ComponentSidebar = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ChildEventsState | "all">("all");
   const [justCopied, setJustCopied] = useState(false);
+  const [isCreateIntegrationDialogOpen, setIsCreateIntegrationDialogOpen] = useState(false);
+  const [createIntegrationName, setCreateIntegrationName] = useState("");
+  const [createIntegrationConfig, setCreateIntegrationConfig] = useState<Record<string, unknown>>({});
+  const [createIntegrationBrowserAction, setCreateIntegrationBrowserAction] = useState<
+    OrganizationsBrowserAction | undefined
+  >(undefined);
+  const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
+  const [configureIntegrationName, setConfigureIntegrationName] = useState("");
   // Use autocompleteExampleObj directly - current node is already filtered out upstream
   const resolvedAutocompleteExampleObj = autocompleteExampleObj ?? null;
+
+  const { data: availableIntegrationDefinitions = [] } = useAvailableIntegrations();
+  const createIntegrationMutation = useCreateIntegration(domainId ?? "");
+  const { data: configureIntegration, isLoading: configureIntegrationLoading } = useIntegration(
+    domainId ?? "",
+    configureIntegrationId ?? "",
+  );
+  const updateIntegrationMutation = useUpdateIntegration(domainId ?? "", configureIntegrationId ?? "");
+  const configureIntegrationDefinition = useMemo(
+    () =>
+      configureIntegration?.spec?.integrationName
+        ? availableIntegrationDefinitions.find((d) => d.name === configureIntegration.spec?.integrationName)
+        : undefined,
+    [availableIntegrationDefinitions, configureIntegration?.spec?.integrationName],
+  );
+  const [configureIntegrationConfig, setConfigureIntegrationConfig] = useState<Record<string, unknown>>({});
+  const createIntegrationDefinition = useMemo(
+    () => (integrationName ? availableIntegrationDefinitions.find((d) => d.name === integrationName) : undefined),
+    [availableIntegrationDefinitions, integrationName],
+  );
+  const selectedIntegrationForDialog = isCreateIntegrationDialogOpen ? createIntegrationDefinition : undefined;
+  const selectedInstructions = selectedIntegrationForDialog?.instructions?.trim();
+  const integrationHomeHref = useMemo(() => {
+    if (!domainId) return "#";
+    const selectedIntegrationId =
+      integrationRef?.id ||
+      integrations?.find((integration) => integration.spec?.integrationName === selectedIntegrationForDialog?.name)
+        ?.metadata?.id;
+    if (selectedIntegrationId) {
+      return `/${domainId}/settings/integrations/${selectedIntegrationId}`;
+    }
+    return `/${domainId}/settings/integrations`;
+  }, [domainId, integrationRef?.id, integrations, selectedIntegrationForDialog?.name]);
 
   const handleCopyNodeId = useCallback(async () => {
     if (nodeId) {
@@ -262,6 +302,149 @@ export const ComponentSidebar = ({
       setTimeout(() => setJustCopied(false), 1000);
     }
   }, [nodeId]);
+
+  const handleOpenCreateIntegrationDialog = useCallback(() => {
+    setCreateIntegrationName(createIntegrationDefinition?.name ?? "");
+    setCreateIntegrationConfig({});
+    setCreateIntegrationBrowserAction(undefined);
+    setIsCreateIntegrationDialogOpen(true);
+  }, [createIntegrationDefinition?.name]);
+
+  const handleCloseCreateIntegrationDialog = useCallback(() => {
+    setIsCreateIntegrationDialogOpen(false);
+    setCreateIntegrationName("");
+    setCreateIntegrationConfig({});
+    setCreateIntegrationBrowserAction(undefined);
+    createIntegrationMutation.reset();
+  }, [createIntegrationMutation]);
+
+  const handleCreateIntegrationSubmit = useCallback(async () => {
+    if (!selectedIntegrationForDialog?.name || !domainId) return;
+    const nextName = createIntegrationName.trim();
+    if (!nextName) {
+      showErrorToast("Integration name is required");
+      return;
+    }
+
+    try {
+      const result = await createIntegrationMutation.mutateAsync({
+        integrationName: selectedIntegrationForDialog.name,
+        name: nextName,
+        configuration: createIntegrationConfig,
+      });
+      const browserAction = result.data?.integration?.status?.browserAction;
+      if (browserAction) {
+        setCreateIntegrationBrowserAction(browserAction);
+        return;
+      }
+      handleCloseCreateIntegrationDialog();
+    } catch (error) {
+      showErrorToast(`Failed to create integration: ${getApiErrorMessage(error)}`);
+    }
+  }, [
+    selectedIntegrationForDialog?.name,
+    domainId,
+    createIntegrationName,
+    createIntegrationConfig,
+    createIntegrationMutation,
+    handleCloseCreateIntegrationDialog,
+  ]);
+
+  const handleCreateBrowserAction = useCallback(() => {
+    if (!createIntegrationBrowserAction) return;
+    const { url, method, formFields } = createIntegrationBrowserAction;
+    if (method?.toUpperCase() === "POST" && formFields) {
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = url || "";
+      form.target = "_blank";
+      form.style.display = "none";
+      Object.entries(formFields).forEach(([key, value]) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = key;
+        input.value = String(value);
+        form.appendChild(input);
+      });
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
+    } else if (url) {
+      window.open(url, "_blank");
+    }
+  }, [createIntegrationBrowserAction]);
+
+  const handleOpenConfigureIntegrationDialog = useCallback((integrationId: string) => {
+    setConfigureIntegrationId(integrationId);
+  }, []);
+
+  const handleCloseConfigureIntegrationDialog = useCallback(() => {
+    setConfigureIntegrationId(null);
+    setConfigureIntegrationName("");
+    setConfigureIntegrationConfig({});
+    updateIntegrationMutation.reset();
+  }, [updateIntegrationMutation]);
+
+  const handleConfigureIntegrationSubmit = useCallback(async () => {
+    if (!configureIntegrationId || !domainId) return;
+
+    const nextName = configureIntegrationName.trim();
+    if (!nextName) {
+      showErrorToast("Integration name is required");
+      return;
+    }
+
+    try {
+      await updateIntegrationMutation.mutateAsync({ name: nextName, configuration: configureIntegrationConfig });
+      handleCloseConfigureIntegrationDialog();
+    } catch (_error) {
+      showErrorToast("Failed to update integration");
+    }
+  }, [
+    configureIntegrationId,
+    domainId,
+    configureIntegrationName,
+    configureIntegrationConfig,
+    updateIntegrationMutation,
+    handleCloseConfigureIntegrationDialog,
+  ]);
+
+  const handleConfigureBrowserAction = useCallback(() => {
+    const browserAction = configureIntegration?.status?.browserAction;
+    if (!browserAction) return;
+    const { url, method, formFields } = browserAction;
+    if (method?.toUpperCase() === "POST" && formFields) {
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = url || "";
+      form.target = "_blank";
+      form.style.display = "none";
+      Object.entries(formFields).forEach(([key, value]) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = key;
+        input.value = String(value);
+        form.appendChild(input);
+      });
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
+    } else if (url) {
+      window.open(url, "_blank");
+    }
+  }, [configureIntegration?.status?.browserAction]);
+
+  useEffect(() => {
+    if (configureIntegration?.spec?.configuration) {
+      setConfigureIntegrationConfig(configureIntegration.spec.configuration);
+    }
+  }, [configureIntegration?.spec?.configuration]);
+
+  useEffect(() => {
+    setConfigureIntegrationName(
+      configureIntegration?.metadata?.name || configureIntegration?.spec?.integrationName || "",
+    );
+  }, [configureIntegration?.metadata?.name, configureIntegration?.spec?.integrationName]);
 
   // Seed open ids from incoming props (without closing already open ones)
   useEffect(() => {
@@ -496,9 +679,7 @@ export const ComponentSidebar = ({
   }, [onHighlightedNodesChange]);
 
   const isDetailView = page !== "overview";
-  const nameParts = blockName?.split(".") ?? [];
-  const appLogo = nameParts[0] ? APP_LOGO_MAP[nameParts[0]] : undefined;
-  const appIconSrc = typeof appLogo === "string" ? appLogo : nameParts[1] ? appLogo?.[nameParts[1]] : undefined;
+  const appIconSrc = getHeaderIconSrc(blockName);
   const headerIconSrc = iconSrc ?? appIconSrc;
 
   if (!isOpen) return null;
@@ -649,7 +830,14 @@ export const ComponentSidebar = ({
                   integrationName={integrationName}
                   integrationRef={integrationRef}
                   integrations={integrations}
+                  readOnly={readOnly}
+                  canReadIntegrations={canReadIntegrations}
+                  canCreateIntegrations={canCreateIntegrations}
+                  canUpdateIntegrations={canUpdateIntegrations}
+                  integrationDefinition={createIntegrationDefinition}
                   autocompleteExampleObj={resolvedAutocompleteExampleObj}
+                  onOpenCreateIntegrationDialog={handleOpenCreateIntegrationDialog}
+                  onOpenConfigureIntegrationDialog={handleOpenConfigureIntegrationDialog}
                 />
               </TabsContent>
             )}
@@ -750,6 +938,266 @@ export const ComponentSidebar = ({
           )}
         </div>
       </div>
+
+      <Dialog
+        open={isCreateIntegrationDialogOpen}
+        onOpenChange={(open) => !open && handleCloseCreateIntegrationDialog()}
+      >
+        <DialogContent
+          className="sm:max-w-2xl max-h-[80vh] overflow-y-auto"
+          showCloseButton={!createIntegrationMutation.isPending}
+        >
+          {selectedIntegrationForDialog && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-3">
+                  <IntegrationIcon
+                    integrationName={selectedIntegrationForDialog.name}
+                    iconSlug={selectedIntegrationForDialog.icon}
+                    className="h-6 w-6 text-gray-500 dark:text-gray-400"
+                  />
+                  <div className="flex items-center gap-2">
+                    <DialogTitle>
+                      Configure{" "}
+                      {getIntegrationTypeDisplayName(undefined, selectedIntegrationForDialog.name) ||
+                        selectedIntegrationForDialog.name}
+                    </DialogTitle>
+                    <a
+                      href={integrationHomeHref}
+                      className="inline-flex h-4 w-4 items-center justify-center text-gray-500 hover:text-gray-800 transition-colors"
+                      aria-label="Open integration settings"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </a>
+                  </div>
+                </div>
+                {(createIntegrationBrowserAction?.description || selectedInstructions) && (
+                  <IntegrationInstructions
+                    description={createIntegrationBrowserAction?.description || selectedInstructions}
+                    onContinue={createIntegrationBrowserAction?.url ? handleCreateBrowserAction : undefined}
+                    className="mt-2"
+                  />
+                )}
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-gray-800 dark:text-gray-100 mb-2">
+                    Integration Name
+                    <span className="text-gray-800 ml-1">*</span>
+                  </Label>
+                  <Input
+                    type="text"
+                    value={createIntegrationName}
+                    onChange={(e) => setCreateIntegrationName(e.target.value)}
+                    placeholder="e.g., my-app-integration"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
+                </div>
+                {selectedIntegrationForDialog.configuration &&
+                  selectedIntegrationForDialog.configuration.length > 0 && (
+                    <div className="space-y-4">
+                      {selectedIntegrationForDialog.configuration.map((field: ConfigurationField) => {
+                        if (!field.name) return null;
+                        return (
+                          <ConfigurationFieldRenderer
+                            key={field.name}
+                            field={field}
+                            value={createIntegrationConfig[field.name]}
+                            onChange={(value) =>
+                              setCreateIntegrationConfig((prev) => ({ ...prev, [field.name || ""]: value }))
+                            }
+                            allValues={createIntegrationConfig}
+                            domainId={domainId ?? ""}
+                            domainType="DOMAIN_TYPE_ORGANIZATION"
+                            organizationId={domainId ?? ""}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+              </div>
+              <DialogFooter className="gap-2 sm:justify-start mt-6">
+                {createIntegrationBrowserAction ? (
+                  <>
+                    <Button color="blue" onClick={handleCloseCreateIntegrationDialog}>
+                      Save
+                    </Button>
+                    <Button variant="outline" onClick={handleCloseCreateIntegrationDialog}>
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      color="blue"
+                      onClick={() => void handleCreateIntegrationSubmit()}
+                      disabled={createIntegrationMutation.isPending || !createIntegrationName?.trim()}
+                      className="flex items-center gap-2"
+                    >
+                      {createIntegrationMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Connecting...
+                        </>
+                      ) : (
+                        "Connect"
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleCloseCreateIntegrationDialog}
+                      disabled={createIntegrationMutation.isPending}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                )}
+              </DialogFooter>
+              {createIntegrationMutation.isError && (
+                <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                  <p className="text-sm text-red-800 dark:text-red-200">
+                    Failed to create integration: {getApiErrorMessage(createIntegrationMutation.error)}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!configureIntegrationId} onOpenChange={(open) => !open && handleCloseConfigureIntegrationDialog()}>
+        <DialogContent
+          className="sm:max-w-2xl max-h-[80vh] overflow-y-auto"
+          showCloseButton={!updateIntegrationMutation.isPending}
+        >
+          {configureIntegrationLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-gray-500 dark:text-gray-400" />
+            </div>
+          ) : configureIntegrationId && configureIntegration ? (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-3">
+                  <IntegrationIcon
+                    integrationName={configureIntegration.spec?.integrationName}
+                    iconSlug={configureIntegrationDefinition?.icon}
+                    className="h-6 w-6 text-gray-500 dark:text-gray-400"
+                  />
+                  <div className="flex items-center gap-2">
+                    <DialogTitle>
+                      Configure{" "}
+                      {getIntegrationTypeDisplayName(undefined, configureIntegration.spec?.integrationName) ||
+                        configureIntegration.spec?.integrationName}
+                    </DialogTitle>
+                    <a
+                      href={
+                        configureIntegration.metadata?.id
+                          ? `/${domainId}/settings/integrations/${configureIntegration.metadata.id}`
+                          : `/${domainId}/settings/integrations`
+                      }
+                      className="inline-flex h-4 w-4 items-center justify-center text-gray-500 hover:text-gray-800 transition-colors"
+                      aria-label="Open integration settings"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </a>
+                  </div>
+                </div>
+              </DialogHeader>
+              {configureIntegration.status?.state === "error" && configureIntegration.status?.stateDescription && (
+                <div className="flex items-start gap-2 text-sm text-red-700 dark:text-red-300">
+                  <TriangleAlert className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <p>{configureIntegration.status.stateDescription}</p>
+                </div>
+              )}
+              {configureIntegration?.status?.browserAction && (
+                <IntegrationInstructions
+                  description={configureIntegration.status.browserAction.description}
+                  onContinue={configureIntegration.status.browserAction.url ? handleConfigureBrowserAction : undefined}
+                  className="mb-6"
+                />
+              )}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void handleConfigureIntegrationSubmit();
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <Label className="text-gray-800 dark:text-gray-100 mb-2">
+                    Integration Name
+                    <span className="text-gray-800 ml-1">*</span>
+                  </Label>
+                  <Input
+                    type="text"
+                    value={configureIntegrationName}
+                    onChange={(e) => setConfigureIntegrationName(e.target.value)}
+                    placeholder="e.g., my-app-integration"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
+                </div>
+
+                {configureIntegrationDefinition?.configuration &&
+                configureIntegrationDefinition.configuration.length > 0 ? (
+                  configureIntegrationDefinition.configuration.map((field: ConfigurationField) => {
+                    if (!field.name) return null;
+                    return (
+                      <ConfigurationFieldRenderer
+                        key={field.name}
+                        field={field}
+                        value={configureIntegrationConfig[field.name]}
+                        onChange={(value) =>
+                          setConfigureIntegrationConfig((prev) => ({ ...prev, [field.name || ""]: value }))
+                        }
+                        allValues={configureIntegrationConfig}
+                        domainId={domainId ?? ""}
+                        domainType="DOMAIN_TYPE_ORGANIZATION"
+                        organizationId={domainId ?? ""}
+                        appInstallationId={configureIntegration.metadata?.id}
+                      />
+                    );
+                  })
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No configuration fields available.</p>
+                )}
+
+                <DialogFooter className="gap-2 sm:justify-start pt-4">
+                  <Button
+                    type="submit"
+                    color="blue"
+                    disabled={updateIntegrationMutation.isPending || !configureIntegrationName.trim()}
+                    className="flex items-center gap-2"
+                  >
+                    {updateIntegrationMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save"
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCloseConfigureIntegrationDialog}
+                    disabled={updateIntegrationMutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                </DialogFooter>
+                {updateIntegrationMutation.isError && (
+                  <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                    <p className="text-sm text-red-800 dark:text-red-200">
+                      Failed to update integration: {getApiErrorMessage(updateIntegrationMutation.error)}
+                    </p>
+                  </div>
+                )}
+              </form>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -1,0 +1,19 @@
+{
+  "data": {
+    "task": {
+      "clusterArn": "arn:aws:ecs:us-east-1:111122223333:cluster/superplane-demo-cluster",
+      "createdAt": "2026-02-10T14:30:01Z",
+      "desiredStatus": "STOPPED",
+      "group": "family:superplane-ecs-task",
+      "lastStatus": "STOPPED",
+      "launchType": "FARGATE",
+      "platformVersion": "1.4.0",
+      "startedBy": "",
+      "stoppedReason": "stopping",
+      "taskArn": "arn:aws:ecs:us-east-1:111122223333:task/superplane-demo-cluster/aaaaaaaa11111111bbbbbbbb22222222",
+      "taskDefinitionArn": "arn:aws:ecs:us-east-1:111122223333:task-definition/superplane-ecs-task:1"
+    }
+  },
+  "timestamp": "2026-02-10T14:31:19.987196041Z",
+  "type": "aws.ecs.task"
+}

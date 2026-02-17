@@ -5,6 +5,8 @@ import { Icon } from "../../../components/Icon";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link } from "../../../components/Link/link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
+import { PermissionTooltip } from "@/components/PermissionGate";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import {
   useDeleteGroup,
   useOrganizationGroups,
@@ -12,7 +14,6 @@ import {
   useUpdateGroup,
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
-import { isRBACEnabled } from "@/lib/env";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { showErrorToast } from "@/utils/toast";
 
@@ -22,6 +23,7 @@ interface GroupsProps {
 
 export function Groups({ organizationId }: GroupsProps) {
   const navigate = useNavigate();
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [sortConfig, setSortConfig] = useState<{
     key: string | null;
     direction: "asc" | "desc";
@@ -37,10 +39,14 @@ export function Groups({ organizationId }: GroupsProps) {
   // Mutations
   const updateGroupMutation = useUpdateGroup(organizationId);
   const deleteGroupMutation = useDeleteGroup(organizationId);
+  const canCreateGroups = canAct("groups", "create");
+  const canUpdateGroups = canAct("groups", "update");
+  const canDeleteGroups = canAct("groups", "delete");
 
   const error = groupsError || rolesError;
 
   const handleCreateGroup = () => {
+    if (!canCreateGroups) return;
     navigate(`/${organizationId}/settings/create-group`);
   };
 
@@ -48,6 +54,7 @@ export function Groups({ organizationId }: GroupsProps) {
     `/${organizationId}/settings/groups/${encodeURIComponent(groupName)}/members`;
 
   const handleDeleteGroup = async (groupName: string) => {
+    if (!canDeleteGroups) return;
     const confirmed = window.confirm(
       `Are you sure you want to delete the group "${groupName}"? This cannot be undone.`,
     );
@@ -65,6 +72,7 @@ export function Groups({ organizationId }: GroupsProps) {
   };
 
   const handleRoleUpdate = async (groupName: string, newRoleName: string) => {
+    if (!canUpdateGroups) return;
     try {
       await updateGroupMutation.mutateAsync({
         groupName,
@@ -141,10 +149,15 @@ export function Groups({ organizationId }: GroupsProps) {
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
         {filteredAndSortedGroups.length > 0 && (
           <div className="px-6 pt-6 pb-4 flex items-center justify-start">
-            <Button className="flex items-center" onClick={handleCreateGroup}>
-              <Icon name="plus" />
-              Create New Group
-            </Button>
+            <PermissionTooltip
+              allowed={canCreateGroups || permissionsLoading}
+              message="You don't have permission to create groups."
+            >
+              <Button className="flex items-center" onClick={handleCreateGroup} disabled={!canCreateGroups}>
+                <Icon name="plus" />
+                Create New Group
+              </Button>
+            </PermissionTooltip>
           </div>
         )}
         <div className="px-6 pb-6 min-h-96">
@@ -158,10 +171,15 @@ export function Groups({ organizationId }: GroupsProps) {
                 <Icon name="users" size="xl" />
               </div>
               <p className="mt-3 text-sm text-gray-800">Create your first group</p>
-              <Button className="mt-4 flex items-center" onClick={handleCreateGroup}>
-                <Icon name="plus" />
-                Create New Group
-              </Button>
+              <PermissionTooltip
+                allowed={canCreateGroups || permissionsLoading}
+                message="You don't have permission to create groups."
+              >
+                <Button className="mt-4 flex items-center" onClick={handleCreateGroup} disabled={!canCreateGroups}>
+                  <Icon name="plus" />
+                  Create New Group
+                </Button>
+              </PermissionTooltip>
             </div>
           ) : (
             <Table dense>
@@ -194,17 +212,15 @@ export function Groups({ organizationId }: GroupsProps) {
                       <Icon name={getSortIcon("members")} size="sm" className="text-gray-400" />
                     </div>
                   </TableHeader>
-                  {isRBACEnabled() && (
-                    <TableHeader
-                      className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                      onClick={() => handleSort("role")}
-                    >
-                      <div className="flex items-center gap-2">
-                        Role
-                        <Icon name={getSortIcon("role")} size="sm" className="text-gray-400" />
-                      </div>
-                    </TableHeader>
-                  )}
+                  <TableHeader
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    onClick={() => handleSort("role")}
+                  >
+                    <div className="flex items-center gap-2">
+                      Role
+                      <Icon name={getSortIcon("role")} size="sm" className="text-gray-400" />
+                    </div>
+                  </TableHeader>
                   <TableHeader></TableHeader>
                 </TableRow>
               </TableHead>
@@ -233,13 +249,16 @@ export function Groups({ organizationId }: GroupsProps) {
                         {group.status?.membersCount || 0} member{group.status?.membersCount === 1 ? "" : "s"}
                       </span>
                     </TableCell>
-                    {isRBACEnabled() && (
-                      <TableCell>
+                    <TableCell>
+                      <PermissionTooltip
+                        allowed={canUpdateGroups || permissionsLoading}
+                        message="You don't have permission to update groups."
+                      >
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button
                               className="flex items-center gap-2 text-sm justify-between"
-                              disabled={updateGroupMutation.isPending}
+                              disabled={updateGroupMutation.isPending || !canUpdateGroups}
                             >
                               {updateGroupMutation.isPending
                                 ? "Updating..."
@@ -254,6 +273,7 @@ export function Groups({ organizationId }: GroupsProps) {
                                 key={role.metadata?.name}
                                 onClick={() => handleRoleUpdate(group.metadata!.name!, role.metadata!.name!)}
                                 className="flex flex-col items-start gap-1"
+                                disabled={!canUpdateGroups}
                               >
                                 <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
                                   {role.spec?.displayName || role.metadata!.name}
@@ -262,26 +282,31 @@ export function Groups({ organizationId }: GroupsProps) {
                             ))}
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      </TableCell>
-                    )}
+                      </PermissionTooltip>
+                    </TableCell>
                     <TableCell>
                       <div className="flex justify-end">
-                        <TooltipProvider delayDuration={200}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteGroup(group.metadata!.name!)}
-                                className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors"
-                                aria-label="Delete group"
-                                disabled={deleteGroupMutation.isPending}
-                              >
-                                <Icon name="trash-2" size="sm" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">Delete Group</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                        <PermissionTooltip
+                          allowed={canDeleteGroups || permissionsLoading}
+                          message="You don't have permission to delete groups."
+                        >
+                          <TooltipProvider delayDuration={200}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteGroup(group.metadata!.name!)}
+                                  className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors"
+                                  aria-label="Delete group"
+                                  disabled={deleteGroupMutation.isPending || !canDeleteGroups}
+                                >
+                                  <Icon name="trash-2" size="sm" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Delete Group</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </PermissionTooltip>
                       </div>
                     </TableCell>
                   </TableRow>

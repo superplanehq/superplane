@@ -45,8 +45,8 @@ function SelectTrigger({
 function SelectContent({
   className,
   children,
-  position = "popper",
-  align = "center",
+  position = "item-aligned",
+  align = "start",
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {
   return (

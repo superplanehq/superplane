@@ -1,4 +1,5 @@
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { formatTimeAgo } from "@/utils/date";
 import { EventStateRegistry } from "./types";
 import { defaultStateFunction } from "./stateRegistry";
 
@@ -67,4 +68,51 @@ export function buildActionStateRegistry(successState: string): EventStateRegist
       return state === "success" ? successState : state;
     },
   };
+}
+
+/*
+ * Predicate type and format function.
+ * See: AnyPredicateListFieldRenderer.
+ *
+ * @param predicate - The predicate to format.
+ * @returns The formatted predicate.
+ */
+export type PredicateType = "equals" | "notEquals" | "matches";
+
+export interface Predicate {
+  type: PredicateType;
+  value: string;
+}
+
+export function formatPredicate(predicate: Predicate): string {
+  switch (predicate.type) {
+    case "equals":
+      return `=${predicate.value}`;
+    case "notEquals":
+      return `!=${predicate.value}`;
+    case "matches":
+      return `~${predicate.value}`;
+    default:
+      return predicate.value;
+  }
+}
+
+export function buildSubtitle(content: string | undefined, createdAt?: string): string {
+  const trimmed = (content || "").trim();
+  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
+
+  if (trimmed && timeAgo) {
+    return `${trimmed} · ${timeAgo}`;
+  }
+  return trimmed || timeAgo;
+}
+
+export interface ExecutionLike {
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export function buildExecutionSubtitle(execution: ExecutionLike, content?: string): string {
+  const timestamp = execution.updatedAt || execution.createdAt;
+  return buildSubtitle(content || "", timestamp);
 }

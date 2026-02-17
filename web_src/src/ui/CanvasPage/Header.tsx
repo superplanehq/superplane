@@ -4,8 +4,9 @@ import { Button } from "../button";
 import { Switch } from "../switch";
 import { useCanvases } from "@/hooks/useCanvasData";
 import { useParams, useNavigate } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export interface BreadcrumbItem {
   label: string;
@@ -26,8 +27,12 @@ interface HeaderProps {
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
+  saveDisabled?: boolean;
+  saveDisabledTooltip?: string;
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
+  autoSaveDisabled?: boolean;
+  autoSaveDisabledTooltip?: string;
   onExportYamlCopy?: () => void;
   onExportYamlDownload?: () => void;
 }
@@ -42,8 +47,12 @@ export function Header({
   unsavedMessage,
   saveIsPrimary,
   saveButtonHidden,
+  saveDisabled,
+  saveDisabledTooltip,
   isAutoSaveEnabled,
   onToggleAutoSave,
+  autoSaveDisabled,
+  autoSaveDisabledTooltip,
   onExportYamlCopy,
   onExportYamlDownload,
 }: HeaderProps) {
@@ -105,6 +114,18 @@ export function Header({
       setIsMenuOpen(false);
       navigate(`/${organizationId}/canvases/${selectedWorkflowId}`);
     }
+  };
+
+  const wrapWithTooltip = (disabled: boolean | undefined, message: string | undefined, child: ReactNode) => {
+    if (!disabled || !message) return child;
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="inline-flex">{child}</div>
+        </TooltipTrigger>
+        <TooltipContent side="top">{message}</TooltipContent>
+      </Tooltip>
+    );
   };
 
   return (
@@ -220,30 +241,46 @@ export function Header({
                 {unsavedMessage}
               </span>
             )}
-            {onToggleAutoSave && (
-              <div className="flex items-center gap-2">
-                <label htmlFor="auto-save-toggle" className="text-sm text-gray-800 hidden sm:inline">
-                  Auto-save
-                </label>
-                <Switch id="auto-save-toggle" checked={isAutoSaveEnabled} onCheckedChange={onToggleAutoSave} />
-              </div>
-            )}
+            {onToggleAutoSave &&
+              wrapWithTooltip(
+                autoSaveDisabled,
+                autoSaveDisabledTooltip,
+                <div className="flex items-center gap-2">
+                  <label
+                    htmlFor="auto-save-toggle"
+                    className={`text-sm hidden sm:inline ${autoSaveDisabled ? "text-gray-400" : "text-gray-800"}`}
+                  >
+                    Auto-save
+                  </label>
+                  <Switch
+                    id="auto-save-toggle"
+                    checked={isAutoSaveEnabled}
+                    onCheckedChange={onToggleAutoSave}
+                    disabled={autoSaveDisabled}
+                  />
+                </div>,
+              )}
             {onUndo && canUndo && (
               <Button onClick={onUndo} size="sm" variant="outline">
                 <Undo2 />
                 Revert
               </Button>
             )}
-            {onSave && !saveButtonHidden && (
-              <Button
-                onClick={onSave}
-                size="sm"
-                variant={saveIsPrimary ? "default" : "outline"}
-                data-testid="save-canvas-button"
-              >
-                Save
-              </Button>
-            )}
+            {onSave &&
+              !saveButtonHidden &&
+              wrapWithTooltip(
+                saveDisabled,
+                saveDisabledTooltip,
+                <Button
+                  onClick={onSave}
+                  size="sm"
+                  variant={saveIsPrimary ? "default" : "outline"}
+                  data-testid="save-canvas-button"
+                  disabled={saveDisabled}
+                >
+                  Save
+                </Button>,
+              )}
           </div>
         </div>
       </header>

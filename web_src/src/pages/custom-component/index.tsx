@@ -16,7 +16,7 @@ import { CustomComponentBuilderPage } from "../../ui/CustomComponentBuilderPage"
 import { filterVisibleConfiguration } from "../../utils/components";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
 import { getComponentBaseMapper } from "../workflowv2/mappers";
-import { generateNodeId, generateUniqueNodeName } from "../workflowv2/utils";
+import { buildComponentDefinition, buildNodeInfo, generateNodeId, generateUniqueNodeName } from "../workflowv2/utils";
 
 const elk = new ELK();
 const BUNDLE_ICON_SLUG = "component";
@@ -108,7 +108,14 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
   const blockType = getBlockType(componentName);
   const channels = component?.outputChannels?.map((channel: any) => channel.name) || ["default"];
 
-  const componentBaseProps = getComponentBaseMapper(component?.name!).props([], node, component!, [], undefined);
+  const componentBaseProps = getComponentBaseMapper(component?.name!).props({
+    nodes: [],
+    node: buildNodeInfo(node),
+    componentDefinition: buildComponentDefinition(component!),
+    lastExecutions: [],
+    nodeQueueItems: [],
+    additionalData: undefined,
+  });
 
   const baseData: BlockData = {
     label: node.name,
@@ -495,7 +502,7 @@ export const CustomComponent = () => {
       // Check if this component is from an application
       let appName: string | undefined;
       const componentApp = availableIntegrations.find((i) =>
-        i.components?.some((c) => c.name === (node.data as any)._originalComponent),
+        i.components?.some((c: ComponentsComponent) => c.name === (node.data as any)._originalComponent),
       );
       if (componentApp) {
         appName = componentApp.name;
@@ -677,13 +684,14 @@ export const CustomComponent = () => {
               name: component.name,
             },
           };
-          updatedData.component = getComponentBaseMapper(component.name!).props(
-            [],
-            updatedNode,
-            component,
-            [],
-            undefined,
-          );
+          updatedData.component = getComponentBaseMapper(component.name!).props({
+            nodes: [],
+            node: buildNodeInfo(updatedNode),
+            componentDefinition: buildComponentDefinition(component!),
+            lastExecutions: [],
+            nodeQueueItems: [],
+            additionalData: undefined,
+          });
         }
 
         return {
