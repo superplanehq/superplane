@@ -130,6 +130,10 @@ export const waitForButtonClickMapper: ComponentBaseMapper = {
       details["Clicked at"] = formatTimestamp(receivedData.clicked_at);
     }
 
+    if ((receivedData?.clicked_by as Record<string, unknown>)?.username) {
+      details["Clicked by"] = (receivedData?.clicked_by as Record<string, unknown>)?.username as string;
+    }
+
     // Add selected button value if available
     if (metadata?.selectedButton) {
       details["Selected Button"] = metadata.selectedButton;
