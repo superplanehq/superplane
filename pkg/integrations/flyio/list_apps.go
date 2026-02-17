@@ -1,8 +1,11 @@
 package flyio
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+
+	_ "embed"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -53,23 +56,16 @@ func (c *ListApps) Color() string {
 	return "purple"
 }
 
+//go:embed list_apps_example_output.json
+var listAppsExampleOutput []byte
+
 func (c *ListApps) ExampleOutput() map[string]any {
-	return map[string]any{
-		"orgSlug": "personal",
-		"count":   2,
-		"apps": []map[string]any{
-			{
-				"name":         "my-fly-app",
-				"status":       "deployed",
-				"machineCount": 2,
-			},
-			{
-				"name":         "my-other-app",
-				"status":       "deployed",
-				"machineCount": 1,
-			},
-		},
-	}
+	var output map[string]any
+	// The component rules state that Example JSON files must be valid.
+	// We can trust it is valid JSON if we wrote it correctly.
+	// Ignoring error here as this is a static asset.
+	_ = json.Unmarshal(listAppsExampleOutput, &output)
+	return output
 }
 
 func (c *ListApps) OutputChannels(configuration any) []core.OutputChannel {
@@ -110,6 +106,13 @@ func (c *ListApps) Execute(ctx core.ExecutionContext) error {
 	// Get org slug from component config or fall back to integration config
 	orgSlug := spec.OrgSlug
 	if orgSlug == "" {
+		// Try to get from integration config
+		if configSlug, err := ctx.Integration.GetConfig("orgSlug"); err == nil && len(configSlug) > 0 {
+			orgSlug = string(configSlug)
+		}
+	}
+
+	if orgSlug == "" {
 		// Try to get from integration metadata
 		integrationMetadata := Metadata{}
 		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err == nil && len(integrationMetadata.Apps) > 0 {
@@ -118,9 +121,10 @@ func (c *ListApps) Execute(ctx core.ExecutionContext) error {
 				orgSlug = integrationMetadata.Apps[0].Organization.Slug
 			}
 		}
-		if orgSlug == "" {
-			orgSlug = "personal"
-		}
+	}
+
+	if orgSlug == "" {
+		orgSlug = "personal"
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)

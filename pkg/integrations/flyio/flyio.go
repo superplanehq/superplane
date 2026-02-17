@@ -91,9 +91,7 @@ func (f *FlyIO) Components() []core.Component {
 }
 
 func (f *FlyIO) Triggers() []core.Trigger {
-	return []core.Trigger{
-		&OnAppStateChange{},
-	}
+	return []core.Trigger{}
 }
 
 func (f *FlyIO) Sync(ctx core.SyncContext) error {
