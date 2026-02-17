@@ -22,6 +22,7 @@ import discordIcon from "@/assets/icons/integrations/discord.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
+import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
@@ -408,6 +409,7 @@ function CategorySection({
     discord: discordIcon,
     github: githubIcon,
     gitlab: gitlabIcon,
+    grafana: grafanaIcon,
     hetzner: hetznerIcon,
     jira: jiraIcon,
     openai: openAiIcon,
@@ -489,6 +491,7 @@ function CategorySection({
             discord: discordIcon,
             github: githubIcon,
             gitlab: gitlabIcon,
+            grafana: grafanaIcon,
             hetzner: hetznerIcon,
             openai: openAiIcon,
             "open-ai": openAiIcon,
