@@ -131,7 +131,7 @@ func Test_DeleteRole(t *testing.T) {
 
 		account, err := models.CreateAccount("only-role-user", "only-role-user@test.com")
 		require.NoError(t, err)
-		user, err := models.CreateUser(r.Organization.ID, account.ID, account.Name, account.Email)
+		user, err := models.CreateUser(r.Organization.ID, account.ID, account.Email, account.Name)
 		require.NoError(t, err)
 
 		err = r.AuthService.AssignRole(user.ID.String(), "test-role-only-users", orgID, models.DomainTypeOrganization)

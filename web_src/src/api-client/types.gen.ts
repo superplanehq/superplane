@@ -406,6 +406,7 @@ export type ConfigurationListItemDefinition = {
 export type ConfigurationListTypeOptions = {
   itemDefinition?: ConfigurationListItemDefinition;
   itemLabel?: string;
+  maxItems?: number;
 };
 
 export type ConfigurationMultiSelectTypeOptions = {
@@ -921,6 +922,57 @@ export type SecretsUpdateSecretNameResponse = {
 
 export type SecretsUpdateSecretResponse = {
   secret?: SecretsSecret;
+};
+
+export type ServiceAccountsCreateServiceAccountRequest = {
+  name?: string;
+  description?: string;
+  role?: string;
+};
+
+export type ServiceAccountsCreateServiceAccountResponse = {
+  serviceAccount?: ServiceAccountsServiceAccount;
+  token?: string;
+};
+
+export type ServiceAccountsDeleteServiceAccountResponse = {
+  [key: string]: unknown;
+};
+
+export type ServiceAccountsDescribeServiceAccountResponse = {
+  serviceAccount?: ServiceAccountsServiceAccount;
+};
+
+export type ServiceAccountsListServiceAccountsResponse = {
+  serviceAccounts?: Array<ServiceAccountsServiceAccount>;
+};
+
+export type ServiceAccountsRegenerateServiceAccountTokenBody = {
+  [key: string]: unknown;
+};
+
+export type ServiceAccountsRegenerateServiceAccountTokenResponse = {
+  token?: string;
+};
+
+export type ServiceAccountsServiceAccount = {
+  id?: string;
+  name?: string;
+  description?: string;
+  organizationId?: string;
+  createdBy?: string;
+  hasToken?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ServiceAccountsUpdateServiceAccountBody = {
+  name?: string;
+  description?: string;
+};
+
+export type ServiceAccountsUpdateServiceAccountResponse = {
+  serviceAccount?: ServiceAccountsServiceAccount;
 };
 
 export type SuperplaneBlueprintsOutputChannel = {
@@ -3027,6 +3079,176 @@ export type SecretsUpdateSecretNameResponses = {
 
 export type SecretsUpdateSecretNameResponse2 = SecretsUpdateSecretNameResponses[keyof SecretsUpdateSecretNameResponses];
 
+export type ServiceAccountsListServiceAccountsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/api/v1/service-accounts";
+};
+
+export type ServiceAccountsListServiceAccountsErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type ServiceAccountsListServiceAccountsError =
+  ServiceAccountsListServiceAccountsErrors[keyof ServiceAccountsListServiceAccountsErrors];
+
+export type ServiceAccountsListServiceAccountsResponses = {
+  /**
+   * A successful response.
+   */
+  200: ServiceAccountsListServiceAccountsResponse;
+};
+
+export type ServiceAccountsListServiceAccountsResponse2 =
+  ServiceAccountsListServiceAccountsResponses[keyof ServiceAccountsListServiceAccountsResponses];
+
+export type ServiceAccountsCreateServiceAccountData = {
+  body: ServiceAccountsCreateServiceAccountRequest;
+  path?: never;
+  query?: never;
+  url: "/api/v1/service-accounts";
+};
+
+export type ServiceAccountsCreateServiceAccountErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type ServiceAccountsCreateServiceAccountError =
+  ServiceAccountsCreateServiceAccountErrors[keyof ServiceAccountsCreateServiceAccountErrors];
+
+export type ServiceAccountsCreateServiceAccountResponses = {
+  /**
+   * A successful response.
+   */
+  200: ServiceAccountsCreateServiceAccountResponse;
+};
+
+export type ServiceAccountsCreateServiceAccountResponse2 =
+  ServiceAccountsCreateServiceAccountResponses[keyof ServiceAccountsCreateServiceAccountResponses];
+
+export type ServiceAccountsDeleteServiceAccountData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/service-accounts/{id}";
+};
+
+export type ServiceAccountsDeleteServiceAccountErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type ServiceAccountsDeleteServiceAccountError =
+  ServiceAccountsDeleteServiceAccountErrors[keyof ServiceAccountsDeleteServiceAccountErrors];
+
+export type ServiceAccountsDeleteServiceAccountResponses = {
+  /**
+   * A successful response.
+   */
+  200: ServiceAccountsDeleteServiceAccountResponse;
+};
+
+export type ServiceAccountsDeleteServiceAccountResponse2 =
+  ServiceAccountsDeleteServiceAccountResponses[keyof ServiceAccountsDeleteServiceAccountResponses];
+
+export type ServiceAccountsDescribeServiceAccountData = {
+  body?: never;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/service-accounts/{id}";
+};
+
+export type ServiceAccountsDescribeServiceAccountErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type ServiceAccountsDescribeServiceAccountError =
+  ServiceAccountsDescribeServiceAccountErrors[keyof ServiceAccountsDescribeServiceAccountErrors];
+
+export type ServiceAccountsDescribeServiceAccountResponses = {
+  /**
+   * A successful response.
+   */
+  200: ServiceAccountsDescribeServiceAccountResponse;
+};
+
+export type ServiceAccountsDescribeServiceAccountResponse2 =
+  ServiceAccountsDescribeServiceAccountResponses[keyof ServiceAccountsDescribeServiceAccountResponses];
+
+export type ServiceAccountsUpdateServiceAccountData = {
+  body: ServiceAccountsUpdateServiceAccountBody;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/service-accounts/{id}";
+};
+
+export type ServiceAccountsUpdateServiceAccountErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type ServiceAccountsUpdateServiceAccountError =
+  ServiceAccountsUpdateServiceAccountErrors[keyof ServiceAccountsUpdateServiceAccountErrors];
+
+export type ServiceAccountsUpdateServiceAccountResponses = {
+  /**
+   * A successful response.
+   */
+  200: ServiceAccountsUpdateServiceAccountResponse;
+};
+
+export type ServiceAccountsUpdateServiceAccountResponse2 =
+  ServiceAccountsUpdateServiceAccountResponses[keyof ServiceAccountsUpdateServiceAccountResponses];
+
+export type ServiceAccountsRegenerateServiceAccountTokenData = {
+  body: ServiceAccountsRegenerateServiceAccountTokenBody;
+  path: {
+    id: string;
+  };
+  query?: never;
+  url: "/api/v1/service-accounts/{id}/token";
+};
+
+export type ServiceAccountsRegenerateServiceAccountTokenErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type ServiceAccountsRegenerateServiceAccountTokenError =
+  ServiceAccountsRegenerateServiceAccountTokenErrors[keyof ServiceAccountsRegenerateServiceAccountTokenErrors];
+
+export type ServiceAccountsRegenerateServiceAccountTokenResponses = {
+  /**
+   * A successful response.
+   */
+  200: ServiceAccountsRegenerateServiceAccountTokenResponse;
+};
+
+export type ServiceAccountsRegenerateServiceAccountTokenResponse2 =
+  ServiceAccountsRegenerateServiceAccountTokenResponses[keyof ServiceAccountsRegenerateServiceAccountTokenResponses];
+
 export type TriggersListTriggersData = {
   body?: never;
   path?: never;
@@ -3085,6 +3307,7 @@ export type UsersListUsersData = {
   query?: {
     domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
+    includeServiceAccounts?: boolean;
   };
   url: "/api/v1/users";
 };

@@ -164,10 +164,10 @@ type ProvisionRuleParameters struct {
 }
 
 type EventBridgeEvent struct {
-	Region     string         `json:"region"`
-	DetailType string         `json:"detail-type"`
-	Source     string         `json:"source"`
-	Detail     map[string]any `json:"detail"`
+	Region     string         `json:"region" mapstructure:"region"`
+	DetailType string         `json:"detail-type" mapstructure:"detail-type"`
+	Source     string         `json:"source" mapstructure:"source"`
+	Detail     map[string]any `json:"detail" mapstructure:"detail"`
 }
 
 type Tag struct {
@@ -187,6 +187,9 @@ func TagsForAPI(tags []Tag) []any {
 }
 
 func CredentialsFromInstallation(ctx core.IntegrationContext) (*aws.Credentials, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("AWS integration context is missing")
+	}
 	secrets, err := ctx.GetSecrets()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get AWS session secrets: %w", err)

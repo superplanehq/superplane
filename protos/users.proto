@@ -102,6 +102,7 @@ message ListUserRolesResponse {
 message ListUsersRequest {
   Authorization.DomainType domain_type = 1;
   string domain_id = 2;
+  bool include_service_accounts = 3;
 }
 
 message ListUsersResponse {

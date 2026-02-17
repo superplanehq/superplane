@@ -340,7 +340,7 @@ func Test__CreateOrganization(t *testing.T) {
 
 		user, err := models.FindActiveUserByEmail(orgID, account.Email)
 		require.NoError(t, err)
-		assert.Equal(t, account.Email, user.Email)
+		assert.Equal(t, account.Email, user.GetEmail())
 
 		roles, err := authService.GetUserRolesForOrg(user.ID.String(), orgID)
 		require.NoError(t, err)

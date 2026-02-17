@@ -16,7 +16,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Cancel Deploy" href="#cancel-deploy" description="Cancel an in-progress deploy for a Render service and wait for it to complete" />
   <LinkCard title="Deploy" href="#deploy" description="Trigger a deploy for a Render service and wait for it to complete" />
+  <LinkCard title="Get Deploy" href="#get-deploy" description="Retrieve a deploy by ID for a Render service" />
+  <LinkCard title="Get Service" href="#get-service" description="Retrieve a Render service by ID" />
+  <LinkCard title="Purge Cache" href="#purge-cache" description="Request a purge of the build cache for a Render service" />
+  <LinkCard title="Rollback Deploy" href="#rollback-deploy" description="Roll back a Render service to a previous deploy and wait for it to complete" />
+  <LinkCard title="Update Env Var" href="#update-env-var" description="Update or generate a value for a Render service environment variable" />
 </CardGrid>
 
 ## Instructions
@@ -119,6 +125,58 @@ The default output emits payload data fields like `deployId`, `eventId`, `servic
 }
 ```
 
+<a id="cancel-deploy"></a>
+
+## Cancel Deploy
+
+The Cancel Deploy component cancels an in-progress deploy for a Render service and waits for it to complete.
+
+### Use Cases
+
+- **Automated rollback/abort**: Cancel deploys when health checks fail
+- **Manual intervention**: Stop a deploy triggered earlier in a workflow
+
+### How It Works
+
+1. Sends a cancel request for the specified deploy via the Render API
+2. Waits for the deploy to finish (via deploy_ended webhook and optional polling fallback)
+3. Routes execution based on deploy outcome:
+   - **Success channel**: Deploy was cancelled successfully (status is `canceled`)
+   - **Failed channel**: Deploy finished with an unexpected status
+
+### Configuration
+
+- **Service**: Render service that owns the deploy
+- **Deploy ID**: Deploy ID to cancel (supports expressions)
+
+### Output Channels
+
+- **Success**: Emitted when the deploy is cancelled successfully
+- **Failed**: Emitted when the deploy finishes with a non-cancelled status
+
+### Notes
+
+- Uses the existing integration webhook for deploy_ended events
+- Falls back to polling if the webhook does not arrive
+- Requires a Render API key configured on the integration
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": "2026-02-05T16:10:00.000000Z",
+    "deployId": "dep-cukouhrtq21c73e9scng",
+    "finishedAt": "2026-02-05T16:12:00.000000Z",
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "status": "canceled",
+    "trigger": "api"
+  },
+  "timestamp": "2026-02-05T16:12:00.000000Z",
+  "type": "render.deploy"
+}
+```
+
 <a id="deploy"></a>
 
 ## Deploy
@@ -168,6 +226,214 @@ The Deploy component starts a new deploy for a Render service and waits for it t
   },
   "timestamp": "2026-02-05T16:15:00.000000Z",
   "type": "render.deploy.finished"
+}
+```
+
+<a id="get-deploy"></a>
+
+## Get Deploy
+
+The Get Deploy component fetches a deploy for a Render service.
+
+### Use Cases
+
+- **Status checks**: Inspect deploy status and timestamps
+- **Debugging**: Fetch deploy metadata after receiving an event
+
+### Configuration
+
+- **Service**: Render service that owns the deploy
+- **Deploy ID**: Deploy ID to retrieve (supports expressions)
+
+### Output
+
+Emits a `render.deploy` payload containing deploy fields like `deployId`, `status`, `trigger`, and timestamps when available.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "commit": {
+      "createdAt": "2026-02-05T16:09:30.000000Z",
+      "id": "1a2b3c4d5e6f",
+      "message": "Release v1.2.3"
+    },
+    "createdAt": "2026-02-05T16:10:00.000000Z",
+    "deployId": "dep-cukouhrtq21c73e9scng",
+    "finishedAt": "2026-02-05T16:15:00.000000Z",
+    "image": {
+      "ref": "registry.example.com/backend-api:1a2b3c4d",
+      "sha": "sha256:4f7c2d7f0bb27e2f8d4d9b3d2b3a1a9a3b2c1d0e"
+    },
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "startedAt": "2026-02-05T16:10:10.000000Z",
+    "status": "live",
+    "trigger": "api"
+  },
+  "timestamp": "2026-02-05T16:15:00.000000Z",
+  "type": "render.deploy"
+}
+```
+
+<a id="get-service"></a>
+
+## Get Service
+
+The Get Service component fetches details for a Render service.
+
+### Use Cases
+
+- **Service inspection**: Fetch current service configuration and metadata
+- **Workflow context**: Use service fields to drive branching decisions in later steps
+
+### Configuration
+
+- **Service**: Render service to retrieve
+
+### Output
+
+Emits a `render.service` payload containing service fields like `serviceId`, `serviceName`, `type`, `dashboardUrl`, and `suspended`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": "2026-02-05T15:00:00.000000Z",
+    "dashboardUrl": "https://dashboard.render.com/web/srv-cukouhrtq21c73e9scng",
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "serviceName": "backend-api",
+    "suspended": "not_suspended",
+    "type": "web_service",
+    "updatedAt": "2026-02-05T16:00:00.000000Z"
+  },
+  "timestamp": "2026-02-05T16:05:00.000000Z",
+  "type": "render.service"
+}
+```
+
+<a id="purge-cache"></a>
+
+## Purge Cache
+
+The Purge Cache component requests a build cache purge for a Render service.
+
+### Use Cases
+
+- **Cache reset**: Force a clean rebuild when you suspect stale dependencies or build artifacts
+- **Operational tooling**: Provide a one-click cache purge in incident response workflows
+
+### Configuration
+
+- **Service**: Render service whose build cache should be purged
+
+### Output
+
+Emits a `render.cache.purge.requested` payload with `serviceId` and a `status` field indicating the request was accepted.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "status": "accepted"
+  },
+  "timestamp": "2026-02-05T16:20:00.000000Z",
+  "type": "render.cache.purge.requested"
+}
+```
+
+<a id="rollback-deploy"></a>
+
+## Rollback Deploy
+
+The Rollback Deploy component triggers a rollback deploy for a Render service and waits for it to complete.
+
+### Use Cases
+
+- **Automated recovery**: Roll back after detecting errors in a new deploy
+- **One-click rollback**: Trigger rollbacks from an incident workflow
+
+### How It Works
+
+1. Triggers a rollback deploy for the selected Render service via the Render API
+2. Waits for the deploy to complete (via deploy_ended webhook and optional polling fallback)
+3. Routes execution based on deploy outcome:
+   - **Success channel**: Deploy completed successfully (status is `live`)
+   - **Failed channel**: Deploy failed or was cancelled
+
+### Configuration
+
+- **Service**: Render service to roll back
+- **Deploy ID**: The deploy ID to roll back to (supports expressions)
+
+### Output Channels
+
+- **Success**: Emitted when the rollback deploy completes successfully
+- **Failed**: Emitted when the rollback deploy fails or is cancelled
+
+### Notes
+
+- Uses the existing integration webhook for deploy_ended events
+- Falls back to polling if the webhook does not arrive
+- Includes `rollbackToDeployId` in the output payload for reference
+- Requires a Render API key configured on the integration
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": "2026-02-05T16:18:00.000000Z",
+    "deployId": "dep-cukouhrtq21c73e9scng",
+    "rollbackToDeployId": "dep-cukouhrtq21c73e9scnf",
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "status": "build_in_progress",
+    "trigger": "rollback"
+  },
+  "timestamp": "2026-02-05T16:18:00.000000Z",
+  "type": "render.deploy"
+}
+```
+
+<a id="update-env-var"></a>
+
+## Update Env Var
+
+The Update Env Var component updates a Render service environment variable.
+
+### Use Cases
+
+- **Rotate secrets**: Generate a new value for an env var (for example, API tokens) and optionally emit it
+- **Configuration changes**: Update non-secret environment values as part of a workflow
+
+### Configuration
+
+- **Service**: Render service that owns the env var
+- **Key**: Env var key to update
+- **Value Strategy**:
+  - `Set value`: provide the `Value` field
+  - `Generate value`: request Render to generate a new value
+- **Value**: New env var value (sensitive). Required when using `Set value`
+- **Emit Value**: When enabled, include the env var `value` in output. Disabled by default to avoid leaking secrets.
+
+### Output
+
+Emits a `render.envVar.updated` payload with `serviceId`, `key`, and a `valueGenerated` boolean. The `value` field is only included when `emitValue` is enabled.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "key": "DATABASE_URL",
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "valueGenerated": false
+  },
+  "timestamp": "2026-02-05T16:25:00.000000Z",
+  "type": "render.envVar.updated"
 }
 ```
 

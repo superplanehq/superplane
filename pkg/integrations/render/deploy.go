@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -28,11 +29,22 @@ type DeployExecutionMetadata struct {
 }
 
 type DeployMetadata struct {
-	ID         string `json:"id"`
-	Status     string `json:"status"`
-	ServiceID  string `json:"serviceId"`
-	CreatedAt  string `json:"createdAt"`
-	FinishedAt string `json:"finishedAt"`
+	ID                 string `json:"id"`
+	Status             string `json:"status"`
+	ServiceID          string `json:"serviceId"`
+	CreatedAt          string `json:"createdAt"`
+	FinishedAt         string `json:"finishedAt"`
+	RollbackToDeployID string `json:"rollbackToDeployId,omitempty"`
+}
+
+// deployEndedWebhookConfig holds the parameters that vary between
+// deploy lifecycle components (Deploy, CancelDeploy, RollbackDeploy).
+type deployEndedWebhookConfig struct {
+	executionKey    string
+	successStatuses []string
+	successChannel  string
+	failedChannel   string
+	payloadType     string
 }
 
 type DeployConfiguration struct {
@@ -277,61 +289,27 @@ func (c *Deploy) poll(ctx core.ActionContext) error {
 		return err
 	}
 
-	return c.emitDeployResult(ctx, deploy)
+	payload := deployPayloadFromDeployResponse(deploy)
+	return emitDeployStatusResult(ctx.ExecutionState, deploy.Status, deployEndedWebhookConfig{
+		successStatuses: []string{"live", "succeeded"},
+		successChannel:  DeploySuccessOutputChannel,
+		failedChannel:   DeployFailedOutputChannel,
+		payloadType:     DeployPayloadType,
+	}, payload)
 }
 
 func (c *Deploy) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	if err := verifyWebhookSignature(ctx); err != nil {
-		return http.StatusForbidden, err
-	}
-
-	payload, err := parseDeployWebhookPayload(ctx.Body)
-	if err != nil {
-		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %w", err)
-	}
-
-	if readString(payload.Type) != "deploy_ended" {
-		return http.StatusOK, nil
-	}
-
-	result, err := c.resolveDeployWebhookResult(ctx, payload)
-	if err != nil {
-		return http.StatusOK, nil
-	}
-	if result.DeployID == "" || result.Status == "" {
-		return http.StatusOK, nil
-	}
-
-	executionCtx, err := findDeployExecutionByID(ctx, result.DeployID)
-	if err != nil {
-		return http.StatusOK, nil
-	}
-	if executionCtx == nil {
-		return http.StatusOK, nil
-	}
-
-	metadata := DeployExecutionMetadata{}
-	if err := mapstructure.Decode(executionCtx.Metadata.Get(), &metadata); err != nil {
-		return http.StatusInternalServerError, fmt.Errorf("error decoding metadata: %w", err)
-	}
-
-	if metadata.Deploy != nil && metadata.Deploy.FinishedAt != "" {
-		return http.StatusOK, nil
-	}
-
-	applyDeployWebhookResultToMetadata(&metadata, result)
-	if err := executionCtx.Metadata.Set(metadata); err != nil {
-		return http.StatusInternalServerError, err
-	}
-
-	if err := c.emitDeployResultFromWebhook(executionCtx, deployPayloadFromWebhookResult(result)); err != nil {
-		return http.StatusInternalServerError, err
-	}
-
-	return http.StatusOK, nil
+	return handleDeployEndedWebhook(ctx, deployEndedWebhookConfig{
+		executionKey:    deployExecutionKey,
+		successStatuses: []string{"live", "succeeded"},
+		successChannel:  DeploySuccessOutputChannel,
+		failedChannel:   DeployFailedOutputChannel,
+		payloadType:     DeployPayloadType,
+	})
 }
 
-func (c *Deploy) resolveDeployFromEvent(
+// resolveDeployFromEvent fetches deploy details from a webhook event ID.
+func resolveDeployFromEvent(
 	ctx core.WebhookRequestContext,
 	eventID string,
 ) (deployWebhookResult, error) {
@@ -355,22 +333,6 @@ func (c *Deploy) resolveDeployFromEvent(
 		FinishedAt: readString(event.Timestamp),
 		EventID:    eventID,
 	}, nil
-}
-
-func (c *Deploy) emitDeployResult(ctx core.ActionContext, deploy DeployResponse) error {
-	payload := deployPayloadFromDeployResponse(deploy)
-	if deploy.Status == "live" {
-		return ctx.ExecutionState.Emit(DeploySuccessOutputChannel, DeployPayloadType, []any{payload})
-	}
-	return ctx.ExecutionState.Emit(DeployFailedOutputChannel, DeployPayloadType, []any{payload})
-}
-
-func (c *Deploy) emitDeployResultFromWebhook(ctx *core.ExecutionContext, data map[string]any) error {
-	status := readString(data["status"])
-	if status == "live" {
-		return ctx.ExecutionState.Emit(DeploySuccessOutputChannel, DeployPayloadType, []any{data})
-	}
-	return ctx.ExecutionState.Emit(DeployFailedOutputChannel, DeployPayloadType, []any{data})
 }
 
 func parseDeployWebhookPayload(body []byte) (deployWebhookPayload, error) {
@@ -430,12 +392,14 @@ func mergeDeployWebhookResults(primary, fallback deployWebhookResult) deployWebh
 	return primary
 }
 
-func (c *Deploy) resolveDeployWebhookResult(
+// resolveDeployEndedWebhookResult resolves webhook payload and event data
+// into a unified deployWebhookResult.
+func resolveDeployEndedWebhookResult(
 	ctx core.WebhookRequestContext,
 	payload deployWebhookPayload,
 ) (deployWebhookResult, error) {
 	result := deployWebhookResultFromPayload(payload)
-	eventResult, err := c.resolveDeployFromEvent(ctx, result.EventID)
+	eventResult, err := resolveDeployFromEvent(ctx, result.EventID)
 	if err != nil {
 		return deployWebhookResult{}, err
 	}
@@ -443,12 +407,13 @@ func (c *Deploy) resolveDeployWebhookResult(
 	return mergeDeployWebhookResults(result, eventResult), nil
 }
 
-func findDeployExecutionByID(ctx core.WebhookRequestContext, deployID string) (*core.ExecutionContext, error) {
+// findExecutionByDeployID looks up an execution using a deploy ID stored in KV.
+func findExecutionByDeployID(ctx core.WebhookRequestContext, key, deployID string) (*core.ExecutionContext, error) {
 	if deployID == "" || ctx.FindExecutionByKV == nil {
 		return nil, nil
 	}
 
-	return ctx.FindExecutionByKV(deployExecutionKey, deployID)
+	return ctx.FindExecutionByKV(key, deployID)
 }
 
 func applyDeployWebhookResultToMetadata(metadata *DeployExecutionMetadata, result deployWebhookResult) {
@@ -502,6 +467,89 @@ func deployPayloadFromWebhookResult(result deployWebhookResult) map[string]any {
 	}
 
 	return payload
+}
+
+// handleDeployEndedWebhook is the shared webhook handler for deploy lifecycle
+// components (Deploy, CancelDeploy, RollbackDeploy).
+func handleDeployEndedWebhook(
+	ctx core.WebhookRequestContext,
+	config deployEndedWebhookConfig,
+) (int, error) {
+	if err := verifyWebhookSignature(ctx); err != nil {
+		return http.StatusForbidden, err
+	}
+
+	payload, err := parseDeployWebhookPayload(ctx.Body)
+	if err != nil {
+		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %w", err)
+	}
+
+	if readString(payload.Type) != "deploy_ended" {
+		return http.StatusOK, nil
+	}
+
+	result, err := resolveDeployEndedWebhookResult(ctx, payload)
+	if err != nil {
+		return http.StatusOK, nil
+	}
+	if result.DeployID == "" || result.Status == "" {
+		return http.StatusOK, nil
+	}
+
+	executionCtx, err := findExecutionByDeployID(ctx, config.executionKey, result.DeployID)
+	if err != nil {
+		return http.StatusOK, nil
+	}
+	if executionCtx == nil {
+		return http.StatusOK, nil
+	}
+
+	metadata := DeployExecutionMetadata{}
+	if err := mapstructure.Decode(executionCtx.Metadata.Get(), &metadata); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error decoding metadata: %w", err)
+	}
+
+	if metadata.Deploy != nil && metadata.Deploy.FinishedAt != "" {
+		return http.StatusOK, nil
+	}
+
+	applyDeployWebhookResultToMetadata(&metadata, result)
+	if err := executionCtx.Metadata.Set(metadata); err != nil {
+		return http.StatusInternalServerError, err
+	}
+
+	data := deployPayloadFromWebhookResult(result)
+	enrichPayloadFromMetadata(data, &metadata)
+
+	if err := emitDeployStatusResult(executionCtx.ExecutionState, readString(data["status"]), config, data); err != nil {
+		return http.StatusInternalServerError, err
+	}
+
+	return http.StatusOK, nil
+}
+
+// emitDeployStatusResult emits to the success or failed channel based on status.
+func emitDeployStatusResult(
+	state core.ExecutionStateContext,
+	status string,
+	config deployEndedWebhookConfig,
+	payload map[string]any,
+) error {
+	if slices.Contains(config.successStatuses, status) {
+		return state.Emit(config.successChannel, config.payloadType, []any{payload})
+	}
+	return state.Emit(config.failedChannel, config.payloadType, []any{payload})
+}
+
+// enrichPayloadFromMetadata adds optional metadata fields (e.g. rollbackToDeployId)
+// to an output payload.
+func enrichPayloadFromMetadata(payload map[string]any, metadata *DeployExecutionMetadata) {
+	if metadata.Deploy == nil {
+		return
+	}
+	if metadata.Deploy.RollbackToDeployID != "" {
+		payload["rollbackToDeployId"] = metadata.Deploy.RollbackToDeployID
+	}
 }
 
 func (c *Deploy) Cancel(ctx core.ExecutionContext) error {
