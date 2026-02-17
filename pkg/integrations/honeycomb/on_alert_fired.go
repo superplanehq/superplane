@@ -1,6 +1,7 @@
 package honeycomb
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -159,7 +160,13 @@ func (t *OnAlertFired) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 		provided = strings.TrimSpace(provided[len("bearer "):])
 	}
 
-	if provided != secret {
+	providedBytes := []byte(provided)
+	secretBytes := []byte(secret)
+	if len(providedBytes) != len(secretBytes) {
+		subtle.ConstantTimeCompare(secretBytes, secretBytes) // constant-time dummy to avoid leaking length
+		return http.StatusForbidden, fmt.Errorf("invalid webhook token")
+	}
+	if subtle.ConstantTimeCompare(providedBytes, secretBytes) != 1 {
 		return http.StatusForbidden, fmt.Errorf("invalid webhook token")
 	}
 
