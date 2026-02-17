@@ -22,7 +22,7 @@ func canonicalStatus(status string) string {
 	switch normalized {
 	case "success", "completed":
 		return "succeeded"
-	case "error":
+	case "error", "errored":
 		return "failed"
 	case "cancelled", "canceled", "stopped", "rejected":
 		return "aborted"

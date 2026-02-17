@@ -345,6 +345,44 @@ func Test__RunPipeline__Poll_EmitsFailed(t *testing.T) {
 	assert.Equal(t, "failed", payload["status"])
 }
 
+func Test__RunPipeline__Poll_EmitsFailedForErrored(t *testing.T) {
+	component := &RunPipeline{}
+
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{{
+			StatusCode: http.StatusOK,
+			Body: io.NopCloser(strings.NewReader(`
+				{"data":{"content":[{"planExecutionId":"exec-1","pipelineIdentifier":"deploy-prod","status":"ERRORED","planExecutionUrl":"https://app.harness.io/executions/exec-1"}]}}
+			`)),
+		}},
+	}
+
+	executionStateCtx := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	metadataCtx := &contexts.MetadataContext{Metadata: RunPipelineExecutionMetadata{ExecutionID: "exec-1", PipelineIdentifier: "deploy-prod", Status: "running"}}
+
+	err := component.HandleAction(core.ActionContext{
+		Name:           RunPipelinePollAction,
+		Configuration:  RunPipelineSpec{OrgID: "default", ProjectID: "default_project", PipelineIdentifier: "deploy-prod"},
+		HTTP:           httpCtx,
+		Metadata:       metadataCtx,
+		ExecutionState: executionStateCtx,
+		Requests:       &contexts.RequestContext{},
+		Integration: &contexts.IntegrationContext{Configuration: map[string]any{
+			"apiToken": "pat.acc.test",
+		}},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, RunPipelineFailed, executionStateCtx.Channel)
+	assert.Equal(t, RunPipelinePayloadType, executionStateCtx.Type)
+	require.NotEmpty(t, executionStateCtx.Payloads)
+	payloadWrapper, ok := executionStateCtx.Payloads[0].(map[string]any)
+	require.True(t, ok)
+	payload, ok := payloadWrapper["data"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "failed", payload["status"])
+}
+
 func Test__RunPipeline__Poll_EmitsFailedAfterMaxPollErrors(t *testing.T) {
 	component := &RunPipeline{}
 

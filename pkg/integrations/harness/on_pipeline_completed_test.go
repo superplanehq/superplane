@@ -161,6 +161,34 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		assert.Equal(t, "exec-1", storedMetadata.LastExecutionID)
 	})
 
+	t.Run("treats errored webhook status as failed terminal", func(t *testing.T) {
+		headers := http.Header{}
+		headers.Set("Authorization", "Bearer expected")
+		events := &contexts.EventContext{}
+		metadata := &contexts.MetadataContext{}
+
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers: headers,
+			Body:    []byte(`{"eventType":"PIPELINE_END","data":{"planExecutionId":"exec-errored","pipelineIdentifier":"deploy","status":"ERRORED"}}`),
+			Webhook: &contexts.WebhookContext{Secret: "expected"},
+			Configuration: OnPipelineCompletedConfiguration{
+				OrgID:              "default",
+				ProjectID:          "default_project",
+				PipelineIdentifier: "deploy",
+				Statuses:           []string{"failed"},
+			},
+			Metadata: metadata,
+			Events:   events,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Equal(t, 1, events.Count())
+		eventData, ok := events.Payloads[0].Data.(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "failed", eventData["status"])
+	})
+
 	t.Run("without webhook secret rejects request", func(t *testing.T) {
 		events := &contexts.EventContext{}
 

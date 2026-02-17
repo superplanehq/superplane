@@ -61,3 +61,8 @@ func Test__IsPipelineCompletedEventType(t *testing.T) {
 	assert.False(t, isPipelineCompletedEventType("STAGE_END"))
 	assert.False(t, isPipelineCompletedEventType(""))
 }
+
+func Test__CanonicalStatus__TreatsErroredAsFailedTerminal(t *testing.T) {
+	assert.Equal(t, "failed", canonicalStatus("ERRORED"))
+	assert.True(t, isTerminalStatus("ERRORED"))
+}
