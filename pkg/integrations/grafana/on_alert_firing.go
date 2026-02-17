@@ -74,13 +74,29 @@ func (t *OnAlertFiring) Configuration() []configuration.Field {
 }
 
 func (t *OnAlertFiring) Setup(ctx core.TriggerContext) error {
+	if ctx.Integration == nil {
+		return fmt.Errorf("missing integration context")
+	}
+
+	if err := ctx.Integration.RequestWebhook(ctx.Configuration); err != nil {
+		return err
+	}
+
+	if ctx.Webhook == nil {
+		return fmt.Errorf("missing webhook context")
+	}
+
 	webhookURL, err := ctx.Webhook.Setup()
 	if err != nil {
 		return err
 	}
 
-	if err := setWebhookURLMetadata(ctx, webhookURL); err != nil {
-		ctx.Logger.Warnf("grafana onAlertFiring: failed to store webhook url metadata: %v", err)
+	if ctx.Metadata != nil {
+		if err := setWebhookURLMetadata(ctx, webhookURL); err != nil {
+			if ctx.Logger != nil {
+				ctx.Logger.Warnf("grafana onAlertFiring: failed to store webhook url metadata: %v", err)
+			}
+		}
 	}
 
 	return nil
