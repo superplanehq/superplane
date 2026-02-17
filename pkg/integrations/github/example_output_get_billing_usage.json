@@ -1,0 +1,32 @@
+{
+  "data": {
+    "minutes_used": 2450,
+    "minutes_used_breakdown": {
+      "UBUNTU": 1800,
+      "WINDOWS": 500,
+      "MACOS": 150
+    },
+    "total_cost": 24.50,
+    "repository_breakdown": [
+      {
+        "repository_name": "backend-api",
+        "minutes_used": 1200,
+        "breakdown": {
+          "UBUNTU": 1000,
+          "WINDOWS": 200
+        }
+      },
+      {
+        "repository_name": "frontend-app",
+        "minutes_used": 1250,
+        "breakdown": {
+          "UBUNTU": 800,
+          "WINDOWS": 300,
+          "MACOS": 150
+        }
+      }
+    ]
+  },
+  "timestamp": "2026-02-09T04:47:31.680755501Z",
+  "type": "github.billing.usage"
+}
