@@ -142,10 +142,12 @@ func (t *OnAlertFired) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 	}
 
 	provided := strings.TrimSpace(ctx.Headers.Get("X-Honeycomb-Webhook-Token"))
+	fromAuthorizationHeader := false
 
 	// Fallbacks
 	if provided == "" {
 		provided = strings.TrimSpace(ctx.Headers.Get("Authorization"))
+		fromAuthorizationHeader = provided != ""
 	}
 
 	if provided == "" {
@@ -156,7 +158,7 @@ func (t *OnAlertFired) HandleWebhook(ctx core.WebhookRequestContext) (int, error
 		return http.StatusUnauthorized, fmt.Errorf("missing webhook token")
 	}
 
-	if strings.HasPrefix(strings.ToLower(provided), "bearer ") {
+	if fromAuthorizationHeader && strings.HasPrefix(strings.ToLower(provided), "bearer ") {
 		provided = strings.TrimSpace(provided[len("bearer "):])
 	}
 

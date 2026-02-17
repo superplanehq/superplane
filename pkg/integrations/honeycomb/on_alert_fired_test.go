@@ -125,4 +125,40 @@ func Test__OnAlertFired__HandleWebhook(t *testing.T) {
 		require.Equal(t, 1, events.Count())
 	})
 
+	t.Run("custom token header starting with bearer is not stripped -> emits", func(t *testing.T) {
+		h := http.Header{}
+		h.Set("X-Honeycomb-Webhook-Token", "bearer test-secret")
+
+		events := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers:       h,
+			Body:          body,
+			Configuration: validConfig,
+			Webhook:       &contexts.WebhookContext{Secret: "bearer test-secret"},
+			Events:        events,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 1, events.Count())
+	})
+
+	t.Run("shared secret header starting with bearer is not stripped -> emits", func(t *testing.T) {
+		h := http.Header{}
+		h.Set("X-Shared-Secret", "Bearer test-secret")
+
+		events := &contexts.EventContext{}
+		code, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers:       h,
+			Body:          body,
+			Configuration: validConfig,
+			Webhook:       &contexts.WebhookContext{Secret: "Bearer test-secret"},
+			Events:        events,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 1, events.Count())
+	})
+
 }
