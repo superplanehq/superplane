@@ -22,6 +22,13 @@ type CreateServiceConfiguration struct {
 	ClientToken                  string `json:"clientToken" mapstructure:"clientToken"`
 }
 
+type CreateServiceNodeMetadata struct {
+	Region         string `json:"region" mapstructure:"region"`
+	Cluster        string `json:"cluster" mapstructure:"cluster"`
+	ServiceName    string `json:"serviceName" mapstructure:"serviceName"`
+	TaskDefinition string `json:"taskDefinition" mapstructure:"taskDefinition"`
+}
+
 func (c *CreateService) Name() string {
 	return "aws.ecs.createService"
 }
@@ -67,10 +74,11 @@ func (c *CreateService) Configuration() []configuration.Field {
 		ecsRegionField(),
 		ecsClusterField(),
 		{
-			Name:     "serviceName",
-			Label:    "Service Name",
-			Type:     configuration.FieldTypeString,
-			Required: true,
+			Name:        "serviceName",
+			Label:       "Service Name",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Description: "Name of the ECS service to create",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{
 					Field:  "cluster",
@@ -80,11 +88,12 @@ func (c *CreateService) Configuration() []configuration.Field {
 		},
 		ecsTaskDefinitionField(true),
 		{
-			Name:     "schedulingStrategy",
-			Label:    "Scheduling Strategy",
-			Type:     configuration.FieldTypeSelect,
-			Required: true,
-			Default:  serviceSchedulingStrategyReplica,
+			Name:        "schedulingStrategy",
+			Label:       "Scheduling Strategy",
+			Type:        configuration.FieldTypeSelect,
+			Required:    true,
+			Default:     serviceSchedulingStrategyReplica,
+			Description: "REPLICA for a fixed number of tasks, or DAEMON for one task per instance",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: serviceSchedulingStrategyOptions,
@@ -105,8 +114,16 @@ func (c *CreateService) Configuration() []configuration.Field {
 }
 
 func (c *CreateService) Setup(ctx core.SetupContext) error {
-	_, err := c.decodeAndValidateConfiguration(ctx.Configuration)
-	return err
+	config, err := c.decodeAndValidateConfiguration(ctx.Configuration)
+	if err != nil {
+		return err
+	}
+	return ctx.Metadata.Set(CreateServiceNodeMetadata{
+		Region:         config.Region,
+		Cluster:        config.Cluster,
+		ServiceName:    config.ServiceName,
+		TaskDefinition: config.TaskDefinition,
+	})
 }
 
 func (c *CreateService) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {

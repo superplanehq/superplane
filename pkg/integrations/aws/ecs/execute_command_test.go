@@ -38,6 +38,7 @@ func Test__ExecuteCommand__Setup(t *testing.T) {
 	})
 
 	t.Run("missing container -> no error", func(t *testing.T) {
+		metadataCtx := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"region":  "us-east-1",
@@ -45,9 +46,11 @@ func Test__ExecuteCommand__Setup(t *testing.T) {
 				"task":    "arn:aws:ecs:us-east-1:123456789012:task/demo/abc",
 				"command": "ls -la",
 			},
+			Metadata: metadataCtx,
 		})
 
 		require.NoError(t, err)
+		require.NotNil(t, metadataCtx.Metadata)
 	})
 }
 

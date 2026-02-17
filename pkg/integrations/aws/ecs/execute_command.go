@@ -23,6 +23,12 @@ type ExecuteCommandConfiguration struct {
 	Interactive bool   `json:"interactive" mapstructure:"interactive"`
 }
 
+type ExecuteCommandNodeMetadata struct {
+	Region  string `json:"region" mapstructure:"region"`
+	Cluster string `json:"cluster" mapstructure:"cluster"`
+	Task    string `json:"task" mapstructure:"task"`
+}
+
 func (c *ExecuteCommand) Name() string {
 	return "aws.ecs.executeCommand"
 }
@@ -68,10 +74,11 @@ func (c *ExecuteCommand) Configuration() []configuration.Field {
 		ecsRegionField(),
 		ecsClusterField(),
 		{
-			Name:     "task",
-			Label:    "Task",
-			Type:     configuration.FieldTypeIntegrationResource,
-			Required: true,
+			Name:        "task",
+			Label:       "Task",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "Running ECS task (task ARN or ID) to run the command in",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{
 					Field:  "region",
@@ -130,8 +137,15 @@ func (c *ExecuteCommand) Configuration() []configuration.Field {
 }
 
 func (c *ExecuteCommand) Setup(ctx core.SetupContext) error {
-	_, err := c.decodeAndValidateConfiguration(ctx.Configuration)
-	return err
+	config, err := c.decodeAndValidateConfiguration(ctx.Configuration)
+	if err != nil {
+		return err
+	}
+	return ctx.Metadata.Set(ExecuteCommandNodeMetadata{
+		Region:  config.Region,
+		Cluster: config.Cluster,
+		Task:    config.Task,
+	})
 }
 
 func (c *ExecuteCommand) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {

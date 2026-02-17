@@ -19,6 +19,12 @@ type UpdateServiceConfiguration struct {
 	Service                      string `json:"service" mapstructure:"service"`
 }
 
+type UpdateServiceNodeMetadata struct {
+	Region  string `json:"region" mapstructure:"region"`
+	Cluster string `json:"cluster" mapstructure:"cluster"`
+	Service string `json:"service" mapstructure:"service"`
+}
+
 func (c *UpdateService) Name() string {
 	return "aws.ecs.updateService"
 }
@@ -64,10 +70,11 @@ func (c *UpdateService) Configuration() []configuration.Field {
 		ecsRegionField(),
 		ecsClusterField(),
 		{
-			Name:     "service",
-			Label:    "Service",
-			Type:     configuration.FieldTypeIntegrationResource,
-			Required: true,
+			Name:        "service",
+			Label:       "Service",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "ECS service to update (name or ARN)",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{
 					Field:  "region",
@@ -106,8 +113,15 @@ func (c *UpdateService) Configuration() []configuration.Field {
 }
 
 func (c *UpdateService) Setup(ctx core.SetupContext) error {
-	_, err := c.decodeAndValidateConfiguration(ctx.Configuration)
-	return err
+	config, err := c.decodeAndValidateConfiguration(ctx.Configuration)
+	if err != nil {
+		return err
+	}
+	return ctx.Metadata.Set(UpdateServiceNodeMetadata{
+		Region:  config.Region,
+		Cluster: config.Cluster,
+		Service: config.Service,
+	})
 }
 
 func (c *UpdateService) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {

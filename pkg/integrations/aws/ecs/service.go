@@ -162,11 +162,12 @@ func (config ServiceMutationConfiguration) toInput() ServiceMutationInput {
 
 func ecsRegionField() configuration.Field {
 	return configuration.Field{
-		Name:     "region",
-		Label:    "Region",
-		Type:     configuration.FieldTypeSelect,
-		Required: true,
-		Default:  "us-east-1",
+		Name:        "region",
+		Label:       "Region",
+		Type:        configuration.FieldTypeSelect,
+		Required:    true,
+		Default:     "us-east-1",
+		Description: "AWS region where the ECS cluster is located",
 		TypeOptions: &configuration.TypeOptions{
 			Select: &configuration.SelectTypeOptions{
 				Options: common.AllRegions,
@@ -177,10 +178,11 @@ func ecsRegionField() configuration.Field {
 
 func ecsClusterField() configuration.Field {
 	return configuration.Field{
-		Name:     "cluster",
-		Label:    "Cluster",
-		Type:     configuration.FieldTypeIntegrationResource,
-		Required: true,
+		Name:        "cluster",
+		Label:       "Cluster",
+		Type:        configuration.FieldTypeIntegrationResource,
+		Required:    true,
+		Description: "ECS cluster to run the service or task in",
 		VisibilityConditions: []configuration.VisibilityCondition{
 			{
 				Field:  "region",
@@ -206,11 +208,12 @@ func ecsClusterField() configuration.Field {
 
 func ecsTaskDefinitionField(required bool) configuration.Field {
 	return configuration.Field{
-		Name:      "taskDefinition",
-		Label:     "Task Definition",
-		Type:      configuration.FieldTypeIntegrationResource,
-		Required:  required,
-		Togglable: !required,
+		Name:        "taskDefinition",
+		Label:       "Task Definition",
+		Type:        configuration.FieldTypeIntegrationResource,
+		Required:    required,
+		Togglable:   !required,
+		Description: "Task definition family and revision (e.g. myapp:1) to run",
 		VisibilityConditions: []configuration.VisibilityCondition{
 			{
 				Field:  "region",
