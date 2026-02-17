@@ -345,7 +345,12 @@ func (l *Linear) handleCallback(ctx core.HTTPRequestContext, clientID, clientSec
 		return
 	}
 
-	redirectURI := fmt.Sprintf("%s/api/v1/integrations/%s/callback", redirectBaseURL, ctx.Integration.ID().String())
+	// Use WebhooksBaseURL for the redirect URI to match what was sent during OAuth initiation in Sync().
+	webhooksBaseURL := ctx.WebhooksBaseURL
+	if webhooksBaseURL == "" {
+		webhooksBaseURL = ctx.BaseURL
+	}
+	redirectURI := fmt.Sprintf("%s/api/v1/integrations/%s/callback", webhooksBaseURL, ctx.Integration.ID().String())
 
 	if metadata.State == nil {
 		ctx.Logger.Errorf("Callback error: missing OAuth state in metadata")
