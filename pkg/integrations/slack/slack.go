@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,7 +21,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"gorm.io/gorm"
 )
 
 const (
@@ -438,19 +436,42 @@ func (s *Slack) handleInteractivity(ctx core.HTTPRequestContext, body []byte) {
 		return
 	}
 
-	subscription, err := findButtonClickSubscription(database.Conn(), ctx.Integration.ID(), messageTS, channelID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			ctx.Logger.Warnf("no subscription found for message_ts %s", messageTS)
-			ctx.Response.WriteHeader(http.StatusOK)
-			return
+	subscription, err := ctx.Integration.FindSubscription(func(sub core.IntegrationSubscriptionContext) bool {
+		config, ok := sub.Configuration().(map[string]any)
+		if !ok {
+			return false
 		}
+
+		subscriptionType, ok := config["type"].(string)
+		if !ok {
+			return false
+		}
+		subscriptionMessageTS, ok := config["message_ts"].(string)
+		if !ok {
+			return false
+		}
+		subscriptionChannelID, ok := config["channel_id"].(string)
+		if !ok {
+			return false
+		}
+
+		return subscriptionType == "button_click" &&
+			subscriptionMessageTS == messageTS &&
+			subscriptionChannelID == channelID
+	})
+	if err != nil {
 		ctx.Logger.Errorf("error finding subscription: %v", err)
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	config := subscription.Configuration.Data()
+	if subscription == nil {
+		ctx.Logger.Warnf("no subscription found for message_ts %s", messageTS)
+		ctx.Response.WriteHeader(http.StatusOK)
+		return
+	}
+
+	config := subscription.Configuration()
 	configMap, ok := config.(map[string]any)
 	if !ok {
 		ctx.Logger.Errorf("invalid subscription configuration")
@@ -480,21 +501,6 @@ func (s *Slack) handleInteractivity(ctx core.HTTPRequestContext, body []byte) {
 	}
 
 	ctx.Response.WriteHeader(http.StatusOK)
-}
-
-func findButtonClickSubscription(tx *gorm.DB, installationID uuid.UUID, messageTS, channelID string) (*models.IntegrationSubscription, error) {
-	var subscription models.IntegrationSubscription
-	err := tx.
-		Where("installation_id = ?", installationID).
-		Where("configuration->>'type' = ?", "button_click").
-		Where("configuration->>'message_ts' = ?", messageTS).
-		Where("configuration->>'channel_id' = ?", channelID).
-		First(&subscription).Error
-	if err != nil {
-		return nil, err
-	}
-
-	return &subscription, nil
 }
 
 func (s *Slack) createButtonClickAction(executionID uuid.UUID, buttonValue string) error {
