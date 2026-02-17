@@ -1,0 +1,42 @@
+{
+  "data": {
+    "pipeline": {
+      "id": 457882113,
+      "iid": 9821,
+      "project_id": 123456,
+      "status": "success",
+      "source": "web",
+      "ref": "main",
+      "sha": "f4f6c5a0d2e5ad34be4c17c3f166f4d2ff8b0a55",
+      "before_sha": "0000000000000000000000000000000000000000",
+      "tag": false,
+      "yaml_errors": null,
+      "web_url": "https://gitlab.com/group/example-project/-/pipelines/457882113",
+      "url": "https://gitlab.com/group/example-project/-/pipelines/457882113",
+      "created_at": "2026-02-13T18:00:00.000Z",
+      "updated_at": "2026-02-13T18:04:12.000Z",
+      "started_at": "2026-02-13T18:00:12.000Z",
+      "finished_at": "2026-02-13T18:04:12.000Z",
+      "committed_at": "2026-02-13T17:59:22.000Z",
+      "duration": 240.0,
+      "queued_duration": 8.2,
+      "coverage": "86.5",
+      "user": {
+        "id": 22,
+        "name": "Jamie Rivera",
+        "username": "jrivera",
+        "avatar_url": "https://www.gravatar.com/avatar/abc123"
+      },
+      "detailed_status": {
+        "icon": "status_success",
+        "text": "passed",
+        "label": "passed",
+        "group": "success",
+        "tooltip": "passed",
+        "has_details": true
+      }
+    }
+  },
+  "timestamp": "2026-02-13T18:04:12.000Z",
+  "type": "gitlab.pipeline.finished"
+}

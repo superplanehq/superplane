@@ -15,6 +15,7 @@ api_me.go
 api_organization.go
 api_roles.go
 api_secret.go
+api_service_accounts.go
 api_trigger.go
 api_users.go
 api_widget.go
@@ -179,6 +180,15 @@ docs/SecretsUpdateSecretBody.md
 docs/SecretsUpdateSecretNameBody.md
 docs/SecretsUpdateSecretNameResponse.md
 docs/SecretsUpdateSecretResponse.md
+docs/ServiceAccountsAPI.md
+docs/ServiceAccountsCreateServiceAccountRequest.md
+docs/ServiceAccountsCreateServiceAccountResponse.md
+docs/ServiceAccountsDescribeServiceAccountResponse.md
+docs/ServiceAccountsListServiceAccountsResponse.md
+docs/ServiceAccountsRegenerateServiceAccountTokenResponse.md
+docs/ServiceAccountsServiceAccount.md
+docs/ServiceAccountsUpdateServiceAccountBody.md
+docs/ServiceAccountsUpdateServiceAccountResponse.md
 docs/SuperplaneBlueprintsOutputChannel.md
 docs/SuperplaneBlueprintsUserRef.md
 docs/SuperplaneCanvasesUserRef.md
@@ -352,6 +362,14 @@ model_secrets_update_secret_body.go
 model_secrets_update_secret_name_body.go
 model_secrets_update_secret_name_response.go
 model_secrets_update_secret_response.go
+model_service_accounts_create_service_account_request.go
+model_service_accounts_create_service_account_response.go
+model_service_accounts_describe_service_account_response.go
+model_service_accounts_list_service_accounts_response.go
+model_service_accounts_regenerate_service_account_token_response.go
+model_service_accounts_service_account.go
+model_service_accounts_update_service_account_body.go
+model_service_accounts_update_service_account_response.go
 model_superplane_blueprints_output_channel.go
 model_superplane_blueprints_user_ref.go
 model_superplane_canvases_user_ref.go
@@ -387,6 +405,7 @@ test/api_me_test.go
 test/api_organization_test.go
 test/api_roles_test.go
 test/api_secret_test.go
+test/api_service_accounts_test.go
 test/api_trigger_test.go
 test/api_users_test.go
 test/api_widget_test.go

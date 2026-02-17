@@ -121,7 +121,7 @@ func (c *InvitationEmailConsumer) Consume(delivery tackle.Delivery) error {
 		invitation.Email,
 		org.Name,
 		c.BaseURL+"/login",
-		inviter.Email,
+		inviter.GetEmail(),
 	)
 
 	if err != nil {

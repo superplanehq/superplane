@@ -1,0 +1,7 @@
+{
+  "successfulVersions": {
+    "1.0.0": {"revision": "REVISION1", "status": "Archived"},
+    "1.0.1": {"revision": "REVISION2", "status": "Archived"}
+  },
+  "failedVersions": {}
+}
