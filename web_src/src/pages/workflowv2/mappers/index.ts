@@ -108,6 +108,15 @@ import {
   eventStateRegistry as dockerhubEventStateRegistry,
 } from "./dockerhub";
 
+import {
+  componentMappers as honeycombComponentMappers,
+  triggerRenderers as honeycombTriggerRenderers,
+  eventStateRegistry as honeycombEventStateRegistry,
+  customFieldRenderers as honeycombCustomFieldRenderers,
+} from "./honeycomb/index";
+
+
+
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
@@ -158,6 +167,8 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   openai: openaiComponentMappers,
   claude: claudeComponentMappers,
   dockerhub: dockerhubComponentMappers,
+  honeycomb: honeycombComponentMappers,
+
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -179,6 +190,8 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   openai: openaiTriggerRenderers,
   claude: claudeTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
+  honeycomb: honeycombTriggerRenderers,
+
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -200,6 +213,8 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   aws: awsEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
+  honeycomb: honeycombEventStateRegistry,
+
 };
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
@@ -226,6 +241,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {
   github: githubCustomFieldRenderers,
   dockerhub: dockerhubCustomFieldRenderers,
+  honeycomb: honeycombCustomFieldRenderers,
 };
 
 /**
