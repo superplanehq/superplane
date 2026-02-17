@@ -14,7 +14,7 @@ import (
 func Test__ListUsers(t *testing.T) {
 	r := support.Setup(t)
 
-	resp, err := ListUsers(context.Background(), models.DomainTypeOrganization, r.Organization.ID.String(), r.AuthService)
+	resp, err := ListUsers(context.Background(), models.DomainTypeOrganization, r.Organization.ID.String(), false, r.AuthService)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.Len(t, resp.Users, 1)

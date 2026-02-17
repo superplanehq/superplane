@@ -9,8 +9,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func ListUsers(ctx context.Context, domainType string, domainID string, authService authorization.Authorization) (*pb.ListUsersResponse, error) {
-	users, err := GetUsersWithRolesInDomain(domainID, domainType, authService)
+func ListUsers(ctx context.Context, domainType string, domainID string, includeServiceAccounts bool, authService authorization.Authorization) (*pb.ListUsersResponse, error) {
+	users, err := GetUsersWithRolesInDomain(domainID, domainType, includeServiceAccounts, authService)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get canvas users")
 	}

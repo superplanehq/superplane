@@ -6,6 +6,7 @@ import { resolveIcon } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
+import { parseDefaultValues } from "../../utils/components";
 
 export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
@@ -231,14 +232,11 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   }
 
   // Merge schema defaults so visibility/required for nested fields see e.g. authMethod
+  // Use parseDefaultValues to properly convert string defaults to their correct types
+  // (e.g. boolean "false" -> false, number "5" -> 5)
   const schemaDefaults = React.useMemo(() => {
-    const acc: Record<string, unknown> = {};
-    schema?.forEach((f) => {
-      if (f.name != null && f.defaultValue !== undefined && f.defaultValue !== null) {
-        acc[f.name] = f.defaultValue;
-      }
-    });
-    return acc;
+    if (!schema) return {};
+    return parseDefaultValues(schema);
   }, [schema]);
 
   const objValue = React.useMemo(
