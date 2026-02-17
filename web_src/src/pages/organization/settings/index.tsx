@@ -15,10 +15,13 @@ import { Integrations } from "./Integrations";
 import { IntegrationDetails } from "./IntegrationDetails";
 import { Secrets } from "./Secrets";
 import { SecretDetail } from "./SecretDetail";
+import { ServiceAccounts } from "./ServiceAccounts";
+import { ServiceAccountDetail } from "./ServiceAccountDetail";
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { cn } from "@/lib/utils";
 import {
   ArrowRightLeft,
+  Bot,
   CircleUser,
   Home,
   Key,
@@ -87,7 +90,16 @@ export function OrganizationSettings() {
     permission?: { resource: string; action: string };
   };
 
-  const sectionIds = ["profile", "general", "members", "groups", "roles", "integrations", "secrets"];
+  const sectionIds = [
+    "profile",
+    "general",
+    "members",
+    "groups",
+    "roles",
+    "integrations",
+    "secrets",
+    "service-accounts",
+  ];
   const pathSegments = location.pathname?.split("/").filter(Boolean) || [];
   const settingsIndex = pathSegments.indexOf("settings");
   const segmentsAfterSettings = settingsIndex >= 0 ? pathSegments.slice(settingsIndex + 1) : [];
@@ -125,6 +137,13 @@ export function OrganizationSettings() {
       href: `/${organizationId}/settings/members`,
       Icon: UserIcon,
       permission: { resource: "members", action: "read" },
+    },
+    {
+      id: "service-accounts",
+      label: "Service Accounts",
+      href: `/${organizationId}/settings/service-accounts`,
+      Icon: Bot,
+      permission: { resource: "service_accounts", action: "read" },
     },
     {
       id: "groups",
@@ -194,6 +213,9 @@ export function OrganizationSettings() {
     if (link.id === "secrets" && currentSection === "secrets") {
       return true;
     }
+    if (link.id === "service-accounts" && currentSection === "service-accounts") {
+      return true;
+    }
     return currentSection === link.id;
   };
 
@@ -233,6 +255,10 @@ export function OrganizationSettings() {
     secrets: {
       title: "Secrets",
       description: "Store and manage secrets.",
+    },
+    "service-accounts": {
+      title: "Service Accounts",
+      description: "Create and manage service accounts for programmatic API access.",
     },
     profile: {
       title: "Profile",
@@ -439,6 +465,22 @@ export function OrganizationSettings() {
             />
             <Route path="secrets" element={<Secrets organizationId={organizationId || ""} />} />
             <Route path="secrets/:secretId" element={<SecretDetail organizationId={organizationId || ""} />} />
+            <Route
+              path="service-accounts"
+              element={
+                <RequirePermission resource="service_accounts" action="read">
+                  <ServiceAccounts organizationId={organizationId || ""} />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="service-accounts/:id"
+              element={
+                <RequirePermission resource="service_accounts" action="read">
+                  <ServiceAccountDetail organizationId={organizationId || ""} />
+                </RequirePermission>
+              }
+            />
             <Route path="create-role" element={<CreateRolePage />} />
             <Route path="create-role/:roleName" element={<CreateRolePage />} />
             <Route path="profile" element={<Profile />} />

@@ -30,6 +30,7 @@ import slackIcon from "@/assets/icons/integrations/slack.svg";
 import awsIcon from "@/assets/icons/integrations/aws.svg";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
+import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
@@ -426,6 +427,7 @@ function CategorySection({
       cloudwatch: awsCloudwatchIcon,
       lambda: awsLambdaIcon,
       ecr: awsEcrIcon,
+      ecs: awsEcsIcon,
       sns: awsSnsIcon,
     },
   };
@@ -505,6 +507,7 @@ function CategorySection({
               cloudwatch: awsCloudwatchIcon,
               ecr: awsEcrIcon,
               lambda: awsLambdaIcon,
+              ecs: awsEcsIcon,
               sns: awsSnsIcon,
             },
           };

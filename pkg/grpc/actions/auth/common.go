@@ -94,7 +94,7 @@ func FindUser(org, id, email string) (*models.User, error) {
 	return models.FindActiveUserByEmail(orgID.String(), email)
 }
 
-func GetUsersWithRolesInDomain(domainID, domainType string, authService authorization.Authorization) ([]*pbUsers.User, error) {
+func GetUsersWithRolesInDomain(domainID, domainType string, includeServiceAccounts bool, authService authorization.Authorization) ([]*pbUsers.User, error) {
 	if domainType != models.DomainTypeOrganization {
 		return nil, status.Error(codes.InvalidArgument, "domain type must be organization")
 	}
@@ -139,9 +139,25 @@ func GetUsersWithRolesInDomain(domainID, domainType string, authService authoriz
 		}
 	}
 
+	userIDs := make([]string, 0, len(userRoleMap))
+	for userID := range userRoleMap {
+		userIDs = append(userIDs, userID)
+	}
+
+	var dbUsers []models.User
+	if includeServiceAccounts {
+		dbUsers, err = models.FindUsersByIDs(userIDs)
+	} else {
+		dbUsers, err = models.FindHumanUsersByIDs(userIDs)
+	}
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to fetch users")
+	}
+
 	var users []*pbUsers.User
-	for userID, roleAssignments := range userRoleMap {
-		user, err := convertUserToProto(userID, roleAssignments)
+	for i := range dbUsers {
+		roleAssignments := userRoleMap[dbUsers[i].ID.String()]
+		user, err := convertUserToProto(&dbUsers[i], roleAssignments)
 		if err != nil {
 			continue
 		}
@@ -151,39 +167,34 @@ func GetUsersWithRolesInDomain(domainID, domainType string, authService authoriz
 	return users, nil
 }
 
-func convertUserToProto(userID string, roleAssignments []*pbUsers.UserRoleAssignment) (*pbUsers.User, error) {
-	dbUser, err := models.FindUnscopedUserByID(userID)
-	if err != nil {
-		return nil, err
-	}
+func convertUserToProto(dbUser *models.User, roleAssignments []*pbUsers.UserRoleAssignment) (*pbUsers.User, error) {
+	var pbAccountProviders []*pbUsers.AccountProvider
 
-	account, err := models.FindAccountByID(dbUser.AccountID.String())
-	if err != nil {
-		return nil, err
-	}
-
-	providers, err := account.GetAccountProviders()
-	if err != nil {
-		return nil, err
-	}
-
-	pbAccountProviders := make([]*pbUsers.AccountProvider, len(providers))
-	for i, provider := range providers {
-		pbAccountProviders[i] = &pb.AccountProvider{
-			ProviderType: provider.Provider,
-			ProviderId:   provider.ProviderID,
-			Email:        provider.Email,
-			DisplayName:  provider.Name,
-			AvatarUrl:    provider.AvatarURL,
-			CreatedAt:    timestamppb.New(provider.CreatedAt),
-			UpdatedAt:    timestamppb.New(provider.UpdatedAt),
+	if dbUser.AccountID != nil {
+		account, err := models.FindAccountByID(dbUser.AccountID.String())
+		if err == nil {
+			providers, err := account.GetAccountProviders()
+			if err == nil {
+				pbAccountProviders = make([]*pbUsers.AccountProvider, len(providers))
+				for i, provider := range providers {
+					pbAccountProviders[i] = &pb.AccountProvider{
+						ProviderType: provider.Provider,
+						ProviderId:   provider.ProviderID,
+						Email:        provider.Email,
+						DisplayName:  provider.Name,
+						AvatarUrl:    provider.AvatarURL,
+						CreatedAt:    timestamppb.New(provider.CreatedAt),
+						UpdatedAt:    timestamppb.New(provider.UpdatedAt),
+					}
+				}
+			}
 		}
 	}
 
 	return &pb.User{
 		Metadata: &pb.User_Metadata{
-			Id:        userID,
-			Email:     dbUser.Email,
+			Id:        dbUser.ID.String(),
+			Email:     dbUser.GetEmail(),
 			CreatedAt: timestamppb.New(dbUser.CreatedAt),
 			UpdatedAt: timestamppb.New(dbUser.UpdatedAt),
 		},

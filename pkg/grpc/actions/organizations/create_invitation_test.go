@@ -131,8 +131,8 @@ func Test__CreateInvitation(t *testing.T) {
 		//
 		user, err := models.FindActiveUserByEmail(r.Organization.ID.String(), account.Email)
 		require.NoError(t, err)
-		assert.Equal(t, account.ID, user.AccountID)
-		assert.Equal(t, account.Email, user.Email)
+		assert.Equal(t, &account.ID, user.AccountID)
+		assert.Equal(t, account.Email, user.GetEmail())
 		assert.Equal(t, account.Name, user.Name)
 		assert.Equal(t, r.Organization.ID, user.OrganizationID)
 

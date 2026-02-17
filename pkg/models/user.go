@@ -12,13 +12,27 @@ import (
 type User struct {
 	ID             uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
 	OrganizationID uuid.UUID
-	AccountID      uuid.UUID
-	Email          string
+	AccountID      *uuid.UUID
+	Email          *string
 	Name           string
+	Type           string
+	Description    *string
+	CreatedBy      *uuid.UUID
 	TokenHash      string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	DeletedAt      gorm.DeletedAt
+}
+
+func (u *User) IsServiceAccount() bool {
+	return u.Type == UserTypeServiceAccount
+}
+
+func (u *User) GetEmail() string {
+	if u.Email != nil {
+		return *u.Email
+	}
+	return ""
 }
 
 func (u *User) Delete() error {
@@ -53,11 +67,13 @@ func CreateUser(orgID, accountID uuid.UUID, email, name string) (*User, error) {
 }
 
 func CreateUserInTransaction(tx *gorm.DB, orgID, accountID uuid.UUID, email, name string) (*User, error) {
+	normalizedEmail := utils.NormalizeEmail(email)
 	user := &User{
 		OrganizationID: orgID,
-		AccountID:      accountID,
-		Email:          utils.NormalizeEmail(email),
+		AccountID:      &accountID,
+		Email:          &normalizedEmail,
 		Name:           name,
+		Type:           UserTypeHuman,
 	}
 
 	err := tx.Create(user).Error
@@ -66,6 +82,39 @@ func CreateUserInTransaction(tx *gorm.DB, orgID, accountID uuid.UUID, email, nam
 	}
 
 	return user, nil
+}
+
+func CreateServiceAccount(tx *gorm.DB, orgID uuid.UUID, name string, description *string, createdBy uuid.UUID) (*User, error) {
+	user := &User{
+		OrganizationID: orgID,
+		Name:           name,
+		Type:           UserTypeServiceAccount,
+		Description:    description,
+		CreatedBy:      &createdBy,
+	}
+
+	err := tx.Create(user).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func FindServiceAccountsByOrganization(orgID string) ([]User, error) {
+	return FindServiceAccountsByOrganizationInTransaction(database.Conn(), orgID)
+}
+
+func FindServiceAccountsByOrganizationInTransaction(tx *gorm.DB, orgID string) ([]User, error) {
+	var users []User
+
+	err := tx.
+		Where("organization_id = ?", orgID).
+		Where("type = ?", UserTypeServiceAccount).
+		Find(&users).
+		Error
+
+	return users, err
 }
 
 func FindUnscopedUserByID(id string) (*User, error) {
@@ -77,6 +126,33 @@ func FindUnscopedUserByID(id string) (*User, error) {
 
 	err = database.Conn().Where("id = ?", userUUID).First(&user).Error
 	return &user, err
+}
+
+func FindUsersByIDs(ids []string) ([]User, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	var users []User
+	err := database.Conn().
+		Where("id IN ?", ids).
+		Find(&users).Error
+
+	return users, err
+}
+
+func FindHumanUsersByIDs(ids []string) ([]User, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	var users []User
+	err := database.Conn().
+		Where("id IN ?", ids).
+		Where("type = ?", UserTypeHuman).
+		Find(&users).Error
+
+	return users, err
 }
 
 // NOTE: this method returns soft deleted users too.

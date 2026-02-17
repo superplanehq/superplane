@@ -29,6 +29,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
   <LinkCard title="ECR • Scan Image" href="#ecr-•-scan-image" description="Scan an ECR image for vulnerabilities" />
+  <LinkCard title="ECS • Describe Service" href="#ecs-•-describe-service" description="Describe an AWS ECS service" />
+  <LinkCard title="ECS • Run Task" href="#ecs-•-run-task" description="Run a task in AWS ECS" />
+  <LinkCard title="ECS • Stop Task" href="#ecs-•-stop-task" description="Stop a running AWS ECS task" />
   <LinkCard title="Lambda • Run Function" href="#lambda-•-run-function" description="Invoke a Lambda function, optionally creating it from inline JavaScript" />
   <LinkCard title="SNS • Create Topic" href="#sns-•-create-topic" description="Create an AWS SNS topic" />
   <LinkCard title="SNS • Delete Topic" href="#sns-•-delete-topic" description="Delete an AWS SNS topic" />
@@ -715,6 +718,179 @@ At least one of **Image Digest** or **Image Tag** is required. If both are provi
   },
   "timestamp": "2026-02-03T12:05:00Z",
   "type": "aws.ecr.image.scanFindings"
+}
+```
+
+<a id="ecs-•-describe-service"></a>
+
+## ECS • Describe Service
+
+The Describe Service component fetches details about a single ECS service.
+
+### Use Cases
+
+- **Deployment checks**: Inspect running/desired task counts before or after deployment
+- **Operational visibility**: Fetch service status and task definition details in workflows
+- **Automation branching**: Route workflow execution based on ECS service state
+
+### Example Output
+
+```json
+{
+  "data": {
+    "service": {
+      "clusterArn": "arn:aws:ecs:us-west-1:123456789012:cluster/production-cluster-alpha",
+      "createdAt": "2026-01-20T10:12:33Z",
+      "deployments": [
+        {
+          "createdAt": "2026-01-20T10:12:33Z",
+          "desiredCount": 3,
+          "id": "ecs-svc/8473629182736450912",
+          "pendingCount": 0,
+          "runningCount": 3,
+          "status": "PRIMARY",
+          "taskDefinition": "arn:aws:ecs:us-west-1:123456789012:task-definition/api-gateway-service:7",
+          "updatedAt": "2026-01-20T10:18:11Z"
+        }
+      ],
+      "desiredCount": 3,
+      "enableExecuteCommand": true,
+      "events": [
+        {
+          "createdAt": "2026-01-20T10:18:11Z",
+          "id": "d91b5e4a-7a5f-4b1d-bdb4-3d4f8f8a9912",
+          "message": "(service api-gateway-service-prod) has reached a steady state."
+        },
+        {
+          "createdAt": "2026-01-20T10:17:02Z",
+          "id": "a12f9c47-92c3-4c9f-8d12-88d6ab3f8e72",
+          "message": "(service api-gateway-service-prod) (deployment ecs-svc/8473629182736450912) deployment completed."
+        },
+        {
+          "createdAt": "2026-01-20T10:13:05Z",
+          "id": "c7a8e3b1-11f2-4fbc-9d8e-2194bb0eaf55",
+          "message": "(service api-gateway-service-prod) has started 3 tasks: (task 9f8e7d6c5b4a3210e1f2a3b4c5d6e7f8)."
+        }
+      ],
+      "launchType": "FARGATE",
+      "networkConfiguration": {
+        "awsvpcConfiguration": {
+          "assignPublicIp": "DISABLED",
+          "securityGroups": [
+            "sg-0a1b2c3d4e5f6a7b8",
+            "sg-1b2c3d4e5f6a7b8c9"
+          ],
+          "subnets": [
+            "subnet-01a2b3c4d5e6f7a8b",
+            "subnet-09f8e7d6c5b4a3210"
+          ]
+        }
+      },
+      "pendingCount": 0,
+      "platformVersion": "1.4.0",
+      "propagateTags": "SERVICE",
+      "runningCount": 3,
+      "schedulingStrategy": "REPLICA",
+      "serviceArn": "arn:aws:ecs:us-west-1:123456789012:service/production-cluster-alpha/api-gateway-service-prod",
+      "serviceName": "api-gateway-service-prod",
+      "status": "ACTIVE",
+      "taskDefinition": "arn:aws:ecs:us-west-1:123456789012:task-definition/api-gateway-service:7",
+      "taskSets": []
+    }
+  },
+  "timestamp": "2026-01-20T12:45:09.123456789Z",
+  "type": "aws.ecs.service"
+}
+```
+
+<a id="ecs-•-run-task"></a>
+
+## ECS • Run Task
+
+The Run Task component starts one or more ECS tasks and completes based on task lifecycle events.
+
+### Use Cases
+
+- **One-off workloads**: Execute ad-hoc jobs on ECS
+- **Batch processing**: Trigger task runs from workflow events
+- **Operational automation**: Run remediation or maintenance tasks
+
+### Completion behavior
+
+- Always waits for tasks to leave startup states (for example, PENDING) before completing.
+- If **Timeout (seconds)** is set, waits for all tracked tasks to reach STOPPED, or completes with timeout when that deadline is reached.
+
+### Notes
+
+- For Fargate tasks, set **Network Configuration** using the ECS awsvpcConfiguration format.
+- Use **Capacity Provider Strategy** when you want ECS to choose capacity providers; it cannot be combined with **Launch Type**.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "failures": [],
+    "tasks": [
+      {
+        "clusterArn": "arn:aws:ecs:us-east-1:111122223333:cluster/superplane-demo-cluster",
+        "createdAt": "2026-02-10T14:30:01Z",
+        "desiredStatus": "RUNNING",
+        "group": "family:superplane-ecs-task",
+        "lastStatus": "RUNNING",
+        "launchType": "FARGATE",
+        "platformVersion": "1.4.0",
+        "startedBy": "",
+        "stoppedReason": "",
+        "taskArn": "arn:aws:ecs:us-east-1:111122223333:task/superplane-demo-cluster/aaaaaaaa11111111bbbbbbbb22222222",
+        "taskDefinitionArn": "arn:aws:ecs:us-east-1:111122223333:task-definition/superplane-ecs-task:1"
+      }
+    ],
+    "timedOut": false
+  },
+  "timestamp": "2026-02-10T14:30:37.633534466Z",
+  "type": "aws.ecs.task"
+}
+```
+
+<a id="ecs-•-stop-task"></a>
+
+## ECS • Stop Task
+
+The Stop Task component requests ECS to stop a running task and waits for the task to reach STOPPED.
+
+### Use Cases
+
+- **Operational control**: Stop ad-hoc or long-running tasks from workflows
+- **Remediation**: Terminate unhealthy tasks during automated incident response
+- **Cost control**: Stop no-longer-needed background workloads
+
+### Notes
+
+- ECS sends a SIGTERM signal and then force-stops the task if it does not exit gracefully.
+- **Reason** is optional and appears in ECS task stop metadata when provided.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "task": {
+      "clusterArn": "arn:aws:ecs:us-east-1:111122223333:cluster/superplane-demo-cluster",
+      "createdAt": "2026-02-10T14:30:01Z",
+      "desiredStatus": "STOPPED",
+      "group": "family:superplane-ecs-task",
+      "lastStatus": "STOPPED",
+      "launchType": "FARGATE",
+      "platformVersion": "1.4.0",
+      "startedBy": "",
+      "stoppedReason": "stopping",
+      "taskArn": "arn:aws:ecs:us-east-1:111122223333:task/superplane-demo-cluster/aaaaaaaa11111111bbbbbbbb22222222",
+      "taskDefinitionArn": "arn:aws:ecs:us-east-1:111122223333:task-definition/superplane-ecs-task:1"
+    }
+  },
+  "timestamp": "2026-02-10T14:31:19.987196041Z",
+  "type": "aws.ecs.task"
 }
 ```
 
