@@ -15,6 +15,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Get Pipeline" href="#get-pipeline" description="Retrieve a Semaphore pipeline by ID" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run Semaphore workflow" />
 </CardGrid>
 
@@ -124,6 +125,41 @@ This trigger automatically sets up a Semaphore webhook when configured. The webh
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "semaphore.pipeline.done"
+}
+```
+
+<a id="get-pipeline"></a>
+
+## Get Pipeline
+
+The Get Pipeline component fetches a Semaphore pipeline by its ID.
+
+### Use Cases
+
+- **Status checks**: Inspect pipeline state and result after triggering a workflow
+- **Debugging**: Fetch pipeline metadata for inspection
+
+### Configuration
+
+- **Pipeline ID**: The pipeline ID to retrieve (supports expressions)
+
+### Output
+
+Emits a `semaphore.pipeline` payload containing pipeline fields like `name`, `ppl_id`, `wf_id`, `state`, and `result`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "name": "Initial Pipeline",
+    "ppl_id": "00000000-0000-0000-0000-000000000000",
+    "result": "passed",
+    "state": "done",
+    "wf_id": "00000000-0000-0000-0000-000000000000"
+  },
+  "timestamp": "2026-01-22T15:32:56.061430218Z",
+  "type": "semaphore.pipeline"
 }
 ```
 

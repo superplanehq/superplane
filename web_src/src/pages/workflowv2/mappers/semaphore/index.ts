@@ -1,9 +1,11 @@
 import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { onPipelineDoneTriggerRenderer } from "./on_pipeline_done";
+import { getPipelineMapper } from "./get_pipeline";
 import { RUN_WORKFLOW_STATE_REGISTRY, runWorkflowMapper } from "./run_workflow";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   runWorkflow: runWorkflowMapper,
+  getPipeline: getPipelineMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
