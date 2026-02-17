@@ -161,6 +161,8 @@ func (f *FlyIO) ListResources(resourceType string, ctx core.ListResourcesContext
 		for _, app := range metadata.Apps {
 			machines, err := client.ListMachines(app.Name)
 			if err != nil {
+				// Log error but continue with other apps to provide partial results
+				ctx.Logger.Warnf("failed to list machines for app %s: %v", app.Name, err)
 				continue
 			}
 
@@ -181,18 +183,6 @@ func (f *FlyIO) ListResources(resourceType string, ctx core.ListResourcesContext
 
 func (f *FlyIO) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
-}
-
-func (f *FlyIO) CompareWebhookConfig(a, b any) (bool, error) {
-	return false, nil
-}
-
-func (f *FlyIO) SetupWebhook(ctx core.SetupWebhookContext) (any, error) {
-	return nil, nil
-}
-
-func (f *FlyIO) CleanupWebhook(ctx core.CleanupWebhookContext) error {
-	return nil
 }
 
 func (f *FlyIO) Actions() []core.Action {

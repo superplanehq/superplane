@@ -116,6 +116,8 @@ func (t *OnAppStateChange) Configuration() []configuration.Field {
 }
 
 func (t *OnAppStateChange) Setup(ctx core.TriggerContext) error {
+	ctx.Logger.Info("OnAppStateChange Setup called")
+
 	config := OnAppStateChangeConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
@@ -126,14 +128,34 @@ func (t *OnAppStateChange) Setup(ctx core.TriggerContext) error {
 		orgSlug = "personal"
 	}
 
+	interval := config.PollingInterval
+	if interval < 30 {
+		interval = 60 // default
+	}
+
+	ctx.Logger.Infof("Configuration: orgSlug=%s, interval=%d", orgSlug, interval)
+
 	// Get existing metadata
 	metadata := OnAppStateChangeMetadata{}
 	_ = mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 
-	// If already set up for this org, skip
+	// If already set up for this org, just schedule the next poll
 	if metadata.OrgSlug == orgSlug && metadata.AppStates != nil {
+		ctx.Logger.Infof("Already set up, scheduling next poll in %d seconds", interval)
+		err := ctx.Requests.ScheduleActionCall(
+			"poll",
+			map[string]any{},
+			time.Duration(interval)*time.Second,
+		)
+		if err != nil {
+			ctx.Logger.Errorf("Failed to schedule poll: %v", err)
+			return err
+		}
+		ctx.Logger.Info("Poll scheduled successfully")
 		return nil
 	}
+
+	ctx.Logger.Info("First time setup, fetching initial app states")
 
 	// Initialize by fetching current app states
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -145,6 +167,8 @@ func (t *OnAppStateChange) Setup(ctx core.TriggerContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to list apps: %w", err)
 	}
+
+	ctx.Logger.Infof("Found %d apps", len(apps))
 
 	// Store initial states
 	appStates := make(map[string]string)
@@ -162,16 +186,18 @@ func (t *OnAppStateChange) Setup(ctx core.TriggerContext) error {
 	}
 
 	// Schedule first poll
-	interval := config.PollingInterval
-	if interval < 30 {
-		interval = 60 // default
-	}
-
-	return ctx.Requests.ScheduleActionCall(
+	ctx.Logger.Infof("Scheduling first poll in %d seconds", interval)
+	err = ctx.Requests.ScheduleActionCall(
 		"poll",
 		map[string]any{},
 		time.Duration(interval)*time.Second,
 	)
+	if err != nil {
+		ctx.Logger.Errorf("Failed to schedule first poll: %v", err)
+		return err
+	}
+	ctx.Logger.Info("First poll scheduled successfully")
+	return nil
 }
 
 func (t *OnAppStateChange) Actions() []core.Action {
