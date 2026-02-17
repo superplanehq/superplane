@@ -116,7 +116,9 @@ func (c *UpdateHTTPSyntheticCheck) Configuration() []configuration.Field {
 			Required:    false,
 			Togglable:   true,
 			Description: "Conditions the synthetic check must satisfy.",
-			Default:     `[{"kind":"status_code","severity":"critical","operator":"is","value":"200"}]`,
+			Default: []map[string]any{
+				{"kind": "status_code", "severity": "critical", "operator": "is", "value": "200"},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Assertion",

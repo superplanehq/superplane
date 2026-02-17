@@ -330,7 +330,11 @@ func (c *CreateHTTPSyntheticCheck) Configuration() []configuration.Field {
 			Required:    false,
 			Togglable:   true,
 			Description: "Conditions the synthetic check must satisfy. Failed assertions mark the check as critical or degraded.",
-			Default:     `[{"kind":"status_code","severity":"critical","operator":"is","value":"200"},{"kind":"timing","severity":"critical","type":"response","operator":"lte","value":"5000ms"},{"kind":"timing","severity":"degraded","type":"response","operator":"lte","value":"2000ms"}]`,
+			Default: []map[string]any{
+				{"kind": "status_code", "severity": "critical", "operator": "is", "value": "200"},
+				{"kind": "timing", "severity": "critical", "type": "response", "operator": "lte", "value": "5000ms"},
+				{"kind": "timing", "severity": "degraded", "type": "response", "operator": "lte", "value": "2000ms"},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Assertion",
