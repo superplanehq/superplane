@@ -165,5 +165,39 @@ describe('Get Feature Flag Action', () => {
         expect.any(Object),
       );
     });
+
+    it('should use custom EU API base URL when configured', async () => {
+      (global.fetch as any).mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: async () => ({
+          key: 'test-flag',
+          name: 'Test Flag',
+          kind: 'boolean',
+          _version: 1,
+          creationDate: 1234567890,
+          temporary: false,
+          tags: [],
+          variations: [],
+          archived: false,
+          _links: {},
+        }),
+      });
+
+      const ctx = {
+        props: { projectKey: 'test-project', flagKey: 'test-flag' },
+        connection: {
+          ...mockConnection,
+          apiBaseUrl: 'https://app.eu.launchdarkly.com',
+        },
+      } as any;
+
+      await getFlag.run(ctx);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('https://app.eu.launchdarkly.com/api/v2/flags/'),
+        expect.any(Object),
+      );
+    });
   });
 });

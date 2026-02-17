@@ -1,6 +1,7 @@
 /// <reference types="jest" />
 import {
   buildAuthHeaders,
+  resolveApiBaseUrl,
   launchDarklyConnection,
   type LaunchDarklyConnectionProps,
 } from './auth';
@@ -59,6 +60,39 @@ describe('LaunchDarkly Auth Module', () => {
     });
   });
 
+  describe('resolveApiBaseUrl', () => {
+    it('should return default US API endpoint when not configured', () => {
+      expect(resolveApiBaseUrl(undefined)).toBe(
+        'https://app.launchdarkly.com/api/v2',
+      );
+      expect(resolveApiBaseUrl({ apiAccessToken: 'token' })).toBe(
+        'https://app.launchdarkly.com/api/v2',
+      );
+    });
+
+    it('should normalize EU host by appending /api/v2', () => {
+      const connection: LaunchDarklyConnectionProps = {
+        apiAccessToken: 'token',
+        apiBaseUrl: 'https://app.eu.launchdarkly.com',
+      };
+
+      expect(resolveApiBaseUrl(connection)).toBe(
+        'https://app.eu.launchdarkly.com/api/v2',
+      );
+    });
+
+    it('should keep custom value when already ending with /api/v2', () => {
+      const connection: LaunchDarklyConnectionProps = {
+        apiAccessToken: 'token',
+        apiBaseUrl: 'https://app.eu.launchdarkly.com/api/v2/',
+      };
+
+      expect(resolveApiBaseUrl(connection)).toBe(
+        'https://app.eu.launchdarkly.com/api/v2',
+      );
+    });
+  });
+
   describe('launchDarklyConnection', () => {
     it('should have correct configuration', () => {
       expect(launchDarklyConnection.name).toBe('LaunchDarkly');
@@ -71,6 +105,13 @@ describe('LaunchDarkly Auth Module', () => {
 
       expect(tokenProp.required).toBe(true);
       expect((tokenProp as any).sensitive).toBe(true);
+    });
+
+    it('should expose optional apiBaseUrl setting', () => {
+      const baseUrlProp = (launchDarklyConnection as any).props.apiBaseUrl;
+
+      expect(baseUrlProp).toBeDefined();
+      expect(baseUrlProp.required).toBe(false);
     });
   });
 });

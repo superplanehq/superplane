@@ -28,6 +28,14 @@ export interface LaunchDarklyConnectionProps {
    * integration will perform (e.g. `reader` for GET, `writer` for DELETE).
    */
   apiAccessToken: string;
+
+  /**
+   * Optional custom LaunchDarkly API host (for example EU region).
+   *
+   * @example "https://app.eu.launchdarkly.com"
+   * @defaultValue "https://app.launchdarkly.com/api/v2"
+   */
+  apiBaseUrl?: string;
 }
 
 /**
@@ -91,6 +99,28 @@ export function buildAuthHeaders(
   };
 }
 
+/**
+ * Resolve the LaunchDarkly API base URL for the active connection.
+ *
+ * If a custom host is provided, this helper ensures the final value ends with
+ * `/api/v2`. Otherwise, the default US endpoint is used.
+ */
+export function resolveApiBaseUrl(
+  connection?: LaunchDarklyConnectionProps,
+): string {
+  const configured = connection?.apiBaseUrl?.trim();
+  if (!configured) {
+    return LD_API_BASE_URL;
+  }
+
+  const normalized = configured.replace(/\/+$/, '');
+  if (normalized.endsWith('/api/v2')) {
+    return normalized;
+  }
+
+  return `${normalized}/api/v2`;
+}
+
 // ---------------------------------------------------------------------------
 // Connection definition
 // ---------------------------------------------------------------------------
@@ -116,6 +146,13 @@ export const launchDarklyConnection = createConnection<LaunchDarklyConnectionPro
         'A personal or service API access token generated from the LaunchDarkly Authorization page.',
       required: true,
       sensitive: true, // masks the value in the UI
+    },
+    apiBaseUrl: {
+      type: 'string',
+      label: 'API Base URL (Optional)',
+      description:
+        'Custom LaunchDarkly API host for regional tenants, e.g. https://app.eu.launchdarkly.com. If omitted, uses https://app.launchdarkly.com/api/v2.',
+      required: false,
     },
   },
 });

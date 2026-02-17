@@ -192,5 +192,27 @@ describe('Delete Feature Flag Action', () => {
         expect.objectContaining({ method: 'DELETE' }),
       );
     });
+
+    it('should use custom EU API base URL when configured', async () => {
+      (global.fetch as any).mockResolvedValue({
+        status: 204,
+        ok: true,
+      });
+
+      const ctx = {
+        props: { projectKey: 'test-project', flagKey: 'test-flag' },
+        connection: {
+          ...mockConnection,
+          apiBaseUrl: 'https://app.eu.launchdarkly.com',
+        },
+      } as any;
+
+      await deleteFlag.run(ctx);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('https://app.eu.launchdarkly.com/api/v2/flags/'),
+        expect.any(Object),
+      );
+    });
   });
 });

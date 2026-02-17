@@ -2,7 +2,7 @@ import { createAction, ActionContext } from '@superplane/framework';
 import {
   launchDarklyConnection,
   buildAuthHeaders,
-  LD_API_BASE_URL,
+  resolveApiBaseUrl,
   type LaunchDarklyConnectionProps,
 } from '../auth';
 
@@ -176,7 +176,8 @@ export const getFlag = createAction<
       );
     }
 
-    const url = `${LD_API_BASE_URL}/flags/${encodeURIComponent(projectKey)}/${encodeURIComponent(flagKey)}`;
+    const apiBaseUrl = resolveApiBaseUrl(ctx.connection);
+    const url = `${apiBaseUrl}/flags/${encodeURIComponent(projectKey)}/${encodeURIComponent(flagKey)}`;
     const headers = buildAuthHeaders(ctx.connection);
 
     console.debug(
