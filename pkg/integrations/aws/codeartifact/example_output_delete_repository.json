@@ -1,0 +1,11 @@
+{
+  "repository": {
+    "arn": "arn:aws:codeartifact:us-east-1:123456789012:repository/example-domain/my-repo",
+    "name": "my-repo",
+    "domainName": "example-domain",
+    "domainOwner": "123456789012",
+    "description": "Deleted repository",
+    "administratorAccount": "123456789012",
+    "createdTime": 1706961600
+  }
+}

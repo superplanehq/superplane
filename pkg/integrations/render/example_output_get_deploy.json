@@ -1,0 +1,22 @@
+{
+  "data": {
+    "deployId": "dep-cukouhrtq21c73e9scng",
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "status": "live",
+    "trigger": "api",
+    "createdAt": "2026-02-05T16:10:00.000000Z",
+    "startedAt": "2026-02-05T16:10:10.000000Z",
+    "finishedAt": "2026-02-05T16:15:00.000000Z",
+    "commit": {
+      "id": "1a2b3c4d5e6f",
+      "message": "Release v1.2.3",
+      "createdAt": "2026-02-05T16:09:30.000000Z"
+    },
+    "image": {
+      "ref": "registry.example.com/backend-api:1a2b3c4d",
+      "sha": "sha256:4f7c2d7f0bb27e2f8d4d9b3d2b3a1a9a3b2c1d0e"
+    }
+  },
+  "timestamp": "2026-02-05T16:15:00.000000Z",
+  "type": "render.deploy"
+}
