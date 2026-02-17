@@ -1,0 +1,91 @@
+{
+  "actor": {
+    "display_name": "John Doe",
+    "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}",
+    "type": "user",
+    "nickname": "johndoe",
+    "links": {
+      "html": {
+        "href": "https://bitbucket.org/johndoe/"
+      },
+      "avatar": {
+        "href": "https://bitbucket.org/account/johndoe/avatar/"
+      }
+    }
+  },
+  "repository": {
+    "type": "repository",
+    "full_name": "my-workspace/my-repo",
+    "name": "my-repo",
+    "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}",
+    "links": {
+      "html": {
+        "href": "https://bitbucket.org/my-workspace/my-repo"
+      }
+    }
+  },
+  "push": {
+    "changes": [
+      {
+        "new": {
+          "type": "branch",
+          "name": "main",
+          "target": {
+            "type": "commit",
+            "hash": "709d658dc5b6d6afcd46049c2f332ee3f515a67d",
+            "author": {
+              "type": "author",
+              "raw": "John Doe <john@example.com>",
+              "user": {
+                "display_name": "John Doe",
+                "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}",
+                "type": "user"
+              }
+            },
+            "message": "Add new feature\n",
+            "date": "2024-01-15T10:30:00+00:00",
+            "links": {
+              "html": {
+                "href": "https://bitbucket.org/my-workspace/my-repo/commits/709d658dc5b6d6afcd46049c2f332ee3f515a67d"
+              }
+            }
+          }
+        },
+        "old": {
+          "type": "branch",
+          "name": "main",
+          "target": {
+            "type": "commit",
+            "hash": "1e65c05c1d5171631d92438a13901ca7dae9618c",
+            "author": {
+              "type": "author",
+              "raw": "John Doe <john@example.com>"
+            },
+            "message": "Previous commit\n",
+            "date": "2024-01-14T15:00:00+00:00"
+          }
+        },
+        "created": false,
+        "forced": false,
+        "closed": false,
+        "commits": [
+          {
+            "hash": "709d658dc5b6d6afcd46049c2f332ee3f515a67d",
+            "type": "commit",
+            "message": "Add new feature\n",
+            "author": {
+              "type": "author",
+              "raw": "John Doe <john@example.com>"
+            },
+            "links": {
+              "html": {
+                "href": "https://bitbucket.org/my-workspace/my-repo/commits/709d658dc5b6d6afcd46049c2f332ee3f515a67d"
+              }
+            }
+          }
+        ],
+        "truncated": false
+      }
+    ]
+  }
+}
