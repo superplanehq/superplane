@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -132,23 +131,7 @@ func (c *GetIncident) Setup(ctx core.SetupContext) error {
 		return errors.New("incident is required")
 	}
 
-	// Resolve page name for metadata when Page is a static ID (no expression).
-	// Skip API call if HTTP context is not available (e.g. in tests without HTTP mock).
-	metadata := NodeMetadata{}
-	if spec.Page != "" && !strings.Contains(spec.Page, "{{") && ctx.HTTP != nil {
-		client, clientErr := NewClient(ctx.HTTP, ctx.Integration)
-		if clientErr == nil {
-			pages, listErr := client.ListPages()
-			if listErr == nil {
-				for _, p := range pages {
-					if p.ID == spec.Page {
-						metadata.PageName = p.Name
-						break
-					}
-				}
-			}
-		}
-	}
+	metadata := resolveMetadataSetup(ctx, spec.Page, nil)
 	return ctx.Metadata.Set(metadata)
 }
 
