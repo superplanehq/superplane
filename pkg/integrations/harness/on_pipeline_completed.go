@@ -3,9 +3,14 @@ package harness
 import (
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"slices"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -13,17 +18,37 @@ import (
 )
 
 const OnPipelineCompletedPayloadType = "harness.pipeline.completed"
+const (
+	OnPipelineCompletedPollAction    = "poll"
+	OnPipelineCompletedPollInterval  = 1 * time.Minute
+	OnPipelineCompletedPollPageSize  = 100
+	OnPipelineCompletedPollMaxPages  = 100
+	OnPipelineCompletedMaxPollErrors = 5
+	// When pipeline-scoped webhook delivery is configured, defer very recent
+	// poll items to avoid duplicate emits from webhook/poll races.
+	OnPipelineCompletedPollRaceWindow = 2 * time.Minute
+)
+
+var onPipelineCompletedCheckpointUpdateMu sync.Mutex
+var errOnPipelineCompletedUnsupportedPipelineIdentifierFilter = errors.New(
+	"pipelineIdentifier filter is not supported by this Harness account/endpoint",
+)
 
 type OnPipelineCompleted struct{}
 
 type OnPipelineCompletedConfiguration struct {
+	OrgID              string   `json:"orgId" mapstructure:"orgId"`
+	ProjectID          string   `json:"projectId" mapstructure:"projectId"`
 	PipelineIdentifier string   `json:"pipelineIdentifier" mapstructure:"pipelineIdentifier"`
 	Statuses           []string `json:"statuses" mapstructure:"statuses"`
 }
 
 type OnPipelineCompletedMetadata struct {
-	PipelineIdentifier string `json:"pipelineIdentifier,omitempty" mapstructure:"pipelineIdentifier"`
-	WebhookURL         string `json:"webhookUrl,omitempty" mapstructure:"webhookUrl"`
+	PipelineIdentifier                 string `json:"pipelineIdentifier,omitempty" mapstructure:"pipelineIdentifier"`
+	LastExecutionID                    string `json:"lastExecutionId,omitempty" mapstructure:"lastExecutionId"`
+	LastExecutionEnded                 int64  `json:"lastExecutionEnded,omitempty" mapstructure:"lastExecutionEnded"`
+	PollErrorCount                     int    `json:"pollErrorCount,omitempty" mapstructure:"pollErrorCount"`
+	DisableServerPipelineIDFilterInAPI bool   `json:"disableServerPipelineIdFilterInApi,omitempty" mapstructure:"disableServerPipelineIdFilterInApi"`
 }
 
 var onPipelineCompletedStatusOptions = []configuration.FieldOption{
@@ -34,6 +59,13 @@ var onPipelineCompletedStatusOptions = []configuration.FieldOption{
 }
 
 var onPipelineCompletedAllowedStatuses = []string{"succeeded", "failed", "aborted", "expired"}
+
+var parseEpochMillisecondsLayouts = []string{
+	time.RFC3339,
+	"Mon Jan 2 15:04:05 MST 2006",
+	time.RFC1123,
+	time.RFC1123Z,
+}
 
 func (t *OnPipelineCompleted) Name() string {
 	return "harness.onPipelineCompleted"
@@ -58,14 +90,16 @@ func (t *OnPipelineCompleted) Documentation() string {
 
 ## Configuration
 
+- **Org**: Harness organization identifier
+- **Project**: Harness project identifier
 - **Pipeline Identifier**: Optional pipeline identifier filter. Leave empty to accept all pipeline completions.
 - **Statuses**: Completion statuses that should trigger the workflow.
 
 ## Webhook Setup
 
-This trigger generates a SuperPlane webhook URL. Configure a Harness notification rule to send pipeline completion events to that URL.
+SuperPlane automatically provisions Harness pipeline ` + "`notificationRules`" + ` when **Pipeline** is selected.
 
-Recommended: set **Webhook Secret** in the Harness integration and send it as ` + "`Authorization: Bearer <secret>`" + ` from Harness.`
+If no pipeline is selected, or webhook delivery is unavailable in your Harness account, SuperPlane falls back to polling recent executions.`
 }
 
 func (t *OnPipelineCompleted) Icon() string {
@@ -79,6 +113,38 @@ func (t *OnPipelineCompleted) Color() string {
 func (t *OnPipelineCompleted) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:        "orgId",
+			Label:       "Organization",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "Select Harness organization",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeOrg,
+				},
+			},
+		},
+		{
+			Name:        "projectId",
+			Label:       "Project",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "Select Harness project",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeProject,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "orgId",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "orgId",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			Name:        "pipelineIdentifier",
 			Label:       "Pipeline",
 			Type:        configuration.FieldTypeIntegrationResource,
@@ -87,6 +153,20 @@ func (t *OnPipelineCompleted) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: ResourceTypePipeline,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "orgId",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "orgId",
+							},
+						},
+						{
+							Name: "projectId",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "projectId",
+							},
+						},
+					},
 				},
 			},
 		},
@@ -110,27 +190,90 @@ func (t *OnPipelineCompleted) Setup(ctx core.TriggerContext) error {
 		return err
 	}
 
-	if ctx.Webhook == nil {
-		return fmt.Errorf("missing webhook context")
+	if ctx.Integration == nil {
+		return fmt.Errorf("missing integration context")
+	}
+	if ctx.Metadata == nil {
+		return fmt.Errorf("missing metadata context")
 	}
 
-	webhookURL, err := ctx.Webhook.Setup()
-	if err != nil {
-		return fmt.Errorf("failed to setup webhook: %w", err)
-	}
-
-	return ctx.Metadata.Set(OnPipelineCompletedMetadata{
+	webhookConfig := WebhookConfiguration{
 		PipelineIdentifier: config.PipelineIdentifier,
-		WebhookURL:         webhookURL,
-	})
+		OrgID:              config.OrgID,
+		ProjectID:          config.ProjectID,
+		EventTypes:         defaultWebhookEventTypes,
+	}
+	webhookReconciled := true
+	if err := ctx.Integration.RequestWebhook(webhookConfig); err != nil {
+		webhookReconciled = false
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("failed to reconcile Harness webhook configuration: %v", err)
+		}
+	}
+
+	wantsWebhookDelivery := strings.TrimSpace(config.PipelineIdentifier) != ""
+	webhookReady := false
+	if wantsWebhookDelivery && webhookReconciled && ctx.Webhook != nil {
+		resolvedURL, setupErr := ctx.Webhook.Setup()
+		if setupErr != nil {
+			if ctx.Logger != nil {
+				ctx.Logger.Warnf("failed to setup Harness webhook URL, using polling fallback: %v", setupErr)
+			}
+		} else if strings.TrimSpace(resolvedURL) != "" {
+			webhookReady = true
+		}
+	} else if wantsWebhookDelivery && ctx.Logger != nil {
+		if !webhookReconciled {
+			ctx.Logger.Warnf("Harness webhook reconciliation failed, using polling fallback")
+		} else {
+			ctx.Logger.Warnf("Harness webhook context is unavailable, using polling fallback")
+		}
+	}
+
+	currentMetadata, err := decodeOnPipelineCompletedMetadata(ctx.Metadata.Get())
+	if err != nil {
+		currentMetadata = OnPipelineCompletedMetadata{}
+	}
+	if currentMetadata.LastExecutionEnded == 0 {
+		currentMetadata.LastExecutionEnded = time.Now().UnixMilli()
+	}
+	currentMetadata.PipelineIdentifier = config.PipelineIdentifier
+
+	if err := ctx.Metadata.Set(currentMetadata); err != nil {
+		return err
+	}
+
+	if wantsWebhookDelivery && !webhookReady && ctx.Logger != nil {
+		ctx.Logger.Warnf("Harness webhook is unavailable, running in polling mode")
+	}
+
+	// Poll only when webhook delivery is not active.
+	if !webhookReady && ctx.Requests != nil {
+		if err := scheduleOnPipelineCompletedPoll(ctx.Requests); err != nil {
+			return fmt.Errorf("failed to schedule polling action: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (t *OnPipelineCompleted) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		{
+			Name:           OnPipelineCompletedPollAction,
+			Description:    "Poll Harness executions as fallback for webhook delivery",
+			UserAccessible: false,
+		},
+	}
 }
 
 func (t *OnPipelineCompleted) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
-	return nil, nil
+	switch ctx.Name {
+	case OnPipelineCompletedPollAction:
+		return nil, t.poll(ctx)
+	default:
+		return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+	}
 }
 
 func (t *OnPipelineCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
@@ -157,13 +300,31 @@ func (t *OnPipelineCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int
 		return http.StatusOK, nil
 	}
 
+	webhookExecution := executionSummaryFromWebhookPayload(event, payload)
+
 	if config.PipelineIdentifier != "" {
 		if event.PipelineIdentifier == "" || config.PipelineIdentifier != event.PipelineIdentifier {
 			return http.StatusOK, nil
 		}
 	}
 
+	onPipelineCompletedCheckpointUpdateMu.Lock()
+	defer onPipelineCompletedCheckpointUpdateMu.Unlock()
+
+	if ctx.Metadata != nil {
+		metadata, decodeErr := decodeOnPipelineCompletedMetadata(ctx.Metadata.Get())
+		if decodeErr != nil {
+			return http.StatusInternalServerError, decodeErr
+		}
+		if !isNewerExecution(metadata, webhookExecution) {
+			return http.StatusOK, nil
+		}
+	}
+
 	if len(config.Statuses) > 0 && !statusSelected(config.Statuses, event.Status) {
+		if updateErr := t.updateCheckpointFromExecutionUnlocked(ctx.Metadata, webhookExecution); updateErr != nil {
+			return http.StatusInternalServerError, updateErr
+		}
 		return http.StatusOK, nil
 	}
 
@@ -179,7 +340,331 @@ func (t *OnPipelineCompleted) HandleWebhook(ctx core.WebhookRequestContext) (int
 		return http.StatusInternalServerError, fmt.Errorf("failed to emit event: %w", err)
 	}
 
+	if updateErr := t.updateCheckpointFromExecutionUnlocked(ctx.Metadata, webhookExecution); updateErr != nil {
+		return http.StatusInternalServerError, updateErr
+	}
+
 	return http.StatusOK, nil
+}
+
+func (t *OnPipelineCompleted) poll(ctx core.TriggerActionContext) error {
+	config, err := decodeOnPipelineCompletedConfiguration(ctx.Configuration)
+	if err != nil {
+		return err
+	}
+	if ctx.Metadata == nil {
+		return fmt.Errorf("missing metadata context")
+	}
+
+	metadata, err := decodeOnPipelineCompletedMetadata(ctx.Metadata.Get())
+	if err != nil {
+		return fmt.Errorf("failed to decode trigger metadata: %w", err)
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+	client = client.withScope(config.OrgID, config.ProjectID)
+
+	pipelineIdentifierForAPI := config.PipelineIdentifier
+	if metadata.DisableServerPipelineIDFilterInAPI {
+		pipelineIdentifierForAPI = ""
+	}
+
+	executions, err := t.collectExecutionsSinceCheckpoint(client, metadata, pipelineIdentifierForAPI)
+	if err != nil && pipelineIdentifierForAPI != "" && errors.Is(err, errOnPipelineCompletedUnsupportedPipelineIdentifierFilter) {
+		metadata.DisableServerPipelineIDFilterInAPI = true
+		if setErr := ctx.Metadata.Set(metadata); setErr != nil {
+			return setErr
+		}
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("Harness execution summary API does not support pipelineIdentifier filter, falling back to unfiltered polling")
+		}
+
+		executions, err = t.collectExecutionsSinceCheckpoint(client, metadata, "")
+	}
+
+	if err != nil {
+		metadata.PollErrorCount++
+		if setErr := ctx.Metadata.Set(metadata); setErr != nil {
+			return setErr
+		}
+
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("failed to poll Harness pipeline executions (attempt %d): %v", metadata.PollErrorCount, err)
+		}
+		if metadata.PollErrorCount >= OnPipelineCompletedMaxPollErrors && ctx.Logger != nil {
+			ctx.Logger.Warnf("Harness polling has reached %d consecutive failures; continuing with backoff polling", metadata.PollErrorCount)
+		}
+
+		return scheduleOnPipelineCompletedPoll(ctx.Requests)
+	}
+
+	if metadata.PollErrorCount > 0 {
+		metadata.PollErrorCount = 0
+		if err := ctx.Metadata.Set(metadata); err != nil {
+			return err
+		}
+	}
+
+	for _, execution := range executions {
+		if err := t.processPolledExecution(ctx, config, execution); err != nil {
+			return err
+		}
+	}
+
+	return scheduleOnPipelineCompletedPoll(ctx.Requests)
+}
+
+func (t *OnPipelineCompleted) collectExecutionsSinceCheckpoint(
+	client *Client,
+	metadata OnPipelineCompletedMetadata,
+	pipelineIdentifier string,
+) ([]ExecutionSummary, error) {
+	executions := make([]ExecutionSummary, 0, OnPipelineCompletedPollPageSize)
+
+	for page := 0; page < OnPipelineCompletedPollMaxPages; page++ {
+		pageExecutions, err := client.ListExecutionSummariesPage(page, OnPipelineCompletedPollPageSize, pipelineIdentifier)
+		if err != nil {
+			if strings.TrimSpace(pipelineIdentifier) != "" && IsExecutionSummaryPipelineIdentifierFilterUnsupported(err) {
+				return nil, fmt.Errorf("%w: %v", errOnPipelineCompletedUnsupportedPipelineIdentifierFilter, err)
+			}
+			return nil, err
+		}
+
+		if len(pageExecutions) == 0 {
+			break
+		}
+
+		// Harness responses are expected newest-first, but sort defensively.
+		slices.SortFunc(pageExecutions, func(a, b ExecutionSummary) int {
+			return -compareExecutionOrdering(a, b)
+		})
+
+		for _, execution := range pageExecutions {
+			if !isNewerExecution(metadata, execution) {
+				slices.SortFunc(executions, compareExecutionOrdering)
+				return executions, nil
+			}
+			executions = append(executions, execution)
+		}
+
+		if len(pageExecutions) < OnPipelineCompletedPollPageSize {
+			break
+		}
+	}
+
+	// Process oldest first to preserve event ordering.
+	slices.SortFunc(executions, compareExecutionOrdering)
+
+	return executions, nil
+}
+
+func (t *OnPipelineCompleted) processPolledExecution(
+	ctx core.TriggerActionContext,
+	config OnPipelineCompletedConfiguration,
+	execution ExecutionSummary,
+) error {
+	onPipelineCompletedCheckpointUpdateMu.Lock()
+	defer onPipelineCompletedCheckpointUpdateMu.Unlock()
+
+	metadata, err := decodeOnPipelineCompletedMetadata(ctx.Metadata.Get())
+	if err != nil {
+		return err
+	}
+	if !isNewerExecution(metadata, execution) {
+		return nil
+	}
+
+	status := canonicalStatus(execution.Status)
+	shouldEmit := isTerminalStatus(status)
+
+	pipelineScoped := strings.TrimSpace(config.PipelineIdentifier) != ""
+	if pipelineScoped && strings.TrimSpace(execution.PipelineIdentifier) != config.PipelineIdentifier {
+		shouldEmit = false
+	}
+	if len(config.Statuses) > 0 && !slices.Contains(config.Statuses, status) {
+		shouldEmit = false
+	}
+
+	// For pipeline-scoped mode, avoid polling terminal executions that just
+	// finished. Webhook delivery should win for near-real-time events.
+	if shouldEmit && pipelineScoped && isWithinPollRaceWindow(execution) {
+		return nil
+	}
+
+	if shouldEmit {
+		emittedPayload := map[string]any{
+			"executionId":        execution.ExecutionID,
+			"pipelineIdentifier": execution.PipelineIdentifier,
+			"status":             status,
+			"eventType":          "PipelineEnd",
+			"raw":                map[string]any{},
+		}
+
+		if err := ctx.Events.Emit(OnPipelineCompletedPayloadType, emittedPayload); err != nil {
+			return fmt.Errorf("failed to emit polled event: %w", err)
+		}
+	}
+
+	return t.updateCheckpointFromExecutionUnlocked(ctx.Metadata, execution)
+}
+
+func (t *OnPipelineCompleted) updateCheckpointFromExecutionUnlocked(
+	metadataCtx core.MetadataContext,
+	execution ExecutionSummary,
+) error {
+	if metadataCtx == nil {
+		return nil
+	}
+
+	metadata, err := decodeOnPipelineCompletedMetadata(metadataCtx.Get())
+	if err != nil {
+		return err
+	}
+
+	updated := updateCheckpoint(metadata, execution)
+	if updated.LastExecutionEnded == metadata.LastExecutionEnded &&
+		strings.TrimSpace(updated.LastExecutionID) == strings.TrimSpace(metadata.LastExecutionID) {
+		return nil
+	}
+
+	return metadataCtx.Set(updated)
+}
+
+func executionSummaryFromWebhookPayload(event pipelineWebhookEvent, payload map[string]any) ExecutionSummary {
+	return ExecutionSummary{
+		ExecutionID:        event.ExecutionID,
+		PipelineIdentifier: event.PipelineIdentifier,
+		Status:             event.Status,
+		PlanExecutionURL: firstNonEmpty(
+			findStringByPaths(payload,
+				[]string{"eventData", "executionUrl"},
+				[]string{"eventData", "planExecutionUrl"},
+				[]string{"data", "executionUrl"},
+				[]string{"data", "planExecutionUrl"},
+				[]string{"executionUrl"},
+				[]string{"planExecutionUrl"},
+			),
+		),
+		StartedAt: firstNonEmpty(
+			findStringByPaths(payload,
+				[]string{"eventData", "startTs"},
+				[]string{"data", "startTs"},
+				[]string{"startTs"},
+			),
+			findStringByPaths(payload,
+				[]string{"eventData", "startTime"},
+				[]string{"data", "startTime"},
+				[]string{"startTime"},
+				[]string{"timestamp"},
+			),
+		),
+		EndedAt: firstNonEmpty(
+			findStringByPaths(payload,
+				[]string{"eventData", "endTs"},
+				[]string{"data", "endTs"},
+				[]string{"endTs"},
+			),
+			findStringByPaths(payload,
+				[]string{"eventData", "endedAt"},
+				[]string{"data", "endedAt"},
+				[]string{"endedAt"},
+			),
+		),
+	}
+}
+
+func updateCheckpoint(metadata OnPipelineCompletedMetadata, execution ExecutionSummary) OnPipelineCompletedMetadata {
+	executionID := strings.TrimSpace(execution.ExecutionID)
+	if executionID == "" {
+		return metadata
+	}
+
+	ended := executionOrderingTimestamp(execution)
+	if ended == 0 {
+		// If webhook payload doesn't contain timestamps, keep the existing
+		// timestamp checkpoint and only advance execution ID to avoid drops.
+		if executionID != strings.TrimSpace(metadata.LastExecutionID) {
+			metadata.LastExecutionID = executionID
+		}
+		return metadata
+	}
+
+	if ended > metadata.LastExecutionEnded {
+		metadata.LastExecutionEnded = ended
+		metadata.LastExecutionID = executionID
+		return metadata
+	}
+
+	if ended == metadata.LastExecutionEnded &&
+		strings.Compare(executionID, strings.TrimSpace(metadata.LastExecutionID)) > 0 {
+		metadata.LastExecutionID = executionID
+	}
+
+	return metadata
+}
+
+func isNewerExecution(metadata OnPipelineCompletedMetadata, execution ExecutionSummary) bool {
+	executionID := strings.TrimSpace(execution.ExecutionID)
+	if executionID == "" {
+		return false
+	}
+
+	ended := executionOrderingTimestamp(execution)
+	if ended == 0 {
+		// Without timestamp we can only dedupe by execution ID.
+		return executionID != strings.TrimSpace(metadata.LastExecutionID)
+	}
+
+	if ended > metadata.LastExecutionEnded {
+		return true
+	}
+
+	if ended < metadata.LastExecutionEnded {
+		return false
+	}
+
+	return strings.Compare(executionID, strings.TrimSpace(metadata.LastExecutionID)) > 0
+}
+
+func executionOrderingTimestamp(execution ExecutionSummary) int64 {
+	ended := parseEpochMilliseconds(execution.EndedAt)
+	if ended > 0 {
+		return ended
+	}
+
+	started := parseEpochMilliseconds(execution.StartedAt)
+	if started > 0 {
+		return started
+	}
+
+	return 0
+}
+
+func parseEpochMilliseconds(value string) int64 {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return 0
+	}
+
+	number, err := strconv.ParseInt(trimmed, 10, 64)
+	if err != nil {
+		for _, layout := range parseEpochMillisecondsLayouts {
+			if parsedTime, parseErr := time.Parse(layout, trimmed); parseErr == nil {
+				return parsedTime.UnixMilli()
+			}
+		}
+		return 0
+	}
+
+	// Harness webhook payloads may send seconds while execution summaries commonly use milliseconds.
+	if number > 0 && number < 1_000_000_000_000 {
+		return number * 1000
+	}
+
+	return number
 }
 
 func (t *OnPipelineCompleted) Cleanup(ctx core.TriggerContext) error {
@@ -190,6 +675,16 @@ func decodeOnPipelineCompletedConfiguration(value any) (OnPipelineCompletedConfi
 	config := OnPipelineCompletedConfiguration{}
 	if err := mapstructure.Decode(value, &config); err != nil {
 		return OnPipelineCompletedConfiguration{}, fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	config.OrgID = strings.TrimSpace(config.OrgID)
+	if config.OrgID == "" {
+		return OnPipelineCompletedConfiguration{}, fmt.Errorf("orgId is required")
+	}
+
+	config.ProjectID = strings.TrimSpace(config.ProjectID)
+	if config.ProjectID == "" {
+		return OnPipelineCompletedConfiguration{}, fmt.Errorf("projectId is required")
 	}
 
 	config.PipelineIdentifier = strings.TrimSpace(config.PipelineIdentifier)
@@ -209,11 +704,11 @@ func normalizeSelectedStatuses(statuses []string) []string {
 			continue
 		}
 
-		if !contains(onPipelineCompletedAllowedStatuses, normalized) {
+		if !slices.Contains(onPipelineCompletedAllowedStatuses, normalized) {
 			continue
 		}
 
-		if contains(selected, normalized) {
+		if slices.Contains(selected, normalized) {
 			continue
 		}
 
@@ -223,36 +718,19 @@ func normalizeSelectedStatuses(statuses []string) []string {
 	return selected
 }
 
-func contains(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
-}
-
 func statusSelected(selected []string, currentStatus string) bool {
 	normalized := canonicalStatus(currentStatus)
 	if normalized == "" {
 		return false
 	}
 
-	return contains(selected, normalized)
+	return slices.Contains(selected, normalized)
 }
 
 func authorizeWebhook(ctx core.WebhookRequestContext) error {
-	if ctx.Integration == nil {
-		return nil
-	}
-
-	secret, err := optionalConfig(ctx.Integration, "webhookSecret")
+	secret, err := readWebhookSecret(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to read webhookSecret: %w", err)
-	}
-
-	if secret == "" {
-		return nil
+		return err
 	}
 
 	candidateTokens := []string{}
@@ -277,4 +755,66 @@ func authorizeWebhook(ctx core.WebhookRequestContext) error {
 	}
 
 	return fmt.Errorf("invalid webhook authorization")
+}
+
+func readWebhookSecret(ctx core.WebhookRequestContext) (string, error) {
+	if ctx.Webhook == nil {
+		return "", fmt.Errorf("webhook context is required")
+	}
+
+	secretBytes, err := ctx.Webhook.GetSecret()
+	if err != nil {
+		return "", fmt.Errorf("failed to read webhook secret: %w", err)
+	}
+
+	secret := strings.TrimSpace(string(secretBytes))
+	if secret == "" {
+		return "", fmt.Errorf("webhook secret is not configured")
+	}
+
+	return secret, nil
+}
+
+func decodeOnPipelineCompletedMetadata(value any) (OnPipelineCompletedMetadata, error) {
+	metadata := OnPipelineCompletedMetadata{}
+	if err := mapstructure.Decode(value, &metadata); err != nil {
+		return OnPipelineCompletedMetadata{}, fmt.Errorf("failed to decode metadata: %w", err)
+	}
+	return metadata, nil
+}
+
+func compareExecutionOrdering(a, b ExecutionSummary) int {
+	aTimestamp := executionOrderingTimestamp(a)
+	bTimestamp := executionOrderingTimestamp(b)
+	switch {
+	case aTimestamp > bTimestamp:
+		return 1
+	case aTimestamp < bTimestamp:
+		return -1
+	default:
+		return strings.Compare(strings.TrimSpace(a.ExecutionID), strings.TrimSpace(b.ExecutionID))
+	}
+}
+
+func isWithinPollRaceWindow(execution ExecutionSummary) bool {
+	ended := executionOrderingTimestamp(execution)
+	if ended <= 0 {
+		return false
+	}
+
+	now := time.Now().UnixMilli()
+	threshold := int64(OnPipelineCompletedPollRaceWindow / time.Millisecond)
+	return now-ended < threshold
+}
+
+func scheduleOnPipelineCompletedPoll(requests core.RequestContext) error {
+	if requests == nil {
+		return nil
+	}
+
+	return requests.ScheduleActionCall(
+		OnPipelineCompletedPollAction,
+		map[string]any{},
+		OnPipelineCompletedPollInterval,
+	)
 }

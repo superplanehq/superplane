@@ -4,28 +4,21 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 func init() {
-	registry.RegisterIntegration("harness", &Harness{})
+	registry.RegisterIntegrationWithWebhookHandler("harness", &Harness{}, &HarnessWebhookHandler{})
 }
 
 type Harness struct{}
 
 type Configuration struct {
-	APIToken      string `json:"apiToken" mapstructure:"apiToken"`
-	AccountID     string `json:"accountId" mapstructure:"accountId"`
-	OrgID         string `json:"orgId" mapstructure:"orgId"`
-	ProjectID     string `json:"projectId" mapstructure:"projectId"`
-	BaseURL       string `json:"baseURL" mapstructure:"baseURL"`
-	WebhookSecret string `json:"webhookSecret" mapstructure:"webhookSecret"`
+	APIToken string `json:"apiToken" mapstructure:"apiToken"`
+	BaseURL  string `json:"baseURL" mapstructure:"baseURL"`
 }
-
-type Metadata struct{}
 
 func (h *Harness) Name() string {
 	return "harness"
@@ -45,9 +38,9 @@ func (h *Harness) Description() string {
 
 func (h *Harness) Instructions() string {
 	return `1. **Create API key:** In Harness, create a service-account API key with permission to run and read pipeline executions.
-2. **Scope fields:** Enter **Account ID**, and optionally **Org ID** and **Project ID** for scoped APIs (**Project ID** requires **Org ID**).
-3. **Webhook Secret (optional but recommended):** Set a secret token and configure Harness webhook notifications to send it in an Authorization Bearer header.
-4. **Trigger setup:** After adding the On Pipeline Completed trigger, copy the generated SuperPlane webhook URL from trigger metadata into a Harness notification webhook.
+2. **Connect once, then configure nodes:** Scope fields (**Org**, **Project**, **Pipeline**) are selected in each Harness node.
+3. **Account ID is automatic:** SuperPlane resolves account scope from your API key.
+4. **Trigger notifications are automatic:** For **On Pipeline Completed** with a selected **Pipeline**, SuperPlane provisions a pipeline notification rule for you.
 5. **Auth method:** SuperPlane calls Harness APIs with ` + "`x-api-key: <token>`" + ` against ` + "`https://app.harness.io/gateway`" + ` unless overridden by Base URL.`
 }
 
@@ -62,42 +55,14 @@ func (h *Harness) Configuration() []configuration.Field {
 			Description: "Harness API key used for API calls",
 		},
 		{
-			Name:        "accountId",
-			Label:       "Account ID",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "Harness account identifier",
-		},
-		{
-			Name:        "orgId",
-			Label:       "Org ID",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Optional Harness organization identifier",
-		},
-		{
-			Name:        "projectId",
-			Label:       "Project ID",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Optional Harness project identifier (requires Org ID)",
-		},
-		{
 			Name:        "baseURL",
 			Label:       "Base URL",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
+			Togglable:   true,
 			Default:     DefaultBaseURL,
 			Placeholder: "https://app.harness.io/gateway",
-			Description: "Harness API gateway base URL",
-		},
-		{
-			Name:        "webhookSecret",
-			Label:       "Webhook Secret",
-			Type:        configuration.FieldTypeString,
-			Sensitive:   true,
-			Required:    false,
-			Description: "Optional shared secret expected in incoming Harness webhook requests",
+			Description: "Override only for custom or self-hosted Harness gateways",
 		},
 	}
 }
@@ -119,16 +84,6 @@ func (h *Harness) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (h *Harness) Sync(ctx core.SyncContext) error {
-	config := Configuration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-
-	config.AccountID = strings.TrimSpace(config.AccountID)
-	if config.AccountID == "" {
-		return fmt.Errorf("accountId is required")
-	}
-
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
@@ -138,7 +93,6 @@ func (h *Harness) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to verify Harness credentials: %w", err)
 	}
 
-	ctx.Integration.SetMetadata(Metadata{})
 	ctx.Integration.Ready()
 	return nil
 }
@@ -148,7 +102,9 @@ func (h *Harness) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (h *Harness) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != ResourceTypePipeline {
+	if resourceType != ResourceTypeOrg &&
+		resourceType != ResourceTypeProject &&
+		resourceType != ResourceTypePipeline {
 		return []core.IntegrationResource{}, nil
 	}
 
@@ -157,30 +113,81 @@ func (h *Harness) ListResources(resourceType string, ctx core.ListResourcesConte
 		return nil, err
 	}
 
-	pipelines, err := client.ListPipelines()
-	if err != nil {
-		return nil, err
-	}
-
-	resources := make([]core.IntegrationResource, 0, len(pipelines))
-	for _, pipeline := range pipelines {
-		if strings.TrimSpace(pipeline.Identifier) == "" {
-			continue
+	switch resourceType {
+	case ResourceTypeOrg:
+		organizations, err := client.ListOrganizations()
+		if err != nil {
+			return nil, err
+		}
+		resources := make([]core.IntegrationResource, 0, len(organizations))
+		for _, organization := range organizations {
+			if strings.TrimSpace(organization.Identifier) == "" {
+				continue
+			}
+			name := firstNonEmpty(strings.TrimSpace(organization.Name), organization.Identifier)
+			resources = append(resources, core.IntegrationResource{
+				Type: ResourceTypeOrg,
+				Name: name,
+				ID:   organization.Identifier,
+			})
+		}
+		return resources, nil
+	case ResourceTypeProject:
+		orgID := strings.TrimSpace(ctx.Parameters["orgId"])
+		if orgID == "" {
+			return []core.IntegrationResource{}, nil
+		}
+		projects, err := client.ListProjects(orgID)
+		if err != nil {
+			return nil, err
+		}
+		resources := make([]core.IntegrationResource, 0, len(projects))
+		for _, project := range projects {
+			if strings.TrimSpace(project.Identifier) == "" {
+				continue
+			}
+			name := firstNonEmpty(strings.TrimSpace(project.Name), project.Identifier)
+			resources = append(resources, core.IntegrationResource{
+				Type: ResourceTypeProject,
+				Name: name,
+				ID:   project.Identifier,
+			})
+		}
+		return resources, nil
+	case ResourceTypePipeline:
+		orgID := strings.TrimSpace(ctx.Parameters["orgId"])
+		projectID := strings.TrimSpace(ctx.Parameters["projectId"])
+		if orgID == "" || projectID == "" {
+			return []core.IntegrationResource{}, nil
 		}
 
-		name := strings.TrimSpace(pipeline.Name)
-		if name == "" {
-			name = pipeline.Identifier
+		scopedClient := client.withScope(orgID, projectID)
+		pipelines, err := scopedClient.ListPipelines()
+		if err != nil {
+			return nil, err
 		}
 
-		resources = append(resources, core.IntegrationResource{
-			Type: ResourceTypePipeline,
-			Name: name,
-			ID:   pipeline.Identifier,
-		})
+		resources := make([]core.IntegrationResource, 0, len(pipelines))
+		for _, pipeline := range pipelines {
+			if strings.TrimSpace(pipeline.Identifier) == "" {
+				continue
+			}
+
+			name := strings.TrimSpace(pipeline.Name)
+			if name == "" {
+				name = pipeline.Identifier
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: ResourceTypePipeline,
+				Name: name,
+				ID:   pipeline.Identifier,
+			})
+		}
+		return resources, nil
 	}
 
-	return resources, nil
+	return []core.IntegrationResource{}, nil
 }
 
 func (h *Harness) Actions() []core.Action {

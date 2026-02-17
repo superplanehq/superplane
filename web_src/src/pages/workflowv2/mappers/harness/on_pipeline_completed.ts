@@ -6,7 +6,6 @@ import { formatTimeAgo } from "@/utils/date";
 
 interface OnPipelineCompletedMetadata {
   pipelineIdentifier?: string;
-  webhookUrl?: string;
 }
 
 interface OnPipelineCompletedEventData {
@@ -42,15 +41,11 @@ export const onPipelineCompletedTriggerRenderer: TriggerRenderer = {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as OnPipelineCompletedMetadata;
     const configuration = node.configuration as { pipelineIdentifier?: string };
-    const metadataItems = [];
+    const metadataItems: TriggerProps["metadata"] = [];
 
     const pipelineLabel = metadata?.pipelineIdentifier || configuration?.pipelineIdentifier;
     if (pipelineLabel) {
       metadataItems.push({ icon: "workflow", label: pipelineLabel });
-    }
-
-    if (metadata?.webhookUrl) {
-      metadataItems.push({ icon: "link", label: "Webhook configured" });
     }
 
     const props: TriggerProps = {

@@ -1,7 +1,9 @@
 package harness
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -23,6 +25,8 @@ const (
 type RunPipeline struct{}
 
 type RunPipelineSpec struct {
+	OrgID              string   `json:"orgId" mapstructure:"orgId"`
+	ProjectID          string   `json:"projectId" mapstructure:"projectId"`
 	PipelineIdentifier string   `json:"pipelineIdentifier" mapstructure:"pipelineIdentifier"`
 	Ref                string   `json:"ref" mapstructure:"ref"`
 	InputSetReferences []string `json:"inputSetReferences" mapstructure:"inputSetReferences"`
@@ -30,6 +34,8 @@ type RunPipelineSpec struct {
 }
 
 type RunPipelineExecutionMetadata struct {
+	OrgID              string `json:"orgId" mapstructure:"orgId"`
+	ProjectID          string `json:"projectId" mapstructure:"projectId"`
 	ExecutionID        string `json:"executionId" mapstructure:"executionId"`
 	PipelineIdentifier string `json:"pipelineIdentifier" mapstructure:"pipelineIdentifier"`
 	Status             string `json:"status" mapstructure:"status"`
@@ -64,13 +70,15 @@ func (r *RunPipeline) Documentation() string {
 
 1. Starts a Harness pipeline execution
 2. Stores the execution ID in node execution state
-3. Polls execution summary until a terminal status is reached
+3. Watches execution completion via webhook (with polling fallback)
 4. Routes output to:
    - **Success** when execution succeeds
    - **Failed** when execution fails, aborts, or expires
 
 ## Configuration
 
+- **Org**: Harness organization identifier
+- **Project**: Harness project identifier
 - **Pipeline**: Harness pipeline identifier
 - **Ref**: Optional git ref (` + "`refs/heads/main`" + ` or ` + "`refs/tags/v1.2.3`" + `)
 - **Input Set References**: Optional input set identifiers
@@ -95,31 +103,69 @@ func (r *RunPipeline) OutputChannels(configuration any) []core.OutputChannel {
 func (r *RunPipeline) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "pipelineIdentifier",
-			Label:       "Pipeline",
+			Name:        "orgId",
+			Label:       "Organization",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "Harness pipeline identifier",
+			Description: "Select Harness organization",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: ResourceTypePipeline,
+					Type: ResourceTypeOrg,
 				},
 			},
 		},
 		{
-			Name:        "ref",
-			Label:       "Ref",
-			Type:        configuration.FieldTypeGitRef,
-			Required:    false,
-			Default:     "refs/heads/main",
-			Description: "Optional branch or tag ref",
+			Name:        "projectId",
+			Label:       "Project",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "Select Harness project",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeProject,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "orgId",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "orgId",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:        "pipelineIdentifier",
+			Label:       "Pipeline",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "Select the pipeline to run",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypePipeline,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "orgId",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "orgId",
+							},
+						},
+						{
+							Name: "projectId",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "projectId",
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "inputSetReferences",
 			Label:       "Input Set References",
 			Type:        configuration.FieldTypeList,
 			Required:    false,
-			Description: "Optional Harness input set references",
+			Description: "Optional Harness input sets to apply",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel:      "Input Set",
@@ -128,10 +174,20 @@ func (r *RunPipeline) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "ref",
+			Label:       "Ref",
+			Type:        configuration.FieldTypeGitRef,
+			Required:    false,
+			Togglable:   true,
+			Default:     "refs/heads/main",
+			Description: "Optional branch or tag to run against",
+		},
+		{
 			Name:        "inputYAML",
 			Label:       "Runtime Input YAML",
 			Type:        configuration.FieldTypeText,
 			Required:    false,
+			Togglable:   true,
 			Description: "Optional runtime input YAML override",
 		},
 	}
@@ -142,8 +198,27 @@ func (r *RunPipeline) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 }
 
 func (r *RunPipeline) Setup(ctx core.SetupContext) error {
-	_, err := decodeRunPipelineSpec(ctx.Configuration)
-	return err
+	spec, err := decodeRunPipelineSpec(ctx.Configuration)
+	if err != nil {
+		return err
+	}
+
+	if ctx.Integration == nil {
+		return nil
+	}
+
+	if err := ctx.Integration.RequestWebhook(WebhookConfiguration{
+		PipelineIdentifier: spec.PipelineIdentifier,
+		OrgID:              spec.OrgID,
+		ProjectID:          spec.ProjectID,
+		EventTypes:         defaultWebhookEventTypes,
+	}); err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("failed to request Harness webhook provisioning, using polling fallback: %v", err)
+		}
+	}
+
+	return nil
 }
 
 func (r *RunPipeline) Execute(ctx core.ExecutionContext) error {
@@ -156,6 +231,7 @@ func (r *RunPipeline) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
+	client = client.withScope(spec.OrgID, spec.ProjectID)
 
 	response, err := client.RunPipeline(RunPipelineRequest{
 		PipelineIdentifier: spec.PipelineIdentifier,
@@ -168,6 +244,8 @@ func (r *RunPipeline) Execute(ctx core.ExecutionContext) error {
 	}
 
 	metadata := RunPipelineExecutionMetadata{
+		OrgID:              spec.OrgID,
+		ProjectID:          spec.ProjectID,
 		ExecutionID:        response.ExecutionID,
 		PipelineIdentifier: spec.PipelineIdentifier,
 		Status:             "running",
@@ -210,11 +288,18 @@ func (r *RunPipeline) poll(ctx core.ActionContext) error {
 	if strings.TrimSpace(metadata.ExecutionID) == "" {
 		return fmt.Errorf("execution ID is missing from metadata")
 	}
+	spec, err := decodeRunPipelineSpec(ctx.Configuration)
+	if err != nil {
+		return err
+	}
+	metadata.OrgID = firstNonEmpty(metadata.OrgID, spec.OrgID)
+	metadata.ProjectID = firstNonEmpty(metadata.ProjectID, spec.ProjectID)
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}
+	client = client.withScope(metadata.OrgID, metadata.ProjectID)
 
 	summary, err := client.GetExecutionSummary(metadata.ExecutionID)
 	if err != nil {
@@ -258,24 +343,73 @@ func (r *RunPipeline) poll(ctx core.ActionContext) error {
 		return ctx.Requests.ScheduleActionCall(RunPipelinePollAction, map[string]any{}, RunPipelinePollInterval)
 	}
 
-	payload := map[string]any{
-		"executionId":        metadata.ExecutionID,
-		"pipelineIdentifier": metadata.PipelineIdentifier,
-		"status":             canonicalStatus(summary.Status),
-		"planExecutionUrl":   metadata.PlanExecutionURL,
-		"startedAt":          metadata.StartedAt,
-		"endedAt":            metadata.EndedAt,
-	}
-
-	if isSuccessStatus(summary.Status) {
-		return ctx.ExecutionState.Emit(RunPipelineSuccess, RunPipelinePayloadType, []any{payload})
-	}
-
-	return ctx.ExecutionState.Emit(RunPipelineFailed, RunPipelinePayloadType, []any{payload})
+	return r.emitResult(ctx.ExecutionState, metadata, summary.Status, nil)
 }
 
 func (r *RunPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, error) {
-	return 200, nil
+	if err := authorizeWebhook(ctx); err != nil {
+		return http.StatusForbidden, err
+	}
+
+	if ctx.FindExecutionByKV == nil {
+		return http.StatusOK, nil
+	}
+
+	payload := map[string]any{}
+	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
+		return http.StatusBadRequest, fmt.Errorf("failed to parse webhook payload: %w", err)
+	}
+
+	event := extractPipelineWebhookEvent(payload)
+	if !isPipelineCompletedEventType(event.EventType) {
+		return http.StatusOK, nil
+	}
+
+	if !isTerminalStatus(event.Status) {
+		return http.StatusOK, nil
+	}
+
+	executionID := strings.TrimSpace(event.ExecutionID)
+	if executionID == "" {
+		return http.StatusOK, nil
+	}
+
+	executionCtx, err := ctx.FindExecutionByKV("execution", executionID)
+	if err != nil {
+		// Ignore unrelated webhook events for executions not created by SuperPlane.
+		return http.StatusOK, nil
+	}
+
+	if executionCtx.ExecutionState != nil && executionCtx.ExecutionState.IsFinished() {
+		return http.StatusOK, nil
+	}
+	if executionCtx.Metadata == nil {
+		return http.StatusInternalServerError, fmt.Errorf("missing metadata context")
+	}
+
+	metadata := RunPipelineExecutionMetadata{}
+	if err := mapstructure.Decode(executionCtx.Metadata.Get(), &metadata); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	webhookSummary := executionSummaryFromWebhookPayload(event, payload)
+	metadata.ExecutionID = firstNonEmpty(strings.TrimSpace(metadata.ExecutionID), webhookSummary.ExecutionID)
+	metadata.PipelineIdentifier = firstNonEmpty(strings.TrimSpace(metadata.PipelineIdentifier), webhookSummary.PipelineIdentifier)
+	metadata.Status = firstNonEmpty(strings.TrimSpace(webhookSummary.Status), metadata.Status)
+	metadata.PlanExecutionURL = firstNonEmpty(strings.TrimSpace(webhookSummary.PlanExecutionURL), metadata.PlanExecutionURL)
+	metadata.StartedAt = firstNonEmpty(strings.TrimSpace(webhookSummary.StartedAt), metadata.StartedAt)
+	metadata.EndedAt = firstNonEmpty(strings.TrimSpace(webhookSummary.EndedAt), metadata.EndedAt)
+	metadata.PollErrorCount = 0
+
+	if err := executionCtx.Metadata.Set(metadata); err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to update metadata: %w", err)
+	}
+
+	if err := r.emitResult(executionCtx.ExecutionState, metadata, metadata.Status, payload); err != nil {
+		return http.StatusInternalServerError, err
+	}
+
+	return http.StatusOK, nil
 }
 
 func (r *RunPipeline) Cancel(ctx core.ExecutionContext) error {
@@ -290,6 +424,16 @@ func decodeRunPipelineSpec(value any) (RunPipelineSpec, error) {
 	spec := RunPipelineSpec{}
 	if err := mapstructure.Decode(value, &spec); err != nil {
 		return RunPipelineSpec{}, fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	spec.OrgID = strings.TrimSpace(spec.OrgID)
+	if spec.OrgID == "" {
+		return RunPipelineSpec{}, fmt.Errorf("orgId is required")
+	}
+
+	spec.ProjectID = strings.TrimSpace(spec.ProjectID)
+	if spec.ProjectID == "" {
+		return RunPipelineSpec{}, fmt.Errorf("projectId is required")
 	}
 
 	spec.PipelineIdentifier = strings.TrimSpace(spec.PipelineIdentifier)
@@ -311,4 +455,34 @@ func decodeRunPipelineSpec(value any) (RunPipelineSpec, error) {
 	spec.InputSetReferences = filtered
 
 	return spec, nil
+}
+
+func (r *RunPipeline) emitResult(
+	executionState core.ExecutionStateContext,
+	metadata RunPipelineExecutionMetadata,
+	status string,
+	raw map[string]any,
+) error {
+	if executionState == nil {
+		return fmt.Errorf("missing execution state context")
+	}
+
+	payload := map[string]any{
+		"executionId":        metadata.ExecutionID,
+		"pipelineIdentifier": metadata.PipelineIdentifier,
+		"status":             canonicalStatus(status),
+		"planExecutionUrl":   metadata.PlanExecutionURL,
+		"startedAt":          metadata.StartedAt,
+		"endedAt":            metadata.EndedAt,
+	}
+	if raw != nil {
+		payload["raw"] = raw
+	}
+
+	channel := RunPipelineFailed
+	if isSuccessStatus(status) {
+		channel = RunPipelineSuccess
+	}
+
+	return executionState.Emit(channel, RunPipelinePayloadType, []any{payload})
 }
