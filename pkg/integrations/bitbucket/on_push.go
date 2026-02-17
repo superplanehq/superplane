@@ -106,13 +106,14 @@ func (p *OnPush) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if err := ensureRepoInMetadata(ctx.Metadata, ctx.Integration, config.Repository); err != nil {
+	repo, err := ensureRepoInMetadata(ctx.HTTP, ctx.Metadata, ctx.Integration, config.Repository)
+	if err != nil {
 		return err
 	}
 
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		EventType:  "repo:push",
-		Repository: config.Repository,
+		EventType:      "repo:push",
+		RepositorySlug: repo.Slug,
 	})
 }
 

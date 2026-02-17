@@ -2,16 +2,14 @@ package bitbucket
 
 import (
 	"fmt"
-	"slices"
-	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 type WebhookConfiguration struct {
-	EventType  string `json:"eventType"`
-	Repository string `json:"repository"`
+	EventType      string `json:"eventType"`
+	RepositorySlug string `json:"repositorySlug"`
 }
 
 type BitbucketWebhook struct {
@@ -19,16 +17,6 @@ type BitbucketWebhook struct {
 }
 
 type BitbucketWebhookHandler struct{}
-
-// repoSlug extracts the repo slug from a full repository name.
-// e.g. "superplane/test" -> "test", "test" -> "test"
-func repoSlug(fullName string) string {
-	parts := strings.Split(fullName, "/")
-	if len(parts) > 1 {
-		return parts[len(parts)-1]
-	}
-	return fullName
-}
 
 func (h *BitbucketWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	configA := WebhookConfiguration{}
@@ -44,7 +32,7 @@ func (h *BitbucketWebhookHandler) CompareConfig(a, b any) (bool, error) {
 		return false, err
 	}
 
-	if configA.Repository != configB.Repository {
+	if configA.RepositorySlug != configB.RepositorySlug {
 		return false, nil
 	}
 
@@ -66,7 +54,7 @@ func (h *BitbucketWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, er
 		return nil, fmt.Errorf("failed to decode integration metadata: %w", err)
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	client, err := NewClient(metadata.AuthType, ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
@@ -77,25 +65,8 @@ func (h *BitbucketWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, er
 		return nil, fmt.Errorf("failed to decode webhook configuration: %w", err)
 	}
 
-	if config.Repository == "" {
+	if config.RepositorySlug == "" {
 		return nil, fmt.Errorf("repository is required")
-	}
-
-	workspace := metadata.Workspace
-	if workspace == "" {
-		workspaceBytes, err := ctx.Integration.GetConfig("workspace")
-		if err != nil {
-			return nil, fmt.Errorf("failed to get workspace config: %w", err)
-		}
-		workspace = string(workspaceBytes)
-	}
-	if workspace == "" {
-		return nil, fmt.Errorf("workspace is required")
-	}
-
-	repoSlugValue, err := resolveRepositorySlug(metadata.Repositories, config.Repository)
-	if err != nil {
-		return nil, err
 	}
 
 	secret, err := ctx.Webhook.GetSecret()
@@ -104,8 +75,8 @@ func (h *BitbucketWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, er
 	}
 
 	hook, err := client.CreateWebhook(
-		workspace,
-		repoSlugValue,
+		metadata.Workspace.Slug,
+		config.RepositorySlug,
 		ctx.Webhook.GetURL(),
 		string(secret),
 		[]string{config.EventType},
@@ -125,7 +96,7 @@ func (h *BitbucketWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error 
 		return fmt.Errorf("failed to decode integration metadata: %w", err)
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	client, err := NewClient(metadata.AuthType, ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -147,53 +118,10 @@ func (h *BitbucketWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error 
 		return fmt.Errorf("failed to decode webhook configuration: %w", err)
 	}
 
-	workspace := metadata.Workspace
-	if workspace == "" {
-		workspaceBytes, err := ctx.Integration.GetConfig("workspace")
-		if err != nil {
-			return fmt.Errorf("failed to get workspace config: %w", err)
-		}
-		workspace = string(workspaceBytes)
-	}
-	if workspace == "" {
-		return fmt.Errorf("workspace is required")
-	}
-
-	repoSlugValue, err := resolveRepositorySlug(metadata.Repositories, config.Repository)
-	if err != nil {
-		return err
-	}
-
-	err = client.DeleteWebhook(workspace, repoSlugValue, webhook.UUID)
+	err = client.DeleteWebhook(metadata.Workspace.Slug, config.RepositorySlug, webhook.UUID)
 	if err != nil {
 		return fmt.Errorf("error deleting webhook: %w", err)
 	}
 
 	return nil
-}
-
-func resolveRepositorySlug(repositories []Repository, repository string) (string, error) {
-	if repository == "" {
-		return "", fmt.Errorf("repository is required")
-	}
-
-	repoIndex := slices.IndexFunc(repositories, func(r Repository) bool {
-		return repositoryMatches(r, repository)
-	})
-	if repoIndex == -1 {
-		return "", fmt.Errorf("repository %s is not accessible to workspace", repository)
-	}
-
-	repo := repositories[repoIndex]
-	if repo.Slug != "" {
-		return repo.Slug, nil
-	}
-	if repo.FullName != "" {
-		return repoSlug(repo.FullName), nil
-	}
-	if repo.Name != "" {
-		return repo.Name, nil
-	}
-
-	return repoSlug(repository), nil
 }
