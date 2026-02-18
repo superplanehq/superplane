@@ -1,0 +1,131 @@
+---
+title: "OpenCost"
+---
+
+Monitor Kubernetes cost allocation with OpenCost
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="Cost Exceeds Threshold" href="#cost-exceeds-threshold" description="Trigger when OpenCost allocation exceeds a cost threshold" />
+</CardGrid>
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Get Cost Allocation" href="#get-cost-allocation" description="Fetch cost allocation data from OpenCost" />
+</CardGrid>
+
+## Instructions
+
+### Connection
+
+Configure this integration with:
+- **OpenCost API URL**: URL of your OpenCost API server (e.g., `http://opencost.example.com:9003`)
+- **API Auth**: `none`, `basic`, or `bearer` depending on how your OpenCost instance is secured
+
+### Finding the OpenCost API URL
+
+If OpenCost is running in Kubernetes, you can port-forward:
+```
+kubectl port-forward -n opencost svc/opencost 9003:9003
+```
+
+Then use `http://localhost:9003` as the base URL.
+
+For production, use the externally accessible URL of your OpenCost API.
+
+<a id="cost-exceeds-threshold"></a>
+
+## Cost Exceeds Threshold
+
+The Cost Exceeds Threshold trigger starts a workflow execution when the total cost for any allocation item exceeds the configured threshold.
+
+### What this trigger does
+
+- Periodically polls the OpenCost allocation API
+- Compares the total cost of each allocation item against the threshold
+- Emits one event per allocation item that exceeds the threshold as `opencost.costAllocation`
+
+### Configuration
+
+- **Window**: Time window for the allocation query (e.g., 1h, 1d, 7d)
+- **Aggregate**: How to group cost data (namespace, cluster, controller, service, deployment)
+- **Threshold**: Cost value (USD) that triggers the event
+- **Filter** (optional): Only emit events for allocation items matching this name
+
+### Use Cases
+
+- Notify a Slack channel when a namespace's daily cost exceeds $50
+- Create a Jira ticket when cluster costs spike above a threshold
+- Trigger an automated scaling workflow when spend is too high
+
+### Example Data
+
+```json
+{
+  "data": {
+    "aggregate": "namespace",
+    "cpuCost": 28.45,
+    "end": "2026-02-18T00:00:00Z",
+    "gpuCost": 0,
+    "name": "production",
+    "networkCost": 2.12,
+    "pvCost": 5.67,
+    "ramCost": 18.32,
+    "start": "2026-02-17T00:00:00Z",
+    "threshold": 50,
+    "totalCost": 54.56,
+    "window": "1d"
+  },
+  "timestamp": "2026-02-18T09:05:00.000Z",
+  "type": "opencost.costAllocation"
+}
+```
+
+<a id="get-cost-allocation"></a>
+
+## Get Cost Allocation
+
+The Get Cost Allocation component fetches cost allocation data from the OpenCost API.
+
+### Configuration
+
+- **Window**: Time window for the allocation query (e.g., 1h, 1d, 7d)
+- **Aggregate By**: How to group cost data (namespace, cluster, controller, service, deployment)
+- **Filter** (optional): Only return allocation items matching this name
+
+### Output
+
+Emits `opencost.costAllocation` payloads with cost breakdown fields including cpuCost, gpuCost, ramCost, pvCost, networkCost, and totalCost.
+
+### Use Cases
+
+- Post a daily cost report to Slack grouped by namespace
+- Feed cost data into a workflow that compares spend over time
+- Generate periodic cost reports for specific services
+
+### Example Output
+
+```json
+{
+  "data": {
+    "aggregate": "namespace",
+    "cpuCost": 28.45,
+    "end": "2026-02-18T00:00:00Z",
+    "gpuCost": 0,
+    "name": "production",
+    "networkCost": 2.12,
+    "pvCost": 5.67,
+    "ramCost": 18.32,
+    "start": "2026-02-17T00:00:00Z",
+    "totalCost": 54.56,
+    "window": "1d"
+  },
+  "timestamp": "2026-02-18T09:05:00.000Z",
+  "type": "opencost.costAllocation"
+}
+```
+

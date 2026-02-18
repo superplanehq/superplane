@@ -48,6 +48,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/hetzner"
 	_ "github.com/superplanehq/superplane/pkg/integrations/jira"
 	_ "github.com/superplanehq/superplane/pkg/integrations/openai"
+	_ "github.com/superplanehq/superplane/pkg/integrations/opencost"
 	_ "github.com/superplanehq/superplane/pkg/integrations/pagerduty"
 	_ "github.com/superplanehq/superplane/pkg/integrations/prometheus"
 	_ "github.com/superplanehq/superplane/pkg/integrations/render"
